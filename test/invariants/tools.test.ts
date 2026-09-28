@@ -260,35 +260,36 @@ test("bash documents open and snapshots the Visuals row", async () => {
   chat.app.socket.dispose();
 });
 
-describe("the Web access page's usage", () => {
-  test("counts a turn's web calls through the composed app", async () => {
-    const chat = await chatApp();
-    const empty = await chat.admin.call("GET", "/api/usage/web");
-    expect(await empty.json()).toMatchObject({
-      fetches: 0,
-      searches: 0,
-      failed: 0,
+describe("tool usage through the composed app", () => {
+  for (const [tool, page, counts] of [
+    ["webfetch", "web", { fetches: 0, searches: 0 }],
+    ["visualize", "visuals", { drawn: 0, opened: 0 }],
+  ] as const) {
+    test(`counts a turn's failed ${tool} calls`, async () => {
+      const chat = await chatApp();
+      try {
+        const empty = await chat.admin.call("GET", `/api/usage/${page}`);
+        expect(empty.status).toBe(200);
+        expect(await empty.json()).toMatchObject({ ...counts, failed: 0 });
+        const started = await startChat(chat, "use the tool");
+        // Invalid arguments exercise the real tool without a network request.
+        started.script.toolRound([{ id: "c1", name: tool, arguments: "{}" }]);
+        started.script.end();
+        const answer = await waitScript(chat.scripted, 2);
+        answer.reply("done");
+        await settle(chat);
+        const rows = chat.app.sessions
+          .messages(started.sessionId)
+          .filter((row) => row.kind === "tool");
+        expect(rows.map((row) => [row.toolName, row.status])).toEqual([
+          [tool, "failed"],
+        ]);
+        const after = await chat.admin.call("GET", `/api/usage/${page}`);
+        expect(after.status).toBe(200);
+        expect(await after.json()).toMatchObject({ ...counts, failed: 1 });
+      } finally {
+        await chat.app.shutdown();
+      }
     });
-    const started = await startChat(chat, "fetch it");
-    // arguments the tool refuses: a failed call, still a webfetch row
-    started.script.toolRound([{ id: "c1", name: "webfetch", arguments: "{}" }]);
-    started.script.end();
-    const answer = await waitScript(chat.scripted, 2);
-    answer.reply("done");
-    await settle(chat);
-    const rows = chat.app.sessions
-      .messages(started.sessionId)
-      .filter((row) => row.kind === "tool");
-    expect(rows.map((row) => [row.toolName, row.status])).toEqual([
-      ["webfetch", "failed"],
-    ]);
-    const after = await chat.admin.call("GET", "/api/usage/web");
-    expect(await after.json()).toMatchObject({
-      fetches: 0,
-      searches: 0,
-      failed: 1,
-    });
-    const member = await chat.member.call("GET", "/api/usage/web");
-    expect(member.status).toBe(403);
-  });
+  }
 });

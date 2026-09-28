@@ -37,6 +37,7 @@ import {
   startChat,
   waitScript,
 } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
 type StoredMessage = Omit<RawMessage, "prompt_tokens"> & {
   reasoning_details: string | null;
@@ -93,22 +94,6 @@ async function detail(
   const response = await client.call("GET", `/api/sessions/${sessionId}`);
   expect(response.status).toBe(200);
   return response.json();
-}
-
-async function teamProject(chat: ChatApp): Promise<string> {
-  const response = await chat.admin.call("POST", "/api/projects", {
-    body: { name: "fork-team", description: "A team project." },
-  });
-  expect(response.status).toBe(201);
-  const { project } = await response.json();
-  expect(
-    (
-      await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
-        body: { userId: chat.memberId },
-      })
-    ).status,
-  ).toBe(201);
-  return project.id;
 }
 
 function expectCopy(
@@ -749,7 +734,9 @@ describe("POST /api/sessions/:id/fork", () => {
   test("a team member forks another author's tools onto another agent and owns the result", async () => {
     const chat = await chatApp();
     try {
-      const projectId = await teamProject(chat);
+      const projectId = (
+        await createTeam(chat.admin, "fork-team", [chat.memberId])
+      ).id;
       const picked = await chat.makeAgent({
         name: "reviewer",
         model: NO_TOOLS,
@@ -854,7 +841,9 @@ describe("POST /api/sessions/:id/fork", () => {
   test("a run fork keeps its outcome but never its memory phase or automation identity", async () => {
     const chat = await chatApp();
     try {
-      const projectId = await teamProject(chat);
+      const projectId = (
+        await createTeam(chat.admin, "fork-team", [chat.memberId])
+      ).id;
       const automation = await createAutomation(
         { ...chat, projectId },
         { ownMemory: true },

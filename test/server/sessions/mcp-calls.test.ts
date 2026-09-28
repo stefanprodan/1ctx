@@ -1,28 +1,22 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { migrate } from "../../../src/server/db/index.ts";
 import {
   mcpCalls,
   mcpServerCalls,
 } from "../../../src/server/sessions/activity.ts";
+import type { MessageStatus } from "../../../src/shared/words.ts";
+import { memoryDb } from "../../helpers/db.ts";
+import { messageRows } from "../../helpers/messages.ts";
 
 // tool rows alone: the query reads no other table, so the keys are off
 function db() {
-  const d = new Database(":memory:");
-  migrate(d as never);
+  const d = memoryDb();
   d.exec("pragma foreign_keys = off");
-  let seq = 0;
-  const add = (tool: string, at: number, status = "done") => {
-    seq++;
-    d.query(
-      `insert into messages (id, session_id, seq, kind, send_id, round,
-         status, tool_name, tool_call_id, created_at)
-       values (?, 'c1', ?, 'tool', 's1', 1, ?, ?, ?, ?)`,
-    ).run(`m${seq}`, seq, status, tool, `call${seq}`, at);
-  };
+  const row = messageRows(d);
+  const add = (tool: string, at: number, status: MessageStatus = "done") =>
+    row("tool", at, { tool, status });
   return { d, add };
 }
 
@@ -37,7 +31,7 @@ test("a server's calls are its tools' rows inside the window", () => {
   // outside [since, until)
   add("mcp__github__get_me", 49);
   add("mcp__github__get_me", 150);
-  expect(mcpCalls(d as never, "github", 50, 150)).toEqual({
+  expect(mcpCalls(d, "github", 50, 150)).toEqual({
     calls: 3,
     failed: 1,
     tools: [
@@ -45,7 +39,7 @@ test("a server's calls are its tools' rows inside the window", () => {
       { name: "search_code", calls: 1 },
     ],
   });
-  expect(mcpCalls(d as never, "none", 50, 150)).toEqual({
+  expect(mcpCalls(d, "none", 50, 150)).toEqual({
     calls: 0,
     failed: 0,
     tools: [],
@@ -78,7 +72,7 @@ test("every server's calls, by the name its rows carry", () => {
   add("mcp_describe", 120);
   add("bash", 120);
   add("mcp__flux__get_x", 10);
-  expect(mcpServerCalls(d as never, 50, 150)).toEqual({
+  expect(mcpServerCalls(d, 50, 150)).toEqual({
     calls: 4,
     failed: 1,
     servers: [

@@ -115,25 +115,26 @@ describe("the Visuals page", () => {
     tools.value = response();
     limits.value = rows;
     const html = render(<Visuals />);
-    expect(html.match(/<form/g)).toHaveLength(3);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(3);
     expect(
       [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
     ).toEqual(["Visuals", "CDNs", "Limits"]);
-    // the switch sits in the first card's head, the tool as its row
+    expect(forms[0]).toContain('role="switch"');
+    expect(forms[0]).toContain(">visualize<");
+    expect(forms[1]).toContain('name="hosts"');
+    expect(forms[2]).toContain('name="visualBytes"');
     expect(html.match(/role="switch"/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Visuals on"');
-    expect(html).toContain(visualsLine(true));
+    expect(html).toContain("Allows agents to draw HTML and SVG visuals.");
     expect(html).toContain(">visualize<");
     expect(html).toMatch(/204 tokens/);
-    // every Save waits for a change
     expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(3);
     expect(html).not.toContain("Unsaved changes");
-    // the CDNs: the count, the box as saved
     expect(html).toMatch(/setting-count">2 of 16</);
     expect(html).toMatch(
       /<textarea name="hosts"[^>]*>https:\/\/a\.example\.com\nhttps:\/\/b\.example\.com</,
     );
-    // the visual limits alone, typed as text, a changed one's default
     expect(html).toContain('name="visualBytes"');
     expect(html).toContain('name="maxVisuals"');
     expect(html).not.toContain('name="rounds"');
@@ -141,7 +142,6 @@ describe("the Visuals page", () => {
     expect(html).toContain("default 256 KB");
     expect(html).not.toContain('type="number"');
     expect(html).toContain('inputmode="decimal"');
-    // the aside waits for its read
     expect(html).toContain("Last 30 days");
     expect(html).toContain("Loading");
   });
@@ -166,7 +166,7 @@ describe("the Visuals page", () => {
     limits.value = rows;
     const html = render(<Visuals />);
     expect(html).toContain('aria-label="Visuals off"');
-    expect(html).toContain(visualsLine(false));
+    expect(html).toContain("In-line visualizations are disabled.");
     expect(html).toContain("No CDNs. Visuals use inline code only.");
     expect(html).toMatch(/setting-count">0 of 16</);
     // the other cards stay editable while it is off

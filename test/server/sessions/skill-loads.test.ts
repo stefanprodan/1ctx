@@ -1,62 +1,44 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { migrate } from "../../../src/server/db/index.ts";
 import {
   SKILL_LOADS,
   skillLoads,
 } from "../../../src/server/sessions/activity.ts";
+import type { MessageStatus } from "../../../src/shared/words.ts";
+import { memoryDb } from "../../helpers/db.ts";
+import { messageRows } from "../../helpers/messages.ts";
 
 // a reply's calls and their tool rows; the query reads no other table,
 // so the keys are off
 function db() {
-  const d = new Database(":memory:");
-  migrate(d as never);
+  const d = memoryDb();
   d.exec("pragma foreign_keys = off");
-  let seq = 0;
-  const row = (
-    kind: string,
-    send: string,
-    round: number,
-    at: number,
-    extra: { status?: string; calls?: string; tool?: string; call?: string },
-  ) => {
-    seq++;
-    d.query(
-      `insert into messages (id, session_id, seq, kind, send_id, round, slot,
-         status, tool_calls, tool_name, tool_call_id, created_at)
-       values (?, 'c1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      `m${seq}`,
-      seq,
-      kind,
-      send,
-      round,
-      kind === "reply" ? "work" : null,
-      extra.status ?? "done",
-      extra.calls ?? null,
-      extra.tool ?? null,
-      extra.call ?? null,
-      at,
-    );
-  };
-  // one round: a reply naming each call, then a tool row per call
+  const row = messageRows(d);
   const round = (
     send: string,
     n: number,
     at: number,
-    calls: { tool: string; args: string; status?: string; id?: string }[],
+    calls: {
+      tool: string;
+      args: string;
+      status?: MessageStatus;
+      id?: string;
+    }[],
   ) => {
     const ids = calls.map((c, i) => c.id ?? `call_${i}`);
-    row("reply", send, n, at, {
+    row("reply", at, {
+      send,
+      round: n,
       calls: JSON.stringify(
         calls.map((c, i) => ({ id: ids[i], name: c.tool, arguments: c.args })),
       ),
     });
     calls.forEach((c, i) => {
-      row("tool", send, n, at, {
+      row("tool", at, {
+        send,
+        round: n,
         tool: c.tool,
         call: ids[i],
         status: c.status,
@@ -90,7 +72,7 @@ test("skill calls count by the name their call carried", () => {
   // outside [since, until)
   round("s4", 1, 49, [load("flux")]);
   round("s5", 1, 150, [load("flux")]);
-  expect(skillLoads(d as never, 50, 150)).toEqual({
+  expect(skillLoads(d, 50, 150)).toEqual({
     loads: 3,
     reads: 3,
     failed: 1,
@@ -108,7 +90,7 @@ test("skill calls count by the name their call carried", () => {
       { name: "timoni", loads: 1, reads: 0, failed: 1, files: [] },
     ],
   });
-  expect(skillLoads(d as never, 300, 400)).toEqual({
+  expect(skillLoads(d, 300, 400)).toEqual({
     loads: 0,
     reads: 0,
     failed: 0,
@@ -127,7 +109,7 @@ test("a repeated call id pairs by position, as the writer pairs them", () => {
     { tool: "bash", args: "{}" },
     { ...read("a", ""), id: "y" },
   ]);
-  expect(skillLoads(d as never, 50, 150)).toEqual({
+  expect(skillLoads(d, 50, 150)).toEqual({
     loads: 2,
     reads: 1,
     failed: 1,

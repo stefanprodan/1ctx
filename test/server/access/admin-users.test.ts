@@ -4,7 +4,9 @@
 import { expect, test } from "bun:test";
 import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
 import type { UsersResponse } from "../../../src/shared/api/users.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { chatApp, startChat } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
+import { waitAgentSends } from "../../helpers/usage.ts";
 
 async function listed(chat: Awaited<ReturnType<typeof chatApp>>) {
   const res = await chat.admin.call("GET", "/api/users");
@@ -14,14 +16,7 @@ async function listed(chat: Awaited<ReturnType<typeof chatApp>>) {
 
 test("the admin's list says each user's last visit and team projects", async () => {
   const chat = await chatApp();
-  const { project } = await (
-    await chat.admin.call("POST", "/api/projects", {
-      body: { name: "ops", description: "A team project." },
-    })
-  ).json();
-  await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
-    body: { userId: chat.memberId },
-  });
+  const project = await createTeam(chat.admin, "ops", [chat.memberId]);
   await chat.member.call("GET", "/api/me");
   const casey = (await listed(chat)).find((u) => u.id === chat.memberId)!;
   // the personal project is not a team one
@@ -58,35 +53,15 @@ test("the admin's list says each user's last visit and team projects", async () 
 test("a user's usage counts their personal project alone", async () => {
   const chat = await chatApp();
   // a turn in a team project they are in is not theirs alone
-  const { project } = await (
-    await chat.admin.call("POST", "/api/projects", {
-      body: { name: "ops", description: "A team project." },
-    })
-  ).json();
-  await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
-    body: { userId: chat.memberId },
-  });
-  const agentSends = async () => {
-    // the window is [since, until): a row stamped now is not in it yet
-    chat.app.now.value += 1;
-    const res = await chat.admin.call(
-      "GET",
-      `/api/agents/${chat.agentId}/usage`,
-    );
-    return ((await res.json()) as { sends: number }).sends;
-  };
-  const settled = async (sends: number) => {
-    for (let i = 0; i < 50 && (await agentSends()) < sends; i++) await tick();
-    expect(await agentSends()).toBe(sends);
-  };
+  const project = await createTeam(chat.admin, "ops", [chat.memberId]);
   const team = await startChat(chat, "in the team", chat.member, project.id);
   team.script.reply("done");
-  await settled(1);
+  await waitAgentSends(chat, 1);
   const own = await chat.admin.call("GET", `/api/users/${chat.memberId}/usage`);
   expect(await own.json()).toMatchObject({ sends: 0, tokens: 0 });
   const started = await startChat(chat);
   started.script.reply("done");
-  await settled(2);
+  await waitAgentSends(chat, 2);
   const res = await chat.admin.call("GET", `/api/users/${chat.memberId}/usage`);
   const body = (await res.json()) as SendTotalsResponse;
   expect(body.sends).toBe(1);

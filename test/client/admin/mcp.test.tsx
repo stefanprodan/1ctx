@@ -6,7 +6,7 @@
 // the rows loaded; the entity that loads the list with the keys and
 // folds a write back; and the list and a server's tabs rendered.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
 import { agents } from "../../../src/client/data/agents.ts";
@@ -50,19 +50,15 @@ import type {
   McpServerSummary,
   McpToolSummary,
 } from "../../../src/shared/contracts/mcp.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
 import {
   MAX_INSTRUCTIONS_BLOCK,
   MAX_SCHEMAS_BYTES,
 } from "../../../src/shared/mcp.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
+
+const admin = adminFixture();
 
 const HOUR = 3_600_000;
 const now = 1_789_000_000_000;
@@ -113,8 +109,8 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
 });
 const flux = server();
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
@@ -122,12 +118,6 @@ beforeEach(() => {
   serversError.value = null;
   keys.value = [];
   loadedAt.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the model", () => {

@@ -26,70 +26,51 @@ const WORKER = new URL(
 );
 
 describe("the scan worker", () => {
-  test("scans a file database from its own connection", async () => {
-    const file = fileDb();
-    try {
-      const app = await testApp({ db: file.db });
-      const admin = app.client();
-      await admin.login("admin", "hunter2-test");
-      const res = await admin.call("GET", "/api/admin/storage?tz=UTC");
-      expect(res.status).toBe(200);
-      const body: StorageResponse = await res.json();
-      expect(body.file.name).toBe(basename(file.path));
-      expect(body.file.bytes).toBeGreaterThan(0);
-      expect(body.file.journalMode).toBe("wal");
-      expect(body.file.walBytes).toBeGreaterThan(0);
-      const config = body.areas.find((area) => area.key === "config")!;
-      expect(config.tables.find((table) => table.name === "users")?.rows).toBe(
-        1,
-      );
-      await app.shutdown();
-    } finally {
-      file.cleanup();
-    }
-  });
-
-  test("answers the overview's days from the same worker", async () => {
-    const file = fileDb();
-    try {
-      const app = await testApp({ db: file.db });
-      const admin = app.client();
-      await admin.login("admin", "hunter2-test");
-      const res = await admin.call("GET", "/api/admin/overview?tz=UTC");
-      expect(res.status).toBe(200);
-      const body: OverviewResponse = await res.json();
-      expect(body.days).toHaveLength(30);
-      expect(body.instance.users).toBe(1);
-      expect(body.instance.databaseBytes).toBeGreaterThan(0);
-      expect(body.range).toBe("30d");
-      await app.shutdown();
-    } finally {
-      file.cleanup();
-    }
-  });
-
-  test("answers the usage page's month from the same worker", async () => {
-    const file = fileDb();
-    try {
-      const app = await testApp({ db: file.db });
-      const admin = app.client();
-      await admin.login("admin", "hunter2-test");
-      const month = new Date(app.now.value).toISOString().slice(0, 7);
-      const res = await admin.call(
-        "GET",
-        `/api/admin/usage?tz=UTC&month=${month}`,
-      );
-      expect(res.status).toBe(200);
-      const body: UsageResponse = await res.json();
-      expect(body.month).toBe(month);
-      expect(body.days.length).toBeGreaterThan(0);
-      expect(body.since).toBeNull();
-      expect(body.by).toEqual({ projects: [], agents: [], models: [] });
-      await app.shutdown();
-    } finally {
-      file.cleanup();
-    }
-  });
+  test.each(["storage", "overview", "usage"])(
+    "answers %s from a worker's own file connection",
+    async (page) => {
+      const file = fileDb();
+      let app: Awaited<ReturnType<typeof testApp>> | undefined;
+      try {
+        app = await testApp({ db: file.db });
+        const admin = app.client();
+        await admin.login("admin", "hunter2-test");
+        const month = new Date(app.now.value).toISOString().slice(0, 7);
+        const query = page === "usage" ? `&month=${month}` : "";
+        const res = await admin.call(
+          "GET",
+          `/api/admin/${page}?tz=UTC${query}`,
+        );
+        expect(res.status).toBe(200);
+        if (page === "storage") {
+          const body: StorageResponse = await res.json();
+          expect(body.file.name).toBe(basename(file.path));
+          expect(body.file.bytes).toBeGreaterThan(0);
+          expect(body.file.journalMode).toBe("wal");
+          expect(body.file.walBytes).toBeGreaterThan(0);
+          const config = body.areas.find((area) => area.key === "config")!;
+          expect(
+            config.tables.find((table) => table.name === "users")?.rows,
+          ).toBe(1);
+        } else if (page === "overview") {
+          const body: OverviewResponse = await res.json();
+          expect(body.days).toHaveLength(30);
+          expect(body.instance.users).toBe(1);
+          expect(body.instance.databaseBytes).toBeGreaterThan(0);
+          expect(body.range).toBe("30d");
+        } else {
+          const body: UsageResponse = await res.json();
+          expect(body.month).toBe(month);
+          expect(body.days.length).toBeGreaterThan(0);
+          expect(body.since).toBeNull();
+          expect(body.by).toEqual({ projects: [], agents: [], models: [] });
+        }
+      } finally {
+        await app?.shutdown();
+        file.cleanup();
+      }
+    },
+  );
 
   test("a file that cannot be opened fails the scan without its path", async () => {
     const path = join(tmpdir(), "1ctx-missing", "none.sqlite");

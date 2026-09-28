@@ -44,15 +44,10 @@ import type {
   CredentialSummary,
   HttpMethod,
 } from "../../../src/shared/contracts/credential.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Admin",
-  role: "admin",
-  mustChangePassword: false,
-};
+const admin = adminFixture({ fullName: "Admin" });
 
 const credential = (
   changes: Partial<CredentialSummary> = {},
@@ -71,73 +66,76 @@ const credential = (
   ...changes,
 });
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
   credentials.value = null;
   credentialKeys.value = [];
   credentialsError.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the model", () => {
-  test("a new credential starts on GET and HEAD, with no key or project", () => {
-    expect(draftOf(null)).toEqual({
-      name: "",
-      keyName: "",
-      prefix: "",
-      header: "",
-      template: "",
-      methods: ["GET", "HEAD"],
-      projectIds: [],
-    });
-    expect(draftOf(credential())).toMatchObject({
-      keyName: "http-finnhub",
-      methods: ["GET"],
-      projectIds: ["p1"],
-    });
-  });
+  test.serial(
+    "a new credential starts on GET and HEAD, with no key or project",
+    () => {
+      expect(draftOf(null)).toEqual({
+        name: "",
+        keyName: "",
+        prefix: "",
+        header: "",
+        template: "",
+        methods: ["GET", "HEAD"],
+        projectIds: [],
+      });
+      expect(draftOf(credential())).toMatchObject({
+        keyName: "http-finnhub",
+        methods: ["GET"],
+        projectIds: ["p1"],
+      });
+    },
+  );
 
-  test("the key picks mark a file that cannot be used, and one gone", () => {
-    const keys = [
-      { name: "http-finnhub", usable: true },
-      { name: "http-short", usable: false },
-    ];
-    expect(keyOptions(keys, "")).toEqual([
-      { value: "http-finnhub", label: "http-finnhub" },
-      { value: "http-short", label: "http-short", detail: "unusable" },
-    ]);
-    expect(keyOptions(keys, "http-gone").at(-1)).toEqual({
-      value: "http-gone",
-      label: "http-gone",
-      detail: "missing",
-    });
-    expect(keyOptions(keys, "http-finnhub")).toHaveLength(2);
-  });
+  test.serial(
+    "the key picks mark a file that cannot be used, and one gone",
+    () => {
+      const keys = [
+        { name: "http-finnhub", usable: true },
+        { name: "http-short", usable: false },
+      ];
+      expect(keyOptions(keys, "")).toEqual([
+        { value: "http-finnhub", label: "http-finnhub" },
+        { value: "http-short", label: "http-short", detail: "unusable" },
+      ]);
+      expect(keyOptions(keys, "http-gone").at(-1)).toEqual({
+        value: "http-gone",
+        label: "http-gone",
+        detail: "missing",
+      });
+      expect(keyOptions(keys, "http-finnhub")).toHaveLength(2);
+    },
+  );
 
-  test("the row's key line is a failure unless the file is usable", () => {
-    expect(keyLine("http-a", "ok")).toEqual({
-      text: "http-a.key",
-      bad: false,
-    });
-    expect(keyLine("http-a", "missing")).toEqual({
-      text: "http-a.key missing",
-      bad: true,
-    });
-    expect(keyLine("http-a", "unusable")).toEqual({
-      text: "http-a.key unusable",
-      bad: true,
-    });
-  });
+  test.serial(
+    "the row's key line is a failure unless the file is usable",
+    () => {
+      expect(keyLine("http-a", "ok")).toEqual({
+        text: "http-a.key",
+        bad: false,
+      });
+      expect(keyLine("http-a", "missing")).toEqual({
+        text: "http-a.key missing",
+        bad: true,
+      });
+      expect(keyLine("http-a", "unusable")).toEqual({
+        text: "http-a.key unusable",
+        bad: true,
+      });
+    },
+  );
 
-  test("the row's and the cards' words", () => {
+  test.serial("the row's and the cards' words", () => {
     expect(keyHint("http-finnhub", credential())).toBe(
       "http-finnhub.key is present",
     );
@@ -154,13 +152,13 @@ describe("the model", () => {
     expect(projectsLine(credential({ projects: [] }))).toBe("no projects");
   });
 
-  test("the methods keep the server's order", () => {
+  test.serial("the methods keep the server's order", () => {
     expect(toggledMethod(["GET"], "HEAD")).toEqual(["GET", "HEAD"]);
     expect(toggledMethod(["POST"], "GET")).toEqual(["GET", "POST"]);
     expect(toggledMethod(["GET", "HEAD"], "GET")).toEqual(["HEAD"]);
   });
 
-  test("a refusal's field", () => {
+  test.serial("a refusal's field", () => {
     expect(credentialFieldOf("name must be 2 to 80 characters")).toBe("name");
     expect(credentialFieldOf("a credential named finnhub exists")).toBe("name");
     expect(credentialFieldOf("keyName must be http- followed by")).toBe(
@@ -180,7 +178,7 @@ describe("the model", () => {
     expect(credentialFieldOf("no such credential")).toBeUndefined();
   });
 
-  test("the form checks what is empty before a call", () => {
+  test.serial("the form checks what is empty before a call", () => {
     const d = { ...draftOf(null), name: "finnhub" };
     expect(problemOf(d, true)?.field).toBe("keyName");
     expect(problemOf({ ...draftOf(null) }, true)?.field).toBe("name");
@@ -204,7 +202,7 @@ describe("the model", () => {
     });
   });
 
-  test("a change sends only the fields it touched", () => {
+  test.serial("a change sends only the fields it touched", () => {
     const all = [
       "keyName",
       "prefix",
@@ -335,7 +333,7 @@ describe("the entity", () => {
 });
 
 describe("a card of the page", () => {
-  test("sends and counts only its own fields", () => {
+  test.serial("sends and counts only its own fields", () => {
     // a template the server kept with a space round it: trimmed by the
     // draft, yet no other card may carry it
     const row = credential({ template: "Bearer {key} " });
@@ -351,7 +349,7 @@ describe("a card of the page", () => {
     ).toEqual({});
   });
 
-  test("checks only its own fields before a call", () => {
+  test.serial("checks only its own fields before a call", () => {
     const d = { ...draftOf(credential()), prefix: "" };
     expect(cardProblem(d, ["methods"])).toBeNull();
     expect(cardProblem(d, ["prefix", "header", "template"])?.field).toBe(
@@ -359,7 +357,7 @@ describe("a card of the page", () => {
     );
   });
 
-  test("a refusal about another card's field is its notice", () => {
+  test.serial("a refusal about another card's field is its notice", () => {
     const projects = cardFieldOf(["projectIds"]);
     expect(projects("the prefix overlaps github in finops")).toBeUndefined();
     expect(projects("finops has 10 credentials")).toBe("projectIds");
@@ -368,7 +366,7 @@ describe("a card of the page", () => {
     );
   });
 
-  test("a key file names its one reader, or counts them", () => {
+  test.serial("a key file names its one reader, or counts them", () => {
     const list = [
       credential(),
       credential({ id: "c2", name: "b", keyName: "http-shared" }),
@@ -385,7 +383,7 @@ describe("a card of the page", () => {
 });
 
 describe("the teams a credential may bind", () => {
-  test("team projects by name, and a bound one the admin lacks", () => {
+  test.serial("team projects by name, and a bound one the admin lacks", () => {
     const seen = [
       { id: "p2", name: "research", kind: "team" },
       { id: "p9", name: "mine", kind: "personal" },
@@ -478,30 +476,36 @@ describe("the pages", () => {
         id: "p1",
         name: "finops",
         kind: "team",
-      } as (typeof projects.value & object)[number],
+        createdAt: 0,
+        memberCount: 1,
+      },
     ];
     const html = render(<CredentialPage params={{ name: "finnhub" }} />);
-    expect(
-      [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
-    ).toEqual(["Key", "Request", "Methods", "Projects", "Delete finnhub"]);
-    expect(html.match(/<form/g)).toHaveLength(4);
-    // nothing to save at rest
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(4);
+    for (const [index, title] of [
+      "Key",
+      "Request",
+      "Methods",
+      "Projects",
+    ].entries()) {
+      expect(forms[index]).toMatch(new RegExp(`<h2\\b[^>]*>${title}<`));
+    }
+    expect(html).toMatch(/<h2\b[^>]*>Delete finnhub<\/h2>/);
+    expect(html.indexOf(">Delete finnhub<")).toBeGreaterThan(
+      html.lastIndexOf("</form>"),
+    );
     expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(4);
     expect(html).not.toContain("Unsaved changes");
-    // the saved fields, the name fixed
     expect(html).not.toContain('name="name"');
     expect(html).toContain('value="https://finnhub.io/api/v1/"');
     expect(html).toContain('value="X-Finnhub-Token"');
     expect(html).toContain("http-finnhub.key is present");
-    // only what it is bound to, each with a remove, Add over the rest
     expect(html).toMatch(/setting-count">1</);
     expect(html).toContain('aria-label="Remove finops"');
     expect(html).toContain("Add project");
     expect(html).not.toContain('name="projectIds"');
-    expect(html).toContain(
-      "curl stops adding the header to requests under https://finnhub.io/api/v1/.",
-    );
-    // the crumb climbs to the tab, the switcher names the other
+    expect(html).toContain(deleteLine(credential()));
     expect(html).toContain('href="/admin/config/web/credentials"');
     expect(html).toContain("page-pill");
     // the aside

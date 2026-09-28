@@ -7,7 +7,7 @@
 // loads both routes and replaces what it holds on a write; and the
 // Config board rendered over the rows.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { onPage } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
@@ -38,6 +38,7 @@ import {
   displayOf,
   draftOf,
   LIMIT_WORDS,
+  limitFieldOf,
   problem,
   read,
   seedOf,
@@ -64,17 +65,13 @@ import type {
   SearchState,
   WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
 import type { WebAccess } from "../../../src/shared/web.ts";
 import { LIMIT_NAMES } from "../../../src/shared/words.ts";
+import { deferred } from "../../helpers/async.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
+const admin = adminFixture();
 
 const row = (changes: Partial<LimitRow>): LimitRow => ({
   name: "rounds",
@@ -160,6 +157,22 @@ const maxVisuals = row({
   unit: "count",
   scope: "visuals",
 });
+const toolWorkTokens = row({
+  name: "toolWorkTokens",
+  default: 500_000,
+  value: 750_000,
+  min: 10_000,
+  max: 10_000_000,
+  unit: "tokens",
+  changedAt: 1,
+});
+const maxBashCalls = row({
+  name: "maxBashCalls",
+  value: 200,
+  max: 1000,
+  scope: "call",
+  changedAt: 1,
+});
 const rows = [
   rounds,
   toolMs,
@@ -170,6 +183,8 @@ const rows = [
   reserve,
   runsPerUser,
   maxVisuals,
+  toolWorkTokens,
+  maxBashCalls,
 ];
 
 const html =
@@ -210,20 +225,14 @@ const search: SearchState = {
   keys: { exa: true, firecrawl: false, tavily: false },
 };
 
-const realFetch = globalThis.fetch;
-let answer: (url: string, init?: RequestInit) => Response;
+let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+const calls = clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
   tools.value = null;
   limits.value = null;
   toolsError.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the limit words and units", () => {
@@ -243,6 +252,8 @@ describe("the limit words and units", () => {
       expect(displayOf(searchBody).word).toBe("MB");
       expect(displayOf(cut).word).toBe("chars");
       expect(displayOf(reserve)).toEqual({ word: "tokens", factor: 1 });
+      expect(displayOf(toolWorkTokens)).toEqual({ word: "tokens", factor: 1 });
+      expect(displayOf(maxBashCalls)).toEqual({ word: "", factor: 1 });
       expect(show(toolMs, 600_000)).toBe("600");
       expect(show(timeout, 1500)).toBe("1.5");
       expect(show(resultBytes, 2 * 1024 * 1024)).toBe("2");
@@ -272,6 +283,20 @@ describe("the limit words and units", () => {
     );
     expect(problem(rounds, "x")).toBe("Rounds needs a number");
     expect(problem(rounds, "500")).toBeNull();
+    expect(problem(toolWorkTokens, "9999")).toBe(
+      "Tool-work tokens must be from 10000 to 10000000 tokens",
+    );
+    expect(problem(maxBashCalls, "1001")).toBe(
+      "Bash calls per turn must be from 1 to 1000",
+    );
+    for (const row of [toolWorkTokens, maxBashCalls]) {
+      expect(problem(row, String(row.min))).toBeNull();
+      expect(problem(row, String(row.max))).toBeNull();
+    }
+    expect(limitFieldOf("toolWorkTokens needs a number")).toBe(
+      "toolWorkTokens",
+    );
+    expect(limitFieldOf("maxBashCalls is out of range")).toBe("maxBashCalls");
   });
 
   test.serial("the draft, what a Save collects and what is dirty", () => {
@@ -290,6 +315,8 @@ describe("the limit words and units", () => {
         contextReserve: 20_000,
         runsPerUser: 4,
         maxVisuals: 2,
+        toolWorkTokens: 750_000,
+        maxBashCalls: 200,
       },
     });
     const edited = { ...draft, rounds: "501" };
@@ -301,6 +328,8 @@ describe("the limit words and units", () => {
     expect(defaultLine(timeout)).toBe("default 20 s");
     expect(defaultLine(searchBody)).toBe("default 1 MB");
     expect(defaultLine(rounds)).toBe("default 100");
+    expect(defaultLine(toolWorkTokens)).toBe("default 500000 tokens");
+    expect(defaultLine(maxBashCalls)).toBe("default 100");
   });
 
   test.serial("a card sums its tokens and re-seeds only on new values", () => {
@@ -334,25 +363,28 @@ describe("the limit words and units", () => {
 });
 
 describe("the domains box", () => {
-  test("gives the sorted hosts a save sends", () => {
+  test.serial("gives the sorted hosts a save sends", () => {
     expect(accessBody("listed", "GitHub.com\n\n docs.example.com \n")).toEqual({
       body: { mode: "listed", domains: ["docs.example.com", "github.com"] },
     });
   });
 
-  test("an empty box and a line that is not a host are the field's words", () => {
-    expect(accessBody("listed", " \n")).toEqual({
-      error: "List at least one host.",
-    });
-    expect(accessBody("listed", "github.com\n*.github.com")).toEqual({
-      error: "Line 2, *.github.com, is not a host name.",
-    });
-    expect(accessBody("listed", "https://github.com")).toEqual({
-      error: "Line 1, https://github.com, is not a host name.",
-    });
-  });
+  test.serial(
+    "an empty box and a line that is not a host are the field's words",
+    () => {
+      expect(accessBody("listed", " \n")).toEqual({
+        error: "List at least one host.",
+      });
+      expect(accessBody("listed", "github.com\n*.github.com")).toEqual({
+        error: "Line 2, *.github.com, is not a host name.",
+      });
+      expect(accessBody("listed", "https://github.com")).toEqual({
+        error: "Line 1, https://github.com, is not a host name.",
+      });
+    },
+  );
 
-  test("a refusal about hosts belongs to the box", () => {
+  test.serial("a refusal about hosts belongs to the box", () => {
     expect(domainsFieldOf("domains line 2 is not a host name")).toBe("domains");
     expect(domainsFieldOf("list at least one host")).toBe("domains");
     expect(domainsFieldOf("forbidden")).toBeUndefined();
@@ -377,9 +409,7 @@ describe("the tools entity", () => {
   test.serial(
     "a write replaces what it holds with the server's rows",
     async () => {
-      const calls: { url: string; method?: string; body?: string }[] = [];
-      answer = (url, init) => {
-        calls.push({ url, method: init?.method, body: init?.body as string });
+      answer = (url) => {
         if (url.startsWith("/api/tools/")) {
           return Response.json(body({ ...fetchTool, enabled: false }));
         }
@@ -391,35 +421,33 @@ describe("the tools entity", () => {
       expect(tools.value?.visualize.enabled).toBe(false);
       expect(calls[0]).toMatchObject({
         url: "/api/tools/visualize",
-        method: "PATCH",
-        body: '{"enabled":false}',
+        init: { method: "PATCH", body: '{"enabled":false}' },
       });
       await saveLimits({ values: { rounds: 3 } as never });
       expect(limits.value?.[0]?.value).toBe(3);
-      expect(calls.map((c) => c.method)).toEqual(["PATCH", "PUT"]);
+      expect(calls.map((c) => c.init?.method)).toEqual(["PATCH", "PUT"]);
     },
   );
 
   test.serial(
     "an earlier write answering last does not undo a later one",
     async () => {
-      const pending: Array<() => void> = [];
+      const pending: ReturnType<typeof deferred<void>>[] = [];
       answer = (_url, init) => {
         const enabled = JSON.parse(init?.body as string).enabled as boolean;
-        return Response.json(body({ ...fetchTool, enabled }));
+        const held = deferred<void>();
+        pending.push(held);
+        return held.promise.then(() =>
+          Response.json(body({ ...fetchTool, enabled })),
+        );
       };
-      const realAnswer = answer;
-      globalThis.fetch = (async (url: string, init?: RequestInit) => {
-        await new Promise<void>((release) => pending.push(release));
-        return realAnswer(url, init);
-      }) as unknown as typeof fetch;
       const first = patchTool("visualize", { enabled: false });
       const second = patchTool("visualize", { enabled: true });
       while (pending.length < 2) await Promise.resolve();
-      pending[1]();
+      pending[1]!.resolve();
       await second;
       expect(tools.value?.visualize.enabled).toBe(true);
-      pending[0]();
+      pending[0]!.resolve();
       await first;
       expect(tools.value?.visualize.enabled).toBe(true);
     },
@@ -433,7 +461,7 @@ describe("the tools entity", () => {
 });
 
 describe("the Config board", () => {
-  test("the tab is the address", () => {
+  test.serial("the tab is the address", () => {
     expect(configTab("/admin/config")).toBe("overview");
     expect(configTab("/admin/config/limits")).toBe("limits");
     expect(configTab("/admin/config/storage")).toBe("storage");
@@ -446,7 +474,7 @@ describe("the Config board", () => {
     expect(WHEN_WORDS.always).not.toBe("");
   });
 
-  test("every limit is on one card of one page", () => {
+  test.serial("every limit is on one card of one page", () => {
     const placed = [
       ...LIMITS_CARDS.flatMap((c) => c.names),
       ...STORAGE_CARDS.flatMap((c) => c.names),
@@ -463,7 +491,7 @@ describe("the Config board", () => {
     ]);
   });
 
-  test("a tool is off while no turn is offered it", () => {
+  test.serial("a tool is off while no turn is offered it", () => {
     const state = body();
     expect(builtinsOf(state).map((t) => t.name)).toEqual([
       "datetime",
@@ -484,18 +512,21 @@ describe("the Config board", () => {
     expect(offered(hidden.visualize, hidden)).toBe(false);
   });
 
-  test("an open row names the description and counts the schema's lines", () => {
-    const html = render(<ToolRow tool={time} open onToggle={() => {}} />);
-    expect(html).toContain('<div class="label">Description</div>');
-    expect(html).not.toContain("Description for agents");
-    // a short schema is not cut: no fade, no Show all
-    expect(html).toContain('class="fold fold-inset fold-framed"');
-    expect(html).not.toContain("fold-more");
-    expect(jsonLines({ type: "object", properties: {} })).toBe(4);
-    expect(jsonLines({})).toBe(1);
-  });
+  test.serial(
+    "an open row names the description and counts the schema's lines",
+    () => {
+      const html = render(<ToolRow tool={time} open onToggle={() => {}} />);
+      expect(html).toContain('<div class="label">Description</div>');
+      expect(html).not.toContain("Description for agents");
+      // a short schema is not cut: no fade, no Show all
+      expect(html).toContain('class="fold fold-inset fold-framed"');
+      expect(html).not.toContain("fold-more");
+      expect(jsonLines({ type: "object", properties: {} })).toBe(4);
+      expect(jsonLines({})).toBe(1);
+    },
+  );
 
-  test("memory_edit says when each of its two texts is sent", () => {
+  test.serial("memory_edit says when each of its two texts is sent", () => {
     const edit: BuiltinToolSummary = {
       ...time,
       name: "memory_edit",
@@ -516,7 +547,7 @@ describe("the Config board", () => {
     );
   });
 
-  test("the aside counts what is loaded and says what turns get", () => {
+  test.serial("the aside counts what is loaded and says what turns get", () => {
     const lines = instanceLines(body(), {
       providers: [1, 2],
       agents: [1],
@@ -595,6 +626,20 @@ describe("the Config board", () => {
     expect(html).toContain("Call timeout");
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    const turns = forms[0]!;
+    expect(turns).toContain(">Turns<");
+    for (const [name, value, label, defaultText] of [
+      ["toolWorkTokens", "750000", "Tool-work tokens", "default 500000 tokens"],
+      ["maxBashCalls", "200", "Bash calls per turn", "default 100"],
+    ]) {
+      expect(turns).toContain(label);
+      expect(turns).toMatch(new RegExp(`name="${name}"[^>]*value="${value}"`));
+      expect(turns).toContain(defaultText);
+      for (const form of forms.filter((form) => form !== turns)) {
+        expect(form).not.toContain(`name="${name}"`);
+      }
+    }
     // the web and visual limits are on their own pages
     expect(html).not.toContain('name="searchBodyBytes"');
     expect(html).not.toContain('name="maxVisuals"');

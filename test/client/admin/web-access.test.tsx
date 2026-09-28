@@ -193,42 +193,43 @@ describe("the Web access page", () => {
     tools.value = response();
     limits.value = rows;
     const html = render(<WebAccess />);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(3);
     expect(
       [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
     ).toEqual(["Access", "Search", "Limits", "Tools"]);
-    expect(html.match(/<form/g)).toHaveLength(3);
+    expect(forms[0]).toContain('aria-pressed="true"');
+    expect(forms[1]).toContain('value="exa"');
+    expect(forms[2]).toContain(`name="${WEB_LIMITS[0]}"`);
     expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(3);
     expect(html).not.toContain("Unsaved changes");
-    // the tabs, General lit
     expect(html).toMatch(/General/);
     expect(html).toContain("Credentials");
-    // the mode as saved, its words, no box while All domains
-    expect(html).toMatch(/seg-on" aria-pressed="true">All domains/);
+    expect(html).toMatch(
+      /<button\b(?=[^>]*\bseg-on\b)[^>]*aria-pressed="true"[^>]*>All domains/,
+    );
     expect(html).toContain(ACCESS_WORDS.all);
     expect(html).not.toContain('name="domains"');
-    // None first, the saved provider picked, the key files
     expect(html.indexOf('value="none"')).toBeLessThan(
       html.indexOf('value="exa"'),
     );
-    expect(html).toMatch(/value="exa" checked/);
+    expect(html).toMatch(
+      /<input\b(?=[^>]*value="exa")(?=[^>]*\bchecked)[^>]*>/,
+    );
     expect(html).toContain("search-exa.key present");
     expect(html).toContain("search-tavily.key keyless");
     expect(html).toContain("websearch runs on exa.");
-    // the web limits alone, a changed one's default
-    // fetch's three over search's, as listed, not as the rows come
     expect(
-      [
-        ...html.matchAll(/<input class="numberbox-input" name="([a-zA-Z]+)"/g),
-      ].map((m) => m[1]),
+      [...forms[2]!.matchAll(/<input\b[^>]*name="([a-zA-Z]+)"/g)].map(
+        (m) => m[1],
+      ),
     ).toEqual([...WEB_LIMITS]);
     expect(html).not.toContain('name="callTimeoutMs"');
     expect(html).toContain("default 2 MB");
-    // the two web tools, their tokens together, bash left out
     expect(html).toContain(">webfetch<");
     expect(html).toContain(">websearch<");
     expect(html).not.toContain(">bash<");
     expect(html).toMatch(/setting-count">200 tokens</);
-    // the aside waits for its read
     expect(html).toContain("Last 30 days");
     expect(html).toContain("Loading");
   });

@@ -1,12 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Database } from "bun:sqlite";
-import { describe, expect, test } from "bun:test";
-import { migrate } from "../../../src/server/db/index.ts";
+import { describe, expect, spyOn, test } from "bun:test";
 import { UsageStore } from "../../../src/server/usage/store.ts";
 import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
 import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { memoryDb } from "../../helpers/db.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -76,9 +75,8 @@ describe("a usage total", () => {
   });
 
   test("counts its own rows in [since, until), a priced part summed", () => {
-    const db = new Database(":memory:");
-    migrate(db as never);
-    const store = new UsageStore(db as never);
+    const db = memoryDb();
+    const store = new UsageStore(db);
     store.record(fields("mine", 50, 9, 1));
     store.record(fields("mine", 100, null, 2));
     store.record(fields("other", 100, 2, 3));
@@ -106,17 +104,23 @@ describe("a usage total", () => {
   });
 
   test("an agent's and a provider's totals seek their index by time", () => {
-    const db = new Database(":memory:");
-    migrate(db as never);
-    for (const [column, index] of [
-      ["provider_id", "usage_provider_activity"],
-      ["agent_id", "usage_agent_activity"],
-    ]) {
+    const db = memoryDb();
+    for (const [by, column, index] of [
+      [{ providerId: "x" }, "provider_id", "usage_provider_activity"],
+      [{ agentId: "x" }, "agent_id", "usage_agent_activity"],
+    ] as const) {
+      const query = spyOn(db, "query");
+      let sql: string;
+      try {
+        new UsageStore(db).total(by, 0, 1);
+        expect(query).toHaveBeenCalledTimes(1);
+        sql = query.mock.calls[0]![0];
+      } finally {
+        query.mockRestore();
+      }
       const plan = db
         .query<{ detail: string }, [string, number, number]>(
-          `explain query plan select sum(prompt_tokens + completion_tokens),
-             sum(cost), count(distinct send_id) from usage
-           where ${column} = ? and created_at >= ? and created_at < ?`,
+          `explain query plan ${sql}`,
         )
         .all("x", 0, 1)
         .map((row) => row.detail)
@@ -125,5 +129,6 @@ describe("a usage total", () => {
         `USING INDEX ${index} (${column}=? AND created_at>? AND created_at<?)`,
       );
     }
+    db.close();
   });
 });

@@ -35,6 +35,7 @@ import {
   startRun,
 } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, FLASH, startChat } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
 const NOW = Date.parse("2026-06-15T12:00:00Z");
 const DAY = 86_400_000;
@@ -101,21 +102,6 @@ async function settledChat(chat: ChatApp, projectId = chat.projectId) {
   script.reply("a reply");
   await settleRun(chat, sessionId);
   return sessionId;
-}
-
-async function team(chat: ChatApp, name: string): Promise<string> {
-  const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name, description: "A team project." },
-  });
-  expect(res.status).toBe(201);
-  const { project } = await res.json();
-  const added = await chat.admin.call(
-    "POST",
-    `/api/projects/${project.id}/members`,
-    { body: { userId: chat.memberId } },
-  );
-  expect(added.status).toBe(201);
-  return project.id as string;
 }
 
 async function runOf(chat: ChatApp, automationId: string): Promise<string> {
@@ -568,7 +554,8 @@ describe("the overview ranges", () => {
 describe("the usage breakdowns", () => {
   test("name a team project, never a personal one", async () => {
     const chat = await fixture();
-    const teamId = await team(chat, "research");
+    const teamId = (await createTeam(chat.admin, "research", [chat.memberId]))
+      .id;
     const personalChat = await settledChat(chat);
     const teamChat = await settledChat(chat, teamId);
     const personalTask = await createAutomation(chat, { name: "secret-task" });
@@ -652,12 +639,12 @@ describe("the usage breakdowns", () => {
 
   test("sum every deleted project into one ranked row", async () => {
     const chat = await fixture();
-    const live = await team(chat, "research");
+    const live = (await createTeam(chat.admin, "research", [chat.memberId])).id;
     const liveChat = await settledChat(chat, live);
     const goneChats: string[] = [];
     const gone: string[] = [];
     for (const name of ["old", "older"]) {
-      const id = await team(chat, name);
+      const id = (await createTeam(chat.admin, name, [chat.memberId])).id;
       gone.push(id);
       goneChats.push(await settledChat(chat, id));
     }
@@ -698,7 +685,7 @@ describe("the usage breakdowns", () => {
   test("leave out what was deleted and used no tokens", async () => {
     const chat = await fixture();
     const liveChat = await settledChat(chat);
-    const goneId = await team(chat, "old");
+    const goneId = (await createTeam(chat.admin, "old", [chat.memberId])).id;
     const goneChat = await settledChat(chat, goneId);
     hide(chat);
     // turns that failed before a round: sends with no usage

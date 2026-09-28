@@ -11,9 +11,48 @@ import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
 import { EFFORTS, WIRES } from "../../src/shared/words.ts";
 import { fileDb, memoryDb } from "../helpers/db.ts";
 
+const EXPECTED_IDS = [
+  "0001-init",
+  "0002-usage-activity",
+  "0003-automations",
+  "0004-run-source",
+  "0005-suspended-by",
+  "0006-skills",
+  "0007-user-tz",
+  "0008-search-tavily",
+  "0009-mcp",
+  "0010-memory",
+  "0011-gemini",
+  "0012-fork",
+  "0013-web-tools",
+  "0014-visualize",
+  "0015-knowledge",
+  "0016-openai-strict",
+  "0017-chat-uploads",
+  "0018-web-access",
+  "0019-open",
+  "0020-mcp-kept",
+  "0021-served-by",
+  "0022-credentials",
+  "0023-chat-memory",
+  "0024-memory-agent",
+  "0025-model-thinking",
+  "0026-agent-upstream",
+  "0027-usage-agent",
+  "0028-user-activity",
+  "0029-agent-pick",
+  "0030-archived-chats",
+  "0031-deciders",
+  "0032-admin-activity",
+] as const;
+
+const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
+  EXPECTED_IDS.slice(EXPECTED_IDS.indexOf(first));
+
 describe("migrations", () => {
   test("ids are unique and ordered", () => {
     const ids = MIGRATIONS.map((m) => m.id);
+    expect(ids).toEqual([...EXPECTED_IDS]);
     expect(new Set(ids).size).toBe(ids.length);
     expect([...ids].sort()).toEqual(ids);
     for (const id of ids) expect(id).toMatch(/^\d{4}-[a-z0-9-]+$/);
@@ -566,21 +605,7 @@ describe("the schema", () => {
   test("0020 keeps MCP files with their row and counts the folders", () => {
     const db = seed(MIGRATIONS.slice(0, 19));
     try {
-      expect(migrate(db)).toEqual([
-        "0020-mcp-kept",
-        "0021-served-by",
-        "0022-credentials",
-        "0023-chat-memory",
-        "0024-memory-agent",
-        "0025-model-thinking",
-        "0026-agent-upstream",
-        "0027-usage-agent",
-        "0028-user-activity",
-        "0029-agent-pick",
-        "0030-archived-chats",
-        "0031-deciders",
-        "0032-admin-activity",
-      ]);
+      expect(migrate(db)).toEqual(expectedFrom("0020-mcp-kept"));
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
         db.query("select mcp_folders from sessions where id = 'sess'").get(),
@@ -745,17 +770,7 @@ describe("the schema", () => {
           values ('p', null, '[]', '[]', 1, 0, 'u', 'sess'),
                  ('t', null, '[]', '[]', 1, 0, 'u', null);
       `);
-      expect(migrate(db)).toEqual([
-        "0024-memory-agent",
-        "0025-model-thinking",
-        "0026-agent-upstream",
-        "0027-usage-agent",
-        "0028-user-activity",
-        "0029-agent-pick",
-        "0030-archived-chats",
-        "0031-deciders",
-        "0032-admin-activity",
-      ]);
+      expect(migrate(db)).toEqual(expectedFrom("0024-memory-agent"));
       expect(
         db
           .query("select project_id, agent_name from memory_notes order by 1")
@@ -1170,37 +1185,7 @@ describe("additive migrations", () => {
                 'done', 1, 0, 1);
     `);
 
-    expect(migrate(db)).toEqual([
-      "0004-run-source",
-      "0005-suspended-by",
-      "0006-skills",
-      "0007-user-tz",
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0004-run-source"));
     expect(
       db.query("select id, run_source from sessions order by id").all(),
     ).toEqual([
@@ -1239,36 +1224,7 @@ describe("0005", () => {
         values ('au5', 'p5', 'u5', 'a5', 'daily', 'check', '0 9 * * *',
                 'UTC', 30, 7, null, 0, 0);
     `);
-    expect(migrate(db)).toEqual([
-      "0005-suspended-by",
-      "0006-skills",
-      "0007-user-tz",
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0005-suspended-by"));
     expect(
       db.query("select suspended_at, suspended_by from automations").get(),
     ).toEqual({ suspended_at: 7, suspended_by: null });
@@ -1314,38 +1270,7 @@ describe("rebuild migrations", () => {
         values ('z3', 'd3', 's3', 'p3', 'u3', 'a3', 'pr3', 'm', 1, 1, 1, 1, 0);
     `);
 
-    expect(migrate(db)).toEqual([
-      "0003-automations",
-      "0004-run-source",
-      "0005-suspended-by",
-      "0006-skills",
-      "0007-user-tz",
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0003-automations"));
     expect(
       db.query("select origin, automation_id from sessions").get(),
     ).toEqual({
@@ -1427,35 +1352,7 @@ describe("0006 skills migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a6', 'agent6', 'pr6', 'm', 'Model', 0);
     `);
-    expect(migrate(db)).toEqual([
-      "0006-skills",
-      "0007-user-tz",
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0006-skills"));
     expect(db.query("select name from agents where id = 'a6'").get()).toEqual({
       name: "agent6",
     });
@@ -1497,34 +1394,7 @@ describe("0007 user tz migration", () => {
         (id, username, full_name, email, role, password_hash, created_at)
         values ('u7', 'user7', 'User', 'u7@example.com', 'member', 'h', 0);
     `);
-    expect(migrate(db)).toEqual([
-      "0007-user-tz",
-      "0008-search-tavily",
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0007-user-tz"));
     expect(db.query("select tz from users where id = 'u7'").get()).toEqual({
       tz: "UTC",
     });
@@ -1547,32 +1417,7 @@ describe("0009 mcp migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a9', 'agent9', 'p9', 'm', 'M', 0);
     `);
-    expect(migrate(db)).toEqual([
-      "0009-mcp",
-      "0010-memory",
-      "0011-gemini",
-      "0012-fork",
-      "0013-web-tools",
-      "0014-visualize",
-      "0015-knowledge",
-      "0016-openai-strict",
-      "0017-chat-uploads",
-      "0018-web-access",
-      "0019-open",
-      "0020-mcp-kept",
-      "0021-served-by",
-      "0022-credentials",
-      "0023-chat-memory",
-      "0024-memory-agent",
-      "0025-model-thinking",
-      "0026-agent-upstream",
-      "0027-usage-agent",
-      "0028-user-activity",
-      "0029-agent-pick",
-      "0030-archived-chats",
-      "0031-deciders",
-      "0032-admin-activity",
-    ]);
+    expect(migrate(db)).toEqual(expectedFrom("0009-mcp"));
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
     ).toEqual({ mcp_mode: "auto" });
@@ -1818,25 +1663,7 @@ describe("0008 search tavily migration", () => {
             )
             .run(),
         ).toThrow();
-        expect(migrate(db)).toEqual([
-          "0016-openai-strict",
-          "0017-chat-uploads",
-          "0018-web-access",
-          "0019-open",
-          "0020-mcp-kept",
-          "0021-served-by",
-          "0022-credentials",
-          "0023-chat-memory",
-          "0024-memory-agent",
-          "0025-model-thinking",
-          "0026-agent-upstream",
-          "0027-usage-agent",
-          "0028-user-activity",
-          "0029-agent-pick",
-          "0030-archived-chats",
-          "0031-deciders",
-          "0032-admin-activity",
-        ]);
+        expect(migrate(db)).toEqual(expectedFrom("0016-openai-strict"));
         expect(MIGRATIONS[15]?.rebuild).toBe(true);
         expect(db.query("select * from providers order by id").all()).toEqual(
           providers,

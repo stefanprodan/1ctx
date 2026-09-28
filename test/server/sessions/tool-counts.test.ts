@@ -1,31 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { migrate } from "../../../src/server/db/index.ts";
 import {
   VISUAL_OPENS,
   visualCounts,
   webCounts,
 } from "../../../src/server/sessions/activity.ts";
+import type { MessageStatus } from "../../../src/shared/words.ts";
+import { memoryDb } from "../../helpers/db.ts";
+import { messageRows } from "../../helpers/messages.ts";
 
 // tool rows and the files opened from them; the queries read no other
 // table, so the keys are off
 function db() {
-  const d = new Database(":memory:");
-  migrate(d as never);
+  const d = memoryDb();
   d.exec("pragma foreign_keys = off");
-  let seq = 0;
-  const tool = (name: string, at: number, status = "done") => {
-    seq++;
-    d.query(
-      `insert into messages (id, session_id, seq, kind, send_id, round,
-         status, tool_name, tool_call_id, created_at)
-       values (?, 'c1', ?, 'tool', 's1', 1, ?, ?, ?, ?)`,
-    ).run(`m${seq}`, seq, status, name, `call_${seq}`, at);
-    return `m${seq}`;
-  };
+  const row = messageRows(d);
+  const tool = (name: string, at: number, status: MessageStatus = "done") =>
+    row("tool", at, { tool: name, status });
   const opened = (message: string, kinds: string[]) => {
     kinds.forEach((kind, position) => {
       d.query(
@@ -50,12 +43,12 @@ test("visuals count the visualize calls and the files opened as visuals", () => 
   tool("visualize", 49);
   opened(tool("bash", 200), ["visual"]);
   tool("visualize", 200);
-  expect(visualCounts(d as never, 50, 200)).toEqual({
+  expect(visualCounts(d, 50, 200)).toEqual({
     drawn: 2,
     failed: 1,
     opened: 2,
   });
-  expect(visualCounts(d as never, 400, 500)).toEqual({
+  expect(visualCounts(d, 400, 500)).toEqual({
     drawn: 0,
     failed: 0,
     opened: 0,
@@ -74,12 +67,12 @@ test("web counts the webfetch and websearch calls, done and failed", () => {
   // outside [since, until)
   tool("webfetch", 49);
   tool("websearch", 200);
-  expect(webCounts(d as never, 50, 200)).toEqual({
+  expect(webCounts(d, 50, 200)).toEqual({
     fetches: 2,
     searches: 1,
     failed: 2,
   });
-  expect(webCounts(d as never, 400, 500)).toEqual({
+  expect(webCounts(d, 400, 500)).toEqual({
     fetches: 0,
     searches: 0,
     failed: 0,
@@ -104,7 +97,7 @@ test("opened visuals start from the opened files and count as the join did", () 
     )
     .get(50, 200)!.opened;
   expect(joined).toBe(2);
-  expect(visualCounts(d as never, 50, 200).opened).toBe(joined);
+  expect(visualCounts(d, 50, 200).opened).toBe(joined);
   const plan = d
     .query<{ detail: string }, [number, number]>(
       `explain query plan ${VISUAL_OPENS}`,

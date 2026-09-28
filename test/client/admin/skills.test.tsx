@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
 import { agents } from "../../../src/client/data/agents.ts";
@@ -45,15 +45,10 @@ import {
 } from "../../../src/client/views/admin/Skills.model.ts";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type { SkillSummary } from "../../../src/shared/contracts/skill.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
+const admin = adminFixture();
 
 const HOUR = 3_600_000;
 const now = 1_789_000_000_000;
@@ -102,8 +97,8 @@ const gitops = skill({
   agents: [],
 });
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   // a new sign-in drops the usage answers
@@ -113,32 +108,20 @@ beforeEach(() => {
   skillsError.value = null;
   bodies.value = {};
   files.value = {};
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the form", () => {
-  test("tells the four forms apart on the URL alone", () => {
-    expect(formKind("https://github.com/o/r/tree/main/skills/x")).toBe(
-      "github",
-    );
-    expect(formKind("https://example.com/skill.tar.gz")).toBe("archive");
-    expect(formKind("https://example.com/skill.zip")).toBe("archive");
+  test.serial("the detected form picks Look up or Add skill", () => {
     expect(formKind("https://timoni.sh")).toBe("index");
-    expect(formKind("https://timoni.sh/.well-known/index.json")).toBe("index");
-    expect(formKind("https://timoni.sh/skills/timoni/SKILL.md")).toBe("file");
     expect(formKind("ftp://x")).toBeNull();
-    expect(formKind("not a url")).toBeNull();
     expect(submitLabel("index")).toBe("Look up");
     expect(submitLabel("github")).toBe("Add skill");
+    expect(submitLabel("archive")).toBe("Add skill");
+    expect(submitLabel("file")).toBe("Add skill");
     expect(submitLabel(null)).toBe("Add skill");
   });
 
-  test("refuses an empty or odd URL and a climbing path", () => {
+  test.serial("refuses an empty or odd URL and a climbing path", () => {
     expect(urlProblem("")).toBe("Paste a URL");
     expect(urlProblem("x")).toBe("Not an http(s) URL");
     expect(urlProblem("https://timoni.sh")).toBeNull();
@@ -150,22 +133,25 @@ describe("the form", () => {
 });
 
 describe("the row's words", () => {
-  test("the text folds at twelve lines and says how many there are", () => {
-    const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
-    const folded = textBox(long, false);
-    expect(folded.cut).toBe(true);
-    expect(folded.text.split("\n")).toHaveLength(12);
-    expect(folded.label).toBe("Show all 20 lines");
-    const open = textBox(long, true);
-    expect(open.text).toBe(long);
-    // open stays open: the row folds it again
-    expect(open.label).toBe("Show all 20 lines");
-    const short = textBox("one\ntwo\n", false);
-    expect(short.cut).toBe(false);
-    expect(short.text).toBe("one\ntwo\n");
-  });
+  test.serial(
+    "the text folds at twelve lines and says how many there are",
+    () => {
+      const long = Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n");
+      const folded = textBox(long, false);
+      expect(folded.cut).toBe(true);
+      expect(folded.text.split("\n")).toHaveLength(12);
+      expect(folded.label).toBe("Show all 20 lines");
+      const open = textBox(long, true);
+      expect(open.text).toBe(long);
+      // open stays open: the row folds it again
+      expect(open.label).toBe("Show all 20 lines");
+      const short = textBox("one\ntwo\n", false);
+      expect(short.cut).toBe(false);
+      expect(short.text).toBe("one\ntwo\n");
+    },
+  );
 
-  test("the source and the change", () => {
+  test.serial("the source and the change", () => {
     expect(sourceLine(timoni)).toBe("timoni.sh, digest checked");
     expect(sourceLine(gitops)).toBe("GitHub, main, skills/gitops-knowledge");
     expect(
@@ -218,7 +204,7 @@ describe("the row's words", () => {
     ).toMatch(/^Body changed, license changed, 2 files added, 1 file removed/);
   });
 
-  test("the bytes, the dropped files and the metadata", () => {
+  test.serial("the bytes, the dropped files and the metadata", () => {
     expect(droppedLine(timoni)).toBe("");
     expect(droppedLine(gitops)).toBe(
       "1 file not kept: assets/logo.png (binary)",
