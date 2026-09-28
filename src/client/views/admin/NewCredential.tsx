@@ -37,7 +37,6 @@ import {
   draftOf,
   HEADER_PLACEHOLDER,
   keyHint,
-  PREFIX_HINT,
   problemOf,
   TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
@@ -138,7 +137,6 @@ function Form() {
             name="prefix"
             value={d.prefix}
             placeholder="https://api.github.com/"
-            hint={PREFIX_HINT}
             required
             wide
             save={save}
@@ -182,9 +180,7 @@ function Form() {
               )}
             </div>
             {d.projectIds.length === 0 ? (
-              <span class="hint">
-                None yet. It signs nothing until a project is added.
-              </span>
+              <span class="hint">No projects yet.</span>
             ) : (
               <RowsList>
                 <ProjectRows

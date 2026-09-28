@@ -445,7 +445,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   projects, the key file as `RowsMeta`, `bad` when missing or unusable;
   New credential in the page's head, the aside adding the `http-` key
   files with the credential that reads each. While web access is off
-  the list and a credential's page say credentials sign nothing.
+  the list and a credential's page say no credential is used.
 - **A credential is a page.** `/admin/config/web/credentials/:name`
   (`CredentialPage.tsx`, the fields in `CredentialFields.tsx`, the words
   and bodies in `Credentials.model.ts`), the crumb's own step a switcher

@@ -55,7 +55,6 @@ import {
   HEADER_PLACEHOLDER,
   keyHint,
   keyLine,
-  PREFIX_HINT,
   TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
   teamsOf,
@@ -251,7 +250,6 @@ function RequestCard(props: CardProps) {
             name="prefix"
             value={card.d.prefix}
             placeholder="https://api.github.com/"
-            hint={PREFIX_HINT}
             required
             wide
             save={card.save}
@@ -314,7 +312,7 @@ function ProjectsCard(props: CardProps) {
       <Setting
         title="Projects"
         count={String(ids.length)}
-        line="Chats and runs in these projects sign with it."
+        line="Chats and runs in these projects can use it."
         list
         action={
           loaded && (
@@ -333,7 +331,7 @@ function ProjectsCard(props: CardProps) {
         {!loaded ? (
           <RowsNote>Loading</RowsNote>
         ) : ids.length === 0 ? (
-          <RowsNote>No projects. It signs nothing until one is added.</RowsNote>
+          <RowsNote>No projects yet.</RowsNote>
         ) : (
           <ProjectRows
             teams={teams}

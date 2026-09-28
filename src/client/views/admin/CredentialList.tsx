@@ -5,7 +5,7 @@
 // in name order, the name over its prefix and projects, the key file at
 // the right, marked when it is missing or cannot be used. The card's
 // head searches and counts; New credential is in the page's head. While
-// web access is off, one line says credentials sign nothing.
+// web access is off, one line says no credential is used.
 
 import { useSignal } from "@preact/signals";
 import { credentials } from "../../data/credentials.ts";

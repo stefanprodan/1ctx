@@ -34,9 +34,8 @@ export type CredentialDraft = {
 export const HEADER_PLACEHOLDER = "Authorization";
 export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
 export const TEMPLATE_HINT = "The key goes where {key} is";
-export const PREFIX_HINT = "Requests under it are signed. Narrow is better";
 export const WEB_OFF_NOTE =
-  "Web access is off. Credentials sign nothing until it is on.";
+  "Web access is off. No credential is used until it is on.";
 
 export function draftOf(c: CredentialSummary | null): CredentialDraft {
   if (c === null) {
@@ -232,7 +231,7 @@ export function teamsOf(
 
 // Delete's line: what stops when it goes
 export function deleteLine(c: Pick<CredentialSummary, "prefix">): string {
-  return `curl stops signing requests under ${c.prefix}.`;
+  return `curl stops adding the header to requests under ${c.prefix}.`;
 }
 
 // A card of a credential's page owns some fields. Its body is what it

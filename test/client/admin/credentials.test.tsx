@@ -152,7 +152,7 @@ describe("the model", () => {
     );
     expect(keyHint("", null)).toBe("An http- file in the secrets directory");
     expect(deleteLine(credential())).toBe(
-      "curl stops signing requests under https://finnhub.io/api/v1/.",
+      "curl stops adding the header to requests under https://finnhub.io/api/v1/.",
     );
     expect(projectsLine(credential())).toBe("finops");
     expect(projectsLine(credential({ projects: [] }))).toBe("no projects");
@@ -420,7 +420,7 @@ describe("the pages", () => {
     expect(html).not.toContain("<form");
   });
 
-  test.serial("the list says credentials sign nothing while web is off", () => {
+  test.serial("the list says no credential is used while web is off", () => {
     credentials.value = [credential()];
     tools.value = {
       builtin: [],
@@ -442,7 +442,7 @@ describe("the pages", () => {
     };
     const html = render(<CredentialList />);
     expect(html).toContain(
-      "Web access is off. Credentials sign nothing until it is on.",
+      "Web access is off. No credential is used until it is on.",
     );
   });
 
@@ -479,7 +479,7 @@ describe("the pages", () => {
     expect(html).toContain("Add project");
     expect(html).not.toContain('name="projectIds"');
     expect(html).toContain(
-      "curl stops signing requests under https://finnhub.io/api/v1/.",
+      "curl stops adding the header to requests under https://finnhub.io/api/v1/.",
     );
     // the crumb climbs to the tab, the switcher names the other
     expect(html).toContain('href="/admin/config/web/credentials"');
@@ -505,7 +505,7 @@ describe("the pages", () => {
     expect(html).toContain("Create credential");
     expect(html).toMatch(/type="submit"[^>]*disabled/);
     expect(html).toContain('href="/admin/config/web/credentials"');
-    expect(html).toContain("It signs nothing until a project is added.");
+    expect(html).toContain("No projects yet.");
     // GET and HEAD are on for a new one
     expect(html.match(/rows-check-on/g)).toHaveLength(2);
   });
