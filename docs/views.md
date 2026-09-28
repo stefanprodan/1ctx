@@ -419,9 +419,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has four tabs,** one view over `/admin/config/tools`
-  (Built-in), `/admin/config/tools/web`, `/admin/config/tools/visuals` and
-  `/admin/config/tools/limits`: Built-in lists every built-in schema, including
+- **The Tools page has three tabs,** one view over `/admin/config/tools`
+  (Built-in), `/admin/config/tools/web` and `/admin/config/tools/limits`: Built-in lists every built-in schema, including
   `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
   each row `RowsTitle` (the name over the first sentence) with its
   tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
@@ -443,21 +442,25 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   methods as boxes (GET and HEAD new), the rail's team projects as
   `RowsCheck` lines, a PATCH sending only the fields changed, and
   Delete asked once.
-- **The Visuals tab is settings sections,** apart from web access:
-  Tools, the visualize row in a `RowsList` with its tokens and its
-  switch (name and switch alone on a phone); CDNs (`VisualHosts.tsx`), a
-  box of origins one per line checked through `parseVisualHosts()` in
-  `shared/visual.ts` (the rule the server's `parseHosts()` runs per
-  entry), saved whole, Reset to defaults beside Save and the count of
-  the box's lines at the line's end; and Limits (`LimitsSection.tsx`,
-  the `visuals` scope over `useLimitsForm()` from `LimitsCard.tsx`), the
-  fields side by side. While visualize is off its row is `off` with Off
-  in place of its tokens, and both sections are `Section`'s `off`, faded
-  with every field and button disabled, the saved values kept.
+- **Config › Visuals is a page of cards.** `/admin/config/visuals`
+  (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
+  `Setting` cards, each its own form with a `DraftFoot`, nothing saved
+  before Save, the switch included. Visuals: the switch in the head, the
+  line saying what the saved state does, the `visualize` row under it
+  (`ToolRow`, which has no switch of its own). CDNs: the count in the
+  head, a box of origins one per line checked through
+  `parseVisualHosts()` in `shared/visual.ts` (the rule the server's
+  `parseHosts()` runs per entry), saved whole. Limits: the visual limits
+  side by side (`useLimitsForm()` from `LimitsCard.tsx` over their
+  names), a changed one's default beside its label. CDNs and Limits have
+  Use defaults in the head, which fills the draft and saves nothing. The
+  cards stay editable while the switch is off. The aside is the last 30
+  days from `GET /api/usage/visuals`: visualize calls drawn and failed,
+  and the files `open` put on a chat page as visuals.
 - **The Limits tab is a form per scope.** Limit fields are text boxes
   with `inputmode="decimal"`, never number inputs. Limits is a form per
   scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
-  saving the full set with the other scopes' saved values. A save or a
+  saving only its own limits. A save or a
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
 - **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one

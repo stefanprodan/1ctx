@@ -45,7 +45,6 @@ import {
   toolsTab,
   totalTokens,
   WHEN_WORDS,
-  withSaved,
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { Tools } from "../../../src/client/views/admin/Tools.tsx";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
@@ -294,32 +293,11 @@ describe("the limit words and units", () => {
     expect(defaultLine(rounds)).toBe("default 100");
   });
 
-  test.serial("a scope's save carries the other scope's saved values", () => {
-    const sent = withSaved(rows, "call", {
-      callTimeoutMs: 2000,
-      searchBodyBytes: 1024 * 1024,
-      resultCut: 40_000,
-    });
-    expect(sent).toMatchObject({
-      rounds: 100,
-      toolMs: 600_000,
-      callTimeoutMs: 2000,
-      searchBodyBytes: 1024 * 1024,
-      resultCut: 40_000,
-    });
-    const reset = withSaved(
-      rows,
-      "call",
-      defaultsOf(rows.filter((r) => r.scope === "call")),
-    );
+  test.serial("a reset sends the defaults of its own limits", () => {
+    const reset = defaultsOf(rows.filter((r) => r.scope === "call"));
     expect(reset.callTimeoutMs).toBe(20_000);
     expect(reset.searchBodyBytes).toBe(1024 * 1024);
-    expect(withSaved(rows, "send", { rounds: 3 }).callTimeoutMs).toBe(1500);
-    expect(withSaved(rows, "runs", { runsPerUser: 2 })).toMatchObject({
-      runsPerUser: 2,
-      rounds: 100,
-      callTimeoutMs: 1500,
-    });
+    expect(reset.rounds).toBeUndefined();
     expect(totalTokens([{ tokens: 96 }, { tokens: 2716 }])).toBe(2812);
     // another form's save moves only the change times: no re-seed
     expect(seedOf([{ ...timeout, changedAt: 99 }])).toBe(seedOf([timeout]));
@@ -448,12 +426,10 @@ describe("the page", () => {
   test.serial("the tab is the address, and Tools stays lit on it", () => {
     expect(toolsTab("/admin/config/tools")).toBe("builtin");
     expect(toolsTab("/admin/config/tools/web")).toBe("web");
-    expect(toolsTab("/admin/config/tools/visuals")).toBe("visuals");
     expect(toolsTab("/admin/config/tools/limits")).toBe("limits");
     expect(TOOLS_TABS.map((t) => t.label)).toEqual([
       "Built-in",
       "Web",
-      "Visuals",
       "Limits",
     ]);
     expect(onPage("/admin/config/tools/web", "/admin/config/tools")).toBe(true);
@@ -575,42 +551,6 @@ describe("the page", () => {
     const html = render(<Tools />);
     expect(html).toContain(ACCESS_WORDS.off);
     expect(html).toContain("Web access is off. websearch is not offered.");
-    // visualize is apart from web access
-    path.value = "/admin/config/tools/visuals";
-    expect(render(<Tools />)).toContain('aria-label="visualize on"');
-  });
-
-  test.serial("Visuals renders three sections: tools, CDNs, limits", () => {
-    tools.value = body({ ...fetchTool, hosts: ["https://cdn.example.com"] });
-    limits.value = rows;
-    path.value = "/admin/config/tools/visuals";
-    const html = render(<Tools />);
-    expect(html).not.toContain("rows-card");
-    expect(
-      [...html.matchAll(/section-title">([^<]+)</g)].map((m) => m[1]),
-    ).toEqual(["Tools", "CDNs", "Limits"]);
-    expect(html).toContain('section-text">Inline visualizations<');
-    // the row in an inset list, its tokens and sub line only from 720 up
-    expect(html).toContain('class="rows-list"');
-    expect(html.match(/role="switch"/g)).toHaveLength(1);
-    expect(html).toContain('aria-checked="true"');
-    expect(html).toMatch(/rows-meta-long">2\.72K tokens/);
-    expect(html).toContain("rows-sub rows-sub-wide");
-    expect(html).toMatch(/section-fact-end">1 of 16/);
-    // the CDNs, then the visual limits as text boxes with their units
-    expect(html.match(/<form/g)).toHaveLength(2);
-    expect(html).toContain('class="section-grid"');
-    expect(html).toContain('class="numberbox-input"');
-    expect(html).not.toContain('type="number"');
-    expect(html).not.toContain("section-off");
-    expect(html).toContain("Visuals per turn");
-    expect(html).toContain('name="maxVisuals"');
-    expect(html).not.toContain("Rounds");
-    expect(html).toMatch(
-      /<textarea name="hosts"[^>]*>https:\/\/cdn\.example\.com</,
-    );
-    expect(html).not.toContain("Web search");
-    expect(html).not.toContain("Per turn");
   });
 
   test.serial("Limits renders the fields", () => {

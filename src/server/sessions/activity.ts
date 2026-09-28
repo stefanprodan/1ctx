@@ -116,6 +116,37 @@ export function mcpServerCalls(
   return { ...total, servers };
 }
 
+export type VisualCounts = { drawn: number; failed: number; opened: number };
+
+// the visualize calls in a window, and the files `open` put on a chat
+// page as visuals, found through the bash rows that carry them
+export function visualCounts(
+  db: Db,
+  since: number,
+  until: number,
+): VisualCounts {
+  const calls = db
+    .query<{ drawn: number; failed: number }, [number, number]>(
+      `select coalesce(sum(status = 'done'), 0) as drawn,
+              coalesce(sum(status = 'failed'), 0) as failed
+         from messages
+        where kind = 'tool' and tool_name = 'visualize'
+          and created_at > ? and created_at <= ?`,
+    )
+    .get(since, until)!;
+  const files = db
+    .query<{ opened: number }, [number, number]>(
+      `select count(*) as opened
+         from messages t
+         join opened_files f on f.message_id = t.id
+        where t.kind = 'tool' and t.tool_name = 'bash'
+          and t.created_at > ? and t.created_at <= ?
+          and f.kind = 'visual'`,
+    )
+    .get(since, until)!;
+  return { ...calls, opened: files.opened };
+}
+
 export type SkillLoads = {
   loads: number;
   reads: number;

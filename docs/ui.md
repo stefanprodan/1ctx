@@ -83,8 +83,7 @@ client change. What each page draws is in `docs/views.md`.
   row that is itself a link (a stream row's author, an automation row's
   agent).
 - **A settings page is `ui/Section.tsx`.**
-  A settings page (the profile, a project's Settings, the Tools
-  page's Visuals tab) stacks `ui/Section.tsx`: a title and a line at
+  A settings page (the profile, a project's Settings) stacks `ui/Section.tsx`: a title and a line at
   the left, a `SectionForm` at the right. `section.css` holds the parts
   a form puts there: `.section-label` with a `.section-fact` (a
   changed value's default), `.section-grid` of short fields and

@@ -70,7 +70,7 @@ import {
   loadSkillUsage,
   skills,
 } from "../data/skills.ts";
-import { loadTools } from "../data/tools.ts";
+import { loadTools, loadVisualsUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
@@ -617,6 +617,17 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/admin/config/visuals",
+    view: lazy(() =>
+      import("../views/admin/Visuals.tsx").then((m) => m.Visuals),
+    ),
+    title: () => "Visuals",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadTools(), loadVisualsUsage()]);
+    },
+  },
+  {
     path: "/admin/config/tools",
     view: toolsView,
     title: () => "Tools",
@@ -631,13 +642,6 @@ export const ROUTES: Route[] = [
     load: async () => {
       await Promise.all([loadTools(), loadCredentials()]);
     },
-  },
-  {
-    path: "/admin/config/tools/visuals",
-    view: toolsView,
-    title: () => "Visuals",
-    role: "admin",
-    load: () => loadTools(),
   },
   {
     path: "/admin/config/tools/limits",

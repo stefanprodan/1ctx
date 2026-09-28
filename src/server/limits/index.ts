@@ -45,7 +45,7 @@ export type LimitsArea = {
   routes: RouteDescriptor[];
   current(): Limits;
   rows(): LimitRow[];
-  set(values: Limits, now: number): void;
+  set(values: Partial<Limits>, now: number): void;
   reset(): void;
 };
 
@@ -90,13 +90,15 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
     write();
     if (runCaps() !== before) deps.runCapsChanged?.();
   };
-  const set = (values: Limits, now: number): void =>
+  // only the names given; the rest keep what they hold
+  const set = (values: Partial<Limits>, now: number): void =>
     noticing(() => {
       transact(deps.db, () => {
         for (const name of LIMIT_NAMES) {
-          if (values[name] === LIMIT_DEFINITIONS[name].default)
-            store.delete(name);
-          else store.set(name, values[name], now);
+          const value = values[name];
+          if (value === undefined) continue;
+          if (value === LIMIT_DEFINITIONS[name].default) store.delete(name);
+          else store.set(name, value, now);
         }
         return { result: undefined };
       });

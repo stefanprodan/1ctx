@@ -12,7 +12,8 @@ mount in `docs/knowledge.md`.
   loop caps (rounds, calls per round and per send, tool time, result
   bytes, `toolWorkTokens`) and the per-tool caps have their defaults,
   floors and ceilings in one table, `limits/defaults.ts`; an admin's
-  override is a row in `limits`, `limits.current()` merges them, and
+  override is a row in `limits`, `PUT /api/limits` writing only the
+  limits it names, `limits.current()` merges them, and
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
   the defaults; `tools/` never imports `runner/`. The `chats` scope
   holds `archiveIdleDays` (1 to 180, default 30) and
