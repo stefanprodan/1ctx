@@ -218,8 +218,6 @@ client change. What each page draws is in `docs/views.md`.
   buttons' line in place of the hint. A card whose control sits in its
   head (a switch, a number box) puts its field refusal there too,
   through `DraftFoot`'s `hint`.
-  An action whose words never name a field passes
-  `{ whole: true }` to `act`, which skips `fieldOf`.
   A text field's input is `save.bind(signal)`, which clears the
   refusal on an edit. A name field's one check is `nameProblem()` in
   `lib/names.ts`. A row that can be deleted starts its foot with

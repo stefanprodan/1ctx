@@ -93,18 +93,12 @@ export class Save {
     }, this.doneMs);
   }
 
-  // `whole`: the refusal's words are not about the form's values (a
-  // check against a remote service), so no field takes it
-  async act(
-    action: string,
-    call: () => Promise<unknown>,
-    { whole = false }: { whole?: boolean } = {},
-  ): Promise<boolean> {
+  async act(action: string, call: () => Promise<unknown>): Promise<boolean> {
     if (this.busy) return false;
     this.clear();
     this.status.value = "idle";
     this.pending.value = action;
-    const failed = await this.attempt(call, whole);
+    const failed = await this.attempt(call);
     if (!this.live) return false;
     this.pending.value = null;
     if (failed !== null) {
@@ -124,16 +118,13 @@ export class Save {
     this.clear();
   }
 
-  private async attempt(
-    call: () => Promise<unknown>,
-    whole = false,
-  ): Promise<Problem | null> {
+  private async attempt(call: () => Promise<unknown>): Promise<Problem | null> {
     try {
       await call();
       return null;
     } catch (err) {
       const { words: error, status } = failure(err);
-      const field = whole ? undefined : this.fieldOf(error);
+      const field = this.fieldOf(error);
       return {
         error,
         ...(field === undefined ? {} : { field }),
