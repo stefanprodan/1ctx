@@ -1,14 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Config's board, in three tabs. Overview: every built-in tool, each
-// with its tokens, Off while no turn is offered it. Limits: how much a
-// turn or a run may do, and how runs go. Storage: the caps the disk is
-// sized by, retention with them. The aside, on every tab, counts what
-// the instance has and says what turns get from the web. Each card of
-// limits drafts and saves apart, and the cards stay drawn on another
-// tab so a draft outlives a look. The tab is the address, and the three
-// routes name this one view. A change applies to the next turn.
 
 import { useSignal } from "@preact/signals";
 import type { ToolsResponse } from "../../../shared/api/tools.ts";
@@ -45,6 +36,7 @@ export function ConfigBoard() {
   const rows = limits.value;
   const tab = configTab(path.value);
   const error = toolsError.value;
+  // drawn on every tab, so a draft outlives a look at another
   const cards = (groups: readonly LimitsGroup[], shown: boolean) =>
     rows && (
       <div class={`config-board-cards${shown ? "" : " config-board-away"}`}>
@@ -78,7 +70,7 @@ export function ConfigBoard() {
         <Split aside={<Aside state={state} />}>
           <div class="config-board">
             <Tabs
-              tabs={CONFIG_TABS.map(({ label, href }) => ({ label, href }))}
+              tabs={CONFIG_TABS}
               active={CONFIG_TABS.find((t) => t.tab === tab)!.href}
             />
             {tab === "overview" && <Builtins state={state} />}
@@ -91,8 +83,6 @@ export function ConfigBoard() {
   );
 }
 
-// one card of rows, one open at a time, the schemas' tokens together
-// in its head
 function Builtins({ state }: { state: ToolsResponse }) {
   const open = useSignal<string | null>(null);
   const rows = builtinsOf(state);
@@ -113,7 +103,6 @@ function Builtins({ state }: { state: ToolsResponse }) {
   );
 }
 
-// the same on every tab: what the instance has, each a link to its page
 function Aside({ state }: { state: ToolsResponse }) {
   const lines = instanceLines(state, {
     providers: providers.value,

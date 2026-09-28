@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Who a user is, as New user and the user page's Profile card both type
-// it: the username, shaped as it is typed, the full name, the email and
-// the time zone, two by two.
 
 import type { ComponentChildren } from "preact";
 import { shapedInput } from "../../lib/names.ts";
@@ -61,7 +57,6 @@ export function UserFields({
   who: Who;
   save: Save;
   onChange: (patch: Partial<Who>) => void;
-  // more fields in the same grid, New user's role and password
   children?: ComponentChildren;
 }) {
   return (

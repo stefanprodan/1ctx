@@ -1,16 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An agent's name, avatar, system prompt and whether it is the default,
-// the agent page's name card and New agent alike, New agent without
-// the default.
 
-import { useEffect, useRef } from "preact/hooks";
 import { AVATARS, MAX_NAME } from "../../../shared/words.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { shapedInput } from "../../lib/names.ts";
 import type { Save } from "../../lib/save.ts";
-import { touch } from "../../lib/touch.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { RowsCheck } from "../../ui/Rows.tsx";
 import type { AgentDrafts } from "./AgentPage.state.ts";
@@ -24,17 +18,12 @@ export function NameFields({
 }: {
   drafts: AgentDrafts;
   save: Save;
-  // the oldest agent while it is the default: the mark cannot come off
+  // the oldest while default: No hands the mark to the oldest
   kept?: boolean;
-  // a new agent: the name takes the caret, with a mouse, and there is
-  // no default mark to set
+  // a new agent has no mark to set
   fresh?: boolean;
 }) {
   const busy = save.busy;
-  const name = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (fresh && !touch()) name.current?.focus();
-  }, []);
   return (
     <>
       <div class="agent-page-pair">
@@ -42,7 +31,6 @@ export function NameFields({
           <span class="label">Name</span>
           <input
             name="name"
-            ref={name}
             autocomplete="off"
             spellcheck={false}
             maxLength={MAX_NAME}
@@ -97,8 +85,6 @@ export function NameFields({
         />
         <FieldError save={save} field="prompt" />
       </label>
-      {/* New agent leaves the mark to the agent's page. No hands it to
-          the oldest agent, so the oldest, while default, keeps it */}
       {!fresh && (
         <RowsCheck
           name="default"

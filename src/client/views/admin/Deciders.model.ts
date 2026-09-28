@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The words of the Deciders card: a decider's window and input price,
-// the providers a decider can run on, which field a refusal names,
-// and what a Check answered.
 
 import type { CheckDeciderResponse } from "../../../shared/api/deciders.ts";
 import { DECIDER_WIRES } from "../../../shared/contracts/decider.ts";
@@ -14,13 +10,10 @@ import { commas } from "../../lib/format.ts";
 export const NO_DECIDERS =
   "No deciders yet. Decisions stay off until one is added.";
 
-// only these wires answer decisions
 export const deciderProviders = (rows: ProviderSummary[]): ProviderSummary[] =>
   rows.filter((p) => (DECIDER_WIRES as readonly string[]).includes(p.wire));
 
-// the provider the form holds: the one picked while it is still
-// offered, else the first offered, else none; a provider may be
-// deleted, or the first eligible one added, on the same page
+// a provider may be deleted, or the first one added, on the same page
 export function heldProvider(
   offered: ProviderSummary[],
   picked: string,
@@ -28,15 +21,13 @@ export function heldProvider(
   return offered.some((p) => p.id === picked) ? picked : (offered[0]?.id ?? "");
 }
 
-// "$0.04 input" per million tokens, "free" at zero, empty when the
-// catalog did not say; a decision's output costs nothing
+// a decision's output costs nothing, so the input price is the price
 export function inputPriceLine(promptPrice: number | null): string {
   if (promptPrice === null) return "";
   if (promptPrice === 0) return "free";
   return `$${Number(promptPrice.toPrecision(3))} input`;
 }
 
-// "32K · $0.04 input": only the parts the catalog gave
 export function deciderMeta(m: {
   contextLength: number | null;
   promptPrice: number | null;
@@ -46,7 +37,6 @@ export function deciderMeta(m: {
     .join(" · ");
 }
 
-// "$0.000001": two significant digits, never an exponent
 export function checkCost(cost: number): string {
   if (cost <= 0) return "$0";
   const digits = Math.min(12, Math.max(2, 1 - Math.floor(Math.log10(cost))));
@@ -54,16 +44,12 @@ export function checkCost(cost: number): string {
   return `$${fixed}`;
 }
 
-// what a Check answered: how long it took, and what it cost when the
-// server named a cost
 export function checkLine(answer: CheckDeciderResponse): string {
   const took = `Answered in ${commas(Math.round(answer.ms))} ms`;
   return answer.cost === null ? took : `${took} for ${checkCost(answer.cost)}`;
 }
 
-// which field of the decider form a save's refusal names, matched on
-// the server's whole phrases so a provider's own name never steers it;
-// a Check never comes here, its refusal is always the foot's
+// the server's whole phrases, so a provider's name never steers the field
 const DECIDER_FIELDS: [RegExp, string][] = [
   [/^name must be /, "name"],
   [/^a decider named .+ exists$/, "name"],
@@ -78,8 +64,6 @@ export function deciderFieldOf(message: string): string | undefined {
   return DECIDER_FIELDS.find(([words]) => words.test(message))?.[1];
 }
 
-// the decisions a decider answers: those that name it, and while it is
-// the default those that name none
 export function askedBy<T extends { deciderId: string | null }>(
   decider: { id: string; default: boolean },
   decisions: T[],
@@ -90,8 +74,6 @@ export function askedBy<T extends { deciderId: string | null }>(
   );
 }
 
-// the words over a decider's Delete: where what it answers goes, or
-// nothing when it answers nothing
 export function deciderDeleteLine(
   decider: { id: string; default: boolean },
   all: { id: string }[],

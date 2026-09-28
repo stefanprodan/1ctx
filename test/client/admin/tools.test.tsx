@@ -35,7 +35,6 @@ import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
   collect,
   defaultLine,
-  defaultsOf,
   dirty,
   displayOf,
   draftOf,
@@ -50,9 +49,9 @@ import {
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { VISUAL_LIMITS } from "../../../src/client/views/admin/Visuals.model.ts";
 import {
+  accessBody,
   domainsFieldOf,
-  domainsOf,
-  keyLine,
+  searchKeyLine,
   searchLine,
   WEB_LIMITS,
 } from "../../../src/client/views/admin/WebAccess.model.ts";
@@ -302,11 +301,7 @@ describe("the limit words and units", () => {
     expect(defaultLine(rounds)).toBe("default 100");
   });
 
-  test.serial("a reset sends the defaults of its own limits", () => {
-    const reset = defaultsOf(rows.filter((r) => r.scope === "call"));
-    expect(reset.callTimeoutMs).toBe(20_000);
-    expect(reset.searchBodyBytes).toBe(1024 * 1024);
-    expect(reset.rounds).toBeUndefined();
+  test.serial("a card sums its tokens and re-seeds only on new values", () => {
     expect(totalTokens([{ tokens: 96 }, { tokens: 2716 }])).toBe(2812);
     // another form's save moves only the change times: no re-seed
     expect(seedOf([{ ...timeout, changedAt: 99 }])).toBe(seedOf([timeout]));
@@ -314,8 +309,10 @@ describe("the limit words and units", () => {
   });
 
   test.serial("the search lines and the first sentence", () => {
-    expect(keyLine("exa", true)).toBe("search-exa.key present");
-    expect(keyLine("firecrawl", false)).toBe("search-firecrawl.key keyless");
+    expect(searchKeyLine("exa", true)).toBe("search-exa.key present");
+    expect(searchKeyLine("firecrawl", false)).toBe(
+      "search-firecrawl.key keyless",
+    );
     expect(searchLine(search, "all")).toBe("websearch runs on exa.");
     expect(searchLine({ ...search, provider: "firecrawl" }, "listed")).toBe(
       "websearch runs on firecrawl keyless. " +
@@ -336,17 +333,19 @@ describe("the limit words and units", () => {
 
 describe("the domains box", () => {
   test("gives the sorted hosts a save sends", () => {
-    expect(domainsOf("GitHub.com\n\n docs.example.com \n")).toEqual({
-      domains: ["docs.example.com", "github.com"],
+    expect(accessBody("listed", "GitHub.com\n\n docs.example.com \n")).toEqual({
+      body: { mode: "listed", domains: ["docs.example.com", "github.com"] },
     });
   });
 
   test("an empty box and a line that is not a host are the field's words", () => {
-    expect(domainsOf(" \n")).toEqual({ error: "List at least one host." });
-    expect(domainsOf("github.com\n*.github.com")).toEqual({
+    expect(accessBody("listed", " \n")).toEqual({
+      error: "List at least one host.",
+    });
+    expect(accessBody("listed", "github.com\n*.github.com")).toEqual({
       error: "Line 2, *.github.com, is not a host name.",
     });
-    expect(domainsOf("https://github.com")).toEqual({
+    expect(accessBody("listed", "https://github.com")).toEqual({
       error: "Line 1, https://github.com, is not a host name.",
     });
   });

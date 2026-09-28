@@ -1,15 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An MCP server's Tools tab, a draft saved whole from the page's head,
-// which stays on screen: the three matcher lists, each matcher with the
-// tools it decides, in red when it matches none; then the tools by
-// name, each with its side and the matcher that set it, narrowed by the
-// search in the list's head and the side.
-// Picked tools move to a side by exact names, and the bar says which
-// ones a matcher earlier in the order keeps where they are. A tool
-// opens to its description and parameters, the one HTML, rendered on
-// the server.
 
 import { useSignal } from "@preact/signals";
 import type {
@@ -17,9 +7,10 @@ import type {
   McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
 import { decide, type Patterns, type ToolSide } from "../../../shared/mcp.ts";
-import { firstSentence } from "../../lib/format.ts";
+import { firstSentence, plural } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import type { Save } from "../../lib/save.ts";
+import { countOf } from "../../lib/search.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import {
   RowsCard,
@@ -31,7 +22,7 @@ import {
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { Setting } from "../../ui/Setting.tsx";
+import { Setting, SettingFoot, SettingForm } from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import type { McpDrafts } from "./McpPage.state.ts";
 import {
@@ -49,6 +40,7 @@ import {
   shownTools,
   sideCounts,
 } from "./McpTools.model.ts";
+import { ToolParams } from "./ToolParams.tsx";
 
 const FIELD: Record<MatcherSide, string> = {
   read: "readPatterns",
@@ -82,9 +74,7 @@ export function McpTools({
     save.touch();
   };
   const n = server.tools.length;
-  // the same foot under the matchers and under the list, so Save is near
-  // wherever the edit was made; an element each, since a vnode drawn in
-  // two places is patched as one
+  // an element per foot: a vnode drawn in two places is patched as one
   const foot = () => (
     <DraftFoot
       save={save}
@@ -96,34 +86,20 @@ export function McpTools({
     />
   );
   return (
-    <form
-      class="mcp-page-tools"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save} class="mcp-page-tools">
       <Setting title="Matchers" foot={foot()}>
         <Matchers
           server={server}
           patterns={patterns}
           busy={save.busy}
           save={save}
-          onEdit={(next) => edit(next)}
+          onEdit={edit}
         />
       </Setting>
       <RowsCard
         label="Tools"
-        search={
-          <Search
-            value={d.q.value}
-            onChange={(q) => {
-              d.q.value = q;
-            }}
-            placeholder="Search tools"
-          />
-        }
-        count={shown.length === n ? String(n) : `${shown.length} of ${n}`}
+        search={<Search query={d.q} placeholder="Search tools" />}
+        count={countOf(shown.length, n)}
         wrap
       >
         {n === 0 ? (
@@ -141,9 +117,9 @@ export function McpTools({
             <ToolRows drafts={d} tools={shown} decided={decided} />
           </>
         )}
-        <div class="mcp-page-foot">{foot()}</div>
+        <SettingFoot>{foot()}</SettingFoot>
       </RowsCard>
-    </form>
+    </SettingForm>
   );
 }
 
@@ -221,11 +197,11 @@ function MatcherLine({
               class={`tag mcp-page-chip${m.matches ? "" : " mcp-page-chip-none"}`}
               title={
                 m.matches
-                  ? `${m.pattern} decides ${m.decides} ${m.decides === 1 ? "tool" : "tools"}`
+                  ? `${m.pattern} decides ${plural(m.decides, "tool")}`
                   : `${m.pattern} matches no tool`
               }
             >
-              <span class="mcp-page-chip-name">{m.pattern}</span>
+              <span>{m.pattern}</span>
               <span class="mcp-page-chip-count">{m.decides}</span>
               <button
                 type="button"
@@ -279,9 +255,7 @@ function MatcherLine({
   );
 }
 
-// the line over the rows: the side filter, or while tools are picked
-// how many and the sides to move them to, in the same line so the rows
-// never move; the box at the end picks every tool shown that can move
+// the moves take the filter's place so the rows never move
 function Bar({
   server,
   drafts: d,
@@ -375,8 +349,7 @@ function Bar({
   );
 }
 
-// the picked tools to a side, the words of what moved kept for the head
-export function movePicked(
+function movePicked(
   server: McpServerSummary,
   d: McpDrafts,
   target: MatcherSide,
@@ -465,12 +438,7 @@ function ToolRows({
               {tool.description !== "" && (
                 <span class="mcp-page-tool-text">{tool.description}</span>
               )}
-              <div
-                class="mcp-page-tool-params"
-                // rendered on the server from the schema's JSON inside a
-                // code fence, as the Config board shows a built-in's
-                dangerouslySetInnerHTML={{ __html: tool.parametersHtml }}
-              />
+              <ToolParams tool={tool} />
             </div>
           </RowsOpen>
         );

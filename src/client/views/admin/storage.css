@@ -92,15 +92,6 @@
     .storage-top {
       grid-template-columns: 14px minmax(0, 1fr) 84px;
     }
-  }
-
-  /* a load under way keeps the last answer on screen, faded, with no
-     jump in the layout */
-  .storage-stale {
-    opacity: 0.5;
-    transition: opacity 0.2s;
-  }
-  @media (max-width: 719px) {
     .storage-limits {
       display: none;
     }

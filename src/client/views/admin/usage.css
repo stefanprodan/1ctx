@@ -50,11 +50,6 @@
   .usage-months .usage-step-off:hover {
     background: transparent;
   }
-  /* the last month stays on screen, faded, while another loads */
-  .usage-stale {
-    opacity: 0.5;
-    transition: opacity 0.2s;
-  }
 
   /* a phone's head keeps the crumb whole: the short month */
   @media (max-width: 719px) {

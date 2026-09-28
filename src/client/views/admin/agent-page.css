@@ -1,29 +1,6 @@
-/* An agent's page under Config: the failure line over the tabs, and
-   what the cards hold beside the settings card's parts. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .agent-page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 960px;
-  }
-
-  .agent-page-bad {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0 var(--space-1);
-    margin: 0;
-    font-size: var(--text-ui);
-    color: var(--attention);
-  }
-  .agent-page-bad-icon {
-    flex-shrink: 0;
-    margin-right: var(--space-1);
-  }
   .agent-page-bad-link {
     color: inherit;
     text-decoration: underline;
@@ -34,7 +11,6 @@
     text-decoration-color: currentColor;
   }
 
-  /* General: the name and the avatars side by side */
   .agent-page-pair {
     display: flex;
     flex-wrap: wrap;
@@ -67,96 +43,6 @@
     min-height: 160px;
   }
 
-  .agent-page-delete {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    width: 100%;
-  }
-  .agent-page-ask {
-    margin-right: auto;
-    font-size: var(--text-ui);
-    color: var(--fg);
-  }
-
-  /* Model: the id over the provider and the facts, Change at the right */
-  .agent-page-model {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .agent-page-model-words {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-  .agent-page-model-id {
-    font-family: var(--mono);
-    font-size: var(--text-mono);
-    overflow-wrap: anywhere;
-  }
-  .agent-page-model-meta {
-    font-size: var(--text-ui);
-    color: var(--dim);
-  }
-
-  /* Change: the search, the provider at a fixed width, Cancel */
-  .agent-page-change {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .agent-page-search {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .agent-page-provider {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--space-2);
-    width: 200px;
-    height: 36px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--fg);
-    font-family: inherit;
-    font-size: var(--text-ui);
-    cursor: pointer;
-  }
-  .agent-page-provider:hover {
-    background: var(--hover);
-  }
-  .agent-page-provider-key {
-    flex-shrink: 0;
-    color: var(--faint);
-  }
-  .agent-page-provider-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    text-align: left;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
-  .agent-page-provider-chevron {
-    flex-shrink: 0;
-    color: var(--faint);
-  }
-  /* five rows and half the next, the rest scrolled inside the frame */
-  .agent-page-results {
-    max-height: 300px;
-    overflow-y: auto;
-  }
-
   .agent-page-settings {
     display: flex;
     flex-wrap: wrap;
@@ -165,24 +51,19 @@
     padding-top: var(--space-4);
     border-top: 1px solid var(--line);
   }
-  /* the hint and a refusal differ in length: the field keeps its width
-     so the settings beside it never move; a phone gives it the line */
+  /* the hint and a refusal differ in length: a fixed width keeps the
+     settings beside it still */
   .agent-page-window {
     width: 290px;
     max-width: 100%;
-  }
-  @media (max-width: 719px) {
-    .agent-page-window {
-      width: 100%;
-    }
   }
   /* the preferred provider names its endpoint and its price */
   .agent-page-settings .pair-wide {
     min-width: 280px;
   }
 
-  /* MCP: the tool count and the access keep their width, so a pick
-     never moves the row */
+  /* the tool count and the access keep their width, so a pick never
+     moves the row */
   .agent-page-server-end {
     display: flex;
     flex-shrink: 0;
@@ -196,7 +77,6 @@
     white-space: nowrap;
     color: var(--faint);
   }
-  /* its labels never change, so its own width keeps the row still */
   .agent-page-access.seg {
     flex-wrap: nowrap;
     flex-shrink: 0;
@@ -236,36 +116,13 @@
   }
 
   @media (max-width: 719px) {
-    .agent-page-change {
-      flex-wrap: wrap;
-    }
-    .agent-page-search {
-      flex-basis: 100%;
-    }
-    .agent-page-picker {
-      flex: 1 1 auto;
-    }
-    .agent-page-provider {
+    .agent-page-window {
       width: 100%;
     }
-    .agent-page-results {
-      max-height: 264px;
-    }
-    /* the name and the remove on the first line, the tools and the
-       access under them */
     .agent-page-server-end {
       flex-basis: 100%;
       order: 5;
       justify-content: space-between;
-    }
-  }
-
-  /* a touch takes 44px around the remove, on any touch screen */
-  @media (pointer: coarse) {
-    .agent-page-remove.btn-icon {
-      width: 44px;
-      height: 44px;
-      margin: -6px -6px -6px 0;
     }
   }
 }

@@ -7,7 +7,10 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { deciders, decisionUsage } from "../../../src/client/data/deciders.ts";
+import {
+  deciders,
+  loadDecisionUsage,
+} from "../../../src/client/data/deciders.ts";
 import {
   decisions,
   decisionsError,
@@ -352,17 +355,32 @@ describe("the pages", () => {
     );
   });
 
-  test.serial("the aside has its last 30 days", () => {
+  test.serial("the aside has its last 30 days, kept per decision", async () => {
+    // a sign-in change drops every answer
+    me.value = null;
+    me.value = admin;
     deciders.value = [judge];
     decisions.value = [plain];
-    decisionUsage.value = null;
     expect(page()).toContain("Loading");
-    decisionUsage.value = {
-      of: "run-attention",
-      usage: { since: 0, until: 1, answers: 7, tokens: 900, cost: null },
+    const asked: string[] = [];
+    answer = (url) => {
+      asked.push(url);
+      return Response.json({
+        since: 0,
+        until: 1,
+        answers: 7,
+        tokens: 900,
+        cost: null,
+      });
     };
-    expect(page()).toMatch(/Answers[\s\S]*?7/);
-    expect(page()).toContain("not priced");
-    decisionUsage.value = null;
+    await loadDecisionUsage("run-attention");
+    expect(asked).toEqual(["/api/decisions/run-attention/usage"]);
+    const html = page();
+    expect(html).toMatch(/Answers[\s\S]*?7/);
+    expect(html).toContain("not priced");
+    expect(html).toContain('href="/admin/monitor/usage"');
+    answer = () => new Response("no", { status: 500 });
+    await loadDecisionUsage("run-attention");
+    expect(page()).toContain("Did not load.");
   });
 });

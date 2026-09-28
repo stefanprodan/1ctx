@@ -1,18 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The MCP pages' model, tested without a DOM: the change line, a
-// pattern list as text, the timeout in seconds, the key hint, the
-// instructions box trimmed to its first lines, a refusal's field, and
-// the agent form's preview of what a send would carry from the rows
-// loaded.
 
+import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   AgentServer,
   McpChange,
   McpServerSummary,
 } from "../../../shared/contracts/mcp.ts";
 import {
+  classify,
   MAX_INSTRUCTIONS_BLOCK,
   offeredServers,
   promptSnapshot,
@@ -23,15 +19,13 @@ import {
   MCP_TIMEOUT_MS,
   type McpMode,
 } from "../../../shared/words.ts";
-import { ago } from "../../lib/format.ts";
+import { ago, commas, plural, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
 
-// what the last refresh changed, as one line
 export function changeLine(change: McpChange | null, now: number): string {
   if (change === null) return "";
   const parts: string[] = [];
-  const word = (n: number, what: string) =>
-    `${n} ${n === 1 ? "tool" : "tools"} ${what}`;
+  const word = (n: number, what: string) => `${plural(n, "tool")} ${what}`;
   if (change.added.length > 0) parts.push(word(change.added.length, "added"));
   if (change.removed.length > 0) {
     parts.push(
@@ -52,11 +46,7 @@ export function changeLine(change: McpChange | null, now: number): string {
   return `${ago(change.at, now)}: ${parts.join(", ")}`;
 }
 
-export function patternText(list: string[]): string {
-  return list.join("\n");
-}
-
-// the timeout field holds seconds; empty is the limits' value
+// empty is the limits' value
 export function timeoutText(ms: number | null): string {
   return ms === null ? "" : String(ms / 1000);
 }
@@ -97,8 +87,6 @@ export function isModeValue(value: string): value is McpMode {
   return (MCP_MODES as readonly string[]).includes(value);
 }
 
-// the instructions box: the block as the prompt carries it, its first
-// lines when folded; a block of INSTRUCTIONS_LINES or fewer is never cut
 const INSTRUCTIONS_LINES = 12;
 
 export function instructionsBox(
@@ -113,19 +101,12 @@ export function instructionsBox(
   };
 }
 
-// the Instructions card's line, as its switch is drafted
 export function instructionsLine(on: boolean): string {
   return on
     ? "Agents get these instructions in their system prompt."
     : "Agents do not get these instructions.";
 }
 
-export function characters(n: number): string {
-  return `${n.toLocaleString("en-US")} characters`;
-}
-
-// the agent form's preview from the rows loaded: what the prompt would
-// carry, the servers a cap leaves out, and the block to view
 export function promptPreview(
   rows: McpServerSummary[],
   links: AgentServer[],
@@ -133,7 +114,6 @@ export function promptPreview(
   line: string;
   warnings: string[];
   text: string;
-  // the block's characters, and the servers whose instructions it holds
   count: number;
   from: string[];
 } {
@@ -142,7 +122,7 @@ export function promptPreview(
   const warnings: string[] = [];
   for (const name of snapshot.leftForInstructions) {
     warnings.push(
-      `${name} left out: over the ${MAX_INSTRUCTIONS_BLOCK.toLocaleString("en-US")} cap`,
+      `${name} left out: over the ${commas(MAX_INSTRUCTIONS_BLOCK)} cap`,
     );
   }
   for (const name of snapshot.leftForSchemas) {
@@ -160,7 +140,7 @@ export function promptPreview(
   const line =
     snapshot.text === ""
       ? ""
-      : `Instructions in the prompt: ${snapshot.text.length.toLocaleString("en-US")} of ${MAX_INSTRUCTIONS_BLOCK.toLocaleString("en-US")} characters, from ${from.join(", ")}`;
+      : `Instructions in the prompt: ${commas(snapshot.text.length)} of ${commas(MAX_INSTRUCTIONS_BLOCK)} characters, from ${from.join(", ")}`;
   return {
     line,
     warnings,
@@ -170,7 +150,7 @@ export function promptPreview(
   };
 }
 
-// the sides a server offers, as one pick; write alone has no option
+// write alone has no option
 export type Offer = "off" | "read" | "write";
 
 export const OFFER_OPTIONS: { value: Offer; label: string }[] = [
@@ -188,7 +168,6 @@ export function offerSides(offer: Offer): { read: boolean; write: boolean } {
   return { read: offer !== "off", write: offer === "write" };
 }
 
-// which field of the form a refusal names
 export function mcpFieldOf(message: string): string | undefined {
   for (const field of [
     "name",
@@ -202,10 +181,40 @@ export function mcpFieldOf(message: string): string | undefined {
     if (message.startsWith(field)) return field;
   }
   if (message.startsWith("an MCP server named")) return "name";
-  // a discovery that failed is the endpoint's: the key it refused, or
-  // the address that did not answer as a server should
+  // a failed discovery is the endpoint's: the key or the address
   if (message.startsWith("the MCP server refused the key")) return "keyName";
   if (message.startsWith("the MCP server is refreshing")) return undefined;
   if (/^(the MCP server|MCP request)\b/.test(message)) return "url";
   return undefined;
+}
+
+export const usersOf = (
+  agents: readonly AgentSummary[],
+  serverId: string,
+): AgentSummary[] =>
+  agents.filter((a) => a.servers.some((s) => s.serverId === serverId));
+
+export function sidesLine(server: McpServerSummary): string {
+  const sides = classify(server.name, server.tools, {
+    read: server.readPatterns,
+    write: server.writePatterns,
+    excluded: server.excludedPatterns,
+  });
+  let read = 0;
+  let write = 0;
+  for (const side of sides.values()) {
+    if (side === "read") read++;
+    else if (side === "write") write++;
+  }
+  return [
+    server.read ? `${read} read` : "read off",
+    server.write ? `${write} write` : "write off",
+  ].join(" · ");
+}
+
+export function deleteLine(users: number): string {
+  if (users === 0) return "No agent uses it.";
+  return `${pluralCommas(users, "agent uses", "agents use")} it. Remove it from ${
+    users === 1 ? "that agent" : "them"
+  } first.`;
 }

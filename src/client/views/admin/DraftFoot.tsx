@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The foot of an agent page's card that drafts: that a change waits,
-// or the words the view puts in its place (a name taken), or why a
-// save failed, then Discard and Save, both off until something changed.
 
 import type { ComponentChildren } from "preact";
 import type { Save } from "../../lib/save.ts";
@@ -21,17 +17,13 @@ export function DraftFoot({
 }: {
   save: Save;
   dirty: boolean;
-  // a draft that cannot be saved as it is: Save stays off
   blocked?: boolean;
-  // an edit is open: Discard closes it though nothing changed yet
+  // Discard closes an open edit with nothing changed
   open?: boolean;
-  // another card of the page is saving
   locked?: boolean;
-  // in place of the hint
   hint?: ComponentChildren;
   onDiscard: () => void;
 }) {
-  // nothing at rest; on a phone the words wrap beside the buttons
   const words = hint ?? (dirty ? "Unsaved changes" : undefined);
   return (
     <Foot

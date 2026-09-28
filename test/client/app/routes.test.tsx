@@ -110,6 +110,23 @@ describe("the route table's shape", () => {
     ).toEqual(["/things/:id overlaps /things/new"]);
   });
 
+  test("a page's tabs share one view and title each tab", () => {
+    const tabs = [
+      ["/admin/config/mcp/x1", "x1"],
+      ["/admin/config/mcp/x1/tools", "x1 tools"],
+    ] as const;
+    const views = new Set();
+    for (const [at, title] of tabs) {
+      const m = match(at);
+      views.add(m?.route.view);
+      expect(m?.route.title(m.params)).toBe(title);
+    }
+    expect(views.size).toBe(1);
+    expect(match("/admin/config/web")?.route.view).toBe(
+      match("/admin/config/web/credentials")?.route.view,
+    );
+  });
+
   test("a malformed segment matches nothing", () => {
     const routes = [{ ...ROUTES[0], path: "/things/:id" }];
     expect(match("/things/%E0%A4%A", routes)).toBeNull();

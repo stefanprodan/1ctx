@@ -1,29 +1,25 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An MCP server's General tab, a card per setting that saves apart,
-// each sending only its own fields: what the server said about itself
-// with Refresh, the endpoint (its save lists the tools again first, and
-// a refusal keeps what was typed), the sides agents may be offered, the
-// call timeout, the instructions as the prompt carries them, then the
-// agents that use it and Delete from McpUsedBy.tsx.
 
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
-import { useRef } from "preact/hooks";
 import type {
   McpChange,
   McpServerSummary,
 } from "../../../shared/contracts/mcp.ts";
+import { AgentLinks } from "../../agents/AgentLinks.tsx";
+import { agents } from "../../data/agents.ts";
 import {
   callTimeoutMs,
+  deleteServer,
   keys,
   loadMcp,
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { ago, showAll } from "../../lib/format.ts";
-import { at, useAction, useFocusField, useSave } from "../../lib/save.ts";
+import { ago, commas, plural, showAll } from "../../lib/format.ts";
+import { configAgentHref } from "../../lib/hrefs.ts";
+import { at, useAction, useSave } from "../../lib/save.ts";
+import { byName } from "../../lib/search.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Fold } from "../../ui/Fold.tsx";
@@ -31,11 +27,18 @@ import { NumberBox } from "../../ui/NumberBox.tsx";
 import { RowsSwitch } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
-import { Setting } from "../../ui/Setting.tsx";
+import {
+  Setting,
+  SettingDelete,
+  SettingFact,
+  SettingFacts,
+  SettingForm,
+} from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 import {
   changeLine,
-  characters,
+  deleteLine,
   instructionsBox,
   instructionsLine,
   mcpFieldOf,
@@ -46,9 +49,9 @@ import {
   timeoutMs,
   timeoutProblem,
   timeoutText,
+  usersOf,
 } from "./Mcp.model.ts";
 import type { McpDrafts } from "./McpPage.state.ts";
-import { DeleteCard, UsedBy } from "./McpUsedBy.tsx";
 
 type Props = { server: McpServerSummary; drafts: McpDrafts };
 
@@ -61,34 +64,7 @@ export function McpGeneral({ server, drafts, now }: Props & { now: number }) {
       <Timeout server={server} drafts={drafts} />
       <Instructions server={server} drafts={drafts} />
       <UsedBy server={server} />
-      <DeleteCard server={server} />
-    </>
-  );
-}
-
-// the row a save answered, read when the call ends: a later render may
-// have a newer one
-function useLatest(server: McpServerSummary) {
-  const latest = useRef(server);
-  latest.current = server;
-  return latest;
-}
-
-function Fact({
-  label,
-  mono,
-  children,
-}: {
-  label: string;
-  mono?: boolean;
-  children: ComponentChildren;
-}) {
-  return (
-    <>
-      <span class="label">{label}</span>
-      <span class={`mcp-page-fact${mono ? " mcp-page-fact-mono" : ""}`}>
-        {children}
-      </span>
+      <Delete server={server} />
     </>
   );
 }
@@ -116,11 +92,8 @@ function Change({ change, now }: { change: McpChange; now: number }) {
   );
 }
 
-// what the server said about itself and when its tools were listed;
-// Refresh lists them again
 function About({ server, now }: { server: McpServerSummary; now: number }) {
   const refresh = useAction();
-  const n = server.tools.length;
   return (
     <Setting
       title="About"
@@ -134,7 +107,7 @@ function About({ server, now }: { server: McpServerSummary; now: number }) {
               try {
                 await refreshServer(server.id);
               } catch (err) {
-                // the failed route has no row: read the failure it kept
+                // the failed route answers no row: the list holds the failure
                 await loadMcp();
                 throw err;
               }
@@ -145,23 +118,23 @@ function About({ server, now }: { server: McpServerSummary; now: number }) {
         </button>
       }
     >
-      <div class="mcp-page-facts">
-        <Fact label="Server" mono>
+      <SettingFacts>
+        <SettingFact label="Server" mono>
           {`${server.serverName || "unnamed"} ${server.serverVersion}`.trim()}
-        </Fact>
-        <Fact label="Protocol" mono>
+        </SettingFact>
+        <SettingFact label="Protocol" mono>
           {server.protocolVersion || "unknown"}
-        </Fact>
-        <Fact label="Tools">
-          {`${n} ${n === 1 ? "tool" : "tools"}, listed ${ago(server.checkedAt, now)}`}
-        </Fact>
+        </SettingFact>
+        <SettingFact label="Tools">
+          {`${plural(server.tools.length, "tool")}, listed ${ago(server.checkedAt, now)}`}
+        </SettingFact>
         {server.lastChange !== null && (
-          <Fact label="Last change">
+          <SettingFact label="Last change">
             <Change change={server.lastChange} now={now} />
-          </Fact>
+          </SettingFact>
         )}
-      </div>
-      {/* a recorded failure is already the page's head */}
+      </SettingFacts>
+      {/* a recorded failure is already the page's alert */}
       {refresh.failure.value !== null && server.refreshError === null && (
         <p class="error mcp-page-said" role="alert">
           {refresh.failure.value}
@@ -171,11 +144,8 @@ function About({ server, now }: { server: McpServerSummary; now: number }) {
   );
 }
 
-// the address and the key; a save lists the tools there first, and a
-// server that does not answer keeps what was typed with its words
 function Endpoint({ server, drafts: d }: Props) {
   const latest = useLatest(server);
-  const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
     const s = latest.current;
     const body: { url?: string; keyName?: string | null } = {};
@@ -185,25 +155,20 @@ function Endpoint({ server, drafts: d }: Props) {
     if (key !== s.keyName) body.keyName = key;
     d.resetEndpoint(await patchServer(s.id, body));
   }, mcpFieldOf);
-  useFocusField(save, form);
   const invalid = (field: string) => save.fieldError(field) !== null;
-  const dirty = d.endpointDirty(server);
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(
-          at("url", d.url.value.trim() === "" ? "A URL is required" : null),
-        );
-      }}
+    <SettingForm
+      save={save}
+      check={() =>
+        at("url", d.url.value.trim() === "" ? "A URL is required" : null)
+      }
     >
       <Setting
         title="Endpoint"
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
+            dirty={d.endpointDirty(server)}
             onDiscard={() => d.resetEndpoint(latest.current)}
           />
         }
@@ -252,16 +217,14 @@ function Endpoint({ server, drafts: d }: Props) {
           </div>
         </div>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// the most an agent may be given; an agent picks Read, or Read and
-// write, within them
 function Offered({ server, drafts: d }: Props) {
   const latest = useLatest(server);
   const save = useSave(async () => {
-    d.resetSettings(
+    d.resetOffer(
       await patchServer(latest.current.id, {
         read: d.read.value,
         write: d.write.value,
@@ -274,14 +237,8 @@ function Offered({ server, drafts: d }: Props) {
     d.write.value = sides.write;
     save.touch();
   };
-  const dirty = d.read.value !== server.read || d.write.value !== server.write;
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Offered to agents"
         line="Tool set access"
@@ -297,37 +254,28 @@ function Offered({ server, drafts: d }: Props) {
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
-            onDiscard={() => {
-              d.read.value = latest.current.read;
-              d.write.value = latest.current.write;
-            }}
+            dirty={d.offerDirty(server)}
+            onDiscard={() => d.resetOffer(latest.current)}
           />
         }
       />
-    </form>
+    </SettingForm>
   );
 }
 
 function Timeout({ server, drafts: d }: Props) {
   const latest = useLatest(server);
-  const form = useRef<HTMLFormElement>(null);
   const save = useSave(async () => {
-    const saved = await patchServer(latest.current.id, {
-      timeoutMs: timeoutMs(d.timeout.value),
-    });
-    d.timeout.value = timeoutText(saved.timeoutMs);
+    d.resetTimeout(
+      await patchServer(latest.current.id, {
+        timeoutMs: timeoutMs(d.timeout.value),
+      }),
+    );
   }, mcpFieldOf);
-  useFocusField(save, form);
-  const dirty = timeoutMs(d.timeout.value) !== server.timeoutMs;
-  const limit = callTimeoutMs.value;
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(at("timeoutMs", timeoutProblem(d.timeout.value)));
-      }}
+    <SettingForm
+      save={save}
+      check={() => at("timeoutMs", timeoutProblem(d.timeout.value))}
     >
       <Setting
         title="Call timeout"
@@ -335,15 +283,13 @@ function Timeout({ server, drafts: d }: Props) {
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
+            dirty={d.timeoutDirty(server)}
             hint={
               save.fieldError("timeoutMs") !== null ? (
                 <FieldError save={save} field="timeoutMs" />
               ) : undefined
             }
-            onDiscard={() => {
-              d.timeout.value = timeoutText(latest.current.timeoutMs);
-            }}
+            onDiscard={() => d.resetTimeout(latest.current)}
           />
         }
         action={
@@ -352,7 +298,7 @@ function Timeout({ server, drafts: d }: Props) {
             name="timeoutMs"
             class="mcp-page-timeout"
             unit="s"
-            placeholder={timeoutText(limit)}
+            placeholder={timeoutText(callTimeoutMs.value)}
             invalid={save.fieldError("timeoutMs") !== null}
             disabled={save.busy}
             value={d.timeout.value}
@@ -363,11 +309,10 @@ function Timeout({ server, drafts: d }: Props) {
           />
         }
       />
-    </form>
+    </SettingForm>
   );
 }
 
-// the block as the prompt carries it; the switch leaves it out
 function Instructions({ server, drafts: d }: Props) {
   const latest = useLatest(server);
   const open = useSignal(false);
@@ -385,15 +330,10 @@ function Instructions({ server, drafts: d }: Props) {
   }
   const box = instructionsBox(server.name, server.instructions, open.value);
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Instructions"
-        count={characters(box.count)}
+        count={`${commas(box.count)} characters`}
         line={instructionsLine(d.instructionsOn.value)}
         foot={
           <DraftFoot
@@ -426,6 +366,40 @@ function Instructions({ server, drafts: d }: Props) {
           <pre class="textbox mcp-page-block">{box.text}</pre>
         </Fold>
       </Setting>
-    </form>
+    </SettingForm>
+  );
+}
+
+function UsedBy({ server }: { server: McpServerSummary }) {
+  const users = byName(usersOf(agents.value ?? [], server.id));
+  // Delete's line says no agent uses it
+  if (users.length === 0) return null;
+  return (
+    <Setting list title="Used by" count={String(users.length)}>
+      <AgentLinks
+        agents={users}
+        href={(a) => configAgentHref(a.name, "mcp")}
+        sub={(a) =>
+          a.servers.find((s) => s.serverId === server.id)?.write
+            ? "Read and write"
+            : "Read"
+        }
+      />
+    </Setting>
+  );
+}
+
+function Delete({ server }: { server: McpServerSummary }) {
+  const used = usersOf(agents.value ?? [], server.id).length;
+  return (
+    <SettingDelete
+      title={`Delete ${server.name}`}
+      line={deleteLine(used)}
+      ask={`Delete ${server.name}?`}
+      // the server refuses to delete a server an agent uses
+      off={used > 0}
+      onDelete={() => deleteServer(server.id)}
+      leaveTo="/admin/config/mcp"
+    />
   );
 }

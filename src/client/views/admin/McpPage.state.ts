@@ -1,19 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An MCP server page's drafts, one per card that saves apart: the
-// endpoint, the sides and the timeout, the instructions switch, and the
-// Tools tab's three matcher lists with its search, side, picks and the
-// words of the last move. The page holds one per server, so a draft
-// outlives a tab switch and goes with a pick of another server. Each
-// card sends only its own fields, so a card at rest follows the row
-// another card's save answered.
 
 import { signal } from "@preact/signals";
 import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import type { Patterns } from "../../../shared/mcp.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
-import { patternText, timeoutMs, timeoutText } from "./Mcp.model.ts";
+import { timeoutMs, timeoutText } from "./Mcp.model.ts";
 import type { SideFilter } from "./McpTools.model.ts";
 
 const patternsOf = (s: McpServerSummary): Patterns => ({
@@ -22,10 +14,13 @@ const patternsOf = (s: McpServerSummary): Patterns => ({
   excluded: s.excludedPatterns,
 });
 
+const sameList = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((p, i) => p === b[i]);
+
 const samePatterns = (a: Patterns, b: Patterns) =>
-  patternText(a.read) === patternText(b.read) &&
-  patternText(a.write) === patternText(b.write) &&
-  patternText(a.excluded) === patternText(b.excluded);
+  sameList(a.read, b.read) &&
+  sameList(a.write, b.write) &&
+  sameList(a.excluded, b.excluded);
 
 export class McpDrafts {
   readonly url = signal("");
@@ -44,12 +39,11 @@ export class McpDrafts {
   // what the last move did, until the next edit
   readonly moved = signal<string[]>([]);
 
-  constructor(readonly serverId: string) {}
-
   static of(server: McpServerSummary): McpDrafts {
-    const d = new McpDrafts(server.id);
+    const d = new McpDrafts();
     d.resetEndpoint(server);
-    d.resetSettings(server);
+    d.resetOffer(server);
+    d.resetTimeout(server);
     d.resetInstructions(server);
     d.resetTools(server);
     return d;
@@ -60,9 +54,12 @@ export class McpDrafts {
     this.keyName.value = s.keyName ?? NO_KEY;
   }
 
-  resetSettings(s: McpServerSummary): void {
+  resetOffer(s: McpServerSummary): void {
     this.read.value = s.read;
     this.write.value = s.write;
+  }
+
+  resetTimeout(s: McpServerSummary): void {
     this.timeout.value = timeoutText(s.timeoutMs);
   }
 
@@ -81,12 +78,12 @@ export class McpDrafts {
     return this.url.value.trim() !== s.url || key !== s.keyName;
   }
 
-  settingsDirty(s: McpServerSummary): boolean {
-    return (
-      this.read.value !== s.read ||
-      this.write.value !== s.write ||
-      timeoutMs(this.timeout.value) !== s.timeoutMs
-    );
+  offerDirty(s: McpServerSummary): boolean {
+    return this.read.value !== s.read || this.write.value !== s.write;
+  }
+
+  timeoutDirty(s: McpServerSummary): boolean {
+    return timeoutMs(this.timeout.value) !== s.timeoutMs;
   }
 
   instructionsDirty(s: McpServerSummary): boolean {
@@ -97,16 +94,16 @@ export class McpDrafts {
     return !samePatterns(this.patterns.value, patternsOf(s));
   }
 
-  // a card no one touched takes the row another save or a refresh
-  // answered; an edited one stays as it is
+  // each card saves only its own fields: one at rest takes the row
+  // another save or a refresh answered, an edited one stays
   follow(before: McpServerSummary, after: McpServerSummary): void {
     if (!this.endpointDirty(before)) this.resetEndpoint(after);
-    if (!this.settingsDirty(before)) this.resetSettings(after);
+    if (!this.offerDirty(before)) this.resetOffer(after);
+    if (!this.timeoutDirty(before)) this.resetTimeout(after);
     if (!this.instructionsDirty(before)) this.resetInstructions(after);
     if (!this.toolsDirty(before)) {
       this.patterns.value = patternsOf(after);
     }
-    // a tool the refresh took away is no longer picked
     const names = new Set(after.tools.map((t) => t.name));
     if (this.picked.value.some((n) => !names.has(n))) {
       this.picked.value = this.picked.value.filter((n) => names.has(n));

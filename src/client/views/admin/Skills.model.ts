@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the skill pages show and check without a DOM: which form the
-// pasted URL takes and what its button says, the source and change
-// words, the dropped files, and the cut a long body gets.
 
+import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   SkillChange,
   SkillSummary,
@@ -17,12 +14,10 @@ import { cutLines } from "../../lib/lines.ts";
 export const URL_HINT =
   "A site with skills, a GitHub directory, a raw SKILL.md, or a zip or tar archive.";
 
-// the form's shape follows the URL as it is typed: null until it is one
 export function formKind(url: string): SkillSource | null {
   return sourceForm(url)?.kind ?? null;
 }
 
-// what the submit does for the kind: an index is looked up first
 export function submitLabel(kind: SkillSource | null): string {
   return kind === "index" ? "Look up" : "Add skill";
 }
@@ -33,7 +28,6 @@ export function urlProblem(url: string): string | null {
   return null;
 }
 
-// a path inside an archive: relative, no climbing, no odd characters
 export function pathProblem(path: string): string | null {
   const p = path.trim();
   if (p === "") return null;
@@ -42,7 +36,6 @@ export function pathProblem(path: string): string | null {
   return null;
 }
 
-// where the skill came from, in words
 export function sourceLine(
   skill: Pick<
     SkillSummary,
@@ -70,9 +63,6 @@ export function sourceLine(
   }
 }
 
-// what the last refresh found, in a sentence: "Body changed, 2 files
-// added, 1 file removed" when the latest fetch changed something, else
-// "Same as 12 September 2026", the day it was last changed or added
 export function changeLine(
   change: SkillChange | null,
   fetchedAt: number,
@@ -99,7 +89,6 @@ export function changeLine(
   return `${text[0]!.toUpperCase()}${text.slice(1)} ${longDate(change.at)}`;
 }
 
-// "3 files not kept: assets/logo.png (binary), ... and 12 more"
 export function droppedLine(
   skill: Pick<SkillSummary, "dropped" | "droppedMore">,
 ): string {
@@ -110,15 +99,24 @@ export function droppedLine(
   return `${pluralCommas(total, "file", "files")} not kept: ${list}${more}`;
 }
 
-// the metadata as "key: value" lines, in key order
+export const carriersOf = (
+  agents: readonly AgentSummary[],
+  id: string,
+): AgentSummary[] => agents.filter((a) => a.skills.includes(id));
+
+export function skillDeleteLine(carriers: number): string {
+  if (carriers === 0) return "No agent carries it.";
+  return `${pluralCommas(carriers, "agent carries", "agents carry")} it. Remove it from ${
+    carriers === 1 ? "that agent" : "them"
+  } first.`;
+}
+
 export function metadataLines(metadata: Record<string, string>): string[] {
   return Object.keys(metadata)
     .sort()
     .map((key) => `${key}: ${metadata[key]}`);
 }
 
-// a body folded to its first lines; a text of TEXT_LINES or fewer has
-// no button
 const TEXT_LINES = 12;
 
 export function textBox(
@@ -130,7 +128,7 @@ export function textBox(
   return {
     text: box.text,
     cut: box.cut,
-    // a body may pass 999 lines, which count() shortens
+    // count(), since a body may pass 999 lines
     label: `Show all ${count(n)} line${n === 1 ? "" : "s"}`,
   };
 }

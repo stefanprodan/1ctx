@@ -1,17 +1,6 @@
-/* Users: the user page's cards and New user's. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .users-page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 960px;
-  }
-
-  /* PasswordField: Generate, Show and Copy inside the box, as a number
-     box holds its unit */
   .users-password {
     display: flex;
     align-items: center;

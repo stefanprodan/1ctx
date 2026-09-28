@@ -1,18 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A decider's drafts, one set per decider its page shows and one for
-// New decider: the name and the default mark the Identity card saves,
-// the provider and the model the Model card saves. A row that changes
-// under the page (the mark moved by another decider) carries each field
-// the admin has not touched.
 
 import { signal } from "@preact/signals";
 import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 
-// what the page keeps of a pick: what its row shows of it
-export type DeciderModel = {
+type DeciderModel = {
   id: string;
   contextLength: number | null;
   promptPrice: number | null;
@@ -25,26 +18,18 @@ const modelOf = (d: DeciderSummary): DeciderModel => ({
 });
 
 export class DeciderDrafts {
-  readonly deciderId: string | null;
   readonly name = signal("");
   readonly isDefault = signal(false);
   readonly providerId = signal("");
   readonly model = signal<DeciderModel | null>(null);
-  // the model's search is open in its place
   readonly changing = signal(false);
-  // a card is saving: each save sends the whole decider, so the others
-  // wait rather than send what it is about to change
+  // each save sends the whole decider, so the other card waits
   readonly saving = signal(false);
-  // the model the search replaces, to take back on Cancel
   private before: { providerId: string; model: DeciderModel | null } | null =
     null;
 
-  private constructor(deciderId: string | null) {
-    this.deciderId = deciderId;
-  }
-
   static of(d: DeciderSummary): DeciderDrafts {
-    const drafts = new DeciderDrafts(d.id);
+    const drafts = new DeciderDrafts();
     drafts.name.value = d.name;
     drafts.isDefault.value = d.default;
     drafts.providerId.value = d.providerId;
@@ -52,10 +37,8 @@ export class DeciderDrafts {
     return drafts;
   }
 
-  // New decider: the search open on the provider given, nothing to take
-  // back to
   static blank(providerId: string): DeciderDrafts {
-    const drafts = new DeciderDrafts(null);
+    const drafts = new DeciderDrafts();
     drafts.providerId.value = providerId;
     drafts.changing.value = true;
     return drafts;
@@ -106,7 +89,6 @@ export class DeciderDrafts {
     this.changing.value = false;
   }
 
-  // another provider's catalog: the model goes with the old one
   chooseProvider(id: string): void {
     if (id === this.providerId.value) return;
     this.providerId.value = id;
@@ -123,16 +105,7 @@ export class DeciderDrafts {
     this.changing.value = false;
   }
 
-  async save<T>(call: () => Promise<T>): Promise<T> {
-    this.saving.value = true;
-    try {
-      return await call();
-    } finally {
-      this.saving.value = false;
-    }
-  }
-
-  // the row changed under the page: what the admin left alone follows
+  // another decider moving the mark changes this row under the page
   follow(before: DeciderSummary, after: DeciderSummary): void {
     if (this.name.value.trim() === before.name) this.name.value = after.name;
     if (this.isDefault.value === before.default) {

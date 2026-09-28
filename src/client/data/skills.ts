@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The skills entity: the admin's list, loaded when its page or the
-// agents page is reached and dropped with the signed-in user, and the
-// calls that change it. A write puts the server's row in the list, so
-// what shows is what was saved. A body and a file are read on open and
-// kept beside the list, since the list travels without them; a refresh
-// drops what it held of that skill.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -20,24 +13,23 @@ import type {
 } from "../../shared/api/skills.ts";
 import type { IndexEntry, SkillSummary } from "../../shared/contracts/skill.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import { byName } from "../lib/search.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { instanceSlot, usageSlot } from "./slot.ts";
 
 export const skills = signal<SkillSummary[] | null>(null);
 export const skillsError = signal<Failure | null>(null);
-// the bodies read so far, by id, and the files by id and path
 export const bodies = signal<Record<string, string>>({});
 export const files = signal<Record<string, string>>({});
 
-// one skill's last 30 days for its page, keyed by the skill it is for,
-// and every skill's for the list; usage is null when the read failed
-export const skillUsage = signal<{
-  skillId: string;
-  usage: SkillUsageResponse | null;
-} | null>(null);
-export const allSkillUsage = signal<{
-  usage: SkillsUsageResponse | null;
-} | null>(null);
+export const skillUsage = usageSlot<SkillUsageResponse>(
+  (id) => `/api/skills/${encodeURIComponent(id)}/usage`,
+);
+export const loadSkillUsage = skillUsage.load;
+export const allSkillUsage =
+  instanceSlot<SkillsUsageResponse>("/api/usage/skills");
+export const loadAllSkillUsage = allSkillUsage.load;
 
 export const fileKey = (id: string, path: string) => `${id}\n${path}`;
 
@@ -51,21 +43,12 @@ effect(() => {
   skillsError.value = null;
   bodies.value = {};
   files.value = {};
-  skillUsage.value = null;
-  allSkillUsage.value = null;
 });
 
-// a load's answer is kept only when it is still the one wanted: for
-// the signed-in user of the moment and the latest word on the list, a
-// failure included, since a route arrival reloads and a write can land
-// while a load is in flight
 let turn = 0;
-// the writes so far: a body or file read that one overtook keeps
-// nothing, while a list load, which leaves them alone, does not count
+// a body or file read a write overtook reads again: the write dropped
+// the files and nothing else would ask for them
 let writes = 0;
-
-const byName = (rows: SkillSummary[]) =>
-  rows.slice().sort((a, b) => a.name.localeCompare(b.name));
 
 export async function loadSkills(): Promise<void> {
   const forUser = owner;
@@ -79,21 +62,18 @@ export async function loadSkills(): Promise<void> {
   }
 }
 
-// what a row's write answered: the row into the list, the body beside
-// it, and the files it held dropped, since a refresh may have changed
-// them
-function keep(answer: SkillResponse): void {
-  const { skill, body } = answer;
+const withoutFiles = (id: string) =>
+  Object.fromEntries(
+    Object.entries(files.value).filter(([key]) => !key.startsWith(`${id}\n`)),
+  );
+
+function keep({ skill, body }: SkillResponse): void {
   skills.value = byName([
     ...(skills.value ?? []).filter((s) => s.id !== skill.id),
     skill,
   ]);
   bodies.value = { ...bodies.value, [skill.id]: body };
-  const rest: Record<string, string> = {};
-  for (const [key, content] of Object.entries(files.value)) {
-    if (!key.startsWith(`${skill.id}\n`)) rest[key] = content;
-  }
-  files.value = rest;
+  files.value = withoutFiles(skill.id);
 }
 
 export async function addSkill(body: AddSkillRequest): Promise<SkillSummary> {
@@ -128,16 +108,10 @@ export async function deleteSkill(id: string): Promise<void> {
     const nextBodies = { ...bodies.value };
     delete nextBodies[id];
     bodies.value = nextBodies;
-    files.value = Object.fromEntries(
-      Object.entries(files.value).filter(([key]) => !key.startsWith(`${id}\n`)),
-    );
+    files.value = withoutFiles(id);
   }
 }
 
-// the body, read once per open and kept; a read that a write overtook
-// (a refresh landed while it was in flight) keeps nothing, since the
-// write's word is the fresher one, and reads again, as a refresh drops
-// the files it held and nothing else would ask for them
 export async function readSkill(id: string): Promise<string> {
   const held = bodies.value[id];
   if (held !== undefined) return held;
@@ -167,41 +141,9 @@ export async function readSkillFile(id: string, path: string): Promise<string> {
   return answer.content;
 }
 
-// a site's index: a plain call, its answer belongs to the form that
-// asked
 export async function discoverSkills(url: string): Promise<IndexEntry[]> {
   const answer = await api<DiscoverResponse>("/api/skills/discover", "POST", {
     url,
   });
   return answer.entries;
-}
-
-// a failure is the aside's "Did not load", never the page's; only the
-// latest read lands, so a switch between skills keeps the last one
-let usageTurn = 0;
-
-export async function loadSkillUsage(id: string): Promise<void> {
-  const forUser = owner;
-  const mine = ++usageTurn;
-  let usage: SkillUsageResponse | null = null;
-  try {
-    usage = await api<SkillUsageResponse>(
-      `/api/skills/${encodeURIComponent(id)}/usage`,
-    );
-  } catch {}
-  if (owner === forUser && usageTurn === mine) {
-    skillUsage.value = { skillId: id, usage };
-  }
-}
-
-let allTurn = 0;
-
-export async function loadAllSkillUsage(): Promise<void> {
-  const forUser = owner;
-  const mine = ++allTurn;
-  let usage: SkillsUsageResponse | null = null;
-  try {
-    usage = await api<SkillsUsageResponse>("/api/usage/skills");
-  } catch {}
-  if (owner === forUser && allTurn === mine) allSkillUsage.value = { usage };
 }

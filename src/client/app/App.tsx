@@ -128,9 +128,8 @@ export function App() {
     document.title = title ? `1ctx · ${title}` : "1ctx";
   }, [user, needsUser, m]);
 
-  // an alias opens its page; a signed-in user on /login, or on a path
-  // with no route, lands on Home; one who must change the password they
-  // were handed lands on the profile, where the server lets them go
+  // one who must change the password they were handed lands on the
+  // profile, where the server lets them go
   useEffect(() => {
     if (!user) return;
     if (user.mustChangePassword) {

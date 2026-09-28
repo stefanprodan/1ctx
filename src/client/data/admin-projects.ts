@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The admin's team projects: the list its page opens, the detail of the
-// project page on screen, its last 30 days, and the writes. A write
-// keeps the server's detail and reloads the shared project list so the
-// rail follows it.
 
 import { effect, signal } from "@preact/signals";
 import type { SendTotalsResponse } from "../../shared/api/admin.ts";
@@ -25,25 +20,24 @@ import { type Failure, failure } from "../lib/format.ts";
 import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
 import { loadProjects } from "./projects.ts";
+import { usageSlot } from "./slot.ts";
 import { onSocketEvent } from "./socket.ts";
 
 export const adminProjects = signal<ProjectSummary[] | null>(null);
 export const adminProjectsError = signal<Failure | null>(null);
 export const adminProject = signal<ProjectDetail | null>(null);
 export const adminProjectError = signal<Failure | null>(null);
-// by project id: null for a read that failed, missing until it answers
-export const projectUsage = signal<Record<string, SendTotalsResponse | null>>(
-  {},
+export const projectUsage = usageSlot<SendTotalsResponse>(
+  (id) => `/api/projects/${encodeURIComponent(id)}/usage`,
 );
+export const loadProjectUsage = projectUsage.load;
 
 let owner: string | null = null;
 let listTurn = 0;
 let detailTurn = 0;
-// every project read or written, so a page seen before draws at once
 const seen = new Map<string, ProjectDetail>();
 
-// the users list keeps each user's projects: it hears every membership
-// the server answers, without this module importing it
+// users.ts hears every membership without this module importing it
 type MembersListener = (projectId: string, memberIds: string[]) => void;
 const membersListeners: MembersListener[] = [];
 export function onProjectMembers(fn: MembersListener): void {
@@ -63,7 +57,6 @@ effect(() => {
   adminProjectsError.value = null;
   adminProject.value = null;
   adminProjectError.value = null;
-  projectUsage.value = {};
   seen.clear();
 });
 
@@ -174,8 +167,7 @@ export async function updateProject(
   return project;
 }
 
-// a project another tab deleted is gone all the same; the rail follows
-// without holding the page, which leaves as the list drops the row
+// a project another tab deleted is gone all the same
 export async function deleteProject(id: string): Promise<number> {
   const forUser = owner;
   let deleted = 0;
@@ -197,8 +189,8 @@ export async function deleteProject(id: string): Promise<number> {
   return deleted;
 }
 
-// a membership already as asked, which another tab or page made so, is
-// done: false tells the caller its detail is behind
+// a 409 on a membership already as asked is done: false says the
+// detail is behind
 const already = (err: unknown, words: string) =>
   err instanceof ApiError &&
   err.status === 409 &&
@@ -261,12 +253,8 @@ export async function removeProjectMember(
   await followRail(forUser);
 }
 
-// the members as the project page's card drafts them: the adds, then
-// the removes, one at a time. Each answer is the detail, so the calls
-// before a refusal show and the refusal is what the card says. A
-// refusal, or a membership found already as asked, rereads the detail,
-// since another tab's change, which no frame tells this one, is what
-// either most often means
+// a refusal or an already-as-asked rereads: another tab's change, which
+// no frame tells this one
 export async function setProjectMembers(
   project: ProjectDetail,
   userIds: string[],
@@ -294,20 +282,6 @@ export async function setProjectMembers(
   }
   await followRail(forUser);
   if (failed !== null) throw failed;
-}
-
-// a failure is the aside's "Did not load", never the page's
-export async function loadProjectUsage(id: string): Promise<void> {
-  const forUser = owner;
-  let usage: SendTotalsResponse | null = null;
-  try {
-    usage = await api<SendTotalsResponse>(
-      `/api/projects/${encodeURIComponent(id)}/usage`,
-    );
-  } catch {}
-  if (owner === forUser) {
-    projectUsage.value = { ...projectUsage.value, [id]: usage };
-  }
 }
 
 function onAccessChanged(event: SocketEvent): void {

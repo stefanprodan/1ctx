@@ -19,14 +19,13 @@ import { me } from "../../../src/client/data/me.ts";
 import {
   loadOverview,
   loadUsage,
+  MONITOR_EVERY_MS,
   overview,
   overviewError,
   overviewLoading,
-  PAST_EVERY_MS,
   serverLoad,
   serverLoadError,
   thisMonth,
-  USAGE_EVERY_MS,
   usageLoading,
   usageMonth,
   watchOverview,
@@ -227,7 +226,7 @@ describe("watchOverview", () => {
     const calls = held();
     const page = tab();
     const stop = watchOverview(page.tab);
-    for (let i = 0; i < PAST_EVERY_MS / LOAD_SAMPLE_MS - 1; i++) {
+    for (let i = 0; i < MONITOR_EVERY_MS / LOAD_SAMPLE_MS - 1; i++) {
       calls.at(-1)?.answer(json(loadBody(i)));
       await settle();
       page.tick();
@@ -257,7 +256,7 @@ describe("watchUsage", () => {
         },
       },
       tick() {
-        now += USAGE_EVERY_MS;
+        now += MONITOR_EVERY_MS;
         for (const tick of [...ticks]) tick();
       },
     };

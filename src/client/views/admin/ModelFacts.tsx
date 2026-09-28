@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the agent form asks for a model its catalog does not describe:
-// the context window in tokens and whether it takes tools. The runner
-// compacts and weighs the window by the first, and offers tools by the
-// second, as it would by the catalog's words.
 
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";

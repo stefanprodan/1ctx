@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the Agents list and an agent's page decide without a DOM: the
-// body a card's save sends (the saved agent with only that card's
-// fields changed, since the route takes the whole agent), when an agent
-// last ran, what of it is failing, and the words of its Delete card.
 
 import type {
   AgentActivity,
@@ -15,9 +10,8 @@ import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import { ago, plural } from "../../lib/format.ts";
 import { agentFieldOf, listed, statedFields } from "./Agents.model.ts";
 
-// a card's refusal lands on a field only when the card draws it; any
-// other, the catalog no longer listing the model on a rename, is the
-// card's notice
+// a refusal lands on a field only when the card draws it, else it is
+// the card's notice
 export const cardFieldOf =
   (fields: readonly string[]) =>
   (message: string): string | undefined => {
@@ -25,11 +19,18 @@ export const cardFieldOf =
     return field !== undefined && fields.includes(field) ? field : undefined;
   };
 
-// the agent as saved, as a save's body: a model the catalog does not
-// describe carries its stated window and tools again, or the save
-// would lose them
-export function savedBody(agent: AgentSummary): SaveAgentRequest {
-  return {
+type Rows = { id: string }[] | null;
+
+// the route takes the whole agent: the saved one with the card's fields
+// over it. An undescribed model re-sends its stated window and tools, which
+// go only with the model they were stated for; a deleted skill or server
+// drops, or the server refuses its id
+export function cardBody(
+  agent: AgentSummary,
+  change: Partial<SaveAgentRequest>,
+  rows: { skills: Rows; servers: Rows },
+): SaveAgentRequest {
+  const body: SaveAgentRequest = {
     name: agent.name,
     avatar: agent.avatar,
     providerId: agent.providerId,
@@ -37,8 +38,8 @@ export function savedBody(agent: AgentSummary): SaveAgentRequest {
     thinking: agent.thinking,
     effort: agent.effort,
     prompt: agent.prompt,
-    skills: agent.skills,
-    servers: agent.servers,
+    skills: listed(agent.skills, (id) => id, rows.skills),
+    servers: listed(agent.servers, (s) => s.serverId, rows.servers),
     mcpMode: agent.mcpMode,
     upstream: agent.upstream,
     ...statedFields(
@@ -46,25 +47,6 @@ export function savedBody(agent: AgentSummary): SaveAgentRequest {
       agent.model.contextLength?.toString() ?? "",
       agent.model.tools,
     ),
-  };
-}
-
-type Rows = { id: string }[] | null;
-
-// a card's save: the saved agent with the card's fields over it; the
-// stated window and tools go only with the model they were stated for,
-// and a skill or a server deleted since the page loaded drops out, or
-// the server would refuse the id
-export function cardBody(
-  agent: AgentSummary,
-  change: Partial<SaveAgentRequest>,
-  rows: { skills: Rows; servers: Rows },
-): SaveAgentRequest {
-  const saved = savedBody(agent);
-  const body = {
-    ...saved,
-    skills: listed(saved.skills, (id) => id, rows.skills),
-    servers: listed(saved.servers, (s) => s.serverId, rows.servers),
     ...change,
   };
   if (change.model !== undefined && change.contextLength === undefined) {
@@ -74,8 +56,6 @@ export function cardBody(
   return body;
 }
 
-// when the agent last ran, by anyone: "running" while a turn or a run
-// is in flight, "ran 12m ago", or "never ran"
 export function lastUse(
   activity: AgentActivity | undefined,
   now: number,
@@ -87,7 +67,6 @@ export function lastUse(
 
 type Refreshed = { id: string; refreshFailedAt: number | null };
 
-// the servers and skills of the agent whose last refresh failed
 export function failing(
   agent: Pick<AgentSummary, "servers" | "skills">,
   servers: Refreshed[] | null,
@@ -101,7 +80,6 @@ export function failing(
   };
 }
 
-// "1 MCP server failing", "5 MCP servers, 3 skills failing", or empty
 export function failingLine(counts: { servers: number; skills: number }) {
   const parts = [
     counts.servers > 0
@@ -112,8 +90,6 @@ export function failingLine(counts: { servers: number; skills: number }) {
   return parts.length === 0 ? "" : `${parts.join(", ")} failing`;
 }
 
-// the Delete card's line: the parts that apply, what runs now, then
-// that it is for good
 export function deleteLine(impact: AgentImpactResponse | null): string {
   if (impact === null) return "This cannot be undone.";
   const { chats, automations, running } = impact;
@@ -132,7 +108,6 @@ export function deleteLine(impact: AgentImpactResponse | null): string {
     .join(" ");
 }
 
-// a name another agent holds, as the list has it
 export function nameTaken(
   name: string,
   agents: AgentSummary[] | null,

@@ -47,7 +47,6 @@
     padding: 0 var(--space-2);
     color: var(--fg);
   }
-  /* after the logo on the admin face */
   .rail-face {
     color: var(--faint);
     font-family: var(--mono);
@@ -92,8 +91,6 @@
     background: var(--card);
     color: var(--fg);
   }
-  /* a zone's header, bright while one of its pages is on screen; a
-     zone after the first stands off the pages above it */
   .rail-item-in {
     color: var(--fg);
   }
@@ -101,8 +98,6 @@
     margin-top: var(--space-2);
   }
 
-  /* a project under Projects or a zone's page: indented past the icon,
-     in mono */
   /* a block, not a flex row: text-overflow cuts only a block's own text,
      and a name may be 80 characters */
   .rail-sub {
@@ -142,9 +137,6 @@
     color: var(--fg);
   }
 
-  /* the way between the faces: a band the rail's width over the user
-     row, out of the scrolling list; the open icon says the whole view
-     changes. Its icon lines up with the rows' above */
   .rail-band {
     display: flex;
     align-items: center;

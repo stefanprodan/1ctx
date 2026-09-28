@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The model search in the agent form: what was typed, and the matches
-// for it once the typing pauses. Only the latest question's answer is
-// kept, a failure included, and an empty field clears it. One object
-// per open form, disposed with it.
 
 import { signal } from "@preact/signals";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";

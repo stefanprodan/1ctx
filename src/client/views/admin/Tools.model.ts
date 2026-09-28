@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the tool rows and the limits cards show and check without a
-// DOM: the words of each limit, the unit each row is typed in (seconds
-// for a millisecond cap, KB or MB for a byte cap) and the conversion
-// both ways, the range check the server applies, the visual hosts box
-// and when a send carries a built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import {
@@ -16,7 +10,6 @@ import { parseVisualHosts } from "../../../shared/visual.ts";
 import type { LimitName } from "../../../shared/words.ts";
 import { pluralCommas, sentence } from "../../lib/format.ts";
 
-// the label over each field and the line under it
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   rounds: {
     label: "Rounds",
@@ -184,7 +177,6 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
 };
 
-// when a send carries a built-in, over its description
 export const WHEN_WORDS: Record<ToolWhen, string> = {
   always: "Sent to every model that takes tools.",
   skills: "Sent when the agent has skills.",
@@ -197,30 +189,25 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   webSearch: "Sent while web access is on and a search provider is chosen.",
 };
 
-// when a send carries a built-in's variant, the own-note text of
-// memory_edit, the one tool that has one
+// memory_edit's own-note text, the one variant
 export const VARIANT_WHEN_WORDS =
   "Sent in the step after a run that updates its own memory.";
 
 export const NAMES_WORDS =
   "Shown without names. Each skill or tool name listed adds tokens.";
 
-// the lines of a schema as the server renders it, for Show all
 export function jsonLines(parameters: unknown): number {
   return JSON.stringify(parameters, null, 2).split("\n").length;
 }
 
-// the lines of the hosts box that hold something, for its count
 export function hostsCount(text: string): number {
   return text.split("\n").filter((line) => line.trim() !== "").length;
 }
 
-// a card's tokens: every schema in it together
 export function totalTokens(rows: { tokens: number }[]): number {
   return rows.reduce((n, row) => n + row.tokens, 0);
 }
 
-// the unit a row is typed in and how many of the runner's units it is
 type Display = { word: string; factor: number };
 
 const KB = 1024;
@@ -245,22 +232,18 @@ export function displayOf(row: LimitRow): Display {
   }
 }
 
-// a runner value as the page shows it. Milliseconds and binary byte
-// factors have finite decimal forms, so keeping the full number lets
-// every integer accepted by the server survive a display and save.
+// milliseconds and binary byte factors have finite decimal forms, so
+// the full number keeps every integer the server accepts through a save
 export function show(row: LimitRow, value: number): string {
   return String(value / displayOf(row).factor);
 }
 
-// what was typed, back in the runner's units and whole; null when it
-// is not a number
 export function read(row: LimitRow, text: string): number | null {
   const t = text.trim();
   if (t === "" || !/^\d+(\.\d+)?$/.test(t)) return null;
   return Math.round(Number(t) * displayOf(row).factor);
 }
 
-// the server's range check, worded in the page's unit
 export function problem(row: LimitRow, text: string): string | null {
   const value = read(row, text);
   const { label } = LIMIT_WORDS[row.name];
@@ -273,9 +256,7 @@ export function problem(row: LimitRow, text: string): string | null {
   return null;
 }
 
-// A save that lowers the days archived chats are kept deletes the ones
-// past the new days at the next sweep, so it asks first; null when it
-// does not lower them or the days are not a valid number yet.
+// lowering the days deletes the chats past them at the next sweep
 export function deleteAsk(
   rows: LimitRow[],
   draft: Record<string, string>,
@@ -289,8 +270,7 @@ export function deleteAsk(
   return `Delete chats archived over ${pluralCommas(next, "day", "days")} ago?`;
 }
 
-// Keep on that ask: the days back to the saved value, every other
-// field as typed
+// Keep takes back only the lowered days
 export function keepDays(
   rows: LimitRow[],
   draft: Record<string, string>,
@@ -301,14 +281,12 @@ export function keepDays(
     : { ...draft, [row.name]: show(row, row.value) };
 }
 
-// the fields' text as the rows come in
 export function draftOf(rows: LimitRow[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const row of rows) out[row.name] = show(row, row.value);
   return out;
 }
 
-// the body a Save sends, or the first problem and the limit it is about
 export function collect(
   rows: LimitRow[],
   draft: Record<string, string>,
@@ -331,38 +309,27 @@ export function seedOf(rows: LimitRow[]): string {
   return rows.map((row) => `${row.name}=${row.value}`).join(",");
 }
 
-// the defaults of the rows, a reset's values
-export function defaultsOf(
-  rows: LimitRow[],
-): Partial<Record<LimitName, number>> {
-  return Object.fromEntries(rows.map((row) => [row.name, row.default]));
-}
-
-// which limit a server refusal names: its words open with the name
+// a limit refusal opens with the limit's name
 export function limitFieldOf(message: string): LimitName | undefined {
   const name = message.split(" ", 1)[0] as LimitName;
   return name in LIMIT_WORDS ? name : undefined;
 }
 
-// whether any field differs from its row
 export function dirty(rows: LimitRow[], draft: Record<string, string>) {
   return rows.some((row) => read(row, draft[row.name] ?? "") !== row.value);
 }
 
-// "default 10", shown faint when the row was changed
 export function defaultLine(row: LimitRow): string {
   const { word } = displayOf(row);
   return `default ${show(row, row.default)}${word === "" ? "" : ` ${word}`}`;
 }
 
-// what the section says beside the box
 export function hostsLine(hosts: readonly string[]): string {
   return hosts.length === 0
     ? "No CDNs. Visuals use inline code only."
     : "Visuals load scripts, styles and fonts only from these CDNs.";
 }
 
-// whether the list is the one a fresh instance starts with
 export function defaultHosts(hosts: readonly string[]): boolean {
   return (
     hosts.length === DEFAULT_VISUAL_HOSTS.length &&
@@ -370,8 +337,7 @@ export function defaultHosts(hosts: readonly string[]): boolean {
   );
 }
 
-// a list's refusal: the line and its entry, or the words alone when the
-// list as a whole is refused
+// an empty value: the list as a whole is refused
 export function lineError(result: {
   line: number;
   value: string;
@@ -382,7 +348,6 @@ export function lineError(result: {
     : `Line ${result.line}, ${result.value}, ${result.error}.`;
 }
 
-// the box as typed to the list a save sends, or the words for its field
 export function hostsOf(text: string): { hosts: string[] } | { error: string } {
   const result = parseVisualHosts(text.split("\n"));
   if (!result.ok) {

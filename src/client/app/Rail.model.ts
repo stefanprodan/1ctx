@@ -29,14 +29,12 @@ export function onPage(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// the address alone picks the rail's face: /admin, its alias included,
-// and every page under it are the admin face
 export function adminFace(pathname: string): boolean {
   return onPage(pathname, "/admin");
 }
 
-// the one link of a zone lit for a path: the longest that holds it, so
-// /admin/monitor/storage lights Storage and not the zone at /admin/monitor too
+// the longest that holds the path, so /admin/monitor/storage lights
+// Storage and not /admin/monitor too
 export function litPage(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
   for (const href of hrefs) {
@@ -50,17 +48,17 @@ export function litPage(pathname: string, hrefs: string[]): string | null {
   return best;
 }
 
-// the one link of the admin face lit for a path: the zone or the page
-// that holds it, a page's own tab at another address lighting the page
-export function zoneLit(pathname: string, zones = ZONES): string | null {
-  const targets = new Map<string, string>();
-  for (const z of zones) {
-    targets.set(z.href, z.href);
-    for (const p of z.pages) {
-      targets.set(p.href, p.href);
-      for (const also of p.also ?? []) targets.set(also, p.href);
-    }
+const TARGETS = new Map<string, string>();
+for (const z of ZONES) {
+  TARGETS.set(z.href, z.href);
+  for (const p of z.pages) {
+    TARGETS.set(p.href, p.href);
+    for (const also of p.also ?? []) TARGETS.set(also, p.href);
   }
-  const hit = litPage(pathname, [...targets.keys()]);
-  return hit === null ? null : targets.get(hit)!;
+}
+const HREFS = [...TARGETS.keys()];
+
+export function zoneLit(pathname: string): string | null {
+  const hit = litPage(pathname, HREFS);
+  return hit === null ? null : TARGETS.get(hit)!;
 }

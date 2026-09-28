@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Config › Deciders: the words a row and a Check say, the providers a
-// decider may run on, the entity that follows the signed-in user, and
-// the list, New decider and a decider's page rendered.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -12,9 +8,9 @@ import {
   checkDecider,
   deciders,
   decidersError,
-  deciderUsage,
   deleteDecider,
   loadDeciders,
+  loadDeciderUsage,
   updateDecider,
 } from "../../../src/client/data/deciders.ts";
 import { decisions } from "../../../src/client/data/decisions.ts";
@@ -47,6 +43,7 @@ import type {
   ProviderSummary,
 } from "../../../src/shared/contracts/provider.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { MAX_NAME } from "../../../src/shared/words.ts";
 
 const admin: Me = {
   id: "u1",
@@ -323,11 +320,11 @@ describe("the pages", () => {
     deciders.value = [];
     const html = render(<NewDecider />);
     // by name, only the wires that answer decisions: local before router
-    expect(html).toContain('class="decider-page-provider" title="local"');
+    expect(html).toContain('class="model-picker-provider" title="local"');
     // the default decider's provider comes first
     deciders.value = [judge];
     expect(render(<NewDecider />)).toContain(
-      'class="decider-page-provider" title="router"',
+      'class="model-picker-provider" title="router"',
     );
     deciders.value = [];
     expect(html).toContain('name="model"');
@@ -379,20 +376,40 @@ describe("the pages", () => {
     expect(page("gone")).toContain("No decider by that name.");
   });
 
-  test.serial("the aside has its last 30 days", () => {
+  test.serial("the aside has its last 30 days, kept per decider", async () => {
+    // a sign-in change drops every answer
+    me.value = null;
+    me.value = admin;
+    providers.value = [router];
+    deciders.value = [judge, small];
+    decisions.value = [];
+    expect(page("judge")).toContain("Loading");
+    answer = (url) =>
+      url === "/api/deciders/d1/usage"
+        ? Response.json({
+            since: 0,
+            until: 1,
+            answers: 12,
+            tokens: 3400,
+            cost: 0.0002,
+          })
+        : new Response("no", { status: 500 });
+    await loadDeciderUsage("d1");
+    await loadDeciderUsage("d2");
+    expect(page("judge")).toMatch(/Answers[\s\S]*?12/);
+    expect(page("judge")).toContain('href="/admin/monitor/usage"');
+    // another decider's failed read is not this one's
+    expect(page("judge")).not.toContain("Did not load.");
+    expect(page("small")).toContain("Did not load.");
+  });
+
+  test.serial("a name input stops at the longest name", () => {
     providers.value = [router];
     deciders.value = [judge];
     decisions.value = [];
-    deciderUsage.value = null;
-    expect(page("judge")).toContain("Loading");
-    deciderUsage.value = {
-      of: "d1",
-      usage: { since: 0, until: 1, answers: 12, tokens: 3400, cost: 0.0002 },
-    };
-    expect(page("judge")).toMatch(/Answers[\s\S]*?12/);
-    deciderUsage.value = { of: "d9", usage: null };
-    expect(page("judge")).not.toContain("Did not load.");
-    deciderUsage.value = null;
+    const limit = new RegExp(`name="name"[^>]*maxLength="${MAX_NAME}"`, "i");
+    expect(page("judge")).toMatch(limit);
+    expect(render(<NewDecider />)).toMatch(limit);
   });
 });
 
@@ -465,7 +482,6 @@ describe("a decider's drafts", () => {
     const d = DeciderDrafts.blank("pr1");
     expect(d.changing.value).toBe(true);
     expect(d.cancellable).toBe(false);
-    expect(d.deciderId).toBeNull();
   });
 
   test("a row changed under the page carries what the admin left", () => {
@@ -477,19 +493,5 @@ describe("a decider's drafts", () => {
     expect(d.isDefault.value).toBe(false);
     d.follow(judge, { ...judge, model: "vendor/other" });
     expect(d.model.value?.id).toBe("vendor/other");
-  });
-
-  test("a card's save holds the others until it answers", async () => {
-    const d = DeciderDrafts.of(judge);
-    let done: () => void = () => {};
-    const saving = d.save(() => new Promise<void>((r) => (done = r)));
-    expect(d.saving.value).toBe(true);
-    done();
-    await saving;
-    expect(d.saving.value).toBe(false);
-    await expect(
-      d.save(() => Promise.reject(new Error("no"))),
-    ).rejects.toThrow();
-    expect(d.saving.value).toBe(false);
   });
 });

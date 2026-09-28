@@ -1,19 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Overview's live tiles, under the head Monitor / Live: the
-// server's load, polled while the page is on screen. The chat and
-// automation pools against their caps, and the process's CPU and
-// memory over the last 15 minutes on their own cursor. A failed poll
-// keeps the last numbers faded and the head says since when. Also the
-// row head and the tile bones the board's rows share.
 
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
 import type { LoadResponse } from "../../../shared/api/admin.ts";
 import { serverLoad, serverLoadError } from "../../data/overview.ts";
-import { type Failure, size } from "../../lib/format.ts";
-import { CodeTag } from "../../ui/CodeTag.tsx";
+import { size } from "../../lib/format.ts";
 import { Spark } from "../../ui/Plot.tsx";
 import {
   Tile,
@@ -29,33 +20,10 @@ import {
   memoryTile,
   percent,
   sampleLine,
-  staleWords,
   zoomed,
 } from "./Overview.model.ts";
 
 const NOW_SYNC = "overview-now";
-
-// a row's head: its name and, beside it, its scope or its trouble,
-// and a control at its end
-export function BoardRow({
-  label,
-  note,
-  stale,
-  action,
-}: {
-  label: string;
-  note?: ComponentChildren;
-  stale?: boolean;
-  action?: ComponentChildren;
-}) {
-  return (
-    <div class={`overview-section${stale ? " overview-section-stale" : ""}`}>
-      <span class="label">{label}</span>
-      {note && <span class="overview-section-note">{note}</span>}
-      {action && <span class="overview-section-action">{action}</span>}
-    </div>
-  );
-}
 
 function NowTiles({ load }: { load: LoadResponse }) {
   const cpuAt = useSignal<number | null>(null);
@@ -65,14 +33,17 @@ function NowTiles({ load }: { load: LoadResponse }) {
   const cpu = cpuTile(load);
   const memory = memoryTile(load);
   const { at, cpu: cpus, rss } = load.samples;
-  const cpuSub =
-    cpuAt.value !== null && at[cpuAt.value] !== undefined
-      ? sampleLine(at[cpuAt.value]!, percent(cpus[cpuAt.value]!))
-      : cpu.sub;
-  const rssSub =
-    rssAt.value !== null && at[rssAt.value] !== undefined
-      ? sampleLine(at[rssAt.value]!, size(rss[rssAt.value]!))
-      : memory.sub;
+  const atCursor = (
+    i: number | null,
+    values: number[],
+    words: (v: number) => string,
+    rest: string,
+  ) =>
+    i !== null && at[i] !== undefined
+      ? sampleLine(at[i]!, words(values[i]!))
+      : rest;
+  const cpuSub = atCursor(cpuAt.value, cpus, percent, cpu.sub);
+  const rssSub = atCursor(rssAt.value, rss, size, memory.sub);
   return (
     <Tiles>
       <Tile
@@ -132,33 +103,13 @@ function NowTiles({ load }: { load: LoadResponse }) {
   );
 }
 
-// A row whose read failed: since when its numbers are, or that it has
-// none, with the status when the server answered. Nothing while it
-// keeps up.
-export function Trouble({
-  error,
-  at,
-}: {
-  error: Failure | null;
-  at: number | null;
-}) {
-  if (error === null) return null;
-  return (
-    <>
-      {staleWords(at)}
-      <CodeTag status={error.status} />
-    </>
-  );
-}
-
 export function NowRow() {
-  // a server just started has its baseline and no sample yet, which
-  // would draw as 0% and 0 B: the row keeps its bones until one lands
+  // a server just started has no sample yet, which would draw as 0%
   const read = serverLoad.value;
   const load = read && read.samples.at.length > 0 ? read : null;
   const error = serverLoadError.value;
   return load ? (
-    <div class={error ? "overview-stale" : undefined}>
+    <div class={error ? "chart-stale" : undefined}>
       <NowTiles load={load} />
     </div>
   ) : (

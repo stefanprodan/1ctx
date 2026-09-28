@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A decision's page under Config: the crumb is the head, its own step
-// the switcher to the other decisions; then Status, whether it is asked
-// and which decider answers, and Options, what the decider is told each
-// answer means, each its own card and form. A decision is the code's,
-// so there is no Delete; Reset to default fills the option boxes with
-// the code's texts. The aside has its last 30 days.
 
 import { type Signal, signal, useSignal } from "@preact/signals";
 import { useMemo, useRef } from "preact/hooks";
@@ -20,19 +13,23 @@ import {
   decisionsError,
   saveDecision,
 } from "../../data/decisions.ts";
-import { count } from "../../lib/format.ts";
 import { configDecisionHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { Finder } from "../../ui/Finder.tsx";
 import { Foot } from "../../ui/Foot.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
-import { Setting, SettingHint } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import {
+  Setting,
+  SettingForm,
+  SettingHint,
+  SettingStack,
+} from "../../ui/Setting.tsx";
+import { Split } from "../../ui/Split.tsx";
+import { SpendLines, UsageSection } from "./AdminAside.tsx";
+import {
+  byTitle,
   DECISION_WORDS,
   deciderChoices,
   decisionBody,
@@ -45,7 +42,7 @@ import {
   optionProblem,
 } from "./Decisions.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
-import { money } from "./Overview.model.ts";
+import { holding, useLatest } from "./drafts.ts";
 import "./decider-page.css";
 
 const STEPS = [
@@ -68,7 +65,23 @@ export function DecisionPage({ params }: { params: Params }) {
     <Page
       steps={STEPS}
       title={title}
-      menu={decision !== null ? <Switcher decision={decision} /> : undefined}
+      menu={
+        decision !== null ? (
+          <PageSwitcher
+            label="Decisions"
+            current={decision.id}
+            name={title}
+            items={byTitle(list ?? []).map((d) => ({
+              id: d.id,
+              label: DECISION_WORDS[d.id].title,
+              href: configDecisionHref(d.id),
+            }))}
+            mono={false}
+            placeholder="Find a decision"
+            none="No decision matches"
+          />
+        ) : undefined
+      }
       split
       loading={(list === null || deciders.value === null) && error === null}
       empty={
@@ -85,43 +98,11 @@ export function DecisionPage({ params }: { params: Params }) {
   );
 }
 
-function Switcher({ decision }: { decision: DecisionSummary }) {
-  const list = [...(decisions.value ?? [])].sort((a, b) =>
-    DECISION_WORDS[a.id].title.localeCompare(DECISION_WORDS[b.id].title),
-  );
-  const title = DECISION_WORDS[decision.id].title;
-  if (list.length < 2) return <span class="page-crumb-on">{title}</span>;
-  return (
-    <Finder
-      label="Decisions"
-      triggerClass="page-pill"
-      title={title}
-      trigger={
-        <>
-          <span class="cut">{title}</span>
-          <Icon name="chevron" size={14} class="page-pill-chevron" />
-        </>
-      }
-      options={list.map((d) => ({
-        value: d.id,
-        label: DECISION_WORDS[d.id].title,
-        href: configDecisionHref(d.id),
-      }))}
-      value={decision.id}
-      wide
-      placeholder="Find a decision"
-      none="No decision matches"
-    />
-  );
-}
-
-// the kept texts by option key: what a card that saves only the status
-// sends for the options
+// the route takes the whole decision, so Status sends the kept texts
 const keptTexts = (d: DecisionSummary): Record<string, string> =>
   Object.fromEntries(d.options.map((o) => [o.key, o.description]));
 
-// one decision's cards, made again for another, so a save still running
-// for the last one holds nothing here
+// remade per decision, so a save still running for the last holds nothing
 function Cards({
   decision,
   list,
@@ -129,25 +110,14 @@ function Cards({
   decision: DecisionSummary;
   list: DeciderSummary[];
 }) {
-  // a card is saving: each save sends the whole decision, so the other
-  // waits rather than send what it is about to change
+  // each save sends the whole decision, so the other card waits
   const saving = useSignal(false);
   return (
-    <div class="decider-page">
+    <SettingStack>
       <Status decision={decision} list={list} saving={saving} />
       <Options decision={decision} saving={saving} />
-    </div>
+    </SettingStack>
   );
-}
-
-// runs a card's save with the page's lock held
-async function locked(saving: Signal<boolean>, call: () => Promise<void>) {
-  saving.value = true;
-  try {
-    await call();
-  } finally {
-    saving.value = false;
-  }
 }
 
 function Status({
@@ -162,10 +132,8 @@ function Status({
   const words = DECISION_WORDS[decision.id];
   const enabled = useSignal(decision.enabled);
   const deciderId = useSignal(heldDecider(list, decision.deciderId ?? ""));
-  // the save is made once, so it reads the latest row when it runs
-  const latest = useRef(decision);
-  latest.current = decision;
-  // the saved settings, to follow them when they change under the card
+  const latest = useLatest(decision);
+  // follow the saved settings when they change under the card
   const seen = useRef(decision);
   if (seen.current !== decision) {
     if (enabled.value === seen.current.enabled) {
@@ -176,11 +144,11 @@ function Status({
     }
     seen.current = decision;
   }
-  // a decider deleted since hands over to the default
+  // a deleted decider falls back to the default
   const held = heldDecider(list, deciderId.value);
   const save = useSave(
     () =>
-      locked(saving, async () => {
+      holding(saving, async () => {
         const was = latest.current;
         const saved = await saveDecision(
           was.id,
@@ -195,8 +163,6 @@ function Status({
       }),
     decisionFieldOf,
   );
-  const form = useRef<HTMLFormElement>(null);
-  useFocusField(save, form);
   const busy = save.busy;
   const dirty =
     enabled.value !== decision.enabled ||
@@ -206,13 +172,7 @@ function Status({
     deciderId.value = heldDecider(list, decision.deciderId ?? "");
   };
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Status"
         line={words.hint}
@@ -265,7 +225,7 @@ function Status({
           </div>
         </div>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
@@ -276,7 +236,7 @@ function Options({
   decision: DecisionSummary;
   saving: Signal<boolean>;
 }) {
-  // one box per option, its keys fixed for the decision
+  // the keys are fixed per decision
   const texts = useMemo(
     () =>
       Object.fromEntries(
@@ -284,8 +244,7 @@ function Options({
       ) as Record<string, Signal<string>>,
     [decision.id],
   );
-  const latest = useRef(decision);
-  latest.current = decision;
+  const latest = useLatest(decision);
   const seen = useRef(decision);
   if (seen.current !== decision) {
     for (const o of decision.options) {
@@ -302,13 +261,13 @@ function Options({
     );
   const save = useSave(
     () =>
-      locked(saving, async () => {
+      holding(saving, async () => {
         const was = latest.current;
         const saved = await saveDecision(
           was.id,
           decisionBody(was, {
             enabled: was.enabled,
-            // a decider deleted since is no decider to send
+            // a deleted decider falls back to the default
             deciderId: heldDecider(deciders.value ?? [], was.deciderId ?? ""),
             texts: Object.fromEntries(
               was.options.map((o) => [o.key, texts[o.key]!.value]),
@@ -319,27 +278,21 @@ function Options({
       }),
     decisionFieldOf,
   );
-  const form = useRef<HTMLFormElement>(null);
-  useFocusField(save, form);
   const busy = save.busy;
   const dirty = decision.options.some(
     (o) => texts[o.key]!.value.trim() !== o.description,
   );
   const changed = differsFromDefault(decision, held());
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(
-          decision.options.reduce<ReturnType<typeof at>>(
-            (found, o) =>
-              found ??
-              at(optionField(o.key), optionProblem(texts[o.key]!.value)),
-            null,
-          ),
-        );
-      }}
+    <SettingForm
+      save={save}
+      check={() =>
+        decision.options.reduce<ReturnType<typeof at>>(
+          (found, o) =>
+            found ?? at(optionField(o.key), optionProblem(texts[o.key]!.value)),
+          null,
+        )
+      }
     >
       <Setting
         title="Options"
@@ -373,7 +326,7 @@ function Options({
                 <button
                   type="button"
                   class="btn"
-                  disabled={!dirty || busy}
+                  disabled={!dirty || busy || saving.value}
                   onClick={() => {
                     for (const o of decision.options) {
                       texts[o.key]!.value = o.description;
@@ -407,36 +360,21 @@ function Options({
           );
         })}
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
 function Aside({ decision }: { decision: DecisionSummary }) {
-  const known =
-    decisionUsage.value?.of === decision.id ? decisionUsage.value : null;
-  const usage = known?.usage ?? null;
   return (
-    <AsideSection
-      label="Last 30 days"
-      action={
-        <a class="split-link" href="/admin/monitor">
-          Usage
-        </a>
-      }
-    >
-      {known === null ? (
-        <p class="split-empty">Loading</p>
-      ) : usage === null ? (
-        <p class="split-empty">Did not load.</p>
-      ) : (
-        <>
-          <AsideLine label="Answers">{count(usage.answers)}</AsideLine>
-          <AsideLine label="Tokens">{count(usage.tokens)}</AsideLine>
-          <AsideLine label="Cost">
-            {usage.cost === null ? "not priced" : money(usage.cost)}
-          </AsideLine>
-        </>
+    <UsageSection value={decisionUsage.valueFor(decision.id)}>
+      {(usage) => (
+        <SpendLines
+          label="Answers"
+          count={usage.answers}
+          tokens={usage.tokens}
+          cost={usage.cost}
+        />
       )}
-    </AsideSection>
+    </UsageSection>
   );
 }

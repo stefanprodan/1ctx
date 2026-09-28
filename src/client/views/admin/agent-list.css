@@ -1,6 +1,3 @@
-/* Config › Agents: what an agent row holds beside Rows' parts, the
-   provider filter's button, and the New agent form's inset. */
-
 @layer tokens, base, owners;
 
 @layer owners {
@@ -19,17 +16,6 @@
     font-family: var(--sans);
     color: var(--attention);
   }
-
-  /* the last use over the provider, right-aligned */
-  .agent-list-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-  }
-  .agent-list-use {
-    font-family: var(--sans);
-  }
   .agent-list-running {
     color: var(--running);
   }
@@ -38,7 +24,6 @@
     font-family: var(--mono);
   }
 
-  /* the filter: the key faint, the pick cut past 220 wide */
   .agent-list-pick {
     max-width: 220px;
   }
@@ -60,17 +45,5 @@
   }
   .agent-list-pick[aria-expanded="true"] .agent-list-pick-chevron {
     transform: rotate(180deg);
-  }
-
-  @media (max-width: 719px) {
-    /* under the name, lined up with it, one line */
-    .agent-list-meta {
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--space-2);
-    }
-    .agent-list-provider {
-      display: none;
-    }
   }
 }

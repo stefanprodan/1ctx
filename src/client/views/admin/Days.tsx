@@ -1,20 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A span of days as the Monitor pages draw it: four tiles on one
-// cursor and the charts under them, sharing the day under the pointer.
-// The Monitor's Stats draw active users, the failure rate, decisions
-// and tokens over the activity and turn length charts; Usage a month's
-// turns, runs, tokens and cost, money being Usage's alone, and its
-// tokens chart.
 
+import type { Signal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useMemo } from "preact/hooks";
 import type {
   OverviewDay,
   OverviewTotals,
   TurnLengths,
 } from "../../../shared/api/admin.ts";
-import { count } from "../../lib/format.ts";
 import { Bone } from "../../ui/Bones.tsx";
 import { ChartPanel } from "../../ui/Chart.tsx";
 import { DayBars, DayLines, type DaySeries, Spark } from "../../ui/Plot.tsx";
@@ -41,10 +35,93 @@ import {
   lengthHint,
   lengthSeries,
 } from "./Stats.model.ts";
-import "./overview.css";
 
-export type DayCursor = { value: number | null };
+type DayCursor = Signal<number | null>;
+type People = { active: number; users: number };
 
+type TileSpec = {
+  label: string;
+  plot: string;
+  kind: "line" | "bars";
+  values: (days: OverviewDay[]) => number[];
+  words: (
+    totals: OverviewTotals,
+    at: OverviewDay | null,
+    people: People | undefined,
+  ) => { figure: string; unit?: string; sub: string };
+};
+
+const tokensSpec: TileSpec = {
+  label: "Tokens",
+  plot: "Tokens per day",
+  kind: "line",
+  values: (days) => days.map(tokensOf),
+  words: tokensTile,
+};
+
+const STATS_TILES: TileSpec[] = [
+  {
+    label: "Active users",
+    plot: "Active users per day",
+    kind: "bars",
+    values: (days) => days.map((d) => d.activeUsers),
+    words: (_t, at, people) => activeTile(people!.active, people!.users, at),
+  },
+  {
+    label: "Failure rate",
+    plot: "Failure rate per day",
+    kind: "line",
+    values: failureSeries,
+    words: failureTile,
+  },
+  {
+    label: "Decisions",
+    plot: "Decisions per day",
+    kind: "bars",
+    values: (days) => days.map((d) => d.decisions),
+    words: decisionsTile,
+  },
+  tokensSpec,
+];
+
+const USAGE_TILES: TileSpec[] = [
+  tokensSpec,
+  {
+    label: "Cost",
+    plot: "Cost per day",
+    kind: "line",
+    // flat at zero where no provider priced either
+    values: (days) => days.map((d) => costOf(d) ?? 0),
+    words: costTile,
+  },
+  {
+    label: "Chats",
+    plot: "Chat turns per day",
+    kind: "bars",
+    values: (days) => days.map((d) => d.turns),
+    words: turnsTile,
+  },
+  {
+    label: "Automations",
+    plot: "Automation runs per day",
+    kind: "bars",
+    values: (days) => days.map((d) => d.runs),
+    words: (totals, at) => runsTile(totals, at),
+  },
+];
+
+function useDays(days: OverviewDay[], day: DayCursor) {
+  const starts = useMemo(() => days.map((d) => d.start), [days]);
+  return {
+    starts,
+    at: day.value === null ? null : (days[day.value] ?? null),
+    onCursor: (index: number | null) => {
+      day.value = index;
+    },
+  };
+}
+
+// without people, Usage's tiles
 export function DaysTiles({
   days,
   totals,
@@ -54,117 +131,57 @@ export function DaysTiles({
 }: {
   days: OverviewDay[];
   totals: OverviewTotals;
-  // the day under the cursor, shared with the charts
   day: DayCursor;
   sync: string;
-  // the Monitor's tiles: who was active and what failed, then
-  // decisions and tokens; without, Usage's: tokens and cost, then
-  // turns and runs with the decisions in their line
-  people?: { active: number; users: number };
+  people?: People;
 }) {
-  const spend = people === undefined;
-  const series = useMemo(
-    () => ({
-      starts: days.map((d) => d.start),
-      turns: days.map((d) => d.turns),
-      runs: days.map((d) => d.runs),
-      decisions: days.map((d) => d.decisions),
-      active: days.map((d) => d.activeUsers),
-      failed: failureSeries(days),
-      tokens: days.map((d) => tokensOf(d)),
-      // the rounds and the decisions, flat at zero where no provider
-      // priced either
-      cost: days.map((d) => costOf(d) ?? 0),
-    }),
-    [days],
-  );
-  const onCursor = (index: number | null) => {
-    day.value = index;
-  };
-  const at = day.value === null ? null : (days[day.value] ?? null);
-  const turns = turnsTile(totals, at);
-  const runs = runsTile(totals, at, spend);
-  const decisions = decisionsTile(totals, at);
-  const tokens = tokensTile(totals, at);
-  const cost = costTile(totals, at);
-  const spark = (kind: "line" | "bars", values: number[]) => (
-    <Spark
-      kind={kind}
-      times={series.starts}
-      values={values}
-      sync={sync}
-      onCursor={onCursor}
-    />
-  );
-  if (people) {
-    const active = activeTile(people.active, people.users, at);
-    const failure = failureTile(totals, at);
-    return (
-      <Tiles>
-        <Tile
-          label="Active users"
-          figure={active.figure}
-          unit={active.unit}
-          sub={active.sub}
-        >
-          <TilePlot label="Active users per day">
-            {spark("bars", series.active)}
-          </TilePlot>
-        </Tile>
-        <Tile label="Failure rate" figure={failure.figure} sub={failure.sub}>
-          <TilePlot label="Failure rate per day">
-            {spark("line", series.failed)}
-          </TilePlot>
-        </Tile>
-        <Tile
-          label="Decisions"
-          figure={decisions.figure}
-          unit={decisions.unit}
-          sub={decisions.sub}
-        >
-          <TilePlot label="Decisions per day">
-            {spark("bars", series.decisions)}
-          </TilePlot>
-        </Tile>
-        <Tile label="Tokens" figure={tokens.figure} sub={tokens.sub}>
-          <TilePlot label="Tokens per day">
-            {spark("line", series.tokens)}
-          </TilePlot>
-        </Tile>
-      </Tiles>
-    );
-  }
+  const { starts, at, onCursor } = useDays(days, day);
+  const specs = people ? STATS_TILES : USAGE_TILES;
+  const values = useMemo(() => specs.map((s) => s.values(days)), [days, specs]);
   return (
     <Tiles>
-      <Tile label="Tokens" figure={tokens.figure} sub={tokens.sub}>
-        <TilePlot label="Tokens per day">
-          {spark("line", series.tokens)}
-        </TilePlot>
-      </Tile>
-      <Tile label="Cost" figure={cost.figure} sub={cost.sub}>
-        <TilePlot label="Cost per day">{spark("line", series.cost)}</TilePlot>
-      </Tile>
-      <Tile
-        label="Chats"
-        figure={turns.figure}
-        unit={turns.unit}
-        sub={turns.sub}
-      >
-        <TilePlot label="Chat turns per day">
-          {spark("bars", series.turns)}
-        </TilePlot>
-      </Tile>
-      <Tile
-        label="Automations"
-        figure={runs.figure}
-        unit={runs.unit}
-        sub={runs.sub}
-      >
-        <TilePlot label="Automation runs per day">
-          {spark("bars", series.runs)}
-        </TilePlot>
-      </Tile>
+      {specs.map((s, i) => {
+        const words = s.words(totals, at, people);
+        return (
+          <Tile
+            key={s.label}
+            label={s.label}
+            figure={words.figure}
+            unit={words.unit}
+            sub={words.sub}
+          >
+            <TilePlot label={s.plot}>
+              <Spark
+                kind={s.kind}
+                times={starts}
+                values={values[i]!}
+                sync={sync}
+                onCursor={onCursor}
+              />
+            </TilePlot>
+          </Tile>
+        );
+      })}
     </Tiles>
+  );
+}
+
+function DayPanel({
+  label,
+  hint,
+  none,
+  children,
+}: {
+  label: string;
+  hint: string | undefined;
+  // drawn in place of the plot
+  none?: string;
+  children: ComponentChildren;
+}) {
+  return (
+    <ChartPanel label={label} hint={hint} hintBelow>
+      {none === undefined ? children : <p class="chart-none">{none}</p>}
+    </ChartPanel>
   );
 }
 
@@ -179,10 +196,9 @@ export function TokensPanel({
   totals: OverviewTotals;
   day: DayCursor;
   sync: string;
-  // what the panel says with no tokens in the span
   none: string;
 }) {
-  const starts = useMemo(() => days.map((d) => d.start), [days]);
+  const { starts, at, onCursor } = useDays(days, day);
   const series = useMemo<DaySeries[]>(
     () => [
       {
@@ -195,32 +211,23 @@ export function TokensPanel({
     [days],
   );
   const any = tokensOf(totals) > 0;
-  const at = day.value === null ? null : days[day.value];
   return (
-    <ChartPanel
+    <DayPanel
       label="Tokens per day"
       hint={any ? (at ? dayTokensHint(at) : tokensHint(totals)) : undefined}
-      hintBelow
+      none={any ? undefined : none}
     >
-      {any ? (
-        <DayBars
-          label="Tokens per day"
-          days={starts}
-          series={series}
-          words={(v) => (v === 0 ? "0" : count(v))}
-          sync={sync}
-          onCursor={(i) => {
-            day.value = i;
-          }}
-        />
-      ) : (
-        <p class="chart-none">{none}</p>
-      )}
-    </ChartPanel>
+      <DayBars
+        label="Tokens per day"
+        days={starts}
+        series={series}
+        sync={sync}
+        onCursor={onCursor}
+      />
+    </DayPanel>
   );
 }
 
-// turns and runs a day, the failed ones on top, on the tiles' cursor
 export function ActivityPanel({
   days,
   totals,
@@ -232,35 +239,26 @@ export function ActivityPanel({
   day: DayCursor;
   sync: string;
 }) {
-  const starts = useMemo(() => days.map((d) => d.start), [days]);
+  const { starts, at, onCursor } = useDays(days, day);
   const series = useMemo(() => activitySeries(days), [days]);
-  const at = day.value === null ? null : (days[day.value] ?? null);
   return (
-    <ChartPanel
+    <DayPanel
       label="Activity"
       hint={activityHint(totals, at) || undefined}
-      hintBelow
+      none={totals.turns + totals.runs > 0 ? undefined : "No turns or runs"}
     >
-      {totals.turns + totals.runs > 0 ? (
-        <DayBars
-          label="Turns and runs per day"
-          days={starts}
-          series={series}
-          stack="activity"
-          words={(v) => (v === 0 ? "0" : count(v))}
-          sync={sync}
-          onCursor={(i) => {
-            day.value = i;
-          }}
-        />
-      ) : (
-        <p class="chart-none">No turns or runs</p>
-      )}
-    </ChartPanel>
+      <DayBars
+        label="Turns and runs per day"
+        days={starts}
+        series={series}
+        stack="activity"
+        sync={sync}
+        onCursor={onCursor}
+      />
+    </DayPanel>
   );
 }
 
-// how long chat turns took a day: the median over the 95th percentile
 export function LengthPanel({
   days,
   lengths,
@@ -272,31 +270,24 @@ export function LengthPanel({
   day: DayCursor;
   sync: string;
 }) {
-  const starts = useMemo(() => days.map((d) => d.start), [days]);
+  const { starts, at, onCursor } = useDays(days, day);
   const series = useMemo(() => lengthSeries(days), [days]);
-  const at = day.value === null ? null : (days[day.value] ?? null);
   return (
-    <ChartPanel
+    <DayPanel
       label="LLM response time"
       hint={lengthHint(lengths, at) || undefined}
-      hintBelow
+      none={lengths.medianMs !== null ? undefined : "No chat turns ended"}
     >
-      {lengths.medianMs !== null ? (
-        <DayLines
-          label="LLM response time per day"
-          days={starts}
-          series={series}
-          words={lengthAxis}
-          steps={LENGTH_STEPS}
-          sync={sync}
-          onCursor={(i) => {
-            day.value = i;
-          }}
-        />
-      ) : (
-        <p class="chart-none">No chat turns ended</p>
-      )}
-    </ChartPanel>
+      <DayLines
+        label="LLM response time per day"
+        days={starts}
+        series={series}
+        words={lengthAxis}
+        steps={LENGTH_STEPS}
+        sync={sync}
+        onCursor={onCursor}
+      />
+    </DayPanel>
   );
 }
 
@@ -305,7 +296,6 @@ const DAY_HEIGHTS = [
   18, 64, 62, 58, 96, 50, 20, 10, 46, 64, 70,
 ];
 
-// the tokens chart while its first answer loads
 export function TokensGhost({ at }: { at: number }) {
   return (
     <ChartPanel label="Tokens per day" hintBelow>
@@ -313,7 +303,7 @@ export function TokensGhost({ at }: { at: number }) {
         <div class="chart-key">
           <Bone kind="title" at={at} width={30} />
         </div>
-        <div class="chart-plot overview-ghost-days">
+        <div class="chart-plot chart-ghost-days">
           {DAY_HEIGHTS.map((h, i) => (
             <Bone key={i} kind="column" at={at + 1 + i} height={h} />
           ))}

@@ -1,0 +1,8 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .tool-params-cut {
+    max-height: 320px;
+    overflow: clip;
+  }
+}

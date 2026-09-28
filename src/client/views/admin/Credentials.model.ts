@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the credential pages show and check without a DOM: the fields
-// from a row or for a new one, the key picks with the files that cannot
-// be used marked, a row's key line, which field a refusal names, and
-// the body a save sends.
 
 import type {
   CreateCredentialRequest,
@@ -18,6 +13,7 @@ import {
   type HttpMethod,
   type KeyState,
 } from "../../../shared/contracts/credential.ts";
+import { configCredentialHref } from "../../lib/hrefs.ts";
 import { sameIds } from "../../lib/ids.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
@@ -59,9 +55,8 @@ export function draftOf(c: CredentialSummary | null): CredentialDraft {
   };
 }
 
-// the http- files to pick from, a file failing the key's rule marked; a
-// name whose file is gone stays on the list, marked, so the form says
-// why the credential stopped signing
+// a name whose file is gone stays, marked, so the form says why the
+// credential stopped signing
 export function keyOptions(
   keys: readonly CredentialKey[],
   current: string,
@@ -77,7 +72,6 @@ export function keyOptions(
   return options;
 }
 
-// the key's part of a row's meta, and whether it is a failure
 export function keyLine(
   keyName: string,
   state: KeyState,
@@ -86,14 +80,12 @@ export function keyLine(
   return { text: `${keyName}.key ${state}`, bad: true };
 }
 
-// the projects a row names, or that it has none
 export function projectsLine(c: Pick<CredentialSummary, "projects">): string {
   return c.projects.length === 0
     ? "no projects"
     : c.projects.map((p) => p.name).join(", ");
 }
 
-// the methods in the server's order, the one picked flipped
 export function toggledMethod(
   methods: readonly HttpMethod[],
   method: HttpMethod,
@@ -113,7 +105,6 @@ export type CredentialField =
   | "methods"
   | "projectIds";
 
-// which field a server refusal names; anything else is the form's
 export function credentialFieldOf(
   message: string,
 ): CredentialField | undefined {
@@ -140,7 +131,6 @@ export function credentialFieldOf(
   return undefined;
 }
 
-// the first empty field, as the form checks it before a call
 export function problemOf(
   d: CredentialDraft,
   isNew: boolean,
@@ -176,15 +166,13 @@ export function createBody(d: CredentialDraft): CreateCredentialRequest {
   };
 }
 
-// only what changed, so a save never replaces a list it did not touch
-export function patchBody(
+function patchBody(
   d: CredentialDraft,
   c: CredentialSummary,
 ): PatchCredentialRequest {
   const body: PatchCredentialRequest = {};
   if (d.keyName !== c.keyName) body.keyName = d.keyName;
-  // trimmed on both sides: the server keeps a value as it was given, so
-  // a row may hold spaces round it that the box would never change
+  // the server keeps a value as given, so a row may hold spaces round it
   if (d.prefix.trim() !== c.prefix.trim()) body.prefix = d.prefix.trim();
   if (d.header.trim() !== c.header.trim()) body.header = d.header.trim();
   if (d.template.trim() !== c.template.trim()) {
@@ -196,11 +184,6 @@ export function patchBody(
   return body;
 }
 
-export function dirtyOf(d: CredentialDraft, c: CredentialSummary): boolean {
-  return Object.keys(patchBody(d, c)).length > 0;
-}
-
-// the key field's hint: the saved file's state, nothing for a new pick
 export function keyHint(
   keyName: string,
   c: Pick<CredentialSummary, "keyName" | "key"> | null,
@@ -211,8 +194,7 @@ export function keyHint(
     : `${c.keyName}.key is ${c.key}`;
 }
 
-// every team project the admin sees, and any the row names besides, so
-// a link to a project the list lacks stays in view to be taken off
+// a project the list lacks stays in view, to be taken off
 export function teamsOf(
   projects: readonly { id: string; name: string; kind: string }[],
   c: Pick<CredentialSummary, "projects"> | null,
@@ -226,14 +208,10 @@ export function teamsOf(
   return [...teams, ...extra].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Delete's line: what stops when it goes
 export function deleteLine(c: Pick<CredentialSummary, "prefix">): string {
   return `curl stops adding the header to requests under ${c.prefix}.`;
 }
 
-// A card of a credential's page owns some fields. Its body is what it
-// changed of them alone, compared to the row as saved, so a field
-// another card owns never rides along, however the row holds it.
 export function cardBody(
   d: CredentialDraft,
   c: CredentialSummary,
@@ -247,7 +225,6 @@ export function cardBody(
   ) as PatchCredentialRequest;
 }
 
-// the first empty field among the card's own
 export function cardProblem(
   d: CredentialDraft,
   keys: readonly CredentialField[],
@@ -256,9 +233,8 @@ export function cardProblem(
   return problem !== null && keys.includes(problem.field) ? problem : null;
 }
 
-// a refusal names a field of this card, or it is the card's notice: an
-// overlap refused while saving Projects names the prefix, which is on
-// another card
+// an overlap refused on Projects names the prefix, another card's field:
+// it is this card's notice
 export function cardFieldOf(
   keys: readonly CredentialField[],
 ): (message: string) => CredentialField | undefined {
@@ -268,16 +244,14 @@ export function cardFieldOf(
   };
 }
 
-// who reads a key file: the one credential, or how many do
-export function keyUsers(
-  file: string,
+export function keyReader(
   list: readonly Pick<CredentialSummary, "name" | "keyName">[],
-): { label: string; name: string | null; count: number } {
-  const users = list.filter((c) => c.keyName === file);
-  const count = users.length;
-  if (count === 0) return { label: "unused", name: null, count };
-  if (count === 1) {
-    return { label: users[0]!.name, name: users[0]!.name, count };
-  }
-  return { label: `${count} credentials`, name: null, count };
+): (file: string) => { label: string; href?: string; quiet?: boolean } {
+  return (file) => {
+    const users = list.filter((c) => c.keyName === file);
+    if (users.length === 0) return { label: "unused", quiet: true };
+    if (users.length > 1) return { label: `${users.length} credentials` };
+    const name = users[0]!.name;
+    return { label: name, href: configCredentialHref(name) };
+  };
 }

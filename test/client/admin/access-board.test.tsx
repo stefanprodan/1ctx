@@ -6,7 +6,7 @@ import { render } from "preact-render-to-string";
 import {
   accessBoard,
   BOARD_EVERY_MS,
-  loadAccessBoard,
+  refreshAccessBoard,
   watchAccessBoard,
 } from "../../../src/client/data/access-board.ts";
 import { adminProjects } from "../../../src/client/data/admin-projects.ts";
@@ -232,11 +232,13 @@ test.serial("loads the board in the browser's zone", async () => {
   const realFetch = globalThis.fetch;
   let asked = "";
   globalThis.fetch = (async (url: string) => {
+    if (url === "/api/users") return Response.json({ users: [] });
+    if (url === "/api/projects") return Response.json({ projects: [] });
     asked = url;
     return Response.json(board());
   }) as unknown as typeof fetch;
   try {
-    await loadAccessBoard();
+    await refreshAccessBoard();
   } finally {
     globalThis.fetch = realFetch;
   }

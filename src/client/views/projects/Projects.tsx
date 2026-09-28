@@ -16,6 +16,7 @@ import { me } from "../../data/me.ts";
 import { projects, projectsError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { days, daysFailed } from "../../data/usage.ts";
+import { PROJECTS_HREF } from "../../lib/hrefs.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -111,7 +112,7 @@ export function Projects() {
             }
             action={
               admin ? (
-                <RowsLink label="Manage" href="/admin/access/projects" />
+                <RowsLink label="Manage" href={PROJECTS_HREF} />
               ) : undefined
             }
           >

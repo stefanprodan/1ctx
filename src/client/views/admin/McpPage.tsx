@@ -1,13 +1,6 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An MCP server's page under Config: the crumb is the head, its own
-// step the switcher to the other servers; the failed refresh over the
-// tabs when there is one; then General and Tools, one view for the two
-// so the drafts outlive a tab switch. The aside has the server's last
-// 30 days and its most called tools.
 
-import { useRef } from "preact/hooks";
 import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
@@ -19,20 +12,22 @@ import {
   serversError,
   serverUsage,
 } from "../../data/mcp.ts";
-import { ago, count, sentence } from "../../lib/format.ts";
+import { count } from "../../lib/format.ts";
 import { configMcpHref, type McpTab } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { type Save, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
-import { Finder } from "../../ui/Finder.tsx";
-import { Page } from "../../ui/Page.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
+import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
+import { AsideLine, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { TopSection, UsageSection } from "./AdminAside.tsx";
+import { useLatest, useRowDrafts } from "./drafts.ts";
 import { mcpFieldOf } from "./Mcp.model.ts";
 import { McpGeneral } from "./McpGeneral.tsx";
 import { McpDrafts } from "./McpPage.state.ts";
 import { McpTools } from "./McpTools.tsx";
+import { refreshLine } from "./refresh.ts";
 import "./mcp-page.css";
 
 const STEPS = [
@@ -45,32 +40,20 @@ export function mcpTabOf(pathname: string): McpTab {
   return pathname.split("/")[5] === "tools" ? "tools" : "general";
 }
 
-// the most called tools the aside names
-const TOP_TOOLS = 5;
-
 export function McpPage({ params }: { params: Params }) {
   const list = servers.value;
   const server = list?.find((s) => s.name === params.name) ?? null;
   // Used by and Delete name the agents too, so the page waits for them
   const error = serversError.value ?? agentsError.value;
-  const drafts = useRef<McpDrafts | null>(null);
-  const row = useRef<McpServerSummary | null>(null);
-  if (server !== null && drafts.current?.serverId !== server.id) {
-    drafts.current = McpDrafts.of(server);
-  } else if (
-    server !== null &&
-    row.current !== null &&
-    row.current !== server
-  ) {
-    drafts.current?.follow(row.current, server);
-  }
-  row.current = server;
+  const drafts = useRowDrafts(server, McpDrafts.of, (d, before, after) =>
+    d.follow(before, after),
+  );
   const tab = mcpTabOf(path.value);
-  // the Tools draft's save, held by the page so a tab switch keeps its
-  // state; the row and drafts are read when it runs
+  // held by the page so a tab switch keeps its state; the row and the
+  // drafts are read when it runs
+  const latest = useLatest({ server, drafts });
   const toolsSave = useSave(async () => {
-    const s = row.current;
-    const d = drafts.current;
+    const { server: s, drafts: d } = latest.current;
     if (s === null || d === null) return;
     const p = d.patterns.value;
     d.resetTools(
@@ -87,7 +70,20 @@ export function McpPage({ params }: { params: Params }) {
       title={params.name}
       titleMono
       menu={
-        server !== null ? <Switcher server={server} tab={tab} /> : undefined
+        server !== null ? (
+          <PageSwitcher
+            label="MCP servers"
+            current={server.id}
+            name={server.name}
+            items={byName(list ?? []).map((s) => ({
+              id: s.id,
+              label: s.name,
+              href: configMcpHref(s.name, tab),
+            }))}
+            placeholder="Find a server"
+            none="No server matches"
+          />
+        ) : undefined
       }
       split
       loading={(list === null || agents.value === null) && error === null}
@@ -98,50 +94,18 @@ export function McpPage({ params }: { params: Params }) {
       }
       error={error}
     >
-      {server !== null && drafts.current !== null && (
+      {server !== null && drafts !== null && (
         <Split aside={<Aside server={server} />}>
           <Body
             key={server.id}
             server={server}
             tab={tab}
-            drafts={drafts.current}
+            drafts={drafts}
             toolsSave={toolsSave}
           />
         </Split>
       )}
     </Page>
-  );
-}
-
-// the crumb's own step: the other servers, by name, a pick opening its
-// page on the same tab
-function Switcher({ server, tab }: { server: McpServerSummary; tab: McpTab }) {
-  const list = byName(servers.value ?? []);
-  if (list.length < 2) {
-    return <span class="page-crumb-on page-crumb-path">{server.name}</span>;
-  }
-  return (
-    <Finder
-      label="MCP servers"
-      triggerClass="page-pill"
-      title={server.name}
-      trigger={
-        <>
-          <span class="cut">{server.name}</span>
-          <Icon name="chevron" size={14} class="page-pill-chevron" />
-        </>
-      }
-      options={list.map((s) => ({
-        value: s.id,
-        label: s.name,
-        href: configMcpHref(s.name, tab),
-      }))}
-      value={server.id}
-      mono
-      wide
-      placeholder="Find a server"
-      none="No server matches"
-    />
   );
 }
 
@@ -157,18 +121,12 @@ function Body({
   toolsSave: Save;
 }) {
   const now = useNow(60_000);
-  const failed =
-    server.refreshError !== null && server.refreshFailedAt !== null;
   return (
-    <div class="mcp-page">
-      {failed && (
-        <p class="mcp-page-bad" role="status">
-          <Icon name="alert" size={16} class="mcp-page-bad-icon" />
-          {`${sentence(server.refreshError!)} Last refresh ${ago(
-            server.refreshFailedAt!,
-            now,
-          )}.`}
-        </p>
+    <SettingStack>
+      {server.refreshError !== null && server.refreshFailedAt !== null && (
+        <SettingAlert>
+          {refreshLine(server.refreshError, server.refreshFailedAt, now)}
+        </SettingAlert>
       )}
       <Tabs
         tabs={[
@@ -187,38 +145,29 @@ function Body({
       {tab === "tools" && (
         <McpTools server={server} drafts={drafts} save={toolsSave} />
       )}
-    </div>
+    </SettingStack>
   );
 }
 
 function Aside({ server }: { server: McpServerSummary }) {
-  const known =
-    serverUsage.value?.serverId === server.id ? serverUsage.value : null;
-  const usage = known?.usage ?? null;
-  const top = usage?.tools.slice(0, TOP_TOOLS) ?? [];
+  const usage = serverUsage.valueFor(server.id);
   return (
     <>
-      <AsideSection label="Last 30 days">
-        {known === null ? (
-          <p class="split-empty">Loading</p>
-        ) : usage === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
+      <UsageSection value={usage}>
+        {(u) => (
           <>
-            <AsideLine label="Calls">{count(usage.calls)}</AsideLine>
-            <AsideLine label="Failed">{count(usage.failed)}</AsideLine>
+            <AsideLine label="Calls">{count(u.calls)}</AsideLine>
+            <AsideLine label="Failed">{count(u.failed)}</AsideLine>
           </>
         )}
-      </AsideSection>
-      {top.length > 0 && (
-        <AsideSection label="Most called">
-          {top.map((t) => (
-            <AsideLine key={t.name} label={t.name} cut>
-              {count(t.calls)}
-            </AsideLine>
-          ))}
-        </AsideSection>
-      )}
+      </UsageSection>
+      <TopSection
+        label="Most called"
+        rows={(usage?.tools ?? []).map((t) => ({
+          name: t.name,
+          value: t.calls,
+        }))}
+      />
     </>
   );
 }

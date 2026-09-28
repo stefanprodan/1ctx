@@ -17,11 +17,11 @@ import {
   keys,
   loadedAt,
   loadMcp,
+  loadServerUsage,
   patchServer,
   refreshServer,
   servers,
   serversError,
-  serverUsage,
 } from "../../../src/client/data/mcp.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
@@ -36,15 +36,15 @@ import {
   offerOf,
   offerSides,
   promptPreview,
+  sidesLine,
   timeoutMs,
   timeoutProblem,
   timeoutText,
 } from "../../../src/client/views/admin/Mcp.model.ts";
-import {
-  McpList,
-  sidesLine,
-} from "../../../src/client/views/admin/McpList.tsx";
+import { McpList } from "../../../src/client/views/admin/McpList.tsx";
+import { McpDrafts } from "../../../src/client/views/admin/McpPage.state.ts";
 import { McpPage, mcpTabOf } from "../../../src/client/views/admin/McpPage.tsx";
+import { ToolParams } from "../../../src/client/views/admin/ToolParams.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
   McpServerSummary,
@@ -519,27 +519,68 @@ describe("a server's page", () => {
 
   test.serial(
     "the aside has its last 30 days and its most called tools",
-    () => {
+    async () => {
+      // a sign-in drops every answer kept
+      me.value = null;
+      me.value = admin;
       servers.value = [flux];
       agents.value = [];
       path.value = "/admin/config/mcp/flux";
-      serverUsage.value = null;
       const page = () => render(<McpPage params={{ name: "flux" }} />);
       expect(page()).toContain("Loading");
-      serverUsage.value = {
-        serverId: "m1",
-        usage: {
+      answer = () =>
+        Response.json({
           since: 0,
           until: 1,
           calls: 12,
           failed: 2,
           tools: [{ name: "get_flux_instance", calls: 10 }],
-        },
-      };
+        });
+      await loadServerUsage("m1");
       expect(page()).toMatch(/Calls[\s\S]*?12/);
       expect(page()).toMatch(/get_flux_instance[\s\S]*?10/);
-      serverUsage.value = { serverId: "m1", usage: null };
+      expect(page()).toContain('href="/admin/monitor/usage"');
+      answer = () => Response.json({ error: "down" }, { status: 503 });
+      await loadServerUsage("m1");
       expect(page()).toContain("Did not load.");
     },
   );
+});
+
+describe("the drafts", () => {
+  test.serial("saving Offered keeps a timeout typed and not saved", () => {
+    const d = McpDrafts.of(flux);
+    d.timeout.value = "30";
+    d.resetOffer(server({ write: true }));
+    expect(d.timeout.value).toBe("30");
+    expect(d.write.value).toBe(true);
+  });
+
+  test.serial("a card at rest follows the row, an edited one stays", () => {
+    const d = McpDrafts.of(flux);
+    d.write.value = true;
+    d.follow(flux, server({ timeoutMs: 30_000 }));
+    expect(d.timeout.value).toBe("30");
+    expect(d.write.value).toBe(true);
+    d.follow(
+      server({ timeoutMs: 30_000 }),
+      server({ timeoutMs: 30_000, write: false }),
+    );
+    expect(d.write.value).toBe(true);
+  });
+});
+
+describe("a tool's parameters", () => {
+  test.serial("the server's HTML, cut until Show all", () => {
+    const html = render(
+      <ToolParams
+        tool={{
+          parameters: { type: "object" },
+          parametersHtml: "<pre>{}</pre>",
+        }}
+      />,
+    );
+    expect(html).toContain("<pre>{}</pre>");
+    expect(html).toContain("tool-params-cut");
+  });
 });

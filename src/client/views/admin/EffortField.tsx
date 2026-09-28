@@ -1,8 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The agent form's effort: a native select over the wire's levels,
-// the empty option leaving the provider's default in place.
 
 import type { Effort, Wire } from "../../../shared/words.ts";
 import { Icon } from "../../lib/icons.tsx";

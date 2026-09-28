@@ -1,6 +1,3 @@
-/* Config › Web access: the tabs over the cards stacked, General kept
-   drawn but hidden on Credentials, the domains box in mono. */
-
 @layer tokens, base, owners;
 
 @layer owners {

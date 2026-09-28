@@ -18,7 +18,7 @@ import {
   patchCredential,
 } from "../../../src/client/data/credentials.ts";
 import { me } from "../../../src/client/data/me.ts";
-import { projects } from "../../../src/client/data/projects.ts";
+import { projects, projectsError } from "../../../src/client/data/projects.ts";
 import { tools } from "../../../src/client/data/tools.ts";
 import { CredentialList } from "../../../src/client/views/admin/CredentialList.tsx";
 import { CredentialPage } from "../../../src/client/views/admin/CredentialPage.tsx";
@@ -29,13 +29,11 @@ import {
   createBody,
   credentialFieldOf,
   deleteLine,
-  dirtyOf,
   draftOf,
   keyHint,
   keyLine,
   keyOptions,
-  keyUsers,
-  patchBody,
+  keyReader,
   problemOf,
   projectsLine,
   teamsOf,
@@ -207,18 +205,30 @@ describe("the model", () => {
   });
 
   test("a change sends only the fields it touched", () => {
+    const all = [
+      "keyName",
+      "prefix",
+      "header",
+      "template",
+      "methods",
+      "projectIds",
+    ] as const;
     const c = credential();
     const d = draftOf(c);
-    expect(dirtyOf(d, c)).toBe(false);
-    expect(patchBody(d, c)).toEqual({});
-    expect(patchBody({ ...d, projectIds: [] }, c)).toEqual({ projectIds: [] });
+    expect(cardBody(d, c, all)).toEqual({});
+    expect(cardBody({ ...d, projectIds: [] }, c, all)).toEqual({
+      projectIds: [],
+    });
     expect(
-      patchBody(
+      cardBody(
         { ...d, methods: ["GET", "POST"], template: "Bearer {key}" },
         c,
+        all,
       ),
     ).toEqual({ methods: ["GET", "POST"], template: "Bearer {key}" });
-    expect(dirtyOf({ ...d, keyName: "http-other" }, c)).toBe(true);
+    expect(cardBody({ ...d, keyName: "http-other" }, c, all)).toEqual({
+      keyName: "http-other",
+    });
   });
 });
 
@@ -259,6 +269,26 @@ describe("the entity", () => {
       expect(credentials.value?.map((c) => c.id)).toEqual(["c2"]);
     },
   );
+
+  test.serial("a failed write keeps a load that was in flight", async () => {
+    credentials.value = [];
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    answer = async (_url, init) => {
+      if (init?.method === "PATCH") {
+        return Response.json({ error: "nope" }, { status: 500 });
+      }
+      await held;
+      return Response.json({ credentials: [credential()], keys: [] });
+    };
+    const load = loadCredentials();
+    await expect(patchCredential("c1", { methods: ["GET"] })).rejects.toThrow();
+    release();
+    await load;
+    expect(credentials.value?.map((c) => c.id)).toEqual(["c1"]);
+  });
 
   test.serial("a failed load is the page's error", async () => {
     answer = () => Response.json({ error: "nope" }, { status: 500 });
@@ -344,21 +374,13 @@ describe("a card of the page", () => {
       credential({ id: "c2", name: "b", keyName: "http-shared" }),
       credential({ id: "c3", name: "c", keyName: "http-shared" }),
     ];
-    expect(keyUsers("http-finnhub", list)).toEqual({
+    const reader = keyReader(list);
+    expect(reader("http-finnhub")).toEqual({
       label: "finnhub",
-      name: "finnhub",
-      count: 1,
+      href: "/admin/config/web/credentials/finnhub",
     });
-    expect(keyUsers("http-shared", list)).toEqual({
-      label: "2 credentials",
-      name: null,
-      count: 2,
-    });
-    expect(keyUsers("http-none", list)).toEqual({
-      label: "unused",
-      name: null,
-      count: 0,
-    });
+    expect(reader("http-shared")).toEqual({ label: "2 credentials" });
+    expect(reader("http-none")).toEqual({ label: "unused", quiet: true });
   });
 });
 
@@ -485,6 +507,19 @@ describe("the pages", () => {
     // the aside
     expect(html).toMatch(/Key file<span class="split-strong cut">/);
     expect(html).toContain("1 project");
+  });
+
+  test.serial("the Projects card says when the projects did not load", () => {
+    credentials.value = two();
+    projects.value = null;
+    projectsError.value = { words: "nope", status: 500 };
+    try {
+      const html = render(<CredentialPage params={{ name: "finnhub" }} />);
+      expect(html).toContain("Did not load.");
+      expect(html).not.toContain("Add project");
+    } finally {
+      projectsError.value = null;
+    }
   });
 
   test.serial("an unknown name says so", () => {

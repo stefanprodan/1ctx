@@ -102,12 +102,13 @@ let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
 let stopSocket: (() => void) | null = null;
 
 beforeEach(() => {
+  // a new sign-in drops every answer, the aside's included
+  me.value = null;
   me.value = admin;
   adminProjects.value = null;
   adminProjectsError.value = null;
   adminProject.value = null;
   adminProjectError.value = null;
-  projectUsage.value = {};
   projects.value = null;
   users.value = [root, casey];
   usersError.value = null;
@@ -453,7 +454,8 @@ describe("the entity", () => {
           : Response.json({ error: "no such project" }, { status: 404 });
       await loadProjectUsage("p2");
       await loadProjectUsage("p9");
-      expect(projectUsage.value).toEqual({ p2: body, p9: null });
+      expect(projectUsage.valueFor("p2")).toEqual(body);
+      expect(projectUsage.valueFor("p9")).toBeNull();
     },
   );
 
@@ -531,7 +533,7 @@ describe("the page", () => {
     query.value = "?new";
     const html = render(<AdminProjects />);
     query.value = "";
-    expect(html).toContain('class="admin-projects-page"');
+    expect(html).toContain('aria-label="New project"');
     expect(html).toContain(">Create project<");
     expect(html).toContain('href="/admin/access/projects"');
     expect(html).toContain('name="name"');
@@ -539,12 +541,12 @@ describe("the page", () => {
     expect(html).toContain('aria-required="true" rows="3"');
   });
 
-  test("a project's page has its cards and its aside", () => {
+  test.serial("a project's page has its cards and its aside", async () => {
+    answer = () =>
+      Response.json({ since: 0, until: 1, sends: 4, tokens: 1200, cost: null });
+    await loadProjectUsage("p2");
     adminProjects.value = [team];
     adminProject.value = { ...detail, description: "Incidents and pages" };
-    projectUsage.value = {
-      p2: { since: 0, until: 1, sends: 4, tokens: 1200, cost: null },
-    };
     const html = render(<ProjectPage params={{ id: "p2" }} />);
     expect(html).toContain('value="platform"');
     expect(html).toContain(">Incidents and pages</textarea>");

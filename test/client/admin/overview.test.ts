@@ -10,7 +10,6 @@ import {
   attentionRow,
   automationsTile,
   buildLine,
-  cachedLine,
   chatTile,
   costOf,
   costTile,
@@ -35,15 +34,14 @@ import {
   lengthAxis,
   lengthHint,
   lengthSeries,
+  lengthWord,
 } from "../../../src/client/views/admin/Stats.model.ts";
 import {
   agentBars,
-  lengthWord,
   modelBars,
   modelLabel,
   monthLabel,
   monthSteps,
-  shiftMonth,
   usageBars,
 } from "../../../src/client/views/admin/Usage.model.ts";
 import type {
@@ -200,7 +198,7 @@ describe("the last 30 days", () => {
       sub: "38% cached",
     });
     expect(tokensTile(totals(), day()).sub).toBe("13 Sep · 1.1K");
-    expect(cachedLine(totals({ promptTokens: 0 }))).toBe("none yet");
+    expect(tokensTile(totals({ promptTokens: 0 }), null).sub).toBe("none yet");
     expect(dayTokensHint(day())).toBe("13 Sep · 1.1K tokens · 42% cached");
   });
 
@@ -435,9 +433,9 @@ describe("the breakdowns", () => {
   });
 
   test("the arrows step a month between the first turn's and this one", () => {
-    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
-    expect(shiftMonth("2025-12", 1)).toBe("2026-01");
-    expect(shiftMonth("2026-09", -13)).toBe("2025-08");
+    // across a year
+    expect(monthSteps("2026-01", "2025-06", "2026-09").back).toBe("2025-12");
+    expect(monthSteps("2025-12", "2025-06", "2026-09").forward).toBe("2026-01");
     expect(monthSteps("2026-09", "2026-06", "2026-09")).toEqual({
       back: "2026-08",
       forward: null,
@@ -502,8 +500,11 @@ describe("needs attention", () => {
       attentionRow({ kind: "credential-unusable", name: "gh", at: null }, now),
     ).toMatchObject({
       line: "key file unusable",
-      href: "/admin/config/web/credentials",
+      href: "/admin/config/web/credentials/gh",
     });
+    expect(
+      attentionRow({ kind: "credential-key", name: "gh", at: null }, now).href,
+    ).toBe("/admin/config/web/credentials/gh");
   });
 });
 

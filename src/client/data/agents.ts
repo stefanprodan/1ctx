@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The agents entity: the admin's list, loaded when its page is reached
-// and dropped with the signed-in user, and the calls that change it. A write puts
-// the server's row in the list, so what shows is what was saved.
 
 import { effect, signal } from "@preact/signals";
 import type { SendTotalsResponse } from "../../shared/api/admin.ts";
@@ -18,19 +14,11 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { readSlot } from "./slot.ts";
 
 export const agents = signal<AgentSummary[] | null>(null);
 export const agentsError = signal<Failure | null>(null);
-// when each agent last ran and whether it runs now, read with the list
 export const activity = signal<AgentActivity[]>([]);
-// an agent's page beside the row: its last 30 days and what its delete
-// would touch, each null when its read failed
-export type AgentFacts = {
-  agentId: string;
-  usage: SendTotalsResponse | null;
-  impact: AgentImpactResponse | null;
-};
-export const facts = signal<AgentFacts | null>(null);
 
 let owner: string | null = null;
 
@@ -41,13 +29,10 @@ effect(() => {
   agents.value = null;
   agentsError.value = null;
   activity.value = [];
-  facts.value = null;
 });
 
-// a load's answer is kept only when it is still the one wanted: for
-// the signed-in user of the moment and the latest word on the list, a
-// failure included, since a route arrival reloads and a write can land
-// while a load is in flight
+// a route arrival reloads and a write can land while a load is in
+// flight: only the latest word for the same user lands, a failure too
 let turn = 0;
 
 export async function loadAgents(): Promise<void> {
@@ -95,26 +80,27 @@ export async function updateAgent(
   return agent;
 }
 
-// read after the list, which names the agent; a later read for another
-// agent supersedes this one
-let factsTurn = 0;
-export async function loadFacts(name: string): Promise<void> {
-  const mine = ++factsTurn;
-  const agent = agents.value?.find((a) => a.name === name);
-  if (agent === undefined) return;
-  if (facts.value?.agentId !== agent.id) facts.value = null;
-  const id = encodeURIComponent(agent.id);
-  const [usage, impact] = await Promise.all([
-    api<SendTotalsResponse>(`/api/agents/${id}/usage`).catch(() => null),
-    api<AgentImpactResponse>(`/api/agents/${id}/impact`).catch(() => null),
-  ]);
-  if (mine === factsTurn) facts.value = { agentId: agent.id, usage, impact };
-}
+type Facts = {
+  usage: SendTotalsResponse | null;
+  impact: AgentImpactResponse | null;
+};
 
-// what a delete would do now: the chats it archives, the automations
-// it pauses and what it stops
-export const agentImpact = (id: string): Promise<AgentImpactResponse> =>
-  api<AgentImpactResponse>(`/api/agents/${encodeURIComponent(id)}/impact`);
+const facts = readSlot<Facts>(async (id) => {
+  const at = `/api/agents/${encodeURIComponent(id)}`;
+  const [usage, impact] = await Promise.all([
+    api<SendTotalsResponse>(`${at}/usage`).catch(() => null),
+    api<AgentImpactResponse>(`${at}/impact`).catch(() => null),
+  ]);
+  return { usage, impact };
+});
+
+export const factsFor = facts.valueFor;
+
+// the address names the agent; its facts are read by id
+export async function loadFacts(name: string): Promise<void> {
+  const agent = agents.value?.find((a) => a.name === name);
+  if (agent !== undefined) await facts.load(agent.id);
+}
 
 export async function deleteAgent(id: string): Promise<void> {
   const forUser = owner;

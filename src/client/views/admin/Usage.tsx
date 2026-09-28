@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A calendar month of use: the month's tiles and its tokens a day, then
-// the tokens and cost by project, agent (the deciders among them) or
-// model. The month is in the address (?month=2026-09), this month
-// without one, and the head's arrows step a month at a time between the
-// first turn's and this one. Loaded when a month is reached; a pick
-// keeps the last month on screen, faded, until the new one lands.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -22,7 +15,7 @@ import {
 } from "../../data/overview.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { BarsGhost } from "../../ui/Bones.tsx";
-import { Bars, ChartPanel } from "../../ui/Chart.tsx";
+import { BarsPanel, ChartPanel } from "../../ui/Chart.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsFilters } from "../../ui/RowsControls.tsx";
 import { DaysTiles, TokensGhost, TokensPanel } from "./Days.tsx";
@@ -34,7 +27,6 @@ import {
   monthSteps,
   usageBars,
 } from "./Usage.model.ts";
-import "./overview.css";
 import "./usage.css";
 
 const SYNC = "usage";
@@ -46,50 +38,6 @@ const BY = [
   { key: "models", label: "Models" },
 ] as const;
 type By = (typeof BY)[number]["key"];
-
-type Bar = {
-  key: string;
-  name: string;
-  value: number;
-  label: preact.ComponentChildren;
-  hint: string;
-  mono?: boolean;
-  note?: string;
-};
-
-// a panel of bars whose hint follows the pointer
-function BarsPanel({
-  label,
-  bars,
-  none,
-  action,
-}: {
-  label: string;
-  bars: Bar[];
-  none: string;
-  action?: preact.ComponentChildren;
-}) {
-  const over = useSignal<string | null>(null);
-  return (
-    <ChartPanel
-      label={label}
-      hint={bars.find((b) => b.key === over.value)?.hint}
-      action={action}
-    >
-      {bars.length === 0 ? (
-        <p class="chart-none">{none}</p>
-      ) : (
-        <Bars
-          wide
-          bars={bars}
-          onHover={(key) => {
-            over.value = key;
-          }}
-        />
-      )}
-    </ChartPanel>
-  );
-}
 
 function ByPanel({ answer }: { answer: UsageResponse }) {
   const kind = useSignal<By>("projects");
@@ -108,12 +56,11 @@ function ByPanel({ answer }: { answer: UsageResponse }) {
   }));
   return (
     <BarsPanel
-      // a new kind starts with no bar under the pointer
+      // a new kind forgets the bar under the pointer
       key={kind.value}
       label="Usage"
       bars={bars.map(({ cost, costly, ...b }) => ({
         ...b,
-        // the cost after the tokens, as Storage's share after a size
         label:
           cost === undefined ? (
             b.label
@@ -126,6 +73,7 @@ function ByPanel({ answer }: { answer: UsageResponse }) {
             </>
           ),
       }))}
+      wide
       none={NO_TURNS}
       action={<RowsFilters label="Usage by" filters={filters} />}
     />
@@ -143,7 +91,7 @@ function Board({ answer }: { answer: UsageResponse }) {
         sync={SYNC}
       />
       <div class="chart-grid">
-        <div class="overview-wide">
+        <div class="chart-wide">
           <TokensPanel
             days={answer.days}
             totals={answer.totals}
@@ -152,7 +100,7 @@ function Board({ answer }: { answer: UsageResponse }) {
             none={NO_TURNS}
           />
         </div>
-        <div class="overview-wide">
+        <div class="chart-wide">
           <ByPanel answer={answer} />
         </div>
       </div>
@@ -167,10 +115,10 @@ function BoardGhost() {
     <>
       <OverviewGhost at={0} />
       <div class="chart-grid chart-board-ghost" aria-hidden="true">
-        <div class="overview-wide">
+        <div class="chart-wide">
           <TokensGhost at={16} />
         </div>
-        <div class="overview-wide">
+        <div class="chart-wide">
           <ChartPanel label="Usage">
             <BarsGhost widths={BAR_WIDTHS} at={48} wide />
           </ChartPanel>
@@ -180,7 +128,6 @@ function BoardGhost() {
   );
 }
 
-// an arrow is a link to its month, or faded where there is none
 function Step({
   to,
   label,
@@ -235,7 +182,7 @@ export function Usage() {
       error={answer === null && !busy ? error : null}
     >
       <div
-        class={`chart-board${answer && (busy || error) ? " usage-stale" : ""}`}
+        class={`chart-board${answer && (busy || error) ? " chart-stale" : ""}`}
         aria-busy={busy}
       >
         {answer ? <Board answer={answer} /> : <BoardGhost />}

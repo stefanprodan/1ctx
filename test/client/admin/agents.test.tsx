@@ -31,7 +31,6 @@ import {
   loadProviderUsage,
   providers,
   providersError,
-  providerUsage,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
 import { keyOptions } from "../../../src/client/lib/secrets.ts";
@@ -57,10 +56,8 @@ import {
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
-import {
-  ProviderPage,
-  providerDeleteLine,
-} from "../../../src/client/views/admin/ProviderPage.tsx";
+import { ProviderPage } from "../../../src/client/views/admin/ProviderPage.tsx";
+import { providerDeleteLine } from "../../../src/client/views/admin/Providers.model.ts";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
@@ -747,25 +744,40 @@ describe("a provider's page", () => {
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
   });
 
-  test.serial("the aside has its last 30 days, or says it did not load", () => {
-    providers.value = [router];
-    agents.value = [];
-    providerUsage.value = null;
-    const page = () => render(<ProviderPage params={{ name: "router" }} />);
-    expect(page()).toContain("Loading");
-    providerUsage.value = {
-      providerId: "pr1",
-      usage: { since: 0, until: 1, sends: 12, tokens: 3400, cost: null },
-    };
-    expect(page()).toMatch(/Turns[\s\S]*?12/);
-    expect(page()).toContain("not priced");
-    providerUsage.value = { providerId: "pr1", usage: null };
-    expect(page()).toContain("Did not load.");
-    // another provider's answer is not this one's
-    providerUsage.value = { providerId: "pr2", usage: null };
-    expect(page()).not.toContain("Did not load.");
-    providerUsage.value = null;
-  });
+  test.serial(
+    "the aside has its last 30 days, or says it did not load",
+    async () => {
+      me.value = null;
+      me.value = admin;
+      providers.value = [router];
+      agents.value = [];
+      deciders.value = [];
+      const page = () => render(<ProviderPage params={{ name: "router" }} />);
+      expect(page()).toContain('split-empty">Loading');
+      let asked = "";
+      answer = (url) => {
+        asked = url;
+        return Response.json({
+          since: 0,
+          until: 1,
+          sends: 12,
+          tokens: 3400,
+          cost: null,
+        });
+      };
+      await loadProviderUsage("pr1");
+      expect(asked).toBe("/api/providers/pr1/usage");
+      expect(page()).toMatch(/Turns[\s\S]*?12/);
+      expect(page()).toContain("not priced");
+      expect(page()).toContain('href="/admin/monitor/usage"');
+      // another provider's failed read is not this one's
+      answer = () => Response.json({ error: "boom" }, { status: 500 });
+      await loadProviderUsage("pr2");
+      expect(page()).not.toContain("Did not load.");
+      await loadProviderUsage("pr1");
+      expect(page()).toContain("Did not load.");
+    },
+  );
 
   test.serial("waits for the deciders, which Used by and Delete name", () => {
     providers.value = [router];
@@ -789,27 +801,6 @@ describe("a provider's page", () => {
       expect(render(<Providers />)).toContain("Loading");
     },
   );
-
-  test.serial("only the latest usage read lands", async () => {
-    const answers: Record<string, (r: Response) => void> = {};
-    answer = (url) =>
-      new Promise<Response>((resolve) => {
-        answers[url] = resolve;
-      });
-    providerUsage.value = null;
-    const first = loadProviderUsage("pa");
-    const second = loadProviderUsage("pb");
-    const body = (n: number) =>
-      Response.json({ since: 0, until: 1, sends: n, tokens: 0, cost: 0 });
-    answers["/api/providers/pb/usage"]!(body(2));
-    await second;
-    answers["/api/providers/pa/usage"]!(body(1));
-    await first;
-    expect(
-      (providerUsage.value as { providerId: string } | null)?.providerId,
-    ).toBe("pb");
-    providerUsage.value = null;
-  });
 
   test.serial("an unknown name is a missing page", () => {
     providers.value = [router];

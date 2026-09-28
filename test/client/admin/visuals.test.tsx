@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   limits,
+  loadVisualsUsage,
   tools,
   toolsError,
-  visualsUsage,
 } from "../../../src/client/data/tools.ts";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
@@ -100,23 +100,20 @@ describe("the Visuals words", () => {
 });
 
 describe("the Visuals page", () => {
-  let held: [
-    typeof tools.value,
-    typeof limits.value,
-    typeof visualsUsage.value,
-  ];
+  const realFetch = globalThis.fetch;
+  let held: [typeof tools.value, typeof limits.value];
   beforeEach(() => {
-    held = [tools.value, limits.value, visualsUsage.value];
+    held = [tools.value, limits.value];
   });
   afterEach(() => {
-    [tools.value, limits.value, visualsUsage.value] = held;
+    [tools.value, limits.value] = held;
     toolsError.value = null;
+    globalThis.fetch = realFetch;
   });
 
   test.serial("three cards, each its own form, nothing to save at rest", () => {
     tools.value = response();
     limits.value = rows;
-    visualsUsage.value = null;
     const html = render(<Visuals />);
     expect(html.match(/<form/g)).toHaveLength(3);
     expect(
@@ -186,19 +183,34 @@ describe("the Visuals page", () => {
     expect(row).not.toContain('role="switch"');
   });
 
-  test.serial("the aside counts the last 30 days, or says it failed", () => {
-    tools.value = response();
-    limits.value = rows;
-    visualsUsage.value = {
-      usage: { since: 0, until: 1, drawn: 12, failed: 1, opened: 3 },
-    };
-    const html = render(<Visuals />);
-    expect(html).toMatch(/Drawn<span class="split-strong">12</);
-    expect(html).toMatch(/Failed<span class="split-strong">1</);
-    expect(html).toMatch(/Files opened<span class="split-strong">3</);
-    visualsUsage.value = { usage: null };
-    expect(render(<Visuals />)).toContain("Did not load.");
-  });
+  test.serial(
+    "the aside counts the last 30 days, or says it failed",
+    async () => {
+      tools.value = response();
+      limits.value = rows;
+      globalThis.fetch = (async () =>
+        Response.json({
+          since: 0,
+          until: 1,
+          drawn: 12,
+          failed: 1,
+          opened: 3,
+        })) as unknown as typeof fetch;
+      await loadVisualsUsage();
+      const html = render(<Visuals />);
+      expect(html).toMatch(/Drawn<span class="split-strong">12</);
+      expect(html).toMatch(/Failed<span class="split-strong">1</);
+      expect(html).toMatch(/Files opened<span class="split-strong">3</);
+      expect(html).toContain('href="/admin/monitor/usage"');
+      globalThis.fetch = (async () =>
+        Response.json(
+          { error: "nope" },
+          { status: 500 },
+        )) as unknown as typeof fetch;
+      await loadVisualsUsage();
+      expect(render(<Visuals />)).toContain("Did not load.");
+    },
+  );
 
   test.serial("says it is loading, then the failure", () => {
     tools.value = null;

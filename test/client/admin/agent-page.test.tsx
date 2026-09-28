@@ -18,7 +18,6 @@ import {
   failingLine,
   lastUse,
   nameTaken,
-  savedBody,
 } from "../../../src/client/views/admin/AgentPage.model.ts";
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import { tabOf } from "../../../src/client/views/admin/AgentPage.tsx";
@@ -112,12 +111,22 @@ const rows = {
 
 describe("a card's body", () => {
   test("is the saved agent with only the card's fields changed", () => {
-    expect(cardBody(agent, { name: "writer" }, rows)).toEqual({
-      ...savedBody(agent),
+    const body = cardBody(agent, { name: "writer" }, rows);
+    expect(body).toEqual({
       name: "writer",
+      avatar: "bot",
+      providerId: "pr1",
+      model: "vendor/flash",
+      thinking: "on",
+      effort: "high",
+      prompt: "Be brief.",
+      skills: ["sk1", "sk2"],
+      servers: [{ serverId: "s1", read: true, write: false }],
+      mcpMode: "auto",
+      upstream: "vendor/fp8",
     });
-    expect(savedBody(agent)).not.toHaveProperty("contextLength");
-    expect(savedBody(agent)).not.toHaveProperty("default");
+    expect(body).not.toHaveProperty("contextLength");
+    expect(body).not.toHaveProperty("default");
   });
 
   test("carries a stated window and tools on every other card's save", () => {
@@ -335,6 +344,28 @@ describe("the model draft", () => {
     expect(d.thinking.value).toBe("off");
   });
 
+  test("an untouched card follows the mark and the name moved under it", () => {
+    const marked = { ...agent, default: true };
+    const d = AgentDrafts.of(marked);
+    const moved = { ...marked, default: false, name: "writer" };
+    d.follow(marked, moved);
+    expect(d.isDefault.value).toBe(false);
+    expect(d.name.value).toBe("writer");
+    expect(d.generalDirty(moved)).toBe(false);
+    // an edited name and the skills it picked stay
+    d.name.value = "editor";
+    d.skills.value = ["sk1"];
+    const again = { ...moved, name: "other", skills: ["sk2"] };
+    d.follow(moved, again);
+    expect(d.name.value).toBe("editor");
+    expect(d.skills.value).toEqual(["sk1"]);
+    // an untouched list follows
+    const d2 = AgentDrafts.of(agent);
+    d2.follow(agent, { ...agent, skills: ["sk2"], mcpMode: "catalog" });
+    expect(d2.skills.value).toEqual(["sk2"]);
+    expect(d2.mode.value).toBe("catalog");
+  });
+
   test("a draft is dirty against the saved row, trimmed", () => {
     const d = AgentDrafts.of(agent);
     d.name.value = " coder ";
@@ -436,7 +467,7 @@ describe("the cards", () => {
     query.value = "?new&provider=zeta";
     try {
       const html = render(<NewAgent />);
-      expect(html).toContain('class="agent-page-provider" title="zeta"');
+      expect(html).toContain('class="model-picker-provider" title="zeta"');
       // Cancel returns to the provider's page
       expect(html).toContain('href="/admin/config/providers/zeta">Cancel<');
     } finally {

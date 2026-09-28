@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the users pages show and what their forms check before they
-// call: an empty field, a malformed email and a mistyped password,
-// caught without a round trip. The username rule is the server's alone.
 
 import type {
   AdminUser,
@@ -24,8 +20,7 @@ export const ROLE_CHOICES: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
 ];
 
-// the field shapes the username as it is typed and the server holds
-// the rule, so the one slip worth catching here is an empty field
+// the server holds the username rule
 export function usernameProblem(value: string): string | null {
   return value.trim() === "" ? "Enter a username" : null;
 }
@@ -39,13 +34,12 @@ export function emailProblem(value: string): string | null {
   return null;
 }
 
-// a new user's zone is picked, never guessed from the admin's browser
+// a zone is picked, never guessed from the admin's browser
 export function tzProblem(value: string): string | null {
   return value === "" ? "Pick a time zone" : null;
 }
 
-// a first password, or a reset: typed once, since the admin sees it
-// and hands it over
+// typed once, no confirm box: the admin sees it and hands it over
 export function passwordProblem(password: string): string | null {
   if (password.length < MIN_PASSWORD)
     return `The password needs at least ${MIN_PASSWORD} characters`;
@@ -54,11 +48,9 @@ export function passwordProblem(password: string): string | null {
   return null;
 }
 
-// the fields of the user form, by the name each control carries
 type UserField = "username" | "fullName" | "email" | "tz" | "role" | "password";
 
-// which field a server refusal of the user routes names; the words are
-// the parsers' and the conflicts' in access/
+// the words are the parsers' and the conflicts' in access/
 export function userFieldOf(message: string): UserField | undefined {
   const m = message.toLowerCase();
   if (m.startsWith("username")) return "username";
@@ -70,13 +62,10 @@ export function userFieldOf(message: string): UserField | undefined {
   return undefined;
 }
 
-// "@casey · casey@example.com"
 export function metaLine(user: UserAccount): string {
   return `@${user.username} · ${user.email}`;
 }
 
-// today as the user's own date, "2026-09-28", UTC for a zone the
-// browser does not know
 function todayIn(tz: string, now: number): string {
   const day = (timeZone: string) => {
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -99,8 +88,6 @@ const todayYear = (ms: number) => String(new Date(ms).getUTCFullYear());
 
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
 
-// whole days from the user's last visit to their today, both their own
-// dates; null for never
 export function idleDays(
   user: Pick<AdminUser, "lastVisitDay" | "tz">,
   now: number,
@@ -110,23 +97,19 @@ export function idleDays(
   return Math.round((today - dayMs(user.lastVisitDay)) / 86_400_000);
 }
 
-// the last day a user used the app against today, both the user's own
-// dates, so a reader in another zone never moves the day: "today",
-// "yesterday", "3d ago", or "never". A visit is kept per day, so an
-// hour would claim more than is known.
+// a visit is kept per day, so an hour would claim more than is known
 export function lastActive(
   user: Pick<AdminUser, "lastVisitDay" | "tz">,
   now: number,
 ): string {
-  const days = idleDays(user, now);
-  if (days === null || user.lastVisitDay === null) return "never";
+  if (user.lastVisitDay === null) return "never";
   const today = dayMs(todayIn(user.tz, now));
   const last = dayMs(user.lastVisitDay);
+  const days = Math.round((today - last) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 28) return ago(last, today);
-  // the date itself, read in UTC as it was written, so no reader's zone
-  // moves it
+  // read in UTC as it was written, so no reader's zone moves it
   const year = user.lastVisitDay.slice(0, 4) !== todayYear(today);
   return new Date(last).toLocaleDateString("en-GB", {
     timeZone: "UTC",
@@ -136,8 +119,7 @@ export function lastActive(
   });
 }
 
-// the same in a row: "active today", "never active"
-export function activeLine(
+function activeLine(
   user: Pick<AdminUser, "lastVisitDay" | "tz">,
   now: number,
 ): string {
@@ -146,8 +128,6 @@ export function activeLine(
     : `active ${lastActive(user, now)}`;
 }
 
-// the row's right side: the role, then a state worth a word or when
-// they were last active. "member · active today", "member · disabled"
 export function stateLine(user: AdminUser, now: number): string {
   const state = user.disabled
     ? "disabled"
@@ -157,7 +137,6 @@ export function stateLine(user: AdminUser, now: number): string {
   return `${user.role} · ${state}`;
 }
 
-// the list's aside: the admins, the members, the disabled of either
 export function userCounts(users: readonly AdminUser[]): {
   admins: number;
   members: number;
@@ -170,8 +149,7 @@ export function userCounts(users: readonly AdminUser[]): {
   };
 }
 
-// why the role cannot change, or null when it can: the admin's own
-// row, and the last admin, are the server's two refusals
+// the server's two refusals
 export function roleLock(
   user: UserAccount,
   meId: string,
@@ -183,8 +161,7 @@ export function roleLock(
   return null;
 }
 
-// why the user cannot be disabled, or null when they can: the admin's
-// own row, and the last enabled admin, are the server's two refusals
+// the server's two refusals
 export function disableLock(
   user: UserAccount,
   meId: string,
@@ -196,22 +173,14 @@ export function disableLock(
   return null;
 }
 
-// the admins who can sign in: a disabled one holds nothing up
 export function adminCount(users: UserAccount[]): number {
   return users.filter((u) => u.role === "admin" && !u.disabled).length;
 }
 
-// the PATCH body: only what changed, so a stale field is never sent,
-// and null when nothing did
+// only what changed, so a stale field is never sent
 export function patchOf(
   user: UserAccount,
-  fields: {
-    username: string;
-    fullName: string;
-    email: string;
-    role: Role;
-    tz: string;
-  },
+  fields: { username: string; fullName: string; email: string; tz: string },
 ): UpdateUserRequest | null {
   const body: UpdateUserRequest = {};
   const username = fields.username.trim();
@@ -220,22 +189,17 @@ export function patchOf(
   if (username !== user.username) body.username = username;
   if (fullName !== user.fullName) body.fullName = fullName;
   if (email !== user.email) body.email = email;
-  if (fields.role !== user.role) body.role = fields.role;
   if (fields.tz !== user.tz) body.tz = fields.tz;
   return Object.keys(body).length === 0 ? null : body;
 }
 
-// letters and digits without the ones read alike (0 O o, 1 l I), so a
-// password handed over by voice or on paper survives
+// without the lookalikes (0 O o, 1 l I), so it survives voice or paper
 const PASSWORD_CHARS =
   "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-// a first password for New user's Generate: 20 of those, each drawn
-// evenly from the browser's random source
 export function generatePassword(length = 20): string {
   const n = PASSWORD_CHARS.length;
-  // the largest multiple of n below 256: bytes past it are drawn again,
-  // so no character comes up more often than another
+  // bytes past the largest multiple of n are drawn again: no modulo bias
   const limit = 256 - (256 % n);
   let out = "";
   while (out.length < length) {

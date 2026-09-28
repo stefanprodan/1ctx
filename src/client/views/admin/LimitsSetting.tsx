@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A settings card of limits: its limits side by side, each with its
-// default beside a changed one and its line under the box; Use defaults
-// puts the defaults in the boxes, and only Save sends them. A save that
-// lowers the days archived chats are kept deletes the older ones at the
-// next sweep, so it asks first, in the foot.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -17,6 +11,7 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 import {
   collect,
   defaultLine,
@@ -32,23 +27,27 @@ import {
 } from "./Tools.model.ts";
 import "./limits-setting.css";
 
-// one form over some limits: the fields seeded from their rows and
-// re-seeded only when a save answers new values for them, never when a
-// save of another form moves only their change times, so what is typed
-// here stays. A save sends these limits alone; the save is built once,
-// so it reads the rows through a ref.
-function useLimitsForm(rows: LimitRow[], names: readonly LimitName[]) {
-  // in the order the names are given, so a card lays its fields out
+export function LimitsSetting({
+  rows,
+  names,
+  title = "Limits",
+  line,
+}: {
+  rows: LimitRow[];
+  names: readonly LimitName[];
+  title?: string;
+  line: string;
+}) {
   const mine = (list: LimitRow[]) =>
     names.flatMap((name) => list.filter((row) => row.name === name));
   const own = mine(rows);
-  const latest = useRef(rows);
-  latest.current = rows;
+  const latest = useLatest(rows);
   const draft = useSignal(draftOf(own));
-  // the question a save that deletes asks, until Delete or Keep; a
-  // re-seed drops it, since it was asked of the draft it replaces
+  // a re-seed drops the ask, which was of the draft it replaces
   const asking = useSignal<string | null>(null);
   const form = useRef<HTMLFormElement>(null);
+  // re-seeded only on new values, never on another form's change times,
+  // so what is typed here stays
   const seed = seedOf(own);
   useEffect(() => {
     draft.value = draftOf(own);
@@ -70,29 +69,6 @@ function useLimitsForm(rows: LimitRow[], names: readonly LimitName[]) {
     draft.value = { ...draft.value, [name]: text };
     save.touch();
   };
-  const defaults = () => {
-    draft.value = draftOf(own.map((row) => ({ ...row, value: row.default })));
-    save.touch();
-  };
-  const discard = () => {
-    draft.value = draftOf(own);
-  };
-  return { own, draft, asking, form, save, run, type, defaults, discard };
-}
-
-export function LimitsSetting({
-  rows,
-  names,
-  title = "Limits",
-  line,
-}: {
-  rows: LimitRow[];
-  names: readonly LimitName[];
-  title?: string;
-  line: string;
-}) {
-  const { own, draft, asking, form, save, run, type, defaults, discard } =
-    useLimitsForm(rows, names);
   const atDefaults = own.every(
     (row) => draft.value[row.name] === show(row, row.default),
   );
@@ -119,7 +95,12 @@ export function LimitsSetting({
             type="button"
             class="btn btn-small"
             disabled={save.busy || atDefaults || asking.value !== null}
-            onClick={defaults}
+            onClick={() => {
+              draft.value = draftOf(
+                own.map((row) => ({ ...row, value: row.default })),
+              );
+              save.touch();
+            }}
           >
             Use defaults
           </button>
@@ -160,7 +141,7 @@ export function LimitsSetting({
             }
             onDiscard={() => {
               asking.value = null;
-              discard();
+              draft.value = draftOf(own);
             }}
           />
         }

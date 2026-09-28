@@ -1,21 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A team project's admin page under Access, by id so a rename keeps the
-// address: the crumb is the head, its own step the switcher to the other
-// team projects; then a card per setting, each drafting and saving
-// apart, nothing before Save: the name and the description, the
-// members, and Delete last. The aside has the project's last 30 days
-// and what it holds.
 
 import { type Signal, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
-import type {
-  ProjectDetail,
-  ProjectSummary,
-} from "../../../shared/contracts/project.ts";
+import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import type { Params } from "../../app/params.ts";
-import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
   adminProject,
@@ -30,23 +18,29 @@ import {
 import { users, usersError } from "../../data/users.ts";
 import { count, dayMonthYear, initials, plural } from "../../lib/format.ts";
 import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
-import { toggledId } from "../../lib/ids.ts";
+import { sameIds, toggledId } from "../../lib/ids.ts";
 import { nameProblem } from "../../lib/names.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useSave } from "../../lib/save.ts";
+import { countOf } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
-import { AskDelete, Foot } from "../../ui/Foot.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import {
   RowsAvatar,
   RowsEnd,
   RowsLine,
   RowsNote,
+  RowsRemove,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { Setting } from "../../ui/Setting.tsx";
+import {
+  Setting,
+  SettingDelete,
+  SettingForm,
+  SettingStack,
+} from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
+import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import {
   DESCRIPTION_PLACEHOLDER,
   deleteLine,
@@ -56,29 +50,18 @@ import {
   projectFieldOf,
 } from "./AdminProjects.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
-import { money } from "./Overview.model.ts";
-import { locked } from "./UserCards.tsx";
-import "./admin-projects.css";
+import { holding, useLatest } from "./drafts.ts";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
 
 export function ProjectPage({ params }: { params: Params }) {
+  // by id, so a rename keeps the address
   const id = params.id ?? "";
   const list = adminProjects.value;
-  // this page's own delete drops the project before the address leaves
-  // it: the project shown last stays until then
-  const leaving = useSignal(false);
-  const last = useRef<{ listed: ProjectSummary; detail: ProjectDetail }>();
-  const held = leaving.value && last.current?.detail.id === id;
-  const listed =
-    list?.find((p) => p.id === id) ?? (held ? last.current!.listed : null);
-  const detail =
-    adminProject.value?.id === id
-      ? adminProject.value
-      : held
-        ? last.current!.detail
-        : null;
-  if (listed !== null && detail !== null) last.current = { listed, detail };
+  // the delete drops the row and leaves in one run of microtasks, so no
+  // frame without it is painted
+  const listed = list?.find((p) => p.id === id) ?? null;
+  const detail = adminProject.value?.id === id ? adminProject.value : null;
   const listError = adminProjectsError.value;
   const detailError = adminProjectError.value;
   const missing = list !== null && listed === null;
@@ -87,7 +70,22 @@ export function ProjectPage({ params }: { params: Params }) {
       steps={STEPS}
       title={listed?.name ?? detail?.name ?? "Project"}
       titleMono
-      menu={listed !== null ? <Switcher project={listed} /> : undefined}
+      menu={
+        listed !== null ? (
+          <PageSwitcher
+            label="Projects"
+            current={listed.id}
+            name={listed.name}
+            items={(list ?? []).map((p) => ({
+              id: p.id,
+              label: p.name,
+              href: adminProjectHref(p.id),
+            }))}
+            placeholder="Find a project"
+            none="No project matches"
+          />
+        ) : undefined
+      }
       split
       loading={
         !missing &&
@@ -95,8 +93,8 @@ export function ProjectPage({ params }: { params: Params }) {
         detailError === null
       }
       empty={missing ? "No team project by that id." : undefined}
-      // a failed read after a save keeps the page it had: the card that
-      // saved says what went wrong
+      // a failed read after a save keeps the page: the card that saved
+      // says what went wrong
       error={
         missing
           ? null
@@ -109,76 +107,41 @@ export function ProjectPage({ params }: { params: Params }) {
     >
       {!missing && detail !== null && (
         <Split aside={<Aside project={detail} />}>
-          <Body key={detail.id} project={detail} leaving={leaving} />
+          <Body key={detail.id} project={detail} />
         </Split>
       )}
     </Page>
   );
 }
 
-// the crumb's own step: the other team projects by name
-function Switcher({ project }: { project: ProjectSummary }) {
-  const list = adminProjects.value ?? [];
-  if (list.length < 2) {
-    return <span class="page-crumb-on page-crumb-path">{project.name}</span>;
-  }
-  return (
-    <Finder
-      label="Projects"
-      triggerClass="page-pill"
-      title={project.name}
-      trigger={
-        <>
-          <span class="cut">{project.name}</span>
-          <Icon name="chevron" size={14} class="page-pill-chevron" />
-        </>
-      }
-      options={list.map((p) => ({
-        value: p.id,
-        label: p.name,
-        href: adminProjectHref(p.id),
-      }))}
-      value={project.id}
-      mono
-      wide
-      placeholder="Find a project"
-      none="No project matches"
-    />
-  );
-}
-
 type CardProps = { project: ProjectDetail; saving: Signal<boolean> };
 
-function Body({
-  project,
-  leaving,
-}: {
-  project: ProjectDetail;
-  leaving: Signal<boolean>;
-}) {
-  // one card saves at a time, so a slower answer never puts back what
-  // a later save changed
+function Body({ project }: { project: ProjectDetail }) {
+  // one card saves at a time, so a slower answer never puts back what a
+  // later save changed
   const saving = useSignal(false);
   return (
-    <div class="admin-projects-page">
+    <SettingStack>
       <AboutCard project={project} saving={saving} />
       <MembersCard project={project} saving={saving} />
-      <DeleteCard project={project} saving={saving} leaving={leaving} />
-    </div>
+      <SettingDelete
+        title={`Delete ${project.name}`}
+        line={deleteLine(project)}
+        ask={`Delete ${project.name}?`}
+        // a card's save in flight could put the project back
+        off={saving.value}
+        // and a save during the delete would 404
+        onDelete={async () => {
+          await holding(saving, () => deleteProject(project.id));
+        }}
+        leaveTo={PROJECTS_HREF}
+      />
+    </SettingStack>
   );
-}
-
-// the row as a save reads it, so a save of another card in between is
-// not undone
-function useLatest(project: ProjectDetail) {
-  const latest = useRef(project);
-  latest.current = project;
-  return latest;
 }
 
 type About = { name: string; description: string };
 
-// what the draft changed of the saved row, trimmed; null for nothing
 function aboutBody(row: ProjectDetail, d: About): Partial<About> | null {
   const body: Partial<About> = {};
   if (d.name.trim() !== row.name) body.name = d.name.trim();
@@ -192,7 +155,6 @@ function AboutCard({ project, saving }: CardProps) {
   const latest = useLatest(project);
   // only the fields edited, so a save elsewhere shows through
   const drafted = useSignal<Partial<About> | null>(null);
-  const form = useRef<HTMLFormElement>(null);
   const merged = (row: ProjectDetail): About => ({
     name: row.name,
     description: row.description,
@@ -201,10 +163,9 @@ function AboutCard({ project, saving }: CardProps) {
   const save = useSave(async () => {
     const row = latest.current;
     const body = aboutBody(row, merged(row));
-    if (body !== null) await locked(saving, () => updateProject(row.id, body));
+    if (body !== null) await holding(saving, () => updateProject(row.id, body));
     drafted.value = null;
   }, projectFieldOf);
-  useFocusField(save, form);
   const d = merged(project);
   const name = d.name.trim();
   const taken =
@@ -215,15 +176,12 @@ function AboutCard({ project, saving }: CardProps) {
     save.touch();
   };
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(
-          at("name", nameProblem(d.name)) ??
-            at("description", descriptionProblem(d.description)),
-        );
-      }}
+    <SettingForm
+      save={save}
+      check={() =>
+        at("name", nameProblem(d.name)) ??
+        at("description", descriptionProblem(d.description))
+      }
     >
       <Setting
         label="About"
@@ -260,11 +218,10 @@ function AboutCard({ project, saving }: CardProps) {
           />
         </div>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// the users in it, each with a remove, and Add member over the others
 function MembersCard({ project, saving }: CardProps) {
   const latest = useLatest(project);
   const drafted = useSignal<string[] | null>(null);
@@ -272,9 +229,9 @@ function MembersCard({ project, saving }: CardProps) {
   const ids = drafted.value ?? saved;
   const people = users.value;
   const save = useSave(async () => {
-    if (drafted.value !== null) {
-      const ids = drafted.value;
-      await locked(saving, () => setProjectMembers(latest.current, ids));
+    const next = drafted.value;
+    if (next !== null) {
+      await holding(saving, () => setProjectMembers(latest.current, next));
     }
     drafted.value = null;
   });
@@ -282,8 +239,7 @@ function MembersCard({ project, saving }: CardProps) {
     drafted.value = next;
     save.touch();
   };
-  const dirty =
-    ids.length !== saved.length || ids.some((id) => !saved.includes(id));
+  const off = save.busy || saving.value;
   // a member the users list does not hold yet still shows, from the detail
   const shown = ids.flatMap((id) => {
     const u =
@@ -292,29 +248,18 @@ function MembersCard({ project, saving }: CardProps) {
     return u === undefined ? [] : [u];
   });
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Members"
-        count={String(ids.length)}
+        count={countOf(ids.length, ids.length)}
         list
         action={
           people !== null && (
             <Finder
               label="Users"
-              trigger={
-                <>
-                  <Icon name="plus" size={14} />
-                  Add member
-                </>
-              }
-              disabled={save.busy || saving.value}
+              add="Add member"
+              disabled={off}
               options={memberOptions(people, ids)}
-              align="right"
               placeholder="Find a user"
               none="No user matches"
               empty="Every user is a member"
@@ -325,9 +270,8 @@ function MembersCard({ project, saving }: CardProps) {
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
+            dirty={!sameIds(ids, saved)}
             locked={saving.value && !save.busy}
-            // Add member needs the users
             hint={
               people === null && usersError.value !== null ? (
                 <span class="error">{usersError.value.words}</span>
@@ -347,100 +291,33 @@ function MembersCard({ project, saving }: CardProps) {
               <RowsAvatar>{initials(u.fullName)}</RowsAvatar>
               <RowsTitle name={u.fullName} sub={`@${u.username}`} />
               <RowsEnd>
-                <button
-                  type="button"
-                  class="btn-icon admin-projects-remove"
-                  aria-label={`Remove @${u.username}`}
-                  title="Remove"
-                  disabled={save.busy || saving.value}
-                  onClick={() => set(toggledId(ids, u.id))}
-                >
-                  <Icon name="close" size={14} />
-                </button>
+                <RowsRemove
+                  name={`@${u.username}`}
+                  disabled={off}
+                  onRemove={() => set(toggledId(ids, u.id))}
+                />
               </RowsEnd>
             </RowsLine>
           ))
         )}
       </Setting>
-    </form>
-  );
-}
-
-function DeleteCard({
-  project,
-  saving,
-  leaving,
-}: CardProps & { leaving: Signal<boolean> }) {
-  const asking = useSignal(false);
-  const save = useSave(async () => {});
-  // Escape takes the ask back
-  useEffect(() => {
-    if (!asking.value) return;
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") asking.value = false;
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [asking.value]);
-  return (
-    <Setting
-      danger
-      title={`Delete ${project.name}`}
-      line={deleteLine(project)}
-      foot={
-        <Foot save={save}>
-          <div class="admin-projects-delete">
-            <AskDelete
-              save={save}
-              asking={asking}
-              // a card's save in flight could put the project back
-              busy={save.busy || saving.value}
-              words={`Delete ${project.name}?`}
-              wordsClass="admin-projects-ask"
-              // the list drops the project as the call ends, which takes
-              // this page away before act answers: the call leaves
-              onDelete={() => {
-                void save.act("delete", async () => {
-                  const from = address();
-                  leaving.value = true;
-                  try {
-                    // the other cards wait, since a save now would 404
-                    await locked(saving, () => deleteProject(project.id));
-                  } catch (err) {
-                    leaving.value = false;
-                    throw err;
-                  }
-                  if (address() === from) navigate(PROJECTS_HREF);
-                });
-              }}
-            />
-          </div>
-        </Foot>
-      }
-    />
+    </SettingForm>
   );
 }
 
 function Aside({ project }: { project: ProjectDetail }) {
-  const known = project.id in projectUsage.value;
-  const usage = projectUsage.value[project.id] ?? null;
   return (
     <>
-      <AsideSection label="Last 30 days">
-        {!known ? (
-          <p class="split-empty">Loading</p>
-        ) : usage === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
-          <>
-            <AsideLine label="Turns">{count(usage.sends)}</AsideLine>
-            <AsideLine label="Tokens">{count(usage.tokens)}</AsideLine>
-            <AsideLine label="Cost">
-              {usage.cost === null ? "not priced" : money(usage.cost)}
-            </AsideLine>
-          </>
+      <UsageSection value={projectUsage.valueFor(project.id)}>
+        {(usage) => (
+          <SpendLines
+            label="Turns"
+            count={usage.sends}
+            tokens={usage.tokens}
+            cost={usage.cost}
+          />
         )}
-      </AsideSection>
+      </UsageSection>
       <AsideSection label="Project">
         <AsideLine label="Members">{count(project.members.length)}</AsideLine>
         <AsideLine label="Chats">{count(project.chats)}</AsideLine>
