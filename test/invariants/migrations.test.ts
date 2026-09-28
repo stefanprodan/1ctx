@@ -44,6 +44,7 @@ const EXPECTED_IDS = [
   "0030-archived-chats",
   "0031-deciders",
   "0032-admin-activity",
+  "0033-feed-arms",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>

@@ -179,6 +179,19 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and any count above zero logs the event. No sweep vacuums: SQLite
   reuses the pages a delete frees, and the file keeps its
   `auto_vacuum` mode.
+- **The feed reads each project in arms.** `feedRead()`
+  (`sessions/list.ts`) reads a project's running rows through
+  `sessions_running`, its chats and its runs whose automation is gone
+  through `sessions_feed`, and in Tasks each automation's runs through
+  `sessions_automation`, every arm `indexed by` its index, cut at a page
+  and holding the search and the cursor as a range; in All each
+  automation's newest matching run is chosen first and the cursor
+  applies after. The arms go to SQLite in compound batches under its 500
+  terms and are merged in the feed order. It relies on two invariants:
+  a chat has no automation, and a run is in its automation's project.
+  `test/server/sessions/feed.test.ts` keeps the one statement over every
+  project as the oracle and pins each arm's plan; a change to the feed
+  keeps both green.
 - **Usage outlives what it measured.** No delete removes a `usage`
   row: a chat's, a run's by retention or the sweep, an automation's
   with its runs, a project's, and a turn regenerate replaces all keep
