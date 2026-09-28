@@ -58,8 +58,8 @@ export function DaysTiles({
   day: DayCursor;
   sync: string;
   // the Monitor's tiles: who was active and what failed, then
-  // decisions and tokens; without, Usage's: turns, runs with the
-  // decisions in their line, tokens and cost
+  // decisions and tokens; without, Usage's: tokens and cost, then
+  // turns and runs with the decisions in their line
   people?: { active: number; users: number };
 }) {
   const spend = people === undefined;
@@ -136,6 +136,14 @@ export function DaysTiles({
   }
   return (
     <Tiles>
+      <Tile label="Tokens" figure={tokens.figure} sub={tokens.sub}>
+        <TilePlot label="Tokens per day">
+          {spark("line", series.tokens)}
+        </TilePlot>
+      </Tile>
+      <Tile label="Cost" figure={cost.figure} sub={cost.sub}>
+        <TilePlot label="Cost per day">{spark("line", series.cost)}</TilePlot>
+      </Tile>
       <Tile
         label="Chats"
         figure={turns.figure}
@@ -155,14 +163,6 @@ export function DaysTiles({
         <TilePlot label="Automation runs per day">
           {spark("bars", series.runs)}
         </TilePlot>
-      </Tile>
-      <Tile label="Tokens" figure={tokens.figure} sub={tokens.sub}>
-        <TilePlot label="Tokens per day">
-          {spark("line", series.tokens)}
-        </TilePlot>
-      </Tile>
-      <Tile label="Cost" figure={cost.figure} sub={cost.sub}>
-        <TilePlot label="Cost per day">{spark("line", series.cost)}</TilePlot>
       </Tile>
     </Tiles>
   );

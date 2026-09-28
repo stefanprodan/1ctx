@@ -11,7 +11,6 @@ import type {
   OverviewRange,
   OverviewResponse,
   OverviewTotals,
-  TurnLength,
   TurnLengths,
   UsageResponse,
   UsageRow,
@@ -23,7 +22,6 @@ import {
 } from "../usage/index.ts";
 import type {
   GroupRow,
-  ModelRow,
   MonthResult,
   RangeResult,
   SendSlot,
@@ -299,14 +297,6 @@ export function median(values: number[]): number | null {
     : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
-const length = (row: ModelRow): TurnLength => ({
-  provider: row.provider,
-  model: row.model,
-  turns: row.turns,
-  medianMs: median(row.lengths),
-  slowestMs: row.lengths.length === 0 ? null : Math.max(...row.lengths),
-});
-
 export function overviewResponse(
   result: RangeResult,
   window: UsageWindow,
@@ -332,7 +322,6 @@ export function usageResponse(
     since: result.since,
     ...days(result, window),
     by: by(result),
-    lengths: result.models.slice(0, TOP).map(length),
     deciders: result.deciders
       .sort((a, b) => b.decisions - a.decisions || a.name.localeCompare(b.name))
       .slice(0, TOP),

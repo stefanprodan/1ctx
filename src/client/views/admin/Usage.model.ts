@@ -8,7 +8,6 @@
 import type {
   DeciderUsage,
   ModelUsage,
-  TurnLength,
   UsageRow,
 } from "../../../shared/api/admin.ts";
 import { count, pluralCommas, share } from "../../lib/format.ts";
@@ -57,13 +56,39 @@ export function monthSteps(month: string, first: string | null, now: string) {
   };
 }
 
+// a row's cost after its tokens: none when nothing was priced, a dash
+// for a row that was not, apart from a free one's $0.00
+function rowCost(priced: boolean, cost: number | null): string | undefined {
+  if (!priced) return undefined;
+  return cost === null ? "-" : money(cost);
+}
+
+// a cost above this many dollars is drawn in the brand colour
+export const COSTLY_USD = 0.1;
+
+const costly = (cost: number | null) => cost !== null && cost > COSTLY_USD;
+
 // A breakdown's row as a bar: a personal project by its owner, a team
 // project by its name, an agent in mono. The deleted projects come as
 // one row named for them, which needs no mark; a retired agent is
-// marked gone, apart from a live one of its name. The hint says only
+// marked deleted, apart from a live one of its name. The hint says only
 // what the bar does not: the share and what ran.
 export function usageBars(kind: RowsBy, rows: UsageRow[]) {
-  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
+  return rowBars(
+    kind,
+    rows,
+    rows.reduce((sum, row) => sum + row.tokens, 0),
+    rows.some((row) => row.cost !== null),
+  );
+}
+
+// the rows against a total and a cost column that may span more rows
+function rowBars(
+  kind: RowsBy,
+  rows: UsageRow[],
+  total: number,
+  priced: boolean,
+) {
   return rows.map((row, i) => {
     const name =
       row.owner !== null
@@ -75,7 +100,6 @@ export function usageBars(kind: RowsBy, rows: UsageRow[]) {
           : (row.name ?? "");
     const hint = [
       share(row.tokens, total),
-      ...(row.cost !== null ? [money(row.cost)] : []),
       ...(row.turns > 0 || row.runs === 0
         ? [pluralCommas(row.turns, "turn", "turns")]
         : []),
@@ -85,9 +109,11 @@ export function usageBars(kind: RowsBy, rows: UsageRow[]) {
       key: row.id ?? (row.deleted ? "deleted" : `${row.owner ?? "row"}-${i}`),
       name,
       mono: kind === "agents",
-      gone: row.deleted && kind === "agents",
+      note: row.deleted && kind === "agents" ? "deleted" : undefined,
       value: row.tokens,
       label: count(row.tokens),
+      cost: rowCost(priced, row.cost),
+      costly: costly(row.cost),
       hint,
     };
   });
@@ -112,24 +138,11 @@ export function modelLabel(model: string): string {
   return /[\d-]/.test(rest) ? rest : model;
 }
 
-// the models by their median turn, the turns and the slowest the hint
-export function lengthBars(lengths: TurnLength[]) {
-  return lengths.map((m) => ({
-    key: `${m.provider}/${m.model}`,
-    name: modelLabel(m.model),
-    value: m.medianMs ?? 0,
-    label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
-    hint: [
-      pluralCommas(m.turns, "turn", "turns"),
-      ...(m.slowestMs !== null ? [`slowest ${lengthWord(m.slowestMs)}`] : []),
-    ].join(" · "),
-  }));
-}
-
-// the models by their tokens, the provider and the cost in the hint;
-// a deleted provider's model says so
+// the models by their tokens and cost, the provider in the hint; a
+// deleted provider's model says so
 export function modelBars(rows: ModelUsage[]) {
   const total = rows.reduce((sum, row) => sum + row.tokens, 0);
+  const priced = rows.some((row) => row.cost !== null);
   // two deleted providers may share a model, so a gone one keys by place
   return rows.map((row, i) => ({
     key: `${row.provider ?? `gone-${i}`}/${row.model}`,
@@ -137,26 +150,39 @@ export function modelBars(rows: ModelUsage[]) {
     mono: true,
     value: row.tokens,
     label: count(row.tokens),
-    hint: [
-      row.provider ?? "deleted provider",
-      share(row.tokens, total),
-      ...(row.cost !== null ? [money(row.cost)] : []),
-    ].join(" · "),
+    cost: rowCost(priced, row.cost),
+    costly: costly(row.cost),
+    hint: [row.provider ?? "deleted provider", share(row.tokens, total)].join(
+      " · ",
+    ),
   }));
 }
 
-// the deciders by the decisions they answered, tokens and cost in the
-// hint
-export function deciderBars(rows: DeciderUsage[]) {
-  return rows.map((row) => ({
-    key: row.name,
+// The Agents tab: the agents and the deciders together by their tokens,
+// the share over both; a decider is marked so, its hint the decisions
+// it answered.
+export function agentBars(agents: UsageRow[], deciders: DeciderUsage[]) {
+  const total =
+    agents.reduce((sum, row) => sum + row.tokens, 0) +
+    deciders.reduce((sum, row) => sum + row.tokens, 0);
+  const priced =
+    agents.some((row) => row.cost !== null) ||
+    deciders.some((row) => row.cost !== null);
+  const decided = deciders.map((row) => ({
+    key: `decider-${row.name}`,
     name: row.name,
     mono: true,
-    value: row.decisions,
-    label: count(row.decisions),
+    note: "decider",
+    value: row.tokens,
+    label: count(row.tokens),
+    cost: rowCost(priced, row.cost),
+    costly: costly(row.cost),
     hint: [
-      `${count(row.tokens)} tokens`,
-      ...(row.cost !== null ? [money(row.cost)] : []),
+      share(row.tokens, total),
+      pluralCommas(row.decisions, "decision", "decisions"),
     ].join(" · "),
   }));
+  return [...rowBars("agents", agents, total, priced), ...decided].sort(
+    (a, b) => b.value - a.value,
+  );
 }

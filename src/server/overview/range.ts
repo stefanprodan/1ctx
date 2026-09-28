@@ -19,15 +19,13 @@ import {
   byModels,
   byProjects,
   type GroupRow,
-  type ModelRow,
-  models,
 } from "./breakdowns.ts";
 
-export type { GroupRow, ModelRow } from "./breakdowns.ts";
+export type { GroupRow } from "./breakdowns.ts";
 
 export type RangeInput = {
   now: number;
-  // the slots, and a month's breakdowns and lengths, cover [since, until)
+  // the slots, and a month's breakdowns, cover [since, until)
   since: number;
   until: number;
 };
@@ -74,7 +72,7 @@ export type RangeResult = {
   };
 };
 
-// a month's slots, its breakdowns and lengths, and the first send's
+// a month's slots, its breakdowns, and the first send's
 // start for the months before it
 export type MonthResult = {
   readAt: number;
@@ -85,7 +83,6 @@ export type MonthResult = {
   usage: UsageSlot[];
   decisions: DecisionSlot[];
   by: { projects: GroupRow[]; agents: GroupRow[]; models: ModelUsage[] };
-  models: ModelRow[];
   deciders: DeciderUsage[];
 };
 
@@ -235,7 +232,6 @@ export function month(db: Db, input: RangeInput): MonthResult {
         agents: byAgents(db, days),
         models: byModels(db, days),
       },
-      models: models(db, days),
       deciders: byDeciders(db, days),
     };
   });

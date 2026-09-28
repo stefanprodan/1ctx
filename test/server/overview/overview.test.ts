@@ -694,6 +694,35 @@ describe("the usage breakdowns", () => {
     await chat.app.shutdown();
   });
 
+  test("leave out what was deleted and used no tokens", async () => {
+    const chat = await fixture();
+    const liveChat = await settledChat(chat);
+    const goneId = await team(chat, "old");
+    const goneChat = await settledChat(chat, goneId);
+    hide(chat);
+    // turns that failed before a round: sends with no usage
+    addSend(chat, liveChat, { at: NOW, status: "failed" });
+    addSend(chat, goneChat, { at: NOW, status: "failed" });
+    const res = await chat.admin.call("DELETE", `/api/projects/${goneId}`);
+    expect(res.status).toBe(200);
+    // a live agent without tokens keeps its row
+    const live = await usage(chat);
+    expect(live.by.agents).toMatchObject([{ tokens: 0, turns: 1 }]);
+    expect(live.by.projects).toMatchObject([
+      { owner: "casey", deleted: false, tokens: 0, turns: 1 },
+    ]);
+    const retired = await chat.admin.call(
+      "DELETE",
+      `/api/agents/${chat.agentId}`,
+    );
+    expect(retired.status).toBe(200);
+    chat.app.now.value += KEEP_MS;
+    const body = await usage(chat);
+    expect(body.by.agents).toEqual([]);
+    expect(body.by.projects.map((row) => row.deleted)).toEqual([false]);
+    await chat.app.shutdown();
+  });
+
   test("count a send with several rounds once", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
@@ -717,132 +746,6 @@ describe("the usage breakdowns", () => {
       pricedRounds: 2,
       cost: expect.closeTo(0.3, 10),
     });
-    expect(body.lengths[0]).toMatchObject({ turns: 1 });
-  });
-});
-
-describe("the usage turn lengths", () => {
-  test("give medians over the ended turns and count the running one", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    const task = await createAutomation(chat);
-    const runId = await runOf(chat, task.id);
-    hide(chat);
-    const at = NOW - DAY;
-    addSend(chat, sessionId, { at, finishedAt: at + 100 });
-    addSend(chat, sessionId, {
-      at,
-      finishedAt: at + 300,
-      status: "failed",
-    });
-    addSend(chat, sessionId, { at, finishedAt: at + 200 });
-    addSend(chat, sessionId, { at, finishedAt: at + 900 });
-    addSend(chat, sessionId, { at: NOW, status: "running" });
-    addSend(chat, sessionId, { at, model: "other", finishedAt: at + 50 });
-    // a run is its task's length, never the model's
-    addSend(chat, runId, { at, finishedAt: at + 99_000 });
-    addSend(chat, runId, { at, model: "runs-only", finishedAt: at + 10 });
-    const body = await usage(chat);
-    expect(body.lengths).toEqual([
-      {
-        provider: "local",
-        model: FLASH,
-        turns: 5,
-        medianMs: 250,
-        slowestMs: 900,
-      },
-      {
-        provider: "local",
-        model: "other",
-        turns: 1,
-        medianMs: 50,
-        slowestMs: 50,
-      },
-    ]);
-  });
-
-  test("read a turn the clock stepped back on as zero long", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    addSend(chat, sessionId, { at: NOW, finishedAt: NOW - 5_000 });
-    addSend(chat, sessionId, { at: NOW, finishedAt: NOW + 400 });
-    const body = await usage(chat);
-    expect(body.lengths[0]).toMatchObject({
-      turns: 2,
-      medianMs: 200,
-      slowestMs: 400,
-    });
-  });
-
-  test("say null for a model whose turns all run", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    addSend(chat, sessionId, { at: NOW, status: "running" });
-    const body = await usage(chat);
-    expect(body.lengths).toEqual([
-      {
-        provider: "local",
-        model: FLASH,
-        turns: 1,
-        medianMs: null,
-        slowestMs: null,
-      },
-    ]);
-  });
-
-  test("keep the ten models with the most turns", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    for (let i = 1; i <= 12; i++) {
-      for (let n = 0; n < i; n++) {
-        addSend(chat, sessionId, { at: NOW, model: `model-${i}` });
-      }
-    }
-    const body = await usage(chat);
-    expect(body.lengths.map((row) => row.model)).toEqual(
-      [12, 11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => `model-${i}`),
-    );
-  });
-
-  test("count a router's turns under the model its last round said answered", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    const router = "openrouter/free";
-    for (let n = 0; n < 3; n++) {
-      addSend(chat, sessionId, {
-        at: NOW,
-        model: router,
-        rounds: 2,
-        usage: [{ served: "vendor/first-pick" }, { served: "vendor/picked" }],
-      });
-    }
-    addSend(chat, sessionId, {
-      at: NOW,
-      model: router,
-      usage: [{ served: "vendor/other" }],
-    });
-    // no usage row, or none that said: the model asked for
-    addSend(chat, sessionId, { at: NOW, model: router });
-    addSend(chat, sessionId, { at: NOW, model: router, usage: [{}] });
-    // an earlier round's pick says nothing about a last round without
-    // usage, as a stopped one has
-    addSend(chat, sessionId, {
-      at: NOW,
-      model: router,
-      rounds: 2,
-      usage: [{ served: "vendor/first-pick" }],
-    });
-    const body = await usage(chat);
-    expect(body.lengths.map((row) => [row.model, row.turns])).toEqual([
-      // a tie goes by name
-      [router, 3],
-      ["vendor/picked", 3],
-      ["vendor/other", 1],
-    ]);
   });
 });
 
@@ -922,7 +825,7 @@ describe("the usage month", () => {
           `insert into decision_usage (id, decider_id, decider_name,
              provider_id, provider_name, model, purpose, input_tokens,
              output_tokens, cost, duration, created_at)
-           values (?, ?, ?, 'p1', 'router', 'm', 'check', 10, 0, ?, 5, ?)`,
+           values (?, ?, ?, 'p1', 'router', 'm', 'check', 10, 1, ?, 5, ?)`,
         )
         .run(`d${ids++}`, decider, name, cost, at);
     decision("d1", "judge", NOW - DAY, 0.5);
@@ -931,8 +834,30 @@ describe("the usage month", () => {
     decision("d2", "second", NOW - 60 * DAY, null);
     const body = await usage(chat);
     expect(body.deciders).toEqual([
-      { name: "arbiter", decisions: 2, tokens: 20, cost: 0.5 },
-      { name: "second", decisions: 1, tokens: 10, cost: null },
+      { name: "arbiter", decisions: 2, tokens: 22, cost: 0.5 },
+      { name: "second", decisions: 1, tokens: 11, cost: null },
+    ]);
+  });
+
+  test("count the decisions in the model that answered them", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    hide(chat);
+    addSend(chat, sessionId, {
+      at: NOW,
+      usage: [{ prompt: 100, completion: 10, cost: 0.1 }],
+    });
+    chat.app.db
+      .query(
+        `insert into decision_usage (id, decider_id, decider_name,
+           provider_id, provider_name, model, purpose, input_tokens,
+           output_tokens, cost, duration, created_at)
+         values ('dm1', 'd1', 'jev', ?, 'local', ?, 'check', 40, 2, null, 5, ?)`,
+      )
+      .run(chat.providerId, FLASH, NOW);
+    const body = await usage(chat);
+    expect(body.by.models).toEqual([
+      { provider: "local", model: FLASH, tokens: 152, cost: 0.1, rounds: 2 },
     ]);
   });
 });

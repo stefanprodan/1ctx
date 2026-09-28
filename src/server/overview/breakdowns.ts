@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The usage page's breakdowns over one range: by project, agent and
-// model from the rounds, the chat turns' lengths by the model that
-// answered, and the deciders by their decisions. A send has many
+// The usage page's breakdowns over one range: by project and agent
+// from the rounds, by model from the rounds and the decisions, and the
+// deciders by their decisions. A send has many
 // usage rows, so sends and tokens are summed from their own table each
 // and joined by key afterwards, never in one query.
 
@@ -26,14 +26,6 @@ export type GroupRow = {
   runs: number;
 };
 
-export type ModelRow = {
-  provider: string;
-  model: string;
-  turns: number;
-  // the lengths of the ended turns
-  lengths: number[];
-};
-
 type Tokens = { key: string; tokens: number; priced: number; cost: number };
 type Sends = { key: string; turns: number; runs: number };
 type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "deleted">;
@@ -41,7 +33,8 @@ type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "deleted">;
 // the tokens of a group from usage alone and its sends from sends
 // alone, joined by key: a send with three rounds counts once. Usage
 // outlives its project, so a key no row names is a deleted one, kept
-// by its id, or summed into one row keyed merged when it is given
+// by its id, or summed into one row keyed merged when it is given. A
+// deleted one without tokens is left out: its turns cost nothing
 function grouped(
   db: Db,
   bounds: Bounds,
@@ -103,7 +96,7 @@ function grouped(
       gone.runs += row.runs;
     }
   }
-  return rows;
+  return rows.filter((row) => !row.deleted || row.tokens > 0);
 }
 
 const USAGE_BY = (key: string) =>
@@ -186,67 +179,32 @@ export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
   );
 }
 
-// the model that answered a send: its answer round's, when a router
-// served another than the one asked for. Only that round counts: an
-// earlier round's pick says nothing about a last round without usage,
-// and the memory phase, when it ran, is the round after the answer
-const ANSWERED = `coalesce((select u.served_model from usage u
-     where u.send_id = s.id
-       and u.round = coalesce(s.memory_round - 1, s.rounds)), s.model)`;
-
-// the chat turns of each model; a run's length is its task's, not the
-// model's
-export function models(db: Db, bounds: Bounds): ModelRow[] {
-  const rows = db
-    .query<{ provider: string; answered: string; turns: number }, Bounds>(
-      `select s.provider_name as provider, ${ANSWERED} as answered,
-              count(*) as turns
-         from sends s
-         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-         group by s.provider_name, answered
-         order by turns desc, provider, answered`,
-    )
-    .all(...bounds)
-    .map(
-      (row): ModelRow => ({
-        provider: row.provider,
-        model: row.answered,
-        turns: row.turns,
-        lengths: [],
-      }),
-    );
-  const byKey = new Map(
-    rows.map((row) => [`${row.provider}\n${row.model}`, row]),
-  );
-  for (const ended of db
-    .query<{ provider: string; model: string; ms: number }, Bounds>(
-      `select s.provider_name as provider, ${ANSWERED} as model,
-              max(s.finished_at - s.started_at, 0) as ms
-         from sends s
-         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-           and s.status != 'running' and s.finished_at is not null`,
-    )
-    .all(...bounds)) {
-    byKey.get(`${ended.provider}\n${ended.model}`)?.lengths.push(ended.ms);
-  }
-  return rows;
-}
-
-// the rounds by the provider and the model that answered them; a
-// deleted provider's rounds keep its model with no provider name
+// the rounds and the decisions by the provider and the model that
+// answered them, one row where a model served both; a deleted
+// provider's keep their model with no provider name, left out when
+// they used no tokens
 export function byModels(db: Db, bounds: Bounds): ModelUsage[] {
   return db
-    .query<ModelUsage & { priced: number; cost: number }, Bounds>(
-      `select p.name as provider,
-              coalesce(u.served_model, u.model) as model,
-              sum(u.prompt_tokens + u.completion_tokens) as tokens,
-              count(*) as rounds, count(u.cost) as priced,
-              coalesce(sum(u.cost), 0) as cost
-         from usage u left join providers p on p.id = u.provider_id
-         where u.created_at >= ? and u.created_at < ?
-         group by u.provider_id, coalesce(u.served_model, u.model)`,
+    .query<
+      ModelUsage & { priced: number; cost: number },
+      [number, number, number, number]
+    >(
+      `select p.name as provider, x.model, sum(x.tokens) as tokens,
+              count(*) as rounds, count(x.cost) as priced,
+              coalesce(sum(x.cost), 0) as cost
+         from (select provider_id, coalesce(served_model, model) as model,
+                      prompt_tokens + completion_tokens as tokens, cost
+                 from usage where created_at >= ? and created_at < ?
+               union all
+               select provider_id, model,
+                      coalesce(input_tokens, 0) + coalesce(output_tokens, 0),
+                      cost
+                 from decision_usage where created_at >= ? and created_at < ?
+              ) x left join providers p on p.id = x.provider_id
+         group by x.provider_id, x.model`,
     )
-    .all(...bounds)
+    .all(...bounds, ...bounds)
+    .filter((row) => row.provider !== null || row.tokens > 0)
     .map(({ priced, cost, ...row }) => ({
       ...row,
       cost: priced > 0 ? cost : null,
@@ -260,7 +218,8 @@ export function byDeciders(db: Db, bounds: Bounds): DeciderUsage[] {
     .query<DeciderUsage & { priced: number; last: number }, Bounds>(
       `select decider_name as name, max(created_at) as last,
               count(*) as decisions,
-              coalesce(sum(input_tokens), 0) as tokens,
+              coalesce(sum(input_tokens), 0)
+                + coalesce(sum(output_tokens), 0) as tokens,
               count(cost) as priced, sum(cost) as cost
          from decision_usage where created_at >= ? and created_at < ?
          group by decider_id`,

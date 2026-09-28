@@ -50,8 +50,9 @@ type Bar = {
   mono?: boolean;
   // a line that sums others, read apart
   faint?: boolean;
-  // what the bar names is gone, its numbers kept: a small word after
-  gone?: boolean;
+  // a small faint word after the name: "deleted" for what is gone with
+  // its numbers kept, what kind of thing it is among others
+  note?: string;
 };
 
 // Bars from one baseline, the value at the end of each. With onPick
@@ -90,10 +91,10 @@ export function Bars({
           <>
             <span class={`chart-bar-name${b.mono ? " chart-mono" : ""}`}>
               {b.name}
-              {b.gone && (
+              {b.note !== undefined && (
                 <>
                   {" "}
-                  <span class="chart-gone">deleted</span>
+                  <span class="chart-note">{b.note}</span>
                 </>
               )}
             </span>

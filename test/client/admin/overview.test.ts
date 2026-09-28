@@ -37,8 +37,7 @@ import {
   lengthSeries,
 } from "../../../src/client/views/admin/Stats.model.ts";
 import {
-  deciderBars,
-  lengthBars,
+  agentBars,
   lengthWord,
   modelBars,
   modelLabel,
@@ -362,29 +361,36 @@ describe("the breakdowns", () => {
     expect(runner?.hint).toBe("50% · 5 runs");
   });
 
-  test("the deleted projects are one named row, a retired agent is marked gone", () => {
+  test("the deleted projects are one named row, a retired agent is marked deleted", () => {
     const projects = usageBars("projects", [
       row({}),
       row({ id: null, name: null, deleted: true, tokens: 100 }),
     ]);
-    expect(projects.map((b) => [b.name, b.gone, b.key])).toEqual([
-      ["#platform", false, "a1"],
-      ["deleted projects", false, "deleted"],
+    expect(projects.map((b) => [b.name, b.note, b.key])).toEqual([
+      ["#platform", undefined, "a1"],
+      ["deleted projects", undefined, "deleted"],
     ]);
     // a retired sre and a live one of its name are two bars
     const agents = usageBars("agents", [
       row({ id: "a1", name: "sre", deleted: true }),
       row({ id: "a2", name: "sre" }),
     ]);
-    expect(agents.map((b) => [b.name, b.gone, b.key])).toEqual([
-      ["sre", true, "a1"],
-      ["sre", false, "a2"],
+    expect(agents.map((b) => [b.name, b.note, b.key])).toEqual([
+      ["sre", "deleted", "a1"],
+      ["sre", undefined, "a2"],
     ]);
   });
 
-  test("a priced row says its cost after its share", () => {
-    const [priced] = usageBars("projects", [row({ cost: 0.5 })]);
-    expect(priced?.hint).toBe("100% · $0.50 · 3 turns");
+  test("a priced row's cost follows its tokens, an unpriced one's a dash", () => {
+    const [priced, free] = usageBars("projects", [
+      row({ cost: 0.5 }),
+      row({ cost: null }),
+    ]);
+    expect(priced?.cost).toBe("$0.50");
+    expect(priced?.hint).toBe("50% · 3 turns");
+    expect(free?.cost).toBe("-");
+    const [alone] = usageBars("projects", [row({ cost: null })]);
+    expect(alone?.cost).toBeUndefined();
   });
 
   test("a model by its tokens, its provider first in the hint", () => {
@@ -398,18 +404,34 @@ describe("the breakdowns", () => {
       },
       { provider: null, model: "small-2", tokens: 100, cost: null, rounds: 1 },
     ]);
-    expect(bars.map((b) => [b.name, b.label, b.hint, b.mono])).toEqual([
-      ["big-1", "300", "router · 75% · <$0.01", true],
-      ["small-2", "100", "deleted provider · 25%", true],
+    expect(bars.map((b) => [b.name, b.label, b.cost, b.hint, b.mono])).toEqual([
+      ["big-1", "300", "<$0.01", "router · 75%", true],
+      ["small-2", "100", "-", "deleted provider · 25%", true],
     ]);
   });
 
-  test("a decider by its decisions", () => {
-    expect(
-      deciderBars([
-        { name: "jev", decisions: 12, tokens: 4_000, cost: 0.02 },
-      ]).map((b) => [b.name, b.label, b.hint]),
-    ).toEqual([["jev", "12", "4K tokens · $0.02"]]);
+  test("a cost above ten cents is marked, ten cents or less is not", () => {
+    const bars = usageBars("projects", [
+      row({ id: "a", cost: 0.11 }),
+      row({ id: "b", cost: 0.1 }),
+      row({ id: "c", cost: null }),
+    ]);
+    expect(bars.map((b) => [b.cost, b.costly])).toEqual([
+      ["$0.11", true],
+      ["$0.10", false],
+      ["-", false],
+    ]);
+  });
+
+  test("the agents and the deciders by tokens, the share over both", () => {
+    const bars = agentBars(
+      [row({ id: "a1", name: "coder", tokens: 600, cost: 0.5 })],
+      [{ name: "jev", decisions: 12, tokens: 1_400, cost: null }],
+    );
+    expect(bars.map((b) => [b.name, b.note, b.label, b.cost, b.hint])).toEqual([
+      ["jev", "decider", "1.4K", "-", "70% · 12 decisions"],
+      ["coder", undefined, "600", "$0.50", "30% · 3 turns"],
+    ]);
   });
 
   test("the arrows step a month between the first turn's and this one", () => {
@@ -444,32 +466,11 @@ describe("the breakdowns", () => {
     expect(modelLabel("gemini-3.8-flash")).toBe("gemini-3.8-flash");
   });
 
-  test("turn lengths and their bars", () => {
+  test("a turn's length in words", () => {
     expect(lengthWord(41_000)).toBe("41s");
     expect(lengthWord(200_000)).toBe("3m 20s");
     expect(lengthWord(120_000)).toBe("2m");
     expect(lengthWord(3_900_000)).toBe("1h 5m");
-    const [done, running] = lengthBars([
-      {
-        provider: "mlx-serve",
-        model: "ornith",
-        turns: 65,
-        medianMs: 18_000,
-        slowestMs: 317_000,
-      },
-      {
-        provider: "nim",
-        model: "nemo",
-        turns: 1,
-        medianMs: null,
-        slowestMs: null,
-      },
-    ]);
-    expect(done).toMatchObject({
-      label: "18s",
-      hint: "65 turns · slowest 5m 17s",
-    });
-    expect(running).toMatchObject({ label: "running", hint: "1 turn" });
   });
 });
 

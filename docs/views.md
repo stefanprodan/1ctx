@@ -605,16 +605,17 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Delete. The aside is `GET /api/decisions/:id/usage`.
 - **The Usage page** is a calendar month (`?month=2026-09`, this month
   without one): the month's tiles and Tokens per day (`Days.tsx`, shared
-  with the Overview's tiles), then Usage by Projects, Agents or Models,
-  Turn length and, when any, Decisions by decider, each a `Bars` panel
-  whose hint follows the pointer (`Usage.model.ts`). The head steps a
+  with the Overview's tiles), then Usage by Projects, Agents (the
+  deciders among them, marked "decider") or Models (the decisions' in
+  theirs), tokens then cost, a `Bars` panel whose hint follows the
+  pointer (`Usage.model.ts`). The head steps a
   month at a time with two arrows, links to their month
   (`monthSteps()`), each faded where there is none: back to the first
   turn's month, forward to this one; a phone shows the short month
   name so the crumb stays whole. The
   usage bars name the one row of every deleted project "deleted
   projects", unmarked, and mark a retired agent with a small "deleted"
-  after the name (`Bars`' `gone`); a model whose provider is gone says
+  after the name (`Bars`' `note`); a model whose provider is gone says
   "deleted provider" in its hint.
 - **The New agent form's MCP section.** The form's section is a line
   per server with Read and Write boxes (write on brings read, read off
