@@ -8,6 +8,8 @@ import type { UserRegex } from "../../../regex/index.js";
 import { type FieldSeparator, SPACE_SEPARATOR } from "./fields.js";
 import type { FeatureCoverageWriter } from "../../../types.js";
 import type { AwkFunctionDef } from "../ast.js";
+import { utf8ByteLength } from "../../../encoding.js";
+import type { OutputFile } from "./files.js";
 import type { InputStream } from "./input.js";
 import type { AwkFileSystem, AwkValue } from "./types.js";
 
@@ -98,13 +100,18 @@ export interface AwkRuntimeContext {
   outputPipes: Map<string, string>;
   pipeBytes: number;
   flushedAt: number;
+  // (1ctx) the output's UTF-8 length, kept as it grows so printf never
+  // measures the whole output
+  outputBytes: number;
 
   // Filesystem access for getline < file and print > file
   fs?: AwkFileSystem;
   cwd?: string;
 
-  // Track which files have been opened with > (for overwrite-then-append behavior)
-  openedFiles: Set<string>;
+  // (1ctx) the open output files by path, their text held until a flush
+  openedFiles: Map<string, OutputFile>;
+  // (1ctx) the open files holding text, so a flush never walks them all
+  heldFiles: Set<string>;
 
   // Random function override for testing
   random?: () => number;
@@ -231,7 +238,9 @@ export function createRuntimeContext(
     outputPipes: new Map(),
     pipeBytes: 0,
     flushedAt: 0,
-    openedFiles: new Set(),
+    outputBytes: 0,
+    openedFiles: new Map(),
+    heldFiles: new Set(),
 
     fs,
     cwd,
@@ -241,4 +250,18 @@ export function createRuntimeContext(
     signal,
     separators: new Map(),
   };
+}
+
+/**
+ * (1ctx) Adds text to the output and its UTF-8 length. A high surrogate
+ * at the end and a low one at the start are one code point once joined.
+ */
+export function addOutput(ctx: AwkRuntimeContext, text: string): void {
+  const last = ctx.output.charCodeAt(ctx.output.length - 1);
+  const first = text.charCodeAt(0);
+  ctx.output += text;
+  ctx.outputBytes += utf8ByteLength(text);
+  if (last >= 0xd800 && last <= 0xdbff && first >= 0xdc00 && first <= 0xdfff) {
+    ctx.outputBytes -= 2;
+  }
 }

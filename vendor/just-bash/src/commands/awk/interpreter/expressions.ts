@@ -24,6 +24,7 @@ import type {
 import { awkBuiltins } from "../builtins.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { getField, setCurrentLine, setField } from "./fields.js";
+import { flushFiles } from "./files.js";
 import { openStream, readRecord } from "./input.js";
 import { nullRedirection } from "./pipes.js";
 import {
@@ -804,6 +805,9 @@ async function evalGetlineFromCommand(
   let stream = ctx.getlineCommandStreams.get(cmd);
   if (!stream) {
     // First time running this command, or again after close()
+    // (1ctx) it sees what the program wrote to its files so far; a failed
+    // write is fatal, not a failed command
+    await flushFiles(ctx);
     let output: string;
     try {
       const result = await withDefenseContext(ctx, "getline command exec", () =>
@@ -875,6 +879,8 @@ async function evalGetlineFromFile(
   }
   if (!stream) {
     // First time reading this file, or again after close()
+    // (1ctx) what this program wrote to its files so far
+    await flushFiles(ctx);
     let content: string;
     try {
       content = await withDefenseContext(ctx, "getline file read", () =>

@@ -9,7 +9,6 @@ import {
   assertDefenseContext,
   awaitWithDefenseContext,
 } from "../../../security/defense-context.js";
-import { utf8ByteLength } from "../../printf/escapes.js";
 import type {
   AwkArrayAccess,
   AwkExpr,
@@ -18,8 +17,9 @@ import type {
   AwkVariable,
 } from "../ast.js";
 import { formatPrintf, numberToString } from "../format.js";
-import type { AwkRuntimeContext } from "./context.js";
+import { type AwkRuntimeContext, addOutput } from "./context.js";
 import { evalExpr, setBlockExecutor } from "./expressions.js";
+import { writeFile } from "./files.js";
 import { nullRedirection, writePipe } from "./pipes.js";
 import { isTruthy, toStr, toNumber } from "./type-coercion.js";
 import {
@@ -232,7 +232,7 @@ async function executePrint(
       writeToFile(ctx, output.redirect, output.file, text),
     );
   } else {
-    ctx.output += text;
+    addOutput(ctx, text);
     checkAwkOutputSize(ctx);
   }
 }
@@ -263,7 +263,7 @@ async function executePrintf(
   // DEBUG: console.log("printf DEBUG:", JSON.stringify({formatStr, values}));
   const remainingOutput =
     ctx.maxOutputSize > 0
-      ? Math.max(0, ctx.maxOutputSize - utf8ByteLength(ctx.output))
+      ? Math.max(0, ctx.maxOutputSize - ctx.outputBytes)
       : undefined;
   const text = formatPrintf(formatStr, values, remainingOutput, ctx.CONVFMT);
 
@@ -272,7 +272,7 @@ async function executePrintf(
       writeToFile(ctx, output.redirect, output.file, text),
     );
   } else {
-    ctx.output += text;
+    addOutput(ctx, text);
     checkAwkOutputSize(ctx);
   }
 }
@@ -290,7 +290,7 @@ async function writeToFile(
   const fs = ctx.fs;
   if (!fs || !ctx.cwd) {
     // No filesystem access - just append to output
-    ctx.output += text;
+    addOutput(ctx, text);
     checkAwkOutputSize(ctx);
     return;
   }
@@ -309,7 +309,7 @@ async function writeToFile(
   }
   // (1ctx) the standard streams, as gawk names them
   if (filename === "/dev/stdout") {
-    ctx.output += text;
+    addOutput(ctx, text);
     checkAwkOutputSize(ctx);
     return;
   }
@@ -318,32 +318,7 @@ async function writeToFile(
     checkAwkOutputSize(ctx);
     return;
   }
-  const filePath = fs.resolvePath(ctx.cwd, filename);
-
-  if (redirect === ">") {
-    // Overwrite mode: first write clears file, subsequent writes append
-    if (!ctx.openedFiles.has(filePath)) {
-      // First write - overwrite (write empty first, then append)
-      await withDefenseContext(ctx, "redirection overwrite write", () =>
-        fs.writeFile(filePath, text),
-      );
-      ctx.openedFiles.add(filePath);
-    } else {
-      // Subsequent write - append
-      await withDefenseContext(ctx, "redirection append write", () =>
-        fs.appendFile(filePath, text),
-      );
-    }
-  } else {
-    // Append mode: always append
-    if (!ctx.openedFiles.has(filePath)) {
-      // First time seeing this file in append mode
-      ctx.openedFiles.add(filePath);
-    }
-    await withDefenseContext(ctx, "redirection append mode write", () =>
-      fs.appendFile(filePath, text),
-    );
-  }
+  await writeFile(ctx, fs.resolvePath(ctx.cwd, filename), redirect, text);
 }
 
 /**

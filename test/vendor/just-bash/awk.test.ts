@@ -5,7 +5,7 @@
 // abort, and where we refuse rather than copy gawk.
 
 import { describe, expect, test } from "bun:test";
-import { Bash, defineCommand } from "just-bash";
+import { Bash, defineCommand, InMemoryFs } from "just-bash";
 
 const LIMIT_EXIT = 126;
 
@@ -197,6 +197,199 @@ describe("awk limits and refusals", () => {
     expect(r.stdout).toBe("o1\no2\n");
     expect(r.stderr).toBe("e1\ne2\n");
     expect(r.exitCode).toBe(0);
+  });
+});
+
+describe("awk output files and speed", () => {
+  async function run(
+    command: string,
+    files: Record<string, string> = {},
+    options: ConstructorParameters<typeof Bash>[0] = {},
+  ) {
+    const bash = new Bash({ files, cwd: "/w", ...options });
+    const r = await bash.exec(command);
+    const read = (path: string) => bash.readFile(path).catch(() => null);
+    return { ...r, read };
+  }
+
+  test("> truncates once, >> appends, close() lets > truncate again", async () => {
+    const r = await run(
+      `awk 'BEGIN { print "a" > "t"; print "b" > "t"; print "c" >> "p"; print "d" >> "p"; print "e" > "c"; close("c"); print "f" > "c" }'`,
+      { "/w/t": "old\n", "/w/p": "old\n" },
+    );
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
+    expect(await r.read("/w/t")).toBe("a\nb\n");
+    expect(await r.read("/w/p")).toBe("old\nc\nd\n");
+    expect(await r.read("/w/c")).toBe("f\n");
+  });
+
+  test("a command, a getline and an operand see what was written", async () => {
+    const r = await run(
+      `awk 'BEGIN { print "a" > "out"; print "b" > "out"; "cat out" | getline x; print x; print "c" > "out"; print "d" | "wc -l < out"; close("wc -l < out"); while ((getline y < "out") > 0) print "g:" y; print "e" > "out" } { print "r:" $0 }' out`,
+    );
+    expect(r.stderr).toBe("");
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toBe("a\n3\ng:a\ng:b\ng:c\nr:a\nr:b\nr:c\nr:e\n");
+  });
+
+  test("an abort keeps what was written before it", async () => {
+    const controller = new AbortController();
+    const trip = defineCommand("trip", async () => {
+      controller.abort();
+      return { stdout: "", stderr: "", exitCode: 0 };
+    });
+    const bash = new Bash({ cwd: "/w", customCommands: [trip] });
+    const r = await bash.exec(
+      `awk 'BEGIN { print "a" > "out"; print "b" > "out"; "trip" | getline; print "c" > "out" }'`,
+      { signal: controller.signal },
+    );
+    expect(r.exitCode).not.toBe(0);
+    expect(await bash.readFile("/w/out")).toBe("a\nb\n");
+  });
+
+  test("a limit still writes what the files held", async () => {
+    const r = await run(
+      `seq 1 5 | awk '{ print > "out" }'`,
+      {},
+      { executionLimits: { maxAwkIterations: 3 } },
+    );
+    expect(r.stderr).toBe("awk: record limit exceeded (3)\n");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+    expect(await r.read("/w/out")).toBe("1\n2\n3\n");
+  });
+
+  test("printf's width limit counts the output in bytes", async () => {
+    const r = await run(
+      `awk '{ printf "%s", $0; printf "%50s", "x" > "out" }' hay`,
+      { "/w/hay": "é".repeat(40) },
+      { executionLimits: { maxStringLength: 100, maxOutputSize: 10_000 } },
+    );
+    expect(r.stderr).toBe("awk: printf width limit exceeded (20 bytes)\n");
+    expect(r.exitCode).toBe(LIMIT_EXIT);
+  });
+
+  // a shell whose filesystem has room for 20 bytes more than it starts with
+  function tight() {
+    const probe = new InMemoryFs({}, {});
+    new Bash({ fs: probe, cwd: "/w" });
+    const base = (probe as unknown as { retainedBytes: number }).retainedBytes;
+    const fs = new InMemoryFs({}, { maxTotalBytes: base + 20 });
+    return new Bash({ fs, cwd: "/w" });
+  }
+
+  test("a failed write leaves the other files and the pipes whole", async () => {
+    const bash = tight();
+    const r = await bash.exec(
+      `awk 'BEGIN { print "pipe" | "cat"; print "a" > "bad"; print "b" > "good"; print "c" > "good"; print "12345678901234567890" > "bad" }'`,
+    );
+    expect(r.stdout).toBe("pipe\n");
+    expect(r.stderr).toContain("ENOSPC");
+    expect(r.exitCode).toBe(2);
+    expect(await bash.readFile("/w/good")).toBe("b\nc\n");
+    expect(await bash.readFile("/w/bad")).toBe("a\n");
+  });
+
+  test("a failed write before close() still runs that pipe", async () => {
+    const bash = tight();
+    const r = await bash.exec(
+      `awk 'BEGIN { print "pipe" | "cat"; print "a" > "bad"; print "123456789012345678901234567890" > "bad"; close("cat") }'`,
+    );
+    expect(r.stdout).toBe("pipe\n");
+    expect(r.stderr).toContain("ENOSPC");
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("an append that does not fit fails rather than replacing the file", async () => {
+    const bash = tight();
+    const r = await bash.exec(
+      `awk 'BEGIN { printf "aaaaaaaaaa" > "out"; printf "bbbbbb" > "out"; printf "cccccc" > "out" }'`,
+    );
+    expect(r.stderr).toContain("ENOSPC");
+    expect(r.exitCode).toBe(2);
+    expect(await bash.readFile("/w/out")).toBe("aaaaaaaaaa");
+  });
+
+  test(">> to a directory is fatal, as gawk", async () => {
+    const r = await run(`awk 'BEGIN { print "x" >> "d"; print "after" }'`, {
+      "/w/d/x": "",
+    });
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("EISDIR");
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("the bytes written are kept, a BOM included, as gawk", async () => {
+    const bash = new Bash({ cwd: "/w" });
+    await bash.exec(
+      `awk 'BEGIN { printf "%c", 65279 > "out"; printf "%c", 65279 > "out"; printf "x" > "out" }'`,
+    );
+    const bytes = await bash.fs.readFileBuffer("/w/out");
+    expect(Buffer.from(bytes).toString("hex")).toBe("efbbbfefbbbf78");
+  });
+
+  test("a file opened through a link sees what the other name held", async () => {
+    const r = await run(
+      `ln -s out alias; awk 'BEGIN { print "a" > "out"; print "b" > "out"; print "c" >> "alias"; close("out"); close("alias") }'; cat alias out`,
+    );
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual([
+      "a\nb\nc\na\nb\n",
+      "",
+      0,
+    ]);
+  });
+
+  test("halves of a surrogate pair stay apart in a file and join in stdout", async () => {
+    const file = await run(
+      `awk 'BEGIN { printf "x" > "out"; printf "%s", "\uD83D" > "out"; printf "%s", "\uDE00" > "out" }'`,
+    );
+    expect([file.stdout, file.stderr, file.exitCode]).toEqual(["", "", 0]);
+    expect(await file.read("/w/out")).toBe("x\uFFFD\uFFFD");
+    const out = await run(
+      `awk 'BEGIN { ORS = ""; print "\uD83D"; print "\uDE00"; printf "%95s", "x" > "out" }'`,
+      {},
+      { executionLimits: { maxStringLength: 100, maxOutputSize: 10_000 } },
+    );
+    expect([out.stdout, out.stderr, out.exitCode]).toEqual(["😀", "", 0]);
+    expect(await out.read("/w/out")).toBe(`${" ".repeat(94)}x`);
+  });
+
+  test("10k files open in linear time", async () => {
+    const bash = new Bash({ cwd: "/w" });
+    const started = performance.now();
+    const r = await bash.exec(
+      `seq 1 10000 | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`,
+    );
+    // a flush that walked every open file took seconds
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
+    expect(await bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
+  });
+
+  test("printf and print > f at 20k lines stay linear", async () => {
+    const bash = new Bash({
+      cwd: "/w",
+      executionLimits: { maxOutputSize: 10_000_000 },
+    });
+    const started = performance.now();
+    const out = await bash.exec(
+      `seq 1 20000 | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'`,
+    );
+    const file = await bash.exec(
+      `seq 1 20000 | awk '{ print "pod-" $1 > "out" }'`,
+    );
+    // quadratic, this took several seconds
+    expect(performance.now() - started).toBeLessThan(2_000);
+    const lines = Array.from(
+      { length: 20_000 },
+      (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
+    );
+    expect([out.stdout, out.stderr, out.exitCode]).toEqual([
+      lines.join(""),
+      "",
+      0,
+    ]);
+    expect([file.stdout, file.stderr, file.exitCode]).toEqual(["", "", 0]);
+    expect((await bash.readFile("/w/out")).split("\n")).toHaveLength(20_001);
   });
 });
 
