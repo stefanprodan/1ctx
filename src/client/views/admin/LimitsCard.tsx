@@ -88,8 +88,9 @@ function LimitField({
 // built once, so it reads the rows through a ref. Defaults fills the
 // fields with the defaults, which Save then sends.
 export function useLimitsForm(rows: LimitRow[], names: readonly LimitName[]) {
+  // in the order the names are given, so a card lays its fields out
   const mine = (list: LimitRow[]) =>
-    list.filter((row) => names.includes(row.name));
+    names.flatMap((name) => list.filter((row) => row.name === name));
   const own = mine(rows);
   const latest = useRef(rows);
   latest.current = rows;
@@ -145,16 +146,21 @@ export function useLimitsForm(rows: LimitRow[], names: readonly LimitName[]) {
 export function LimitsCard({
   rows,
   scope,
+  omit = [],
   title,
 }: {
   rows: LimitRow[];
   scope: LimitScope;
+  // the scope's limits another page holds
+  omit?: readonly LimitName[];
   title: string;
 }) {
   const { own, draft, form, save, submit, reset, changed, type } =
     useLimitsForm(
       rows,
-      rows.filter((row) => row.scope === scope).map((row) => row.name),
+      rows
+        .filter((row) => row.scope === scope && !omit.includes(row.name))
+        .map((row) => row.name),
     );
   const busy = save.busy;
   // the question a save that deletes asks, and the save it holds back,

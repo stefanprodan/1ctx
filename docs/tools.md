@@ -108,7 +108,7 @@ mount in `docs/knowledge.md`.
   Every provider (exa, firecrawl, tavily) answers keyless, its
   `search-<provider>.key` file raises the rate, and the runner never holds
   a key.
-- **The tools API.** The Web tab's API holds `access` (mode and
+- **The tools API.** `GET /api/tools` holds `access` (mode and
   domains), `search` (nullable provider and key presence), and
   `visualize` (its switch and hosts). The one `PATCH /api/tools/:name`
   descriptor accepts web mode/domains, websearch provider, or visualize

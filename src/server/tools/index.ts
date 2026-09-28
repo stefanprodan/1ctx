@@ -58,7 +58,7 @@ import {
 } from "./offer.ts";
 import type { ToolName } from "./parse.ts";
 import { Registry } from "./registry.ts";
-import { routes, type VisualCounts } from "./routes.ts";
+import { routes, type VisualCounts, type WebCounts } from "./routes.ts";
 import { ToolStore } from "./store.ts";
 import type {
   MemoryScope,
@@ -114,8 +114,12 @@ export type ToolsDeps = {
   credentials?: CredentialsPort & CredentialKeysPort;
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
-  // the visuals drawn and opened in a window, for the Visuals page
-  usage?: { visuals(since: number, until: number): VisualCounts };
+  // the visuals drawn and opened, and the web calls, in a window, for
+  // the Visuals and Web access pages
+  usage?: {
+    visuals(since: number, until: number): VisualCounts;
+    web(since: number, until: number): WebCounts;
+  };
 };
 
 export type Tools = {
@@ -443,6 +447,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     clock: deps.clock,
     visuals: (since, until) =>
       deps.usage?.visuals(since, until) ?? { drawn: 0, failed: 0, opened: 0 },
+    web: (since, until) =>
+      deps.usage?.web(since, until) ?? { fetches: 0, searches: 0, failed: 0 },
     response,
     patch,
     visualHosts: () =>

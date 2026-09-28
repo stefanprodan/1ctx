@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The HTTP credentials entity: the admin's list with the http- key files
-// the form may pick, loaded when the Tools page's Web tab is reached and
+// the form may pick, loaded when Web access is reached and
 // dropped with the signed-in user, and the calls that change it. A write
 // puts the server's row in the list, so what shows is what was saved.
 

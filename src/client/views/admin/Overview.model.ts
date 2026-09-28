@@ -263,19 +263,19 @@ const ATTENTION: Record<
     icon: "key",
     what: "Credential",
     line: "key file missing",
-    href: () => "/admin/config/tools/web",
+    href: () => "/admin/config/web/credentials",
   },
   "credential-unusable": {
     icon: "key",
     what: "Credential",
     line: "key file unusable",
-    href: () => "/admin/config/tools/web",
+    href: () => "/admin/config/web/credentials",
   },
   "search-key": {
     icon: "key",
     what: "Web search",
     line: "key file missing",
-    href: () => "/admin/config/tools/web",
+    href: () => "/admin/config/web",
   },
   "mcp-refresh": {
     icon: "mcp",

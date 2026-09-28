@@ -8,7 +8,14 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import type { Offered } from "../../src/server/tools/index.ts";
-import { type ChatApp, chatApp, startChat, tick } from "../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  startChat,
+  tick,
+  waitScript,
+} from "../helpers/chat.ts";
+import { settle } from "../helpers/tool-loop.ts";
 
 const names = (offered: Offered) => offered.tools.map((tool) => tool.name);
 
@@ -251,4 +258,37 @@ test("bash documents open and snapshots the Visuals row", async () => {
   ).toBe(false);
   await finish(chat, second.script);
   chat.app.socket.dispose();
+});
+
+describe("the Web access page's usage", () => {
+  test("counts a turn's web calls through the composed app", async () => {
+    const chat = await chatApp();
+    const empty = await chat.admin.call("GET", "/api/usage/web");
+    expect(await empty.json()).toMatchObject({
+      fetches: 0,
+      searches: 0,
+      failed: 0,
+    });
+    const started = await startChat(chat, "fetch it");
+    // arguments the tool refuses: a failed call, still a webfetch row
+    started.script.toolRound([{ id: "c1", name: "webfetch", arguments: "{}" }]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    answer.reply("done");
+    await settle(chat);
+    const rows = chat.app.sessions
+      .messages(started.sessionId)
+      .filter((row) => row.kind === "tool");
+    expect(rows.map((row) => [row.toolName, row.status])).toEqual([
+      ["webfetch", "failed"],
+    ]);
+    const after = await chat.admin.call("GET", "/api/usage/web");
+    expect(await after.json()).toMatchObject({
+      fetches: 0,
+      searches: 0,
+      failed: 1,
+    });
+    const member = await chat.member.call("GET", "/api/usage/web");
+    expect(member.status).toBe(403);
+  });
 });

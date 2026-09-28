@@ -5,6 +5,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
   VisualsUsageResponse,
+  WebUsageResponse,
 } from "../../shared/api/tools.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -16,10 +17,12 @@ import { visualShell } from "./visual-shell.ts";
 const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type VisualCounts = Omit<VisualsUsageResponse, "since" | "until">;
+export type WebCounts = Omit<WebUsageResponse, "since" | "until">;
 
 export type RoutesDeps = {
   clock: Clock;
   visuals(since: number, until: number): VisualCounts;
+  web(since: number, until: number): WebCounts;
   response(now: number): ToolsResponse;
   patch(name: ToolName, patch: PatchToolRequest, now: number): void;
   visualHosts(): string[];
@@ -66,6 +69,21 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           since,
           until,
           ...deps.visuals(since, until),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/usage/web",
+      policy: "admin",
+      handle() {
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: WebUsageResponse = {
+          since,
+          until,
+          ...deps.web(since, until),
         };
         return json(body);
       },

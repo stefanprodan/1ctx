@@ -224,11 +224,10 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-type ToolsTab = "builtin" | "web" | "limits";
+type ToolsTab = "builtin" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/config/tools" },
-  { tab: "web", label: "Web", href: "/admin/config/tools/web" },
   { tab: "limits", label: "Limits", href: "/admin/config/tools/limits" },
 ];
 

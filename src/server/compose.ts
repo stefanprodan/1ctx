@@ -323,7 +323,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory,
     knowledge,
     credentials,
-    usage: { visuals: (since, until) => sessions.visualCounts(since, until) },
+    usage: {
+      visuals: (since, until) => sessions.visualCounts(since, until),
+      web: (since, until) => sessions.webCounts(since, until),
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({

@@ -23,9 +23,7 @@ import {
 import { firstSentence } from "../../../src/client/lib/format.ts";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
-  ACCESS_WORDS,
   collect,
-  DOMAINS_HINT,
   defaultLine,
   defaultsOf,
   dirty,
@@ -425,14 +423,11 @@ describe("the tools entity", () => {
 describe("the page", () => {
   test.serial("the tab is the address, and Tools stays lit on it", () => {
     expect(toolsTab("/admin/config/tools")).toBe("builtin");
-    expect(toolsTab("/admin/config/tools/web")).toBe("web");
     expect(toolsTab("/admin/config/tools/limits")).toBe("limits");
-    expect(TOOLS_TABS.map((t) => t.label)).toEqual([
-      "Built-in",
-      "Web",
-      "Limits",
-    ]);
-    expect(onPage("/admin/config/tools/web", "/admin/config/tools")).toBe(true);
+    expect(TOOLS_TABS.map((t) => t.label)).toEqual(["Built-in", "Limits"]);
+    expect(onPage("/admin/config/tools/limits", "/admin/config/tools")).toBe(
+      true,
+    );
     expect(onPage("/admin/config/tools", "/admin/config/tools")).toBe(true);
     expect(onPage("/admin/config/toolsx", "/admin/config/tools")).toBe(false);
     expect(WHEN_WORDS.always).not.toBe("");
@@ -495,64 +490,6 @@ describe("the page", () => {
     expect(html).not.toContain("Per turn");
   });
 
-  test.serial("Web renders web access and the providers", () => {
-    tools.value = body();
-    limits.value = rows;
-    path.value = "/admin/config/tools/web";
-    const html = render(<Tools />);
-    // no row and no switch for the web tools, visualize on its own tab
-    expect(html).not.toContain("webfetch");
-    expect(html).not.toContain("visualize");
-    expect(html).not.toContain('role="switch"');
-    // the modes in the card's head, the picked one pressed, one line under
-    expect(html).toMatch(
-      /Web access<\/span><nav class="seg seg-small rows-filters"/,
-    );
-    expect(html).toMatch(/seg-on" aria-pressed="true">All domains/);
-    expect(html).toContain(ACCESS_WORDS.all);
-    expect(html).not.toContain('name="domains"');
-    // None comes first among the providers
-    expect(html.indexOf('value="none"')).toBeLessThan(
-      html.indexOf('value="exa"'),
-    );
-    expect(html).not.toContain("datetime");
-    expect(html).toContain("search-exa.key present");
-    expect(html).toContain("search-firecrawl.key keyless");
-    expect(html).toContain("search-tavily.key keyless");
-    expect(html).not.toContain("rows-meta-bad");
-    expect(html).toContain("websearch runs on exa.");
-    expect(html).not.toContain("Per turn");
-  });
-
-  test.serial("Listed domains shows the stored hosts in the box", () => {
-    tools.value = body(fetchTool, {
-      mode: "listed",
-      domains: ["docs.example.com", "github.com"],
-      updatedAt: 0,
-    });
-    limits.value = rows;
-    path.value = "/admin/config/tools/web";
-    const html = render(<Tools />);
-    expect(html).toMatch(/seg-on" aria-pressed="true">Listed domains/);
-    expect(html).toContain(ACCESS_WORDS.listed);
-    expect(html).toMatch(
-      /<textarea name="domains"[^>]*>docs\.example\.com\ngithub\.com</,
-    );
-    expect(html).toContain(DOMAINS_HINT);
-    expect(html).toMatch(/foot-label-on">Save</);
-    // nothing to save until the list is edited
-    expect(html).toMatch(/type="submit"[^>]*disabled/);
-  });
-
-  test.serial("Off says so under the providers, a pick kept", () => {
-    tools.value = body(fetchTool, { mode: "off", domains: [], updatedAt: 0 });
-    limits.value = rows;
-    path.value = "/admin/config/tools/web";
-    const html = render(<Tools />);
-    expect(html).toContain(ACCESS_WORDS.off);
-    expect(html).toContain("Web access is off. websearch is not offered.");
-  });
-
   test.serial("Limits renders the fields", () => {
     tools.value = body();
     limits.value = rows;
@@ -566,6 +503,9 @@ describe("the page", () => {
     expect(html).toContain(">Chats<");
     expect(html.match(/<form/g)).toHaveLength(5);
     expect(html).not.toContain("Visuals per turn");
+    // the web limits are on Web access
+    expect(html).toContain("Call timeout");
+    expect(html).not.toContain("Search body");
     expect(html).not.toContain(">Limits</span>");
     expect(html).toContain('inputmode="decimal"');
     expect(html).not.toContain('type="number"');

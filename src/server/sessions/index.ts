@@ -22,6 +22,7 @@ import {
   personDays,
   skillLoads,
   visualCounts,
+  webCounts,
 } from "./activity.ts";
 import {
   agentActivity,
@@ -127,6 +128,8 @@ export type Sessions = {
   skillLoads(since: number, until: number): ReturnType<typeof skillLoads>;
   // the visuals drawn and opened in a window
   visualCounts(since: number, until: number): ReturnType<typeof visualCounts>;
+  // the webfetch and websearch calls in a window
+  webCounts(since: number, until: number): ReturnType<typeof webCounts>;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;
@@ -183,6 +186,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     mcpServerCalls: (since, until) => mcpServerCalls(deps.db, since, until),
     skillLoads: (since, until) => skillLoads(deps.db, since, until),
     visualCounts: (since, until) => visualCounts(deps.db, since, until),
+    webCounts: (since, until) => webCounts(deps.db, since, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

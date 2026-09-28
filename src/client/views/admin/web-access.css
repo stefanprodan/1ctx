@@ -1,15 +1,15 @@
-/* Config › Visuals: the cards stacked, the CDN box in mono. */
+/* Config › Web access: the tabs over the cards stacked, the domains box
+   in mono. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .visuals {
+  .web-access {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    max-width: 960px;
   }
-  .visuals-hosts {
+  .web-access-domains {
     font-family: var(--mono);
     font-size: var(--text-label);
   }

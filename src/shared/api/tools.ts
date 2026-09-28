@@ -43,3 +43,13 @@ export type VisualsUsageResponse = {
   failed: number;
   opened: number;
 };
+
+// GET /api/usage/web, the last 30 days: webfetch and websearch calls
+// done, and the ones of either that failed
+export type WebUsageResponse = {
+  since: number;
+  until: number;
+  fetches: number;
+  searches: number;
+  failed: number;
+};

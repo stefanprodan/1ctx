@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools page's entities: the built-ins, web access with the search
-// state, visualize, and the limits, all admin's, loaded when the page is
+// The tools pages' entities: the built-ins, web access with the search
+// state, visualize, the limits and the usage asides, all admin's, loaded when the page is
 // reached and dropped with the signed-in user. A write answers the
 // server's rows, so what shows is what was saved; a change applies to
 // the next send.
@@ -16,6 +16,7 @@ import type {
   PatchToolRequest,
   ToolsResponse,
   VisualsUsageResponse,
+  WebUsageResponse,
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -29,6 +30,8 @@ export const toolsError = signal<Failure | null>(null);
 export const visualsUsage = signal<{
   usage: VisualsUsageResponse | null;
 } | null>(null);
+// the Web access page's last 30 days, the same way
+export const webUsage = signal<{ usage: WebUsageResponse | null } | null>(null);
 
 let owner: string | null = null;
 
@@ -40,6 +43,7 @@ effect(() => {
   limits.value = null;
   toolsError.value = null;
   visualsUsage.value = null;
+  webUsage.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -108,4 +112,16 @@ export async function loadVisualsUsage(): Promise<void> {
     usage = await api<VisualsUsageResponse>("/api/usage/visuals");
   } catch {}
   if (owner === forUser && usageTurn === mine) visualsUsage.value = { usage };
+}
+
+let webTurn = 0;
+
+export async function loadWebUsage(): Promise<void> {
+  const forUser = owner;
+  const mine = ++webTurn;
+  let usage: WebUsageResponse | null = null;
+  try {
+    usage = await api<WebUsageResponse>("/api/usage/web");
+  } catch {}
+  if (owner === forUser && webTurn === mine) webUsage.value = { usage };
 }

@@ -4,7 +4,10 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { migrate } from "../../../src/server/db/index.ts";
-import { visualCounts } from "../../../src/server/sessions/activity.ts";
+import {
+  visualCounts,
+  webCounts,
+} from "../../../src/server/sessions/activity.ts";
 
 // tool rows and the files opened from them; the queries read no other
 // table, so the keys are off
@@ -55,5 +58,29 @@ test("visuals count the visualize calls and the files opened as visuals", () => 
     drawn: 0,
     failed: 0,
     opened: 0,
+  });
+});
+
+test("web counts the webfetch and websearch calls, done and failed", () => {
+  const { d, tool } = db();
+  tool("webfetch", 100);
+  tool("webfetch", 110);
+  tool("webfetch", 120, "failed");
+  tool("websearch", 130);
+  tool("websearch", 140, "failed");
+  tool("websearch", 150, "stopped");
+  tool("bash", 160, "failed");
+  // outside the window: since is left out, until is kept
+  tool("webfetch", 50);
+  tool("websearch", 300);
+  expect(webCounts(d as never, 50, 200)).toEqual({
+    fetches: 2,
+    searches: 1,
+    failed: 2,
+  });
+  expect(webCounts(d as never, 400, 500)).toEqual({
+    fetches: 0,
+    searches: 0,
+    failed: 0,
   });
 });
