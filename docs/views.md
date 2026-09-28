@@ -590,9 +590,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   addresses under one pair of tabs (`DeciderLists.tsx`): the rail's
   Deciders row stays lit on `/admin/config/decisions` through the zone page's
   `also`. A decider row is a link, the name and "default" over the
-  model, the provider over `deciderMeta()` at the right; New decider,
-  in the card's head so both tabs' heads match, only while a
-  provider's wire is in `DECIDER_WIRES`. A decision row is a link, its
+  model, the provider over `deciderMeta()` at the right; New decider
+  in the page's head on the Deciders tab, only while a provider's
+  wire is in `DECIDER_WIRES`. A decision row is a link, its
   icon, title and sub from `DECISION_WORDS` (the server sends only ids
   and option keys) and `decisionMeta()`: "off", else "on" and the
   decider that answers, the default when none is picked or the picked

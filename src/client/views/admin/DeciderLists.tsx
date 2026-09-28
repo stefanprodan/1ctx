@@ -127,6 +127,14 @@ function Deciders() {
       steps={[zoneStep("Config")]}
       title="Deciders"
       split
+      actions={
+        canAdd && (
+          <a class="btn btn-small" href="/admin/config/deciders?new">
+            <Icon name="plus" size={14} />
+            New decider
+          </a>
+        )
+      }
       loading={(list === null || rows === null) && error === null}
       error={error}
     >
@@ -147,19 +155,6 @@ function Deciders() {
                 />
               }
               count={countOf(shown.length, all.length)}
-              action={
-                // in the card's head, so both tabs' page heads match and
-                // a tab switch moves nothing
-                canAdd && (
-                  <a
-                    class="btn btn-small rows-add"
-                    href="/admin/config/deciders?new"
-                  >
-                    <Icon name="plus" size={14} />
-                    New decider
-                  </a>
-                )
-              }
             >
               {all.length === 0 && (
                 <RowsNote>
