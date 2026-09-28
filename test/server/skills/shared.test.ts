@@ -4,7 +4,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   catalog,
-  codeloadUrl,
   skillContent,
   sourceForm,
 } from "../../../src/shared/skills.ts";
@@ -36,9 +35,6 @@ describe("skill source forms", () => {
     ).toBe("file");
     expect(sourceForm("ftp://skills.test/a")).toBeNull();
     expect(sourceForm("not a url")).toBeNull();
-    expect(codeloadUrl({ owner: "a", repo: "b", ref: "main" })).toBe(
-      "https://codeload.github.com/a/b/tar.gz/main",
-    );
   });
 });
 

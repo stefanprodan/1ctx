@@ -22,8 +22,9 @@ describe("resolve", () => {
     expect(resolve("https://github.com/acme/repo/tree/main/skills/x")).toEqual({
       kind: "github",
       sourceUrl: "https://github.com/acme/repo/tree/main/skills/x",
-      fetchUrl: "https://codeload.github.com/acme/repo/tar.gz/main",
+      fetchUrl: "https://github.com/acme/repo/tree/main/skills/x",
       select: "skills/x",
+      github: { owner: "acme", repo: "repo", ref: "main", path: "skills/x" },
     });
     expect(resolve("https://files.test/x.tar.gz", "inside").kind).toBe(
       "archive",
@@ -85,7 +86,28 @@ describe("parseIndex", () => {
 });
 
 describe("pick", () => {
-  test("selects a codeload directory and returns relative files", () => {
+  test("never takes a skill nested in the one asked for", () => {
+    const md = bytes("---\nname: a\ndescription: a\n---\n");
+    const loose = new Map([
+      ["a/SKILL.md", md],
+      ["a/a/SKILL.md", md],
+    ]);
+    expect(pick(loose, "a").files.has("a/SKILL.md")).toBe(true);
+    const nestedOnly = new Map([
+      ["a/a/SKILL.md", md],
+      ["b/x.md", md],
+    ]);
+    expect(() => pick(nestedOnly, "a")).toThrow("no SKILL.md");
+    const tarball = new Map([["repo-main/a/SKILL.md", md]]);
+    expect(pick(tarball, "a").skillMd).toBe(md);
+    const finder = new Map([
+      ["x/a/SKILL.md", md],
+      ["__MACOSX/x/a/._SKILL.md", md],
+    ]);
+    expect(pick(finder, "a").skillMd).toBe(md);
+  });
+
+  test("selects an archive directory and returns relative files", () => {
     const selected = pick(
       new Map([
         ["repo-main/skills/x/SKILL.md", bytes("skill")],

@@ -218,7 +218,13 @@ mount in `docs/knowledge.md`.
 
 - **A skill is stored text, never executable.** An admin adds a
   `SKILL.md` and its text files from a GitHub directory, an archive, a
-  discovery index or a raw file through the compose fetcher. Tar, tar.gz
+  discovery index or a raw file through the compose fetcher. A GitHub
+  directory is never the repo's archive: `skills/github.ts` pins the ref
+  to a commit, lists the folder with one trees call and reads each file
+  from `raw.githubusercontent.com` at that commit, so the caps count the
+  skill and a repo of any size works. That is two unauthenticated API
+  calls per add or refresh (GitHub allows 60 an hour per address);
+  symlinks and submodules are left out, as in an archive. Tar, tar.gz
   and zip archives go through `lib/archive.ts`; duplicate member names
   are refused. An index digest is checked on add and refresh. Refresh is
   explicit and never renames the skill; deleting one an agent names is a

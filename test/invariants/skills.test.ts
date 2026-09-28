@@ -46,13 +46,28 @@ describe("skill routes", () => {
   test("discovers and adds recorded GitHub and index skills", async () => {
     const gitops = text("gitops-knowledge.SKILL.md");
     const timoni = fixture("timoni.SKILL.md");
-    const archive = await new Bun.Archive(
-      {
-        "repo-main/skills/gitops-knowledge/SKILL.md": gitops,
-        "repo-main/skills/gitops-knowledge/references/runbook.md": "runbook",
-      },
-      { compress: "gzip" },
-    ).bytes();
+    const sha = "a".repeat(40);
+    const rawHost = `https://raw.githubusercontent.com/acme/repo/${sha}/skills`;
+    const listing = new Response(
+      JSON.stringify({
+        truncated: false,
+        tree: [
+          {
+            path: "SKILL.md",
+            mode: "100644",
+            type: "blob",
+            size: new TextEncoder().encode(gitops).byteLength,
+          },
+          { path: "references", mode: "040000", type: "tree" },
+          {
+            path: "references/runbook.md",
+            mode: "100644",
+            type: "blob",
+            size: 7,
+          },
+        ],
+      }),
+    );
     const index = JSON.parse(text("timoni.index.json"));
     index.skills[0].digest = digest(timoni);
     const indexUrl = "https://skills.test/.well-known/agent-skills/index.json";
@@ -60,8 +75,14 @@ describe("skill routes", () => {
       "https://skills.test/.well-known/agent-skills/timoni/skill.md";
     const { app, client } = await admin(
       sources({
-        "https://codeload.github.com/acme/repo/tar.gz/main": new Response(
-          archive,
+        "https://api.github.com/repos/acme/repo/commits/main": new Response(
+          sha,
+        ),
+        [`https://api.github.com/repos/acme/repo/git/trees/${sha}:skills/gitops-knowledge?recursive=1`]:
+          listing,
+        [`${rawHost}/gitops-knowledge/SKILL.md`]: new Response(gitops),
+        [`${rawHost}/gitops-knowledge/references/runbook.md`]: new Response(
+          "runbook",
         ),
         [indexUrl]: new Response(JSON.stringify(index)),
         [skillUrl]: new Response(timoni),

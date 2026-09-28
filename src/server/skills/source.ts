@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { IndexEntry } from "../../shared/contracts/skill.ts";
-import { codeloadUrl, sourceForm } from "../../shared/skills.ts";
+import { sourceForm } from "../../shared/skills.ts";
 import { isSkillName, type SkillSource } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { MAX_INDEX_BYTES, MAX_INDEX_ENTRIES } from "./limits.ts";
@@ -12,6 +12,7 @@ export type ResolvedSource = {
   sourceUrl: string;
   fetchUrl: string;
   select: string;
+  github?: { owner: string; repo: string; ref: string; path: string };
 };
 
 export type Picked = {
@@ -50,11 +51,25 @@ export function resolve(url: string, select = ""): ResolvedSource {
   if (form === null) throw new BadRequest("URL must be http or https");
   if (form.kind === "github") {
     if (form.path === "") throw new BadRequest("GitHub path is empty");
+    // the URL's own escapes, so a pasted %20 is not escaped again
+    let github: NonNullable<ResolvedSource["github"]>;
+    try {
+      github = {
+        owner: decodeURIComponent(form.owner),
+        repo: decodeURIComponent(form.repo),
+        ref: decodeURIComponent(form.ref),
+        path: form.path.split("/").map(decodeURIComponent).join("/"),
+      };
+    } catch {
+      throw new BadRequest("GitHub path is invalid");
+    }
+    if (!validPath(github.path)) throw new BadRequest("GitHub path is invalid");
     return {
       kind: "github",
       sourceUrl: url,
-      fetchUrl: codeloadUrl(form),
+      fetchUrl: url,
       select: form.path,
+      github,
     };
   }
   return {
@@ -143,16 +158,29 @@ export function pick(files: Map<string, Uint8Array>, path: string): Picked {
   const want = path === "" ? "" : normalizePath(path);
   if (want !== "" && !validPath(want)) throw new BadRequest("path is invalid");
 
-  const skillPaths = [...normalized.keys()].filter((name) => {
+  // an archive may wrap everything in one top folder, as a repo
+  // tarball does; only then is a path matched below that folder, so a
+  // skill nested in the one asked for is never taken for it
+  const names = [...normalized.keys()];
+  // Finder's zip adds __MACOSX/ beside the real top folder
+  const real = names.filter((name) => !name.startsWith("__MACOSX/"));
+  const top = real[0]?.split("/")[0];
+  const wrapped =
+    top !== undefined &&
+    real.every((name) => name.startsWith(`${top}/`) && name !== top);
+  const under = (name: string) =>
+    wrapped ? name.split("/").slice(1).join("/") : name;
+  const exact = normalized.has(`${want}/SKILL.md`);
+  const skillPaths = names.filter((name) => {
     if (want === "") {
       const parts = name.split("/");
       return (
         name === "SKILL.md" || (parts.length === 2 && parts[1] === "SKILL.md")
       );
     }
-    const target = `${want}/SKILL.md`;
-    const parts = name.split("/");
-    return name === target || parts.slice(1).join("/") === target;
+    return exact
+      ? name === `${want}/SKILL.md`
+      : under(name) === `${want}/SKILL.md`;
   });
   if (skillPaths.length === 0) throw new BadRequest("no SKILL.md at that path");
   if (skillPaths.length > 1) {
