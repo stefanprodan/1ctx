@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { App } from "../../../src/client/app/App.tsx";
 import { path, query } from "../../../src/client/app/router.ts";
+import { match } from "../../../src/client/app/routes.ts";
 import {
   closeDrawer,
   drawerOpen,
@@ -190,7 +191,7 @@ describe("the rail's faces", () => {
   });
 
   test.serial("the band opens the last page seen on the other face", () => {
-    const stop = watchPages();
+    const stop = watchPages((p) => match(p) !== null);
     try {
       path.value = "/";
       path.value = "/admin/config/mcp";
@@ -204,6 +205,8 @@ describe("the rail's faces", () => {
       expect(lastAdmin.value).toBe("/admin/config/mcp");
       path.value = "/admin";
       expect(lastWork.value).toBe("/projects");
+      path.value = "/admin/monitor/typo";
+      expect(lastAdmin.value).toBe("/admin/config/mcp");
     } finally {
       stop();
     }
