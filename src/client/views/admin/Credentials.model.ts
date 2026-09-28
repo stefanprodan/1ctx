@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the Credentials card shows and checks without a DOM: the form's
-// fields from a row or for a new one, the key picks with the files that
-// cannot be used marked, the row's key line, the head's total, which
-// field a refusal names, and the body a save sends.
+// What the credential pages show and check without a DOM: the fields
+// from a row or for a new one, the key picks with the files that cannot
+// be used marked, a row's key line, which field a refusal names, and
+// the body a save sends.
 
 import type {
   CreateCredentialRequest,
@@ -33,10 +33,8 @@ export type CredentialDraft = {
 
 export const HEADER_PLACEHOLDER = "Authorization";
 export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
-export const TEMPLATE_HINT = "The key goes where {key} is";
-export const PREFIX_HINT = "Requests under it are signed. Narrow is better";
-export const CARD_NOTE =
-  "curl in a chat of a bound project sends the header for URLs under the prefix. The key never reaches the chat.";
+export const WEB_OFF_NOTE =
+  "Web access is off. No credential is used until it is on.";
 
 export function draftOf(c: CredentialSummary | null): CredentialDraft {
   if (c === null) {
@@ -95,10 +93,6 @@ export function projectsLine(c: Pick<CredentialSummary, "projects">): string {
     : c.projects.map((p) => p.name).join(", ");
 }
 
-export function totalLine(count: number): string {
-  return count === 1 ? "1 credential" : `${count} credentials`;
-}
-
 // the methods in the server's order, the one picked flipped
 export function toggledMethod(
   methods: readonly HttpMethod[],
@@ -110,7 +104,7 @@ export function toggledMethod(
   return HTTP_METHODS.filter((m) => next.includes(m));
 }
 
-type CredentialField =
+export type CredentialField =
   | "name"
   | "keyName"
   | "prefix"
@@ -189,9 +183,13 @@ export function patchBody(
 ): PatchCredentialRequest {
   const body: PatchCredentialRequest = {};
   if (d.keyName !== c.keyName) body.keyName = d.keyName;
-  if (d.prefix.trim() !== c.prefix) body.prefix = d.prefix.trim();
-  if (d.header.trim() !== c.header) body.header = d.header.trim();
-  if (d.template.trim() !== c.template) body.template = d.template.trim();
+  // trimmed on both sides: the server keeps a value as it was given, so
+  // a row may hold spaces round it that the box would never change
+  if (d.prefix.trim() !== c.prefix.trim()) body.prefix = d.prefix.trim();
+  if (d.header.trim() !== c.header.trim()) body.header = d.header.trim();
+  if (d.template.trim() !== c.template.trim()) {
+    body.template = d.template.trim();
+  }
   if (!sameIds(d.methods, c.methods)) body.methods = d.methods;
   const ids = c.projects.map((p) => p.id);
   if (!sameIds(d.projectIds, ids)) body.projectIds = d.projectIds;
@@ -200,4 +198,86 @@ export function patchBody(
 
 export function dirtyOf(d: CredentialDraft, c: CredentialSummary): boolean {
   return Object.keys(patchBody(d, c)).length > 0;
+}
+
+// the key field's hint: the saved file's state, nothing for a new pick
+export function keyHint(
+  keyName: string,
+  c: Pick<CredentialSummary, "keyName" | "key"> | null,
+): string | null {
+  if (c === null || c.keyName !== keyName) return null;
+  return c.key === "ok"
+    ? `${c.keyName}.key is present`
+    : `${c.keyName}.key is ${c.key}`;
+}
+
+// every team project the admin sees, and any the row names besides, so
+// a link to a project the list lacks stays in view to be taken off
+export function teamsOf(
+  projects: readonly { id: string; name: string; kind: string }[],
+  c: Pick<CredentialSummary, "projects"> | null,
+): { id: string; name: string }[] {
+  const teams = projects
+    .filter((p) => p.kind === "team")
+    .map((p) => ({ id: p.id, name: p.name }));
+  const extra = (c?.projects ?? []).filter(
+    (p) => !teams.some((q) => q.id === p.id),
+  );
+  return [...teams, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Delete's line: what stops when it goes
+export function deleteLine(c: Pick<CredentialSummary, "prefix">): string {
+  return `curl stops adding the header to requests under ${c.prefix}.`;
+}
+
+// A card of a credential's page owns some fields. Its body is what it
+// changed of them alone, compared to the row as saved, so a field
+// another card owns never rides along, however the row holds it.
+export function cardBody(
+  d: CredentialDraft,
+  c: CredentialSummary,
+  keys: readonly CredentialField[],
+): PatchCredentialRequest {
+  const body = patchBody(d, c) as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) =>
+      keys.includes(key as CredentialField),
+    ),
+  ) as PatchCredentialRequest;
+}
+
+// the first empty field among the card's own
+export function cardProblem(
+  d: CredentialDraft,
+  keys: readonly CredentialField[],
+): { error: string; field: CredentialField } | null {
+  const problem = problemOf(d, false);
+  return problem !== null && keys.includes(problem.field) ? problem : null;
+}
+
+// a refusal names a field of this card, or it is the card's notice: an
+// overlap refused while saving Projects names the prefix, which is on
+// another card
+export function cardFieldOf(
+  keys: readonly CredentialField[],
+): (message: string) => CredentialField | undefined {
+  return (message) => {
+    const field = credentialFieldOf(message);
+    return field !== undefined && keys.includes(field) ? field : undefined;
+  };
+}
+
+// who reads a key file: the one credential, or how many do
+export function keyUsers(
+  file: string,
+  list: readonly Pick<CredentialSummary, "name" | "keyName">[],
+): { label: string; name: string | null; count: number } {
+  const users = list.filter((c) => c.keyName === file);
+  const count = users.length;
+  if (count === 0) return { label: "unused", name: null, count };
+  if (count === 1) {
+    return { label: users[0]!.name, name: users[0]!.name, count };
+  }
+  return { label: `${count} credentials`, name: null, count };
 }

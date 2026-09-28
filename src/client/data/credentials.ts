@@ -16,7 +16,7 @@ import type {
 } from "../../shared/api/credentials.ts";
 import type { CredentialSummary } from "../../shared/contracts/credential.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const credentials = signal<CredentialSummary[] | null>(null);
@@ -82,26 +82,53 @@ export async function addCredential(
   return keep(answer);
 }
 
+// a 404 says the row went elsewhere: it leaves the list, so its page
+// says there is no such credential, and the refusal still reaches the
+// caller
+async function gone<T>(id: string, call: () => Promise<T>): Promise<T> {
+  const forUser = owner;
+  try {
+    return await call();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404 && owner === forUser) {
+      turn++;
+      credentials.value = (credentials.value ?? []).filter((c) => c.id !== id);
+    }
+    throw err;
+  }
+}
+
 export async function patchCredential(
   id: string,
   body: PatchCredentialRequest,
 ): Promise<CredentialSummary> {
   const forUser = owner;
   turn++;
-  const answer = await api<CredentialResponse>(
-    `/api/credentials/${encodeURIComponent(id)}`,
-    "PATCH",
-    body,
+  const answer = await gone(id, () =>
+    api<CredentialResponse>(
+      `/api/credentials/${encodeURIComponent(id)}`,
+      "PATCH",
+      body,
+    ),
   );
   if (owner !== forUser) return answer.credential;
+  // a delete that landed first keeps the row out
+  if (!(credentials.value ?? []).some((c) => c.id === id)) {
+    return answer.credential;
+  }
   turn++;
   return keep(answer);
 }
 
+// a row already gone is what a delete wants: no refusal
 export async function deleteCredential(id: string): Promise<void> {
   const forUser = owner;
   turn++;
-  await api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE");
+  try {
+    await api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE");
+  } catch (err) {
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
+  }
   if (owner === forUser) {
     turn++;
     credentials.value = (credentials.value ?? []).filter((c) => c.id !== id);

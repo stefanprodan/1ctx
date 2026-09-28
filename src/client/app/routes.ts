@@ -640,6 +640,18 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/admin/config/web/credentials/:name",
+    view: lazy<{ params: Params }>(() =>
+      import("../views/admin/CredentialPage.tsx").then((m) => m.CredentialPage),
+    ),
+    title: (params) => params.name,
+    role: "admin",
+    // the tools say whether web access is off, which the page says too
+    load: async () => {
+      await Promise.all([loadTools(), loadCredentials()]);
+    },
+  },
+  {
     path: "/admin/config/visuals",
     view: lazy(() =>
       import("../views/admin/Visuals.tsx").then((m) => m.Visuals),
