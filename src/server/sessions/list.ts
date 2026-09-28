@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The feed reads each project in arms, each through its own index in its
-// own order and cut at a page, and merges them in the feed's order: one
-// statement over every project had to sort all its rows, since neither
-// the running rank nor a project list reads an index in order. A row
-// filter (the search, the cursor) inside an arm is exact before its cut.
 
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";
@@ -26,131 +20,53 @@ type Part = { sql: string; args: (string | number)[] };
 
 const ORDER = "order by status = 'running' desc, last_activity_at desc, id";
 const SEARCH = "and (? = '' or title like ? escape '\\')";
-// terms per compound select, under SQLite's 500
-const BATCH = 200;
 
-// where an arm of one rank starts after the cursor, as a range its index
-// seeks; null when the whole arm is above the cursor
-function place(before: FeedCursor | null, running: 0 | 1): Part | null {
-  if (before === null || before.running > running) return { sql: "", args: [] };
-  if (before.running < running) return null;
+function arm(
+  projects: string,
+  origin: "chat" | "automation" | null,
+  search: [string, string],
+  before: FeedCursor | null,
+  rank: 0 | 1 | null,
+  limit: number,
+): Part {
+  const index = origin === null ? "sessions_feed_unowned" : "sessions_feed";
+  const kind =
+    origin === null ? "automation_id is null" : `origin = '${origin}'`;
+  const at =
+    before === null
+      ? ""
+      : "and last_activity_at <= ? and (last_activity_at < ? or id > ?)";
+  const args = before === null ? [] : [before.at, before.at, before.id];
+  const order = rank === null ? ORDER : "order by last_activity_at desc, id";
   return {
-    sql: "and last_activity_at <= ? and (last_activity_at < ? or id > ?)",
-    args: [before.at, before.at, before.id],
+    sql: `select * from sessions indexed by ${index}
+      where project_id in (select value from json_each(?)) and ${kind}
+        ${SEARCH} ${rank === null ? "" : `and (status = 'running') = ${rank}`}
+        ${at} ${order} limit ?`,
+    args: [projects, ...search, ...args, limit],
   };
 }
 
-function arm(
-  index: string,
-  where: string,
-  args: (string | number)[],
-  search: [string, string],
-  at: Part | null,
-  limit: number,
-): Part[] {
-  if (at === null) return [];
-  return [
-    {
-      sql: `select * from (select * from sessions indexed by ${index}
-        where ${where} ${SEARCH} ${at.sql}
-        order by last_activity_at desc, id limit ?)`,
-      args: [...args, ...search, ...at.args, limit + 1],
-    },
-  ];
-}
-
-// each automation's newest run holding the query, found through its
-// index; the cursor applies after the choice, so an automation already
-// passed never comes back. An automation never runs twice at once, so
-// its running run is its newest by activity
+// The cursor must not bring back an automation whose chosen run was passed.
 function newestRuns(
-  projectIds: string[],
+  projects: string,
   search: [string, string],
   before: FeedCursor | null,
   limit: number,
 ): Part {
-  const marks = projectIds.map(() => "?").join(", ");
   const after = feedAfter(before);
   return {
-    sql: `select * from (select * from (
+    sql: `select * from (
         select sessions.* from automations
         join sessions on sessions.id = (
-          select newest.id from sessions newest
+          select newest.id from sessions newest indexed by sessions_automation
           where newest.automation_id = automations.id
             and (? = '' or newest.title like ? escape '\\')
           order by newest.last_activity_at desc, newest.id limit 1)
-        where automations.project_id in (${marks}))
-      where true ${after.sql} ${ORDER} limit ?)`,
-    args: [...search, ...projectIds, ...after.args, limit + 1],
+        where automations.project_id in (select value from json_each(?)))
+      where true ${after.sql} ${ORDER} limit ?`,
+    args: [...search, projects, ...after.args, limit + 1],
   };
-}
-
-function parts(
-  db: Db,
-  projectIds: string[],
-  search: [string, string],
-  origin: "chat" | "automation" | null,
-  before: FeedCursor | null,
-  limit: number,
-): Part[] {
-  const running = place(before, 1);
-  const rest = place(before, 0);
-  const out: Part[] = [];
-  // chats never carry an automation; a run whose automation is gone
-  // has none left
-  const kind =
-    origin === null ? "automation_id is null" : `origin = '${origin}'`;
-  const origins =
-    origin === null ? (["chat", "automation"] as const) : [origin];
-  for (const id of projectIds) {
-    out.push(
-      ...arm(
-        "sessions_running",
-        `project_id = ? and status = 'running' and ${kind}`,
-        [id],
-        search,
-        running,
-        limit,
-      ),
-    );
-    for (const each of origins) {
-      out.push(
-        ...arm(
-          "sessions_feed",
-          `project_id = ? and origin = '${each}' and automation_id is null
-            and status != 'running'`,
-          [id],
-          search,
-          rest,
-          limit,
-        ),
-      );
-    }
-  }
-  if (origin === "chat") return out;
-  if (origin === null) {
-    return [...out, newestRuns(projectIds, search, before, limit)];
-  }
-  // a run's project is its automation's
-  const marks = projectIds.map(() => "?").join(", ");
-  const automations = db
-    .query<{ id: string }, string[]>(
-      `select id from automations where project_id in (${marks})`,
-    )
-    .all(...projectIds);
-  for (const { id } of automations) {
-    out.push(
-      ...arm(
-        "sessions_automation",
-        "automation_id = ? and status != 'running'",
-        [id],
-        search,
-        rest,
-        limit,
-      ),
-    );
-  }
-  return out;
 }
 
 function feedOrder(a: RawSession, b: RawSession): number {
@@ -174,21 +90,23 @@ export function feedRead(
   ]: ListArgs
 ): RawSession[] {
   if (projectIds.length === 0) return [];
+  const projects = JSON.stringify(projectIds);
   const search: [string, string] = [q, `%${q.replace(/[%_\\]/g, "\\$&")}%`];
-  const all = parts(db, projectIds, search, origin, before, limit);
   const read: RawSession[] = [];
-  for (let i = 0; i < all.length; i += BATCH) {
-    const batch = all.slice(i, i + BATCH);
+  const run = (part: Part) => {
     read.push(
-      ...db
-        .query<RawSession, (string | number)[]>(
-          `select * from (${batch.map((part) => part.sql).join(" union all ")})
-           ${ORDER} limit ?`,
-        )
-        .all(...batch.flatMap((part) => part.args), limit + 1),
+      ...db.query<RawSession, (string | number)[]>(part.sql).all(...part.args),
     );
+  };
+  // SQLite's ordered IN ranges stop each project once it cannot enter the top N.
+  run(
+    arm(projects, origin, search, before, before?.running ?? null, limit + 1),
+  );
+  if (before?.running === 1 && read.length <= limit) {
+    run(arm(projects, origin, search, null, 0, limit + 1 - read.length));
   }
-  return all.length > BATCH ? read.sort(feedOrder).slice(0, limit + 1) : read;
+  if (origin === null) run(newestRuns(projects, search, before, limit));
+  return origin === null ? read.sort(feedOrder).slice(0, limit + 1) : read;
 }
 
 // how many runs each automation keeps, what its line counts

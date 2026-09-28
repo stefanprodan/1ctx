@@ -1,14 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The feed read in arms answers what the one statement over every
-// project answered: that statement is kept here as the oracle.
+// The original statement stays unchanged as the feed's oracle.
 
 import { describe, expect, spyOn, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
 import type { FeedCursor } from "../../../src/server/sessions/cursor.ts";
-import { feedAfter } from "../../../src/server/sessions/cursor.ts";
-import { feedRead } from "../../../src/server/sessions/list.ts";
+import {
+  feedAfter,
+  feedCursor,
+  parseFeedCursor,
+} from "../../../src/server/sessions/cursor.ts";
+import { feedRead, listSessions } from "../../../src/server/sessions/list.ts";
+import type { RawSession } from "../../../src/server/sessions/rows.ts";
+import { streamRows } from "../../../src/server/sessions/stream.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 type Origin = "chat" | "automation" | null;
@@ -82,12 +87,19 @@ function random(seed: number) {
   };
 }
 
-const TITLES = ["alpha", "beta", "al_pha", "100% done", "Gamma", "chat"];
+const TITLES = [
+  "alpha",
+  "beta",
+  "al_pha",
+  "100% done",
+  "Gamma",
+  "chat",
+  "a_\\50%",
+  "path\\file",
+];
 const STATUSES = ["done", "failed", "stopped", "running"] as const;
 
-// projects with chats, archived chats, runs of live automations (at most
-// one running, the newest) and runs whose automation is gone, on few
-// timestamps so ties are common
+// Few timestamps make ties common, including a running run that is not newest.
 function fixture(seed: number, projects: number) {
   const db = memoryDb();
   const rnd = random(seed);
@@ -105,8 +117,8 @@ function fixture(seed: number, projects: number) {
   const session = db.query(
     `insert into sessions (id, project_id, owner_id, agent_id, origin,
        automation_id, title, status, created_at, last_activity_at,
-       archived_at, archived_reason)
-     values (?, ?, 'u', 'a', ?, ?, ?, ?, 0, ?, ?, ?)`,
+       archived_at, archived_reason, revision, run_source, disabled_capabilities)
+     values (?, ?, 'u', 'a', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
   );
   const add = (
     projectId: string,
@@ -126,6 +138,9 @@ function fixture(seed: number, projects: number) {
       at,
       archived ? at : null,
       archived ? "manual" : null,
+      n,
+      origin === "automation" ? rnd.pick(["manual", "schedule"]) : null,
+      n % 2 === 0 ? '["web"]' : "[]",
     );
   };
   const projectIds: string[] = [];
@@ -162,7 +177,13 @@ function fixture(seed: number, projects: number) {
         );
       }
       if (rnd.int(3) === 0) {
-        add(projectId, "automation", automationId, "running", newest + 1);
+        add(
+          projectId,
+          "automation",
+          automationId,
+          "running",
+          rnd.pick([newest + 1, newest, 0]),
+        );
       }
     }
   }
@@ -170,7 +191,7 @@ function fixture(seed: number, projects: number) {
 }
 
 const ORIGINS: Origin[] = [null, "chat", "automation"];
-const QUERIES = ["", "al", "a_", "%", "zz"];
+const QUERIES = ["", "al", "a_", "%", "\\", "a_\\", "zz"];
 
 function compare(
   db: Db,
@@ -179,11 +200,15 @@ function compare(
   origin: Origin,
   before: FeedCursor | null,
   limit: number,
-): string[] {
-  const want = oracle(db, projectIds, q, origin, before, limit);
-  const got = feedRead(db, projectIds, q, origin, before, limit).map(
-    (row) => row.id,
+): FeedCursor | null {
+  const ids = oracle(db, projectIds, q, origin, before, limit);
+  const want = ids.map(
+    (id) =>
+      db
+        .query<RawSession, [string]>("select * from sessions where id = ?")
+        .get(id)!,
   );
+  const got = feedRead(db, projectIds, q, origin, before, limit);
   expect({ projectIds, q, origin, before, limit, got }).toEqual({
     projectIds,
     q,
@@ -192,23 +217,78 @@ function compare(
     limit,
     got: want,
   });
-  return want;
+  const response = listSessions(
+    db,
+    { latest: () => null, latestFor: () => new Map() },
+    projectIds,
+    q,
+    origin,
+    before,
+    limit,
+  );
+  const next = want.length > limit ? feedCursor(want[limit - 1]!) : null;
+  const counts = new Map(
+    db
+      .query<{ id: string; n: number }, []>(
+        `select automation_id as id, count(*) as n from sessions
+         where automation_id is not null group by automation_id`,
+      )
+      .all()
+      .map((row) => [row.id, row.n]),
+  );
+  expect(response).toEqual({
+    rows: streamRows(
+      db,
+      want.slice(0, limit),
+      new Map(),
+      origin === null ? counts : undefined,
+    ),
+    next,
+  });
+  return response.next === null ? null : parseFeedCursor(response.next);
 }
 
-function cursorOf(db: Db, id: string): FeedCursor {
-  const row = db
-    .query<{ status: string; last_activity_at: number }, [string]>(
-      "select status, last_activity_at from sessions where id = ?",
-    )
-    .get(id)!;
-  return {
-    running: row.status === "running" ? 1 : 0,
-    at: row.last_activity_at,
-    id,
-  };
-}
+describe("the feed's ordered project ranges", () => {
+  test("literal escapes, deleted cursors and index-changing writes retain the oracle", () => {
+    const { db, projectIds } = fixture(13, 6);
+    try {
+      db.exec(`
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+        values
+          ('zzzzzzzzzzz1', 'project0', 'u', 'a', 'chat', 'a_\\50%', 'running', 0, 12),
+          ('zzzzzzzzzzz2', 'project0', 'u', 'a', 'chat', 'ax50x', 'done', 0, 12);
+      `);
+      for (const q of ["a_", "\\", "%", "a_\\50%"]) {
+        expect(oracle(db, projectIds, q, "chat", null, 100)).toContain(
+          "zzzzzzzzzzz1",
+        );
+        expect(oracle(db, projectIds, q, "chat", null, 100)).not.toContain(
+          "zzzzzzzzzzz2",
+        );
+        for (const origin of ORIGINS)
+          compare(db, projectIds, q, origin, null, 3);
+      }
+      const deleted: FeedCursor = { running: 1, at: 12, id: "zzzzzzzzzzz1" };
+      db.exec("delete from sessions where id = 'zzzzzzzzzzz1'");
+      db.exec(`
+        update sessions set status = 'running', last_activity_at = 13,
+          revision = revision + 1 where id = 'zzzzzzzzzzz2';
+        delete from automations where project_id = 'project0';
+      `);
+      for (const origin of ORIGINS) {
+        for (const q of QUERIES) {
+          compare(db, projectIds, q, origin, deleted, 3);
+          compare(db, projectIds, q, origin, { ...deleted, running: 0 }, 3);
+          compare(db, projectIds, q, origin, null, 50);
+        }
+      }
+    } finally {
+      db.close();
+    }
+  });
 
-describe("the feed read in arms", () => {
   test("answers the one statement's rows and order", () => {
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       const { db, projectIds, rnd } = fixture(seed, 6);
@@ -216,20 +296,20 @@ describe("the feed read in arms", () => {
         projectIds,
         projectIds.filter(() => rnd.int(2) === 0),
         [projectIds[0]!],
+        [projectIds[0]!, projectIds[0]!],
+        [],
         ["nothing"],
       ];
       for (const ids of subsets) {
         for (const origin of ORIGINS) {
           for (const q of QUERIES) {
             for (const limit of [1, 3, 50]) {
-              // every page, following the cursor each answer gives
               let before: FeedCursor | null = null;
               for (let page = 0; page < 60; page++) {
-                const read = compare(db, ids, q, origin, before, limit);
-                if (read.length <= limit) break;
-                before = cursorOf(db, read[limit - 1]!);
+                before = compare(db, ids, q, origin, before, limit);
+                if (before === null) break;
+                expect(page).toBeLessThan(59);
               }
-              // cursors of both ranks at any place, a deleted row's too
               for (let k = 0; k < 6; k++) {
                 const cursor: FeedCursor = {
                   running: rnd.int(2) === 0 ? 0 : 1,
@@ -246,91 +326,177 @@ describe("the feed read in arms", () => {
     }
   });
 
-  test("merges project lists that cross a batch", () => {
-    const { db, projectIds, rnd } = fixture(9, 260);
-    for (const origin of ORIGINS) {
-      for (const q of ["", "al"]) {
-        let before: FeedCursor | null = null;
-        for (let page = 0; page < 200; page++) {
-          const read = compare(db, projectIds, q, origin, before, 50);
-          if (read.length <= 50) break;
-          before = cursorOf(db, read[49]!);
-        }
-        compare(
-          db,
-          projectIds,
-          q,
-          origin,
-          {
-            running: 1,
-            at: rnd.int(12),
-            id: "000000000000",
-          },
-          7,
-        );
-      }
-    }
-    db.close();
-  });
-
-  test("each arm seeks its index, with and without planner stats", () => {
-    const { db, projectIds } = fixture(11, 4);
-    const plans = () => {
-      const out: { sql: string; ranged: boolean }[] = [];
-      for (const origin of ORIGINS) {
-        for (const before of [
-          null,
-          { running: 0, at: 5, id: "000000000009" },
-          { running: 1, at: 5, id: "000000000009" },
-        ] as FeedCursor[]) {
-          const query = spyOn(db, "query");
-          try {
-            feedRead(db, projectIds, "al", origin, before, 50);
-            for (const [sql] of query.mock.calls) {
-              if (sql.includes("indexed by")) {
-                out.push({ sql, ranged: before?.running === 0 });
-              }
+  test("pages across former batch boundaries without changing SQL shape", () => {
+    const { db, projectIds } = fixture(9, 501);
+    try {
+      for (const size of [
+        1, 4, 7, 8, 9, 15, 16, 17, 30, 100, 199, 200, 201, 499, 500, 501,
+      ]) {
+        const ids = projectIds.slice(0, size).reverse();
+        for (const origin of ORIGINS) {
+          for (const q of QUERIES) {
+            let before: FeedCursor | null = null;
+            for (let page = 0; page < 250; page++) {
+              before = compare(db, ids, q, origin, before, 50);
+              if (before === null) break;
+              expect(page).toBeLessThan(249);
             }
-          } finally {
-            query.mockRestore();
+            for (const running of [0, 1] as const) {
+              compare(
+                db,
+                ids,
+                q,
+                origin,
+                { running, at: 5, id: "zzzzzzzzzzzz" },
+                7,
+              );
+            }
           }
         }
       }
-      return out;
-    };
-    const explain = (sql: string) => {
-      const marks = (sql.match(/\?/g) ?? []).length;
-      return db
-        .query<{ detail: string }, (string | number)[]>(
-          `explain query plan ${sql}`,
-        )
-        .all(...Array.from({ length: marks }, () => 1))
-        .map((row) => row.detail);
-    };
-    for (const stats of [false, true]) {
-      if (stats) db.exec("analyze");
-      const statements = plans();
-      expect(statements.length).toBe(9);
-      for (const { sql, ranged } of statements) {
-        const plan = explain(sql);
-        const scans = plan.filter((line) => /^SCAN sessions\b/.test(line));
-        expect({ sql, scans }).toEqual({ sql, scans: [] });
-        // a rank-0 cursor is a range the index seeks, not a filter
-        const feed = ranged
-          ? "(project_id=? AND origin=? AND last_activity_at<?)"
-          : "(project_id=? AND origin=?)";
-        for (const line of plan.filter((l) => l.includes("sessions_feed"))) {
-          expect(line).toBe(
-            `SEARCH sessions USING INDEX sessions_feed ${feed}`,
-          );
-        }
-        for (const line of plan.filter((l) => l.includes("sessions_running"))) {
-          expect(line).toMatch(
-            /USING INDEX sessions_running \(project_id=\?\)/,
-          );
+    } finally {
+      db.close();
+    }
+  }, 30_000);
+
+  test("every statement seeks its indexes, with and without planner stats", () => {
+    const { db, projectIds } = fixture(11, 501);
+    const shapes = new Set<string>();
+    try {
+      for (const stats of [false, true]) {
+        if (stats) db.exec("analyze");
+        for (const size of [
+          1, 4, 8, 9, 15, 16, 17, 30, 100, 199, 200, 201, 499, 500, 501,
+        ]) {
+          for (const origin of ORIGINS) {
+            for (const q of ["", "al", "\\", "zz"]) {
+              for (const before of [
+                null,
+                { running: 0, at: 5, id: "000000000009" },
+                { running: 1, at: 5, id: "000000000009" },
+                { running: 1, at: 0, id: "zzzzzzzzzzzz" },
+              ] satisfies (FeedCursor | null)[]) {
+                const statements = capture(
+                  db,
+                  projectIds.slice(0, size),
+                  q,
+                  origin,
+                  before,
+                );
+                expect(statements.length).toBeGreaterThanOrEqual(
+                  origin === null ? 2 : 1,
+                );
+                expect(statements.length).toBeLessThanOrEqual(
+                  origin === null ? 3 : 2,
+                );
+                for (const { sql, bound } of statements) {
+                  shapes.add(sql);
+                  expect((sql.match(/\?/g) ?? []).length).toBeLessThanOrEqual(
+                    9,
+                  );
+                  expect(sql).toContain("in (select value from json_each(?))");
+                  expect(sql).not.toContain("union all");
+                  assertPlan(db, bound);
+                  if (!sql.includes("newest")) assertEarlyExit(db, bound);
+                  if (sql.includes("newest")) {
+                    expect(() =>
+                      assertPlan(
+                        db,
+                        bound.replace(
+                          "newest indexed by sessions_automation",
+                          "newest not indexed",
+                        ),
+                      ),
+                    ).toThrow("SCAN newest");
+                  }
+                }
+              }
+            }
+          }
         }
       }
+      expect(shapes.size).toBe(14);
+    } finally {
+      db.close();
     }
-    db.close();
-  });
+  }, 30_000);
 });
+
+function capture(
+  db: Db,
+  ids: string[],
+  q: string,
+  origin: Origin,
+  before: FeedCursor | null,
+) {
+  const query = spyOn(db, "query");
+  let sqls: string[];
+  try {
+    feedRead(db, ids, q, origin, before, 50);
+    sqls = query.mock.calls.map(([sql]) => sql);
+  } finally {
+    query.mockRestore();
+  }
+  return sqls.map((sql) => ({ sql, bound: db.query(sql).toString() }));
+}
+
+function assertPlan(db: Db, sql: string) {
+  const plan = db
+    .query<{ detail: string }, []>(`explain query plan ${sql}`)
+    .all()
+    .map((row) => row.detail);
+  const aliases = [
+    ...sql.matchAll(
+      /\b(?:from|join)\s+sessions(?:\s+(?!indexed\b|not\b|where\b|on\b)(\w+))?/gi,
+    ),
+  ].map((match) => match[1] ?? "sessions");
+  for (const alias of aliases) {
+    const scan = plan.find((line) =>
+      new RegExp(`^SCAN (?:TABLE )?${alias}\\b`).test(line),
+    );
+    if (scan) throw new Error(scan);
+  }
+  const sessions = plan.filter((line) =>
+    /^SEARCH (sessions|newest)\b/.test(line),
+  );
+  expect(sessions).toHaveLength(aliases.length);
+  if (sql.includes("newest")) {
+    expect(plan).toContain(
+      "SEARCH automations USING INDEX sqlite_autoindex_automations_2 (project_id=?)",
+    );
+    expect(sessions).toContain(
+      "SEARCH sessions USING INDEX sqlite_autoindex_sessions_1 (id=?)",
+    );
+    expect(sessions).toContain(
+      "SEARCH newest USING INDEX sessions_automation (automation_id=?)",
+    );
+  } else {
+    const unowned = sql.includes("sessions_feed_unowned");
+    const index = unowned ? "sessions_feed_unowned" : "sessions_feed";
+    const origin = unowned ? "" : " AND origin=?";
+    const rank = /and \(status = 'running'\) = [01]/.test(sql)
+      ? " AND <expr>=?"
+      : "";
+    const range = sql.includes("last_activity_at <=")
+      ? " AND last_activity_at<?"
+      : "";
+    expect(sessions).toEqual([
+      `SEARCH sessions USING INDEX ${index} (project_id=?${origin}${rank}${range})`,
+    ]);
+  }
+}
+
+function assertEarlyExit(db: Db, sql: string) {
+  const ops = db
+    .query<{ addr: number; opcode: string; p1: number; p2: number }, []>(
+      `explain ${sql}`,
+    )
+    .all();
+  const cut = ops.find((op) => op.opcode === "IdxLE");
+  expect(cut).toBeDefined();
+  const nextProject = ops.find((op) => op.addr === cut?.p2);
+  const nextSession = ops.find((op) => op.addr === (cut?.p2 ?? 0) - 1);
+  expect(nextProject?.opcode).toBe("Next");
+  expect(nextSession?.opcode).toBe("Next");
+  expect(nextProject?.p1).not.toBe(nextSession?.p1);
+}

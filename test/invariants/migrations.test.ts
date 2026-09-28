@@ -980,6 +980,61 @@ describe("the schema", () => {
     db.close();
   });
 
+  test("0033 adds only the feed indexes and preserves existing data and indexes", () => {
+    const db = seed(MIGRATIONS.slice(0, 32));
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string }, []>(
+          "select name, sql from sqlite_schema where type = 'index' order by name",
+        )
+        .all();
+    const rows = () =>
+      ["sessions", "sends", "messages", "usage", "agents"].map((table) =>
+        db.query(`select * from ${table} order by id`).all(),
+      );
+    try {
+      const before = rows();
+      const existing = indexes();
+      expect(migrate(db)).toEqual(["0033-feed-arms"]);
+      expect(rows()).toEqual(before);
+      expect(
+        indexes().filter((index) => !index.name.startsWith("sessions_feed")),
+      ).toEqual(existing);
+      expect(
+        indexes()
+          .filter((index) => index.name.startsWith("sessions_feed"))
+          .map((index) => index.name),
+      ).toEqual(["sessions_feed", "sessions_feed_unowned"]);
+      for (const name of ["sessions_feed", "sessions_feed_unowned"]) {
+        const columns = db
+          .query<{ name: string | null; desc: number; key: number }, []>(
+            `pragma index_xinfo('${name}')`,
+          )
+          .all()
+          .filter((column) => column.key === 1)
+          .map(({ name, desc }) => ({ name, desc }));
+        expect(columns).toEqual([
+          { name: "project_id", desc: 0 },
+          ...(name === "sessions_feed" ? [{ name: "origin", desc: 0 }] : []),
+          { name: null, desc: 1 },
+          { name: "last_activity_at", desc: 1 },
+          { name: "id", desc: 0 },
+          { name: "title", desc: 0 },
+        ]);
+      }
+      expect(
+        indexes().find((index) => index.name === "sessions_feed")?.sql,
+      ).toContain("(status = 'running')");
+      expect(
+        indexes().find((index) => index.name === "sessions_feed_unowned")?.sql,
+      ).toContain("where automation_id is null");
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   describe("0030 archived chats migration", () => {
     const columns = (db: Database, table: string) =>
       db

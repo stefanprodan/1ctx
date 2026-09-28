@@ -3,18 +3,20 @@
 
 import type { Migration } from "../migration.ts";
 
-// The feed reads each project's rows in its own order and stops at a
-// page, where one scan over every project had to sort them all:
-// sessions_running holds the few running rows, sessions_feed the chats
-// and apart from them the runs whose automation is gone, newest first.
 export const m0033: Migration = {
   id: "0033-feed-arms",
   up(db) {
+    // Rank and title let filtered feeds stop and search inside project ranges.
     db.exec(`
-      create index sessions_running on sessions(project_id)
-        where status = 'running';
       create index sessions_feed
-        on sessions(project_id, origin, last_activity_at desc, id)
+        on sessions(project_id, origin, (status = 'running') desc,
+          last_activity_at desc, id, title);
+    `);
+    // All skips live automation history without visiting unrelated projects.
+    db.exec(`
+      create index sessions_feed_unowned
+        on sessions(project_id, (status = 'running') desc,
+          last_activity_at desc, id, title)
         where automation_id is null;
     `);
   },

@@ -179,19 +179,27 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and any count above zero logs the event. No sweep vacuums: SQLite
   reuses the pages a delete frees, and the file keeps its
   `auto_vacuum` mode.
-- **The feed reads each project in arms.** `feedRead()`
-  (`sessions/list.ts`) reads a project's running rows through
-  `sessions_running`, its chats and its runs whose automation is gone
-  through `sessions_feed`, and in Tasks each automation's runs through
-  `sessions_automation`, every arm `indexed by` its index, cut at a page
-  and holding the search and the cursor as a range; in All each
-  automation's newest matching run is chosen first and the cursor
-  applies after. The arms go to SQLite in compound batches under its 500
-  terms and are merged in the feed order. It relies on two invariants:
-  a chat has no automation, and a run is in its automation's project.
-  `test/server/sessions/feed.test.ts` keeps the one statement over every
-  project as the oracle and pins each arm's plan; a change to the feed
-  keeps both green.
+- **The feed seeks ordered project ranges.** `feedRead()`
+  (`sessions/list.ts`) binds the visible projects as one JSON array.
+  Chats and Tasks use `sessions_feed`, ordered by project, origin,
+  running rank, descending activity and id; All's chats and runs whose
+  automation is gone use the partial `sessions_feed_unowned`, without
+  origin. Both include title so a search reads the index before the
+  table. SQLite keeps a page-sized top N and skips to the next project
+  when its ordered range cannot improve the page. No global history
+  walk, per-project SQL generation or per-automation Tasks query is
+  needed. A cursor fixes the rank and seeks the activity boundary;
+  after a running cursor, the remaining page comes from non-running
+  rows only if needed. All separately chooses each visible automation's
+  newest matching run through the existing `sessions_automation` index,
+  then applies the cursor and merges at most two pages. It never assumes
+  a running run is newest. Search can exhaust visible history, but never
+  unrelated projects; All's newest-match search can exhaust each visible
+  automation's retained runs. The query shapes and parameter counts do
+  not grow with projects or automations. `test/server/sessions/feed.test.ts`
+  compares full raw rows, response rows and `next` with the unchanged
+  oracle, pins every statement's plan and cursor seek before and after
+  `ANALYZE`, and checks the bytecode's next-project early exit.
 - **Usage outlives what it measured.** No delete removes a `usage`
   row: a chat's, a run's by retention or the sweep, an automation's
   with its runs, a project's, and a turn regenerate replaces all keep
