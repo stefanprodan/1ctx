@@ -40,6 +40,12 @@ export function configMcpHref(name: string, tab: McpTab = "general") {
   return tab === "general" ? base : `${base}/${tab}`;
 }
 
+// Web access's Credentials tab, and a credential's page under it
+export const CREDENTIALS_HREF = "/admin/config/web/credentials";
+export function configCredentialHref(name: string) {
+  return `${CREDENTIALS_HREF}/${encodeURIComponent(name)}`;
+}
+
 // a skill's page under Config, on General or Files
 export type SkillTab = "general" | "files";
 export function configSkillHref(name: string, tab: SkillTab = "general") {

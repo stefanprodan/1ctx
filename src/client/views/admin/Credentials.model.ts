@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the Credentials card shows and checks without a DOM: the form's
-// fields from a row or for a new one, the key picks with the files that
-// cannot be used marked, the row's key line, the head's total, which
-// field a refusal names, and the body a save sends.
+// What the credential pages show and check without a DOM: the fields
+// from a row or for a new one, the key picks with the files that cannot
+// be used marked, a row's key line, which field a refusal names, and
+// the body a save sends.
 
 import type {
   CreateCredentialRequest,
@@ -35,8 +35,10 @@ export const HEADER_PLACEHOLDER = "Authorization";
 export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
 export const TEMPLATE_HINT = "The key goes where {key} is";
 export const PREFIX_HINT = "Requests under it are signed. Narrow is better";
-export const CARD_NOTE =
-  "curl in a chat of a bound project sends the header for URLs under the prefix. The key never reaches the chat.";
+export const LIST_NOTE =
+  "curl in a chat or run of a bound project sends the header for URLs under the prefix. The key never reaches the chat.";
+export const WEB_OFF_NOTE =
+  "Web access is off. Credentials sign nothing until it is on.";
 
 export function draftOf(c: CredentialSummary | null): CredentialDraft {
   if (c === null) {
@@ -93,10 +95,6 @@ export function projectsLine(c: Pick<CredentialSummary, "projects">): string {
   return c.projects.length === 0
     ? "no projects"
     : c.projects.map((p) => p.name).join(", ");
-}
-
-export function totalLine(count: number): string {
-  return count === 1 ? "1 credential" : `${count} credentials`;
 }
 
 // the methods in the server's order, the one picked flipped
@@ -200,4 +198,37 @@ export function patchBody(
 
 export function dirtyOf(d: CredentialDraft, c: CredentialSummary): boolean {
   return Object.keys(patchBody(d, c)).length > 0;
+}
+
+// the key card's hint: the saved file's state, or what to pick
+export function keyHint(
+  keyName: string,
+  c: Pick<CredentialSummary, "keyName" | "key"> | null,
+): string {
+  if (c === null || c.keyName !== keyName) {
+    return "An http- file in the secrets directory";
+  }
+  return c.key === "ok"
+    ? `${c.keyName}.key is present`
+    : `${c.keyName}.key is ${c.key}`;
+}
+
+// every team project the admin sees, and any the row names besides, so
+// a link to a project the list lacks stays in view to be taken off
+export function teamsOf(
+  projects: readonly { id: string; name: string; kind: string }[],
+  c: Pick<CredentialSummary, "projects"> | null,
+): { id: string; name: string }[] {
+  const teams = projects
+    .filter((p) => p.kind === "team")
+    .map((p) => ({ id: p.id, name: p.name }));
+  const extra = (c?.projects ?? []).filter(
+    (p) => !teams.some((q) => q.id === p.id),
+  );
+  return [...teams, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Delete's line: what stops when it goes
+export function deleteLine(c: Pick<CredentialSummary, "prefix">): string {
+  return `curl stops signing requests under ${c.prefix}.`;
 }

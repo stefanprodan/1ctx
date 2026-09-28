@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Credentials card: the form's defaults and what a save sends, the
+// The credential pages: the form's defaults and what a save sends, the
 // key picks and marks, which field a refusal names; the entity that
-// loads the list with the keys and folds a write back; and the card
-// rendered.
+// loads the list with the keys and folds a write back; the list, a
+// credential's page and New credential rendered.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -18,20 +18,26 @@ import {
   patchCredential,
 } from "../../../src/client/data/credentials.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { projects } from "../../../src/client/data/projects.ts";
+import { tools } from "../../../src/client/data/tools.ts";
+import { CredentialList } from "../../../src/client/views/admin/CredentialList.tsx";
+import { CredentialPage } from "../../../src/client/views/admin/CredentialPage.tsx";
 import {
   createBody,
   credentialFieldOf,
+  deleteLine,
   dirtyOf,
   draftOf,
+  keyHint,
   keyLine,
   keyOptions,
   patchBody,
   problemOf,
   projectsLine,
+  teamsOf,
   toggledMethod,
-  totalLine,
-} from "../../../src/client/views/admin/CredentialsCard.model.ts";
-import { CredentialsCard } from "../../../src/client/views/admin/CredentialsCard.tsx";
+} from "../../../src/client/views/admin/Credentials.model.ts";
+import { NewCredential } from "../../../src/client/views/admin/NewCredential.tsx";
 import type { CredentialSummary } from "../../../src/shared/contracts/credential.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
@@ -126,9 +132,21 @@ describe("the model", () => {
     });
   });
 
-  test("the head's words", () => {
-    expect(totalLine(0)).toBe("0 credentials");
-    expect(totalLine(1)).toBe("1 credential");
+  test("the row's and the cards' words", () => {
+    expect(keyHint("http-finnhub", credential())).toBe(
+      "http-finnhub.key is present",
+    );
+    expect(keyHint("http-finnhub", credential({ key: "unusable" }))).toBe(
+      "http-finnhub.key is unusable",
+    );
+    // a new pick says what to pick, not the saved file's state
+    expect(keyHint("http-other", credential())).toBe(
+      "An http- file in the secrets directory",
+    );
+    expect(keyHint("", null)).toBe("An http- file in the secrets directory");
+    expect(deleteLine(credential())).toBe(
+      "curl stops signing requests under https://finnhub.io/api/v1/.",
+    );
     expect(projectsLine(credential())).toBe("finops");
     expect(projectsLine(credential({ projects: [] }))).toBe("no projects");
   });
@@ -260,28 +278,154 @@ describe("the entity", () => {
   });
 });
 
-describe("the card", () => {
-  test.serial("a row per credential, a missing key marked", () => {
-    credentials.value = [
-      credential(),
-      credential({
-        id: "c2",
-        name: "github",
-        keyName: "http-github",
-        key: "missing",
-        projects: [],
-      }),
+describe("the teams a credential may bind", () => {
+  test("team projects by name, and a bound one the admin lacks", () => {
+    const seen = [
+      { id: "p2", name: "research", kind: "team" },
+      { id: "p9", name: "mine", kind: "personal" },
+      { id: "p3", name: "alpha", kind: "team" },
     ];
-    const html = render(<CredentialsCard />);
-    expect(html).toContain("2 credentials");
-    expect(html).toContain("New credential");
+    expect(teamsOf(seen, null).map((p) => p.name)).toEqual([
+      "alpha",
+      "research",
+    ]);
+    expect(teamsOf(seen, credential()).map((p) => p.name)).toEqual([
+      "alpha",
+      "finops",
+      "research",
+    ]);
+  });
+});
+
+describe("the pages", () => {
+  const two = () => [
+    credential(),
+    credential({
+      id: "c2",
+      name: "github",
+      keyName: "http-github",
+      key: "missing",
+      prefix: "https://api.github.com/",
+      projects: [],
+    }),
+  ];
+  let heldTools: typeof tools.value;
+  let heldProjects: typeof projects.value;
+  beforeEach(() => {
+    heldTools = tools.value;
+    heldProjects = projects.value;
+  });
+  afterEach(() => {
+    tools.value = heldTools;
+    projects.value = heldProjects;
+  });
+
+  test.serial("the list: a link per credential, a missing key marked", () => {
+    credentials.value = two();
+    const html = render(<CredentialList />);
+    expect(html).toContain('href="/admin/config/web/credentials/finnhub"');
+    expect(html).toContain('href="/admin/config/web/credentials/github"');
     expect(html).toContain("The key never reaches the chat.");
     expect(html).toContain("https://finnhub.io/api/v1/ · finops");
     expect(html).toContain("http-github.key missing");
     expect(html.match(/rows-meta-bad/g)?.length).toBe(1);
+    // no form on the list, nothing opens in place
+    expect(html).not.toContain("<form");
   });
 
-  test.serial("draws nothing until the list loaded", () => {
-    expect(render(<CredentialsCard />)).toBe("");
+  test.serial("the list says credentials sign nothing while web is off", () => {
+    credentials.value = [credential()];
+    tools.value = {
+      builtin: [],
+      access: { mode: "off", domains: [], updatedAt: 0 },
+      search: {
+        provider: null,
+        keys: { exa: false, firecrawl: false, tavily: false },
+      },
+      visualize: {
+        name: "visualize",
+        description: "",
+        parameters: {},
+        parametersHtml: "",
+        tokens: 0,
+        enabled: true,
+        hosts: [],
+        updatedAt: 0,
+      },
+    };
+    const html = render(<CredentialList />);
+    expect(html).toContain(
+      "Web access is off. Credentials sign nothing until it is on.",
+    );
+    expect(html).not.toContain("The key never reaches the chat.");
+  });
+
+  test.serial("an empty list says what New credential takes", () => {
+    credentials.value = [];
+    expect(render(<CredentialList />)).toContain("No credentials yet.");
+  });
+
+  test.serial("a credential's page: a form per card, Delete last", () => {
+    credentials.value = two();
+    projects.value = [
+      {
+        id: "p1",
+        name: "finops",
+        kind: "team",
+      } as (typeof projects.value & object)[number],
+    ];
+    const html = render(<CredentialPage params={{ name: "finnhub" }} />);
+    expect(
+      [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
+    ).toEqual(["Key", "Request", "Methods", "Projects", "Delete finnhub"]);
+    expect(html.match(/<form/g)).toHaveLength(4);
+    // nothing to save at rest
+    expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(4);
+    expect(html).not.toContain("Unsaved changes");
+    // the saved fields, the name fixed
+    expect(html).not.toContain('name="name"');
+    expect(html).toContain('value="https://finnhub.io/api/v1/"');
+    expect(html).toContain('value="X-Finnhub-Token"');
+    expect(html).toContain("http-finnhub.key is present");
+    expect(html).toMatch(/setting-count">1 of 1</);
+    expect(html).toContain(
+      "curl stops signing requests under https://finnhub.io/api/v1/.",
+    );
+    // the crumb climbs to the tab, the switcher names the other
+    expect(html).toContain('href="/admin/config/web/credentials"');
+    expect(html).toContain("page-pill");
+    // the aside
+    expect(html).toMatch(/Key file<span class="split-strong cut">/);
+    expect(html).toContain("1 project");
+  });
+
+  test.serial("an unknown name says so", () => {
+    credentials.value = two();
+    expect(render(<CredentialPage params={{ name: "gone" }} />)).toContain(
+      "No credential by that name.",
+    );
+  });
+
+  test.serial("New credential: one card, Create off until named", () => {
+    credentials.value = two();
+    projects.value = [];
+    const html = render(<NewCredential />);
+    expect(html.match(/<form/g)).toHaveLength(1);
+    expect(html).toContain('name="name"');
+    expect(html).toContain("Create credential");
+    expect(html).toMatch(/type="submit"[^>]*disabled/);
+    expect(html).toContain('href="/admin/config/web/credentials"');
+    expect(html).toContain("No team projects yet");
+    // GET and HEAD are on for a new one
+    expect(html.match(/rows-check-on/g)).toHaveLength(2);
+  });
+
+  test.serial("the pages wait for the list", () => {
+    credentials.value = null;
+    expect(render(<CredentialPage params={{ name: "x" }} />)).toContain(
+      "Loading",
+    );
+    expect(render(<NewCredential />)).toContain("Loading");
+    expect(render(<CredentialList />)).not.toContain("rows-go");
   });
 });

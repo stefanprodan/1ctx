@@ -439,16 +439,22 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   the list. Search: the providers as radio rows with None first, each
   with its key file. Limits: the web limits (`LimitsSetting.tsx`, the
   same card as Visuals'). Tools: the `webfetch` and `websearch` rows.
-  Credentials
-  (`CredentialsCard.tsx`, its words and bodies in
-  `CredentialsCard.model.ts`, the rows and `http-` keys in
-  `data/credentials.ts`, loaded by the Web access routes) is `Rows`: the name
-  over the prefix and its projects, the key file as `RowsMeta`, `bad`
-  when missing or unusable; New credential and an open row are one
-  form, the key a `Select` marking unusable and missing files, the
-  methods as boxes (GET and HEAD new), the rail's team projects as
-  `RowsCheck` lines, a PATCH sending only the fields changed, and
-  Delete asked once.
+  Credentials (`CredentialList.tsx`, the rows and `http-` keys in
+  `data/credentials.ts`, loaded by the Web access routes) is one card
+  of links, searched and counted, the name over the prefix and its
+  projects, the key file as `RowsMeta`, `bad` when missing or unusable;
+  New credential in the page's head, the aside adding the `http-` key
+  files with the credential that reads each. While web access is off
+  the list and a credential's page say credentials sign nothing.
+- **A credential is a page.** `/admin/config/web/credentials/:name`
+  (`CredentialPage.tsx`, the fields in `CredentialFields.tsx`, the words
+  and bodies in `Credentials.model.ts`), the crumb's own step a switcher
+  to the others: Key, Request (prefix, header, value), Methods (GET and
+  HEAD new) and Projects (the rail's team projects, and any the row
+  names besides) are `Setting` cards, each drafting over the saved row
+  and sending only its own changed fields, then Delete. The name is
+  fixed once made. `?new` on the tab (`NewCredential.tsx`) is every
+  field in one card, Create opening the page.
 - **Config › Visuals is a page of cards.** `/admin/config/visuals`
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved

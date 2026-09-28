@@ -4,9 +4,11 @@
 // Config › Web access, in two tabs. General: who agents may reach, the
 // search provider, how much one turn may fetch and search, and the two
 // tools it offers, each a card that drafts and saves apart. Credentials:
-// what bash's curl signs with. The aside has the last 30 days. Nothing
-// saves before Save, the mode and the provider included. A change
-// applies to the next turn.
+// the list of what bash's curl signs with, each a link to its page, New
+// credential in the head and `?new` its form. The aside has the last 30
+// days, and on Credentials the http- key files. Nothing saves before
+// Save, the mode and the provider included. A change applies to the
+// next turn.
 
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
@@ -16,9 +18,13 @@ import {
   SEARCH_PROVIDERS,
   type SearchProvider,
 } from "../../../shared/words.ts";
-import { path } from "../../app/router.ts";
+import { path, query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { credentials, credentialsError } from "../../data/credentials.ts";
+import {
+  credentialKeys,
+  credentials,
+  credentialsError,
+} from "../../data/credentials.ts";
 import {
   limits,
   patchTool,
@@ -27,6 +33,8 @@ import {
   webUsage,
 } from "../../data/tools.ts";
 import { count, tokensText } from "../../lib/format.ts";
+import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -35,9 +43,10 @@ import { Seg } from "../../ui/Seg.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
-import { CredentialsCard } from "./CredentialsCard.tsx";
+import { CredentialList } from "./CredentialList.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { LimitsSetting } from "./LimitsSetting.tsx";
+import { NewCredential } from "./NewCredential.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 import { totalTokens } from "./Tools.model.ts";
 import {
@@ -61,9 +70,16 @@ import {
 import "./web-access.css";
 
 export function WebAccess() {
+  const tab = webTab(path.value);
+  if (tab === "credentials" && new URLSearchParams(query.value).has("new")) {
+    return <NewCredential />;
+  }
+  return <Tabbed tab={tab} />;
+}
+
+function Tabbed({ tab }: { tab: "general" | "credentials" }) {
   const state = tools.value;
   const rows = limits.value;
-  const tab = webTab(path.value);
   // the Credentials tab fails with its list too
   const error =
     toolsError.value ?? (tab === "credentials" ? credentialsError.value : null);
@@ -73,11 +89,19 @@ export function WebAccess() {
       steps={[zoneStep("Config")]}
       title="Web access"
       split
+      actions={
+        tab === "credentials" ? (
+          <a class="btn btn-small" href={`${CREDENTIALS_HREF}?new`}>
+            <Icon name="plus" size={14} />
+            New credential
+          </a>
+        ) : undefined
+      }
       loading={(state === null || rows === null) && error === null}
       error={error}
     >
       {state && rows && (
-        <Split aside={<Aside />}>
+        <Split aside={<Aside tab={tab} />}>
           <div class="web-access">
             <Tabs
               tabs={WEB_TABS.map(({ tab, label, href }) => ({
@@ -103,7 +127,7 @@ export function WebAccess() {
               />
               <Tools state={state} />
             </div>
-            {tab === "credentials" && <CredentialsCard />}
+            {tab === "credentials" && <CredentialList />}
           </div>
         </Split>
       )}
@@ -299,21 +323,55 @@ function Tools({ state }: { state: ToolsResponse }) {
   );
 }
 
-function Aside() {
+function Aside({ tab }: { tab: "general" | "credentials" }) {
   const known = webUsage.value;
   const usage = known?.usage ?? null;
   return (
-    <AsideSection label="Last 30 days">
-      {known === null ? (
-        <p class="split-empty">Loading</p>
-      ) : usage === null ? (
-        <p class="split-empty">Did not load.</p>
+    <>
+      <AsideSection label="Last 30 days">
+        {known === null ? (
+          <p class="split-empty">Loading</p>
+        ) : usage === null ? (
+          <p class="split-empty">Did not load.</p>
+        ) : (
+          <>
+            <AsideLine label="Fetches">{count(usage.fetches)}</AsideLine>
+            <AsideLine label="Searches">{count(usage.searches)}</AsideLine>
+            <AsideLine label="Failed">{count(usage.failed)}</AsideLine>
+          </>
+        )}
+      </AsideSection>
+      {tab === "credentials" && <KeyFiles />}
+    </>
+  );
+}
+
+// the http- files in the secrets directory, each with the credential
+// that reads it
+function KeyFiles() {
+  const list = credentials.value ?? [];
+  const files = credentialKeys.value
+    .map((k) => k.name)
+    .sort((a, b) => a.localeCompare(b));
+  return (
+    <AsideSection label="Key files">
+      {files.length === 0 ? (
+        <p class="split-empty">None in the secrets directory.</p>
       ) : (
-        <>
-          <AsideLine label="Fetches">{count(usage.fetches)}</AsideLine>
-          <AsideLine label="Searches">{count(usage.searches)}</AsideLine>
-          <AsideLine label="Failed">{count(usage.failed)}</AsideLine>
-        </>
+        files.map((file) => {
+          const user = list.find((c) => c.keyName === file);
+          return (
+            <AsideLine
+              key={file}
+              label={`${file}.key`}
+              cut
+              href={user ? configCredentialHref(user.name) : undefined}
+              quiet={user === undefined}
+            >
+              {user?.name ?? "unused"}
+            </AsideLine>
+          );
+        })
       )}
     </AsideSection>
   );
