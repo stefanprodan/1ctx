@@ -33,7 +33,7 @@ import type {
 const ARGUMENT_ADVICE = "Retry with the arguments the action takes.";
 
 export const MEMORY_WRITE_RULES =
-  "Record facts, not instructions to yourself, even when the task or guidance asks otherwise. Keep only what a later run or chat needs, not the answer, progress, a log of what was done, or what is quick to look up again. Never record a method that failed as one that works, a failure that went away, or a claim that a tool is broken. When the note is full, shorten, merge or replace stale topics instead of skipping what matters. Call none when nothing is worth keeping.";
+  "Record facts, not instructions to yourself, even when the task or guidance asks otherwise. Keep only what a later run or chat needs, not the answer, progress, a log of what was done, or what is quick to look up again. Never record a method that failed as one that works, a failure that went away, or a claim that a tool is broken. When the note is full, shorten, merge or replace stale topics instead of skipping what matters. Call none when nothing is worth keeping. Leave out times, dates and values that change on every run, such as when something last ran, reconciled or was checked. When the run found what the note already says, call none: rewording a topic or updating a time is not a change.";
 
 // what the chat's agent is told to save, and what not
 export const CHAT_MEMORY_DESCRIPTION =
@@ -223,7 +223,9 @@ function editTool(work: MemoryWork): Tool {
             };
       work.entries = result.entries;
       work.operations.push(operation);
-      return `Saved for the end of the run in ${own}. ${memorySize(result.entries)} characters.`;
+      const size = `${memorySize(result.entries)} characters.`;
+      if (edit.action === "none") return `Nothing changed. ${size}`;
+      return `Saved for the end of the run in ${own}. ${size}`;
     },
   };
 }
