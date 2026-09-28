@@ -54,7 +54,7 @@ client change. What each page draws is in `docs/views.md`.
   project pages, the automation page and editor, a knowledge file's
   pages, the user and agent pages and the profile put their content in
   the main column, 900px at most, and sections of plain lines in the
-  280px aside at the right, no boxes; under 1100, a tablet or a phone,
+  240px aside at the right, no boxes; under 1100, a tablet or a phone,
   the aside is hidden. The aside holds only honest numbers: the agents
   and the past seven calendar days in the caller's zone from `GET
   /api/usage/week?tz=` on Home and Projects, the About facts on a
