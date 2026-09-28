@@ -29,10 +29,10 @@ export function onPage(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// the address alone picks the rail's face: a zone's pages are the admin
-// face, every other page the working one
+// the address alone picks the rail's face: /admin, its alias included,
+// and every page under it are the admin face
 export function adminFace(pathname: string): boolean {
-  return ZONES.some((z) => onPage(pathname, z.href));
+  return onPage(pathname, "/admin");
 }
 
 // the one link of a zone lit for a path: the longest that holds it, so

@@ -10,6 +10,7 @@ import { App } from "../../../src/client/app/App.tsx";
 import { adminFace, zoneLit } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
 import {
+  ALIASES,
   conflicts,
   match,
   navEntries,
@@ -91,6 +92,14 @@ describe("the route table", () => {
 });
 
 describe("the route table's shape", () => {
+  test("an alias has no page of its own and opens one that exists", () => {
+    expect(ALIASES["/admin"]).toBe("/admin/monitor");
+    for (const [from, to] of Object.entries(ALIASES)) {
+      expect(match(from), from).toBeNull();
+      expect(match(to)?.route.path, to).toBe(to);
+    }
+  });
+
   test("no route shadows another", () => {
     expect(conflicts()).toEqual([]);
     expect(

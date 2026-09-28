@@ -65,9 +65,11 @@ export function watchWidth(): void {
 export const lastAdmin = signal("/admin/monitor");
 export const lastWork = signal("/");
 
-// follows the address; sign in is no working page to return to
-export function watchPages(): () => void {
+// follows the address; sign in is no working page to return to, and an
+// address with no page (an alias, a typo) is none to open again
+export function watchPages(hasPage: (pathname: string) => boolean): () => void {
   return effect(() => {
+    if (!hasPage(path.value)) return;
     const here = path.value + query.value;
     if (adminFace(path.value)) lastAdmin.value = here;
     else if (path.value !== "/login") lastWork.value = here;
