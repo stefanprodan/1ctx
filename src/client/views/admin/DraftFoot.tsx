@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The foot of an agent page's card that drafts: that a change waits,
-// or the words the view puts in its place (a name taken), then Discard
-// and Save, both off until something changed.
+// or the words the view puts in its place (a name taken), or why a
+// save failed, then Discard and Save, both off until something changed.
 
 import type { ComponentChildren } from "preact";
 import type { Save } from "../../lib/save.ts";
@@ -31,14 +31,14 @@ export function DraftFoot({
   hint?: ComponentChildren;
   onDiscard: () => void;
 }) {
-  // nothing at rest; the words take a phone's line of their own
+  // nothing at rest; on a phone the words wrap beside the buttons
   const words = hint ?? (dirty ? "Unsaved changes" : undefined);
   return (
     <Foot
       save={save}
       dirty={dirty && !blocked && !locked}
       label="Save"
-      stack={words !== undefined}
+      inline
       start={<SettingHint>{words}</SettingHint>}
       before={
         <button

@@ -91,14 +91,8 @@
     flex: 1 1 200px;
     min-width: 0;
   }
-  .mcp-page-checks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-6);
-  }
   .mcp-page-timeout {
-    width: 200px;
-    max-width: 100%;
+    width: 120px;
   }
   .mcp-page-block {
     white-space: pre-wrap;

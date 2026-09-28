@@ -476,7 +476,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   (`McpGeneral.tsx`, `McpUsedBy.tsx`) is About (what the server says
   of itself, its tools and last change, Refresh), Endpoint (its save
   lists the tools there first, a refusal keeping what was typed),
-  Offered to agents (the Read and Write switches), Call timeout,
+  Offered to agents (Off, Read, or Read and write, one `Seg`; write
+  alone has no option), Call timeout (seconds, empty for the limits'),
   Instructions (the switch over the block as `serverBlock()` gives it,
   trimmed to 12 lines), Used by (only when an agent does) and Delete,
   off while an agent uses it. Each card sends only its own fields, so

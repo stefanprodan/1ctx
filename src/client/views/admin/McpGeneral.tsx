@@ -27,7 +27,9 @@ import { at, useAction, useFocusField, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Fold } from "../../ui/Fold.tsx";
-import { RowsCheck } from "../../ui/Rows.tsx";
+import { NumberBox } from "../../ui/NumberBox.tsx";
+import { RowsSwitch } from "../../ui/Rows.tsx";
+import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
@@ -35,8 +37,11 @@ import {
   changeLine,
   characters,
   instructionsBox,
-  KEY_HINT,
   mcpFieldOf,
+  OFFER_OPTIONS,
+  type Offer,
+  offerOf,
+  offerSides,
   timeoutMs,
   timeoutProblem,
   timeoutText,
@@ -155,7 +160,8 @@ function About({ server, now }: { server: McpServerSummary; now: number }) {
           </Fact>
         )}
       </div>
-      {refresh.failure.value !== null && (
+      {/* a recorded failure is already the page's head */}
+      {refresh.failure.value !== null && server.refreshError === null && (
         <p class="error mcp-page-said" role="alert">
           {refresh.failure.value}
         </p>
@@ -197,7 +203,6 @@ function Endpoint({ server, drafts: d }: Props) {
           <DraftFoot
             save={save}
             dirty={dirty}
-            hint={dirty ? "Saving lists the tools there first" : undefined}
             onDiscard={() => d.resetEndpoint(latest.current)}
           />
         }
@@ -218,9 +223,9 @@ function Endpoint({ server, drafts: d }: Props) {
             <FieldError save={save} field="url" />
           </label>
           <div class="field mcp-page-key">
-            <span class="label">Key</span>
+            <span class="label">Key file</span>
             <Select
-              label="Key"
+              label="Key file"
               name="keyName"
               mono
               value={d.keyName.value}
@@ -235,17 +240,13 @@ function Endpoint({ server, drafts: d }: Props) {
             {invalid("keyName") ? (
               <FieldError save={save} field="keyName" />
             ) : (
-              <span
-                class={`hint${
-                  server.keyName !== null && !server.hasKey ? " error" : ""
-                }`}
-              >
-                {server.keyName === null
-                  ? KEY_HINT
-                  : server.hasKey
+              server.keyName !== null && (
+                <span class={`hint${server.hasKey ? "" : " error"}`}>
+                  {server.hasKey
                     ? `${server.keyName}.key is present`
                     : `${server.keyName}.key is missing`}
-              </span>
+                </span>
+              )
             )}
           </div>
         </div>
@@ -254,7 +255,7 @@ function Endpoint({ server, drafts: d }: Props) {
   );
 }
 
-// the sides an agent may be given; an agent picks Read, or Read and
+// the most an agent may be given; an agent picks Read, or Read and
 // write, within them
 function Offered({ server, drafts: d }: Props) {
   const latest = useLatest(server);
@@ -266,8 +267,10 @@ function Offered({ server, drafts: d }: Props) {
       }),
     );
   }, mcpFieldOf);
-  const flip = (side: "read" | "write") => {
-    d[side].value = !d[side].value;
+  const pick = (offer: Offer) => {
+    const sides = offerSides(offer);
+    d.read.value = sides.read;
+    d.write.value = sides.write;
     save.touch();
   };
   const dirty = d.read.value !== server.read || d.write.value !== server.write;
@@ -280,7 +283,16 @@ function Offered({ server, drafts: d }: Props) {
     >
       <Setting
         title="Offered to agents"
-        line="An agent gets only the sides that are on."
+        line="Tool set access"
+        action={
+          <Seg
+            label="Offered to agents"
+            name="offer"
+            value={offerOf(d.read.value, d.write.value)}
+            options={OFFER_OPTIONS.map((o) => ({ ...o, disabled: save.busy }))}
+            onPick={pick}
+          />
+        }
         foot={
           <DraftFoot
             save={save}
@@ -291,26 +303,7 @@ function Offered({ server, drafts: d }: Props) {
             }}
           />
         }
-      >
-        <div class="mcp-page-checks">
-          <RowsCheck
-            name="read"
-            checked={d.read.value}
-            disabled={save.busy}
-            onChange={() => flip("read")}
-          >
-            Read tools
-          </RowsCheck>
-          <RowsCheck
-            name="write"
-            checked={d.write.value}
-            disabled={save.busy}
-            onChange={() => flip("write")}
-          >
-            Write tools
-          </RowsCheck>
-        </div>
-      </Setting>
+      />
     </form>
   );
 }
@@ -337,37 +330,38 @@ function Timeout({ server, drafts: d }: Props) {
     >
       <Setting
         title="Call timeout"
-        line={
-          limit === null
-            ? "Seconds a call may take. Empty takes the limits' call timeout."
-            : `Seconds a call may take. Empty takes the limits' ${timeoutText(limit)}.`
-        }
+        line="Seconds a call may take."
         foot={
           <DraftFoot
             save={save}
             dirty={dirty}
+            hint={
+              save.fieldError("timeoutMs") !== null ? (
+                <FieldError save={save} field="timeoutMs" />
+              ) : undefined
+            }
             onDiscard={() => {
               d.timeout.value = timeoutText(latest.current.timeoutMs);
             }}
           />
         }
-      >
-        <label class="field mcp-page-timeout">
-          <span class="label">Seconds</span>
-          <input
+        action={
+          <NumberBox
+            label="Call timeout"
             name="timeoutMs"
-            class="mcp-page-mono"
-            inputMode="decimal"
-            autocomplete="off"
+            class="mcp-page-timeout"
+            unit="s"
             placeholder={timeoutText(limit)}
-            aria-invalid={save.fieldError("timeoutMs") !== null || undefined}
+            invalid={save.fieldError("timeoutMs") !== null}
             disabled={save.busy}
             value={d.timeout.value}
-            onInput={save.bind(d.timeout)}
+            onInput={(text) => {
+              d.timeout.value = text;
+              save.touch();
+            }}
           />
-          <FieldError save={save} field="timeoutMs" />
-        </label>
-      </Setting>
+        }
+      />
     </form>
   );
 }
@@ -399,7 +393,6 @@ function Instructions({ server, drafts: d }: Props) {
       <Setting
         title="Instructions"
         count={characters(box.count)}
-        line="What the server tells agents, put in their system prompt."
         foot={
           <DraftFoot
             save={save}
@@ -407,18 +400,18 @@ function Instructions({ server, drafts: d }: Props) {
             onDiscard={() => d.resetInstructions(latest.current)}
           />
         }
+        action={
+          <RowsSwitch
+            on={d.instructionsOn.value}
+            label="Put them in the system prompt"
+            disabled={save.busy}
+            onClick={() => {
+              d.instructionsOn.value = !d.instructionsOn.value;
+              save.touch();
+            }}
+          />
+        }
       >
-        <RowsCheck
-          name="instructionsOn"
-          checked={d.instructionsOn.value}
-          disabled={save.busy}
-          onChange={() => {
-            d.instructionsOn.value = !d.instructionsOn.value;
-            save.touch();
-          }}
-        >
-          Put them in the system prompt
-        </RowsCheck>
         <Fold
           cut={box.cut && !open.value}
           onOpen={() => {

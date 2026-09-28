@@ -87,10 +87,11 @@ client change. What each page draws is in `docs/views.md`.
   page's Visuals tab) stacks `ui/Section.tsx`: a title and a line at
   the left, a `SectionForm` at the right. `section.css` holds the parts
   a form puts there: `.section-label` with a `.section-fact` (a
-  changed value's default), `.section-grid` of short fields,
-  `.section-number` (a value with its unit inside the box) and
-  `.section-lines` (a box of entries); `Foot`'s `after` puts Reset
-  beside Save and a count (`.section-fact-end`) at the line's end.
+  changed value's default), `.section-grid` of short fields and
+  `.section-lines` (a box of entries). A number with its unit inside
+  the box is `ui/NumberBox.tsx`, on a section or in a card. `Foot`'s
+  `after` puts Reset beside Save and a count (`.section-fact-end`) at
+  the line's end.
   `off` fades a section whose setting does nothing now; the view
   disables its fields. The page's stylesheet holds only what it
   puts inside a row. Small and danger buttons are `.btn-small` and
@@ -101,9 +102,14 @@ client change. What each page draws is in `docs/views.md`.
   Save, so each card saves apart; `list` puts the title, a count and
   an Add in a band over rows edge to edge (flush `RowsLine`s, controls
   in `RowsEnd`, never a link); `danger` is the Delete card, last. A
-  card that drafts ends in `Foot` with `stack`, so a phone gives the
-  hint its own line. The card clips nothing, so a select's list opens
-  past it.
+  card with one control (a `Seg`, a `NumberBox`, a `RowsSwitch`) puts
+  it in `action`, at the head's right, never under the line; the head
+  wraps it under the words on a phone, and a card that shows more (a
+  preview, a prompt) keeps that in the body. A card that drafts ends
+  in `admin/DraftFoot.tsx`: "Unsaved changes", a refusal or the view's
+  hint in the buttons' line, wrapping beside them on a phone. Nothing
+  saves before Save, a switch included. The card clips nothing, so a
+  select's list opens past it.
 - **A dashboard is a board, not rows.** The admin's Monitor (`/monitor`,
   the zone's own page, headed `Monitor / Live`: the live tiles, Needs
   attention and Stats), Usage (`/monitor/usage`) and Storage (`/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
@@ -208,7 +214,11 @@ client change. What each page draws is in `docs/views.md`.
   in `base.css`, `invalid` on `ui/Select.tsx`), `ui/FieldError.tsx` in
   place of its hint, and `useFocusField()` moves the focus to the
   control carrying that `name`. Any other refusal is the notice `Foot`
-  draws over the buttons, "Could not delete." then the server's words.
+  draws over the buttons, "Could not delete." then the server's words;
+  a card's `DraftFoot` passes `inline`, so it is red words in the
+  buttons' line in place of the hint. A card whose control sits in its
+  head (a switch, a number box) puts its field refusal there too,
+  through `DraftFoot`'s `hint`.
   An action whose words never name a field (a decider's Check) passes
   `{ whole: true }` to `act`, which skips `fieldOf`.
   A text field's input is `save.bind(signal)`, which clears the

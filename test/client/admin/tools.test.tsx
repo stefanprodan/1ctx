@@ -600,7 +600,7 @@ describe("the page", () => {
     // the CDNs, then the visual limits as text boxes with their units
     expect(html.match(/<form/g)).toHaveLength(2);
     expect(html).toContain('class="section-grid"');
-    expect(html).toContain('class="section-number-input"');
+    expect(html).toContain('class="numberbox-input"');
     expect(html).not.toContain('type="number"');
     expect(html).not.toContain("section-off");
     expect(html).toContain("Visuals per turn");

@@ -12,6 +12,7 @@ import type { LimitScope } from "../../../shared/words.ts";
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
+import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
 import { useLimitsForm } from "./LimitsCard.tsx";
 import { defaultLine, dirty, displayOf, LIMIT_WORDS } from "./Tools.model.ts";
@@ -41,21 +42,14 @@ function LimitField({
           <span class="section-fact">{defaultLine(row)}</span>
         )}
       </span>
-      <span class={`section-number${error ? " section-number-invalid" : ""}`}>
-        <input
-          class="section-number-input"
-          name={row.name}
-          type="text"
-          inputMode="decimal"
-          autocomplete="off"
-          spellcheck={false}
-          disabled={busy}
-          value={text}
-          aria-invalid={error ? true : undefined}
-          onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)}
-        />
-        {word !== "" && <span class="section-number-unit">{word}</span>}
-      </span>
+      <NumberBox
+        name={row.name}
+        value={text}
+        unit={word}
+        invalid={Boolean(error)}
+        disabled={busy}
+        onInput={onInput}
+      />
       {error ? (
         <FieldError save={save} field={row.name} />
       ) : (

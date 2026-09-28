@@ -19,7 +19,7 @@ import {
   serversError,
   serverUsage,
 } from "../../data/mcp.ts";
-import { ago, count, plural, sentence } from "../../lib/format.ts";
+import { ago, count, sentence } from "../../lib/format.ts";
 import { configMcpHref, type McpTab } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
@@ -164,12 +164,10 @@ function Body({
       {failed && (
         <p class="mcp-page-bad" role="status">
           <Icon name="alert" size={16} class="mcp-page-bad-icon" />
-          {`Refresh failed ${ago(server.refreshFailedAt!, now)}: ${sentence(
-            server.refreshError!,
-          )} Agents are still offered the ${plural(
-            server.tools.length,
-            "tool",
-          )} listed ${ago(server.checkedAt, now)}, and their calls fail until the server answers.`}
+          {`${sentence(server.refreshError!)} Last refresh ${ago(
+            server.refreshFailedAt!,
+            now,
+          )}.`}
         </p>
       )}
       <Tabs

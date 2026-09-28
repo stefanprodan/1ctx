@@ -105,9 +105,10 @@ function Body({ skill, tab }: { skill: SkillSummary; tab: SkillTab }) {
       {failed && (
         <p class="skill-page-bad" role="status">
           <Icon name="alert" size={16} class="skill-page-bad-icon" />
-          {`Refresh failed ${ago(skill.refreshFailedAt!, now)}: ${sentence(
-            skill.refreshError!,
-          )} Agents still get the copy fetched ${ago(skill.fetchedAt, now)}.`}
+          {`${sentence(skill.refreshError!)} Last refresh ${ago(
+            skill.refreshFailedAt!,
+            now,
+          )}.`}
         </p>
       )}
       <Tabs
