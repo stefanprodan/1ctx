@@ -482,10 +482,10 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Offered to agents (Off, Read, or Read and write, one `Seg`; write
   alone has no option), Call timeout (seconds, empty for the limits'),
   Instructions (the switch, a line that follows its draft, and the
-  block as `serverBlock()` gives it, trimmed to 12 lines), Used by (only when an agent does) and Delete,
-  off while an agent uses it. Each card sends only its own fields, so
-  none waits on another, and a card at rest follows the row a save or
-  a refresh answered. Tools (`McpTools.tsx`, its logic in
+  block as `serverBlock()` gives it, trimmed to 12 lines), Used by
+  (only when an agent does) and Delete, off while an agent uses it.
+  Each card sends only its own fields, so none waits on another, and a
+  card at rest follows the row a save or a refresh answered. Tools (`McpTools.tsx`, its logic in
   `McpTools.model.ts` over `decide()` in `shared/mcp.ts`) is one draft
   form: the Matchers card, the Read, Write and Excluded matchers, each
   a chip with the tools it decides, in red when it matches none, and a
