@@ -10,8 +10,9 @@ import { LIMIT_DEFINITIONS } from "./defaults.ts";
 export function parseLimits(body: unknown): PutLimitsRequest {
   const outer = fields(body, ["values"]);
   const input = fields(outer.values, [...LIMIT_NAMES]);
-  const values = {} as PutLimitsRequest["values"];
+  const values: PutLimitsRequest["values"] = {};
   for (const name of LIMIT_NAMES) {
+    if (!(name in input)) continue;
     const value = input[name];
     const entry = LIMIT_DEFINITIONS[name];
     if (!Number.isInteger(value)) {
@@ -23,6 +24,9 @@ export function parseLimits(body: unknown): PutLimitsRequest {
       );
     }
     values[name] = value as number;
+  }
+  if (Object.keys(values).length === 0) {
+    throw new BadRequest("values must name a limit");
   }
   return { values };
 }

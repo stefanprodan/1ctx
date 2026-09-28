@@ -15,6 +15,7 @@ import type {
 import type {
   PatchToolRequest,
   ToolsResponse,
+  VisualsUsageResponse,
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -24,6 +25,10 @@ import { me } from "./me.ts";
 export const tools = signal<ToolsResponse | null>(null);
 export const limits = signal<LimitRow[] | null>(null);
 export const toolsError = signal<Failure | null>(null);
+// the Visuals page's last 30 days; `usage` is null when the read failed
+export const visualsUsage = signal<{
+  usage: VisualsUsageResponse | null;
+} | null>(null);
 
 let owner: string | null = null;
 
@@ -34,6 +39,7 @@ effect(() => {
   tools.value = null;
   limits.value = null;
   toolsError.value = null;
+  visualsUsage.value = null;
 });
 
 // a load's answer is kept only when it is still the one wanted: for
@@ -90,4 +96,16 @@ export async function saveLimits(body: PutLimitsRequest): Promise<void> {
   const next = await api<LimitsResponse>("/api/limits", "PUT", body);
   turn++;
   if (owner === forUser && limitWrites === mine) limits.value = next.limits;
+}
+
+let usageTurn = 0;
+
+export async function loadVisualsUsage(): Promise<void> {
+  const forUser = owner;
+  const mine = ++usageTurn;
+  let usage: VisualsUsageResponse | null = null;
+  try {
+    usage = await api<VisualsUsageResponse>("/api/usage/visuals");
+  } catch {}
+  if (owner === forUser && usageTurn === mine) visualsUsage.value = { usage };
 }

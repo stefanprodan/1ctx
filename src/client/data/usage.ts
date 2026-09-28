@@ -16,7 +16,7 @@ import { me } from "./me.ts";
 
 export const week = signal<WeekUsageResponse | null>(null);
 
-// the weeks Home's aside asks for: as many as its 280px column holds at
+// the weeks Home's aside asks for: as many as its 240px column holds at
 // the heatmap's cell size
 export const RECENT_WEEKS = 16;
 

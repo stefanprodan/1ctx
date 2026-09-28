@@ -419,9 +419,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has four tabs,** one view over `/admin/config/tools`
-  (Built-in), `/admin/config/tools/web`, `/admin/config/tools/visuals` and
-  `/admin/config/tools/limits`: Built-in lists every built-in schema, including
+- **The Tools page has three tabs,** one view over `/admin/config/tools`
+  (Built-in), `/admin/config/tools/web` and `/admin/config/tools/limits`: Built-in lists every built-in schema, including
   `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
   each row `RowsTitle` (the name over the first sentence) with its
   tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
@@ -443,59 +442,63 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   methods as boxes (GET and HEAD new), the rail's team projects as
   `RowsCheck` lines, a PATCH sending only the fields changed, and
   Delete asked once.
-- **The Visuals tab is settings sections,** apart from web access:
-  Tools, the visualize row in a `RowsList` with its tokens and its
-  switch (name and switch alone on a phone); CDNs (`VisualHosts.tsx`), a
-  box of origins one per line checked through `parseVisualHosts()` in
-  `shared/visual.ts` (the rule the server's `parseHosts()` runs per
-  entry), saved whole, Reset to defaults beside Save and the count of
-  the box's lines at the line's end; and Limits (`LimitsSection.tsx`,
-  the `visuals` scope over `useLimitsForm()` from `LimitsCard.tsx`), the
-  fields side by side. While visualize is off its row is `off` with Off
-  in place of its tokens, and both sections are `Section`'s `off`, faded
-  with every field and button disabled, the saved values kept.
+- **Config › Visuals is a page of cards.** `/admin/config/visuals`
+  (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
+  `Setting` cards, each its own form with a `DraftFoot`, nothing saved
+  before Save, the switch included. Visuals: the switch in the head, the
+  line and the `visualize` row under it following the draft
+  (`ToolRow`, which has no switch of its own). CDNs: the count in the
+  head, a box of origins one per line checked through
+  `parseVisualHosts()` in `shared/visual.ts` (the rule the server's
+  `parseHosts()` runs per entry), saved whole. Limits: the visual limits
+  side by side (`useLimitsForm()` from `LimitsCard.tsx` over their
+  names), a changed one's default beside its label. CDNs and Limits have
+  Use defaults in the head, which fills the draft and saves nothing. The
+  cards stay editable while the switch is off. The aside is the last 30
+  days from `GET /api/usage/visuals`: visualize calls drawn and failed,
+  and the files `open` put on a chat page as visuals.
 - **The Limits tab is a form per scope.** Limit fields are text boxes
   with `inputmode="decimal"`, never number inputs. Limits is a form per
   scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
-  saving the full set with the other scopes' saved values. A save or a
+  saving only its own limits. A save or a
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
 - **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one
   card of links by name, the name over the URL, or over the failed
-  refresh in red, the agents that use it over `sidesLine()` at the
-  right ("25 read · write off", a side the server has off saying so);
-  New server is in the page's head, and `?new` (`NewMcpServer.tsx`) is
-  the name, the key file and the URL in one card, Create listing the
-  tools and opening the Tools tab, read matching nothing and write off.
-  The aside is every server's calls over the last 30 days (`GET
-  /api/mcp/usage`), the most called five, and the `mcp-` key files
-  with the server that reads each.
-  A server's page, `/admin/config/mcp/:name` and `/tools`, is one view
-  (`McpPage.tsx`, drafts in `McpPage.state.ts`), the crumb's own step
-  the switcher, a failed refresh over the tabs. General
-  (`McpGeneral.tsx`, `McpUsedBy.tsx`) is About (what the server says
-  of itself, its tools and last change, Refresh), Endpoint (its save
-  lists the tools there first, a refusal keeping what was typed),
-  Offered to agents (Off, Read, or Read and write, one `Seg`; write
-  alone has no option), Call timeout (seconds, empty for the limits'),
-  Instructions (the switch over the block as `serverBlock()` gives it,
-  trimmed to 12 lines), Used by (only when an agent does) and Delete,
-  off while an agent uses it. Each card sends only its own fields, so
-  none waits on another, and a card at rest follows the row a save or
-  a refresh answered. Tools (`McpTools.tsx`, its logic in
-  `McpTools.model.ts` over `decide()` in `shared/mcp.ts`) is one draft
-  form: the Matchers card, the Read, Write and Excluded matchers, each
-  a chip with the tools it decides, in red when it matches none, and a
-  box that adds one; then the tools as `Rows` by name, the search in
-  the card's head band, a side `Seg`, in whose place Move to shows
-  while tools are picked so the rows never move, then each tool with its side and the matcher that
-  set it. Picked tools move to a side by `moveTools()`: their exact
-  names leave the other lists and join the side's unless they land
-  there without one, an empty write list never gets a name nor loses
-  its last. The Matchers card and the list end in the same foot, either
-  saving the draft, its hint saying what moved and naming a tool a
-  matcher earlier in the order keeps. The aside
-  is `GET /api/mcp/:id/usage` and the most called five tools.
+  refresh in red, the agents that use it over `sidesLine()` at the right
+  ("25 read · write off", a side the server has off saying so); New
+  server is in the page's head, and `?new` (`NewMcpServer.tsx`) is the
+  name, the key file and the URL in one card, Create listing the tools
+  and opening the Tools tab, read matching nothing and write off. The
+  aside is every server's calls over the last 30 days (`GET
+  /api/mcp/usage`), the most called five, and the `mcp-` key files with
+  the server that reads each. A server's page, `/admin/config/mcp/:name`
+  and `/tools`, is one view (`McpPage.tsx`, drafts in
+  `McpPage.state.ts`), the crumb's own step the switcher, a failed
+  refresh over the tabs. General (`McpGeneral.tsx`, `McpUsedBy.tsx`) is
+  About (what the server says of itself, its tools and last change,
+  Refresh), Endpoint (its save lists the tools there first, a refusal
+  keeping what was typed), Offered to agents (Off, Read, or Read and
+  write, one `Seg`; write alone has no option), Call timeout (seconds,
+  empty for the limits'), Instructions (the switch, a line that follows
+  its draft, and the block as `serverBlock()` gives it, trimmed to 12
+  lines), Used by (only when an agent does) and Delete, off while an
+  agent uses it. Each card sends only its own fields, so none waits on
+  another, and a card at rest follows the row a save or a refresh
+  answered. Tools (`McpTools.tsx`, its logic in `McpTools.model.ts` over
+  `decide()` in `shared/mcp.ts`) is one draft form: the Matchers card,
+  the Read, Write and Excluded matchers, each a chip with the tools it
+  decides, in red when it matches none, and a box that adds one; then
+  the tools as `Rows` by name, the search in the card's head band, a
+  side `Seg`, in whose place Move to shows while tools are picked so the
+  rows never move, then each tool with its side and the matcher that set
+  it. Picked tools move to a side by `moveTools()`: their exact names
+  leave the other lists and join the side's unless they land there
+  without one, an empty write list never gets a name nor loses its last.
+  The Matchers card and the list end in the same foot, either saving the
+  draft, its hint saying what moved and naming a tool a matcher earlier
+  in the order keeps. The aside is `GET /api/mcp/:id/usage` and the most
+  called five tools.
 - **The agent form's Preferred provider.** On an OpenRouter provider,
   a `Select` under the model (`UpstreamField.tsx`) asks for the
   model's endpoints each time one is picked, Any provider first, and

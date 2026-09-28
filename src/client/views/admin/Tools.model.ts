@@ -16,11 +16,7 @@ import {
 } from "../../../shared/contracts/tool.ts";
 import { parseVisualHosts } from "../../../shared/visual.ts";
 import { parseDomains, type WebAccessMode } from "../../../shared/web.ts";
-import type {
-  LimitName,
-  LimitScope,
-  SearchProvider,
-} from "../../../shared/words.ts";
+import type { LimitName, SearchProvider } from "../../../shared/words.ts";
 import { pluralCommas, sentence } from "../../lib/format.ts";
 
 // the label over each field and the line under it
@@ -228,12 +224,11 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-type ToolsTab = "builtin" | "web" | "visuals" | "limits";
+type ToolsTab = "builtin" | "web" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/config/tools" },
   { tab: "web", label: "Web", href: "/admin/config/tools/web" },
-  { tab: "visuals", label: "Visuals", href: "/admin/config/tools/visuals" },
   { tab: "limits", label: "Limits", href: "/admin/config/tools/limits" },
 ];
 
@@ -346,23 +341,8 @@ export function collect(
   return { values };
 }
 
-// the full set the route takes: one scope's values, and the saved
-// value of every other row
-export function withSaved(
-  rows: LimitRow[],
-  scope: LimitScope,
-  values: Partial<Record<LimitName, number>>,
-): Record<LimitName, number> {
-  const out = {} as Record<LimitName, number>;
-  for (const row of rows) {
-    out[row.name] =
-      row.scope === scope ? (values[row.name] ?? row.value) : row.value;
-  }
-  return out;
-}
-
-// what re-seeds a form's fields: its rows' values alone, since every
-// save of the full set moves the change time of each kept override
+// what re-seeds a form's fields: its rows' values alone, never their
+// change times
 export function seedOf(rows: LimitRow[]): string {
   return rows.map((row) => `${row.name}=${row.value}`).join(",");
 }

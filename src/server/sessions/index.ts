@@ -21,6 +21,7 @@ import {
   mcpServerCalls,
   personDays,
   skillLoads,
+  visualCounts,
 } from "./activity.ts";
 import {
   agentActivity,
@@ -124,6 +125,8 @@ export type Sessions = {
   ): ReturnType<typeof mcpServerCalls>;
   // the skill loads and file reads in a window, by skill name
   skillLoads(since: number, until: number): ReturnType<typeof skillLoads>;
+  // the visuals drawn and opened in a window
+  visualCounts(since: number, until: number): ReturnType<typeof visualCounts>;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;
@@ -179,6 +182,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     mcpCalls: (server, since, until) => mcpCalls(deps.db, server, since, until),
     mcpServerCalls: (since, until) => mcpServerCalls(deps.db, since, until),
     skillLoads: (since, until) => skillLoads(deps.db, since, until),
+    visualCounts: (since, until) => visualCounts(deps.db, since, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

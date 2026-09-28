@@ -37,6 +37,7 @@ import {
   changeLine,
   characters,
   instructionsBox,
+  instructionsLine,
   mcpFieldOf,
   OFFER_OPTIONS,
   type Offer,
@@ -393,6 +394,7 @@ function Instructions({ server, drafts: d }: Props) {
       <Setting
         title="Instructions"
         count={characters(box.count)}
+        line={instructionsLine(d.instructionsOn.value)}
         foot={
           <DraftFoot
             save={save}
@@ -403,7 +405,7 @@ function Instructions({ server, drafts: d }: Props) {
         action={
           <RowsSwitch
             on={d.instructionsOn.value}
-            label="Put them in the system prompt"
+            label="Instructions"
             disabled={save.busy}
             onClick={() => {
               d.instructionsOn.value = !d.instructionsOn.value;

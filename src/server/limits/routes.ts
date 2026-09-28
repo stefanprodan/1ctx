@@ -11,7 +11,7 @@ import { parseLimits } from "./parse.ts";
 export type RoutesDeps = {
   clock: Clock;
   response(): LimitsResponse;
-  set(values: Limits, now: number): void;
+  set(values: Partial<Limits>, now: number): void;
   reset(): void;
 };
 

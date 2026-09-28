@@ -11,7 +11,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
-import type { LimitScope } from "../../../shared/words.ts";
+import type { LimitName, LimitScope } from "../../../shared/words.ts";
 import { saveLimits } from "../../data/tools.ts";
 import { type Save, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -29,7 +29,6 @@ import {
   LIMIT_WORDS,
   limitFieldOf,
   seedOf,
-  withSaved,
 } from "./Tools.model.ts";
 import "./tools.css";
 
@@ -82,17 +81,18 @@ function LimitField({
   );
 }
 
-// one scope's form: the fields seeded from its rows and re-seeded only
-// when a save answers new values for them, never when a save of the
-// other form moves only their change times, so what is typed here
-// stays. The route takes the full set, so a save or a reset sends the
-// other scope's latest saved values beside this one's; the save is
-// built once, so it reads the rows through a ref.
-export function useLimitsForm(rows: LimitRow[], scope: LimitScope) {
-  const own = rows.filter((row) => row.scope === scope);
+// one form over some limits: the fields seeded from their rows and
+// re-seeded only when a save answers new values for them, never when a
+// save of another form moves only their change times, so what is typed
+// here stays. A save or a reset sends these limits alone; the save is
+// built once, so it reads the rows through a ref. Defaults fills the
+// fields with the defaults, which Save then sends.
+export function useLimitsForm(rows: LimitRow[], names: readonly LimitName[]) {
+  const mine = (list: LimitRow[]) =>
+    list.filter((row) => names.includes(row.name));
+  const own = mine(rows);
   const latest = useRef(rows);
   latest.current = rows;
-  const ownNow = () => latest.current.filter((row) => row.scope === scope);
   const draft = useSignal(draftOf(own));
   const form = useRef<HTMLFormElement>(null);
   const seed = seedOf(own);
@@ -100,9 +100,9 @@ export function useLimitsForm(rows: LimitRow[], scope: LimitScope) {
     draft.value = draftOf(own);
   }, [seed]);
   const save = useSave(async () => {
-    const got = collect(ownNow(), draft.value);
+    const got = collect(mine(latest.current), draft.value);
     if ("problem" in got) throw new Error(got.problem);
-    await saveLimits({ values: withSaved(latest.current, scope, got.values) });
+    await saveLimits({ values: got.values });
   }, limitFieldOf);
   useFocusField(save, form);
   const submit = (event: Event) => {
@@ -114,16 +114,32 @@ export function useLimitsForm(rows: LimitRow[], scope: LimitScope) {
   };
   const reset = () =>
     save.act("reset the limits", () =>
-      saveLimits({
-        values: withSaved(latest.current, scope, defaultsOf(ownNow())),
-      }),
+      saveLimits({ values: defaultsOf(mine(latest.current)) }),
     );
   const changed = own.some((row) => row.changedAt !== null);
   const type = (name: string, text: string) => {
     draft.value = { ...draft.value, [name]: text };
     save.touch();
   };
-  return { own, draft, form, save, submit, reset, changed, type };
+  const defaults = () => {
+    draft.value = draftOf(own.map((row) => ({ ...row, value: row.default })));
+    save.touch();
+  };
+  const discard = () => {
+    draft.value = draftOf(own);
+  };
+  return {
+    own,
+    draft,
+    form,
+    save,
+    submit,
+    reset,
+    changed,
+    type,
+    defaults,
+    discard,
+  };
 }
 
 export function LimitsCard({
@@ -136,7 +152,10 @@ export function LimitsCard({
   title: string;
 }) {
   const { own, draft, form, save, submit, reset, changed, type } =
-    useLimitsForm(rows, scope);
+    useLimitsForm(
+      rows,
+      rows.filter((row) => row.scope === scope).map((row) => row.name),
+    );
   const busy = save.busy;
   // the question a save that deletes asks, and the save it holds back,
   // until Delete or Keep; Reset to defaults may lower the days too

@@ -33,3 +33,13 @@ export type PatchToolRequest = {
   enabled?: boolean;
   hosts?: string[];
 };
+
+// GET /api/usage/visuals, the last 30 days: visualize calls drawn and
+// failed, and the files `open` put on a chat page as visuals
+export type VisualsUsageResponse = {
+  since: number;
+  until: number;
+  drawn: number;
+  failed: number;
+  opened: number;
+};

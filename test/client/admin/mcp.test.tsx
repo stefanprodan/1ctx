@@ -31,6 +31,7 @@ import {
 import {
   changeLine,
   instructionsBox,
+  instructionsLine,
   mcpFieldOf,
   offerOf,
   offerSides,
@@ -448,7 +449,8 @@ describe("a server's page", () => {
     expect(html).toContain("1 agent uses it. Remove it from that agent first.");
     // the server refuses a server an agent uses, so Delete waits
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Delete</);
-    expect(html).toContain("Put them in the system prompt");
+    expect(html).toContain('aria-label="Instructions on"');
+    expect(html).toContain(instructionsLine(true));
   });
 
   test.serial("waits for the agents, so Delete never opens early", () => {

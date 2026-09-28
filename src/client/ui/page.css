@@ -201,7 +201,7 @@
   }
   @media (min-width: 1100px) {
     .page-head-main {
-      max-width: min(900px, calc(100% - 280px - var(--space-6)));
+      max-width: min(900px, calc(100% - 240px - var(--space-6)));
     }
   }
   /* the crumb takes the room the actions leave, rather than wrapping

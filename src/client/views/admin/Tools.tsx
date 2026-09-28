@@ -1,16 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools, in four tabs. Built-in: every tool the server writes
+// The tools, in three tabs. Built-in: every tool the server writes
 // itself, webfetch and websearch included, read-only, each with its
 // tokens. Web: web access for the instance, the search provider, None
 // first, one row per provider with whether its key file is there, and
-// the HTTP credentials bash's curl signs with. Visuals, as settings
-// sections: visualize with its own switch, apart from web access, the
-// CDNs a visual may load from and its limits. Limits: the caps a turn,
-// a call, the knowledge base and scheduled tasks run under. The tab is
-// the address, and the four routes name this one view, so a tab change
-// keeps the page and its load. A change applies to the next send.
+// the HTTP credentials bash's curl signs with. Limits: the caps a turn,
+// a call, the knowledge base and scheduled tasks run under. Visuals has
+// its own page. The tab is the address, and the three routes name this
+// one view, so a tab change keeps the page and its load. A change
+// applies to the next send.
 
 import { useSignal } from "@preact/signals";
 import type {
@@ -31,17 +30,14 @@ import {
   Rows,
   RowsCard,
   RowsLine,
-  RowsList,
   RowsMeta,
   RowsNote,
   RowsRadio,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { Section } from "../../ui/Section.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { CredentialsCard } from "./CredentialsCard.tsx";
 import { LimitsCard } from "./LimitsCard.tsx";
-import { LimitsSection } from "./LimitsSection.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 import {
   keyLine,
@@ -50,7 +46,6 @@ import {
   toolsTab,
   totalTokens,
 } from "./Tools.model.ts";
-import { VisualHosts } from "./VisualHosts.tsx";
 import { WebAccessCard } from "./WebAccessCard.tsx";
 import "./tools.css";
 import { zoneStep } from "../../app/zones.ts";
@@ -78,25 +73,6 @@ function ToolsCard({
         />
       ))}
     </RowsCard>
-  );
-}
-
-// the visualize row in an inset list beside what it gives, the switch
-// at its end
-function VisualTool({ tool }: { tool: WebToolSummary }) {
-  const open = useSignal(false);
-  return (
-    <Section title="Tools" text="Inline visualizations">
-      <RowsList>
-        <ToolRow
-          tool={tool}
-          open={open.value}
-          onToggle={() => {
-            open.value = !open.value;
-          }}
-        />
-      </RowsList>
-    </Section>
   );
 }
 
@@ -175,19 +151,6 @@ export function Tools() {
             <SearchCard />
             <CredentialsCard />
           </>
-        )}
-        {tab === "visuals" && state && rows && (
-          <div>
-            <VisualTool tool={state.visualize} />
-            <VisualHosts off={!state.visualize.enabled} />
-            <LimitsSection
-              rows={rows}
-              scope="visuals"
-              title="Limits"
-              text="How much one turn may draw."
-              off={!state.visualize.enabled}
-            />
-          </div>
         )}
         {tab === "limits" && rows && (
           <>

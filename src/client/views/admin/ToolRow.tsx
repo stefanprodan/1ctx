@@ -13,19 +13,11 @@ import type {
   BuiltinToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
-import { patchTool } from "../../data/tools.ts";
 import { firstSentence, showAll, tokensText } from "../../lib/format.ts";
 import { useCut } from "../../lib/resize.ts";
-import { useAction } from "../../lib/save.ts";
 import { copyCode } from "../../transcript/copy.ts";
 import { Fold } from "../../ui/Fold.tsx";
-import {
-  RowsEnd,
-  RowsMeta,
-  RowsOpen,
-  RowsSwitch,
-  RowsTitle,
-} from "../../ui/Rows.tsx";
+import { RowsMeta, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
 import {
   jsonLines,
   NAMES_WORDS,
@@ -35,22 +27,6 @@ import {
 import "../../transcript/hljs.css";
 import "../../transcript/md.css";
 import "./tools.css";
-
-function Switch({ tool }: { tool: WebToolSummary }) {
-  const { busy, failure, run } = useAction();
-  const flip = () =>
-    run(() => patchTool(tool.name, { enabled: !tool.enabled }));
-  return (
-    <RowsEnd error={failure.value}>
-      <RowsSwitch
-        on={tool.enabled}
-        label={tool.name}
-        disabled={busy.value}
-        onClick={() => void flip()}
-      />
-    </RowsEnd>
-  );
-}
 
 export function ToolRow({
   tool,
@@ -106,7 +82,6 @@ export function ToolRow({
           )}
         </>
       }
-      end={"enabled" in tool ? <Switch tool={tool} /> : undefined}
     >
       <div class="tools-schema">
         {builtin && (

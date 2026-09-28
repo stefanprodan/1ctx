@@ -113,6 +113,13 @@ export function instructionsBox(
   };
 }
 
+// the Instructions card's line, as its switch is drafted
+export function instructionsLine(on: boolean): string {
+  return on
+    ? "Agents get these instructions in their system prompt."
+    : "Agents do not get these instructions.";
+}
+
 export function characters(n: number): string {
   return `${n.toLocaleString("en-US")} characters`;
 }
