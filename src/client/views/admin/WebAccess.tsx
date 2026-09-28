@@ -46,6 +46,7 @@ import {
   accessBody,
   accessDirty,
   DOMAINS_HINT,
+  DOMAINS_PLACEHOLDER,
   domainsCount,
   domainsFieldOf,
   domainsText,
@@ -188,7 +189,7 @@ function Access({ state }: { state: ToolsResponse }) {
               rows={Math.max(4, typed.split("\n").length + 1)}
               spellcheck={false}
               autocomplete="off"
-              placeholder="docs.example.com"
+              placeholder={DOMAINS_PLACEHOLDER}
               value={typed}
               disabled={save.busy}
               aria-invalid={invalid || undefined}

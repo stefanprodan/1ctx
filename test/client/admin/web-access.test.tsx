@@ -253,6 +253,7 @@ describe("the Web access page", () => {
       /<textarea name="domains"[^>]*>docs\.example\.com\ngithub\.com</,
     );
     expect(html).toContain(DOMAINS_HINT);
+    expect(html).toContain('placeholder="github.com\napi.github.com');
   });
 
   test.serial("off says what the search line means", () => {

@@ -80,6 +80,16 @@ export const ACCESS_WORDS: Record<WebAccessMode, string> = {
   listed: "Agents fetch pages and use curl in bash, only on these hosts.",
 };
 
+// what an empty box shows: the hosts a GitHub repo, its API, raw files
+// and release downloads are served from
+export const DOMAINS_PLACEHOLDER = [
+  "github.com",
+  "api.github.com",
+  "raw.githubusercontent.com",
+  "codeload.github.com",
+  "objects.githubusercontent.com",
+].join("\n");
+
 export const DOMAINS_HINT =
   "One host per line. A subdomain needs its own line.";
 
