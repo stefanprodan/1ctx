@@ -1,8 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An agent's page, for every signed-in user: how it is configured. The
-// composer's route already sends the whole row, so the page adds only
+// The agents list and an agent's page, for every signed-in user: the
+// list is the live agents with the model's id alone; the page is how
+// an agent is configured. The composer's route already sends the whole
+// row, so the page adds only
 // what a user cannot see elsewhere: the provider's name, the skills
 // with when they were fetched and how many files they hold, the
 // built-in tools a send would offer it now with their descriptions and
@@ -16,9 +18,11 @@
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
+  DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
+import { parseNoQuery } from "../access/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -120,6 +124,27 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
     return n;
   };
   return [
+    {
+      method: "GET",
+      path: "/api/directory/agents",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        parseNoQuery(ctx.url);
+        const body: DirectoryAgentsResponse = {
+          agents: deps.store
+            .list()
+            .map((agent) => ({
+              id: agent.id,
+              name: agent.name,
+              avatar: agent.avatar,
+              default: agent.default,
+              model: agent.model.id,
+            }))
+            .sort(byName),
+        };
+        return json(body);
+      },
+    },
     {
       method: "GET",
       path: "/api/directory/agents/:name",

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A user's page and an agent's page render what the directory answered,
-// and their words come from People.model.
+// and their words come from Directory.model.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -14,14 +14,14 @@ import {
   agentPageError,
   loadAgentDays,
   loadAgentPage,
-  loadPerson,
-  person,
-  personError,
+  loadUserPage,
+  userPage,
+  userPageError,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { tokensText } from "../../../src/client/lib/format.ts";
 import { agentHref, userHref } from "../../../src/client/lib/hrefs.ts";
-import { Agent } from "../../../src/client/views/people/Agent.tsx";
+import { Agent } from "../../../src/client/views/directory/Agent.tsx";
 import {
   agentAnswer,
   agentHint,
@@ -36,8 +36,8 @@ import {
   serverLine,
   serverMeta,
   thinkingText,
-} from "../../../src/client/views/people/People.model.ts";
-import { User } from "../../../src/client/views/people/User.tsx";
+} from "../../../src/client/views/directory/Directory.model.ts";
+import { User } from "../../../src/client/views/directory/User.tsx";
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
@@ -120,8 +120,8 @@ const realFetch = globalThis.fetch;
 
 beforeEach(() => {
   me.value = casey;
-  person.value = null;
-  personError.value = null;
+  userPage.value = null;
+  userPageError.value = null;
   agentPage.value = null;
   agentPageError.value = null;
   agentDays.value = null;
@@ -133,7 +133,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-const personOf = (username: string): DirectoryUserResponse => ({
+const userOf = (username: string): DirectoryUserResponse => ({
   user: {
     id: `id-${username}`,
     username,
@@ -162,41 +162,41 @@ function gated(answer: (name: string) => Response) {
 
 describe("the directory entity", () => {
   test.serial("an older user answer never overwrites a newer one", async () => {
-    const gates = gated((name) => Response.json(personOf(name)));
-    const first = loadPerson("bogdan");
-    const second = loadPerson("elena");
+    const gates = gated((name) => Response.json(userOf(name)));
+    const first = loadUserPage("bogdan");
+    const second = loadUserPage("elena");
     gates[1]();
     await second;
     gates[0]();
     await first;
-    expect(person.value?.user.username).toBe("elena");
+    expect(userPage.value?.user.username).toBe("elena");
   });
 
   test.serial("another name drops the page shown at once", async () => {
-    person.value = personOf("bogdan");
-    const gates = gated((name) => Response.json(personOf(name)));
-    const pending = loadPerson("dana");
-    expect(person.value).toBeNull();
+    userPage.value = userOf("bogdan");
+    const gates = gated((name) => Response.json(userOf(name)));
+    const pending = loadUserPage("dana");
+    expect(userPage.value).toBeNull();
     gates[0]();
     await pending;
-    expect(person.value?.user.username).toBe("dana");
+    expect(userPage.value?.user.username).toBe("dana");
   });
 
   test.serial(
     "a page seen before is drawn at once and loaded again",
     async () => {
-      const gates = gated((name) => Response.json(personOf(name)));
-      const first = loadPerson("radu");
+      const gates = gated((name) => Response.json(userOf(name)));
+      const first = loadUserPage("radu");
       gates[0]();
       await first;
-      const second = loadPerson("irina");
+      const second = loadUserPage("irina");
       gates[1]();
       await second;
-      const back = loadPerson("radu");
-      expect(person.value?.user.username).toBe("radu");
+      const back = loadUserPage("radu");
+      expect(userPage.value?.user.username).toBe("radu");
       gates[2]();
       await back;
-      expect(person.value?.user.username).toBe("radu");
+      expect(userPage.value?.user.username).toBe("radu");
     },
   );
 
@@ -204,36 +204,34 @@ describe("the directory entity", () => {
     let status = 200;
     globalThis.fetch = (async (url: string) =>
       status === 200
-        ? Response.json(
-            personOf(decodeURIComponent(url.split("/").pop() ?? "")),
-          )
+        ? Response.json(userOf(decodeURIComponent(url.split("/").pop() ?? "")))
         : Response.json(
             { error: "no such user" },
             { status },
           )) as unknown as typeof fetch;
-    await loadPerson("ion");
-    await loadPerson("maria");
+    await loadUserPage("ion");
+    await loadUserPage("maria");
     status = 404;
-    await loadPerson("ion");
-    expect(person.value).toBeNull();
+    await loadUserPage("ion");
+    expect(userPage.value).toBeNull();
     status = 200;
-    await loadPerson("maria");
-    const pending = loadPerson("ion");
-    expect(person.value).toBeNull();
+    await loadUserPage("maria");
+    const pending = loadUserPage("ion");
+    expect(userPage.value).toBeNull();
     await pending;
   });
 
   test.serial(
     "an answer that lands after the user changed is dropped",
     async () => {
-      const gates = gated((name) => Response.json(personOf(name)));
-      const pending = loadPerson("bogdan");
+      const gates = gated((name) => Response.json(userOf(name)));
+      const pending = loadUserPage("bogdan");
       me.value = { ...casey, id: "u9", username: "someone" };
       gates[0]();
       await pending;
-      expect(person.value).toBeNull();
+      expect(userPage.value).toBeNull();
       me.value = null;
-      expect(personError.value).toBeNull();
+      expect(userPageError.value).toBeNull();
     },
   );
 
@@ -241,11 +239,11 @@ describe("the directory entity", () => {
     const gates = gated(() =>
       Response.json({ error: "no such user" }, { status: 404 }),
     );
-    const pending = loadPerson("nobody");
+    const pending = loadUserPage("nobody");
     gates[0]();
     await pending;
-    expect(personError.value).toEqual({ words: "no such user", status: 404 });
-    expect(person.value).toBeNull();
+    expect(userPageError.value).toEqual({ words: "no such user", status: 404 });
+    expect(userPage.value).toBeNull();
   });
 
   test.serial(
@@ -348,7 +346,7 @@ describe("the agent's days", () => {
   });
 });
 
-describe("People.model", () => {
+describe("Directory.model", () => {
   test("the addresses of both pages", () => {
     expect(userHref("casey")).toBe("/users/casey");
     expect(agentHref("sre_bot")).toBe("/agents/sre_bot");
@@ -457,9 +455,9 @@ describe("People.model", () => {
 
 describe("the pages", () => {
   test.serial(
-    "User shows the person, the email and the shared projects",
+    "User shows the userPage, the email and the shared projects",
     () => {
-      person.value = {
+      userPage.value = {
         user: {
           id: "u2",
           username: "bogdan",
@@ -508,7 +506,7 @@ describe("the pages", () => {
   );
 
   test.serial("User on your own page names your team projects", () => {
-    person.value = {
+    userPage.value = {
       user: {
         id: "u1",
         username: "casey",
@@ -542,10 +540,10 @@ describe("the pages", () => {
       // do at the instructions' foot
       expect(html).toContain('class="who-line">router · 128K · $0.14 / $0.28<');
       expect(html).toMatch(
-        /class="people-foot"><svg.*<\/svg><span class="people-foot-name">Capabilities<\/span>tools · reasoning</,
+        /class="directory-foot"><svg.*<\/svg><span class="directory-foot-name">Capabilities<\/span>tools · reasoning</,
       );
       expect(html).toContain(
-        'class="people-prompt clamp">You write code.\nSmall diffs.<',
+        'class="directory-prompt clamp">You write code.\nSmall diffs.<',
       );
       expect(html).toContain('</nav><span class="rows-hint cut">7 tokens<');
       // the card is named for the tab on screen
@@ -581,7 +579,7 @@ describe("the pages", () => {
     expect(html).toContain('class="rows-sub">Get the current date and time.<');
     expect(html).toContain(">websearch<");
     expect(html).toContain('class="rows-meta">exa<');
-    expect(html).not.toContain("people-prompt");
+    expect(html).not.toContain("directory-prompt");
 
     path.value = "/agents/coder/skills";
     html = render(<Agent params={{ name: "coder" }} />);

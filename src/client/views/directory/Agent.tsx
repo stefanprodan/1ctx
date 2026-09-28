@@ -20,17 +20,22 @@ import {
   agentDaysFailed,
   agentPage,
   agentPageError,
+  directoryAgents,
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
 import { ago, firstSentence, longDate } from "../../lib/format.ts";
-import { configAgentHref } from "../../lib/hrefs.ts";
+import {
+  configAgentHref,
+  DIRECTORY_AGENTS_HREF,
+  DIRECTORY_HREF,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Fold } from "../../ui/Fold.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAvatar,
@@ -51,15 +56,17 @@ import {
   agentHint,
   agentLine,
   agentTab,
+  agentTabHref,
   agentTabs,
   capabilities,
   effortText,
   filesText,
   serverLine,
   serverMeta,
+  switchItems,
   thinkingText,
-} from "./People.model.ts";
-import "./people.css";
+} from "./Directory.model.ts";
+import "./directory.css";
 
 // the agent's turns per day, the Projects page's card over one series;
 // its ghost while they load, nothing when their first load failed
@@ -93,9 +100,9 @@ function AgentActivity({ name, agentId }: { name: string; agentId: string }) {
 function ModelFoot({ can }: { can: string }) {
   return (
     <RowsBlock>
-      <p class="people-foot">
+      <p class="directory-foot">
         <Icon name="providers" size={14} />
-        <span class="people-foot-name">Capabilities</span>
+        <span class="directory-foot-name">Capabilities</span>
         {can}
       </p>
     </RowsBlock>
@@ -117,7 +124,7 @@ function Prompt({ text }: { text: string }) {
         label="Show all"
         ground="card"
       >
-        <pre ref={el} class={`people-prompt${open.value ? "" : " clamp"}`}>
+        <pre ref={el} class={`directory-prompt${open.value ? "" : " clamp"}`}>
           {text}
         </pre>
       </Fold>
@@ -240,8 +247,35 @@ export function Agent({ params }: { params: Params }) {
   const tabs = shown === null ? [] : agentTabs(name, shown);
   return (
     <Page
-      crumb="Agents"
+      steps={[
+        { label: "Directory", href: DIRECTORY_HREF },
+        { label: "Agents", href: DIRECTORY_AGENTS_HREF },
+      ]}
       title={`@${name}`}
+      titleMono
+      menu={
+        shown !== null ? (
+          <PageSwitcher
+            label="Agents"
+            current={shown.agent.id}
+            name={`@${shown.agent.name}`}
+            items={switchItems(
+              (directoryAgents.value ?? []).map((a) => ({
+                id: a.id,
+                label: `@${a.name}`,
+                href: agentTabHref(a.name, tab),
+              })),
+              {
+                id: shown.agent.id,
+                label: `@${shown.agent.name}`,
+                href: agentTabHref(shown.agent.name, tab),
+              },
+            )}
+            placeholder="Find an agent"
+            none="No agent matches"
+          />
+        ) : undefined
+      }
       loading={shown === null && agentPageError.value === null}
       error={agentPageError.value}
     >
@@ -302,7 +336,7 @@ export function Agent({ params }: { params: Params }) {
             </>
           }
         >
-          <div class="people">
+          <div class="directory">
             <Who
               agent
               avatar={<AvatarIcon name={shown.agent.avatar} size={24} />}

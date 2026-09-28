@@ -4,26 +4,28 @@
 // A user's page, open to every signed-in user: who they are, their
 // actions per day in every project, then one card whose head is tabs
 // at their own addresses: what they say about themselves, and the team
-// projects the viewer shares with them. The aside is how to reach them and when it is for
-// them; where it is hidden, the head carries the email and the local
-// time.
+// projects the viewer shares with them. The aside is how to reach them
+// and when it is for them; where it is hidden, the head carries the
+// email and the local time. The name is a switcher over the Directory's
+// users that keeps the tab.
 
 import { useMemo } from "preact/hooks";
 import type { DirectoryUserResponse } from "../../../shared/api/directory.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import {
-  person,
-  personDays,
-  personDaysFailed,
-  personError,
+  directoryUsers,
+  userDays,
+  userDaysFailed,
+  userPage,
+  userPageError,
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { initials, longDate } from "../../lib/format.ts";
-import { adminUserHref } from "../../lib/hrefs.ts";
+import { adminUserHref, DIRECTORY_HREF } from "../../lib/hrefs.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import {
   Rows,
   RowsAvatar,
@@ -38,17 +40,19 @@ import { Tabs } from "../../ui/Tabs.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ACTION_WORDS, activityModel } from "../projects/Activity.model.ts";
 import { Activity, ActivityGhost } from "../projects/Activity.tsx";
-import { peopleLine } from "../projects/Project.model.ts";
+import { membersLine } from "../projects/Project.model.ts";
 import {
   localTime,
-  personAnswer,
   roleWords,
+  switchItems,
+  userAnswer,
   userTab,
+  userTabHref,
   userTabs,
-} from "./People.model.ts";
-import "./people.css";
+} from "./Directory.model.ts";
+import "./directory.css";
 
-// the person's actions per day, the Projects page's card in their
+// the user's actions per day, the Projects page's card in their
 // words; its ghost while they load, nothing when their first load
 // failed
 function UserActivity({
@@ -58,10 +62,10 @@ function UserActivity({
   username: string;
   userId: string;
 }) {
-  const held = personDays.value;
+  const held = userDays.value;
   const body = held !== null && held.username === username ? held.body : null;
   const answer = useMemo(
-    () => (body === null ? null : personAnswer(body, userId)),
+    () => (body === null ? null : userAnswer(body, userId)),
     [body, userId],
   );
   const model = useMemo(
@@ -76,7 +80,7 @@ function UserActivity({
     );
   }
   // no empty wrapper when the days failed, so the head keeps one gap
-  return personDaysFailed.value ? null : (
+  return userDaysFailed.value ? null : (
     <Rows>
       <ActivityGhost />
     </Rows>
@@ -101,14 +105,14 @@ function AboutTab({
         <RowsNote>Nothing written yet.</RowsNote>
       ) : (
         <RowsBlock>
-          <p class="people-about">{about}</p>
+          <p class="directory-about">{about}</p>
         </RowsBlock>
       )}
       {time !== "" && (
         <RowsBlock>
-          <p class="people-foot">
+          <p class="directory-foot">
             <Icon name="clock" size={14} />
-            <span class="people-foot-name">Local time</span>
+            <span class="directory-foot-name">Local time</span>
             {time}
           </p>
         </RowsBlock>
@@ -138,7 +142,7 @@ function ProjectsTab({
           <RowsAvatar>
             <Icon name={projectIcon(p.kind)} size={14} />
           </RowsAvatar>
-          <RowsTitle name={p.name} sub={peopleLine(p)} mono />
+          <RowsTitle name={p.name} sub={membersLine(p)} mono />
         </RowsGo>
       ))}
     </>
@@ -147,7 +151,7 @@ function ProjectsTab({
 
 export function User({ params }: { params: Params }) {
   const username = params.username ?? "";
-  const answer = person.value;
+  const answer = userPage.value;
   const shown =
     answer !== null && answer.user.username === username ? answer : null;
   // the local time moves on the minute
@@ -157,10 +161,37 @@ export function User({ params }: { params: Params }) {
   const tabs = shown === null ? [] : userTabs(username, shown);
   return (
     <Page
-      crumb="People"
+      steps={[
+        { label: "Directory", href: DIRECTORY_HREF },
+        { label: "Users", href: DIRECTORY_HREF },
+      ]}
       title={`@${username}`}
-      loading={shown === null && personError.value === null}
-      error={personError.value}
+      titleMono
+      menu={
+        shown !== null ? (
+          <PageSwitcher
+            label="Users"
+            current={shown.user.id}
+            name={`@${shown.user.username}`}
+            items={switchItems(
+              (directoryUsers.value ?? []).map((u) => ({
+                id: u.id,
+                label: `@${u.username}`,
+                href: userTabHref(u.username, tab),
+              })),
+              {
+                id: shown.user.id,
+                label: `@${shown.user.username}`,
+                href: userTabHref(shown.user.username, tab),
+              },
+            )}
+            placeholder="Find a user"
+            none="No user matches"
+          />
+        ) : undefined
+      }
+      loading={shown === null && userPageError.value === null}
+      error={userPageError.value}
     >
       {shown && (
         <Split
@@ -191,7 +222,7 @@ export function User({ params }: { params: Params }) {
             </AsideSection>
           }
         >
-          <div class="people">
+          <div class="directory">
             <Who
               avatar={initials(shown.user.fullName)}
               name={shown.user.fullName}

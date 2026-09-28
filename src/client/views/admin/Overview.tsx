@@ -141,7 +141,7 @@ function Stats({
             totals={answer.totals}
             day={day}
             sync={DAYS_SYNC}
-            people={{
+            active={{
               active: answer.activeUsers,
               users: answer.instance.users,
             }}

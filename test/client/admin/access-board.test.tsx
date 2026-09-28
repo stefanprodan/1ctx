@@ -126,14 +126,14 @@ describe("the groups", () => {
   });
 
   test("the recent users keep the server's order, an unknown one left out", () => {
-    const people = [person("u1", "first"), person("u2", "second")];
+    const list = [person("u1", "first"), person("u2", "second")];
     const rows = recentUsers(
       [
         { userId: "u2", at: 50, online: true },
         { userId: "gone", at: 200, online: false },
         { userId: "u1", at: 100, online: false },
       ],
-      people,
+      list,
     );
     expect(rows.map((r) => r.user.username)).toEqual(["second", "first"]);
   });

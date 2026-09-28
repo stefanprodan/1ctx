@@ -1,7 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A user's page and an agent's page are open to every signed-in user.
+// The lists of users and agents, a user's page and an agent's page are
+// open to every signed-in user. The lists hold live actors alone.
 // A user's page lists only the team projects both users are members
 // of; an agent's page lists the tools a send would offer it now.
 
@@ -11,7 +12,9 @@ import { wireTokens } from "../../src/server/providers/index.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import type {
   DirectoryAgentResponse,
+  DirectoryAgentsResponse,
   DirectoryUserResponse,
+  DirectoryUsersResponse,
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
 import { hashPassword } from "../helpers/app.ts";
@@ -47,6 +50,57 @@ const loaded = (
 });
 
 describe("the directory", () => {
+  test("a member lists the enabled users by username, with no email", async () => {
+    const chat = await chatApp();
+    const other = chat.app.createUser({
+      username: "bogdan",
+      fullName: "Bogdan P",
+      email: "bogdan@example.com",
+      role: "member",
+      tz: "Europe/Bucharest",
+      passwordHash: await hashPassword("pw"),
+      mustChangePassword: false,
+      now: chat.app.now.value,
+    });
+    chat.app.users.setDisabled(other.id, true);
+    const res = await chat.member.call("GET", "/api/directory/users");
+    expect(res.status).toBe(200);
+    const body: DirectoryUsersResponse = await res.json();
+    expect(body.users.map((u) => u.username)).toEqual(["admin", "casey"]);
+    expect(Object.keys(body.users[0]!).sort()).toEqual([
+      "fullName",
+      "id",
+      "role",
+      "tz",
+      "username",
+    ]);
+    expect(
+      (await chat.member.call("GET", "/api/directory/users?x=1")).status,
+    ).toBe(400);
+  });
+
+  test("a member lists the live agents by name, the model as its id", async () => {
+    const chat = await chatApp();
+    const res = await chat.member.call("GET", "/api/directory/agents");
+    expect(res.status).toBe(200);
+    const body: DirectoryAgentsResponse = await res.json();
+    expect(body.agents).toEqual([
+      {
+        id: chat.agentId,
+        name: "coder",
+        avatar: expect.any(String),
+        default: true,
+        model: FLASH,
+      },
+    ]);
+    const gone = await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`);
+    expect(gone.status).toBe(200);
+    const after: DirectoryAgentsResponse = await (
+      await chat.member.call("GET", "/api/directory/agents")
+    ).json();
+    expect(after.agents).toEqual([]);
+  });
+
   test("a member opens another user's page with the email, zone and about", async () => {
     const chat = await chatApp();
     const other = chat.app.createUser({

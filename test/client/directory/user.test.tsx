@@ -8,18 +8,18 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
 import {
-  loadPersonDays,
-  person,
-  personDays,
-  personDaysFailed,
+  loadUserDays,
+  userDays,
+  userDaysFailed,
+  userPage,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
-  personAnswer,
+  userAnswer,
   userTab,
   userTabs,
-} from "../../../src/client/views/people/People.model.ts";
-import { User } from "../../../src/client/views/people/User.tsx";
+} from "../../../src/client/views/directory/Directory.model.ts";
+import { User } from "../../../src/client/views/directory/User.tsx";
 import { ACTION_WORDS } from "../../../src/client/views/projects/Activity.model.ts";
 import type {
   DirectoryUserDaysResponse,
@@ -44,7 +44,7 @@ const bogdan: DirectoryUserResponse = {
   ],
 };
 
-// two days, the person busy on the second
+// two days, the user busy on the second
 const days: DirectoryUserDaysResponse = {
   since: Date.UTC(2026, 8, 14),
   until: Date.UTC(2026, 8, 16),
@@ -63,9 +63,9 @@ beforeEach(() => {
     role: "member",
     mustChangePassword: false,
   };
-  person.value = null;
-  personDays.value = null;
-  personDaysFailed.value = false;
+  userPage.value = null;
+  userDays.value = null;
+  userDaysFailed.value = false;
   path.value = "/users/bogdan";
 });
 
@@ -73,9 +73,9 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-describe("the person's days", () => {
+describe("the user's days", () => {
   test.serial(
-    "asks for the person.s own days and keeps the latest",
+    "asks for the userPage.s own days and keeps the latest",
     async () => {
       const asked: string[] = [];
       const gates: (() => void)[] = [];
@@ -84,14 +84,14 @@ describe("the person's days", () => {
           asked.push(url);
           gates.push(() => resolve(Response.json(days)));
         })) as unknown as typeof fetch;
-      const first = loadPersonDays("bogdan");
-      const second = loadPersonDays("elena");
+      const first = loadUserDays("bogdan");
+      const second = loadUserDays("elena");
       expect(asked[0]).toBe("/api/directory/users/bogdan/days");
       gates[1]();
       await second;
       gates[0]();
       await first;
-      expect(personDays.value?.username).toBe("elena");
+      expect(userDays.value?.username).toBe("elena");
     },
   );
 
@@ -106,41 +106,41 @@ describe("the person's days", () => {
               { error: "down" },
               { status: 500 },
             )) as unknown as typeof fetch;
-      await loadPersonDays("bogdan");
-      expect(personDays.value).toBeNull();
-      expect(personDaysFailed.value).toBe(true);
+      await loadUserDays("bogdan");
+      expect(userDays.value).toBeNull();
+      expect(userDaysFailed.value).toBe(true);
       ok = true;
-      await loadPersonDays("bogdan");
-      expect(personDaysFailed.value).toBe(false);
-      expect(personDays.value?.body).toEqual(days);
+      await loadUserDays("bogdan");
+      expect(userDaysFailed.value).toBe(false);
+      expect(userDays.value?.body).toEqual(days);
       ok = false;
-      await loadPersonDays("bogdan");
-      expect(personDaysFailed.value).toBe(false);
-      expect(personDays.value?.body).toEqual(days);
+      await loadUserDays("bogdan");
+      expect(userDaysFailed.value).toBe(false);
+      expect(userDays.value?.body).toEqual(days);
     },
   );
 
   test.serial("a failed load forgets the held days of that name", async () => {
     globalThis.fetch = (async () =>
       Response.json(days)) as unknown as typeof fetch;
-    await loadPersonDays("bogdan");
-    await loadPersonDays("elena");
+    await loadUserDays("bogdan");
+    await loadUserDays("elena");
     globalThis.fetch = (async () =>
       Response.json(
         { error: "no such user" },
         { status: 404 },
       )) as unknown as typeof fetch;
-    await loadPersonDays("bogdan");
+    await loadUserDays("bogdan");
     const gates: (() => void)[] = [];
     globalThis.fetch = ((_url: string) =>
       new Promise<Response>((resolve) => {
         gates.push(() => resolve(Response.json(days)));
       })) as unknown as typeof fetch;
-    const elena = loadPersonDays("elena");
+    const elena = loadUserDays("elena");
     gates[0]();
     await elena;
-    const again = loadPersonDays("bogdan");
-    expect(personDays.value).toBeNull();
+    const again = loadUserDays("bogdan");
+    expect(userDays.value).toBeNull();
     gates[1]();
     await again;
   });
@@ -148,25 +148,25 @@ describe("the person's days", () => {
   test.serial("a new user drops the days and their failure", async () => {
     globalThis.fetch = (async () =>
       Response.json(days)) as unknown as typeof fetch;
-    await loadPersonDays("bogdan");
-    personDaysFailed.value = true;
+    await loadUserDays("bogdan");
+    userDaysFailed.value = true;
     me.value = null;
-    expect(personDays.value).toBeNull();
-    expect(personDaysFailed.value).toBe(false);
+    expect(userDays.value).toBeNull();
+    expect(userDaysFailed.value).toBe(false);
   });
 });
 
 describe("the user page's activity", () => {
   test.serial("draws its ghost, then the days as actions", () => {
-    person.value = bogdan;
+    userPage.value = bogdan;
     let html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain('aria-label="Loading activity"');
-    // another person's days are not this one's
-    personDays.value = { username: "elena", body: days };
+    // another user's days are not this one's
+    userDays.value = { username: "elena", body: days };
     html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain('aria-label="Loading activity"');
 
-    personDays.value = { username: "bogdan", body: days };
+    userDays.value = { username: "bogdan", body: days };
     html = render(<User params={{ username: "bogdan" }} />);
     expect(html).not.toContain('aria-label="Loading activity"');
     expect(html).toContain(">5 actions<");
@@ -176,8 +176,8 @@ describe("the user page's activity", () => {
       'data-index="1" class="activity-cell activity-level-4"',
     );
 
-    personDays.value = null;
-    personDaysFailed.value = true;
+    userDays.value = null;
+    userDaysFailed.value = true;
     html = render(<User params={{ username: "bogdan" }} />);
     expect(html).not.toContain(">Activity<");
     expect(html).toContain(">About<");
@@ -186,22 +186,25 @@ describe("the user page's activity", () => {
 
 describe("the user page's About", () => {
   test.serial("ends on the time where the user is", () => {
-    person.value = {
+    userPage.value = {
       ...bogdan,
       user: { ...bogdan.user, tz: "Europe/Bucharest", about: "Head of SRE." },
     };
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain(">Head of SRE.<");
     expect(html).toMatch(
-      /class="people-foot">.*Local time<\/span>\d\d:\d\d · GMT\+[23]</,
+      /class="directory-foot">.*Local time<\/span>\d\d:\d\d · GMT\+[23]</,
     );
   });
 
   test.serial("drops the time for a zone the browser does not know", () => {
-    person.value = { ...bogdan, user: { ...bogdan.user, tz: "Nowhere/Land" } };
+    userPage.value = {
+      ...bogdan,
+      user: { ...bogdan.user, tz: "Nowhere/Land" },
+    };
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain("Nothing written yet.");
-    expect(html).not.toContain("people-foot");
+    expect(html).not.toContain("directory-foot");
   });
 });
 
@@ -223,7 +226,7 @@ describe("the user page's words", () => {
   });
 
   test("the days are one series of actions with no tokens", () => {
-    expect(personAnswer(days, "u2")).toEqual({
+    expect(userAnswer(days, "u2")).toEqual({
       since: days.since,
       until: days.until,
       days: days.days,

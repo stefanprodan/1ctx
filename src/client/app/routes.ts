@@ -30,8 +30,10 @@ import { loadDecisions } from "../data/decisions.ts";
 import {
   loadAgentDays,
   loadAgentPage,
-  loadPerson,
-  loadPersonDays,
+  loadDirectoryAgents,
+  loadDirectoryUsers,
+  loadUserDays,
+  loadUserPage,
 } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
@@ -151,14 +153,20 @@ const thenUsage = async <T extends { id: string }>(
   if (row !== undefined) await usage(row.id);
 };
 
+// the list feeds the name's switcher
 const agentPage = async (params: Params) => {
-  await Promise.all([loadAgentPage(params.name), loadAgentDays(params.name)]);
+  await Promise.all([
+    loadAgentPage(params.name),
+    loadAgentDays(params.name),
+    loadDirectoryAgents(),
+  ]);
 };
 
 const userPage = async (params: Params) => {
   await Promise.all([
-    loadPerson(params.username),
-    loadPersonDays(params.username),
+    loadUserPage(params.username),
+    loadUserDays(params.username),
+    loadDirectoryUsers(),
   ]);
 };
 
@@ -229,6 +237,26 @@ export const ROUTES: Route[] = [
     },
     nav: { label: "Projects", icon: "projects", order: 2 },
   },
+  // both lists load on either tab, so each tab's count shows
+  ...tabRoutes(
+    "/directory",
+    [
+      ["", () => "Directory"],
+      ["/agents", () => "Directory agents"],
+    ],
+    lazy(() =>
+      import("../views/directory/Directory.tsx").then((m) => m.Directory),
+    ),
+    "authenticated",
+    async () => {
+      await Promise.all([loadDirectoryUsers(), loadDirectoryAgents()]);
+    },
+  ).map(
+    (route, i): Route =>
+      i === 0
+        ? { ...route, nav: { label: "Directory", icon: "users", order: 3 } }
+        : route,
+  ),
   {
     path: "/projects/:id",
     view: lazy(() =>
@@ -724,7 +752,7 @@ export const ROUTES: Route[] = [
       ["", (params) => `@${params.username}`],
       ["/projects", (params) => `@${params.username} projects`],
     ],
-    lazy(() => import("../views/people/User.tsx").then((m) => m.User)),
+    lazy(() => import("../views/directory/User.tsx").then((m) => m.User)),
     "authenticated",
     userPage,
   ),
@@ -737,7 +765,7 @@ export const ROUTES: Route[] = [
       ["/skills", (params) => `@${params.name} skills`],
       ["/mcp", (params) => `@${params.name} MCP`],
     ],
-    lazy(() => import("../views/people/Agent.tsx").then((m) => m.Agent)),
+    lazy(() => import("../views/directory/Agent.tsx").then((m) => m.Agent)),
     "authenticated",
     agentPage,
   ),

@@ -30,7 +30,7 @@ import {
   aboutLine,
   latestFiles,
   listedProjects,
-  peopleLine,
+  membersLine,
   settledCounts,
   tabsOf,
 } from "../../../src/client/views/projects/Project.model.ts";
@@ -373,9 +373,9 @@ describe("Project.model", () => {
   });
 
   test("the words on a project's row", () => {
-    expect(peopleLine({ kind: "personal", memberCount: 1 })).toBe("only you");
-    expect(peopleLine({ kind: "team", memberCount: 1 })).toBe("1 member");
-    expect(peopleLine({ kind: "team", memberCount: 4 })).toBe("4 members");
+    expect(membersLine({ kind: "personal", memberCount: 1 })).toBe("only you");
+    expect(membersLine({ kind: "team", memberCount: 1 })).toBe("1 member");
+    expect(membersLine({ kind: "team", memberCount: 4 })).toBe("4 members");
   });
 
   test("the tab counts show together once every one is known", () => {

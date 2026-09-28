@@ -62,3 +62,14 @@ export function zoneLit(pathname: string): string | null {
   const hit = litPage(pathname, HREFS);
   return hit === null ? null : TARGETS.get(hit)!;
 }
+
+// a rail entry is lit on its own address; the Directory also on its
+// Agents tab and on the user and agent pages it lists
+export function navLit(pathname: string, href: string): boolean {
+  if (href !== "/directory") return pathname === href;
+  return (
+    onPage(pathname, href) ||
+    pathname.startsWith("/users/") ||
+    pathname.startsWith("/agents/")
+  );
+}

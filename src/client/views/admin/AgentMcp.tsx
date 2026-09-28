@@ -26,7 +26,7 @@ import {
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
-import { serverLine, serverMeta } from "../people/People.model.ts";
+import { serverLine, serverMeta } from "../directory/Directory.model.ts";
 import {
   cardBody,
   isModeValue,

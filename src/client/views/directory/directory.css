@@ -1,16 +1,29 @@
-/* A user's page and an agent's page: the head, the heatmap, then one
-   card whose head is the tabs. */
+/* The Directory: its tabs over one list. A user's page and an agent's
+   page: the head, the heatmap, then one card whose head is the tabs. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .people {
+  .directory {
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
   }
 
-  .people-about {
+  /* the tabs over the list, spaced as the Config board's */
+  .directory-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .directory-model {
+    display: block;
+    min-width: 0;
+    font-family: var(--mono);
+  }
+
+  .directory-about {
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -19,7 +32,7 @@
 
   /* a card's foot: the time where a user is, what an agent's model
      can do; its name quieter than its words, as the aside names a line */
-  .people-foot {
+  .directory-foot {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -27,13 +40,13 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
-  .people-foot-name {
+  .directory-foot-name {
     color: var(--faint);
   }
 
   /* the Instructions tab's row: the prompt, folded at its first lines,
      Show all in its fade */
-  .people-prompt {
+  .directory-prompt {
     --clamp: 12;
     margin: 0;
     font-family: var(--mono);

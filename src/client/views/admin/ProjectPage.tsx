@@ -217,12 +217,12 @@ function MembersCard({ project, saving }: CardProps) {
   });
   const { ids } = card.d;
   const set = (next: string[]) => card.set({ ids: next });
-  const people = users.value;
+  const everyone = users.value;
   const off = card.save.busy || saving.value;
   // a member the users list does not hold yet still shows, from the detail
   const shown = ids.flatMap((id) => {
     const u =
-      people?.find((p) => p.id === id) ??
+      everyone?.find((p) => p.id === id) ??
       project.members.find((m) => m.id === id);
     return u === undefined ? [] : [u];
   });
@@ -233,12 +233,12 @@ function MembersCard({ project, saving }: CardProps) {
         count={countOf(ids.length, ids.length)}
         list
         action={
-          people !== null && (
+          everyone !== null && (
             <Finder
               label="Users"
               add="Add member"
               disabled={off}
-              options={memberOptions(people, ids)}
+              options={memberOptions(everyone, ids)}
               placeholder="Find a user"
               none="No user matches"
               empty="Every user is a member"
@@ -248,7 +248,7 @@ function MembersCard({ project, saving }: CardProps) {
         }
         foot={card.foot({
           hint:
-            people === null && usersError.value !== null ? (
+            everyone === null && usersError.value !== null ? (
               <span class="error">{usersError.value.words}</span>
             ) : undefined,
         })}

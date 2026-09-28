@@ -11,7 +11,13 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
-import { adminFace, onPage, projectHere, zoneLit } from "./Rail.model.ts";
+import {
+  adminFace,
+  navLit,
+  onPage,
+  projectHere,
+  zoneLit,
+} from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import { lastAdmin, lastWork } from "./shell.ts";
@@ -143,7 +149,7 @@ export function Rail({
               <Fragment key={route.path}>
                 <a
                   href={route.path}
-                  class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
+                  class={`rail-item${navLit(here, route.path) ? " rail-item-on" : ""}`}
                   aria-current={here === route.path ? "page" : undefined}
                   onClick={follow}
                 >

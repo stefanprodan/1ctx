@@ -27,7 +27,7 @@ import { Section, SectionForm } from "../../ui/Section.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
-import { roleWords } from "../people/People.model.ts";
+import { roleWords } from "../directory/Directory.model.ts";
 import {
   aboutProblem,
   detailsFieldOf,

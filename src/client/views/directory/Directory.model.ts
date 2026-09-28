@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words on a user's page and an agent's page.
+// The words on the Directory, a user's page and an agent's page.
 
 import type {
   DirectoryAgentDaysResponse,
@@ -15,7 +15,12 @@ import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Role } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
 import { ago, tokensText } from "../../lib/format.ts";
-import { agentHref, userHref } from "../../lib/hrefs.ts";
+import {
+  agentHref,
+  DIRECTORY_AGENTS_HREF,
+  DIRECTORY_HREF,
+  userHref,
+} from "../../lib/hrefs.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 import { offsetOf } from "../../ui/Zone.model.ts";
 
@@ -129,6 +134,11 @@ export function agentTab(pathname: string, name: string): number {
   return at === -1 ? 0 : at;
 }
 
+// the same tab of another agent, so the switcher keeps the tab
+export function agentTabHref(name: string, tab: number): string {
+  return `${agentHref(name)}${AGENT_TABS[tab] ?? ""}`;
+}
+
 export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
   const base = agentHref(name);
   return [
@@ -139,9 +149,9 @@ export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
   ];
 }
 
-// the person's actions as the heatmap's answer, one number a day in the
+// the user's actions as the heatmap's answer, one number a day in the
 // place of turns, with no tokens
-export function personAnswer(
+export function userAnswer(
   body: DirectoryUserDaysResponse,
   userId: string,
 ): DaysUsageResponse {
@@ -167,6 +177,11 @@ export function userTab(pathname: string, username: string): number {
   const base = userHref(username);
   const at = USER_TABS.findIndex((tail) => pathname === `${base}${tail}`);
   return at === -1 ? 0 : at;
+}
+
+// the same tab of another user, so the switcher keeps the tab
+export function userTabHref(username: string, tab: number): string {
+  return `${userHref(username)}${USER_TABS[tab] ?? ""}`;
 }
 
 export function userTabs(
@@ -208,4 +223,32 @@ export function agentHint(
   return shown.mcp.servers.length === 0
     ? undefined
     : tokensText(shown.mcp.tokens);
+}
+
+// the Directory's tab is its address: Users for /directory and any
+// other, Agents for /directory/agents
+export function directoryTab(pathname: string): "users" | "agents" {
+  return pathname === DIRECTORY_AGENTS_HREF ? "agents" : "users";
+}
+
+export function directoryTabs(
+  users: number | undefined,
+  agents: number | undefined,
+): Tab[] {
+  return [
+    { label: "Users", href: DIRECTORY_HREF, count: users },
+    { label: "Agents", href: DIRECTORY_AGENTS_HREF, count: agents },
+  ];
+}
+
+type SwitchItem = { id: string; label: string; href: string };
+
+// the lists hold live actors alone, so a disabled user's page, or an
+// agent's deleted while open, adds its own name to be marked current
+export function switchItems(
+  listed: SwitchItem[],
+  shown: SwitchItem,
+): SwitchItem[] {
+  if (listed.some((i) => i.id === shown.id)) return listed;
+  return [...listed, shown].sort((a, b) => a.label.localeCompare(b.label));
 }
