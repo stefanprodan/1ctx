@@ -21,6 +21,8 @@ export const CREDENTIALS_HREF = "/admin/config/web/credentials";
 export const MONITOR_HREF = "/admin/monitor";
 export const STORAGE_HREF = "/admin/monitor/storage";
 export const USAGE_HREF = "/admin/monitor/usage";
+export const DIRECTORY_HREF = "/directory";
+export const DIRECTORY_AGENTS_HREF = "/directory/agents";
 
 export function userHref(username: string): string {
   return `/users/${encodeURIComponent(username)}`;

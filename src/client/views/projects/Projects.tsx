@@ -34,7 +34,7 @@ import { Split } from "../../ui/Split.tsx";
 import { WeekAside } from "../home/WeekAside.tsx";
 import { activityModel } from "./Activity.model.ts";
 import { Activity, ActivityGhost } from "./Activity.tsx";
-import { listedProjects, peopleLine } from "./Project.model.ts";
+import { listedProjects, membersLine } from "./Project.model.ts";
 import { Strip, StripGhost } from "./Strip.tsx";
 
 function ProjectRow({
@@ -51,7 +51,7 @@ function ProjectRow({
       <RowsAvatar>
         <Icon name={projectIcon(project.kind)} size={14} />
       </RowsAvatar>
-      <RowsTitle name={project.name} sub={peopleLine(project)} mono />
+      <RowsTitle name={project.name} sub={membersLine(project)} mono />
       {answer !== null ? (
         <RowsMeta>
           <Strip

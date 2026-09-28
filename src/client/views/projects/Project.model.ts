@@ -31,7 +31,7 @@ type TabCounts = {
   automations: number | null;
   // the files of the project's knowledge base
   knowledge: number | null;
-  // the people and the agents a team tab lists
+  // the users and the agents a team tab lists
   members: number | null;
   agents: number | null;
 };
@@ -57,7 +57,7 @@ export function settledCounts(kind: ProjectKind, counts: TabCounts): TabCounts {
   return shown.every((n) => n !== null) ? counts : NO_COUNTS;
 }
 
-// every project has automations; a team's people are its Members, and
+// every project has automations; a team's users are its Members, and
 // a personal project has one person, who describes it in Settings.
 // Members counts the users and the agents the tab lists
 export function tabsOf(
@@ -93,7 +93,7 @@ export function tabsOf(
 }
 
 // the line under a project's name on the Projects page
-export function peopleLine(
+export function membersLine(
   project: Pick<ProjectSummary, "kind" | "memberCount">,
 ): string {
   return project.kind === "personal"

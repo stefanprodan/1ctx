@@ -37,7 +37,7 @@ import {
 } from "./Stats.model.ts";
 
 type DayCursor = Signal<number | null>;
-type People = { active: number; users: number };
+type Active = { active: number; users: number };
 
 type TileSpec = {
   label: string;
@@ -47,7 +47,7 @@ type TileSpec = {
   words: (
     totals: OverviewTotals,
     at: OverviewDay | null,
-    people: People | undefined,
+    active: Active | undefined,
   ) => { figure: string; unit?: string; sub: string };
 };
 
@@ -65,7 +65,7 @@ const STATS_TILES: TileSpec[] = [
     plot: "Active users per day",
     kind: "bars",
     values: (days) => days.map((d) => d.activeUsers),
-    words: (_t, at, people) => activeTile(people!.active, people!.users, at),
+    words: (_t, at, active) => activeTile(active!.active, active!.users, at),
   },
   {
     label: "Failure rate",
@@ -121,27 +121,27 @@ function useDays(days: OverviewDay[], day: DayCursor) {
   };
 }
 
-// without people, Usage's tiles
+// without the active users, Usage's tiles
 export function DaysTiles({
   days,
   totals,
   day,
   sync,
-  people,
+  active,
 }: {
   days: OverviewDay[];
   totals: OverviewTotals;
   day: DayCursor;
   sync: string;
-  people?: People;
+  active?: Active;
 }) {
   const { starts, at, onCursor } = useDays(days, day);
-  const specs = people ? STATS_TILES : USAGE_TILES;
+  const specs = active ? STATS_TILES : USAGE_TILES;
   const values = useMemo(() => specs.map((s) => s.values(days)), [days, specs]);
   return (
     <Tiles>
       {specs.map((s, i) => {
-        const words = s.words(totals, at, people);
+        const words = s.words(totals, at, active);
         return (
           <Tile
             key={s.label}

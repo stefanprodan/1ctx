@@ -746,6 +746,16 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/directory/users",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/directory/agents",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "GET",
     path: "/api/directory/users/:username",
     // the pattern's own ":" breaks the name rule: the parser's 400
     expect: { anonymous: 401, member: 400, admin: 400 },

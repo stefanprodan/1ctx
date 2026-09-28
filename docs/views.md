@@ -190,10 +190,28 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Protocol mark, drawn at a stroke of 1 (`THIN` in `lib/icons.tsx`),
   wherever MCP servers are listed.
 
-## People and projects
+## The Directory, users, agents and projects
 
+- **The Directory lists every enabled user and every live agent.** It
+  is an app page for every signed-in user, the same for admins, with
+  one rail entry after Projects, lit on its tabs and on the user and
+  agent pages. Its tabs are addresses, Users at `/directory` and
+  Agents at `/directory/agents`, one view (`views/directory/`), both
+  lists loaded on either so both tabs carry a count. Each list is a
+  `RowsCard` with a search and a count, read whole from `GET
+  /api/directory/users` (username order, no email, the zone for the
+  row's local time) and `GET /api/directory/agents` (name order, the
+  model's id alone); a disabled user and a deleted agent are never
+  listed. A user's row is the initials, the full name over
+  `@username`, the role over the local time; an agent's is its
+  avatar, `@name` with `default`, the model through `Fit` and
+  `shortModel()`. The aside counts roles, models and names the
+  default agent. A user's page
+  reads `Directory / Users / @name`, an agent's `Directory / Agents /
+  @name`, the middle step linking to its tab. The words are
+  users and agents, never people, in the page and in the code.
 - **Every user and every agent has a page.** `/users/:username` and
-  `/agents/:name` (`views/people/`, addresses from `lib/hrefs.ts`) are
+  `/agents/:name` (`views/directory/`, addresses from `lib/hrefs.ts`) are
   open to every signed-in user, read from `GET
   /api/directory/users/:username` (`access/directory.ts`) and `GET
   /api/directory/agents/:name` (`agents/directory.ts`), held in

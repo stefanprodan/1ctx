@@ -1,14 +1,29 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Response bodies of the directory routes: a user's page and an
-// agent's page, open to every signed-in user.
+// Response bodies of the directory routes: the lists of users and
+// agents, a user's page and an agent's page, open to every signed-in
+// user.
 
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
-import type { DirectoryUser } from "../contracts/user.ts";
+import type { DirectoryUser, UserSummary } from "../contracts/user.ts";
 import type { DayUsage } from "./usage.ts";
+
+// GET /api/directory/users: the enabled users by username, with the
+// zone their local time is read in and no email
+export type DirectoryUsersResponse = {
+  users: (UserSummary & { tz: string })[];
+};
+
+// GET /api/directory/agents: the live agents by name, the model as its
+// id alone
+export type DirectoryAgentRow = Pick<
+  AgentSummary,
+  "id" | "name" | "avatar" | "default"
+> & { model: string };
+export type DirectoryAgentsResponse = { agents: DirectoryAgentRow[] };
 
 // GET /api/directory/users/:username; the projects are the team
 // projects the caller and the user are both members of

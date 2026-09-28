@@ -48,11 +48,11 @@ import { RolesSection } from "./Users.tsx";
 
 export function AccessBoard() {
   const board = accessBoard.value;
-  const people = users.value;
+  const list = users.value;
   const teams = adminProjects.value;
   const error =
     accessBoardError.value ?? usersError.value ?? adminProjectsError.value;
-  const ready = board !== null && people !== null && teams !== null;
+  const ready = board !== null && list !== null && teams !== null;
   useEffect(() => watchAccessBoard(), []);
   return (
     <Page
@@ -66,12 +66,12 @@ export function AccessBoard() {
         <Split
           aside={
             <>
-              <RolesSection users={people} label="Users" />
-              <ProjectCountsSection teams={teams} users={people} />
+              <RolesSection users={list} label="Users" />
+              <ProjectCountsSection teams={teams} users={list} />
             </>
           }
         >
-          <Body board={board} people={people} teams={teams} />
+          <Body board={board} list={list} teams={teams} />
         </Split>
       )}
     </Page>
@@ -80,20 +80,20 @@ export function AccessBoard() {
 
 function Body({
   board,
-  people,
+  list,
   teams,
 }: {
   board: AccessBoardResponse;
-  people: AdminUser[];
+  list: AdminUser[];
   teams: ProjectSummary[];
 }) {
   const now = useNow(60_000);
-  const accounts = accountGroups(people, now);
+  const accounts = accountGroups(list, now);
   const projects = projectGroups(teams, board.activeProjectIds);
   return (
     <Rows>
-      <SignedIn board={board} users={people.length} />
-      <Recent rows={recentUsers(board.recent, people)} now={now} />
+      <SignedIn board={board} users={list.length} />
+      <Recent rows={recentUsers(board.recent, list)} now={now} />
       <Inactive users={accounts.inactive} projects={projects.quiet} now={now} />
       <Accounts label="Disabled" rows={accounts.disabled} now={now} />
       <Projects label="Projects without members" rows={projects.empty} />

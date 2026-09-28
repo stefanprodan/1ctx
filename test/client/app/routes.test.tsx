@@ -52,8 +52,12 @@ describe("the route table", () => {
     }
   });
 
-  test("the working face lists Home and Projects", () => {
-    expect(navEntries().map((r) => r.path)).toEqual(["/", "/projects"]);
+  test("the working face lists Home, Projects and Directory", () => {
+    expect(navEntries().map((r) => r.path)).toEqual([
+      "/",
+      "/projects",
+      "/directory",
+    ]);
   });
 
   test("every zone address is an admin route, and every admin route is in a zone", () => {

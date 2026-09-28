@@ -1,7 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An agent's page, for every signed-in user: how it is configured. The
+// The agents list and an agent's page, for every signed-in user: the
+// list is the live agents with the model's id alone; the page is how
+// an agent is configured. The
 // composer's route already sends the whole row, so the page adds only
 // what a user cannot see elsewhere: the provider's name, the skills
 // with when they were fetched and how many files they hold, the
@@ -16,6 +18,7 @@
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
+  DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
@@ -26,7 +29,7 @@ import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { parseAgentName } from "./parse.ts";
+import { parseAgentName, parseNoQuery } from "./parse.ts";
 import type { AgentTotalPort, ProvidersPort } from "./routes.ts";
 import { type AgentRow, type AgentStore, summary } from "./store.ts";
 
@@ -120,6 +123,27 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
     return n;
   };
   return [
+    {
+      method: "GET",
+      path: "/api/directory/agents",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        parseNoQuery(ctx.url);
+        const body: DirectoryAgentsResponse = {
+          agents: deps.store
+            .list()
+            .map((agent) => ({
+              id: agent.id,
+              name: agent.name,
+              avatar: agent.avatar,
+              default: agent.default,
+              model: agent.model.id,
+            }))
+            .sort(byName),
+        };
+        return json(body);
+      },
+    },
     {
       method: "GET",
       path: "/api/directory/agents/:name",
