@@ -5,7 +5,12 @@
 // transaction as each write so the response names the field instead of
 // exposing a unique-index error.
 
-import type { UserResponse, UsersResponse } from "../../shared/api/users.ts";
+import type {
+  AdminUser,
+  UserResponse,
+  UsersResponse,
+  UserUsageResponse,
+} from "../../shared/api/users.ts";
 import type { Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -15,6 +20,9 @@ import { json, type RouteDescriptor } from "../lib/http.ts";
 import { account, type UserFields, type UserRow } from "../users/index.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
+import type { VisitStore } from "./visits.ts";
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type UsersPort = {
   list(): UserRow[];
@@ -34,10 +42,27 @@ export type UsersPort = {
   createUser(fields: UserFields): UserRow;
 };
 
+export type UsersProjectsPort = {
+  memberProjectIds(userId: string): string[];
+  teamProjectIds(): string[];
+  personal(userId: string): { id: string } | null;
+};
+
+export type UsersUsagePort = {
+  projectTotal(
+    projectId: string,
+    since: number,
+    until: number,
+  ): { sends: number; tokens: number; cost: number | null };
+};
+
 export type UsersRoutesDeps = {
   db: Db;
   logins: LoginStore;
+  visits: VisitStore;
   users: UsersPort;
+  projects: UsersProjectsPort;
+  usage: UsersUsagePort;
   clock: Clock;
 };
 
@@ -53,6 +78,14 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       throw new Conflict("username is taken");
     }
   };
+  // the team projects a user is in, of the team ids read once per answer
+  const teamsOf = (userId: string, teams: Set<string>) =>
+    deps.projects.memberProjectIds(userId).filter((id) => teams.has(id));
+  const adminUser = (user: UserRow): AdminUser => ({
+    ...account(user),
+    lastVisitDay: deps.visits.latestFor(user.id),
+    projectIds: teamsOf(user.id, new Set(deps.projects.teamProjectIds())),
+  });
   const emailAvailable = (email: string, except: string | null) => {
     const other = deps.users.byEmail(email);
     if (other !== null && other.id !== except) {
@@ -65,8 +98,14 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       path: "/api/users",
       policy: "admin",
       handle() {
+        const visits = deps.visits.latest();
+        const teams = new Set(deps.projects.teamProjectIds());
         const body: UsersResponse = {
-          users: deps.users.list().map(account),
+          users: deps.users.list().map((user) => ({
+            ...account(user),
+            lastVisitDay: visits.get(user.id) ?? null,
+            projectIds: teamsOf(user.id, teams),
+          })),
         };
         return json(body);
       },
@@ -105,7 +144,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           }
           return { result: find(created.id) };
         });
-        const body: UserResponse = { user: account(user) };
+        const body: UserResponse = { user: adminUser(user) };
         return json(body, 201);
       },
     },
@@ -187,7 +226,26 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             ],
           };
         });
-        const body: UserResponse = { user: account(changed) };
+        const body: UserResponse = { user: adminUser(changed) };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/users/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const user = find(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const own = deps.projects.personal(user.id);
+        const body: UserUsageResponse = {
+          since,
+          until,
+          ...(own === null
+            ? { sends: 0, tokens: 0, cost: 0 }
+            : deps.usage.projectTotal(own.id, since, until)),
+        };
         return json(body);
       },
     },

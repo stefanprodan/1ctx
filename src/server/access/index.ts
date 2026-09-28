@@ -27,7 +27,12 @@ import {
 } from "./profile.ts";
 import { type UsersPort as LoginUsersPort, routes } from "./routes.ts";
 import { LoginStore } from "./store.ts";
-import { type UsersPort as AdminUsersPort, usersRoutes } from "./users.ts";
+import {
+  type UsersPort as AdminUsersPort,
+  type UsersProjectsPort,
+  type UsersUsagePort,
+  usersRoutes,
+} from "./users.ts";
 import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export {
@@ -74,7 +79,9 @@ export type AccessDeps = {
     ProfileUsersPort &
     AdminUsersPort &
     DirectoryUsersPort;
-  projects: AuthProjectsPort & DirectoryProjectsPort;
+  projects: AuthProjectsPort & DirectoryProjectsPort & UsersProjectsPort;
+  // the users pages' last 30 days of a personal project
+  usage: UsersUsagePort;
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
@@ -121,7 +128,10 @@ export function accessArea(deps: AccessDeps): Access {
       ...usersRoutes({
         db: deps.db,
         logins,
+        visits,
         users: deps.users,
+        projects: deps.projects,
+        usage: deps.usage,
         clock: deps.clock,
       }),
       ...directoryRoutes({

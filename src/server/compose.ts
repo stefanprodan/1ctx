@@ -265,6 +265,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secureCookie: options.secureCookie,
     users,
     projects,
+    usage,
     activity: { personDays: (...args) => sessions.personDays(...args) },
   });
   agents = agentsArea({

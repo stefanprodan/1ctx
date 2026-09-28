@@ -1,11 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the users page shows and what its forms check before they call:
-// an empty field, a malformed email and a mistyped password, caught
-// without a round trip. The username rule is the server's alone.
+// What the users pages show and what their forms check before they
+// call: an empty field, a malformed email and a mistyped password,
+// caught without a round trip. The username rule is the server's alone.
 
-import type { UpdateUserRequest } from "../../../shared/api/users.ts";
+import type {
+  AdminUser,
+  UpdateUserRequest,
+} from "../../../shared/api/users.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
 import {
   isEmail,
@@ -14,20 +17,11 @@ import {
   MIN_PASSWORD,
   type Role,
 } from "../../../shared/words.ts";
-import { sinceLine } from "../../lib/format.ts";
-import type { Problem } from "../../lib/save.ts";
+import { ago } from "../../lib/format.ts";
 
-export const ROLE_CHOICES: { value: Role; label: string; text: string }[] = [
-  {
-    value: "member",
-    label: "Member",
-    text: "Works in the projects they belong to.",
-  },
-  {
-    value: "admin",
-    label: "Admin",
-    text: "Also manages users, projects and agents.",
-  },
+export const ROLE_CHOICES: { value: Role; label: string }[] = [
+  { value: "member", label: "Member" },
+  { value: "admin", label: "Admin" },
 ];
 
 // the field shapes the username as it is typed and the server holds
@@ -50,26 +44,14 @@ export function tzProblem(value: string): string | null {
   return value === "" ? "Pick a time zone" : null;
 }
 
-// a first password, or a reset: typed twice, since nobody sees it
-export function newPasswordProblem(next: string, again: string): string | null {
-  if (next.length < MIN_PASSWORD)
+// a first password, or a reset: typed once, since the admin sees it
+// and hands it over
+export function passwordProblem(password: string): string | null {
+  if (password.length < MIN_PASSWORD)
     return `The password needs at least ${MIN_PASSWORD} characters`;
-  if (new TextEncoder().encode(next).length > MAX_PASSWORD_BYTES)
+  if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES)
     return `The password needs at most ${MAX_PASSWORD_BYTES} bytes`;
-  if (again !== next) return "The two passwords differ";
   return null;
-}
-
-// the same checks pinned to the field to fix: a mismatch is the second
-// box, anything else the first
-export function newPasswordFieldProblem(
-  next: string,
-  again: string,
-  names: { next: string; again: string },
-): Problem | null {
-  const error = newPasswordProblem(next, again);
-  if (error === null) return null;
-  return { error, field: error.includes("differ") ? names.again : names.next };
 }
 
 // the fields of the user form, by the name each control carries
@@ -93,14 +75,87 @@ export function metaLine(user: UserAccount): string {
   return `@${user.username} · ${user.email}`;
 }
 
-// the row's right side: the role, then the states worth a word, then
-// since when. "member · disabled · since 12 September 2026"
-export function stateLine(user: UserAccount): string {
-  const parts: string[] = [user.role];
-  if (user.disabled) parts.push("disabled");
-  else if (user.mustChangePassword) parts.push("password to change");
-  parts.push(sinceLine(user));
-  return parts.join(" · ");
+// today as the user's own date, "2026-09-28", UTC for a zone the
+// browser does not know
+function todayIn(tz: string, now: number): string {
+  const day = (timeZone: string) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const part = (type: string) => parts.find((p) => p.type === type)!.value;
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  };
+  try {
+    return day(tz);
+  } catch {
+    return day("UTC");
+  }
+}
+
+const todayYear = (ms: number) => String(new Date(ms).getUTCFullYear());
+
+// the last day a user used the app against today, both the user's own
+// dates, so a reader in another zone never moves the day: "today",
+// "yesterday", "3d ago", or "never". A visit is kept per day, so an
+// hour would claim more than is known.
+export function lastActive(
+  user: Pick<AdminUser, "lastVisitDay" | "tz">,
+  now: number,
+): string {
+  if (user.lastVisitDay === null) return "never";
+  const ms = (day: string) => Date.parse(`${day}T00:00:00Z`);
+  const today = ms(todayIn(user.tz, now));
+  const last = ms(user.lastVisitDay);
+  const days = Math.round((today - last) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 28) return ago(last, today);
+  // the date itself, read in UTC as it was written, so no reader's zone
+  // moves it
+  const year = user.lastVisitDay.slice(0, 4) !== todayYear(today);
+  return new Date(last).toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    ...(year ? { year: "numeric" } : {}),
+  });
+}
+
+// the same in a row: "active today", "never active"
+export function activeLine(
+  user: Pick<AdminUser, "lastVisitDay" | "tz">,
+  now: number,
+): string {
+  return user.lastVisitDay === null
+    ? "never active"
+    : `active ${lastActive(user, now)}`;
+}
+
+// the row's right side: the role, then a state worth a word or when
+// they were last active. "member · active today", "member · disabled"
+export function stateLine(user: AdminUser, now: number): string {
+  const state = user.disabled
+    ? "disabled"
+    : user.mustChangePassword
+      ? "password to change"
+      : activeLine(user, now);
+  return `${user.role} · ${state}`;
+}
+
+// the list's aside: the admins, the members, the disabled of either
+export function userCounts(users: readonly AdminUser[]): {
+  admins: number;
+  members: number;
+  disabled: number;
+} {
+  return {
+    admins: users.filter((u) => u.role === "admin").length,
+    members: users.filter((u) => u.role === "member").length,
+    disabled: users.filter((u) => u.disabled).length,
+  };
 }
 
 // why the role cannot change, or null when it can: the admin's own
@@ -156,4 +211,25 @@ export function patchOf(
   if (fields.role !== user.role) body.role = fields.role;
   if (fields.tz !== user.tz) body.tz = fields.tz;
   return Object.keys(body).length === 0 ? null : body;
+}
+
+// letters and digits without the ones read alike (0 O o, 1 l I), so a
+// password handed over by voice or on paper survives
+const PASSWORD_CHARS =
+  "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+// a first password for New user's Generate: 20 of those, each drawn
+// evenly from the browser's random source
+export function generatePassword(length = 20): string {
+  const n = PASSWORD_CHARS.length;
+  // the largest multiple of n below 256: bytes past it are drawn again,
+  // so no character comes up more often than another
+  const limit = 256 - (256 % n);
+  let out = "";
+  while (out.length < length) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(length * 2))) {
+      if (byte < limit && out.length < length) out += PASSWORD_CHARS[byte % n];
+    }
+  }
+  return out;
 }

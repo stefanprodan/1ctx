@@ -1,37 +1,46 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words the users page shows, the checks its forms apply, the
-// entity that follows the signed-in user, and the page rendered over
+// The words the users pages show, the checks their forms apply, the
+// entity that follows the signed-in user, and the pages rendered over
 // the rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { me } from "../../../src/client/data/me.ts";
+import { projects } from "../../../src/client/data/projects.ts";
 import {
   createUser,
   loadUsers,
+  loadUserUsage,
   resetPassword,
+  setUserProjects,
   updateUser,
   users,
   usersError,
+  userUsage,
 } from "../../../src/client/data/users.ts";
-import { UserForm } from "../../../src/client/views/admin/UserForm.tsx";
+import { NewUser } from "../../../src/client/views/admin/NewUser.tsx";
+import { UserPage } from "../../../src/client/views/admin/UserPage.tsx";
 import {
+  activeLine,
   adminCount,
   disableLock,
   emailProblem,
+  generatePassword,
   metaLine,
-  newPasswordFieldProblem,
-  newPasswordProblem,
+  passwordProblem,
   patchOf,
   roleLock,
   stateLine,
+  userCounts,
   userFieldOf,
   usernameProblem,
 } from "../../../src/client/views/admin/Users.model.ts";
 import { Users } from "../../../src/client/views/admin/Users.tsx";
-import type { Me, UserAccount } from "../../../src/shared/contracts/user.ts";
+import type { AdminUser } from "../../../src/shared/api/users.ts";
+import type { ProjectSummary } from "../../../src/shared/contracts/project.ts";
+import type { Me } from "../../../src/shared/contracts/user.ts";
 
 const admin: Me = {
   id: "u1",
@@ -40,7 +49,8 @@ const admin: Me = {
   role: "admin",
   mustChangePassword: false,
 };
-const root: UserAccount = {
+const NOW = Date.parse("2026-09-28T12:00:00Z");
+const root: AdminUser = {
   id: "u1",
   username: "admin",
   fullName: "Stefan Prodan",
@@ -50,8 +60,10 @@ const root: UserAccount = {
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
   mustChangePassword: false,
+  lastVisitDay: "2026-09-28",
+  projectIds: [],
 };
-const casey: UserAccount = {
+const casey: AdminUser = {
   id: "u2",
   username: "casey",
   fullName: "Casey Doe",
@@ -61,7 +73,16 @@ const casey: UserAccount = {
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: true,
+  lastVisitDay: null,
+  projectIds: ["p1"],
 };
+const team = (id: string, name: string): ProjectSummary => ({
+  id,
+  kind: "team",
+  name,
+  createdAt: 0,
+  memberCount: 1,
+});
 
 const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response;
@@ -70,6 +91,8 @@ beforeEach(() => {
   me.value = admin;
   users.value = null;
   usersError.value = null;
+  userUsage.value = {};
+  projects.value = null;
   globalThis.fetch = (async (url: string, init?: RequestInit) =>
     answer(url, init)) as unknown as typeof fetch;
 });
@@ -79,15 +102,53 @@ afterEach(() => {
 });
 
 describe("the words", () => {
-  test("the handle with the email, and since when", () => {
+  test("the handle with the email, the role and when last active", () => {
     expect(metaLine(casey)).toBe("@casey · casey@example.com");
-    expect(stateLine(root)).toBe("admin · since 12 September 2026");
-    expect(stateLine(casey)).toBe(
-      "member · password to change · since 13 September 2026",
+    expect(stateLine(root, NOW)).toBe("admin · active today");
+    expect(stateLine(casey, NOW)).toBe("member · password to change");
+    expect(stateLine({ ...casey, disabled: true }, NOW)).toBe(
+      "member · disabled",
     );
-    expect(stateLine({ ...casey, disabled: true })).toBe(
-      "member · disabled · since 13 September 2026",
+    expect(stateLine({ ...casey, mustChangePassword: false }, NOW)).toBe(
+      "member · never active",
     );
+  });
+
+  test("last active counts the user's own days, never hours", () => {
+    const utc = (lastVisitDay: string | null) => ({ lastVisitDay, tz: "UTC" });
+    expect(activeLine(utc("2026-09-28"), NOW)).toBe("active today");
+    expect(activeLine(utc("2026-09-27"), NOW)).toBe("active yesterday");
+    expect(activeLine(utc("2026-09-25"), NOW)).toBe("active 3d ago");
+    expect(activeLine(utc(null), NOW)).toBe("never active");
+    // noon UTC is already the 29th on Kiritimati, whatever the reader's
+    // zone
+    expect(
+      activeLine({ lastVisitDay: "2026-09-28", tz: "Pacific/Kiritimati" }, NOW),
+    ).toBe("active yesterday");
+    expect(
+      activeLine({ lastVisitDay: "2026-09-28", tz: "Not/AZone" }, NOW),
+    ).toBe("active today");
+    // past four weeks the date itself, the year once it differs
+    expect(activeLine(utc("2026-08-02"), NOW)).toBe("active 2 Aug");
+    expect(activeLine(utc("2025-12-31"), NOW)).toBe("active 31 Dec 2025");
+  });
+
+  test("a generated password passes the rule and skips look-alikes", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const p = generatePassword();
+      expect(p).toHaveLength(20);
+      expect(p).toMatch(/^[a-km-zA-HJ-NP-Z2-9]+$/);
+      expect(passwordProblem(p)).toBeNull();
+      seen.add(p);
+    }
+    expect(seen.size).toBe(50);
+  });
+
+  test("the list's aside counts by role, the disabled apart", () => {
+    expect(
+      userCounts([root, casey, { ...casey, id: "u3", disabled: true }]),
+    ).toEqual({ admins: 1, members: 2, disabled: 1 });
   });
 
   test("the disable lock: the admin's own row and the last enabled admin", () => {
@@ -130,15 +191,10 @@ describe("the checks", () => {
     expect(emailProblem(`${"a".repeat(250)}@b.co`)).toContain("under 254");
   });
 
-  test("the password rule, typed twice", () => {
-    expect(newPasswordProblem("longenough", "longenough")).toBeNull();
-    expect(newPasswordProblem("short", "short")).toContain("at least 8");
-    expect(newPasswordProblem("é".repeat(513), "é".repeat(513))).toContain(
-      "at most 1024 bytes",
-    );
-    expect(newPasswordProblem("longenough", "longenougx")).toBe(
-      "The two passwords differ",
-    );
+  test("the password rule", () => {
+    expect(passwordProblem("longenough")).toBeNull();
+    expect(passwordProblem("short")).toContain("at least 8");
+    expect(passwordProblem("é".repeat(513))).toContain("at most 1024 bytes");
   });
 
   test("the patch carries only what changed, lowercased", () => {
@@ -186,19 +242,6 @@ describe("the refusals", () => {
       "password",
     );
     expect(userFieldOf("the last admin must remain enabled")).toBeUndefined();
-  });
-
-  test("a password slip is pinned to the box to fix", () => {
-    const names = { next: "password", again: "again" };
-    expect(newPasswordFieldProblem("short", "short", names)?.field).toBe(
-      "password",
-    );
-    expect(
-      newPasswordFieldProblem("longenough", "longenougx", names)?.field,
-    ).toBe("again");
-    expect(
-      newPasswordFieldProblem("longenough", "longenough", names),
-    ).toBeNull();
   });
 });
 
@@ -255,6 +298,72 @@ describe("the entity", () => {
     },
   );
 
+  test.serial(
+    "a projects save adds and removes one call each, then reads the list",
+    async () => {
+      const calls: string[] = [];
+      answer = (url, init) => {
+        const method = init?.method ?? "GET";
+        calls.push(`${method} ${url}`);
+        if (url === "/api/users") return Response.json({ users: [root] });
+        return Response.json({
+          project: { ...team("p2", "ops"), description: "", members: [] },
+        });
+      };
+      await setUserProjects(casey, ["p2"]);
+      expect(calls.filter((c) => !c.startsWith("GET /api/projects"))).toEqual([
+        "POST /api/projects/p2/members",
+        "DELETE /api/projects/p1/members/u2",
+        "GET /api/users",
+      ]);
+    },
+  );
+
+  test.serial(
+    "a projects save that fails partway still reads the list again",
+    async () => {
+      const calls: string[] = [];
+      answer = (url, init) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url === "/api/users") return Response.json({ users: [root] });
+        return Response.json({ error: "no such project" }, { status: 404 });
+      };
+      await expect(setUserProjects(casey, ["p2"])).rejects.toThrow();
+      expect(calls).toEqual([
+        "POST /api/projects/p2/members",
+        "GET /api/users",
+      ]);
+      expect(users.value).toEqual([root]);
+    },
+  );
+
+  test.serial(
+    "a write that answers no row says when the list did not come back",
+    async () => {
+      answer = (_url, init) =>
+        init?.method === "POST"
+          ? new Response(null, { status: 204 })
+          : Response.json({ error: "down" }, { status: 503 });
+      users.value = [root, casey];
+      await expect(
+        resetPassword("u2", { password: "longenough" }),
+      ).rejects.toThrow("down");
+      await expect(setUserProjects(casey, ["p1"])).rejects.toThrow("down");
+      // the page keeps the list it had
+      expect(users.value).toEqual([root, casey]);
+    },
+  );
+
+  test.serial("usage lands under its own user, a failure as null", async () => {
+    const usage = { since: 0, until: 1, sends: 2, tokens: 10, cost: 0 };
+    answer = (url) =>
+      url.includes("/u1/")
+        ? Response.json(usage)
+        : Response.json({ error: "no" }, { status: 500 });
+    await Promise.all([loadUserUsage("u2"), loadUserUsage("u1")]);
+    expect(userUsage.value).toEqual({ u1: usage, u2: null });
+  });
+
   test.serial("a refusal is the error shown", async () => {
     answer = () => Response.json({ error: "forbidden" }, { status: 403 });
     await loadUsers();
@@ -263,33 +372,78 @@ describe("the entity", () => {
   });
 });
 
-describe("the page", () => {
-  test("the signed-in admin has no role choice or reset", () => {
-    const html = render(<UserForm user={root} admins={1} onDone={() => {}} />);
-    expect(html).not.toContain(">Role<");
-    expect(html).not.toContain("Reset password");
-  });
-
-  test("renders every user with the handle, the email and the role", () => {
+describe("the pages", () => {
+  test("the list links every user with the handle, the email and the role", () => {
     users.value = [root, casey];
     const html = render(<Users />);
     expect(html).toContain("Stefan Prodan");
     expect(html).toContain("@admin · admin@1ctx.dev");
     expect(html).toContain("@casey · casey@example.com");
-    expect(html).toContain(
-      "member · password to change · since 13 September 2026",
-    );
-    users.value = [root, { ...casey, disabled: true }];
-    expect(render(<Users />)).toContain("rows-item-off");
+    expect(html).toContain('href="/admin/access/users/casey"');
+    expect(html).toContain("member · password to change");
     expect(html).toContain(">you<");
-    expect(html).toContain("New user");
+    expect(html).toContain('href="/admin/access/users?new"');
+    expect(html).toContain(">Admins<");
     expect(html).not.toContain("passwordHash");
   });
 
-  test("shows the load's refusal", () => {
+  test("the list shows the load's refusal", () => {
     usersError.value = { words: "forbidden", status: 403 };
     const html = render(<Users />);
     expect(html).toContain("This page did not load");
     expect(html).toContain("Forbidden.");
+  });
+
+  test("New user asks who, the role and the password twice", () => {
+    users.value = [root];
+    const html = render(<NewUser />);
+    expect(html).toContain("Create user");
+    expect(html).toContain('name="username"');
+    expect(html).not.toContain('name="again"');
+    expect(html).toContain('aria-label="Generate"');
+    expect(html).toContain('aria-label="Show"');
+    expect(html).toContain('aria-label="Copy"');
+  });
+
+  test("another user's page has every card and their personal usage", () => {
+    users.value = [root, casey];
+    projects.value = [team("p1", "platform"), team("p2", "ops")];
+    userUsage.value = {
+      u2: { since: 0, until: 1, sends: 4, tokens: 1200, cost: null },
+    };
+    const html = render(<UserPage params={{ username: "casey" }} />);
+    expect(html).toContain('aria-label="Profile"');
+    expect(html).toContain(">Role<");
+    expect(html).not.toContain("Works in");
+    expect(html).toContain(">platform<");
+    expect(html).not.toContain(">ops<");
+    expect(html).toContain("Reset password");
+    expect(html).toContain("Disable @casey");
+    expect(html).toContain("Personal, last 30 days");
+    expect(html).toContain("1.2K");
+    expect(html).toContain("not priced");
+  });
+
+  test("the admin's own page fixes the role and has no reset or disable", () => {
+    users.value = [root, casey];
+    projects.value = [];
+    const html = render(<UserPage params={{ username: "admin" }} />);
+    expect(html).toContain("You cannot change your own role.");
+    expect(html).not.toContain("Reset password");
+    expect(html).not.toContain("Disable @admin");
+  });
+
+  test("a disabled user's page offers Enable", () => {
+    users.value = [root, { ...casey, disabled: true }];
+    projects.value = [];
+    const html = render(<UserPage params={{ username: "casey" }} />);
+    expect(html).toContain("Enable @casey");
+    expect(html).toContain("They cannot sign in.");
+  });
+
+  test("an unknown handle says so", () => {
+    users.value = [root];
+    const html = render(<UserPage params={{ username: "nobody" }} />);
+    expect(html).toContain("No user by that name.");
   });
 });

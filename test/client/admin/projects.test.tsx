@@ -35,11 +35,12 @@ import {
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectForm } from "../../../src/client/views/admin/ProjectForm.tsx";
+import type { AdminUser } from "../../../src/shared/api/users.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../../src/shared/contracts/project.ts";
-import type { Me, UserAccount } from "../../../src/shared/contracts/user.ts";
+import type { Me } from "../../../src/shared/contracts/user.ts";
 
 const admin: Me = {
   id: "u1",
@@ -48,14 +49,16 @@ const admin: Me = {
   role: "admin",
   mustChangePassword: false,
 };
-const root: UserAccount = {
+const root: AdminUser = {
   ...admin,
   email: "admin@1ctx.dev",
   tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
+  lastVisitDay: null,
+  projectIds: [],
 };
-const casey: UserAccount = {
+const casey: AdminUser = {
   id: "u2",
   username: "casey",
   fullName: "Casey Doe",
@@ -65,6 +68,8 @@ const casey: UserAccount = {
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: false,
+  lastVisitDay: null,
+  projectIds: [],
 };
 const personal: ProjectSummary = {
   id: "p1",
@@ -125,7 +130,7 @@ describe("the words", () => {
   });
 
   test("offers the people not in the project, by any of their names", () => {
-    const mira: UserAccount = {
+    const mira: AdminUser = {
       ...casey,
       id: "u3",
       username: "mira",

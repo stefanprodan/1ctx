@@ -470,6 +470,29 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   (`NewCredential.tsx`) is every field in one card, the same Add
   project, Create saying which required field is empty and opening the
   page.
+- **Access › Users is a list of links, and a user is a page.**
+  `/admin/access/users` (`Users.tsx`, the words in `Users.model.ts`) is
+  one `RowsCard` of `RowsGo` rows by username: the initials, the full
+  name with "you", the handle and the email, then the role and "active
+  today", "active 3d ago" or "never active" from the last visit day
+  (`lastActive()`, calendar days, never hours), or "disabled" or
+  "password to change" in its place; the aside counts admins, members
+  and the disabled. New user is in the page's head, its `?new`
+  (`NewUser.tsx`) one card with the fields, the password and the role,
+  Create opening the page. A password an admin sets, there and in Reset
+  password, is typed once in `PasswordField.tsx`, its box holding
+  Generate, Show and Copy. `/admin/access/users/:username`
+  (`UserPage.tsx`, the four identity fields shared in `UserFields.tsx`,
+  the sign-in cards in `UserCards.tsx`), its crumb step a switcher to
+  the others: Profile, Role (a `Seg` in the
+  head, its line only the lock), Projects (the
+  credential page's `ProjectRows` and `AddProject` over the team
+  projects, one membership call per change, then the list again), Reset
+  password, and Disable or Enable, each its own form. The admin's own
+  page fixes the role and has no reset and no Disable. The aside is the
+  personal project's last 30 days alone (`GET /api/users/:id/usage`),
+  since a team project's turns are not one person's, and the account's
+  dates. The public user page's Account section has Manage for an admin.
 - **Config › Visuals is a page of cards.** `/admin/config/visuals`
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved
