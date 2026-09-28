@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
+import { DecisionUsageStore } from "../../../src/server/usage/decisions.ts";
 import {
   type UsageFields,
   UsageStore,
@@ -221,5 +222,52 @@ describe("UsageStore.days", () => {
       ],
     });
     db.close();
+  });
+});
+
+describe("a rolling total's window", () => {
+  test("counts a row at since and leaves out one at until", () => {
+    const db = memoryDb();
+    const store = new UsageStore(db);
+    for (const [sendId, now] of [
+      ["before", 99],
+      ["since", 100],
+      ["inside", 150],
+      ["until", 200],
+    ] as const) {
+      record(db, store, { projectId: "p", sendId, now });
+    }
+    expect(store.total({ projectId: "p" }, 100, 200)).toEqual({
+      sends: 2,
+      tokens: 10,
+      cost: null,
+    });
+    expect(store.activeProjects(["p"], 200, 300)).toEqual(["p"]);
+    expect(store.activeProjects(["p"], 201, 300)).toEqual([]);
+  });
+
+  test("holds for a decider's answers too", () => {
+    const decisions = new DecisionUsageStore(memoryDb());
+    for (const now of [99, 100, 150, 200]) {
+      decisions.record({
+        deciderId: "d",
+        deciderName: "d",
+        providerId: "p",
+        providerName: "p",
+        model: "m",
+        purpose: "run-attention",
+        sessionId: null,
+        projectId: null,
+        inputTokens: 1,
+        outputTokens: null,
+        cost: null,
+        duration: 1,
+        now,
+      });
+    }
+    expect(decisions.total({ deciderId: "d" }, 100, 200)).toMatchObject({
+      answers: 2,
+      tokens: 2,
+    });
   });
 });

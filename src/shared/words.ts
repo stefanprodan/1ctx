@@ -21,12 +21,6 @@ const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
 export const NAME_CHARACTERS =
   "lowercase letters, digits, dashes and underscores";
 
-// what a name field does as it is typed: lowercase, and a space or a dot
-// becomes a dash. Anything else stays for the server to refuse
-export function shapeName(value: string): string {
-  return value.toLowerCase().replace(/[ .]/g, "-");
-}
-
 // a username: the sign-in name and the handle
 export const MIN_USERNAME = 3;
 export const MAX_USERNAME = 32;
@@ -102,12 +96,6 @@ export const MAX_PASSWORD_BYTES = 1024;
 // a project is personal (one per user, made with the user) or team
 export const PROJECT_KINDS = ["personal", "team"] as const;
 export type ProjectKind = (typeof PROJECT_KINDS)[number];
-export function isProjectKind(value: unknown): value is ProjectKind {
-  return (
-    typeof value === "string" &&
-    (PROJECT_KINDS as readonly string[]).includes(value)
-  );
-}
 
 // a name an admin gives a thing on the server: a project, a provider, an
 // agent
@@ -153,18 +141,9 @@ export function isServerName(value: unknown): value is string {
     SERVER_NAME_RE.test(value)
   );
 }
-// what a server name field does as it is typed: shapeName, and an
-// underscore becomes a dash
-export function shapeServerName(value: string): string {
-  return shapeName(value).replace(/_/g, "-");
-}
-
 // the two sides an MCP server's tools are sorted into
 export const SIDES = ["read", "write"] as const;
 export type Side = (typeof SIDES)[number];
-export function isSide(value: unknown): value is Side {
-  return SIDES.includes(value as Side);
-}
 
 // a pattern on MCP tool names: `*` alone, or a name in the characters
 // MCP allows with an optional trailing `*` making it a prefix
@@ -278,16 +257,10 @@ export type SendCause = (typeof SEND_CAUSES)[number];
 // a run is the send an automation opens its session with
 export const SEND_KINDS = ["chat", "compact", "run"] as const;
 export type SendKind = (typeof SEND_KINDS)[number];
-export function isSendKind(value: unknown): value is SendKind {
-  return SEND_KINDS.includes(value as SendKind);
-}
 
 // what opened a session: a person's chat, or an automation's run
 export const SESSION_ORIGINS = ["chat", "automation"] as const;
 export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
-export function isSessionOrigin(value: unknown): value is SessionOrigin {
-  return SESSION_ORIGINS.includes(value as SessionOrigin);
-}
 
 // why a chat is archived: someone archived it, its agent was deleted,
 // or it went the admin's days without activity
@@ -351,13 +324,8 @@ export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
 // the stream's search box
 export const MAX_SEARCH = 100;
 
-// the tools that reach the web, each with a server-wide switch on the
-// tools page
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
 export type WebTool = (typeof WEB_TOOLS)[number];
-export function isWebTool(value: unknown): value is WebTool {
-  return WEB_TOOLS.includes(value as WebTool);
-}
 
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has
@@ -426,9 +394,6 @@ export const LIMIT_NAMES = [
   "archivedDeleteDays",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
-export function isLimitName(value: unknown): value is LimitName {
-  return LIMIT_NAMES.includes(value as LimitName);
-}
 
 // what a limit's number counts; the page turns ms and bytes into words
 export const LIMIT_UNITS = [
@@ -484,14 +449,8 @@ export const MAX_CONTEXT_LENGTH = 10_000_000;
 // inside it, a site's discovery index, or one raw SKILL.md
 export const SKILL_SOURCES = ["github", "archive", "index", "file"] as const;
 export type SkillSource = (typeof SKILL_SOURCES)[number];
-export function isSkillSource(value: unknown): value is SkillSource {
-  return SKILL_SOURCES.includes(value as SkillSource);
-}
 
-// the two tools an agent's skills bring to a send, never on the Tools
-// page: `skill` loads a body, `skill_file` reads one of its files
+// never switched on their own: `skill` loads a body, `skill_file`
+// reads one of its files
 export const SKILL_TOOLS = ["skill", "skill_file"] as const;
 export type SkillTool = (typeof SKILL_TOOLS)[number];
-export function isSkillTool(value: unknown): value is SkillTool {
-  return SKILL_TOOLS.includes(value as SkillTool);
-}

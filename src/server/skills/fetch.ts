@@ -79,23 +79,26 @@ async function download(
     } catch {
       if (shutdown.aborted)
         throw new ServiceUnavailable("server is shutting down");
-      if (timeout.aborted) throw new BadGateway(`${url.host} timed out`);
-      throw new BadGateway(`${url.host} did not answer`);
+      if (timeout.aborted)
+        throw new BadGateway(`the host ${url.host} timed out`);
+      throw new BadGateway(`the host ${url.host} did not answer`);
     }
     if (response.status >= 300 && response.status < 400) {
       // the body of a redirect is never read; free it before the hop
       await response.body?.cancel().catch(() => {});
       const location = response.headers.get("location");
       if (location === null)
-        throw new BadGateway(`${url.host} redirected without a location`);
+        throw new BadGateway(
+          `the host ${url.host} redirected without a location`,
+        );
       if (redirects >= 3)
-        throw new BadGateway(`${url.host} redirected too many times`);
+        throw new BadGateway(`the host ${url.host} redirected too many times`);
       url = checkedUrl(new URL(location, url).href);
       continue;
     }
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      throw new BadGateway(`${url.host} answered ${response.status}`);
+      throw new BadGateway(`the host ${url.host} answered ${response.status}`);
     }
     try {
       return await readCapped(response.body, cap, "the download is too large");
@@ -103,8 +106,9 @@ async function download(
       if (error instanceof BadRequest) throw error;
       if (shutdown.aborted)
         throw new ServiceUnavailable("server is shutting down");
-      if (timeout.aborted) throw new BadGateway(`${url.host} timed out`);
-      throw new BadGateway(`${url.host} did not answer`);
+      if (timeout.aborted)
+        throw new BadGateway(`the host ${url.host} timed out`);
+      throw new BadGateway(`the host ${url.host} did not answer`);
     }
   }
 }

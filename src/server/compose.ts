@@ -176,6 +176,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     },
   });
+  const projectTotal = (projectId: string, since: number, until: number) =>
+    usage.total({ projectId }, since, until);
   const providers = providersArea({
     db,
     clock,
@@ -186,6 +188,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
     deciders: {
       usesProvider: (providerId) => deciders.usesProvider(providerId),
+    },
+    usage: {
+      providerTotal: (providerId, since, until) =>
+        usage.total({ providerId }, since, until),
     },
   });
   const deciders = decidersArea({
@@ -213,6 +219,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     version: options.version,
     render: renderMarkdown,
     capabilities,
+    usage: {
+      calls: (server, since, until) => sessions.mcpCalls(server, since, until),
+      servers: (since, until) => sessions.mcpServerCalls(since, until),
+    },
   });
   const skills: Skills = skillsArea({
     db,
@@ -220,6 +230,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: log("skills"),
     fetcher,
     capabilities,
+    usage: { loads: (since, until) => sessions.skillLoads(since, until) },
     agents: {
       agentNames: (ids) =>
         ids.flatMap((id) => {
@@ -241,6 +252,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       counts: (projectId) => knowledge.counts(projectId),
       latest: (projectId, limit) => knowledge.latest(projectId, limit),
     },
+    usage: { projectTotal },
   });
   const credentials = credentialsArea({
     db,
@@ -256,7 +268,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secureCookie: options.secureCookie,
     users,
     projects,
+    usage: {
+      projectTotal,
+      activeProjects: (ids, since, until) =>
+        usage.activeProjects(ids, since, until),
+    },
     activity: { personDays: (...args) => sessions.personDays(...args) },
+    presence: { onlineUserIds: () => socket.onlineUserIds() },
   });
   agents = agentsArea({
     db,
@@ -276,6 +294,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner: () => runner,
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
+      agentTotal: (agentId, since, until) =>
+        usage.total({ agentId }, since, until),
     },
     users,
   });
@@ -312,6 +332,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory,
     knowledge,
     credentials,
+    usage: {
+      visuals: (since, until) => sessions.visualCounts(since, until),
+      web: (since, until) => sessions.webCounts(since, until),
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
@@ -389,6 +413,38 @@ export async function compose(options: ComposeOptions): Promise<App> {
     }),
     online: () => socket.online(),
     automations: () => automations.store.tally(clock() - WAIT_GRACE_MS),
+    attention: () => {
+      const keyed = (kind: SecretKind, name: string | null) =>
+        name !== null && secret(kind, name) !== null;
+      const search =
+        configuredTools.store.rows().find((row) => row.name === "websearch")
+          ?.provider ?? null;
+      return {
+        providers: providers.store.list().map((p) => ({
+          name: p.name,
+          keyName: p.keyName,
+          hasKey: keyed("provider-", p.keyName),
+        })),
+        mcp: mcp.store.list().map((s) => ({
+          name: s.name,
+          keyName: s.keyName,
+          hasKey: keyed(MCP_KEY_PREFIX, s.keyName),
+          refreshFailedAt: s.refreshFailedAt,
+        })),
+        skills: skills.store.list().map((s) => ({
+          name: s.name,
+          refreshFailedAt: s.refreshFailedAt,
+        })),
+        credentials: credentials.store.list().map((c) => ({
+          name: c.name,
+          key: credentials.keyState(c.keyName),
+        })),
+        search: {
+          provider: search,
+          hasKey: keyed("search-", search === null ? null : `search-${search}`),
+        },
+      };
+    },
     // built here, at the compile root, so the binary finds its entry
     worker: new URL("./overview/scan.worker.ts", import.meta.url),
   });

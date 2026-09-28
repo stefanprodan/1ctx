@@ -1,22 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The deciders entity: the admin's list, loaded with the agents page
-// and dropped with the signed-in user, and the calls that change it. A
-// write puts the server's row in the list, so what shows is what was
-// saved. A check's answer belongs to the row that asked, not here.
 
 import { effect, signal } from "@preact/signals";
 import type {
   CheckDeciderResponse,
   DeciderResponse,
   DecidersResponse,
+  DecisionUsageResponse,
   SaveDeciderRequest,
 } from "../../shared/api/deciders.ts";
 import type { DeciderSummary } from "../../shared/contracts/decider.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { usageSlot } from "./slot.ts";
 
 export const deciders = signal<DeciderSummary[] | null>(null);
 export const decidersError = signal<Failure | null>(null);
@@ -31,8 +28,6 @@ effect(() => {
   decidersError.value = null;
 });
 
-// a load's answer is kept only when it is still the latest word on the
-// list for the same user, as the agents' is
 let turn = 0;
 
 export async function loadDeciders(): Promise<void> {
@@ -91,3 +86,13 @@ export async function deleteDecider(id: string): Promise<void> {
 
 export const checkDecider = (id: string): Promise<CheckDeciderResponse> =>
   api<CheckDeciderResponse>(`${path(id)}/check`, "POST");
+
+export const deciderUsage = usageSlot<DecisionUsageResponse>(
+  (id) => `${path(id)}/usage`,
+);
+export const loadDeciderUsage = deciderUsage.load;
+
+export const decisionUsage = usageSlot<DecisionUsageResponse>(
+  (id) => `/api/decisions/${encodeURIComponent(id)}/usage`,
+);
+export const loadDecisionUsage = decisionUsage.load;

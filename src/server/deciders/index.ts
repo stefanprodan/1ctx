@@ -26,11 +26,10 @@ import {
   type UsagePort,
 } from "./decide.ts";
 import { DecisionStore } from "./decisions.ts";
-import { routes } from "./routes.ts";
+import { routes, type TotalsPort } from "./routes.ts";
 import { type DeciderRow, DeciderStore } from "./store.ts";
 
 export {
-  type DecisionAnswer,
   DecisionError,
   type DecisionQuestion,
 } from "../providers/index.ts";
@@ -52,7 +51,7 @@ export type DecidersDeps = {
   clock: Clock;
   log: Log;
   providers: ProvidersPort;
-  usage: UsagePort;
+  usage: UsagePort & TotalsPort;
 };
 
 export type Deciders = {

@@ -1,0 +1,8 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .visuals-hosts {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+}

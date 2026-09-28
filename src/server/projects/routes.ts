@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DeleteProjectResponse,
   ProjectResponse,
@@ -19,6 +20,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { type UserRow, summary as userSummary } from "../users/index.ts";
 import {
   parseAddMember,
@@ -47,6 +49,10 @@ export type KnowledgePort = {
   latest(projectId: string, limit: number): KnowledgeFile[];
 };
 
+export type UsagePort = {
+  projectTotal(projectId: string, since: number, until: number): SendTotals;
+};
+
 export type RoutesDeps = {
   db: Db;
   store: ProjectStore;
@@ -54,6 +60,7 @@ export type RoutesDeps = {
   users: UsersPort;
   sessions: SessionsPort;
   knowledge: KnowledgePort;
+  usage: UsagePort;
   clock: Clock;
 };
 
@@ -227,6 +234,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         });
         const body: DeleteProjectResponse = { deleted };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const project = findTeam(ctx.params.id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.projectTotal(project.id, since, until),
+          ),
+        );
       },
     },
     {

@@ -1,14 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The rail: the logo with the button that hides it, the pages the route
-// table lists with the user's projects under Projects, personal first,
-// a group as a row that opens to its pages, open while one is shown,
-// and the user row at the bottom with its menu: the profile, the dark
-// theme's switch and sign out. A sign out the server refuses stays in the menu with the
-// reason. As a drawer the hide button is a close, it takes the focus
-// when the drawer opens, and any link closes the drawer, the one to the
-// page already shown included, since that is no navigation.
 
 import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
@@ -20,10 +11,12 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
-import { litPage, onPage, projectHere } from "./Rail.model.ts";
+import { adminFace, onPage, projectHere, zoneLit } from "./Rail.model.ts";
 import { navigate, path } from "./router.ts";
-import { type Route, railRows } from "./routes.ts";
+import { navEntries } from "./routes.ts";
+import { lastAdmin, lastWork } from "./shell.ts";
 import { theme, toggleTheme } from "./theme.ts";
+import { ZONES } from "./zones.ts";
 import "./rail.css";
 
 function Sub({
@@ -38,7 +31,6 @@ function Sub({
   here: string;
   // inside the link's page, not only on it
   on?: boolean;
-  // a project's kind; a group's pages have none
   icon?: IconName;
   follow?: () => void;
   children: string;
@@ -62,60 +54,36 @@ function Sub({
   );
 }
 
-// a row that opens to its pages: open by the user, or while one of its
-// pages is on screen
-function Group({
-  name,
-  icon,
-  routes,
-  here,
-  follow,
-}: {
-  name: string;
-  icon: IconName;
-  routes: Route[];
-  here: string;
-  follow?: () => void;
-}) {
-  const lit = litPage(
-    here,
-    routes.map((r) => r.path),
-  );
-  const inside = lit !== null;
-  const open = useSignal(inside);
-  useEffect(() => {
-    if (inside) open.value = true;
-  }, [inside]);
+function Zones({ here, follow }: { here: string; follow?: () => void }) {
+  const lit = zoneLit(here);
   return (
     <>
-      <button
-        type="button"
-        class={`rail-item rail-group${inside ? " rail-item-in" : ""}`}
-        aria-expanded={open.value}
-        onClick={() => {
-          open.value = !open.value;
-        }}
-      >
-        <Icon name={icon} />
-        <span>{name}</span>
-        <Icon
-          name="chevron"
-          size={14}
-          class={`rail-item-chevron${open.value ? " rail-item-chevron-open" : ""}`}
-        />
-      </button>
-      {open.value &&
-        routes.map((r) => (
-          <Sub
-            key={r.path}
-            href={r.path}
-            here={here}
-            on={r.path === lit}
-            follow={follow}
+      {ZONES.map((z) => (
+        <Fragment key={z.href}>
+          <a
+            href={z.href}
+            class={`rail-item rail-zone${lit === z.href ? " rail-item-on" : ""}${
+              lit !== null && onPage(lit, z.href) ? " rail-item-in" : ""
+            }`}
+            aria-current={here === z.href ? "page" : undefined}
+            onClick={follow}
           >
-            {r.nav!.label}
-          </Sub>
-        ))}
+            <Icon name={z.icon} />
+            <span>{z.label}</span>
+          </a>
+          {z.pages.map((p) => (
+            <Sub
+              key={p.href}
+              href={p.href}
+              here={here}
+              on={p.href === lit}
+              follow={follow}
+            >
+              {p.label}
+            </Sub>
+          ))}
+        </Fragment>
+      ))}
     </>
   );
 }
@@ -132,6 +100,7 @@ export function Rail({
   const open = useSignal(false);
   const failure = useSignal<string | null>(null);
   const here = path.value;
+  const admin = adminFace(here);
   const inProject = projectHere(here, session.value, automationProject.value);
   const hide = useRef<HTMLButtonElement>(null);
   const nav = useRef<HTMLElement>(null);
@@ -145,6 +114,8 @@ export function Rail({
       ?.querySelector(".rail-sub-on")
       ?.scrollIntoView({ block: "nearest" });
   }, [here, inProject, projects.value]);
+  // a link to the page on screen is no navigation, so the link closes
+  // the drawer itself
   const follow = narrow ? onHide : undefined;
   return (
     <aside class={`rail${narrow ? " rail-drawer" : ""}`}>
@@ -153,6 +124,7 @@ export function Rail({
           <a class="rail-logo" href="/" aria-label="Home" onClick={follow}>
             <Logo height={26} />
           </a>
+          {admin && <span class="rail-face">Admin</span>}
           <button
             ref={hide}
             type="button"
@@ -164,28 +136,21 @@ export function Rail({
           </button>
         </div>
         <nav ref={nav} class="rail-nav">
-          {railRows(user.role).map((row) =>
-            row.kind === "group" ? (
-              <Group
-                key={row.name}
-                name={row.name}
-                icon={row.icon}
-                routes={row.routes}
-                here={here}
-                follow={follow}
-              />
-            ) : (
-              <Fragment key={row.route.path}>
+          {admin ? (
+            <Zones here={here} follow={follow} />
+          ) : (
+            navEntries().map((route) => (
+              <Fragment key={route.path}>
                 <a
-                  href={row.route.path}
-                  class={`rail-item${here === row.route.path ? " rail-item-on" : ""}`}
-                  aria-current={here === row.route.path ? "page" : undefined}
+                  href={route.path}
+                  class={`rail-item${here === route.path ? " rail-item-on" : ""}`}
+                  aria-current={here === route.path ? "page" : undefined}
                   onClick={follow}
                 >
-                  <Icon name={row.route.nav!.icon} />
-                  <span>{row.route.nav!.label}</span>
+                  <Icon name={route.nav!.icon} />
+                  <span>{route.nav!.label}</span>
                 </a>
-                {row.route.path === "/projects" &&
+                {route.path === "/projects" &&
                   (projects.value ?? []).map((p) => (
                     <Sub
                       key={p.id}
@@ -199,10 +164,21 @@ export function Rail({
                     </Sub>
                   ))}
               </Fragment>
-            ),
+            ))
           )}
         </nav>
       </div>
+      {user.role === "admin" && (
+        <a
+          class="rail-band"
+          href={admin ? lastWork.value : lastAdmin.value}
+          onClick={follow}
+        >
+          <Icon name={admin ? "home" : "panel"} />
+          <span>{admin ? "Exit admin panel" : "Admin panel"}</span>
+          <Icon name="open" size={14} class="rail-band-open" />
+        </a>
+      )}
       <div class="rail-user">
         {open.value && (
           <div class="menu rail-menu">

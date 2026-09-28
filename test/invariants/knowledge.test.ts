@@ -550,7 +550,7 @@ describe("knowledge routes", () => {
     const s = await setup();
     try {
       const response = await s.admin.call("POST", "/api/projects", {
-        body: { name: "team" },
+        body: { name: "team", description: "A team project." },
       });
       expect(response.status).toBe(201);
       const projectId = (await response.json()).project.id;

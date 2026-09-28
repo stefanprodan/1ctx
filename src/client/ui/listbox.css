@@ -1,0 +1,41 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .listbox-search {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    height: 40px;
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .listbox-glass {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .listbox-input {
+    flex-grow: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    font-size: var(--text-input);
+    outline: none;
+  }
+  .listbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-1);
+    overflow-y: auto;
+  }
+  .listbox-none {
+    margin: 0;
+    padding: var(--space-2);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+}

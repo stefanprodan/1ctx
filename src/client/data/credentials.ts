@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The HTTP credentials entity: the admin's list with the http- key files
-// the form may pick, loaded when the Tools page's Web tab is reached and
-// dropped with the signed-in user, and the calls that change it. A write
-// puts the server's row in the list, so what shows is what was saved.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -16,7 +11,8 @@ import type {
 } from "../../shared/api/credentials.ts";
 import type { CredentialSummary } from "../../shared/contracts/credential.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { byName } from "../lib/search.ts";
+import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
 
 export const credentials = signal<CredentialSummary[] | null>(null);
@@ -30,17 +26,11 @@ effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
   owner = id;
-  turn++;
   credentials.value = null;
   credentialKeys.value = [];
   credentialsError.value = null;
 });
 
-const byName = (rows: CredentialSummary[]) =>
-  rows.slice().sort((a, b) => a.name.localeCompare(b.name));
-
-// a load's answer is kept only when it is still the one wanted: for the
-// signed-in user of the moment and the latest word on the list
 export async function loadCredentials(): Promise<void> {
   const forUser = owner;
   const mine = ++turn;
@@ -71,7 +61,6 @@ export async function addCredential(
   body: CreateCredentialRequest,
 ): Promise<CredentialSummary> {
   const forUser = owner;
-  turn++;
   const answer = await api<CredentialResponse>(
     "/api/credentials",
     "POST",
@@ -82,26 +71,49 @@ export async function addCredential(
   return keep(answer);
 }
 
+// a 404: another tab deleted it, so the page says it is gone
+async function gone<T>(id: string, call: () => Promise<T>): Promise<T> {
+  const forUser = owner;
+  try {
+    return await call();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404 && owner === forUser) {
+      turn++;
+      credentials.value = (credentials.value ?? []).filter((c) => c.id !== id);
+    }
+    throw err;
+  }
+}
+
 export async function patchCredential(
   id: string,
   body: PatchCredentialRequest,
 ): Promise<CredentialSummary> {
   const forUser = owner;
-  turn++;
-  const answer = await api<CredentialResponse>(
-    `/api/credentials/${encodeURIComponent(id)}`,
-    "PATCH",
-    body,
+  const answer = await gone(id, () =>
+    api<CredentialResponse>(
+      `/api/credentials/${encodeURIComponent(id)}`,
+      "PATCH",
+      body,
+    ),
   );
   if (owner !== forUser) return answer.credential;
+  // a delete that landed first keeps the row out
+  if (!(credentials.value ?? []).some((c) => c.id === id)) {
+    return answer.credential;
+  }
   turn++;
   return keep(answer);
 }
 
+// a row already gone is what a delete wants: no refusal
 export async function deleteCredential(id: string): Promise<void> {
   const forUser = owner;
-  turn++;
-  await api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE");
+  try {
+    await api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE");
+  } catch (err) {
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
+  }
   if (owner === forUser) {
     turn++;
     credentials.value = (credentials.value ?? []).filter((c) => c.id !== id);

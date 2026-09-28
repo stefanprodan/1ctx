@@ -1,6 +1,3 @@
-/* The one design of a list: a card of rows, the same rows inset in a
-   form or an open row, and every part of a row's head and end. */
-
 @layer tokens, base, owners;
 
 @layer owners {
@@ -26,7 +23,6 @@
     padding: 0 var(--space-4);
     border-bottom: 1px solid var(--line);
   }
-  /* the search fills the band from the card's edge, as over the stream */
   .rows-head-search {
     padding-left: 0;
   }
@@ -36,8 +32,6 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
-  /* tabs in the head: they stand on its rule, the hint at the right,
-     and a phone gives the head to the tabs */
   .rows-head-tabs {
     align-items: stretch;
   }
@@ -50,18 +44,58 @@
       display: none;
     }
   }
+  /* the count grows to the left, so typing moves only the search */
+  .rows-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: var(--text-ui);
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .rows-head-slot {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  @media (max-width: 719px) {
+    .rows-head-wrap {
+      flex-wrap: wrap;
+      row-gap: 0;
+      padding-bottom: var(--space-2);
+    }
+    .rows-head-wrap .rows-head-slot {
+      flex-basis: 100%;
+    }
+    .rows-head-wrap .rows-count {
+      margin-left: 15px;
+      margin-right: auto;
+    }
+    .rows-head-below {
+      flex-wrap: wrap;
+      row-gap: 0;
+      padding-top: var(--space-2);
+      padding-bottom: var(--space-2);
+    }
+    .rows-head-below .rows-hint {
+      flex-basis: 100%;
+      min-height: 1.5em;
+      margin-left: 0;
+    }
+  }
   .rows-add {
     margin-left: auto;
     flex-shrink: 0;
     white-space: nowrap;
   }
-  /* a head's filters stay on the head's line */
   .rows-filters {
     flex-wrap: nowrap;
     flex-shrink: 0;
     margin-left: auto;
   }
-  /* the hint takes the free room, so what follows it sits beside it */
+  .rows-count + .rows-add,
+  .rows-count + .rows-filters {
+    margin-left: 0;
+  }
   .rows-hint ~ .rows-add,
   .rows-hint ~ .rows-filters,
   .rows-hint ~ .seg {
@@ -114,14 +148,11 @@
     min-height: 56px;
     padding: var(--space-2) var(--space-4);
   }
-  /* a static row starts where an opening row's head does */
   .rows-line-static {
     padding-left: calc(var(--space-4) + 14px + var(--space-3));
     color: var(--dim);
   }
 
-  /* a row the pointer can act on lights as a stream row does: the
-     whole line, a switch at its end included */
   .rows-toggle.rows-line:hover,
   .rows-line-end:hover,
   .rows-line-pick:hover,
@@ -155,7 +186,6 @@
     color: var(--dim);
     text-decoration: none;
   }
-  /* the link part of a row with an end: the line's flex, its height */
   .rows-go-part {
     display: flex;
     align-items: center;
@@ -258,8 +288,29 @@
   .rows-meta-bad {
     color: var(--failed);
   }
+  .rows-meta-brand {
+    color: var(--brand);
+  }
   .rows-meta-short {
     display: none;
+  }
+  .rows-meta-two {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-family: var(--sans);
+  }
+  .rows-meta-under {
+    color: var(--faint);
+  }
+  /* a touch takes 44px around the X */
+  @media (pointer: coarse) {
+    .rows-remove.btn-icon {
+      width: 44px;
+      height: 44px;
+      margin: -6px -6px -6px 0;
+    }
   }
 
   .rows-handle {
@@ -272,7 +323,6 @@
     color: var(--failed);
   }
 
-  /* an inset list: the same rows, tighter, on the field's ground */
   .rows-list {
     display: flex;
     flex-direction: column;
@@ -486,8 +536,6 @@
     opacity: 0.5;
   }
 
-  /* RowsTree: a folder tree as rows of one line, a folder opening in
-     place, each level indented by its depth */
   .rows-tree {
     margin: 0;
     padding: 0;
@@ -565,7 +613,6 @@
   }
 
   @media (max-width: 719px) {
-    /* a level indents less, and a file's name has the whole line */
     .rows-tree-node {
       padding-left: calc(var(--space-4) + var(--rows-depth, 0) * 12px);
     }
@@ -581,10 +628,8 @@
     .rows-go-part {
       flex-wrap: wrap;
     }
-    /* the head keeps room for its name: an end that does not fit beside
-       it, a failure or a group of boxes, wraps to its own line at the
-       right and wraps inside itself, while a lone switch or button
-       stays on the head's line */
+    /* the head keeps room for its name: an end that does not fit
+       beside it wraps to its own line */
     .rows-title {
       min-width: min(160px, 100%);
     }
@@ -602,16 +647,11 @@
     .rows-line-static {
       padding-left: var(--space-4);
     }
-    /* the meta wraps under the text it follows: past a radio or a
-       chevron, past nothing in a static row, a link or a row whose
-       title comes first, and past the avatar too when the row has one */
     .rows-meta {
       flex-basis: 100%;
       order: 6;
       white-space: normal;
     }
-    /* a meta with a short form shows only that on a phone, and a sub
-       line marked wide none */
     .rows-meta-long,
     .rows-meta-wide,
     .rows-sub-wide {
@@ -619,6 +659,11 @@
     }
     .rows-meta-short {
       display: inline;
+    }
+    .rows-meta-two {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2);
     }
     .rows-line > .rows-meta,
     .rows-toggle > .rows-meta {
@@ -646,9 +691,6 @@
     .rows-list .rows-body-chevron {
       padding: var(--space-3);
     }
-    /* a row's question wraps below its head, at the right; buttons
-       alone stay on the head's line, and an open row's end beside its
-       toggle */
     .rows-line:not(.rows-line-end) > .rows-end-ask {
       flex-basis: 100%;
       order: 7;

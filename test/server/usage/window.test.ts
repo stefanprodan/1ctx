@@ -5,6 +5,10 @@ import { describe, expect, test } from "bun:test";
 import {
   countByDay,
   daysWindow,
+  LAST_DAYS_MS,
+  lastDays,
+  monthWindow,
+  nextDay,
   usageWindow,
   weekWindow,
 } from "../../../src/server/usage/window.ts";
@@ -190,5 +194,68 @@ describe("countByDay", () => {
       ]),
     ).toEqual([2, 2]);
     expect(countByDay([], 0, [0])).toEqual([]);
+  });
+});
+
+describe("monthWindow", () => {
+  const now = Date.parse("2026-10-15T12:00:00Z");
+
+  test("holds every day of a past month from its local midnight", () => {
+    const window = monthWindow(now, "Europe/Bucharest", "2026-02");
+    expect(window.days).toHaveLength(28);
+    expect(window.days[0]).toBe("2026-02-01");
+    expect(window.days.at(-1)).toBe("2026-02-28");
+    expect(window.since).toBe(Date.parse("2026-01-31T22:00:00Z"));
+    expect(window.until).toBe(Date.parse("2026-02-28T22:00:00Z"));
+  });
+
+  test("ends with today in this month", () => {
+    const window = monthWindow(now, "UTC", "2026-10");
+    expect(window.days.at(-1)).toBe("2026-10-15");
+    expect(window.until).toBe(Date.parse("2026-10-16T00:00:00Z"));
+  });
+
+  test("keeps a DST change inside the month's days", () => {
+    const window = monthWindow(now, "Europe/Bucharest", "2026-03");
+    expect(window.days).toHaveLength(31);
+    const last = window.starts.at(-1)!;
+    expect(window.until - last).toBe(24 * HOUR);
+    expect(window.starts[29]! - window.starts[28]!).toBe(23 * HOUR);
+  });
+
+  test("crosses a year end", () => {
+    const window = monthWindow(now, "UTC", "2025-12");
+    expect(window.days.at(-1)).toBe("2025-12-31");
+    expect(window.until).toBe(Date.parse("2026-01-01T00:00:00Z"));
+  });
+
+  test("has no days for a month after this one", () => {
+    const window = monthWindow(now, "UTC", "2026-11");
+    expect(window.days).toEqual([]);
+    expect(window.until).toBe(window.since);
+  });
+});
+
+describe("lastDays", () => {
+  test("reads 30 days of 24 hours back from now and names the bounds", () => {
+    const now = Date.UTC(2026, 2, 29, 12);
+    const seen: number[][] = [];
+    const body = lastDays(now, (since, until) => {
+      seen.push([since, until]);
+      return { sends: 1 };
+    });
+    expect(seen).toEqual([[now - LAST_DAYS_MS, now]]);
+    expect(body).toEqual({ since: now - 30 * 24 * HOUR, until: now, sends: 1 });
+  });
+});
+
+describe("nextDay", () => {
+  test.each([
+    ["2026-09-28", "2026-09-29"],
+    ["2026-09-30", "2026-10-01"],
+    ["2026-12-31", "2027-01-01"],
+    ["2028-02-28", "2028-02-29"],
+  ])("%s to %s", (day, next) => {
+    expect(nextDay(day)).toBe(next);
   });
 });

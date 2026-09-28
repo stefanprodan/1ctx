@@ -5,6 +5,10 @@
 // rename, the deletion, and the boot repair of rows a crash left running. The
 // runner below writes them through the store this area builds.
 
+import type { AgentActivity } from "../../shared/api/agents.ts";
+import type { McpServersUsage, McpUsage } from "../../shared/api/mcp.ts";
+import type { SkillLoads } from "../../shared/api/skills.ts";
+import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
@@ -15,7 +19,15 @@ import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
-import { personDays } from "./activity.ts";
+import {
+  agentActivity,
+  mcpCalls,
+  mcpServerCalls,
+  personDays,
+  skillLoads,
+  visualCounts,
+  webCounts,
+} from "./activity.ts";
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import {
@@ -31,7 +43,6 @@ import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
 export { ARCHIVED, refuseArchived } from "./archive.ts";
 export {
-  type FeedCursor,
   parseFeedCursor,
   parseRunsCursor,
   type RunsCursor,
@@ -61,13 +72,12 @@ export {
   cutResult,
   offWire,
   RESULT_DISPLAY_CHARS,
-  type RepairedSession,
   type ReplyFinish,
   type SessionRow,
   STREAM_LIMIT,
   type UsagePort,
 } from "./rows.ts";
-export { type ScratchPort, SessionStore } from "./store.ts";
+export { SessionStore } from "./store.ts";
 export type { ChatSweep } from "./sweep.ts";
 
 export const RESTART_ERROR = "the server restarted";
@@ -94,12 +104,18 @@ export type Sessions = {
   sessionProject(principal: Principal, id: string): string | null;
   // the chats an agent's delete archives and the sends it stops
   agentImpact(agentId: string): { chats: number; running: number };
+  agentActivity(): AgentActivity[];
   // in the caller's transaction: every chat on the agent archived, one
   // envelope each
   archiveAgent(agentId: string, now: number): BusEvent[];
   // a person's posts, chats and manual runs on each day of a window,
   // in every project
   personDays(userId: string, starts: number[], until: number): number[];
+  mcpCalls(server: string, since: number, until: number): McpUsage;
+  mcpServerCalls(since: number, until: number): McpServersUsage;
+  skillLoads(since: number, until: number): SkillLoads;
+  visualCounts(since: number, until: number): VisualCounts;
+  webCounts(since: number, until: number): WebCounts;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;
@@ -144,6 +160,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       chats: agentChats(deps.db, agentId).length,
       running: agentRunning(deps.db, agentId),
     }),
+    agentActivity: () => agentActivity(deps.db),
     archiveAgent: (agentId, now) =>
       agentChats(deps.db, agentId).flatMap((id) => {
         const row = store.archive(id, "agent", null, now);
@@ -151,6 +168,11 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }),
     personDays: (userId, starts, until) =>
       personDays(deps.db, userId, starts, until),
+    mcpCalls: (server, since, until) => mcpCalls(deps.db, server, since, until),
+    mcpServerCalls: (since, until) => mcpServerCalls(deps.db, since, until),
+    skillLoads: (since, until) => skillLoads(deps.db, since, until),
+    visualCounts: (since, until) => visualCounts(deps.db, since, until),
+    webCounts: (since, until) => webCounts(deps.db, since, until),
     sessionInfo(sessionId) {
       const row = deps.db
         .query<NonNullable<Memory["session"]>, [string]>(

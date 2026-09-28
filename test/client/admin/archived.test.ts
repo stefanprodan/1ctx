@@ -1,53 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What deleting an agent would do, on the line over its ask, and the
-// question a Limits save asks when it lowers the days archived chats
+// The question a Limits save asks when it lowers the days archived chats
 // are kept.
 
 import { describe, expect, test } from "bun:test";
-import { impactLine } from "../../../src/client/views/admin/Agents.model.ts";
 import {
   deleteAsk,
   keepDays,
-} from "../../../src/client/views/admin/Tools.model.ts";
+} from "../../../src/client/views/admin/Limits.model.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
-
-describe("the agent delete's line", () => {
-  test("each part only when there is any", () => {
-    expect(impactLine({ chats: 12, automations: 2, running: 1 })).toBe(
-      "12 chats will be archived and 2 automations paused. 1 running now will be stopped.",
-    );
-    expect(impactLine({ chats: 12, automations: 2, running: 0 })).toBe(
-      "12 chats will be archived and 2 automations paused.",
-    );
-    expect(impactLine({ chats: 3, automations: 0, running: 0 })).toBe(
-      "3 chats will be archived.",
-    );
-    expect(impactLine({ chats: 0, automations: 2, running: 0 })).toBe(
-      "2 automations will be paused.",
-    );
-    expect(impactLine({ chats: 0, automations: 0, running: 2 })).toBe(
-      "2 running now will be stopped.",
-    );
-  });
-
-  test("the singular reads right and nothing says nothing", () => {
-    expect(impactLine({ chats: 1, automations: 1, running: 1 })).toBe(
-      "1 chat will be archived and 1 automation paused. 1 running now will be stopped.",
-    );
-    expect(impactLine({ chats: 0, automations: 1, running: 0 })).toBe(
-      "1 automation will be paused.",
-    );
-    expect(impactLine({ chats: 0, automations: 0, running: 0 })).toBe("");
-  });
-
-  test("a large count stays exact", () => {
-    expect(impactLine({ chats: 1250, automations: 0, running: 0 })).toBe(
-      "1,250 chats will be archived.",
-    );
-  });
-});
 
 describe("the Limits save that deletes", () => {
   const row = (name: LimitRow["name"], value: number): LimitRow => ({

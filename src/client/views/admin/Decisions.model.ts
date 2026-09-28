@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The words of the Decisions card: what each decision is called and
-// what its options are labelled, a row's meta, the deciders the form
-// offers, what a save sends and Reset fills, a description's check and
-// which field a refusal names.
 
 import type { SaveDecisionRequest } from "../../../shared/api/decisions.ts";
 import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
@@ -19,12 +14,9 @@ import type { Option } from "../../ui/Select.model.ts";
 
 export type DecisionWords = {
   title: string;
-  // the row's line under the title
   sub: string;
-  // the form's line under the switch
   hint: string;
   icon: IconName;
-  // an option's label by its key
   labels: Record<string, string>;
 };
 
@@ -41,21 +33,24 @@ export const DECISION_WORDS: Record<DecisionId, DecisionWords> = {
   },
 };
 
-// the key itself for an option the words do not know yet
+export const byTitle = (list: readonly DecisionSummary[]): DecisionSummary[] =>
+  list
+    .slice()
+    .sort((a, b) =>
+      DECISION_WORDS[a.id].title.localeCompare(DECISION_WORDS[b.id].title),
+    );
+
 export const optionLabel = (id: DecisionId, key: string): string =>
   DECISION_WORDS[id].labels[key] ?? key;
 
-// any option told something other than the text in code
 export const isCustom = (d: DecisionSummary): boolean =>
   d.options.some((o) => o.description !== o.default);
 
 const defaultName = (list: DeciderSummary[]): string | undefined =>
   list.find((d) => d.default)?.name;
 
-// "on" and the decider that answers, a named one gone falling back on
-// the default as the server does, or "off"; then "custom" while an
-// option is the admin's own. With no deciders nothing is asked,
-// whatever the switch says
+// a named decider gone falls back on the default, as the server does;
+// with no deciders nothing is asked, whatever the switch says
 export function decisionMeta(
   d: DecisionSummary,
   list: DeciderSummary[],
@@ -72,8 +67,7 @@ export function decisionMeta(
   return { long: mark === "" ? short : `${short} · ${mark}`, short };
 }
 
-// the decider picks: the default first, then each decider by name; ""
-// stands for the default
+// "" stands for the default
 export function deciderChoices(list: DeciderSummary[]): Option[] {
   const name = defaultName(list);
   return [
@@ -82,12 +76,10 @@ export function deciderChoices(list: DeciderSummary[]): Option[] {
   ];
 }
 
-// the decider the form holds: the one picked while it is still listed,
-// else the default; a decider may be deleted on the same page
+// a decider may be deleted on the same page
 export const heldDecider = (list: DeciderSummary[], picked: string): string =>
   list.some((d) => d.id === picked) ? picked : "";
 
-// what the form sends: "" for the default decider, each text trimmed
 export function decisionBody(
   d: DecisionSummary,
   form: { enabled: boolean; deciderId: string; texts: Record<string, string> },
@@ -101,20 +93,16 @@ export function decisionBody(
   };
 }
 
-// what Reset to default fills the boxes with
 export const defaultTexts = (d: DecisionSummary): Record<string, string> =>
   Object.fromEntries(d.options.map((o) => [o.key, o.default]));
 
-// any box other than its option's text in code, so Reset has work
 export const differsFromDefault = (
   d: DecisionSummary,
   texts: Record<string, string>,
 ): boolean => d.options.some((o) => (texts[o.key] ?? "").trim() !== o.default);
 
-// an option's field name, the one the server's refusal names
 export const optionField = (key: string): string => `options.${key}`;
 
-// a description's check before a save, as the server's
 export function optionProblem(text: string): string | null {
   const trimmed = text.trim();
   if (trimmed === "") return "Say when this applies";
@@ -124,8 +112,7 @@ export function optionProblem(text: string): string | null {
   return null;
 }
 
-// which field of the form a save's refusal names, on the server's
-// whole phrases; "no such decision" stays in the foot
+// the server's whole phrases, so a name never steers the field
 const DECISION_FIELDS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/^options\.(\S+) must be /, (m) => optionField(m[1]!)],
   [/^enabled must be /, () => "enabled"],

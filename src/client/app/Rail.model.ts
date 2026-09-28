@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { SessionDetail } from "../../shared/contracts/session.ts";
+import { ZONES } from "./zones.ts";
 
 // the project a page is in: its own pages, the chat's, or the
 // automation's, which only its row names
@@ -28,9 +29,13 @@ export function onPage(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// the one page of a group lit for a path: the longest that holds it, so
-// /admin/storage lights Storage and not the Overview at /admin too
-export function litPage(pathname: string, hrefs: string[]): string | null {
+export function adminFace(pathname: string): boolean {
+  return onPage(pathname, "/admin");
+}
+
+// the longest that holds the path, so /admin/monitor/storage lights
+// Storage and not /admin/monitor too
+function litPage(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
   for (const href of hrefs) {
     if (
@@ -41,4 +46,19 @@ export function litPage(pathname: string, hrefs: string[]): string | null {
     }
   }
   return best;
+}
+
+const TARGETS = new Map<string, string>();
+for (const z of ZONES) {
+  TARGETS.set(z.href, z.href);
+  for (const p of z.pages) {
+    TARGETS.set(p.href, p.href);
+    for (const also of p.also ?? []) TARGETS.set(also, p.href);
+  }
+}
+const HREFS = [...TARGETS.keys()];
+
+export function zoneLit(pathname: string): string | null {
+  const hit = litPage(pathname, HREFS);
+  return hit === null ? null : TARGETS.get(hit)!;
 }

@@ -6,6 +6,7 @@
 // so one across a DST change is 23 or 25 hours; nothing here divides a
 // timestamp, which would bucket by a fixed offset.
 
+import type { Windowed } from "../../shared/api/admin.ts";
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
 
 export type UsageWindow = {
@@ -89,14 +90,29 @@ const midnight = (day: CalendarDay, formatter: Intl.DateTimeFormat): number => {
 const dayString = ({ year, month, day }: CalendarDay): string =>
   `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-// the days ending with today in the zone; how many can hang on today's
-// weekday, so the year starts on a Monday
-function calendarWindow(
+export function nextDay(day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return dayString(addDays({ year, month, day: date }, 1));
+}
+
+// a rolling 30 days of 24 hours, not calendar days: the object pages'
+// totals, [now - LAST_DAYS_MS, now)
+export const LAST_DAYS_MS = 30 * DAY_MS;
+
+export function lastDays<T extends object>(
   now: number,
-  timeZone: string,
-  span: (weekday: number) => number,
-): UsageWindow {
-  const formatter = new Intl.DateTimeFormat("en", {
+  read: (since: number, until: number) => T,
+): Windowed<T> {
+  const since = now - LAST_DAYS_MS;
+  return { since, until: now, ...read(since, now) };
+}
+
+const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
+  new Intl.DateTimeFormat("en", {
     timeZone,
     calendar: "gregory",
     numberingSystem: "latn",
@@ -108,6 +124,15 @@ function calendarWindow(
     second: "2-digit",
     hourCycle: "h23",
   });
+
+// the days ending with today in the zone; how many can hang on today's
+// weekday, so the year starts on a Monday
+function calendarWindow(
+  now: number,
+  timeZone: string,
+  span: (weekday: number) => number,
+): UsageWindow {
+  const formatter = zoneFormatter(timeZone);
   const local = localParts(formatter, now);
   const today = { year: local.year, month: local.month, day: local.day };
   const weekday = utcDate(today).getUTCDay() || 7;
@@ -146,6 +171,34 @@ export function daysWindow(
   count: number,
 ): UsageWindow {
   return calendarWindow(now, timeZone, () => count);
+}
+
+// a month after this one has none
+export function monthWindow(
+  now: number,
+  timeZone: string,
+  month: string,
+): UsageWindow {
+  const formatter = zoneFormatter(timeZone);
+  const local = localParts(formatter, now);
+  const today = { year: local.year, month: local.month, day: local.day };
+  const [year, number] = month.split("-").map(Number) as [number, number];
+  const first = { year, month: number, day: 1 };
+  const next =
+    number === 12
+      ? { year: year + 1, month: 1, day: 1 }
+      : { year, month: number + 1, day: 1 };
+  const tomorrow = addDays(today, 1);
+  const end = utcDate(next) < utcDate(tomorrow) ? next : tomorrow;
+  const days: string[] = [];
+  const starts: number[] = [];
+  for (let day = first; utcDate(day) < utcDate(end); day = addDays(day, 1)) {
+    days.push(dayString(day));
+    starts.push(midnight(day, formatter));
+  }
+  const since = midnight(first, formatter);
+  const until = Math.max(since, midnight(end, formatter));
+  return { days, starts, since, until };
 }
 
 // how many of the instants fall on each day of a window, from the

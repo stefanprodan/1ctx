@@ -5,6 +5,7 @@
 // window figures and the agent breakdowns read. The names are kept as
 // text so a row outlives its decider and provider; no delete removes it.
 
+import type { DecisionTotals } from "../../shared/api/deciders.ts";
 import type { DecisionPurpose } from "../../shared/contracts/decision.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -143,6 +144,27 @@ export class DecisionUsageStore {
       .query<Raw, [string]>("select * from decision_usage where id = ?")
       .get(id);
     return raw ? row(raw) : null;
+  }
+
+  // cost is 0 with no answers
+  total(
+    by: { deciderId: string } | { purpose: string },
+    since: number,
+    until: number,
+  ): DecisionTotals {
+    const [column, value] =
+      "deciderId" in by
+        ? ["decider_id", by.deciderId]
+        : ["purpose", by.purpose];
+    return this.db
+      .query<DecisionTotals, [string, number, number]>(
+        `select count(*) as answers,
+                coalesce(sum(input_tokens), 0) as tokens,
+                case when count(*) = 0 then 0 else sum(cost) end as cost
+           from decision_usage
+          where ${column} = ? and created_at >= ? and created_at < ?`,
+      )
+      .get(value, since, until)!;
   }
 
   // newest first, for a test or a later page

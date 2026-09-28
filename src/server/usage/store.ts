@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DaysUsageResponse,
   DayUsage,
@@ -249,6 +250,39 @@ export class UsageStore {
       )
       .get(ids, since, until)!;
     return { total, projects };
+  }
+
+  // cost is 0 with no rows, null when rows ran and none was priced
+  total(
+    by: { agentId: string } | { providerId: string } | { projectId: string },
+    since: number,
+    until: number,
+  ): SendTotals {
+    const [column, value] =
+      "agentId" in by
+        ? ["agent_id", by.agentId]
+        : "providerId" in by
+          ? ["provider_id", by.providerId]
+          : ["project_id", by.projectId];
+    return this.db
+      .query<SendTotals, [string, number, number]>(
+        `select ${countLive("usage", "send_id")} as sends,
+                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
+                case when count(*) = 0 then 0 else sum(cost) end as cost
+           from usage
+          where ${column} = ? and created_at >= ? and created_at < ?`,
+      )
+      .get(value, since, until)!;
+  }
+
+  // one index seek per project
+  activeProjects(ids: string[], since: number, until: number): string[] {
+    const any = this.db.query<{ one: number }, [string, number, number]>(
+      `select 1 as one from usage
+        where project_id = ? and created_at >= ? and created_at < ?
+        limit 1`,
+    );
+    return ids.filter((id) => any.get(id, since, until) !== null);
   }
 
   // one agent's days in every project, one series: the agent page's

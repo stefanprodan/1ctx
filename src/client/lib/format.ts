@@ -117,6 +117,23 @@ export function elapsed(ms: number): string {
   return span(Math.max(0, ms));
 }
 
+export function money(n: number): string {
+  if (n > 0 && n < 0.01) return "<$0.01";
+  return `$${n.toFixed(2)}`;
+}
+
+// "41s", "3m 20s", "1h 5m"
+export function lengthWord(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) {
+    const rest = s % 60;
+    return `${Math.floor(s / 60)}m${rest ? ` ${rest}s` : ""}`;
+  }
+  const m = Math.floor((s % 3600) / 60);
+  return `${Math.floor(s / 3600)}h${m ? ` ${m}m` : ""}`;
+}
+
 // a description's first sentence, for a row's head
 export function firstSentence(text: string): string {
   const end = text.search(/[.!?](\s|$)/);

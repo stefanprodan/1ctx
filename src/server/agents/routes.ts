@@ -5,7 +5,9 @@
 // model must be in that provider's catalog, and what the catalog says
 // about it is kept on the row so a list never asks again.
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
+  AgentActivity,
   AgentImpactResponse,
   AgentResponse,
   AgentsResponse,
@@ -30,6 +32,7 @@ import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ProviderRow } from "../providers/index.ts";
+import { lastDays } from "../usage/index.ts";
 import { type ParsedAgent, parseAgent } from "./parse.ts";
 import { type PicksPort, startingOf } from "./starting.ts";
 import { type AgentFields, type AgentStore, summary } from "./store.ts";
@@ -38,6 +41,10 @@ export type ProvidersPort = {
   byId(id: string): ProviderRow | null;
   model(provider: ProviderRow, id: string): Promise<CatalogMatch | null>;
   endpoints(provider: ProviderRow, model: string): Promise<Endpoint[]>;
+};
+
+export type AgentTotalPort = {
+  agentTotal(agentId: string, since: number, until: number): SendTotals;
 };
 
 export type AccessPort = {
@@ -49,6 +56,7 @@ export type AccessPort = {
 // the delete's transaction and answer their envelopes
 export type SessionsPort = {
   agentImpact(agentId: string): { chats: number; running: number };
+  agentActivity(): AgentActivity[];
   archiveAgent(agentId: string, now: number): BusEvent[];
 };
 
@@ -97,6 +105,7 @@ export type RoutesDeps = {
   automations: () => AutomationsPort;
   runner: () => RunnerPort;
   users: PicksPort & { clearAgent(agentId: string): void };
+  usage: AgentTotalPort;
   clock: Clock;
 };
 
@@ -211,7 +220,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/agents",
       policy: "admin",
       handle() {
-        const body: AgentsResponse = { agents: deps.store.list().map(summary) };
+        const body: AgentsResponse = {
+          agents: deps.store.list().map(summary),
+          activity: deps.sessions().agentActivity(),
+        };
         return json(body);
       },
     },
@@ -268,6 +280,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           running,
         };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/agents/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const agent = find(ctx.params.id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.agentTotal(agent.id, since, until),
+          ),
+        );
       },
     },
     {

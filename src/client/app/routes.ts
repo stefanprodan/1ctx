@@ -3,20 +3,29 @@
 //
 // The one route table. Every view is one entry: the path pattern, the
 // view, its title, the role it needs, what it loads, and either a rail
-// entry or hidden.
-// A rail entry may sit in a group, a row that expands to its entries;
-// Admin is the one so far, and only admins get its routes. The rail and
-// the tests read this; the server enforces access, never this table.
+// entry or hidden. The rail and the tests read this; the server
+// enforces access, never this table.
 // A view is loaded on first use, so the table stays one small module
 // however many views there are; only Login is in the first bundle,
 // since App needs it before any route.
 
+import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter } from "../../shared/words.ts";
-import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
-import { loadAgents } from "../data/agents.ts";
+import { refreshAccessBoard } from "../data/access-board.ts";
+import {
+  loadAdminProject,
+  loadAdminProjects,
+  loadProjectUsage,
+} from "../data/admin-projects.ts";
+import { loadAgents, loadFacts } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
-import { loadDeciders } from "../data/deciders.ts";
+import {
+  deciders,
+  loadDeciders,
+  loadDeciderUsage,
+  loadDecisionUsage,
+} from "../data/deciders.ts";
 import { loadDecisions } from "../data/decisions.ts";
 import {
   loadAgentDays,
@@ -26,9 +35,20 @@ import {
 } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
-import { loadMcp } from "../data/mcp.ts";
+import {
+  loadAllUsage,
+  loadMcp,
+  loadServerUsage,
+  servers,
+} from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
-import { loadOverview, loadStorage } from "../data/overview.ts";
+import {
+  loadAttention,
+  loadOverview,
+  loadStorage,
+  loadUsage,
+  overviewRange,
+} from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
 import {
   loadProject,
@@ -36,7 +56,11 @@ import {
   project,
   projects,
 } from "../data/projects.ts";
-import { loadProviders } from "../data/providers.ts";
+import {
+  loadProviders,
+  loadProviderUsage,
+  providers,
+} from "../data/providers.ts";
 import {
   homeProjectId,
   loadList,
@@ -44,12 +68,18 @@ import {
   loadSession,
   session,
 } from "../data/sessions.ts";
-import { loadSkills } from "../data/skills.ts";
-import { loadTools } from "../data/tools.ts";
+import {
+  loadAllSkillUsage,
+  loadSkills,
+  loadSkillUsage,
+  skills,
+} from "../data/skills.ts";
+import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
-import { loadUsers } from "../data/users.ts";
+import { loadUsers, loadUserUsage, users } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
+import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import { composeProjectOf, originOf } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
@@ -66,11 +96,8 @@ export type Route = {
   // matches, with the query for a view filtered by it; a view never
   // fetches
   load?: (params: Params, query: URLSearchParams) => Promise<void>;
-  nav?: { label: string; icon: IconName; order: number; group?: string };
+  nav?: { label: string; icon: IconName; order: number };
 };
-
-// the icon of a group's row in the rail
-const GROUP_ICONS: Record<string, IconName> = { Admin: "admin" };
 
 // a project page's head, tabs and aside
 const frame = (id: string) => [
@@ -79,6 +106,9 @@ const frame = (id: string) => [
   loadAutomations(id),
   loadRecentDays(),
 ];
+const framed = async (params: Params) => {
+  await Promise.all(frame(params.id));
+};
 
 // the automation's two tabs share one view, so a tab change keeps the
 // page mounted instead of drawing it again
@@ -91,27 +121,54 @@ const docView = lazy(() =>
   import("../views/knowledge/file/DocPage.tsx").then((m) => m.DocPage),
 );
 
-// an agent's tabs share one view the same way, its heatmap included;
-// the page and its days load apart, so the page draws before the days
-const agentView = lazy<{ params: Params }>(() =>
-  import("../views/people/Agent.tsx").then((m) => m.Agent),
-);
-const agentPage = async (name: string) => {
-  await Promise.all([loadAgentPage(name), loadAgentDays(name)]);
+type Tab = readonly [suffix: string, title: (params: Params) => string];
+
+// a page's tabs share one view, so a draft outlives a tab switch
+const tabRoutes = (
+  base: string,
+  tabs: readonly Tab[],
+  view: Lazy<{ params: Params }>,
+  role: Route["role"],
+  load: NonNullable<Route["load"]>,
+): Route[] =>
+  tabs.map(([suffix, title]) => ({
+    path: base + suffix,
+    view,
+    title,
+    role,
+    load,
+  }));
+
+// the aside's usage is read by id, which only the list gives
+const thenUsage = async <T extends { id: string }>(
+  lists: Promise<unknown>[],
+  rows: { readonly value: T[] | null },
+  shown: (row: T) => boolean,
+  usage: (id: string) => Promise<void>,
+) => {
+  await Promise.all(lists);
+  const row = rows.value?.find(shown);
+  if (row !== undefined) await usage(row.id);
 };
 
-// a user's tabs share one view the same way
-const userView = lazy<{ params: Params }>(() =>
-  import("../views/people/User.tsx").then((m) => m.User),
-);
-const userPage = async (username: string) => {
-  await Promise.all([loadPerson(username), loadPersonDays(username)]);
+const agentPage = async (params: Params) => {
+  await Promise.all([loadAgentPage(params.name), loadAgentDays(params.name)]);
 };
 
-// the tools page's tabs share one view the same way
-const toolsView = lazy<{ params: Params }>(() =>
-  import("../views/admin/Tools.tsx").then((m) => m.Tools),
-);
+const userPage = async (params: Params) => {
+  await Promise.all([
+    loadPerson(params.username),
+    loadPersonDays(params.username),
+  ]);
+};
+
+const webAccess = async () => {
+  await Promise.all([loadTools(), loadWebUsage(), loadCredentials()]);
+};
+
+export const ALIASES: Record<string, string> = {
+  "/admin": "/admin/monitor",
+};
 
 export const ROUTES: Route[] = [
   {
@@ -198,9 +255,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Automations",
     role: "authenticated",
-    load: async (params) => {
-      await Promise.all(frame(params.id));
-    },
+    load: framed,
   },
   {
     path: "/projects/:id/memory",
@@ -312,9 +367,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Members",
     role: "authenticated",
-    load: async (params) => {
-      await Promise.all(frame(params.id));
-    },
+    load: framed,
   },
   {
     path: "/projects/:id/settings",
@@ -323,9 +376,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Settings",
     role: "authenticated",
-    load: async (params) => {
-      await Promise.all(frame(params.id));
-    },
+    load: framed,
   },
   {
     path: "/chat/:id",
@@ -352,160 +403,344 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/admin",
+    path: "/admin/monitor",
     view: lazy(() =>
       import("../views/admin/Overview.tsx").then((m) => m.Overview),
     ),
-    title: () => "Overview",
+    title: () => "Monitor",
     role: "admin",
-    load: () => loadOverview(),
-    nav: { label: "Overview", icon: "visual", order: 6, group: "Admin" },
+    load: async () => {
+      await Promise.all([loadOverview(overviewRange.value), loadAttention()]);
+    },
   },
   {
-    path: "/admin/storage",
+    path: "/admin/monitor/usage",
+    view: lazy(() => import("../views/admin/Usage.tsx").then((m) => m.Usage)),
+    title: () => "Usage",
+    role: "admin",
+    load: (_params, q) => loadUsage(q.get("month")),
+  },
+  {
+    path: "/admin/monitor/storage",
     view: lazy(() =>
       import("../views/admin/Storage.tsx").then((m) => m.Storage),
     ),
     title: () => "Storage",
     role: "admin",
     load: () => loadStorage(),
-    nav: { label: "Storage", icon: "storage", order: 7, group: "Admin" },
   },
   {
-    path: "/admin/projects",
+    path: "/admin/access",
+    view: lazy(() =>
+      import("../views/admin/AccessBoard.tsx").then((m) => m.AccessBoard),
+    ),
+    title: () => "Access",
+    role: "admin",
+    load: () => refreshAccessBoard(),
+  },
+  {
+    path: "/admin/access/users",
+    view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
+    title: () => "Users",
+    role: "admin",
+    load: () => loadUsers(),
+  },
+  {
+    path: "/admin/access/users/:username",
+    view: lazy(() =>
+      import("../views/admin/UserPage.tsx").then((m) => m.UserPage),
+    ),
+    title: (params) => `@${params.username}`,
+    role: "admin",
+    load: (params) =>
+      thenUsage(
+        [loadUsers(), loadProjects()],
+        users,
+        (u) => u.username === params.username,
+        loadUserUsage,
+      ),
+  },
+  {
+    path: "/admin/access/projects",
     view: lazy(() =>
       import("../views/admin/AdminProjects.tsx").then((m) => m.AdminProjects),
     ),
     title: () => "Projects",
     role: "admin",
-    // ?open=<id> is the project page's Manage: its row opens loaded
-    load: async (_params, query) => {
-      const open = query.get("open");
+    load: async () => {
+      await Promise.all([loadAdminProjects(), loadUsers()]);
+    },
+  },
+  {
+    path: "/admin/access/projects/:id",
+    view: lazy(() =>
+      import("../views/admin/ProjectPage.tsx").then((m) => m.ProjectPage),
+    ),
+    title: () => "Project",
+    role: "admin",
+    load: async (params) => {
       await Promise.all([
         loadAdminProjects(),
         loadUsers(),
-        open === null ? undefined : loadAdminProject(open),
+        loadAdminProject(params.id),
+        loadProjectUsage(params.id),
       ]);
     },
-    nav: { label: "Projects", icon: "projects", order: 8, group: "Admin" },
   },
-  {
-    path: "/admin/users",
-    view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
-    title: () => "Users",
-    role: "admin",
-    load: () => loadUsers(),
-    nav: { label: "Users", icon: "users", order: 9, group: "Admin" },
-  },
-  {
-    path: "/admin/agents",
-    view: lazy(() => import("../views/admin/Agents.tsx").then((m) => m.Agents)),
-    title: () => "Agents",
-    role: "admin",
-    load: async () => {
-      // the tools bring the limits, where each model compacts; the
-      // skills and the MCP servers are the form's sections
+  ...tabRoutes(
+    "/admin/config",
+    [
+      ["", () => "Config"],
+      ["/limits", () => "Limits"],
+      ["/storage", () => "Storage"],
+    ],
+    lazy(() =>
+      import("../views/admin/ConfigBoard.tsx").then((m) => m.ConfigBoard),
+    ),
+    "admin",
+    async () => {
       await Promise.all([
+        loadTools(),
+        loadProviders(),
         loadAgents(),
         loadDeciders(),
-        loadDecisions(),
+        loadMcp(),
+        loadSkills(),
+        loadCredentials(),
+      ]);
+    },
+  ),
+  {
+    path: "/admin/config/providers",
+    view: lazy(() =>
+      import("../views/admin/Providers.tsx").then((m) => m.Providers),
+    ),
+    title: () => "Providers",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadAgents(), loadProviders(), loadOverview()]);
+    },
+  },
+  {
+    path: "/admin/config/providers/:name",
+    view: lazy(() =>
+      import("../views/admin/ProviderPage.tsx").then((m) => m.ProviderPage),
+    ),
+    title: (params) => params.name,
+    role: "admin",
+    load: (params) =>
+      thenUsage(
+        [loadProviders(), loadAgents(), loadDeciders()],
+        providers,
+        (p) => p.name === params.name,
+        loadProviderUsage,
+      ),
+  },
+  {
+    path: "/admin/config/agents",
+    view: lazy(() =>
+      import("../views/admin/AgentList.tsx").then((m) => m.AgentList),
+    ),
+    title: () => "Agents",
+    role: "admin",
+    // New agent is the list's `?new`, since /admin/config/agents/new
+    // would be an agent's page
+    load: async () => {
+      await Promise.all([
+        loadAgents(),
         loadProviders(),
-        loadTools(),
+        loadSkills(),
+        loadMcp(),
+        loadOverview(),
+      ]);
+    },
+  },
+  ...tabRoutes(
+    "/admin/config/agents/:name",
+    [
+      ["", (params) => `@${params.name}`],
+      ["/skills", (params) => `@${params.name}`],
+      ["/mcp", (params) => `@${params.name}`],
+    ],
+    lazy(() => import("../views/admin/AgentPage.tsx").then((m) => m.AgentPage)),
+    "admin",
+    async (params) => {
+      await Promise.all([
+        loadAgents(),
+        loadProviders(),
         loadSkills(),
         loadMcp(),
       ]);
+      await loadFacts(params.name);
     },
-    nav: { label: "Agents", icon: "agents", order: 10, group: "Admin" },
-  },
+  ),
   {
-    path: "/admin/tools",
-    view: toolsView,
-    title: () => "Tools",
+    path: "/admin/config/deciders",
+    view: lazy(() =>
+      import("../views/admin/DeciderLists.tsx").then((m) => m.DeciderList),
+    ),
+    title: () => "Deciders",
     role: "admin",
-    load: () => loadTools(),
-    nav: { label: "Tools", icon: "tools", order: 11, group: "Admin" },
+    load: async () => {
+      await Promise.all([
+        loadDeciders(),
+        loadDecisions(),
+        loadProviders(),
+        loadOverview(),
+      ]);
+    },
   },
   {
-    path: "/admin/tools/web",
-    view: toolsView,
-    title: () => "Web tools",
+    path: "/admin/config/deciders/:name",
+    view: lazy(() =>
+      import("../views/admin/DeciderPage.tsx").then((m) => m.DeciderPage),
+    ),
+    title: (params) => params.name,
+    role: "admin",
+    load: (params) =>
+      thenUsage(
+        [loadDeciders(), loadDecisions(), loadProviders()],
+        deciders,
+        (d) => d.name === params.name,
+        loadDeciderUsage,
+      ),
+  },
+  {
+    path: "/admin/config/decisions",
+    view: lazy(() =>
+      import("../views/admin/DeciderLists.tsx").then((m) => m.DecisionList),
+    ),
+    title: () => "Decisions",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadDeciders(), loadDecisions(), loadOverview()]);
+    },
+  },
+  {
+    path: "/admin/config/decisions/:id",
+    view: lazy(() =>
+      import("../views/admin/DecisionPage.tsx").then((m) => m.DecisionPage),
+    ),
+    title: (params) =>
+      isDecisionId(params.id) ? DECISION_WORDS[params.id].title : "Decision",
+    role: "admin",
+    load: async (params) => {
+      await Promise.all([
+        loadDeciders(),
+        loadDecisions(),
+        loadDecisionUsage(params.id),
+      ]);
+    },
+  },
+  ...tabRoutes(
+    "/admin/config/web",
+    [
+      ["", () => "Web access"],
+      ["/credentials", () => "Credentials"],
+    ],
+    lazy(() => import("../views/admin/WebAccess.tsx").then((m) => m.WebAccess)),
+    "admin",
+    webAccess,
+  ),
+  {
+    path: "/admin/config/web/credentials/:name",
+    view: lazy<{ params: Params }>(() =>
+      import("../views/admin/CredentialPage.tsx").then((m) => m.CredentialPage),
+    ),
+    title: (params) => params.name,
     role: "admin",
     load: async () => {
       await Promise.all([loadTools(), loadCredentials()]);
     },
   },
   {
-    path: "/admin/tools/visuals",
-    view: toolsView,
+    path: "/admin/config/visuals",
+    view: lazy(() =>
+      import("../views/admin/Visuals.tsx").then((m) => m.Visuals),
+    ),
     title: () => "Visuals",
     role: "admin",
-    load: () => loadTools(),
+    load: async () => {
+      await Promise.all([loadTools(), loadVisualsUsage()]);
+    },
   },
   {
-    path: "/admin/tools/limits",
-    view: toolsView,
-    title: () => "Limits",
-    role: "admin",
-    load: () => loadTools(),
-  },
-  {
-    path: "/admin/skills",
-    view: lazy(() => import("../views/admin/Skills.tsx").then((m) => m.Skills)),
+    path: "/admin/config/skills",
+    view: lazy(() =>
+      import("../views/admin/SkillList.tsx").then((m) => m.SkillList),
+    ),
     title: () => "Skills",
     role: "admin",
-    load: () => loadSkills(),
-    nav: { label: "Skills", icon: "skill", order: 12, group: "Admin" },
+    load: async () => {
+      await Promise.all([loadSkills(), loadAgents(), loadAllSkillUsage()]);
+    },
   },
+  ...tabRoutes(
+    "/admin/config/skills/:name",
+    [
+      ["", (params) => params.name],
+      ["/files", (params) => `${params.name} files`],
+    ],
+    lazy(() => import("../views/admin/SkillPage.tsx").then((m) => m.SkillPage)),
+    "admin",
+    (params) =>
+      thenUsage(
+        [loadSkills(), loadAgents()],
+        skills,
+        (s) => s.name === params.name,
+        loadSkillUsage,
+      ),
+  ),
   {
-    path: "/admin/mcp",
-    view: lazy(() => import("../views/admin/Mcp.tsx").then((m) => m.Mcp)),
-    title: () => "MCP",
+    path: "/admin/config/mcp",
+    view: lazy(() =>
+      import("../views/admin/McpList.tsx").then((m) => m.McpList),
+    ),
+    title: () => "MCP Servers",
     role: "admin",
-    load: () => loadMcp(),
-    nav: { label: "MCP", icon: "mcp", order: 13, group: "Admin" },
+    load: async () => {
+      await Promise.all([loadMcp(), loadAgents(), loadAllUsage()]);
+    },
   },
-  {
-    path: "/users/:username",
-    view: userView,
-    title: (params) => `@${params.username}`,
-    role: "authenticated",
-    load: (params) => userPage(params.username),
-  },
-  {
-    path: "/users/:username/projects",
-    view: userView,
-    title: (params) => `@${params.username} projects`,
-    role: "authenticated",
-    load: (params) => userPage(params.username),
-  },
-  {
-    path: "/agents/:name",
-    view: agentView,
-    title: (params) => `@${params.name}`,
-    role: "authenticated",
-    load: (params) => agentPage(params.name),
-  },
-  {
-    path: "/agents/:name/tools",
-    view: agentView,
-    title: (params) => `@${params.name} tools`,
-    role: "authenticated",
-    load: (params) => agentPage(params.name),
-  },
-  {
-    path: "/agents/:name/skills",
-    view: agentView,
-    title: (params) => `@${params.name} skills`,
-    role: "authenticated",
-    load: (params) => agentPage(params.name),
-  },
-  {
-    path: "/agents/:name/mcp",
-    view: agentView,
-    title: (params) => `@${params.name} MCP`,
-    role: "authenticated",
-    load: (params) => agentPage(params.name),
-  },
+  ...tabRoutes(
+    "/admin/config/mcp/:name",
+    [
+      ["", (params) => params.name],
+      ["/tools", (params) => `${params.name} tools`],
+    ],
+    lazy(() => import("../views/admin/McpPage.tsx").then((m) => m.McpPage)),
+    "admin",
+    (params) =>
+      thenUsage(
+        [loadMcp(), loadAgents()],
+        servers,
+        (s) => s.name === params.name,
+        loadServerUsage,
+      ),
+  ),
+  ...tabRoutes(
+    "/users/:username",
+    [
+      ["", (params) => `@${params.username}`],
+      ["/projects", (params) => `@${params.username} projects`],
+    ],
+    lazy(() => import("../views/people/User.tsx").then((m) => m.User)),
+    "authenticated",
+    userPage,
+  ),
+  // the page and its days load apart, so the page draws before the days
+  ...tabRoutes(
+    "/agents/:name",
+    [
+      ["", (params) => `@${params.name}`],
+      ["/tools", (params) => `@${params.name} tools`],
+      ["/skills", (params) => `@${params.name} skills`],
+      ["/mcp", (params) => `@${params.name} MCP`],
+    ],
+    lazy(() => import("../views/people/Agent.tsx").then((m) => m.Agent)),
+    "authenticated",
+    agentPage,
+  ),
   {
     path: "/profile",
     view: lazy(() =>
@@ -517,7 +752,7 @@ export const ROUTES: Route[] = [
   },
 ];
 
-export type Match = { route: Route; params: Params };
+type Match = { route: Route; params: Params };
 
 // the first route whose pattern matches; a :name segment captures one
 // path segment. A segment that does not decode matches nothing, so a
@@ -565,36 +800,8 @@ export function conflicts(routes = ROUTES): string[] {
   return out;
 }
 
-export function navEntries(role: "admin" | "member", routes = ROUTES) {
+export function navEntries(routes = ROUTES) {
   return routes
-    .filter((r) => r.nav && (r.role !== "admin" || role === "admin"))
+    .filter((r) => r.nav !== undefined)
     .sort((a, b) => a.nav!.order - b.nav!.order);
-}
-
-// the rail's rows in order: a route on its own, or a group with the
-// routes it holds, placed where its first route sorts
-export type RailRow =
-  | { kind: "route"; route: Route }
-  | { kind: "group"; name: string; icon: IconName; routes: Route[] };
-
-export function railRows(role: "admin" | "member", routes = ROUTES) {
-  const rows: RailRow[] = [];
-  for (const route of navEntries(role, routes)) {
-    const group = route.nav!.group;
-    if (group === undefined) {
-      rows.push({ kind: "route", route });
-      continue;
-    }
-    const open = rows.find((r) => r.kind === "group" && r.name === group);
-    if (open && open.kind === "group") open.routes.push(route);
-    else {
-      rows.push({
-        kind: "group",
-        name: group,
-        icon: GROUP_ICONS[group] ?? "settings",
-        routes: [route],
-      });
-    }
-  }
-  return rows;
 }

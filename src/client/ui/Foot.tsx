@@ -1,15 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The foot of a form: the notice of a refusal that names no field, on
-// its own line over the buttons so they never move when it shows, and
-// a line of the view's over both, what an ask is about; the submit
-// button that says what a Save is going through; and room on the
-// left for the form's other actions. A view composes this, never
-// restyles it.
 
 import type { Signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useEffect } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import { noticeOf, type Save } from "../lib/save.ts";
 import "./foot.css";
@@ -23,33 +17,50 @@ export function Foot({
   label,
   start,
   before,
-  after,
   above,
+  stack,
+  inline,
   children,
 }: {
   save: Pick<Save, "status" | "busy" | "notice">;
   dirty?: boolean;
   label?: string;
   children?: ComponentChildren;
-  // what sits at the left end, apart from the submit: a Delete
   start?: ComponentChildren;
-  // what sits right before the submit: a Cancel
   before?: ComponentChildren;
-  // what follows the submit: a Reset beside it, a count at the end
-  after?: ComponentChildren;
-  // a line over the notice and the buttons: what a Delete asked about
-  // would do; its class, which takes the whole line, is the owner's
+  // its class, which takes the whole line, is the owner's
   above?: ComponentChildren;
+  // on a phone the start takes its own line: a hint too long to share
+  // one with the buttons
+  stack?: boolean;
+  // the notice in the start's place, so the buttons never move
+  inline?: boolean;
 }) {
   const status = save.status.value;
   const done = status === "done";
   const busy = status === "busy";
   const notice = save.notice();
   const on = (yes: boolean) => `foot-label${yes ? " foot-label-on" : ""}`;
+  const submit = children ?? (
+    <button
+      type="submit"
+      class={`btn btn-primary foot-submit${done ? " foot-done" : ""}`}
+      disabled={save.busy || done || !dirty}
+    >
+      <span class="foot-labels">
+        <span class={on(!busy && !done)}>{label}</span>
+        <span class={on(busy)}>Saving</span>
+        <span class={on(done)}>
+          <Icon name="check" size={14} />
+          Saved
+        </span>
+      </span>
+    </button>
+  );
   return (
-    <div class="foot">
+    <div class={`foot${stack ? " foot-stack" : ""}`}>
       {above}
-      {notice !== null && (
+      {notice !== null && !inline && (
         <p class="notice-failed foot-notice" role="alert">
           <Icon name="alert" size={14} class="foot-notice-icon" />
           <span class="foot-notice-words">
@@ -58,31 +69,35 @@ export function Foot({
           </span>
         </p>
       )}
-      {start && <div class="foot-start">{start}</div>}
-      {before}
-      {children ?? (
-        <button
-          type="submit"
-          class={`btn btn-primary${done ? " foot-done" : ""}`}
-          disabled={save.busy || done || !dirty}
-        >
-          <span class="foot-labels">
-            <span class={on(!busy && !done)}>{label}</span>
-            <span class={on(busy)}>Saving</span>
-            <span class={on(done)}>
-              <Icon name="check" size={14} />
-              Saved
-            </span>
+      {notice !== null && inline ? (
+        <div class="foot-start foot-start-beside">
+          <span class="error foot-inline" role="alert">
+            {noticeOf(notice)}
+            <CodeTag status={notice.status} class="foot-notice-code" />
           </span>
-        </button>
+        </div>
+      ) : (
+        start && (
+          <div class={`foot-start${inline ? " foot-start-beside" : ""}`}>
+            {start}
+          </div>
+        )
       )}
-      {after}
+      {inline ? (
+        <div class="foot-actions">
+          {before}
+          {submit}
+        </div>
+      ) : (
+        <>
+          {before}
+          {submit}
+        </>
+      )}
     </div>
   );
 }
 
-// A foot's start for a row that can be deleted: Delete, then the words
-// that ask, the danger Delete and Keep. `wordsClass` is the owner's.
 export function AskDelete({
   save,
   asking,
@@ -98,12 +113,20 @@ export function AskDelete({
   busy: boolean;
   words?: string;
   wordsClass?: string;
-  // the danger button's word
   label?: string;
-  // read what the delete would do before asking; it never throws
+  // it never throws
   onAsk?: () => Promise<void>;
   onDelete: () => void;
 }) {
+  useEffect(() => {
+    if (!asking.value) return;
+    // on window: an open picker stops its Escape on the document first
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") asking.value = false;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [asking.value]);
   if (!asking.value) {
     return (
       <button

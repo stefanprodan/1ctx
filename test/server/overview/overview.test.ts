@@ -11,10 +11,13 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
+  BOARD_KEEP_MS,
   KEEP_MS,
   overviewArea,
   type Probe,
-  parseLoadQuery,
+  parseNoQuery,
+  parseOverviewQuery,
+  parseUsageQuery,
   parseZoneQuery,
   type Reading,
   sampler,
@@ -22,6 +25,7 @@ import {
 import type {
   LoadResponse,
   OverviewResponse,
+  UsageResponse,
 } from "../../../src/shared/api/admin.ts";
 import { collectLogs, testApp } from "../../helpers/app.ts";
 import {
@@ -31,15 +35,41 @@ import {
   startRun,
 } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, FLASH, startChat } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
 const NOW = Date.parse("2026-06-15T12:00:00Z");
 const DAY = 86_400_000;
 const LONG_AGO = Date.parse("2020-01-01T00:00:00Z");
+const NO_ATTENTION = () => ({
+  providers: [],
+  mcp: [],
+  skills: [],
+  credentials: [],
+  search: { provider: null, hasKey: false },
+});
 
-async function overview(chat: ChatApp, tz = "UTC"): Promise<OverviewResponse> {
+async function overview(
+  chat: ChatApp,
+  tz = "UTC",
+  range?: string,
+): Promise<OverviewResponse> {
   const res = await chat.admin.call(
     "GET",
-    `/api/admin/overview?tz=${encodeURIComponent(tz)}`,
+    `/api/admin/overview?tz=${encodeURIComponent(tz)}${range ? `&range=${range}` : ""}`,
+  );
+  expect(res.status).toBe(200);
+  return res.json();
+}
+
+// the fixture's month, June 2026, up to its noon on the 15th
+async function usage(
+  chat: ChatApp,
+  month = "2026-06",
+  tz = "UTC",
+): Promise<UsageResponse> {
+  const res = await chat.admin.call(
+    "GET",
+    `/api/admin/usage?tz=${encodeURIComponent(tz)}&month=${month}`,
   );
   expect(res.status).toBe(200);
   return res.json();
@@ -72,21 +102,6 @@ async function settledChat(chat: ChatApp, projectId = chat.projectId) {
   script.reply("a reply");
   await settleRun(chat, sessionId);
   return sessionId;
-}
-
-async function team(chat: ChatApp, name: string): Promise<string> {
-  const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
-  });
-  expect(res.status).toBe(201);
-  const { project } = await res.json();
-  const added = await chat.admin.call(
-    "POST",
-    `/api/projects/${project.id}/members`,
-    { body: { userId: chat.memberId } },
-  );
-  expect(added.status).toBe(201);
-  return project.id as string;
 }
 
 async function runOf(chat: ChatApp, automationId: string): Promise<string> {
@@ -192,7 +207,7 @@ describe("the overview queries", () => {
   const zone = (query: string) =>
     parseZoneQuery(new URL(`http://x/api/admin/overview${query}`));
   const loadQuery = (query: string) =>
-    parseLoadQuery(new URL(`http://x/api/admin/load${query}`));
+    parseNoQuery(new URL(`http://x/api/admin/load${query}`));
 
   test("take one zone by its canonical name", () => {
     expect(zone("?tz=Europe%2FBerlin")).toBe("Europe/Berlin");
@@ -212,6 +227,25 @@ describe("the overview queries", () => {
     }
     expect(() => loadQuery("")).not.toThrow();
     expect(() => loadQuery("?tz=UTC")).toThrow();
+  });
+
+  test("take a zone and a calendar month for usage", () => {
+    const month = (query: string) =>
+      parseUsageQuery(new URL(`http://x/api/admin/usage${query}`));
+    expect(month("?tz=utc&month=2026-09")).toEqual({
+      timeZone: "UTC",
+      month: "2026-09",
+    });
+    for (const query of [
+      "?tz=UTC",
+      "?month=2026-09",
+      "?tz=UTC&month=2026-13",
+      "?tz=UTC&month=2026-9",
+      "?tz=UTC&month=2026-09&month=2026-08",
+      "?tz=UTC&month=2026-09&x=1",
+    ]) {
+      expect(() => month(query), query).toThrow();
+    }
   });
 });
 
@@ -300,6 +334,11 @@ describe("the overview days", () => {
       decisionTokens: 0,
       pricedDecisions: 0,
       decisionCost: null,
+      // the turn ended as it started
+      medianMs: 0,
+      p95Ms: 0,
+      // the member ran both
+      activeUsers: 1,
     });
     expect(body.days[0]).toMatchObject({ day: "2026-05-17", turns: 1 });
     expect(body.totals).toEqual({
@@ -380,7 +419,7 @@ describe("the overview days", () => {
       pricedDecisions: 1,
       decisionCost: 0.00002,
     });
-    expect(body.all).toMatchObject({
+    expect((await overview(chat, "UTC", "all")).totals).toMatchObject({
       decisions: 4,
       decisionTokens: 550,
       pricedDecisions: 2,
@@ -389,8 +428,65 @@ describe("the overview days", () => {
   });
 });
 
-describe("the overview all time", () => {
-  test("counts every send and round since the first", async () => {
+describe("the overview turn lengths", () => {
+  test("give each day's median and p95 of ended chat turns", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    const task = await createAutomation(chat);
+    const runId = await runOf(chat, task.id);
+    hide(chat);
+    const at = NOW - DAY;
+    for (let n = 1; n <= 20; n++) {
+      addSend(chat, sessionId, { at, finishedAt: at + n * 1000 });
+    }
+    addSend(chat, sessionId, { at: NOW, finishedAt: NOW + 400 });
+    // a running turn has no length yet, and a run's is its task's
+    addSend(chat, sessionId, { at: NOW, status: "running" });
+    addSend(chat, runId, { at: NOW, finishedAt: NOW + 99_000 });
+    const body = await overview(chat);
+    expect(body.days.at(-2)).toMatchObject({
+      turns: 20,
+      medianMs: 10_500,
+      p95Ms: 19_000,
+    });
+    expect(body.days.at(-1)).toMatchObject({ medianMs: 400, p95Ms: 400 });
+    expect(body.days.at(-3)).toMatchObject({ medianMs: null, p95Ms: null });
+    expect(body.turnLength).toEqual({ medianMs: 10_000, p95Ms: 19_000 });
+  });
+
+  test("have none with no ended turn", async () => {
+    const chat = await fixture();
+    hide(chat);
+    const body = await overview(chat);
+    expect(body.turnLength).toEqual({ medianMs: null, p95Ms: null });
+  });
+});
+
+describe("the overview active users", () => {
+  test("count each user once a day and once over the range", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    hide(chat);
+    addSend(chat, sessionId, { at: NOW });
+    addSend(chat, sessionId, { at: NOW + 1000 });
+    addSend(chat, sessionId, { at: NOW - DAY });
+    // the same chat's send as another user, as a shared project has
+    const other = addSend(chat, sessionId, { at: NOW });
+    chat.app.db
+      .query(
+        "update sends set user_id = (select id from users where username = 'admin') where id = ?",
+      )
+      .run(other);
+    const body = await overview(chat);
+    expect(body.days.at(-1)?.activeUsers).toBe(2);
+    expect(body.days.at(-2)?.activeUsers).toBe(1);
+    expect(body.days.at(-3)?.activeUsers).toBe(0);
+    expect(body.activeUsers).toBe(2);
+  });
+});
+
+describe("the overview ranges", () => {
+  test("take 30 days, 90 days or every day from the first", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
     const task = await createAutomation(chat);
@@ -401,59 +497,65 @@ describe("the overview all time", () => {
       status: "failed",
       usage: [{ prompt: 10, completion: 1, cached: 4, cost: 0.1 }],
     });
+    addSend(chat, sessionId, { at: NOW - 60 * DAY, usage: [{ prompt: 30 }] });
     addSend(chat, runId, { at: NOW - 400 * DAY, usage: [{ prompt: 20 }] });
-    const body = await overview(chat);
-    // the two real sends moved long ago, and the two above
-    expect(body.all).toMatchObject({
-      turns: 2,
+    const days30 = await overview(chat);
+    expect(days30.range).toBe("30d");
+    expect(days30.days).toHaveLength(30);
+    expect(days30.totals).toMatchObject({ turns: 1, runs: 0 });
+    const days90 = await overview(chat, "UTC", "90d");
+    expect(days90.days).toHaveLength(90);
+    expect(days90.days.at(-1)?.day).toBe("2026-06-15");
+    expect(days90.totals).toMatchObject({ turns: 2, runs: 0 });
+    const all = await overview(chat, "UTC", "all");
+    // the two real sends moved long ago lead the days
+    expect(all.days[0]?.day).toBe("2020-01-01");
+    expect(all.days.at(-1)?.day).toBe("2026-06-15");
+    expect(all.totals).toMatchObject({
+      turns: 3,
       turnsFailed: 1,
       runs: 2,
       runsFailed: 0,
       cachedTokens: 4,
       pricedRounds: 1,
       cost: 0.1,
-      since: LONG_AGO,
     });
-    expect(body.all.rounds).toBeGreaterThanOrEqual(2);
-    expect(body.totals.turns).toBe(1);
-    expect(body.totals.runs).toBe(0);
+    // a zone ahead of UTC starts the first day at its own midnight
+    const east = await overview(chat, "Asia/Tokyo", "all");
+    expect(east.days[0]?.day).toBe("2020-01-01");
   });
 
-  test("is empty with no send", async () => {
+  test("all is today alone with no send", async () => {
     const app = await testApp();
     const admin = app.client();
     await admin.login("admin", "hunter2-test");
-    const res = await admin.call("GET", "/api/admin/overview?tz=UTC");
+    const res = await admin.call("GET", "/api/admin/overview?tz=UTC&range=all");
+    expect(res.status).toBe(200);
     const body: OverviewResponse = await res.json();
-    expect(body.all).toEqual({
-      turns: 0,
-      turnsFailed: 0,
-      runs: 0,
-      runsFailed: 0,
-      promptTokens: 0,
-      cachedTokens: 0,
-      completionTokens: 0,
-      rounds: 0,
-      pricedRounds: 0,
-      cost: null,
-      decisions: 0,
-      decisionTokens: 0,
-      pricedDecisions: 0,
-      decisionCost: null,
-      since: null,
-    });
-    expect(body.days.every((day) => day.turns === 0 && day.cost === null)).toBe(
-      true,
-    );
-    expect(body.lengths).toEqual([]);
+    expect(body.days).toHaveLength(1);
+    expect(body.totals).toMatchObject({ turns: 0, runs: 0, cost: null });
     await app.shutdown();
+  });
+
+  test("refuse an unknown range", () => {
+    const query = (q: string) =>
+      parseOverviewQuery(new URL(`http://x/api/admin/overview${q}`));
+    expect(query("?tz=UTC")).toEqual({ timeZone: "UTC", range: "30d" });
+    expect(query("?tz=UTC&range=all")).toEqual({
+      timeZone: "UTC",
+      range: "all",
+    });
+    for (const q of ["?tz=UTC&range=7d", "?tz=UTC&range=all&range=30d"]) {
+      expect(() => query(q), q).toThrow();
+    }
   });
 });
 
-describe("the overview breakdowns", () => {
+describe("the usage breakdowns", () => {
   test("name a team project, never a personal one", async () => {
     const chat = await fixture();
-    const teamId = await team(chat, "research");
+    const teamId = (await createTeam(chat.admin, "research", [chat.memberId]))
+      .id;
     const personalChat = await settledChat(chat);
     const teamChat = await settledChat(chat, teamId);
     const personalTask = await createAutomation(chat, { name: "secret-task" });
@@ -479,7 +581,7 @@ describe("the overview breakdowns", () => {
       rounds: 2,
       usage: [{ prompt: 40 }, { prompt: 50, completion: 0 }],
     });
-    const body = await overview(chat);
+    const body = await usage(chat);
     expect(body.by.agents).toEqual([
       {
         id: chat.agentId,
@@ -487,6 +589,7 @@ describe("the overview breakdowns", () => {
         owner: null,
         deleted: false,
         tokens: 190,
+        cost: null,
         turns: 2,
         runs: 2,
       },
@@ -498,6 +601,7 @@ describe("the overview breakdowns", () => {
         owner: null,
         deleted: false,
         tokens: 110 + 20,
+        cost: null,
         turns: 1,
         runs: 1,
       },
@@ -507,11 +611,12 @@ describe("the overview breakdowns", () => {
         owner: "casey",
         deleted: false,
         tokens: 60,
+        cost: null,
         turns: 1,
         runs: 1,
       },
     ]);
-    expect(body.instance).toMatchObject({
+    expect((await overview(chat)).instance).toMatchObject({
       version: "v0.0.0-test",
       users: 2,
       projects: 1,
@@ -534,12 +639,12 @@ describe("the overview breakdowns", () => {
 
   test("sum every deleted project into one ranked row", async () => {
     const chat = await fixture();
-    const live = await team(chat, "research");
+    const live = (await createTeam(chat.admin, "research", [chat.memberId])).id;
     const liveChat = await settledChat(chat, live);
     const goneChats: string[] = [];
     const gone: string[] = [];
     for (const name of ["old", "older"]) {
-      const id = await team(chat, name);
+      const id = (await createTeam(chat.admin, name, [chat.memberId])).id;
       gone.push(id);
       goneChats.push(await settledChat(chat, id));
     }
@@ -551,7 +656,7 @@ describe("the overview breakdowns", () => {
       const res = await chat.admin.call("DELETE", `/api/projects/${id}`);
       expect(res.status).toBe(200);
     }
-    const body = await overview(chat);
+    const body = await usage(chat);
     expect(body.by.projects).toEqual([
       {
         id: null,
@@ -559,6 +664,7 @@ describe("the overview breakdowns", () => {
         owner: null,
         deleted: true,
         tokens: 60 + 70,
+        cost: null,
         turns: 0,
         runs: 0,
       },
@@ -568,10 +674,40 @@ describe("the overview breakdowns", () => {
         owner: null,
         deleted: false,
         tokens: 100,
+        cost: null,
         turns: 1,
         runs: 0,
       },
     ]);
+    await chat.app.shutdown();
+  });
+
+  test("leave out what was deleted and used no tokens", async () => {
+    const chat = await fixture();
+    const liveChat = await settledChat(chat);
+    const goneId = (await createTeam(chat.admin, "old", [chat.memberId])).id;
+    const goneChat = await settledChat(chat, goneId);
+    hide(chat);
+    // turns that failed before a round: sends with no usage
+    addSend(chat, liveChat, { at: NOW, status: "failed" });
+    addSend(chat, goneChat, { at: NOW, status: "failed" });
+    const res = await chat.admin.call("DELETE", `/api/projects/${goneId}`);
+    expect(res.status).toBe(200);
+    // a live agent without tokens keeps its row
+    const live = await usage(chat);
+    expect(live.by.agents).toMatchObject([{ tokens: 0, turns: 1 }]);
+    expect(live.by.projects).toMatchObject([
+      { owner: "casey", deleted: false, tokens: 0, turns: 1 },
+    ]);
+    const retired = await chat.admin.call(
+      "DELETE",
+      `/api/agents/${chat.agentId}`,
+    );
+    expect(retired.status).toBe(200);
+    chat.app.now.value += KEEP_MS;
+    const body = await usage(chat);
+    expect(body.by.agents).toEqual([]);
+    expect(body.by.projects.map((row) => row.deleted)).toEqual([false]);
     await chat.app.shutdown();
   });
 
@@ -588,7 +724,7 @@ describe("the overview breakdowns", () => {
         { prompt: 300, completion: 30 },
       ],
     });
-    const body = await overview(chat);
+    const body = await usage(chat);
     const row = { tokens: 660, turns: 1, runs: 0 };
     expect(body.by.agents[0]).toMatchObject(row);
     expect(body.by.projects[0]).toMatchObject(row);
@@ -598,131 +734,118 @@ describe("the overview breakdowns", () => {
       pricedRounds: 2,
       cost: expect.closeTo(0.3, 10),
     });
-    expect(body.lengths[0]).toMatchObject({ turns: 1 });
   });
 });
 
-describe("the overview turn lengths", () => {
-  test("give medians over the ended turns and count the running one", async () => {
+describe("the usage month", () => {
+  test("lays the month's days in the zone up to today", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
-    const task = await createAutomation(chat);
-    const runId = await runOf(chat, task.id);
     hide(chat);
-    const at = NOW - DAY;
-    addSend(chat, sessionId, { at, finishedAt: at + 100 });
+    addSend(chat, sessionId, { at: NOW, usage: [{ prompt: 10 }] });
     addSend(chat, sessionId, {
-      at,
-      finishedAt: at + 300,
-      status: "failed",
+      at: Date.parse("2026-06-01T00:30:00Z"),
+      usage: [{ prompt: 20 }],
     });
-    addSend(chat, sessionId, { at, finishedAt: at + 200 });
-    addSend(chat, sessionId, { at, finishedAt: at + 900 });
-    addSend(chat, sessionId, { at: NOW, status: "running" });
-    addSend(chat, sessionId, { at, model: "other", finishedAt: at + 50 });
-    // a run is its task's length, never the model's
-    addSend(chat, runId, { at, finishedAt: at + 99_000 });
-    addSend(chat, runId, { at, model: "runs-only", finishedAt: at + 10 });
-    const body = await overview(chat);
-    expect(body.lengths).toEqual([
-      {
-        provider: "local",
-        model: FLASH,
-        turns: 5,
-        medianMs: 250,
-        slowestMs: 900,
-      },
-      {
-        provider: "local",
-        model: "other",
-        turns: 1,
-        medianMs: 50,
-        slowestMs: 50,
-      },
-    ]);
-  });
-
-  test("read a turn the clock stepped back on as zero long", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    addSend(chat, sessionId, { at: NOW, finishedAt: NOW - 5_000 });
-    addSend(chat, sessionId, { at: NOW, finishedAt: NOW + 400 });
-    const body = await overview(chat);
-    expect(body.lengths[0]).toMatchObject({
-      turns: 2,
-      medianMs: 200,
-      slowestMs: 400,
+    addSend(chat, sessionId, {
+      at: Date.parse("2026-05-31T23:30:00Z"),
+      usage: [{ prompt: 40 }],
     });
+    const utc = await usage(chat);
+    expect(utc.month).toBe("2026-06");
+    expect(utc.since).toBe(LONG_AGO);
+    expect(utc.days).toHaveLength(15);
+    expect(utc.days[0]).toMatchObject({ day: "2026-06-01", turns: 1 });
+    expect(utc.totals).toMatchObject({ turns: 2, promptTokens: 30 });
+    // Bucharest's June starts three hours before UTC's
+    const local = await usage(chat, "2026-06", "Europe/Bucharest");
+    expect(local.totals).toMatchObject({ turns: 3, promptTokens: 70 });
+    const may = await usage(chat, "2026-05");
+    expect(may.days).toHaveLength(31);
+    expect(may.totals).toMatchObject({ turns: 1, promptTokens: 40 });
+    const later = await usage(chat, "2026-07");
+    expect(later.days).toEqual([]);
+    expect(later.by.projects).toEqual([]);
   });
 
-  test("say null for a model whose turns all run", async () => {
+  test("names the model that answered and its provider, by tokens", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
     hide(chat);
-    addSend(chat, sessionId, { at: NOW, status: "running" });
-    const body = await overview(chat);
-    expect(body.lengths).toEqual([
-      {
-        provider: "local",
-        model: FLASH,
-        turns: 1,
-        medianMs: null,
-        slowestMs: null,
-      },
-    ]);
-  });
-
-  test("keep the ten models with the most turns", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    for (let i = 1; i <= 12; i++) {
-      for (let n = 0; n < i; n++) {
-        addSend(chat, sessionId, { at: NOW, model: `model-${i}` });
-      }
-    }
-    const body = await overview(chat);
-    expect(body.lengths.map((row) => row.model)).toEqual(
-      [12, 11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => `model-${i}`),
-    );
-  });
-
-  test("count a router's turns under the model its last round said answered", async () => {
-    const chat = await fixture();
-    const sessionId = await settledChat(chat);
-    hide(chat);
-    const router = "openrouter/free";
-    for (let n = 0; n < 3; n++) {
-      addSend(chat, sessionId, {
-        at: NOW,
-        model: router,
-        rounds: 2,
-        usage: [{ served: "vendor/first-pick" }, { served: "vendor/picked" }],
-      });
-    }
     addSend(chat, sessionId, {
       at: NOW,
-      model: router,
-      usage: [{ served: "vendor/other" }],
-    });
-    // no usage row, or none that said: the model asked for
-    addSend(chat, sessionId, { at: NOW, model: router });
-    addSend(chat, sessionId, { at: NOW, model: router, usage: [{}] });
-    // an earlier round's pick says nothing about a last round without
-    // usage, as a stopped one has
-    addSend(chat, sessionId, {
-      at: NOW,
-      model: router,
+      model: "openrouter/free",
       rounds: 2,
-      usage: [{ served: "vendor/first-pick" }],
+      usage: [
+        { prompt: 100, served: "vendor/picked", cost: 0.25 },
+        { prompt: 300, served: "vendor/picked" },
+      ],
     });
-    const body = await overview(chat);
-    expect(body.lengths.map((row) => [row.model, row.turns])).toEqual([
-      // a tie goes by name
-      [router, 3],
-      ["vendor/picked", 3],
-      ["vendor/other", 1],
+    addSend(chat, sessionId, { at: NOW, usage: [{ prompt: 50 }] });
+    chat.app.db
+      .query(
+        "update usage set provider_id = 'gone' where created_at = ? and model = ?",
+      )
+      .run(NOW, FLASH);
+    const body = await usage(chat);
+    expect(body.by.models).toEqual([
+      {
+        provider: "local",
+        model: "vendor/picked",
+        tokens: 420,
+        cost: 0.25,
+        rounds: 2,
+      },
+      { provider: null, model: FLASH, tokens: 60, cost: null, rounds: 1 },
+    ]);
+  });
+
+  test("counts the deciders under their latest name", async () => {
+    const chat = await fixture();
+    const decision = (
+      decider: string,
+      name: string,
+      at: number,
+      cost: number | null,
+    ) =>
+      chat.app.db
+        .query(
+          `insert into decision_usage (id, decider_id, decider_name,
+             provider_id, provider_name, model, purpose, input_tokens,
+             output_tokens, cost, duration, created_at)
+           values (?, ?, ?, 'p1', 'router', 'm', 'check', 10, 1, ?, 5, ?)`,
+        )
+        .run(`d${ids++}`, decider, name, cost, at);
+    decision("d1", "judge", NOW - DAY, 0.5);
+    decision("d1", "arbiter", NOW, null);
+    decision("d2", "second", NOW, null);
+    decision("d2", "second", NOW - 60 * DAY, null);
+    const body = await usage(chat);
+    expect(body.deciders).toEqual([
+      { name: "arbiter", decisions: 2, tokens: 22, cost: 0.5 },
+      { name: "second", decisions: 1, tokens: 11, cost: null },
+    ]);
+  });
+
+  test("count the decisions in the model that answered them", async () => {
+    const chat = await fixture();
+    const sessionId = await settledChat(chat);
+    hide(chat);
+    addSend(chat, sessionId, {
+      at: NOW,
+      usage: [{ prompt: 100, completion: 10, cost: 0.1 }],
+    });
+    chat.app.db
+      .query(
+        `insert into decision_usage (id, decider_id, decider_name,
+           provider_id, provider_name, model, purpose, input_tokens,
+           output_tokens, cost, duration, created_at)
+         values ('dm1', 'd1', 'jev', ?, 'local', ?, 'check', 40, 2, null, 5, ?)`,
+      )
+      .run(chat.providerId, FLASH, NOW);
+    const body = await usage(chat);
+    expect(body.by.models).toEqual([
+      { provider: "local", model: FLASH, tokens: 152, cost: 0.1, rounds: 2 },
     ]);
   });
 });
@@ -741,6 +864,7 @@ describe("the overview cache", () => {
       pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      attention: NO_ATTENTION,
       probe: probe([]),
       worker: new URL(
         "../../../src/server/overview/scan.worker.ts",
@@ -748,29 +872,16 @@ describe("the overview cache", () => {
       ),
       scanner: {
         scan: () => Promise.reject(new Error("not this")),
+        month: () => Promise.reject(new Error("not this")),
         range: (input) => {
           keys.push(`${input.since}-${input.until}`);
           return Promise.resolve({
             readAt: input.now,
+            ended: { at: [], ms: [] },
+            actives: { users: [], slot: [], user: [] },
             sends: [],
             usage: [],
             decisions: [],
-            by: { agents: [], projects: [] },
-            models: [],
-            all: {
-              turns: 0,
-              turnsFailed: 0,
-              runs: 0,
-              runsFailed: 0,
-              prompt: 0,
-              cached: 0,
-              completion: 0,
-              rounds: 0,
-              priced: 0,
-              cost: null,
-              since: null,
-            },
-            allDecisions: { decisions: 0, tokens: 0, priced: 0, cost: null },
             instance: {
               users: 0,
               projects: 0,
@@ -788,6 +899,13 @@ describe("the overview cache", () => {
     expect(keys).toHaveLength(1);
     await built.overview("Europe/Berlin");
     expect(keys).toHaveLength(2);
+    // a range is its own read, all from the first instant there is
+    await built.overview("UTC", "all");
+    expect(keys).toHaveLength(3);
+    expect(keys[2]!.startsWith("0-")).toBe(true);
+    await built.overview("UTC", "all");
+    expect(keys).toHaveLength(3);
+    keys.splice(2, 1);
     // the parser gives every spelling the canonical name
     const url = "http://x/api/admin/overview?tz=eUrOpE%2FbErLiN";
     const spelled = await built.routes[0]!.handle(new Request(url), {
@@ -795,7 +913,11 @@ describe("the overview cache", () => {
     } as never);
     expect(spelled?.status).toBe(200);
     expect(keys).toHaveLength(2);
-    app.now.value += KEEP_MS;
+    // kept for the page's poll period, not the storage scan's minute
+    app.now.value += BOARD_KEEP_MS - 1;
+    await built.overview("UTC");
+    expect(keys).toHaveLength(2);
+    app.now.value += 1;
     await built.overview("UTC");
     expect(keys).toHaveLength(3);
     built.close();
@@ -830,22 +952,27 @@ describe("the load sampler", () => {
     const samples = sampler({
       clock: () => now,
       probe: probe([
-        // 2s of CPU over the first 4s of life: half of one of four cores
-        { cpuMicros: 2_000_000, rss: 100, ms: 50, uptimeMs: 4000 },
+        // the baseline: startup spent more CPU than wall time, as a
+        // process compiling its source does, and is never drawn
+        { cpuMicros: 9_000_000, rss: 50, ms: 0, uptimeMs: 800 },
+        // 2s of CPU over 4s: half of one of four cores
+        { cpuMicros: 11_000_000, rss: 100, ms: 4000, uptimeMs: 4800 },
         // 8s of CPU over 5s on four cores: 40%
-        { cpuMicros: 10_000_000, rss: 200, ms: 5050, uptimeMs: 9000 },
+        { cpuMicros: 19_000_000, rss: 200, ms: 9000, uptimeMs: 9800 },
         // more than the cores can give is all of them
-        { cpuMicros: 40_000_000, rss: 300, ms: 6050, uptimeMs: 10000 },
+        { cpuMicros: 49_000_000, rss: 300, ms: 10000, uptimeMs: 10800 },
         // no time passed is none
-        { cpuMicros: 40_000_000, rss: 400, ms: 6050, uptimeMs: 10000 },
+        { cpuMicros: 49_000_000, rss: 400, ms: 10000, uptimeMs: 10800 },
       ]),
     });
+    samples.sample();
+    expect(samples.samples()).toEqual({ at: [], cpu: [], rss: [] });
     for (let i = 0; i < 4; i++) {
-      samples.sample();
       now += 5000;
+      samples.sample();
     }
     expect(samples.samples()).toEqual({
-      at: [1000, 6000, 11000, 16000],
+      at: [6000, 11000, 16000, 21000],
       cpu: [0.125, 0.4, 1, 0],
       rss: [100, 200, 300, 400],
     });
@@ -861,9 +988,9 @@ describe("the load sampler", () => {
       },
       size: 3,
     });
-    for (let i = 0; i < 5; i++) samples.sample();
-    expect(samples.samples().rss).toEqual([3, 4, 5]);
-    expect(samples.samples().at).toEqual([3, 4, 5]);
+    for (let i = 0; i < 6; i++) samples.sample();
+    expect(samples.samples().rss).toEqual([4, 5, 6]);
+    expect(samples.samples().at).toEqual([4, 5, 6]);
   });
 });
 
@@ -881,6 +1008,7 @@ describe("the load", () => {
       pools: () => ({ chats: state.chats, chatsCap: 32, runs: state.runs }),
       online: () => state.online,
       automations: () => ({ total: state.total, waiting: state.waiting }),
+      attention: NO_ATTENTION,
       probe: probe(
         [{ cpuMicros: 1_000_000, rss: 512, ms: 0, uptimeMs: 1000 }],
         { cores: 2, memoryLimit: 2048, contained: true },
@@ -902,7 +1030,7 @@ describe("the load", () => {
       cores: 2,
       memoryLimit: 2048,
       contained: true,
-      samples: { at: [app.now.value], cpu: [0.5], rss: [512] },
+      samples: { at: [], cpu: [], rss: [] },
     });
     state.chats = 0;
     state.waiting = 0;
@@ -926,6 +1054,7 @@ describe("the load", () => {
       pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      attention: NO_ATTENTION,
       probe: {
         ...probe([]),
         read: () => ({ cpuMicros: 0, rss: ++rss, ms: rss, uptimeMs: rss }),
@@ -942,14 +1071,14 @@ describe("the load", () => {
         import.meta.url,
       ),
     });
-    // the first sample is taken at once, the loop waits for start()
-    expect(built.load().samples.rss).toEqual([1]);
+    // the baseline is read at once, the loop waits for start()
+    expect(built.load().samples.rss).toEqual([]);
     expect(ticks).toHaveLength(0);
     built.start();
     built.start();
     expect(ticks).toHaveLength(1);
     ticks[0]!();
-    expect(built.load().samples.rss).toEqual([1, 2]);
+    expect(built.load().samples.rss).toEqual([2]);
     built.close();
     expect(stopped).toBe(1);
     await app.shutdown();
@@ -982,7 +1111,8 @@ describe("the load", () => {
     expect(body.chatsCap).toBeGreaterThan(0);
     expect(body.cores).toBeGreaterThan(0);
     expect(body.memoryLimit).toBeGreaterThan(0);
-    expect(body.samples.cpu.length).toBeGreaterThanOrEqual(1);
+    // the baseline alone until the timer takes the first sample
+    expect(body.samples.cpu).toHaveLength(body.samples.at.length);
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
     await settleRun(chat, sessionId);
   });

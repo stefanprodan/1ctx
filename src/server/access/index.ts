@@ -16,6 +16,11 @@ import {
   auth,
 } from "./auth.ts";
 import {
+  type BoardUsagePort,
+  boardRoutes,
+  type PresencePort,
+} from "./board.ts";
+import {
   type ActivityPort,
   type ProjectsPort as DirectoryProjectsPort,
   type UsersPort as DirectoryUsersPort,
@@ -27,22 +32,24 @@ import {
 } from "./profile.ts";
 import { type UsersPort as LoginUsersPort, routes } from "./routes.ts";
 import { LoginStore } from "./store.ts";
-import { type UsersPort as AdminUsersPort, usersRoutes } from "./users.ts";
+import {
+  type UsersPort as AdminUsersPort,
+  type UsersProjectsPort,
+  type UsersUsagePort,
+  usersRoutes,
+} from "./users.ts";
 import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export {
   type Auth,
-  type AuthDeps,
   auth,
   COOKIE,
   cookieValue,
   LOGIN_TTL_MS,
-  type Resolution,
   TOUCH_AFTER_MS,
 } from "./auth.ts";
 export {
   type ActivityPort,
-  type DirectoryDeps,
   directoryRoutes,
 } from "./directory.ts";
 export {
@@ -53,12 +60,11 @@ export {
   parseUsername,
   parseUserPassword,
 } from "./parse.ts";
-export { type ProfileDeps, profileRoutes } from "./profile.ts";
-export { type RoutesDeps, routes } from "./routes.ts";
-export { type Login, LoginStore } from "./store.ts";
+export { profileRoutes } from "./profile.ts";
+export { routes } from "./routes.ts";
+export { LoginStore } from "./store.ts";
 export {
   type UsersPort as AdminUsersPort,
-  type UsersRoutesDeps,
   usersRoutes,
 } from "./users.ts";
 export { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
@@ -74,10 +80,13 @@ export type AccessDeps = {
     ProfileUsersPort &
     AdminUsersPort &
     DirectoryUsersPort;
-  projects: AuthProjectsPort & DirectoryProjectsPort;
+  projects: AuthProjectsPort & DirectoryProjectsPort & UsersProjectsPort;
+  usage: UsersUsagePort & BoardUsagePort;
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
+  // a closure, the socket is built after access
+  presence: PresencePort;
 };
 
 export type Access = Auth & {
@@ -121,7 +130,19 @@ export function accessArea(deps: AccessDeps): Access {
       ...usersRoutes({
         db: deps.db,
         logins,
+        visits,
         users: deps.users,
+        projects: deps.projects,
+        usage: deps.usage,
+        clock: deps.clock,
+      }),
+      ...boardRoutes({
+        visits,
+        logins,
+        presence: deps.presence,
+        users: deps.users,
+        usage: deps.usage,
+        projects: deps.projects,
         clock: deps.clock,
       }),
       ...directoryRoutes({

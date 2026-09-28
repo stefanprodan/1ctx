@@ -1,26 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The parts of a board drawn in CSS: a panel with the card head of
-// Rows, bars ranked from one baseline, a whole split in two and a
-// meter. What runs over days is uPlot, in Plot.tsx.
 
+import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { shareWidth } from "../lib/format.ts";
 import { RowsCard } from "./Rows.tsx";
 import "./chart.css";
 
-// A panel of a board: the card head of Rows over a chart's body, as
-// tall as the row of the grid it sits in.
 export function ChartPanel({
   label,
   hint,
   action,
+  hintBelow,
   children,
 }: {
   label: string;
   hint?: string;
   action?: ComponentChildren;
+  // a hint that follows a day plot's pointer: its own line on a phone
+  hintBelow?: boolean;
   children: ComponentChildren;
 }) {
   return (
@@ -28,6 +26,7 @@ export function ChartPanel({
       label={label}
       hint={hint}
       action={action}
+      hintBelow={hintBelow}
       live
       class="chart-panel"
     >
@@ -36,25 +35,21 @@ export function ChartPanel({
   );
 }
 
-type Bar = {
+export type Bar = {
   key: string;
   name: string;
   value: number;
   label: ComponentChildren;
-  // the panel's hint while the bar is under the pointer
+  // the panel's hint while the bar is under the pointer, and its
+  // accessible name
   hint: string;
   mono?: boolean;
-  // a line that sums others, read apart
   faint?: boolean;
-  // what the bar names is gone, its numbers kept: a small word after
-  gone?: boolean;
+  note?: string;
 };
 
-// Bars from one baseline, the value at the end of each. With onPick
-// each is a button and the picked one is lit. onHover hears the key
-// under the pointer or the focus, so the panel reads its hint from the
-// answer it holds now; a bar's hint is also its accessible name, the
-// words a pointer would show.
+// onHover hears a key, not a hint, so a refresh that lands under the
+// pointer says the new numbers
 export function Bars({
   bars,
   picked,
@@ -66,7 +61,6 @@ export function Bars({
   picked?: string;
   onPick?: (key: string) => void;
   onHover: (key: string | null) => void;
-  // room for a table's name
   wide?: boolean;
 }) {
   const top = Math.max(0, ...bars.map((b) => b.value));
@@ -86,10 +80,10 @@ export function Bars({
           <>
             <span class={`chart-bar-name${b.mono ? " chart-mono" : ""}`}>
               {b.name}
-              {b.gone && (
+              {b.note !== undefined && (
                 <>
                   {" "}
-                  <span class="chart-gone">deleted</span>
+                  <span class="chart-note">{b.note}</span>
                 </>
               )}
             </span>
@@ -128,13 +122,58 @@ export function Bars({
   );
 }
 
-// the words under a panel's bars: what they add up to
+// a new key from the caller forgets the bar under the pointer
+export function BarsPanel({
+  label,
+  bars,
+  rest,
+  none,
+  action,
+  wide,
+  picked,
+  onPick,
+  children,
+}: {
+  label: string;
+  bars: Bar[];
+  rest?: string;
+  // said in place of no bars; without, no bars draws nothing
+  none?: string;
+  action?: ComponentChildren;
+  wide?: boolean;
+  picked?: string;
+  onPick?: (key: string) => void;
+  children?: ComponentChildren;
+}) {
+  const over = useSignal<string | null>(null);
+  return (
+    <ChartPanel
+      label={label}
+      hint={bars.find((b) => b.key === over.value)?.hint ?? rest}
+      action={action}
+    >
+      {bars.length > 0 ? (
+        <Bars
+          bars={bars}
+          wide={wide}
+          picked={picked}
+          onPick={onPick}
+          onHover={(key) => {
+            over.value = key;
+          }}
+        />
+      ) : (
+        none !== undefined && <p class="chart-none">{none}</p>
+      )}
+      {children}
+    </ChartPanel>
+  );
+}
+
 export function ChartFoot({ children }: { children: ComponentChildren }) {
   return <p class="chart-foot">{children}</p>;
 }
 
-// One bar split in two, the first part dark and the second light; the
-// label says both for a screen reader.
 export function Stack({
   first,
   second,
@@ -161,12 +200,10 @@ export function Stack({
   );
 }
 
-// the small square that names a part of the split
 export function Swatch({ part }: { part: "first" | "second" }) {
   return <span class={`chart-swatch chart-stack-${part}`} />;
 }
 
-// A share as a bar under its number, a row's size against the largest.
 export function Meter({ share }: { share: number }) {
   return (
     <span class="meter" aria-hidden="true">

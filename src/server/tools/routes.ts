@@ -4,15 +4,20 @@
 import type {
   PatchToolRequest,
   ToolsResponse,
+  VisualCounts,
+  WebCounts,
 } from "../../shared/api/tools.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { parseToolName, parseToolPatch, type ToolName } from "./parse.ts";
 import { visualShell } from "./visual-shell.ts";
 
 export type RoutesDeps = {
   clock: Clock;
+  visuals(since: number, until: number): VisualCounts;
+  web(since: number, until: number): WebCounts;
   response(now: number): ToolsResponse;
   patch(name: ToolName, patch: PatchToolRequest, now: number): void;
   visualHosts(): string[];
@@ -46,6 +51,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const now = deps.clock();
         deps.patch(name, patch, now);
         return json(deps.response(now));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/usage/visuals",
+      policy: "admin",
+      handle() {
+        return json(lastDays(deps.clock(), deps.visuals));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/usage/web",
+      policy: "admin",
+      handle() {
+        return json(lastDays(deps.clock(), deps.web));
       },
     },
   ];

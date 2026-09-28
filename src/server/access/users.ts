@@ -5,16 +5,23 @@
 // transaction as each write so the response names the field instead of
 // exposing a unique-index error.
 
-import type { UserResponse, UsersResponse } from "../../shared/api/users.ts";
+import type { SendTotals } from "../../shared/api/admin.ts";
+import type {
+  AdminUser,
+  UserResponse,
+  UsersResponse,
+} from "../../shared/api/users.ts";
 import type { Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { account, type UserFields, type UserRow } from "../users/index.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
+import type { VisitStore } from "./visits.ts";
 
 export type UsersPort = {
   list(): UserRow[];
@@ -34,10 +41,23 @@ export type UsersPort = {
   createUser(fields: UserFields): UserRow;
 };
 
+export type UsersProjectsPort = {
+  memberProjectIds(userId: string): string[];
+  teamProjectIds(): string[];
+  personal(userId: string): { id: string } | null;
+};
+
+export type UsersUsagePort = {
+  projectTotal(projectId: string, since: number, until: number): SendTotals;
+};
+
 export type UsersRoutesDeps = {
   db: Db;
   logins: LoginStore;
+  visits: VisitStore;
   users: UsersPort;
+  projects: UsersProjectsPort;
+  usage: UsersUsagePort;
   clock: Clock;
 };
 
@@ -53,6 +73,20 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       throw new Conflict("username is taken");
     }
   };
+  const teamIds = () => new Set(deps.projects.teamProjectIds());
+  const adminUser = (
+    user: UserRow,
+    lastVisitDay: string | null,
+    teams: Set<string>,
+  ): AdminUser => ({
+    ...account(user),
+    lastVisitDay,
+    projectIds: deps.projects
+      .memberProjectIds(user.id)
+      .filter((id) => teams.has(id)),
+  });
+  const oneUser = (user: UserRow): AdminUser =>
+    adminUser(user, deps.visits.latestFor(user.id), teamIds());
   const emailAvailable = (email: string, except: string | null) => {
     const other = deps.users.byEmail(email);
     if (other !== null && other.id !== except) {
@@ -65,8 +99,14 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       path: "/api/users",
       policy: "admin",
       handle() {
+        const visits = deps.visits.latest();
+        const teams = teamIds();
         const body: UsersResponse = {
-          users: deps.users.list().map(account),
+          users: deps.users
+            .list()
+            .map((user) =>
+              adminUser(user, visits.get(user.id)?.day ?? null, teams),
+            ),
         };
         return json(body);
       },
@@ -105,7 +145,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           }
           return { result: find(created.id) };
         });
-        const body: UserResponse = { user: account(user) };
+        const body: UserResponse = { user: oneUser(user) };
         return json(body, 201);
       },
     },
@@ -187,8 +227,23 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             ],
           };
         });
-        const body: UserResponse = { user: account(changed) };
+        const body: UserResponse = { user: oneUser(changed) };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/users/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const own = deps.projects.personal(find(ctx.params.id).id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            own === null
+              ? { sends: 0, tokens: 0, cost: 0 }
+              : deps.usage.projectTotal(own.id, since, until),
+          ),
+        );
       },
     },
     {

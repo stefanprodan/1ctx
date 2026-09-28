@@ -1,18 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// One read at a time per key, its answer kept a minute on the clock
-// port: a request while a read runs waits for that read, one inside
-// the minute gets the kept answer, and a failed read keeps nothing.
-// The storage scan has one key; the overview a key per zone.
-// Expired answers go on every get, and past MAX_KEPT keys the oldest.
 
 import type { Clock } from "../lib/clock.ts";
 
 export const KEEP_MS = 60_000;
+// under the pages' 30 s poll: a kept answer is stamped when its read
+// ends, after the ask
+export const BOARD_KEEP_MS = 25_000;
 export const MAX_KEPT = 32;
 
-export type Cache<T> = {
+type Cache<T> = {
   get(key?: string): Promise<T>;
 };
 

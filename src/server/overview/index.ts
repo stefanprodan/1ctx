@@ -1,28 +1,37 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The overview area: what an admin reads about the instance. Storage
-// is one scan of the file in a worker over its own connection, or
-// inline over the app's when the database is in memory, kept a minute
-// and shaped for the caller's zone at each request. The overview's
-// days are the same worker's other job, kept a minute per zone. The
-// load is the process's word at each request: its pools, its sockets
-// and its CPU and memory, sampled from the start.
 
 import {
+  type AttentionResponse,
   LOAD_SAMPLE_MS,
   type LoadResponse,
+  type OverviewRange,
   type OverviewResponse,
   type StorageResponse,
+  type UsageResponse,
 } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
-import { scanCache } from "./cache.ts";
+import { monthWindow } from "../usage/index.ts";
+import { type AttentionInput, attention } from "./attention.ts";
+import { BOARD_KEEP_MS, scanCache } from "./cache.ts";
 import { type Probe, processProbe, sampler } from "./load.ts";
-import { daysOf, overviewResponse } from "./overview.ts";
-import { type RangeInput, type RangeResult, range } from "./range.ts";
+import {
+  daysOf,
+  firstOf,
+  overviewResponse,
+  usageResponse,
+  windowOf,
+} from "./overview.ts";
+import {
+  type MonthResult,
+  month,
+  type RangeInput,
+  type RangeResult,
+  range,
+} from "./range.ts";
 import { routes } from "./routes.ts";
 import { type ScanInput, type ScanResult, scan } from "./scan.ts";
 import {
@@ -32,19 +41,15 @@ import {
 } from "./storage.ts";
 import { type Scanner, workerScanner } from "./worker.ts";
 
-export { KEEP_MS } from "./cache.ts";
+export { type AttentionInput, attention } from "./attention.ts";
+export { BOARD_KEEP_MS, KEEP_MS } from "./cache.ts";
+export { type Probe, type Reading, sampler } from "./load.ts";
 export {
-  type Probe,
-  processProbe,
-  type Reading,
-  sampler,
-} from "./load.ts";
-export { daysOf, median, overviewResponse } from "./overview.ts";
-export { parseLoadQuery, parseZoneQuery } from "./parse.ts";
-export { type RangeInput, type RangeResult, range } from "./range.ts";
-export { type ScanInput, type ScanResult, scan } from "./scan.ts";
-export { STORAGE_TABLES, storageResponse } from "./storage.ts";
-export { type Scanner, workerScanner } from "./worker.ts";
+  parseNoQuery,
+  parseOverviewQuery,
+  parseUsageQuery,
+  parseZoneQuery,
+} from "./parse.ts";
 
 export type OverviewDeps = {
   db: Db;
@@ -60,6 +65,8 @@ export type OverviewDeps = {
   online(): number;
   // every automation, and those whose fire waits for a run slot
   automations(): { total: number; waiting: number };
+  // the secrets are read through compose's ports
+  attention(): AttentionInput;
   // a test's process; absent, this one, sampled every LOAD_SAMPLE_MS
   probe?: Probe;
   // a test's timer; absent, setInterval, kept from holding the process
@@ -73,7 +80,9 @@ export type OverviewDeps = {
 export type Overview = {
   routes: RouteDescriptor[];
   storage(timeZone: string): Promise<StorageResponse>;
-  overview(timeZone: string): Promise<OverviewResponse>;
+  overview(timeZone: string, range?: OverviewRange): Promise<OverviewResponse>;
+  usage(timeZone: string, month: string): Promise<UsageResponse>;
+  attention(): AttentionResponse;
   load(): LoadResponse;
   start(): void;
   close(): void;
@@ -81,10 +90,11 @@ export type Overview = {
 
 const DAY_MS = 86_400_000;
 
-export function inlineScanner(db: Db): Scanner {
+function inlineScanner(db: Db): Scanner {
   return {
     scan: (input: ScanInput) => Promise.resolve(scan(db, input)),
     range: (input: RangeInput) => Promise.resolve(range(db, input)),
+    month: (input: RangeInput) => Promise.resolve(month(db, input)),
     close() {},
   };
 }
@@ -118,24 +128,48 @@ export function overviewArea(deps: OverviewDeps): Overview {
     storageResponse(await scans.get(), timeZone, deps.limits.current());
   const ranges = scanCache<RangeResult>({
     clock: deps.clock,
-    run: (timeZone) =>
+    keepMs: BOARD_KEEP_MS,
+    run: (key) =>
       failing("overview read failed", () => {
+        const [timeZone, range] = key.split("\n") as [string, OverviewRange];
         const now = deps.clock();
-        const window = daysOf(now, timeZone);
-        return scanner.range({
-          now,
-          since: window.starts[0]!,
-          until: window.until,
-        });
+        const window =
+          range === "all"
+            ? { since: 0, until: windowOf(now, timeZone, range, null).until }
+            : daysOf(now, timeZone, range);
+        return scanner.range({ now, since: window.since, until: window.until });
       }),
   });
-  const overview = async (timeZone: string) => {
-    const result = await ranges.get(timeZone);
-    return overviewResponse(result, daysOf(result.readAt, timeZone), {
+  const overview = async (timeZone: string, range: OverviewRange = "30d") => {
+    const result = await ranges.get(`${timeZone}\n${range}`);
+    const window = windowOf(result.readAt, timeZone, range, firstOf(result));
+    return overviewResponse(result, window, range, {
       version: deps.version,
       startedAt: deps.startedAt,
     });
   };
+  const months = scanCache<MonthResult>({
+    clock: deps.clock,
+    keepMs: BOARD_KEEP_MS,
+    run: (key) =>
+      failing("usage read failed", () => {
+        const [timeZone, name] = key.split("\n") as [string, string];
+        const now = deps.clock();
+        const window = monthWindow(now, timeZone, name);
+        return scanner.month({ now, since: window.since, until: window.until });
+      }),
+  });
+  const usage = async (timeZone: string, name: string) => {
+    const result = await months.get(`${timeZone}\n${name}`);
+    return usageResponse(
+      result,
+      monthWindow(result.readAt, timeZone, name),
+      name,
+    );
+  };
+  const needs = (): AttentionResponse => ({
+    items: attention(deps.attention()),
+  });
   const probe = deps.probe ?? processProbe();
   const samples = sampler({ clock: deps.clock, probe });
   samples.sample();
@@ -166,9 +200,11 @@ export function overviewArea(deps: OverviewDeps): Overview {
     };
   };
   return {
-    routes: routes({ storage, overview, load }),
+    routes: routes({ storage, overview, usage, attention: needs, load }),
     storage,
     overview,
+    usage,
+    attention: needs,
     load,
     // the sampling loop, started only by an activated app
     start() {

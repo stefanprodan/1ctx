@@ -31,6 +31,38 @@ export class VisitStore {
       .map((row) => row.day);
   }
 
+  // day, not at, is what a page shows: an instant would move the day for
+  // a reader in another zone
+  latest(): Map<string, { day: string; at: number }> {
+    const rows = this.db
+      .query<{ user_id: string; day: string; at: number }, []>(
+        `select user_id, max(day) as day, max(at) as at
+           from visits group by user_id`,
+      )
+      .all();
+    return new Map(
+      rows.map((row) => [row.user_id, { day: row.day, at: row.at }]),
+    );
+  }
+
+  latestFor(userId: string): string | null {
+    return (
+      this.db
+        .query<{ day: string | null }, [string]>(
+          "select max(day) as day from visits where user_id = ?",
+        )
+        .get(userId)?.day ?? null
+    );
+  }
+
+  onDays(first: string, last: string): { userId: string; day: string }[] {
+    return this.db
+      .query<{ userId: string; day: string }, [string, string]>(
+        "select user_id as userId, day from visits where day >= ? and day <= ?",
+      )
+      .all(first, last);
+  }
+
   deleteBefore(at: number): number {
     return this.db.query("delete from visits where at < ?").run(at).changes;
   }

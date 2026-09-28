@@ -1,0 +1,13 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .config-board,
+  .config-board-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .config-board-away {
+    display: none;
+  }
+}

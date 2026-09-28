@@ -9,16 +9,20 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { App } from "../../../src/client/app/App.tsx";
-import { path } from "../../../src/client/app/router.ts";
+import { path, query } from "../../../src/client/app/router.ts";
+import { match } from "../../../src/client/app/routes.ts";
 import {
   closeDrawer,
   drawerOpen,
   hideRail,
+  lastAdmin,
+  lastWork,
   NARROW,
   narrow,
   openDrawer,
   railHidden,
   showRail,
+  watchPages,
   watchWidth,
 } from "../../../src/client/app/shell.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -154,5 +158,57 @@ describe("watchWidth", () => {
     narrow.value = false;
     watchWidth();
     expect(narrow.value).toBe(false);
+  });
+});
+
+describe("the rail's faces", () => {
+  const admin = () => {
+    me.value = { ...me.value!, role: "admin" };
+  };
+
+  test.serial("the working face offers an admin the admin panel", () => {
+    admin();
+    const html = render(<App />);
+    expect(html).toContain("Admin panel");
+    expect(html).not.toContain("Exit admin panel");
+    expect(html).not.toContain('href="/admin/access/users"');
+  });
+
+  test.serial("a member gets no band", () => {
+    expect(render(<App />)).not.toContain("Admin panel");
+  });
+
+  test.serial("an admin address shows the zones and the way back", () => {
+    admin();
+    path.value = "/admin/config/agents/assistant";
+    const html = render(<App />);
+    expect(html).toContain("Exit admin panel");
+    expect(html).toContain('class="rail-face"');
+    expect(html).toContain('href="/admin/monitor"');
+    expect(html).toContain('href="/admin/access/users"');
+    expect(html).toMatch(/class="rail-sub rail-sub-on"[^>]*>Agents</);
+    expect(html).not.toContain('href="/projects"');
+  });
+
+  test.serial("the band opens the last page seen on the other face", () => {
+    const stop = watchPages((p) => match(p) !== null);
+    try {
+      path.value = "/";
+      path.value = "/admin/config/mcp";
+      query.value = "?q=x";
+      expect(lastAdmin.value).toBe("/admin/config/mcp?q=x");
+      query.value = "";
+      path.value = "/projects";
+      expect(lastWork.value).toBe("/projects");
+      path.value = "/login";
+      expect(lastWork.value).toBe("/projects");
+      expect(lastAdmin.value).toBe("/admin/config/mcp");
+      path.value = "/admin";
+      expect(lastWork.value).toBe("/projects");
+      path.value = "/admin/monitor/typo";
+      expect(lastAdmin.value).toBe("/admin/config/mcp");
+    } finally {
+      stop();
+    }
   });
 });

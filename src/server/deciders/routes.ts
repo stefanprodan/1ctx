@@ -10,6 +10,7 @@ import type {
   CheckDeciderResponse,
   DeciderResponse,
   DecidersResponse,
+  DecisionTotals,
 } from "../../shared/api/deciders.ts";
 import type {
   DecisionResponse,
@@ -24,6 +25,7 @@ import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { DecisionError, servesDecisions } from "../providers/index.ts";
+import { lastDays } from "../usage/index.ts";
 import {
   ask,
   CHECK_QUESTIONS,
@@ -41,17 +43,29 @@ import {
   summary,
 } from "./store.ts";
 
+export type TotalsPort = {
+  decisionTotal(
+    by: { deciderId: string } | { purpose: string },
+    since: number,
+    until: number,
+  ): DecisionTotals;
+};
+
 export type RoutesDeps = {
   db: Db;
   store: DeciderStore;
   decisions: DecisionStore;
   providers: ProvidersPort;
-  usage: UsagePort;
+  usage: UsagePort & TotalsPort;
   clock: Clock;
   log: Log;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
+  const usage = (by: { deciderId: string } | { purpose: string }) =>
+    lastDays(deps.clock(), (since, until) =>
+      deps.usage.decisionTotal(by, since, until),
+    );
   const providerName = (id: string) => deps.providers.byId(id)?.name ?? id;
   const logged = (msg: string, decider: DeciderRow) =>
     deps.log.info(msg, {
@@ -130,6 +144,24 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle() {
         const body: DecisionsResponse = { decisions: deps.decisions.list() };
         return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/decisions/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const id = ctx.params.id;
+        if (!isDecisionId(id)) throw new NotFound("no such decision");
+        return json(usage({ purpose: id }));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/deciders/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        return json(usage({ deciderId: find(ctx.params.id).id }));
       },
     },
     {

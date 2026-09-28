@@ -1,0 +1,49 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .agent-list-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .agent-list-model {
+    display: block;
+    min-width: 0;
+    font-family: var(--mono);
+  }
+  .agent-list-bad {
+    font-family: var(--sans);
+    color: var(--attention);
+  }
+  .agent-list-running {
+    color: var(--running);
+  }
+  .agent-list-provider {
+    max-width: 200px;
+    font-family: var(--mono);
+  }
+
+  .agent-list-pick {
+    max-width: 220px;
+  }
+  .agent-list-pick-key {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .agent-list-pick-value {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--mono);
+  }
+  .agent-list-pick-chevron {
+    flex-shrink: 0;
+    color: var(--faint);
+    transition: transform 120ms;
+  }
+  .agent-list-pick[aria-expanded="true"] .agent-list-pick-chevron {
+    transform: rotate(180deg);
+  }
+}

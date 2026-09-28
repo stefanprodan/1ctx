@@ -486,9 +486,9 @@ describe("the pages", () => {
       expect(html).toContain(">only you<");
       expect(html).toContain(">3 members<");
       // a member does not manage teams
-      expect(html).not.toContain('href="/admin/projects"');
+      expect(html).not.toContain('href="/admin/access/projects"');
       me.value = { ...casey, role: "admin" };
-      expect(render(<Projects />)).toContain('href="/admin/projects"');
+      expect(render(<Projects />)).toContain('href="/admin/access/projects"');
     },
   );
 
@@ -597,6 +597,10 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/settings"',
     );
+    // a personal project's description may stay empty
+    expect(html).toContain('name="description"');
+    expect(html).not.toContain("aria-required");
+    expect(html).not.toContain("label-required");
     // a personal project is always named personal, so no name field
     expect(html).not.toContain('name="name"');
     expect(html).toContain(">Scratch work</textarea>");
@@ -641,8 +645,8 @@ describe("the pages", () => {
       expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
       me.value = { ...casey, role: "admin" };
       const html = render(<Members params={{ id: "p1" }} />);
-      expect(html).toContain('href="/admin/projects?open=p1">Manage<');
-      expect(html).toContain('href="/admin/agents">Manage<');
+      expect(html).toContain('href="/admin/access/projects/p1">Manage<');
+      expect(html).toContain('href="/admin/config/agents">Manage<');
     },
   );
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { withSaved } from "../../../src/client/views/admin/Tools.model.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   DEFAULT_LIMITS,
@@ -158,7 +157,7 @@ describe("limits area", () => {
             changedAt: 200,
           });
           const { values } = parseLimits({
-            values: withSaved(area.rows(), definition.scope, {}),
+            values: { [name]: effective },
           });
           area.set(values, 300);
           expect(area.store.rows()).toEqual([
@@ -269,12 +268,24 @@ describe("limits area", () => {
       const loaded = await admin.call("GET", "/api/limits");
       expect(loaded.status).toBe(200);
       expect(await loaded.json()).toEqual(body);
-      const missing: Record<string, number> = { ...DEFAULT_LIMITS };
-      delete missing.runsRunning;
+      const one = await admin.call("PUT", "/api/limits", {
+        body: { values: { runsPerUser: 3 } },
+      });
+      expect(one.status).toBe(200);
+      const runs = ((await one.json()) as typeof body).limits.filter(
+        (row) => row.scope === "runs",
+      );
+      expect(runs).toEqual([
+        expect.objectContaining({ name: "runsPerUser", value: 3 }),
+        expect.objectContaining({ name: "runsRunning", value: 8 }),
+      ]);
       const refused = await admin.call("PUT", "/api/limits", {
-        body: { values: missing },
+        body: { values: {} },
       });
       expect(refused.status).toBe(400);
+      expect(await refused.json()).toEqual({
+        error: "values must name a limit",
+      });
       const over = await admin.call("PUT", "/api/limits", {
         body: { values: { ...DEFAULT_LIMITS, runsRunning: 65 } },
       });
@@ -327,9 +338,9 @@ describe("limits area", () => {
       const response = await admin.call("GET", "/api/limits");
       expect(response.status).toBe(200);
       const { limits }: LimitsResponse = await response.json();
-      const values = withSaved(limits, "send", { rounds: 12 });
+      expect(limits.length).toBeGreaterThan(0);
       const saved = await admin.call("PUT", "/api/limits", {
-        body: { values },
+        body: { values: { rounds: 12 } },
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
@@ -483,10 +494,11 @@ describe("parseLimits", () => {
     });
   });
 
-  test("refuses a missing or unknown limit name", () => {
-    const missing: Partial<typeof DEFAULT_LIMITS> = { ...DEFAULT_LIMITS };
-    delete missing.rounds;
-    expect(() => parseLimits({ values: missing })).toThrow(BadRequest);
+  test("takes some limits, and refuses none or an unknown name", () => {
+    expect(parseLimits({ values: { rounds: 20 } })).toEqual({
+      values: { rounds: 20 },
+    });
+    expect(() => parseLimits({ values: {} })).toThrow(BadRequest);
     expect(() =>
       parseLimits({ values: { ...DEFAULT_LIMITS, forever: 1 } }),
     ).toThrow(BadRequest);

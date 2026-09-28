@@ -1,26 +1,25 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The overview's days and all time: every query the answer needs over
-// one connection, read once in one transaction and shaped into plain
-// data the worker can post. The days come as sums by quarter hour of
-// UTC, which every zone's midnight falls on, laid on the zone's days by
-// the caller; the breakdowns and the models take the days' bounds. A
-// send has many usage rows, so sends and tokens are summed from their
-// own table each and joined by key afterwards, never in one query.
+// The days come as sums by quarter hour of UTC, which every zone's
+// midnight falls on, laid on the zone's days by the caller.
 
 import { statSync } from "node:fs";
+import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
+import { type DecisionSlot, decisionSlots } from "../usage/index.ts";
 import {
-  type DecisionSlot,
-  type DecisionSums,
-  decisionSlots,
-  decisionTotals,
-} from "../usage/index.ts";
+  type Bounds,
+  byAgents,
+  byDeciders,
+  byModels,
+  byProjects,
+  type GroupRow,
+} from "./breakdowns.ts";
 
 export type RangeInput = {
   now: number;
-  // the slots, the breakdowns and the lengths cover [since, until)
+  // [since, until)
   since: number;
   until: number;
 };
@@ -44,39 +43,22 @@ export type UsageSlot = {
   cost: number | null;
 };
 
-// one row of a breakdown before its top is taken: the key that groups
-// it, the names the answer draws, and its sums
-export type GroupRow = {
-  key: string;
-  id: string | null;
-  name: string | null;
-  owner: string | null;
-  deleted: boolean;
-  tokens: number;
-  turns: number;
-  runs: number;
-};
+// oldest first
+type Ended = { at: number[]; ms: number[] };
 
-export type ModelRow = {
-  provider: string;
-  model: string;
-  turns: number;
-  // the lengths of the ended turns
-  lengths: number[];
-};
+// user is the place in users
+type Actives = { users: string[]; slot: number[]; user: number[] };
 
-export type AllTime = Omit<SendSlot, "slot"> &
-  Omit<UsageSlot, "slot"> & { since: number | null };
-
-export type RangeResult = {
+export type DayReads = {
   readAt: number;
+  ended: Ended;
+  actives: Actives;
   sends: SendSlot[];
   usage: UsageSlot[];
   decisions: DecisionSlot[];
-  by: { projects: GroupRow[]; agents: GroupRow[] };
-  models: ModelRow[];
-  all: AllTime;
-  allDecisions: DecisionSums;
+};
+
+export type RangeResult = DayReads & {
   instance: {
     users: number;
     projects: number;
@@ -86,9 +68,13 @@ export type RangeResult = {
   };
 };
 
-export const SLOT_MS = 900_000;
+export type MonthResult = DayReads & {
+  since: number | null;
+  by: { projects: GroupRow[]; agents: GroupRow[]; models: ModelUsage[] };
+  deciders: DeciderUsage[];
+};
 
-type Bounds = [number, number];
+export const SLOT_MS = 900_000;
 
 const SEND_SUMS = `sum(kind != 'run') as turns,
        sum(kind != 'run' and status = 'failed') as turnsFailed,
@@ -118,225 +104,6 @@ function usageSlots(db: Db, bounds: Bounds): UsageSlot[] {
          group by slot order by slot`,
     )
     .all(...bounds);
-}
-
-// every send and every round there is; sums of no rows are null
-function allTime(db: Db): AllTime {
-  const sends = db
-    .query<Omit<SendSlot, "slot"> & { since: number | null }, []>(
-      `select ${SEND_SUMS}, min(started_at) as since from sends`,
-    )
-    .get()!;
-  const usage = db
-    .query<Omit<UsageSlot, "slot">, []>(`select ${USAGE_SUMS} from usage`)
-    .get()!;
-  return {
-    turns: sends.turns ?? 0,
-    turnsFailed: sends.turnsFailed ?? 0,
-    runs: sends.runs ?? 0,
-    runsFailed: sends.runsFailed ?? 0,
-    since: sends.since,
-    prompt: usage.prompt ?? 0,
-    cached: usage.cached ?? 0,
-    completion: usage.completion ?? 0,
-    rounds: usage.rounds,
-    priced: usage.priced,
-    cost: usage.priced > 0 ? usage.cost : null,
-  };
-}
-
-type Tokens = { key: string; tokens: number };
-type Sends = { key: string; turns: number; runs: number };
-type Named = Pick<GroupRow, "key" | "id" | "name" | "owner" | "deleted">;
-
-// the tokens of a group from usage alone and its sends from sends
-// alone, joined by key: a send with three rounds counts once. Usage
-// outlives its project, so a key no row names is a deleted one, kept
-// by its id, or summed into one row keyed merged when it is given
-function grouped(
-  db: Db,
-  bounds: Bounds,
-  tokensSql: string,
-  sendsSql: string,
-  names: Named[],
-  merged?: string,
-): GroupRow[] {
-  const tokens = new Map(
-    db
-      .query<Tokens, Bounds>(tokensSql)
-      .all(...bounds)
-      .map((row) => [row.key, row]),
-  );
-  const sends = new Map(
-    db
-      .query<Sends, Bounds>(sendsSql)
-      .all(...bounds)
-      .map((row) => [row.key, row]),
-  );
-  const rows: GroupRow[] = [];
-  for (const named of names) {
-    const t = tokens.get(named.key);
-    const s = sends.get(named.key);
-    if (t === undefined && s === undefined) continue;
-    rows.push({
-      ...named,
-      tokens: t?.tokens ?? 0,
-      turns: s?.turns ?? 0,
-      runs: s?.runs ?? 0,
-    });
-  }
-  const named = new Set(names.map((row) => row.key));
-  let gone: GroupRow | undefined;
-  for (const [key, t] of tokens) {
-    if (named.has(key)) continue;
-    const s = sends.get(key);
-    const row: GroupRow = {
-      key: merged ?? key,
-      id: merged === undefined ? key : null,
-      name: null,
-      owner: null,
-      deleted: true,
-      tokens: t.tokens,
-      turns: s?.turns ?? 0,
-      runs: s?.runs ?? 0,
-    };
-    if (merged === undefined) {
-      rows.push(row);
-    } else if (gone === undefined) {
-      gone = row;
-      rows.push(gone);
-    } else {
-      gone.tokens += row.tokens;
-      gone.turns += row.turns;
-      gone.runs += row.runs;
-    }
-  }
-  return rows;
-}
-
-const USAGE_BY = (key: string) =>
-  `select ${key} as key, sum(prompt_tokens + completion_tokens) as tokens
-     from usage where created_at >= ? and created_at < ? group by key`;
-
-function byAgents(db: Db, bounds: Bounds): GroupRow[] {
-  const names = db
-    .query<{ id: string; name: string; retired: number }, []>(
-      "select id, name, deleted_at is not null as retired from agents",
-    )
-    .all()
-    .map((row) => ({
-      key: row.id,
-      id: row.id,
-      name: row.name,
-      owner: null,
-      deleted: row.retired === 1,
-    }));
-  return grouped(
-    db,
-    bounds,
-    USAGE_BY("agent_id"),
-    `select agent_id as key, sum(kind != 'run') as turns,
-            sum(kind = 'run') as runs
-       from sends where started_at >= ? and started_at < ? group by key`,
-    names,
-  );
-}
-
-type ProjectRow = {
-  id: string;
-  kind: "personal" | "team";
-  name: string;
-  owner: string;
-};
-
-const projectNames = (db: Db): ProjectRow[] =>
-  db
-    .query<ProjectRow, []>(
-      `select p.id, p.kind, p.name, u.username as owner
-         from projects p join users u on u.id = p.owner_id`,
-    )
-    .all();
-
-// every deleted project is one row: none has a name left to tell them
-// apart. No project id is empty
-const DELETED_PROJECTS = "";
-
-function byProjects(db: Db, bounds: Bounds): GroupRow[] {
-  // a personal project is counted and never named
-  const names = projectNames(db).map((project) =>
-    project.kind === "personal"
-      ? {
-          key: project.id,
-          id: null,
-          name: null,
-          owner: project.owner,
-          deleted: false,
-        }
-      : {
-          key: project.id,
-          id: project.id,
-          name: project.name,
-          owner: null,
-          deleted: false,
-        },
-  );
-  return grouped(
-    db,
-    bounds,
-    USAGE_BY("project_id"),
-    `select x.project_id as key, sum(s.kind != 'run') as turns,
-            sum(s.kind = 'run') as runs
-       from sends s join sessions x on x.id = s.session_id
-       where s.started_at >= ? and s.started_at < ? group by key`,
-    names,
-    DELETED_PROJECTS,
-  );
-}
-
-// the model that answered a send: its answer round's, when a router
-// served another than the one asked for. Only that round counts: an
-// earlier round's pick says nothing about a last round without usage,
-// and the memory phase, when it ran, is the round after the answer
-const ANSWERED = `coalesce((select u.served_model from usage u
-     where u.send_id = s.id
-       and u.round = coalesce(s.memory_round - 1, s.rounds)), s.model)`;
-
-// the chat turns of each model; a run's length is its task's, not the
-// model's
-function models(db: Db, bounds: Bounds): ModelRow[] {
-  const rows = db
-    .query<{ provider: string; answered: string; turns: number }, Bounds>(
-      `select s.provider_name as provider, ${ANSWERED} as answered,
-              count(*) as turns
-         from sends s
-         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-         group by s.provider_name, answered
-         order by turns desc, provider, answered`,
-    )
-    .all(...bounds)
-    .map(
-      (row): ModelRow => ({
-        provider: row.provider,
-        model: row.answered,
-        turns: row.turns,
-        lengths: [],
-      }),
-    );
-  const byKey = new Map(
-    rows.map((row) => [`${row.provider}\n${row.model}`, row]),
-  );
-  for (const ended of db
-    .query<{ provider: string; model: string; ms: number }, Bounds>(
-      `select s.provider_name as provider, ${ANSWERED} as model,
-              max(s.finished_at - s.started_at, 0) as ms
-         from sends s
-         where s.kind != 'run' and s.started_at >= ? and s.started_at < ?
-           and s.status != 'running' and s.finished_at is not null`,
-    )
-    .all(...bounds)) {
-    byKey.get(`${ended.provider}\n${ended.model}`)?.lengths.push(ended.ms);
-  }
-  return rows;
 }
 
 const count = (db: Db, sql: string): number =>
@@ -369,27 +136,88 @@ function instance(db: Db): RangeResult["instance"] {
   };
 }
 
+// a run's length is its task's; a clock stepped back reads as zero long
+function ended(db: Db, bounds: Bounds): Ended {
+  const rows = db
+    .query<{ at: number; ms: number }, Bounds>(
+      `select started_at as at, max(finished_at - started_at, 0) as ms
+         from sends
+         where kind != 'run' and status != 'running'
+           and finished_at is not null
+           and started_at >= ? and started_at < ?
+         order by started_at`,
+    )
+    .all(...bounds);
+  return { at: rows.map((r) => r.at), ms: rows.map((r) => r.ms) };
+}
+
+function actives(db: Db, bounds: Bounds): Actives {
+  const rows = db
+    .query<{ user: string; slot: number }, Bounds>(
+      `select user_id as user, started_at / ${SLOT_MS} as slot
+         from sends where started_at >= ? and started_at < ?
+         group by user, slot order by slot`,
+    )
+    .all(...bounds);
+  const users: string[] = [];
+  const place = new Map<string, number>();
+  const out: Actives = { users, slot: [], user: [] };
+  for (const row of rows) {
+    let at = place.get(row.user);
+    if (at === undefined) {
+      at = users.push(row.user) - 1;
+      place.set(row.user, at);
+    }
+    out.slot.push(row.slot);
+    out.user.push(at);
+  }
+  return out;
+}
+
 // one read transaction, so every statement sees the same WAL snapshot
-export function range(db: Db, input: RangeInput): RangeResult {
+function snapshot<T>(db: Db, read: () => T): T {
   db.exec("begin");
   try {
-    return read(db, input);
+    return read();
   } finally {
     db.exec("rollback");
   }
 }
 
-function read(db: Db, input: RangeInput): RangeResult {
-  const days: Bounds = [input.since, input.until];
+function dayReads(db: Db, input: RangeInput, days: Bounds): DayReads {
   return {
     readAt: input.now,
+    ended: ended(db, days),
+    actives: actives(db, days),
     sends: sendSlots(db, days),
     usage: usageSlots(db, days),
     decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
-    by: { projects: byProjects(db, days), agents: byAgents(db, days) },
-    models: models(db, days),
-    all: allTime(db),
-    allDecisions: decisionTotals(db),
-    instance: instance(db),
   };
+}
+
+export function range(db: Db, input: RangeInput): RangeResult {
+  return snapshot(db, () => ({
+    ...dayReads(db, input, [input.since, input.until]),
+    instance: instance(db),
+  }));
+}
+
+export function month(db: Db, input: RangeInput): MonthResult {
+  return snapshot(db, () => {
+    const days: Bounds = [input.since, input.until];
+    return {
+      ...dayReads(db, input, days),
+      since: db
+        .query<{ since: number | null }, []>(
+          "select min(started_at) as since from sends",
+        )
+        .get()!.since,
+      by: {
+        projects: byProjects(db, days),
+        agents: byAgents(db, days),
+        models: byModels(db, days),
+      },
+      deciders: byDeciders(db, days),
+    };
+  });
 }

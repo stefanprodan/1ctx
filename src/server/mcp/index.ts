@@ -4,7 +4,6 @@
 import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
-  type McpDigest,
   offeredServers,
   type PromptServer,
   promptSnapshot,
@@ -31,7 +30,7 @@ import {
 } from "./limits.ts";
 import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
-import { routes } from "./routes.ts";
+import { routes, type UsagePort } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
 
 export {
@@ -65,11 +64,6 @@ export type OfferedServer = {
   refreshFailedAt: number | null;
 };
 
-export type McpPrompt = {
-  text: string;
-  digest: McpDigest;
-};
-
 export type McpOffer = {
   servers: OfferedServer[];
   prompt: ReturnType<typeof promptSnapshot>;
@@ -94,6 +88,8 @@ export type McpDeps = {
   callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
   capabilities: { forget(key: string): void };
+  // a closure, sessions is built later
+  usage: UsagePort;
 };
 
 export type Mcp = {
@@ -326,11 +322,12 @@ export function mcpArea(deps: McpDeps): Mcp {
     callTimeoutMs: deps.callTimeoutMs,
     render: deps.render,
     discover: runDiscovery,
+    usage: deps.usage,
   });
   return area;
 }
 
-export { type DiscoveryResult, discover, fingerprint } from "./discover.ts";
+export { discover, fingerprint } from "./discover.ts";
 export { changeNote } from "./note.ts";
 export { RefreshCoordinator } from "./refresh.ts";
 export {

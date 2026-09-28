@@ -227,7 +227,7 @@ describe("memory routes", () => {
   test("a team member saves, compares and undoes both notes", async () => {
     const chat = await chatApp();
     const createdProject = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "memory-team", description: "" },
+      body: { name: "memory-team", description: "A team project." },
     });
     const project = (await createdProject.json()).project;
     await chat.admin.call("POST", `/api/projects/${project.id}/members`, {

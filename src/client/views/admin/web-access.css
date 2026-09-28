@@ -1,0 +1,21 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .web-access {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .web-access-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .web-access-away {
+    display: none;
+  }
+  .web-access-domains {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+}

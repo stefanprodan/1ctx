@@ -1,101 +1,10 @@
-/* Agents: the form an open agent, decider or decision row holds: the
-   Delete question and a decider's Check answer in its foot, the
-   presets, the avatar and provider pickers, the model search field and
-   the prompt boxes; and an open provider row's facts. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .agents-ask-words {
-    font-size: var(--text-ui);
-    color: var(--dim);
-  }
-  /* what a delete archives, pauses and stops, on its own line over the
-     ask */
-  .agents-ask-impact {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: var(--text-small);
-    color: var(--dim);
-  }
-
-  /* what a decider's Check answered, on its own line over the foot */
-  .agents-checked {
-    flex-basis: 100%;
-    margin: 0;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    color: var(--dim);
-  }
-  /* empty until a Check answers, out of the flow but still in the
-     accessibility tree, so the answer is announced */
-  .agents-checked:empty {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .agents-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  /* the avatar picker (the five robots) and the provider picker (one
-     chip per provider), the chosen one lit */
-  .agents-avatars,
-  .agents-picks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    min-height: 36px;
-    align-items: center;
-  }
-  /* each a .avatar that is a button */
-  .agents-avatars .avatar {
-    padding: 0;
-    cursor: pointer;
-  }
-  .agents-avatars .avatar:hover {
-    color: var(--fg);
-  }
-  .agents-avatar-on {
-    border-color: var(--brand);
-    color: var(--fg);
-  }
-
-  .agents-pick {
-    height: 30px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: transparent;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-    color: var(--dim);
-    cursor: pointer;
-  }
-  .agents-pick:hover {
-    color: var(--fg);
-  }
-  .agents-pick-on {
-    border-color: var(--brand);
-    color: var(--fg);
-  }
-
-  .agents-prompt {
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
-
-  /* the model field: the glass at the left end of the search */
   .agents-search {
     position: relative;
     display: flex;
   }
-  /* a dropdown: the field with the chevron drawn over its right edge */
   .agents-select {
     position: relative;
     display: flex;
@@ -103,7 +12,7 @@
   .agents-select-input {
     flex: 1;
     padding-right: 36px;
-    font-family: var(--mono);
+    font-family: var(--sans);
     font-size: var(--text-small);
   }
   .agents-select-chevron {
@@ -122,42 +31,8 @@
     color: var(--faint);
     pointer-events: none;
   }
-  /* the field draws the box; room for the glass at its left */
   .agents-search-input {
     width: 100%;
     padding-left: 34px;
-  }
-
-  /* an open provider row: its facts, a label beside each, then the foot */
-  .agents-open {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .agents-facts {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: var(--space-2) var(--space-3);
-    align-items: baseline;
-  }
-  .agents-fact {
-    min-width: 0;
-    font-size: var(--text-ui);
-    line-height: 1.55;
-    color: var(--dim);
-    overflow-wrap: anywhere;
-  }
-  .agents-fact-mono {
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
-  @media (max-width: 719px) {
-    .agents-facts {
-      grid-template-columns: 1fr;
-      gap: var(--space-1) 0;
-    }
-    .agents-fact {
-      margin-bottom: var(--space-2);
-    }
   }
 }

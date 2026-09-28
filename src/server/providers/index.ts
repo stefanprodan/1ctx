@@ -24,7 +24,12 @@ import {
 } from "./catalog.ts";
 import { fetchEndpoints } from "./endpoints.ts";
 import { providerFor } from "./provider.ts";
-import { type AgentsPort, type DecidersPort, routes } from "./routes.ts";
+import {
+  type AgentsPort,
+  type DecidersPort,
+  routes,
+  type UsagePort,
+} from "./routes.ts";
 import { type ProviderRow, ProviderStore } from "./store.ts";
 import {
   DecisionError,
@@ -57,8 +62,8 @@ export { parseBaseUrl, parseKeyName } from "./parse.ts";
 export {
   type AgentsPort,
   type DecidersPort,
-  type RoutesDeps,
   routes,
+  type UsagePort,
 } from "./routes.ts";
 export { type ProviderRow, ProviderStore, summary } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
@@ -95,6 +100,7 @@ export type ProvidersDeps = {
   log: Log;
   agents: AgentsPort;
   deciders: DecidersPort;
+  usage: UsagePort;
 };
 
 export type Providers = {
@@ -183,6 +189,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
       keys: deps.keys,
       agents: deps.agents,
       deciders: deps.deciders,
+      usage: deps.usage,
       clock: deps.clock,
     }),
   };

@@ -4,8 +4,14 @@
 import type { UserAccount } from "../contracts/user.ts";
 import type { Role } from "../words.ts";
 
-export type UsersResponse = { users: UserAccount[] };
-export type UserResponse = { user: UserAccount };
+// lastVisitDay is the user's own date, "2026-09-28"
+export type AdminUser = UserAccount & {
+  lastVisitDay: string | null;
+  projectIds: string[];
+};
+
+export type UsersResponse = { users: AdminUser[] };
+export type UserResponse = { user: AdminUser };
 export type CreateUserRequest = {
   username: string;
   fullName: string;

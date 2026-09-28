@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Deciders card on the agents page: the words a row and a Check
-// say, the providers a decider may run on, the entity that follows the
-// signed-in user, and the card and its form rendered over the rows.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { signal } from "@preact/signals";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { agents, agentsError } from "../../../src/client/data/agents.ts";
 import {
@@ -15,6 +10,7 @@ import {
   decidersError,
   deleteDecider,
   loadDeciders,
+  loadDeciderUsage,
   updateDecider,
 } from "../../../src/client/data/deciders.ts";
 import { decisions } from "../../../src/client/data/decisions.ts";
@@ -24,43 +20,38 @@ import {
   providersError,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
-import { sentence } from "../../../src/client/lib/format.ts";
-import { noticeOf, Save } from "../../../src/client/lib/save.ts";
-import { Agents } from "../../../src/client/views/admin/Agents.tsx";
-import { DeciderForm } from "../../../src/client/views/admin/DeciderForm.tsx";
+import { DeciderList } from "../../../src/client/views/admin/DeciderLists.tsx";
+import { DeciderDrafts } from "../../../src/client/views/admin/DeciderPage.state.ts";
+import { DeciderPage } from "../../../src/client/views/admin/DeciderPage.tsx";
 import {
+  askedBy,
   checkCost,
   checkLine,
+  deciderDeleteLine,
   deciderFieldOf,
   deciderMeta,
   deciderProviders,
   heldProvider,
   inputPriceLine,
   NO_DECIDERS,
-  providerProblem,
 } from "../../../src/client/views/admin/Deciders.model.ts";
-import { DecidersCard } from "../../../src/client/views/admin/DecidersCard.tsx";
-import { DefaultField } from "../../../src/client/views/admin/DefaultField.tsx";
+import { NewDecider } from "../../../src/client/views/admin/NewDecider.tsx";
 import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
-import type { ProviderSummary } from "../../../src/shared/contracts/provider.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import type { DecisionSummary } from "../../../src/shared/contracts/decision.ts";
+import type {
+  CatalogMatch,
+  ProviderSummary,
+} from "../../../src/shared/contracts/provider.ts";
+import { MAX_NAME } from "../../../src/shared/words.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import {
+  admin as adminFixture,
+  decider,
+  provider,
+} from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Admin",
-  role: "admin",
-  mustChangePassword: false,
-};
-const router: ProviderSummary = {
-  id: "pr1",
-  name: "router",
-  wire: "openrouter",
-  baseUrl: "http://models.test/v1",
-  keyName: "provider-router",
-  hasKey: true,
-  createdAt: 0,
-};
+const admin = adminFixture({ fullName: "Admin" });
+const router = provider({ hasKey: true });
 const local: ProviderSummary = {
   ...router,
   id: "pr2",
@@ -81,16 +72,7 @@ const gemini: ProviderSummary = {
   name: "gemini",
   wire: "gemini",
 };
-const judge: DeciderSummary = {
-  id: "d1",
-  name: "judge",
-  providerId: "pr1",
-  model: "vendor/judge-1",
-  contextLength: 32_000,
-  promptPrice: 0.04,
-  default: true,
-  createdAt: 0,
-};
+const judge = decider();
 const small: DeciderSummary = {
   id: "d2",
   name: "small",
@@ -102,8 +84,8 @@ const small: DeciderSummary = {
   createdAt: 1,
 };
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
@@ -113,12 +95,6 @@ beforeEach(() => {
   agentsError.value = null;
   deciders.value = null;
   decidersError.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the words", () => {
@@ -163,8 +139,8 @@ describe("the words", () => {
     ]);
   });
 
-  test.serial("a save's refusal lands on the field it names", () => {
-    const cases: [string, string][] = [
+  test.serial("maps field refusals, leaving other failures unassigned", () => {
+    const cases = [
       ["name must be 2 to 32 lowercase letters, digits or dashes", "name"],
       ["a decider named judge exists", "name"],
       ["providerId must be an id", "provider"],
@@ -172,56 +148,28 @@ describe("the words", () => {
       ["router serves no decision models", "provider"],
       ["model must be a model id", "model"],
       ["router does not list vendor/x as a decision model", "model"],
-    ];
+      ["default must be true or false", undefined],
+      ["no such decider", undefined],
+      ["models did not answer in time", undefined],
+      ["models answered 500", undefined],
+      ["name-server did not answer in time", undefined],
+      ["name-server answered 500", undefined],
+    ] as const;
     for (const [words, field] of cases) {
-      expect(deciderFieldOf(words)).toBe(field);
-    }
-    expect(deciderFieldOf("default must be true or false")).toBeUndefined();
-    expect(deciderFieldOf("no such decider")).toBeUndefined();
-  });
-
-  test.serial("a Check's refusal stays in the foot", async () => {
-    // a provider's name leads a Check's words and may look like a field
-    const refusals = [
-      "models did not answer in time",
-      "models answered 500",
-      "name-server did not answer in time",
-      "name-server answered 500",
-      "no such provider",
-    ];
-    for (const words of refusals.slice(0, 4)) {
-      expect(deciderFieldOf(words)).toBeUndefined();
-    }
-    // a save's words, yet a Check's too: the Check path skips the fields
-    for (const words of refusals) {
-      const save = new Save(async () => {}, 5, deciderFieldOf);
-      const ok = await save.act(
-        "check",
-        () => Promise.reject(new Error(words)),
-        { whole: true },
-      );
-      expect(ok).toBe(false);
-      expect(save.fieldError("name")).toBeNull();
-      expect(save.fieldError("provider")).toBeNull();
-      expect(save.fieldError("model")).toBeNull();
-      expect(noticeOf(save.notice()!)).toBe(
-        `Could not check. ${sentence(words)}`,
-      );
+      expect(deciderFieldOf(words), words).toBe(field);
     }
   });
 
-  test.serial("the form holds an offered provider while there is one", () => {
-    expect(heldProvider([router, local], "pr2")).toBe("pr2");
-    // the picked one deleted on the same page
-    expect(heldProvider([router, local], "pr9")).toBe("pr1");
-    expect(heldProvider([local], "")).toBe("pr2");
-    expect(heldProvider([], "pr1")).toBe("");
-    expect(providerProblem([router], "pr1")).toBeNull();
-    expect(providerProblem([], "")).toBe(
-      "Add an OpenRouter or OpenAI-compatible provider first",
-    );
-    expect(providerProblem([router], "")).toBe("Pick a provider");
-  });
+  test.serial(
+    "New decider holds an offered provider while there is one",
+    () => {
+      expect(heldProvider([router, local], "pr2")).toBe("pr2");
+      // the picked one deleted meanwhile
+      expect(heldProvider([router, local], "pr9")).toBe("pr1");
+      expect(heldProvider([local], "")).toBe("pr2");
+      expect(heldProvider([], "pr1")).toBe("");
+    },
+  );
 });
 
 describe("the entity", () => {
@@ -292,98 +240,232 @@ describe("the entity", () => {
   });
 });
 
-describe("the card", () => {
+describe("the pages", () => {
+  const page = (name: string) => render(<DeciderPage params={{ name }} />);
+  const run: DecisionSummary = {
+    id: "run-attention",
+    enabled: true,
+    deciderId: null,
+    options: [],
+  };
+
   test.serial("a row per decider: default, provider, window, price", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const html = render(<DecidersCard providers={[router, local]} />);
-    expect(html).toContain("judge");
+    decisions.value = [];
+    const html = render(<DeciderList />);
+    expect(html).toContain('href="/admin/config/deciders/judge"');
+    expect(html).toContain('<span class="tag">default</span>');
     expect(html).toContain("vendor/judge-1");
-    expect(html).toContain(">default · router · 32K · $0.04 input");
-    expect(html).toContain(
-      '<span class="rows-meta-short">default · 32K · $0.04 input</span>',
-    );
+    expect(html).toContain(">router<");
+    expect(html).toContain(">32K · $0.04 input<");
     // a local server's decider has no price or window to say
     expect(html).toContain(">local<");
-    expect(html).toContain("New decider");
+    expect(html).toContain('href="/admin/config/deciders?new"');
     expect(html).not.toContain("No deciders yet");
+    expect(html).toMatch(/aria-current="page"[^>]*>Deciders/);
   });
 
-  test.serial("says what having none means", () => {
-    deciders.value = [];
-    const html = render(<DecidersCard providers={[router]} />);
-    expect(html).toContain(NO_DECIDERS);
-    expect(NO_DECIDERS).toBe(
-      "No deciders yet. Decisions stay off until one is added.",
-    );
-  });
-
-  test.serial("New decider is off without a provider that answers", () => {
-    deciders.value = [];
-    const off = render(<DecidersCard providers={[strict, gemini]} />);
-    expect(off).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?New decider/);
-    const on = render(<DecidersCard providers={[strict, router]} />);
-    expect(on).not.toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?New decider/);
-  });
-
-  test.serial("sits after the providers and the agents", () => {
+  test.serial("says what having none means, and what to add first", () => {
     providers.value = [router];
-    agents.value = [];
     deciders.value = [];
     decisions.value = [];
-    const html = render(<Agents />);
-    // each card is named by its search
-    const at = (label: string) => html.indexOf(`aria-label="${label}"`);
-    expect(at("Providers")).toBeGreaterThan(-1);
-    expect(at("Agents")).toBeGreaterThan(at("Providers"));
-    expect(at("Deciders")).toBeGreaterThan(at("Agents"));
-    expect(at("Decisions")).toBeGreaterThan(at("Deciders"));
+    expect(render(<DeciderList />)).toContain(NO_DECIDERS);
+    // a provider that answers no decisions offers no New decider
+    providers.value = [strict, gemini];
+    const none = render(<DeciderList />);
+    expect(none).toContain("Add an OpenRouter or OpenAI-compatible provider");
+    expect(none).not.toContain("New decider");
   });
 
-  test.serial("the form offers only the providers that answer", () => {
+  test.serial("New decider searches the first provider that answers", () => {
+    providers.value = [strict, router, gemini, local];
     deciders.value = [];
-    const html = render(
-      <DeciderForm
-        decider={null}
-        providers={[router, strict, local, gemini]}
-        onDone={() => {}}
-      />,
+    const html = render(<NewDecider />);
+    // by name, only the wires that answer decisions: local before router
+    expect(html).toContain('class="model-picker-provider" title="local"');
+    // the default decider's provider comes first
+    deciders.value = [judge];
+    expect(render(<NewDecider />)).toContain(
+      'class="model-picker-provider" title="router"',
     );
-    expect(html).toContain(">router<");
-    expect(html).toContain(">local<");
-    expect(html).not.toContain(">strict<");
-    expect(html).not.toContain(">gemini<");
-    expect(html).toContain("Default decider");
-    expect(html).toContain("Add decider");
-    // a new decider has nothing saved to check
-    expect(html).not.toContain(">Check<");
-    expect(html).not.toContain('role="status"');
+    deciders.value = [];
+    expect(html).toContain('name="model"');
+    expect(html).toContain("Create decider");
+    expect(html).not.toContain("Default decider");
+    expect((html.match(/type="submit"/g) ?? []).length).toBe(1);
+    providers.value = [strict, gemini];
+    expect(render(<NewDecider />)).toContain("Add a provider");
   });
 
-  test.serial("an open row checks and deletes", () => {
+  test.serial("a decider's page: its cards, one form each", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const html = render(
-      <DeciderForm decider={small} providers={[router]} onDone={() => {}} />,
-    );
+    decisions.value = [run];
+    const html = page("small");
+    expect(html).toContain(">Identity<");
+    expect(html).toContain(">Model<");
     expect(html).toContain(">Check<");
-    expect(html).toContain(">Delete<");
-    // mounted empty, so a screen reader announces what Check answers
-    expect(html).toContain('<p class="agents-checked" role="status"></p>');
+    expect(html).toContain("Delete small");
     expect(html).toContain("small-latest");
+    expect(html).toContain("local");
+    // Identity and Model save, Check and Delete are buttons
+    expect(html.split("<form").length).toBe(3);
+    // nothing asks it, so Delete has nothing to say
+    expect(html).toContain("Delete small</h2></div>");
+    // the aside names the decisions that ask it: none, judge is default
+    expect(html).toContain("No decision.");
   });
 
-  test.serial("the oldest, while it is the default, cannot say No", () => {
+  test.serial("the default decider answers what names none", () => {
+    providers.value = [router, local];
     deciders.value = [judge, small];
-    const field = (row: DeciderSummary) =>
-      render(
-        <DefaultField
-          row={row}
-          on={signal(row.default)}
-          save={{ busy: false, touch() {} }}
-          oldest={deciders.value?.[0]?.id}
-          label="Default decider"
-        />,
-      );
-    expect(field(judge).match(/ disabled/g)).toHaveLength(2);
-    expect(field(small)).not.toContain("disabled");
+    decisions.value = [run];
+    const html = page("judge");
+    expect(html).toContain('href="/admin/config/decisions/run-attention"');
+    expect(html).toContain("Its decisions go to the default decider.");
+    // the oldest, while it is the default, keeps the mark
+    expect(html).toContain("Mark another decider to move it");
+    expect(html).toMatch(
+      /<input type="checkbox"[^>]*name="default"[^>]*disabled/,
+    );
+    expect(page("small")).not.toContain("Mark another decider");
   });
+
+  test.serial("an unknown name is a missing page", () => {
+    providers.value = [router];
+    deciders.value = [judge];
+    decisions.value = [];
+    expect(page("gone")).toContain("No decider by that name.");
+  });
+
+  test.serial("the aside has its last 30 days, kept per decider", async () => {
+    // a sign-in change drops every answer
+    me.value = null;
+    me.value = admin;
+    providers.value = [router];
+    deciders.value = [judge, small];
+    decisions.value = [];
+    expect(page("judge")).toContain("Loading");
+    answer = (url) =>
+      url === "/api/deciders/d1/usage"
+        ? Response.json({
+            since: 0,
+            until: 1,
+            answers: 12,
+            tokens: 3400,
+            cost: 0.0002,
+          })
+        : new Response("no", { status: 500 });
+    await loadDeciderUsage("d1");
+    await loadDeciderUsage("d2");
+    expect(page("judge")).toMatch(/Answers[\s\S]*?12/);
+    expect(page("judge")).toContain('href="/admin/monitor/usage"');
+    // another decider's failed read is not this one's
+    expect(page("judge")).not.toContain("Did not load.");
+    expect(page("small")).toContain("Did not load.");
+  });
+
+  test.serial("a name input stops at the longest name", () => {
+    providers.value = [router];
+    deciders.value = [judge];
+    decisions.value = [];
+    const limit = new RegExp(`name="name"[^>]*maxLength="${MAX_NAME}"`, "i");
+    expect(page("judge")).toMatch(limit);
+    expect(render(<NewDecider />)).toMatch(limit);
+  });
+});
+
+describe("the Delete line", () => {
+  test.serial("says where what it answers goes", () => {
+    const one = { id: "d1", default: true };
+    const other = { id: "d2", default: false };
+    expect(deciderDeleteLine(one, [one], 0)).toBeUndefined();
+    expect(deciderDeleteLine(other, [one, other], 0)).toBeUndefined();
+    expect(deciderDeleteLine(one, [one], 1)).toBe(
+      "Decisions stay off until another decider is added.",
+    );
+    expect(deciderDeleteLine(other, [one, other], 2)).toBe(
+      "Its decisions go to the default decider.",
+    );
+  });
+
+  test.serial(
+    "a decider answers what names it, and while default what names none",
+    () => {
+      const named = { deciderId: "d2" };
+      const none = { deciderId: null };
+      expect(askedBy({ id: "d1", default: true }, [named, none])).toEqual([
+        none,
+      ]);
+      expect(askedBy({ id: "d2", default: false }, [named, none])).toEqual([
+        named,
+      ]);
+    },
+  );
+});
+
+describe("a decider's drafts", () => {
+  const kev: CatalogMatch = {
+    id: "vendor/kev-4b",
+    name: "Kev 4B",
+    contextLength: 8192,
+    promptPrice: 0.04,
+    completionPrice: null,
+    tools: false,
+    reasoning: false,
+    thinkingRequired: false,
+    reasoningKnown: true,
+    described: true,
+  };
+
+  test.serial("Change, Cancel and a pick", () => {
+    const d = DeciderDrafts.of(judge);
+    expect(d.cancellable).toBe(false);
+    d.change();
+    expect(d.changing.value).toBe(true);
+    expect(d.cancellable).toBe(true);
+    // another provider's catalog: the model goes with the old one
+    d.chooseProvider("pr2");
+    expect(d.model.value).toBeNull();
+    expect(d.modelDirty(judge)).toBe(true);
+    d.cancel();
+    expect(d.providerId.value).toBe("pr1");
+    expect(d.model.value?.id).toBe("vendor/judge-1");
+    expect(d.changing.value).toBe(false);
+    d.change();
+    d.pick(kev);
+    expect(d.model.value).toEqual({
+      id: "vendor/kev-4b",
+      contextLength: 8192,
+      promptPrice: kev.promptPrice,
+    });
+    expect(d.changing.value).toBe(false);
+    expect(d.modelDirty(judge)).toBe(true);
+    d.resetModel(judge);
+    expect(d.modelDirty(judge)).toBe(false);
+  });
+
+  test.serial(
+    "New decider opens on the search with nothing to take back",
+    () => {
+      const d = DeciderDrafts.blank("pr1");
+      expect(d.changing.value).toBe(true);
+      expect(d.cancellable).toBe(false);
+    },
+  );
+
+  test.serial(
+    "a row changed under the page carries what the admin left",
+    () => {
+      const d = DeciderDrafts.of(judge);
+      d.name.value = "judge-2";
+      d.follow(judge, { ...judge, name: "renamed", default: false });
+      // the typed name stays, the untouched mark follows
+      expect(d.name.value).toBe("judge-2");
+      expect(d.isDefault.value).toBe(false);
+      d.follow(judge, { ...judge, model: "vendor/other" });
+      expect(d.model.value?.id).toBe("vendor/other");
+    },
+  );
 });

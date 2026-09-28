@@ -4,6 +4,8 @@
 import type {
   McpResponse,
   McpServerResponse,
+  McpServersUsage,
+  McpUsage,
   PatchMcpEndpoint,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
@@ -19,6 +21,7 @@ import {
 } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { lastDays } from "../usage/index.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
 import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
@@ -39,6 +42,12 @@ export type RoutesDeps = {
     endpoint: Pick<McpServerRow, "url" | "keyName">,
     signal: AbortSignal,
   ): Promise<DiscoveryResult>;
+  usage: UsagePort;
+};
+
+export type UsagePort = {
+  calls(server: string, since: number, until: number): McpUsage;
+  servers(since: number, until: number): McpServersUsage;
 };
 
 function gateway(error: unknown): BadGateway {
@@ -140,6 +149,31 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
         if (row === null) throw new NotFound("no such MCP server");
         return json(response(row));
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/mcp/usage",
+      policy: "admin",
+      handle() {
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.servers(since, until),
+          ),
+        );
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/mcp/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const server = find(ctx.params.id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.calls(server.name, since, until),
+          ),
+        );
       },
     },
     {

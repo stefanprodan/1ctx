@@ -14,8 +14,8 @@ import { loadMe, me, meError } from "../data/me.ts";
 import { Icon, Mark } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { Rail } from "./Rail.tsx";
-import { navigate, path } from "./router.ts";
-import { match } from "./routes.ts";
+import { navigate, path, query } from "./router.ts";
+import { ALIASES, match } from "./routes.ts";
 import {
   closeDrawer,
   drawerOpen,
@@ -47,7 +47,7 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [phone, drawerOpen.value]);
+  }, [phone, drawerOpen.value, path.value]);
   useEffect(() => {
     closeDrawer();
   }, [path.value]);
@@ -128,17 +128,18 @@ export function App() {
     document.title = title ? `1ctx · ${title}` : "1ctx";
   }, [user, needsUser, m]);
 
-  // a signed-in user on /login, or on a path with no route, lands on
-  // Home; one who must change the password they were handed lands on
-  // the profile, where the server lets them go
+  // one who must change the password they were handed lands on the
+  // profile, where the server lets them go
   useEffect(() => {
     if (!user) return;
     if (user.mustChangePassword) {
       if (m?.route.path !== "/profile") navigate("/profile", true);
       return;
     }
-    if (m === null || m.route.path === "/login") navigate("/", true);
-  }, [user, m]);
+    const alias = ALIASES[path.value];
+    if (alias !== undefined) navigate(alias + query.value, true);
+    else if (m === null || m.route.path === "/login") navigate("/", true);
+  }, [user, m, path.value]);
 
   if (user === undefined) {
     // a public page needs nobody, so a slow or hanging first load does

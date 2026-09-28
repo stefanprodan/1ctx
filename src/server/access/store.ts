@@ -83,6 +83,15 @@ export class LoginStore {
     this.db.query("delete from logins where id = ?").run(id);
   }
 
+  latestSeen(): Map<string, number> {
+    const rows = this.db
+      .query<{ user_id: string; at: number }, []>(
+        "select user_id, max(last_seen_at) as at from logins group by user_id",
+      )
+      .all();
+    return new Map(rows.map((row) => [row.user_id, row.at]));
+  }
+
   // a password change keeps the tab that changed it
   deleteOthers(userId: string, keepId: string): number {
     return this.db

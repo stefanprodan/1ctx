@@ -1,9 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The storage and the overview routes take the caller's zone and
-// nothing else, the load route nothing; anything unexpected is a 400.
 
+import {
+  isOverviewRange,
+  MONTH_PATTERN,
+  type OverviewRange,
+} from "../../shared/api/admin.ts";
 import { isTimeZone } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -30,13 +32,33 @@ function zone(url: URL): string {
     .timeZone;
 }
 
-// the storage and the overview routes take the zone and nothing else
 export function parseZoneQuery(url: URL): string {
   only(url, ["tz"]);
   return zone(url);
 }
 
-// the load is the process's, in no zone
-export function parseLoadQuery(url: URL): void {
+export function parseOverviewQuery(url: URL): {
+  timeZone: string;
+  range: OverviewRange;
+} {
+  only(url, ["tz", "range"]);
+  const values = url.searchParams.getAll("range");
+  if (values.length > 1) throw new BadRequest("range must appear once");
+  const range = values[0] ?? "30d";
+  if (!isOverviewRange(range)) throw new BadRequest("unknown range");
+  return { timeZone: zone(url), range };
+}
+
+export function parseUsageQuery(url: URL): {
+  timeZone: string;
+  month: string;
+} {
+  only(url, ["tz", "month"]);
+  const month = one(url, "month");
+  if (!MONTH_PATTERN.test(month)) throw new BadRequest("month is YYYY-MM");
+  return { timeZone: zone(url), month };
+}
+
+export function parseNoQuery(url: URL): void {
   only(url, []);
 }

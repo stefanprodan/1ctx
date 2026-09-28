@@ -12,7 +12,12 @@ import type { Params } from "../../app/params.ts";
 import { me } from "../../data/me.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { initials } from "../../lib/format.ts";
-import { agentHref, userHref } from "../../lib/hrefs.ts";
+import {
+  AGENTS_HREF,
+  adminProjectHref,
+  agentHref,
+  userHref,
+} from "../../lib/hrefs.ts";
 import {
   RowsAvatar,
   RowsCard,
@@ -36,10 +41,7 @@ export function Members({ params }: { params: Params }) {
               label="Users"
               action={
                 admin && (
-                  <RowsLink
-                    label="Manage"
-                    href={`/admin/projects?open=${encodeURIComponent(shown.id)}`}
-                  />
+                  <RowsLink label="Manage" href={adminProjectHref(shown.id)} />
                 )
               }
             >
@@ -56,7 +58,7 @@ export function Members({ params }: { params: Params }) {
           )}
           <RowsCard
             label="Agents"
-            action={admin && <RowsLink label="Manage" href="/admin/agents" />}
+            action={admin && <RowsLink label="Manage" href={AGENTS_HREF} />}
           >
             {agents === null ? (
               <RowsNote>Loading</RowsNote>

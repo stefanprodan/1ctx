@@ -47,7 +47,8 @@ spec:
 | `Agent` | `provider`, `model`, `avatar`, `thinking`, `effort`, `prompt`, `skills`, `servers`, `mcpMode` |
 | `Tool` | `enabled`; `provider` only for `websearch`, `hosts` only for `visualize` |
 
-A new user requires `fullName`, `email`, `tz` and `passwordFrom`.
+A new user requires `fullName`, `email`, `tz` and `passwordFrom`. A new
+project requires `description`.
 `passwordFrom` names a `user-<name>.key` file without the extension;
 passwords and `mustChangePassword` are applied only at creation. The flag
 defaults to true and `disabled` defaults to false. The first admin is

@@ -1,141 +1,103 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The users: one card of rows, each the initials, the full name, the
-// handle with the email and, faint, the role and since when. A row
-// opens in place into its form; New user opens an empty one at the
-// top. The form is UserForm.tsx.
 
-import { useSignal } from "@preact/signals";
-import type { UserAccount } from "../../../shared/contracts/user.ts";
+import type { AdminUser } from "../../../shared/api/users.ts";
+import { query } from "../../app/router.ts";
+import { zoneStep } from "../../app/zones.ts";
 import { me } from "../../data/me.ts";
 import { users, usersError } from "../../data/users.ts";
-import { initials } from "../../lib/format.ts";
-import { matches } from "../../lib/search.ts";
-import { Page } from "../../ui/Page.tsx";
+import { count, initials } from "../../lib/format.ts";
+import { adminUserHref, USERS_HREF } from "../../lib/hrefs.ts";
+import { useNow } from "../../lib/now.ts";
+import { useListSearch } from "../../lib/search.ts";
+import { Page, PageNew } from "../../ui/Page.tsx";
 import {
-  Rows,
-  RowsAdd,
   RowsAvatar,
   RowsCard,
+  RowsGo,
   RowsMeta,
-  RowsNew,
   RowsNote,
-  RowsOpen,
   RowsTag,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { UserForm } from "./UserForm.tsx";
-import { adminCount, metaLine, stateLine } from "./Users.model.ts";
-import "./users.css";
-
-function UserRow({
-  user,
-  admins,
-  open,
-  onToggle,
-}: {
-  user: UserAccount;
-  admins: number;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const self = me.value?.id === user.id;
-  return (
-    <RowsOpen
-      open={open}
-      onToggle={onToggle}
-      off={user.disabled}
-      head={
-        <>
-          <RowsAvatar lit={open}>{initials(user.fullName)}</RowsAvatar>
-          <RowsTitle
-            name={
-              <>
-                {user.fullName}
-                {self && <RowsTag>you</RowsTag>}
-              </>
-            }
-            sub={metaLine(user)}
-          />
-          <RowsMeta bad={user.disabled}>{stateLine(user)}</RowsMeta>
-        </>
-      }
-    >
-      <UserForm user={user} admins={admins} onDone={onToggle} />
-    </RowsOpen>
-  );
-}
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { NewUser } from "./NewUser.tsx";
+import { metaLine, stateLine, userCounts } from "./Users.model.ts";
 
 export function Users() {
+  if (new URLSearchParams(query.value).has("new")) return <NewUser />;
+  return <List />;
+}
+
+function List() {
   const list = users.value;
-  const open = useSignal<string | null>(null);
-  const adding = useSignal(false);
   const error = usersError.value;
-  const admins = adminCount(list ?? []);
-  const q = useSignal("");
-  const shown = (list ?? []).filter((u) =>
-    matches(q.value, [u.username, u.fullName, u.email]),
-  );
+  const now = useNow(60_000);
+  const { q, shown, count } = useListSearch(list ?? [], (u) => [
+    u.username,
+    u.fullName,
+    u.email,
+  ]);
+  const meId = me.value?.id;
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Access")]}
       title="Users"
+      split
+      actions={<PageNew href={`${USERS_HREF}?new`} label="New user" />}
       loading={list === null && error === null}
       error={error}
     >
-      <Rows>
-        <RowsCard
-          label="Users"
-          search={
-            <Search
-              value={q.value}
-              onChange={(next) => {
-                q.value = next;
-              }}
-              placeholder="Search users"
-            />
-          }
-          action={
-            <RowsAdd
-              label="New user"
-              disabled={adding.value}
-              onClick={() => {
-                adding.value = true;
-                open.value = null;
-              }}
-            />
-          }
-        >
-          {adding.value && (
-            <RowsNew>
-              <UserForm
-                user={null}
-                admins={admins}
-                onDone={() => {
-                  adding.value = false;
-                }}
-              />
-            </RowsNew>
-          )}
-          {q.value.trim() !== "" && shown.length === 0 && (
-            <RowsNote>No users found</RowsNote>
-          )}
-          {shown.map((u) => (
-            <UserRow
-              key={u.id}
-              user={u}
-              admins={admins}
-              open={open.value === u.id}
-              onToggle={() => {
-                open.value = open.value === u.id ? null : u.id;
-                adding.value = false;
-              }}
-            />
-          ))}
-        </RowsCard>
-      </Rows>
+      {list !== null && (
+        <Split aside={<RolesSection users={list} label="Roles" />}>
+          <RowsCard
+            label="Users"
+            search={<Search query={q} placeholder="Search users" />}
+            count={count}
+          >
+            {shown.length === 0 && <RowsNote>No user matches.</RowsNote>}
+            {shown.map((u) => (
+              <RowsGo
+                key={u.id}
+                href={adminUserHref(u.username)}
+                off={u.disabled}
+              >
+                <RowsAvatar>{initials(u.fullName)}</RowsAvatar>
+                <RowsTitle
+                  name={
+                    <>
+                      {u.fullName}
+                      {u.id === meId && <RowsTag>you</RowsTag>}
+                    </>
+                  }
+                  sub={metaLine(u)}
+                />
+                <RowsMeta bad={u.disabled}>{stateLine(u, now)}</RowsMeta>
+              </RowsGo>
+            ))}
+          </RowsCard>
+        </Split>
+      )}
     </Page>
+  );
+}
+
+export function RolesSection({
+  users,
+  label,
+}: {
+  users: readonly AdminUser[];
+  label: string;
+}) {
+  const n = userCounts(users);
+  return (
+    <AsideSection label={label}>
+      <AsideLine label="Admins">{count(n.admins)}</AsideLine>
+      <AsideLine label="Members">{count(n.members)}</AsideLine>
+      <AsideLine label="Disabled" quiet={n.disabled === 0}>
+        {count(n.disabled)}
+      </AsideLine>
+    </AsideSection>
   );
 }

@@ -111,6 +111,11 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    method: "GET",
+    path: "/api/users/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
     method: "POST",
     path: "/api/users/:id/password",
     body: { password: "longenough" },
@@ -124,18 +129,23 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/projects",
-    body: { name: "matrix-team" },
+    body: { name: "matrix-team", description: "A team project." },
     expect: { anonymous: 401, member: 403, admin: 201 },
   },
   {
     method: "PATCH",
     path: "/api/projects/:id",
-    body: { name: "matrix-team" },
+    body: { name: "matrix-team", description: "A team project." },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
     method: "DELETE",
     path: "/api/projects/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/usage",
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
@@ -302,13 +312,48 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/agents/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/providers/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/deciders/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/decisions/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
     path: "/api/admin/overview",
     expect: { anonymous: 401, member: 403, admin: 400 },
   },
   {
     method: "GET",
+    path: "/api/admin/usage",
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    method: "GET",
+    path: "/api/admin/attention",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
     path: "/api/admin/load",
     expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/admin/access",
+    expect: { anonymous: 401, member: 403, admin: 400 },
   },
   {
     method: "GET",
@@ -537,6 +582,16 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    method: "GET",
+    path: "/api/mcp/usage",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/mcp/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
     method: "POST",
     path: "/api/mcp/:id/refresh",
     expect: { anonymous: 401, member: 403, admin: 404 },
@@ -571,6 +626,26 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "GET",
     path: "/api/skills/:id/file",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/usage/skills",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/usage/visuals",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/usage/web",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/skills/:id/usage",
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {

@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The agent form's Preferred provider, for a model behind OpenRouter: which of
-// the providers serving it is tried first. The list is asked for each
-// model picked; any provider leaves the choice to OpenRouter.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -17,7 +13,6 @@ import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { upstreamOptions } from "./Agents.model.ts";
-import "./agents.css";
 
 export function UpstreamField({
   providerId,
@@ -37,7 +32,6 @@ export function UpstreamField({
   const endpoints = useSignal<Endpoint[] | null>(null);
   const problem = useSignal<string | null>(null);
   useEffect(() => {
-    // an answer for a model picked before is dropped
     let current = true;
     endpoints.value = null;
     problem.value = null;

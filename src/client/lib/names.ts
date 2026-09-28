@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A name field's input: the box shows the shaped name at once, so what
-// is typed is what is saved, and the caller gets the same value.
 
-import { shapeName } from "../../shared/words.ts";
+import { shapeName } from "../../shared/names.ts";
 
 export function shapedInput(event: Event): string {
   const box = event.currentTarget as HTMLInputElement;
@@ -16,4 +13,18 @@ export function shapedInput(event: Event): string {
 // rule, so the one slip worth catching here is an empty field
 export function nameProblem(value: string): string | null {
   return value.trim() === "" ? "Enter a name" : null;
+}
+
+// another row holds the name, or it is reserved
+export function nameTaken(
+  rows: readonly { id: string; name: string }[] | null,
+  name: string,
+  exceptId = "",
+  reserved: readonly string[] = [],
+): boolean {
+  const n = name.trim();
+  return (
+    reserved.includes(n) ||
+    (rows?.some((r) => r.name === n && r.id !== exceptId) ?? false)
+  );
 }

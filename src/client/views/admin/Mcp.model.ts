@@ -1,58 +1,16 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The MCP page's model, tested without a DOM: the head's words, the
-// change and failure lines, the pattern fields to lists and back, the
-// live split and the patterns matching nothing, the timeout in
-// seconds, the key options, the instructions box trimmed to its first
-// lines, and the agent form's preview of what a send would carry from
-// the rows loaded.
 
+import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
-  AgentServer,
   McpChange,
   McpServerSummary,
-  McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
-import {
-  classify,
-  MAX_INSTRUCTIONS_BLOCK,
-  offeredServers,
-  type Patterns,
-  promptSnapshot,
-  serverBlock,
-  unmatched,
-} from "../../../shared/mcp.ts";
-import {
-  MCP_KEY_PREFIX,
-  MCP_MODES,
-  MCP_TIMEOUT_MS,
-  type McpMode,
-} from "../../../shared/words.ts";
-import { ago } from "../../lib/format.ts";
+import { classify, serverBlock } from "../../../shared/mcp.ts";
+import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
+import { ago, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
-import { NO_KEY } from "../../lib/secrets.ts";
 
-// the head under the name: the tools and the last good check, or the
-// failure in red
-export function metaLine(
-  server: McpServerSummary,
-  now: number,
-): { text: string; bad: boolean } {
-  if (server.refreshError !== null && server.refreshFailedAt !== null) {
-    return {
-      text: `refresh failed ${ago(server.refreshFailedAt, now)}`,
-      bad: true,
-    };
-  }
-  const n = server.tools.length;
-  return {
-    text: `${n} ${n === 1 ? "tool" : "tools"} · checked ${ago(server.checkedAt, now)}`,
-    bad: false,
-  };
-}
-
-// what the last refresh changed, as one line
 export function changeLine(change: McpChange | null, now: number): string {
   if (change === null) return "";
   const parts: string[] = [];
@@ -78,95 +36,7 @@ export function changeLine(change: McpChange | null, now: number): string {
   return `${ago(change.at, now)}: ${parts.join(", ")}`;
 }
 
-// a failed refresh keeps the last good list; the line says how old
-export function servedLine(server: McpServerSummary, now: number): string {
-  return `serving the list from ${ago(server.checkedAt, now)}`;
-}
-
-export function patternText(list: string[]): string {
-  return list.join("\n");
-}
-
-export function endpointDirty(
-  server: McpServerSummary,
-  url: string,
-  keyName: string,
-): boolean {
-  const key = keyName === NO_KEY ? null : keyName;
-  return url.trim() !== server.url || key !== server.keyName;
-}
-
-export function settingsDirty(
-  server: McpServerSummary,
-  draft: {
-    read: boolean;
-    write: boolean;
-    instructionsOn: boolean;
-    timeout: string;
-    patterns: Patterns;
-  },
-): boolean {
-  return (
-    draft.read !== server.read ||
-    draft.write !== server.write ||
-    draft.instructionsOn !== server.instructionsOn ||
-    timeoutMs(draft.timeout) !== server.timeoutMs ||
-    patternText(draft.patterns.read) !== patternText(server.readPatterns) ||
-    patternText(draft.patterns.write) !== patternText(server.writePatterns) ||
-    patternText(draft.patterns.excluded) !==
-      patternText(server.excludedPatterns)
-  );
-}
-
-type ToolGroups = {
-  read: McpToolSummary[];
-  write: McpToolSummary[];
-  excluded: McpToolSummary[];
-  // with the reason: the stored one, or the wire name
-  unusable: { tool: McpToolSummary; reason: string }[];
-};
-
-// the four groups as the page computes them live from the fields
-export function toolGroups(
-  server: McpServerSummary,
-  patterns: Patterns,
-): ToolGroups {
-  const sides = classify(server.name, server.tools, patterns);
-  const groups: ToolGroups = {
-    read: [],
-    write: [],
-    excluded: [],
-    unusable: [],
-  };
-  for (const tool of server.tools) {
-    const side = sides.get(tool.name);
-    if (side === "unusable") {
-      groups.unusable.push({
-        tool,
-        reason: tool.unusable ?? "unusable name",
-      });
-    } else if (side === "read") groups.read.push(tool);
-    else if (side === "write") groups.write.push(tool);
-    else groups.excluded.push(tool);
-  }
-  return groups;
-}
-
-// the patterns of one field matching no discovered tool
-export function unmatchedIn(
-  server: McpServerSummary,
-  list: string[],
-): string[] {
-  const names = server.tools.map((t) => t.name);
-  return unmatched(names, { read: list, write: [], excluded: [] });
-}
-
-export function unmatchedLine(patterns: string[]): string {
-  if (patterns.length === 0) return "";
-  return `${patterns.length === 1 ? "matches" : "match"} no tool: ${patterns.join(", ")}`;
-}
-
-// the timeout field holds seconds; empty is the limits' value
+// empty is the limits' value
 export function timeoutText(ms: number | null): string {
   return ms === null ? "" : String(ms / 1000);
 }
@@ -190,27 +60,6 @@ export function timeoutMs(text: string): number | null {
   return trimmed === "" ? null : Math.round(Number(trimmed) * 1000);
 }
 
-export const KEY_HINT = `A key file is ${MCP_KEY_PREFIX}<name>.key in the secrets directory, sent as a bearer token.`;
-
-export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
-  { value: "auto", label: "Auto" },
-  { value: "all", label: "All schemas" },
-  { value: "catalog", label: "Catalog" },
-];
-
-export const MODE_HINT: Record<McpMode, string> = {
-  auto: "Every tool schema goes to the model until they pass the token cap, then a catalog with two tools.",
-  all: "Every offered tool schema goes to the model on every request.",
-  catalog:
-    "The model gets one line per tool and asks for a schema before calling it.",
-};
-
-export function isModeValue(value: string): value is McpMode {
-  return (MCP_MODES as readonly string[]).includes(value);
-}
-
-// the instructions box: the block as the prompt carries it, its first
-// lines when folded; a block of INSTRUCTIONS_LINES or fewer is never cut
 const INSTRUCTIONS_LINES = 12;
 
 export function instructionsBox(
@@ -225,48 +74,30 @@ export function instructionsBox(
   };
 }
 
-export function characters(n: number): string {
-  return `${n.toLocaleString("en-US")} characters`;
+export function instructionsLine(on: boolean): string {
+  return on
+    ? "Agents get these instructions in their system prompt."
+    : "Agents do not get these instructions.";
 }
 
-// the agent form's preview from the rows loaded: what the prompt would
-// carry, the servers a cap leaves out, and the block to view
-export function promptPreview(
-  rows: McpServerSummary[],
-  links: AgentServer[],
-): {
-  line: string;
-  warnings: string[];
-  text: string;
-} {
-  const offered = offeredServers(rows, links);
-  const snapshot = promptSnapshot(offered, () => "");
-  const warnings: string[] = [];
-  for (const name of snapshot.leftForInstructions) {
-    warnings.push(
-      `${name} left out: over the ${MAX_INSTRUCTIONS_BLOCK.toLocaleString("en-US")} cap`,
-    );
-  }
-  for (const name of snapshot.leftForSchemas) {
-    warnings.push(`${name} left out: its tools are over the 1 MB cap`);
-  }
-  const included = new Set(snapshot.included);
-  const from = offered
-    .filter(
-      (s) =>
-        included.has(s.name) &&
-        s.instructions !== null &&
-        !snapshot.leftForInstructions.includes(s.name),
-    )
-    .map((s) => s.name);
-  const line =
-    snapshot.text === ""
-      ? ""
-      : `Instructions in the prompt: ${snapshot.text.length.toLocaleString("en-US")} of ${MAX_INSTRUCTIONS_BLOCK.toLocaleString("en-US")} characters, from ${from.join(", ")}`;
-  return { line, warnings, text: snapshot.text };
+// write alone has no option
+export type Offer = "off" | "read" | "write";
+
+export const OFFER_OPTIONS: { value: Offer; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "read", label: "Read" },
+  { value: "write", label: "Read and write" },
+];
+
+export function offerOf(read: boolean, write: boolean): Offer {
+  if (write) return "write";
+  return read ? "read" : "off";
 }
 
-// which field of the form a refusal names
+export function offerSides(offer: Offer): { read: boolean; write: boolean } {
+  return { read: offer !== "off", write: offer === "write" };
+}
+
 export function mcpFieldOf(message: string): string | undefined {
   for (const field of [
     "name",
@@ -280,10 +111,40 @@ export function mcpFieldOf(message: string): string | undefined {
     if (message.startsWith(field)) return field;
   }
   if (message.startsWith("an MCP server named")) return "name";
-  // a discovery that failed is the endpoint's: the key it refused, or
-  // the address that did not answer as a server should
+  // a failed discovery is the endpoint's: the key or the address
   if (message.startsWith("the MCP server refused the key")) return "keyName";
   if (message.startsWith("the MCP server is refreshing")) return undefined;
   if (/^(the MCP server|MCP request)\b/.test(message)) return "url";
   return undefined;
+}
+
+export const usersOf = (
+  agents: readonly AgentSummary[],
+  serverId: string,
+): AgentSummary[] =>
+  agents.filter((a) => a.servers.some((s) => s.serverId === serverId));
+
+export function sidesLine(server: McpServerSummary): string {
+  const sides = classify(server.name, server.tools, {
+    read: server.readPatterns,
+    write: server.writePatterns,
+    excluded: server.excludedPatterns,
+  });
+  let read = 0;
+  let write = 0;
+  for (const side of sides.values()) {
+    if (side === "read") read++;
+    else if (side === "write") write++;
+  }
+  return [
+    server.read ? `${read} read` : "read off",
+    server.write ? `${write} write` : "write off",
+  ].join(" · ");
+}
+
+export function deleteLine(users: number): string {
+  if (users === 0) return "No agent uses it.";
+  return `${pluralCommas(users, "agent uses", "agents use")} it. Remove it from ${
+    users === 1 ? "that agent" : "them"
+  } first.`;
 }

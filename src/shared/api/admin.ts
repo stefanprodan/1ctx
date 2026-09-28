@@ -129,7 +129,7 @@ export type StorageResponse = {
 // rounds in it. A turn is a send of a chat (a message, a regenerate, a
 // compact), a run a send of a task. cost is null when no round of the
 // day carried one. start is its local midnight
-export type OverviewDay = {
+export type OverviewDay = TurnLengths & {
   day: string;
   start: number;
   turns: number;
@@ -146,10 +146,13 @@ export type OverviewDay = {
   decisionTokens: number;
   pricedDecisions: number;
   decisionCost: number | null;
+  activeUsers: number;
 };
 
-// What the days, or all time, add up to. cost sums the rounds that
-// carry one and pricedRounds counts them; cost is null when no round did
+export type TurnLengths = { medianMs: number | null; p95Ms: number | null };
+
+// What the days add up to. cost sums the rounds that carry one and
+// pricedRounds counts them; cost is null when no round did
 export type OverviewTotals = {
   turns: number;
   turnsFailed: number;
@@ -169,9 +172,6 @@ export type OverviewTotals = {
   decisionCost: number | null;
 };
 
-export const USAGE_BY = ["projects", "agents"] as const;
-export type UsageBy = (typeof USAGE_BY)[number];
-
 // A row of a breakdown, by prompt plus completion tokens. name is the
 // team project's or the agent's; a personal project has id and name
 // null and owner set. deleted is true for a project or an agent that
@@ -184,32 +184,34 @@ export type UsageRow = {
   owner: string | null;
   deleted: boolean;
   tokens: number;
+  cost: number | null;
   turns: number;
   runs: number;
 };
 
-// A provider's model over the days: its chat turns, and the median and
-// slowest length of the ended ones
-export type TurnLength = {
-  provider: string;
+export type ModelUsage = {
+  provider: string | null;
   model: string;
-  turns: number;
-  medianMs: number | null;
-  slowestMs: number | null;
+  tokens: number;
+  cost: number | null;
+  rounds: number;
 };
 
-// GET /api/admin/overview?tz=: the zone's last OVERVIEW_DAYS days, today
-// last, and their totals, the ten largest rows of each breakdown, the
-// ten models with the most turns, all time with the first send's start
-// (null before any), and the instance, as of readAt. Read at most once
-// a minute per zone
-export type OverviewResponse = {
-  readAt: number;
-  days: OverviewDay[];
-  totals: OverviewTotals;
-  by: Record<UsageBy, UsageRow[]>;
-  lengths: TurnLength[];
-  all: OverviewTotals & { since: number | null };
+export type DeciderUsage = {
+  name: string;
+  decisions: number;
+  tokens: number;
+  cost: number | null;
+};
+
+// GET /api/admin/overview?tz=&range=: the range's days in the zone,
+// today last, and their totals, and the instance, as of readAt. 30d and
+// 90d are the last 30 and 90 days, all every day from the first one
+// with a send, a round or a decision (today alone before any); the
+// range is 30d when not given. Read at most once every 25 seconds
+// per zone and range
+export type OverviewResponse = DaysAnswer & {
+  range: OverviewRange;
   instance: {
     version: string;
     startedAt: number;
@@ -221,7 +223,36 @@ export type OverviewResponse = {
   };
 };
 
-export const OVERVIEW_DAYS = 30;
+// what the overview and the usage page share; turnLength and
+// activeUsers are over every day
+export type DaysAnswer = {
+  readAt: number;
+  days: OverviewDay[];
+  totals: OverviewTotals;
+  turnLength: TurnLengths;
+  activeUsers: number;
+};
+
+// a rolling window's bounds, [since, until), and what it counted
+export type Windowed<T> = { since: number; until: number } & T;
+
+// cost is null when rounds ran and none was priced
+export type SendTotals = {
+  sends: number;
+  tokens: number;
+  cost: number | null;
+};
+
+// GET /api/agents/:id/usage, /api/providers/:id/usage,
+// /api/projects/:id/usage (a team project) and /api/users/:id/usage (the
+// personal project alone): the last 30 days
+export type SendTotalsResponse = Windowed<SendTotals>;
+
+export const OVERVIEW_RANGES = ["30d", "90d", "all"] as const;
+export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
+export function isOverviewRange(value: unknown): value is OverviewRange {
+  return OVERVIEW_RANGES.includes(value as OverviewRange);
+}
 
 // the server's load sampled every LOAD_SAMPLE_MS, LOAD_SAMPLES kept
 export const LOAD_SAMPLE_MS = 5_000;
@@ -248,3 +279,41 @@ export type LoadResponse = {
   contained: boolean;
   samples: { at: number[]; cpu: number[]; rss: number[] };
 };
+
+// GET /api/admin/usage?tz=&month=YYYY-MM: the month's days in the zone,
+// up to today in this month, and their totals, the ten largest rows of
+// each breakdown (models by tokens) and the deciders by decisions, as
+// of readAt. since is the first send's start, null before any, so the
+// page offers the months from it. Read at most once every 25 seconds
+// per zone and month
+export type UsageResponse = DaysAnswer & {
+  month: string;
+  since: number | null;
+  by: { projects: UsageRow[]; agents: UsageRow[]; models: ModelUsage[] };
+  deciders: DeciderUsage[];
+};
+
+export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+// What an admin should fix: an MCP server or a skill whose last refresh
+// failed, at when it failed; a provider's, an MCP server's or the
+// search service's key file missing; a credential's key missing or
+// unusable. name is the object's, the search service's for its key
+export type AttentionKind =
+  | "mcp-refresh"
+  | "skill-refresh"
+  | "provider-key"
+  | "mcp-key"
+  | "credential-key"
+  | "credential-unusable"
+  | "search-key";
+
+export type AttentionItem = {
+  kind: AttentionKind;
+  name: string;
+  at: number | null;
+};
+
+// GET /api/admin/attention: read at each request, keys first by kind
+// and name, then the refresh failures newest first
+export type AttentionResponse = { items: AttentionItem[] };

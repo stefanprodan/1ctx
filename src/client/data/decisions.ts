@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The decisions entity: what each feature asks a decider, loaded with
-// the agents page and dropped with the signed-in user. A save puts the
-// server's answer in the list, so what shows is what was saved.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -32,8 +28,6 @@ effect(() => {
   decisionsError.value = null;
 });
 
-// a load's answer is kept only when it is still the latest word on the
-// list for the same user
 let turn = 0;
 
 export async function loadDecisions(): Promise<void> {

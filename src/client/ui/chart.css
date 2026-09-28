@@ -1,8 +1,6 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  /* a board: its rows of tiles and panels, and the same in bones while
-     the first answer loads */
   .chart-board,
   .chart-board-ghost {
     display: flex;
@@ -27,7 +25,6 @@
     font-size: var(--text-ui);
     color: var(--faint);
   }
-  /* the board's foot: facts about what it read */
   .chart-facts {
     margin: 0;
     padding: 0 2px;
@@ -40,6 +37,16 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+  .chart-wide {
+    display: flex;
+    flex-direction: column;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .chart-stale {
+    opacity: 0.5;
+    transition: opacity 0.2s;
   }
   .chart-spark {
     width: 100%;
@@ -81,6 +88,10 @@
   .chart-bars-wide .chart-bar {
     grid-template-columns: 200px minmax(0, 1fr) 72px;
   }
+  /* a wide row's second figure is a cost after the tokens */
+  .chart-bars-wide .chart-bar:has(.chart-share) {
+    grid-template-columns: 200px minmax(0, 1fr) 152px;
+  }
   .chart-bar-pick {
     cursor: pointer;
   }
@@ -113,12 +124,10 @@
   .chart-bar-on .chart-bar-fill {
     background: var(--brand);
   }
-  /* a line that sums others reads apart */
   .chart-bar-faint .chart-bar-name {
     color: var(--faint);
   }
-  /* a bar whose project or agent is gone, its numbers kept */
-  .chart-gone {
+  .chart-note {
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
@@ -137,6 +146,13 @@
     display: inline-block;
     min-width: 5ch;
     color: var(--faint);
+  }
+  /* a cost's slot holds "$1,234.56" with room before it */
+  .chart-bars-wide .chart-share {
+    min-width: 10ch;
+  }
+  .chart-costly {
+    color: var(--brand);
   }
   .chart-foot {
     margin: auto 0 0;
@@ -180,7 +196,6 @@
     height: 10px;
     border-radius: var(--radius-cell);
   }
-  /* a stack of parts over days, its key above it */
   .chart-days {
     position: relative;
     display: flex;
@@ -201,21 +216,17 @@
     align-items: center;
     gap: var(--space-2);
   }
-  /* the key's swatches as Plot.tsx stacks the parts, bottom first */
-  .chart-key-1 {
-    background: var(--heat-3);
-  }
-  .chart-key-2 {
-    background: var(--heat-2);
-  }
-  .chart-key-3 {
-    background: var(--brand);
-  }
   .chart-plot {
     position: relative;
     height: 200px;
   }
-  /* the numbers of a plot for a screen reader, drawn for no one */
+  .chart-ghost-days {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 0 var(--space-2) 24px 52px;
+  }
   .chart-table {
     position: absolute;
     width: 1px;
@@ -242,8 +253,13 @@
     .chart-share {
       display: none;
     }
+    /* a wide row's second figure stays: it is a cost, not a share */
+    .chart-bars-wide .chart-share {
+      display: inline-block;
+    }
     /* a long name takes its own line over the bar, never cut */
-    .chart-bars-wide .chart-bar {
+    .chart-bars-wide .chart-bar,
+    .chart-bars-wide .chart-bar:has(.chart-share) {
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas: "name value" "track track";
       row-gap: var(--space-1);

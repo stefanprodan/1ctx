@@ -7,6 +7,7 @@
 // code's settings until an admin saves their own.
 
 import { describe, expect, test } from "bun:test";
+import type { DecisionUsageResponse } from "../../../src/shared/api/deciders.ts";
 import type {
   DecisionResponse,
   DecisionsResponse,
@@ -276,6 +277,68 @@ describe("deciders", () => {
         cost: null,
       },
     ]);
+  });
+
+  test("a decider's usage and a decision's sum their last 30 days", async () => {
+    const { app, client, created, router, kev } = await admin();
+    const jev = await created({
+      name: "jev",
+      providerId: router,
+      model: "typesafe/jev-1.13",
+    });
+    const local = await created({
+      name: "kev",
+      providerId: kev,
+      model: "kev-latest",
+    });
+    const read = async (path: string) => {
+      app.now.value += 1;
+      const res = await client.call("GET", path);
+      expect(res.status).toBe(200);
+      return (await res.json()) as DecisionUsageResponse;
+    };
+    expect(await read(`/api/deciders/${jev.id}/usage`)).toMatchObject({
+      answers: 0,
+      tokens: 0,
+      cost: 0,
+    });
+    await client.call("POST", `/api/deciders/${jev.id}/check`);
+    await client.call("POST", `/api/deciders/${jev.id}/check`);
+    await client.call("POST", `/api/deciders/${local.id}/check`);
+    const priced = await read(`/api/deciders/${jev.id}/usage`);
+    expect(priced.answers).toBe(2);
+    expect(priced.tokens).toBeGreaterThan(0);
+    expect(priced.cost).toBeCloseTo(2 * 0.000018522, 12);
+    expect(priced.until - priced.since).toBe(30 * 24 * 60 * 60 * 1000);
+    // kev names no cost
+    expect(await read(`/api/deciders/${local.id}/usage`)).toMatchObject({
+      answers: 1,
+      cost: null,
+    });
+    // a Check is no decision's answer
+    expect(await read("/api/decisions/run-attention/usage")).toMatchObject({
+      answers: 0,
+      cost: 0,
+    });
+    app.db.run(
+      "update decision_usage set purpose = 'run-attention' where decider_name = 'kev'",
+    );
+    expect(await read("/api/decisions/run-attention/usage")).toMatchObject({
+      answers: 1,
+    });
+    // past the window nothing counts
+    app.db.run("update decision_usage set created_at = created_at - ?", [
+      31 * 24 * 60 * 60 * 1000,
+    ]);
+    expect(await read(`/api/deciders/${jev.id}/usage`)).toMatchObject({
+      answers: 0,
+    });
+    for (const path of [
+      "/api/deciders/none/usage",
+      "/api/decisions/none/usage",
+    ]) {
+      expect((await client.call("GET", path)).status).toBe(404);
+    }
   });
 
   test("a Check the server refuses is a 502 in the wire's words, logged", async () => {

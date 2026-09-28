@@ -1,0 +1,152 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  /* nothing is clipped, so a select's list opens past the card; the
+     foot rounds its own corners */
+  .setting {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .setting-danger {
+    border-color: var(--failed-line);
+  }
+
+  /* the inset of a card's rows, so a list card's names line up with
+     every card's title */
+  .setting-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .setting-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .setting-head-one {
+    align-items: center;
+  }
+  .setting-words {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .setting-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-body);
+    font-weight: 600;
+  }
+  .setting-count {
+    font-size: var(--text-ui);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .setting-line {
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    color: var(--dim);
+  }
+
+  .setting-list .setting-head {
+    align-items: center;
+    min-height: 60px;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .setting-foot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--line);
+    border-bottom-left-radius: var(--radius-card);
+    border-bottom-right-radius: var(--radius-card);
+    background: var(--page);
+  }
+  .setting-danger .setting-foot {
+    border-top-color: var(--failed-line);
+  }
+  .setting-hint {
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+
+  .setting-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 960px;
+  }
+
+  .setting-delete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .setting-ask {
+    margin-right: auto;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+
+  .setting-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--text-ui);
+  }
+  .setting-fact {
+    min-width: 0;
+    line-height: 1.55;
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+  .setting-fact-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .setting-fact-pre {
+    white-space: pre-wrap;
+  }
+
+  .setting-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    color: var(--attention);
+  }
+  .setting-alert-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  @media (max-width: 719px) {
+    .setting-facts {
+      grid-template-columns: 1fr;
+      gap: var(--space-1) 0;
+    }
+    .setting-fact {
+      margin-bottom: var(--space-2);
+    }
+  }
+}

@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The tools page's entities: the built-ins, web access with the search
-// state, visualize, and the limits, all admin's, loaded when the page is
-// reached and dropped with the signed-in user. A write answers the
-// server's rows, so what shows is what was saved; a change applies to
-// the next send.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -15,15 +9,23 @@ import type {
 import type {
   PatchToolRequest,
   ToolsResponse,
+  VisualsUsageResponse,
+  WebUsageResponse,
 } from "../../shared/api/tools.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { instanceSlot } from "./slot.ts";
 
 export const tools = signal<ToolsResponse | null>(null);
 export const limits = signal<LimitRow[] | null>(null);
 export const toolsError = signal<Failure | null>(null);
+export const visualsUsage =
+  instanceSlot<VisualsUsageResponse>("/api/usage/visuals");
+export const webUsage = instanceSlot<WebUsageResponse>("/api/usage/web");
+export const loadVisualsUsage = visualsUsage.load;
+export const loadWebUsage = webUsage.load;
 
 let owner: string | null = null;
 
@@ -36,10 +38,6 @@ effect(() => {
   toolsError.value = null;
 });
 
-// a load's answer is kept only when it is still the one wanted: for
-// the signed-in user of the moment and the latest word, a failure
-// included, since a route arrival reloads and a write can land while a
-// load is in flight
 let turn = 0;
 
 export async function loadTools(): Promise<void> {
@@ -60,14 +58,13 @@ export async function loadTools(): Promise<void> {
   }
 }
 
-// a write answers the whole entity, so of two writes in flight only the
-// later one started may land: an earlier answer arriving last would put
-// back what the later write changed
+// a write answers the whole entity: of two in flight only the later may
+// land, or an earlier answer arriving last puts back what the later
+// changed
 let toolWrites = 0;
 let limitWrites = 0;
 
-// the rows an admin writes: web access, the search provider, visualize
-export type PatchedTool = "web" | "websearch" | "visualize";
+type PatchedTool = "web" | "websearch" | "visualize";
 
 export async function patchTool(
   name: PatchedTool,

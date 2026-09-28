@@ -1,47 +1,42 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Overview's words and numbers, pure: the Now tiles from the load,
-// the last 30 days' tiles and a day's words, the bars of a breakdown
-// and of the turn lengths, all time, and the faint lines. A chat's send
-// is a turn and a task's a run; "send" is never shown.
 
 import type {
+  AttentionItem,
+  AttentionKind,
   LoadResponse,
   OverviewDay,
   OverviewResponse,
   OverviewTotals,
-  TurnLength,
-  UsageBy,
-  UsageRow,
 } from "../../../shared/api/admin.ts";
 import {
+  ago,
   clock,
   commas,
   count,
   dayMonth,
   elapsed,
+  money,
   pluralCommas,
   share,
   size,
   sizeParts,
 } from "../../lib/format.ts";
+import {
+  configCredentialHref,
+  configMcpHref,
+  configProviderHref,
+  configSkillHref,
+  WEB_HREF,
+} from "../../lib/hrefs.ts";
 
-// a container's memory past this share is marked
 const MEMORY_FULL = 0.8;
-
-// "$4.12", "<$0.01" for a cost that is there but under a cent
-export function money(n: number): string {
-  if (n > 0 && n < 0.01) return "<$0.01";
-  return `$${n.toFixed(2)}`;
-}
 
 export const tokensOf = (t: {
   promptTokens: number;
   completionTokens: number;
 }): number => t.promptTokens + t.completionTokens;
 
-// a pool's tile: the sends running against the process's cap
 function pool(running: number, cap: number, sub: string) {
   return {
     figure: String(running),
@@ -78,7 +73,6 @@ export function cpuTile(load: LoadResponse) {
   };
 }
 
-// memory against the host's, or a container's limit with a meter
 export function memoryTile(load: LoadResponse) {
   const rss = load.samples.rss.at(-1) ?? 0;
   const parts = sizeParts(rss);
@@ -94,24 +88,19 @@ export function memoryTile(load: LoadResponse) {
   };
 }
 
-// a sample under the cursor: "11:32 · 4%"
 export const sampleLine = (at: number, words: string): string =>
   `${clock(at)} · ${words}`;
 
-// The memory line's scale: the window's lowest to highest with room
-// around it, so a steady process draws through the middle and a climb
-// leaves the top; a flat window gets 2% either side.
+// room around the window, so a steady process draws through the middle
+// and a climb leaves the top; a flat window gets 2% either side
 export function zoomed(min: number, max: number): [number, number] {
   const pad = Math.max((max - min) * 0.3, max * 0.02);
   return [Math.max(0, min - pad), max + pad];
 }
 
-// a row whose read failed: since when its numbers are, or that there
-// are none yet
 export const staleWords = (at: number | null): string =>
   at === null ? "Did not load" : `Not updated since ${clock(at)}`;
 
-// "1% failed", or that there was none
 function failedLine(failed: number, of: number): string {
   if (of === 0) return "none yet";
   return failed === 0 ? "none failed" : `${share(failed, of)} failed`;
@@ -135,12 +124,12 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
+// Usage has no Decisions tile, so its decisions ride with the runs
 export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
   const t = at ?? totals;
   const line = at
     ? pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed)
     : failedLine(totals.runsFailed, totals.runs);
-  // the decisions ride along while runs are what asks them
   const words =
     t.decisions > 0
       ? `${line} · ${pluralCommas(t.decisions, "decision", "decisions")}`
@@ -152,8 +141,21 @@ export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// how much of the input a cache served
-export function cachedLine(t: OverviewTotals): string {
+function decisionsLine(t: OverviewTotals): string {
+  return t.decisions === 0 ? "none yet" : `${count(t.decisionTokens)} tokens`;
+}
+
+export function decisionsTile(totals: OverviewTotals, at: OverviewDay | null) {
+  return {
+    figure: commas(totals.decisions),
+    unit: totals.decisions === 1 ? "decision" : "decisions",
+    sub: at
+      ? onDay(at, pluralCommas(at.decisions, "decision", "decisions"))
+      : decisionsLine(totals),
+  };
+}
+
+function cachedLine(t: OverviewTotals): string {
   if (t.promptTokens === 0) return "none yet";
   return `${share(t.cachedTokens, t.promptTokens)} cached`;
 }
@@ -165,8 +167,7 @@ export function tokensTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// the rounds' cost and the decisions' together: a null counts as 0
-// beside a priced one, and both null is no price at all
+// a null counts as 0 beside a priced one; both null is no price at all
 export function costOf(t: {
   cost: number | null;
   decisionCost: number | null;
@@ -175,8 +176,7 @@ export function costOf(t: {
   return (t.cost ?? 0) + (t.decisionCost ?? 0);
 }
 
-// the cost of rounds and decisions: never $0 where no provider priced
-// either
+// never $0 where no provider priced either
 function costWords(t: OverviewTotals) {
   const asked = t.rounds + t.decisions;
   const cost = costOf(t);
@@ -195,7 +195,6 @@ export function costTile(totals: OverviewTotals, at: OverviewDay | null) {
     : words;
 }
 
-// the tokens chart's hint, at rest and on a day
 export const tokensHint = (t: OverviewTotals): string =>
   `${count(tokensOf(t))} tokens`;
 
@@ -207,115 +206,72 @@ export function dayTokensHint(day: OverviewDay): string {
   return parts.join(" · ");
 }
 
-// A breakdown's row as a bar: a personal project by its owner, a team
-// project by its name, an agent in mono. The deleted projects come as
-// one row named for them, which needs no mark; a retired agent is
-// marked gone, apart from a live one of its name. The hint says only
-// what the bar does not: the share and what ran.
-export function usageBars(kind: UsageBy, rows: UsageRow[]) {
-  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
-  return rows.map((row, i) => {
-    const name =
-      row.owner !== null
-        ? `@${row.owner}`
-        : kind === "projects"
-          ? row.name === null
-            ? "deleted projects"
-            : `#${row.name}`
-          : (row.name ?? "");
-    const hint = [
-      share(row.tokens, total),
-      ...(row.turns > 0 || row.runs === 0
-        ? [pluralCommas(row.turns, "turn", "turns")]
-        : []),
-      ...(row.runs > 0 ? [pluralCommas(row.runs, "run", "runs")] : []),
-    ].join(" · ");
-    return {
-      key: row.id ?? (row.deleted ? "deleted" : `${row.owner ?? "row"}-${i}`),
-      name,
-      mono: kind === "agents",
-      gone: row.deleted && kind === "agents",
-      value: row.tokens,
-      label: count(row.tokens),
-      hint,
-    };
-  });
-}
-
-// a turn's length: "41s", "3m 20s", "1h 5m"
-export function lengthWord(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) {
-    const rest = s % 60;
-    return `${Math.floor(s / 60)}m${rest ? ` ${rest}s` : ""}`;
-  }
-  const m = Math.floor((s % 3600) / 60);
-  return `${Math.floor(s / 3600)}h${m ? ` ${m}m` : ""}`;
-}
-
-// A model without its org, as the agent rows show it, unless what is
-// left is a bare word ("openrouter/free").
-export function modelLabel(model: string): string {
-  const rest = model.slice(model.lastIndexOf("/") + 1);
-  return /[\d-]/.test(rest) ? rest : model;
-}
-
-// the models by their median turn, the turns and the slowest the hint
-export function lengthBars(lengths: TurnLength[]) {
-  return lengths.map((m) => ({
-    key: `${m.provider}/${m.model}`,
-    name: modelLabel(m.model),
-    value: m.medianMs ?? 0,
-    label: m.medianMs === null ? "running" : lengthWord(m.medianMs),
-    hint: [
-      pluralCommas(m.turns, "turn", "turns"),
-      ...(m.slowestMs !== null ? [`slowest ${lengthWord(m.slowestMs)}`] : []),
-    ].join(" · "),
-  }));
-}
-
-// all time's four figures
-export function allCells(all: OverviewResponse["all"]) {
-  return [
-    {
-      label: "Chats",
-      figure: commas(all.turns),
-      unit: all.turns === 1 ? "turn" : "turns",
-      sub: failedLine(all.turnsFailed, all.turns),
-    },
-    {
-      label: "Automations",
-      figure: commas(all.runs),
-      unit: all.runs === 1 ? "run" : "runs",
-      sub: failedLine(all.runsFailed, all.runs),
-    },
-    { label: "Tokens", figure: count(tokensOf(all)), sub: cachedLine(all) },
-    { label: "Cost", ...costWords(all) },
-  ];
-}
-
-export const sinceWords = (since: number | null): string =>
-  since === null ? "" : `since ${dayMonth(since)}`;
-
-// all time's foot, before the database's size, which is its own link;
-// each part is kept whole where the line breaks
-export function instanceParts(
-  instance: OverviewResponse["instance"],
-): string[] {
-  return [
-    pluralCommas(instance.users, "user", "users"),
-    pluralCommas(instance.agents, "agent", "agents"),
-    pluralCommas(instance.projects, "team project", "team projects"),
-    pluralCommas(instance.automations, "automation", "automations"),
-  ];
-}
-
-export const databaseWords = (bytes: number): string =>
-  `database ${size(bytes)}`;
-
-// the build and how long it has been up
 export const buildLine = (
   instance: OverviewResponse["instance"],
   now: number,
 ): string => `${instance.version} · up ${elapsed(now - instance.startedAt)}`;
+
+const ATTENTION: Record<
+  AttentionKind,
+  {
+    what: string;
+    line: string;
+    icon: "mcp" | "skill" | "key";
+    href: (name: string) => string;
+  }
+> = {
+  "provider-key": {
+    icon: "key",
+    what: "Provider",
+    line: "key file missing",
+    href: configProviderHref,
+  },
+  "mcp-key": {
+    icon: "mcp",
+    what: "MCP server",
+    line: "key file missing",
+    href: configMcpHref,
+  },
+  "credential-key": {
+    icon: "key",
+    what: "Credential",
+    line: "key file missing",
+    href: configCredentialHref,
+  },
+  "credential-unusable": {
+    icon: "key",
+    what: "Credential",
+    line: "key file unusable",
+    href: configCredentialHref,
+  },
+  "search-key": {
+    icon: "key",
+    what: "Web search",
+    line: "key file missing",
+    href: () => WEB_HREF,
+  },
+  "mcp-refresh": {
+    icon: "mcp",
+    what: "MCP server",
+    line: "refresh failed",
+    href: configMcpHref,
+  },
+  "skill-refresh": {
+    icon: "skill",
+    what: "Skill",
+    line: "refresh failed",
+    href: configSkillHref,
+  },
+};
+
+export function attentionRow(item: AttentionItem, now: number) {
+  const words = ATTENTION[item.kind];
+  return {
+    key: `${item.kind}:${item.name}`,
+    name: item.name,
+    line: item.at === null ? words.line : `${words.line} ${ago(item.at, now)}`,
+    what: words.what,
+    icon: words.icon,
+    href: words.href(item.name),
+  };
+}

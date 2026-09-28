@@ -1,0 +1,14 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .provider-list-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .provider-list-bad {
+    font-family: var(--sans);
+    color: var(--attention);
+  }
+}

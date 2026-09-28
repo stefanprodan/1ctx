@@ -1161,6 +1161,41 @@ describe("skills after a summary", () => {
     expect((messages[1]?.content ?? "").match(/ops/g)).toHaveLength(1);
   });
 
+  test("a repeated call id pairs each load with its own call", () => {
+    const twoSkills: SendPolicy = {
+      ...withSkills,
+      offered: {
+        ...withSkills.offered,
+        skills: {
+          block: "catalog",
+          skills: [
+            { id: "sk1", name: "ops", description: "ops", hasFiles: false },
+            { id: "sk2", name: "dev", description: "dev", hasFiles: false },
+          ],
+        },
+      },
+    };
+    const rows = [
+      row({
+        id: "w",
+        kind: "reply",
+        slot: "work",
+        sendId: "one",
+        toolCalls: ["ops", "dev"].map((name) => ({
+          id: "x",
+          name: "skill",
+          arguments: JSON.stringify({ name }),
+        })),
+      }),
+      { ...loaded("x", "ops", "one"), id: "t1" },
+      { ...loaded("x", "dev", "one"), id: "t2" },
+      row({ id: "s", kind: "summary", content: "summary" }),
+    ];
+    expect(history(rows, twoSkills, lookups, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops, dev`,
+    );
+  });
+
   test("adds no line when the snapshot no longer offers the loaded skill", () => {
     const without = {
       ...withSkills,

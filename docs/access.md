@@ -21,7 +21,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   counts each as one action.
 - **Every user has an email, a zone and flags.** The email is unique and
   lowercased; an admin sets it with the username and the role on
-  `/admin/users` (the routes in `access/users.ts`, since a reset needs
+  `/admin/access/users` (the routes in `access/users.ts`, since a reset needs
   the login store), and the profile shows it. The admin create API also
   accepts `about`, `disabled` and `mustChangePassword`, defaulting to
   empty, false and true; its PATCH accepts `about` but never a password
@@ -41,7 +41,12 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   authenticated route not marked `passwordChange` (logout, the
   profile, the socket), and the client shows only the profile.
   `UserSummary` never carries the email or the flags; `Me` carries
-  the flag, `UserAccount` and `Profile` carry all.
+  the flag, `UserAccount` and `Profile` carry all. The admin's routes
+  answer `AdminUser`, the account with `lastVisitDay` (the latest
+  visit's date in the user's own zone, `"2026-09-28"`, null when none is
+  kept, so no reader's zone moves the day) and `projectIds` (the team
+  projects they are in); `GET /api/users/:id/usage` sums the last 30
+  days of the user's personal project alone.
 - **Names follow Slack's channel rule.** A project, an agent and a
   provider name is `isName` in `shared/words.ts`: 2 to 80 lowercase
   ASCII letters, digits, dashes and underscores, starting with a letter
@@ -64,9 +69,22 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   Admins make, rename, describe, fill and delete team projects; team
   project names are unique. A project's description is one trimmed line
   (`isDescription`) that goes into the system prompt after the agent's
-  prompt, only when set. A team project is open to its members and to
-  admins. Deleting one takes its chats and their
-  usage and is refused while a chat runs. Anyone who may open a chat
+  prompt, only when set. A team project's is required, on create and
+  on every change (`description is required`); a personal project's
+  may be empty. A team project is open to its members and to
+  admins. Deleting one takes its chats, keeps their
+  usage and is refused while a chat runs.
+  `GET /api/projects/:id/usage` (admin, a team project alone) sums its
+  last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
+  board's: the users who signed in each of the reader's last 30 days
+  and over them, each visit on its user's own date, the recent users
+  (ten seen in the window or online now, none disabled, the newer of the visit and
+  the login touch, online while the socket holds a connection of
+  theirs, the online first), and the team projects with a turn or a
+  run. A visit's instant is the day's first request and a login is
+  touched hourly, so a user who signed out may read hours early.
+  Presence comes from the socket through a port `compose.ts` passes;
+  nothing records it per request. Anyone who may open a chat
   may archive it: every member of a team project, the owner of a
   personal one, and an admin wherever `access.project` lets them see
   it; rename and delete stay the owner's or an admin's. A handler gets a project

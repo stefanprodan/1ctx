@@ -20,6 +20,7 @@ import {
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { initials, longDate } from "../../lib/format.ts";
+import { adminUserHref } from "../../lib/hrefs.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { Page } from "../../ui/Page.tsx";
@@ -164,7 +165,16 @@ export function User({ params }: { params: Params }) {
       {shown && (
         <Split
           aside={
-            <AsideSection label="Account">
+            <AsideSection
+              label="Account"
+              action={
+                me.value?.role === "admin" ? (
+                  <a class="split-link" href={adminUserHref(username)}>
+                    Manage
+                  </a>
+                ) : undefined
+              }
+            >
               <AsideLine label="Email" cut href={`mailto:${shown.user.email}`}>
                 {shown.user.email}
               </AsideLine>

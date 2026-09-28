@@ -6,6 +6,7 @@
 // provider an agent or a decider runs on cannot go; whether one does is
 // the agents and deciders ports' answer.
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   CatalogResponse,
   EndpointsResponse,
@@ -17,6 +18,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { CatalogError, type Catalogs, servesDecisions } from "./catalog.ts";
 import {
   parseKind,
@@ -34,6 +36,10 @@ export type DecidersPort = {
   usesProvider(providerId: string): boolean;
 };
 
+export type UsagePort = {
+  providerTotal(providerId: string, since: number, until: number): SendTotals;
+};
+
 export type RoutesDeps = {
   store: ProviderStore;
   catalogs: Catalogs;
@@ -43,6 +49,7 @@ export type RoutesDeps = {
   keys: () => string[];
   agents: AgentsPort;
   deciders: DecidersPort;
+  usage: UsagePort;
   clock: Clock;
 };
 
@@ -79,6 +86,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const provider = deps.store.create({ ...fields, now: deps.clock() });
         const body: ProviderResponse = { provider: show(provider) };
         return json(body, 201);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/providers/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const provider = find(ctx.params.id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            deps.usage.providerTotal(provider.id, since, until),
+          ),
+        );
       },
     },
     {

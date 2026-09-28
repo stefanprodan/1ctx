@@ -363,7 +363,7 @@ function servers(value: unknown): NonNullable<AgentSpec["servers"]> {
     const write = Object.hasOwn(b, "write")
       ? at(`${path}.write`, () => boolean(b.write))
       : false;
-    if (!read && !write) throw new Error(`${path} needs read or write`);
+    if (!read) throw new Error(`${path} needs read`);
     return { name, read, write };
   });
 }

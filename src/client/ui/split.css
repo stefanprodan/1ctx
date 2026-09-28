@@ -1,7 +1,3 @@
-/* Two columns: the content, and a quiet aside of sections at its
-   right: a small heading, plain lines, a hairline between sections,
-   no box, as a repository's About column reads. */
-
 @layer tokens, base, owners;
 
 @layer owners {
@@ -24,7 +20,7 @@
   .split-aside {
     display: flex;
     flex-direction: column;
-    flex: 0 0 280px;
+    flex: 0 0 240px;
     min-width: 0;
   }
 
@@ -50,8 +46,6 @@
     font-size: var(--text-small);
   }
 
-  /* a line of the section: text in the dim colour, what matters in
-     the foreground */
   .split-line {
     display: flex;
     align-items: center;
@@ -64,6 +58,10 @@
     color: var(--fg);
     font-weight: 500;
   }
+  .split-quiet {
+    color: var(--faint);
+    font-weight: 400;
+  }
   .split-link {
     color: var(--dim);
   }
@@ -71,7 +69,6 @@
     color: var(--fg);
   }
 
-  /* an agent: a small tile, the name over the model in faint mono */
   .split-stack {
     display: flex;
     flex-direction: column;
@@ -96,7 +93,6 @@
     color: var(--faint);
   }
 
-  /* a number and its word: "14 sessions" */
   .split-value {
     font-family: var(--mono);
     font-size: var(--text-mono);

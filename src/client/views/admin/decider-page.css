@@ -1,0 +1,36 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .decider-page-new-model {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+
+  .decider-page-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  .decider-page-checked {
+    margin-right: auto;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+
+  .decider-page-name {
+    max-width: 360px;
+  }
+
+  .decider-page-option {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+}

@@ -1,18 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The database as a board: four tiles (the rows, the size and its
-// reusable share, growth, the write-ahead log), then the areas beside
-// one area's tables and the largest rows beside retention, then a
-// faint line of file facts.
-// Areas and tables are pages in the file, Largest and Retention the bytes
-// the rows store, so each panel names its unit. Loaded on arrival and
-// on Refresh; the first load draws the board in bones, a refresh fades
-// the last answer until the next lands.
 
 import { useSignal } from "@preact/signals";
 import { useMemo } from "preact/hooks";
 import type { StorageResponse } from "../../../shared/api/admin.ts";
+import { zoneStep } from "../../app/zones.ts";
 import {
   loadStorage,
   storage,
@@ -23,7 +15,7 @@ import { pluralCommas, share, size, sizeParts } from "../../lib/format.ts";
 import { Icon, type IconName } from "../../lib/icons.tsx";
 import { BarsGhost, Bone } from "../../ui/Bones.tsx";
 import {
-  Bars,
+  BarsPanel,
   ChartFoot,
   ChartPanel,
   Meter,
@@ -43,7 +35,6 @@ import {
 } from "../../ui/Tiles.tsx";
 import {
   AREA_NAMES,
-  added,
   addedByDay,
   areaBars,
   areasFoot,
@@ -64,12 +55,12 @@ import {
   walWords,
 } from "./Storage.model.ts";
 import "./storage.css";
+import { CONFIG_STORAGE_HREF } from "../../lib/hrefs.ts";
 
 const SYNC = "storage";
 
 function StorageTiles({ answer }: { answer: StorageResponse }) {
   const { file, days, before } = answer;
-  // the day under either line's cursor, shared through the sync key
   const day = useSignal<number | null>(null);
   const onDisk = file.bytes + file.walBytes;
   const series = useMemo(
@@ -80,7 +71,7 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
     }),
     [days],
   );
-  const grown = added(days);
+  const grown = series.sums.at(-1) ?? 0;
   const free = file.freePages * file.pageSize;
   const i = day.value;
   const at = i === null ? null : days[i];
@@ -114,7 +105,6 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
         unit={disk.unit}
         sub={freeWords(file)}
       >
-        {/* the used share; the words say what is reusable */}
         <TileMeter share={onDisk > 0 ? 1 - free / onDisk : 0} />
       </Tile>
       <Tile
@@ -149,91 +139,72 @@ function StorageTiles({ answer }: { answer: StorageResponse }) {
   );
 }
 
+// Areas and Tables count pages in the file, Largest and Retention the
+// bytes the rows store, so each panel names its unit
 function AreasPanels({ answer }: { answer: StorageResponse }) {
   const picked = useSignal<string | null>(null);
-  // the keys under the pointer; their words come from the answer held
-  // now, so a refresh that lands under the pointer says the new numbers
-  const areaOver = useSignal<string | null>(null);
-  const tableOver = useSignal<string | null>(null);
   const area = pickedArea(answer.areas, picked.value);
-  const areas = areaBars(answer.areas);
   const tables = area ? tableBars(area) : [];
-  const bars = areas.map((b) => ({
-    key: b.key,
-    name: b.name,
-    value: b.value,
-    hint: b.hint,
-    label: (
-      <>
-        {b.size}
-        <span class="chart-share">{b.share}</span>
-      </>
-    ),
-  }));
-  const hintOf = (list: { key: string; hint: string }[], key: string | null) =>
-    list.find((b) => b.key === key)?.hint ?? null;
   return (
     <>
-      <ChartPanel label="Areas" hint={hintOf(areas, areaOver.value) ?? ""}>
-        <Bars
-          bars={bars}
-          picked={area?.key}
-          onPick={(key) => {
-            picked.value = key;
-            tableOver.value = null;
-          }}
-          onHover={(key) => {
-            areaOver.value = key;
-          }}
-        />
+      <BarsPanel
+        label="Areas"
+        bars={areaBars(answer.areas).map((b) => ({
+          key: b.key,
+          name: b.name,
+          value: b.value,
+          hint: b.hint,
+          label: (
+            <>
+              {b.size}
+              <span class="chart-share">{b.share}</span>
+            </>
+          ),
+        }))}
+        picked={area?.key}
+        onPick={(key) => {
+          picked.value = key;
+        }}
+      >
         <ChartFoot>
           {areasFoot(answer.areas)} · pick an area for its tables
         </ChartFoot>
-      </ChartPanel>
-      <ChartPanel
+      </BarsPanel>
+      <BarsPanel
+        key={area?.key}
         label={area ? `Tables in ${AREA_NAMES[area.key]}` : "Tables"}
-        hint={
-          hintOf(tables, tableOver.value) ??
-          (area ? pluralCommas(area.rows, "row", "rows") : "")
-        }
-      >
-        {area && (
-          <Bars
-            wide
-            bars={tables.map((t) => ({
-              key: t.key,
-              name: t.name,
-              value: t.value,
-              hint: t.hint,
-              label: t.size,
-              mono: !t.faint,
-              faint: t.faint,
-            }))}
-            onHover={(key) => {
-              tableOver.value = key;
-            }}
-          />
-        )}
-      </ChartPanel>
+        rest={area ? pluralCommas(area.rows, "row", "rows") : undefined}
+        wide
+        bars={tables.map((t) => ({
+          key: t.key,
+          name: t.name,
+          value: t.value,
+          hint: t.hint,
+          label: t.size,
+          mono: !t.faint,
+          faint: t.faint,
+        }))}
+      />
     </>
   );
 }
 
-const KIND_ICONS: Record<LargestKind, IconName> = {
-  projects: "hash",
-  chats: "chat",
-  tasks: "bolt",
-};
+const KINDS: { key: LargestKind; label: string; icon: IconName }[] = [
+  { key: "projects", label: "Projects", icon: "hash" },
+  { key: "chats", label: "Chats", icon: "chat" },
+  { key: "tasks", label: "Tasks", icon: "bolt" },
+];
 
 function LargestPanel({ answer }: { answer: StorageResponse }) {
   const kind = useSignal<LargestKind>("projects");
   const rows = answer.largest[kind.value];
   const top = rows[0]?.bytes ?? 0;
-  const filters = (["projects", "chats", "tasks"] as const).map((k) => ({
-    label: k === "projects" ? "Projects" : k === "chats" ? "Chats" : "Tasks",
-    on: kind.value === k,
+  const icon = KINDS.find((k) => k.key === kind.value)!.icon;
+  const filters = KINDS.map((k) => ({
+    label: k.label,
+    on: kind.value === k.key,
     onPick: () => {
-      kind.value = k;
+      kind.value = k.key;
     },
   }));
   return (
@@ -251,7 +222,7 @@ function LargestPanel({ answer }: { answer: StorageResponse }) {
             const inner = (
               <>
                 <Icon
-                  name={line.href ? KIND_ICONS[kind.value] : "lock"}
+                  name={line.href ? icon : "lock"}
                   size={14}
                   class="storage-top-icon"
                 />
@@ -350,9 +321,6 @@ function Board({ answer }: { answer: StorageResponse }) {
   );
 }
 
-// the board while its first answer loads: the same tiles and panels
-// with their heads, bones where the numbers go, pulsing one after
-// another, each panel at its loaded height
 const AREA_WIDTHS = [100, 36, 19, 11, 8, 5, 2, 1, 1];
 const TABLE_WIDTHS = [100, 4, 2, 2, 9];
 const TEN = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -415,22 +383,28 @@ export function Storage() {
   const error = storageError.value;
   const busy = storageLoading.value;
   const actions = (
-    <Loaded
-      readAt={answer?.readAt ?? null}
-      busy={busy}
-      error={error}
-      onRefresh={() => void loadStorage()}
-    />
+    <>
+      {/* off on a phone, where the head has room only for the crumb */}
+      <a class="btn btn-small storage-limits" href={CONFIG_STORAGE_HREF}>
+        Limits
+      </a>
+      <Loaded
+        readAt={answer?.readAt ?? null}
+        busy={busy}
+        error={error}
+        onRefresh={() => void loadStorage()}
+      />
+    </>
   );
   return (
     <Page
-      crumb="Admin"
+      steps={[zoneStep("Monitor")]}
       title="Storage"
       actions={actions}
       error={answer === null && !busy ? error : null}
     >
       <div
-        class={`chart-board${busy && answer ? " storage-stale" : ""}`}
+        class={`chart-board${busy && answer ? " chart-stale" : ""}`}
         aria-busy={busy}
       >
         {answer ? <Board answer={answer} /> : <BoardGhost />}

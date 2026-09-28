@@ -1,32 +1,35 @@
-/* Users: the forms an open row holds. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .users-forms {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-  .users-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .users-reset {
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
-  }
-  .users-reset-head {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-
-  .users-switch {
+  .users-password {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: 2px;
+    height: 36px;
+    padding-right: var(--space-1);
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+  }
+  .users-password:focus-within {
+    border-color: var(--line-strong);
+  }
+  .users-password-invalid,
+  .users-password-invalid:focus-within {
+    border-color: var(--failed);
+  }
+  .users-password .users-password-input {
+    flex: 1;
     min-width: 0;
+    height: 34px;
+    border: 0;
+    background: transparent;
+  }
+  .users-password .users-password-input:focus-visible {
+    outline: 0;
+  }
+  .users-password .btn-icon {
+    width: 28px;
+    height: 28px;
   }
 }

@@ -238,8 +238,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `o200k_base` alone (each encoding carries its vocabulary into the
   binary), exact only for OpenAI models; a skill
   body's count is kept per skill until its digest moves. For an admin
-  the agent's Settings aside has Manage, which opens its row on
-  `/admin/agents?open=<id>`.
+  the agent's Settings aside has Manage, which opens
+  `/admin/config/agents/:name`.
 - **The profile.** The profile's aside is the account (email, role, joined),
   its head the name and the handle, and the email where the aside is
   hidden.
@@ -257,7 +257,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
-  `/admin/projects?open=<id>` and `/admin/agents`.
+  `/admin/access/projects/<id>` and `/admin/config/agents`.
   The aside under every tab (`Frame.tsx`) is About, the Activity weeks
   (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
@@ -419,163 +419,113 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has four tabs,** one view over `/admin/tools`
-  (Built-in), `/admin/tools/web`, `/admin/tools/visuals` and
-  `/admin/tools/limits`: Built-in lists every built-in schema, including
-  `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
-  each row `RowsTitle` (the name over the first sentence) with its
-  tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
-  parameters are cut by `ui/Fold.tsx`, framed.
-- **The Web tab is three cards.**
-  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
-  its modes, Off, All domains and Listed domains, in the card's head as
-  `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
-  and All domains save on the click, Listed domains opens the hosts box,
-  checked through `parseDomains()` in `shared/web.ts`, and saves the mode
-  with the list. Web search is the providers as radio rows with None
-  first. Credentials
-  (`CredentialsCard.tsx`, its words and bodies in
-  `CredentialsCard.model.ts`, the rows and `http-` keys in
-  `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
-  over the prefix and its projects, the key file as `RowsMeta`, `bad`
-  when missing or unusable; New credential and an open row are one
-  form, the key a `Select` marking unusable and missing files, the
-  methods as boxes (GET and HEAD new), the rail's team projects as
-  `RowsCheck` lines, a PATCH sending only the fields changed, and
-  Delete asked once.
-- **The Visuals tab is settings sections,** apart from web access:
-  Tools, the visualize row in a `RowsList` with its tokens and its
-  switch (name and switch alone on a phone); CDNs (`VisualHosts.tsx`), a
-  box of origins one per line checked through `parseVisualHosts()` in
-  `shared/visual.ts` (the rule the server's `parseHosts()` runs per
-  entry), saved whole, Reset to defaults beside Save and the count of
-  the box's lines at the line's end; and Limits (`LimitsSection.tsx`,
-  the `visuals` scope over `useLimitsForm()` from `LimitsCard.tsx`), the
-  fields side by side. While visualize is off its row is `off` with Off
-  in place of its tokens, and both sections are `Section`'s `off`, faded
-  with every field and button disabled, the saved values kept.
-- **The Limits tab is a form per scope.** Limit fields are text boxes
-  with `inputmode="decimal"`, never number inputs. Limits is a form per
-  scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
-  saving the full set with the other scopes' saved values. A save or a
-  reset that lowers the days archived chats are kept asks in the foot
-  first (`deleteAsk()`), Delete then Keep.
-- **The MCP page shows the loaded rows as a send would carry them.**
-  `/admin/mcp` is `Rows`: New server opens `McpForm` (the name shaped
-  by `shapeServerName()`, the key a `Select` of the `mcp-` files the
-  route answered, the call timeout in seconds with the limits' call
-  timeout the route answered as its placeholder), a row's head is the
-  name over its tool count and last check (the refresh failure in red)
-  with Refresh at its end, and
-  it opens to the last change, the server's own words, the endpoint
-  with its own Change endpoint button (it discovers first, a 502
-  keeps what was typed), the settings with Save, the tools in the
-  four groups the pattern fields give live through `shared/mcp.ts`
-  (a pattern matching nothing marked under its field), and the
-  instructions as `serverBlock()` gives them, trimmed to 12 lines with
-  Show all. `data/mcp.ts` keeps the rows, the keys and `loadedAt`; the
-  agent form reads them again on open and says when it did.
-- **The agent form's Preferred provider.** On an OpenRouter provider,
-  a `Select` under the model (`UpstreamField.tsx`) asks for the
-  model's endpoints each time one is picked, Any provider first, and
-  keeps a saved tag the list lacks as a choice; the agent row says
-  `via <tag>`. The New provider form fills OpenRouter's base URL,
-  replaced on a preset change unless the admin typed another one.
-- **The agents page's order.** `/admin/agents` stacks Providers,
-  Agents, Deciders, then Decisions, and waits for all four lists. Each
-  card is named by its search, which filters its rows, and shows them
-  by name (`byName()` in `lib/search.ts`, the entities keeping their
-  own order, the deciders oldest first). An empty Agents card points at
-  a provider above. A provider row (`ProviderRow.tsx`) opens to its
-  facts, never edited: the wire, the base URL, the key file, red when
-  missing, the agents on it linked and the deciders by name, and when
-  it was added, then Delete asked once beside Close; the server's
-  refusal of a provider in use is the foot's notice.
-- **The Deciders card.** `DecidersCard.tsx`, the rows in
-  `data/deciders.ts`, loaded by the route: a row per decider, the name
-  over the model, and "default", the provider, the window and the input
-  price (`deciderMeta()` in `Deciders.model.ts`). New decider, off
-  until a provider's wire is in `DECIDER_WIRES`, and an open row are
-  one `DeciderForm`: the name, the provider as picks of those providers
-  only (`heldProvider()`: when the picked one is deleted on the same
-  page the first eligible one stands in, and "Add an OpenRouter or
-  OpenAI-compatible provider first" only when none is), the model
-  searched in the provider's decisions catalog
-  (`searchCatalog(..., "decisions")`), and the agents' `DefaultField`
-  with its own label and the deciders' oldest id, the oldest while
-  default having no No. A save's refusal reaches a field only through
-  `deciderFieldOf()`, which matches the server's whole phrases, since a
-  provider's name may start them. An open row's foot has Delete and
-  Check: Check asks the saved decider through
-  `POST /api/deciders/:id/check` and says `checkLine()` over the
-  buttons, "Answered in 345 ms for $0.000001", or without the cost when
-  the server named none, in a `role="status"` line kept mounted empty
-  so it is announced; a refusal skips the field mapping (`act(...,
-  { whole: true })`) and is always the foot's notice, "Could not
-  check." then the wire's words. With no deciders the card says
-  decisions stay off until one is added.
-- **The Decisions card.** `DecisionsCard.tsx`, the rows in
-  `data/decisions.ts`, loaded by the route, a save putting the
-  server's answer in the list: a row per decision in `DECISIONS`, its
-  icon, title and sub from `DECISION_WORDS` in `Decisions.model.ts`
-  (the server sends only ids and option keys), and a meta from
-  `decisionMeta()`: "off", else "on" and the name of the decider that
-  answers, the default when none is picked or the picked one is gone,
-  then "custom" while an option differs from its default; a phone
-  shows it without "custom". With no deciders the row stays, faint, "off
-  until a decider is added", and its form still saves. An open row is
-  `DecisionForm.tsx`: Status as a `Seg` (On, Off) over the decision's
-  hint, Decider as a `Select` (`deciderChoices()`: "Default (<name>)",
-  then each decider; a picked one deleted on the page falls back to the
-  default through `heldDecider()`), and a textarea per option labelled
-  by `optionLabel()`, seeded from the entity and seeded again from each
-  answer. Save sends `decisionBody()`, checked by `optionProblem()`,
-  and a refusal reaches a field through `decisionFieldOf()`
-  (`options.<key>`, `enabled`, `decider`). Reset to default, at the
-  foot's left while any box differs from its option's default, fills
-  the boxes with `defaultTexts()` for the admin to save. The form
-  stays open after a save; Cancel closes it.
-- **The agent form's Delete.** Delete reads `GET
-  /api/agents/:id/impact` before it asks, and the ask has a line over
-  the buttons (`impactLine()`, `Foot`'s `above`): the chats it archives
-  and the automations it pauses, then what it stops, each part only
-  when there is any; a failed read asks without it.
-- **The overview's usage bars** name the one row of every deleted
-  project "deleted projects", unmarked, and mark a retired agent with a
-  small "deleted" after the name (`Bars`' `gone`).
-- **The agent form's MCP section.** The agent form's
-  section is a line per server with Read and Write boxes (a side off
-  on the server faint with the word),
-  the mode as a `Select`, and the prompt's instructions total with a
-  warning per server a cap leaves out and View for the block, all from
-  `promptPreview()` in `Mcp.model.ts` over `offeredServers()` and
-  `promptSnapshot()`, so the preview is the bytes a send starting on
-  those rows would carry. A model without the tools flag says so.
-- **Admin lists share their parts.** A row that a Manage link opens
-  reads `?open=<id>` through `useOpenParam()` in
-  `views/admin/OpenParam.ts`. A pick of a few labelled options with a
-  line of text each is `Choices` from `views/admin/Choices.tsx` over
-  base's `.choice`. The new-server form and an open MCP row hold a
-  server's settings through `useMcpSettings()` in
-  `views/admin/McpSettings.ts`, and send the one body it builds.
-- **The Skills page.** The Skills page, `/admin/skills`, is `Rows`: Add
-  skill takes the URL (a site or an index is looked up first and its
-  entries listed with Add), a row's head is the name over its files and
-  when it was fetched (the refresh failure in red), with Refresh at its
-  end, and it opens to the fields, the body and each file as
-  preformatted text, then Delete; the agent form checks skills by box,
-  at most `MAX_SKILLS_PER_AGENT`, and loads them through the agents
-  route. `data/skills.ts` keeps the list, a body and a file once read,
-  dropped on refresh.
-- **The Overview polls while seen.**
-  While the Overview is on screen and the tab is seen, `watchOverview()`
-  in `data/overview.ts` polls `GET /api/admin/load` one request at a
-  time and reads the
-  overview again once a minute; the page has no Refresh. Each row's head
-  is `BoardRow` in `OverviewNow.tsx`, a failed read its `Trouble`; a
-  model is named by `modelLabel()` in `Overview.model.ts`. The
-  decisions close the Automations tile's sub-line (`runsTile()`), "none
-  failed · 2 decisions", on the cursor's day too, left out while there
-  are none; the cost tiles, the cost per day and All time's cost add the rounds' cost and `decisionCost` (`costOf()`, a
-  null counting as 0 beside a priced one). The board is in
-  `docs/ui.md`, the routes in `docs/admin.md`.
+Every admin page is a list, an object page or a New page, built from
+the shared pieces below. Copy the nearest sibling of the same shape and
+compare the two before reporting.
+
+- **A list page.** The list's view answers `?new` itself with its New
+  page. Otherwise it is a `Page` with `zoneStep()` in `steps`, `split`,
+  and `PageNew` (`ui/Page.tsx`) in `actions`. The rows are one
+  `RowsCard` of `RowsGo` links by name, searched through
+  `useListSearch()` in `lib/search.ts`, whose `count` is none while the
+  list is empty and "3 of 9" while a search hides rows. A list that also
+  filters counts what it shows with `countOf()`. An empty list says why,
+  a search that leaves nothing says "No <noun> matches." A meta of two
+  lines is `RowsMeta`'s `under`, which a phone keeps. `loading` waits
+  for every list a row reads.
+- **A list's aside.** It opens with `UsageSection` from
+  `views/admin/AdminAside.tsx` ("Last 30 days" and the Usage link, drawn
+  on every such section), then `TopSection` or `KeyFilesSection`. An
+  aside over the Monitor's numbers reads `overviewTotals()`, which
+  answers only while the overview holds 30d, so the Monitor's range
+  never reaches a list.
+- **An object page.** The crumb's own step is `PageSwitcher`
+  (`ui/Page.tsx`), the siblings in the order the caller gives, mono; a
+  lone object draws a mono crumb. A page whose address names something
+  that can be renamed or deleted (a user, an agent, a decider) finds its
+  row through `useShownRow()` in `views/admin/drafts.ts`, which holds the
+  last row by id until the address follows, so neither flashes "No ...
+  by that name." The body is keyed by the row's id: a `SettingStack` of
+  `Setting` cards, `SettingDelete` last. A failed refresh is a
+  `SettingAlert` over the cards with `refreshLine()`; read-only facts are
+  `SettingFacts`. Other shared parts: `AgentLinks` (the agents using
+  the object), `ProjectRows` and `AddProject` in `ProjectPicks.tsx`
+  (team projects to bind), `ToolParams` (a tool's parameters) and
+  `ModelPicker` (below).
+- **Each card is its own form.** A card that edits is a `SettingForm`
+  ending in `DraftFoot`. Drafts come from one of two holders:
+  `useDraftCard()` (`views/admin/DraftCard.tsx`), where a card drafts only
+  its own fields over the row of the moment (users, team projects,
+  credentials); or `useRowDrafts()` (`drafts.ts`), one drafts object per
+  row id from `<Name>Page.state.ts` held by the page so drafts outlive a
+  tab switch, whose `follow()` moves the cards the admin left alone to a
+  row that changed under the page (agents, MCP servers, deciders).
+- **One save at a time when the row comes back whole.** Where a card
+  sends the whole object (an agent, a decider, a decision) or the
+  answer replaces the row, the page holds one `saving` signal, set
+  through `holding()`, that locks the other cards' Save and sets
+  `SettingDelete`'s `off`; otherwise a slower answer puts back what a
+  later save changed. `useDraftCard()` takes that signal. An MCP
+  server's cards send only their own fields and share none.
+- **An object's aside is kept per id.** The route reads the lists, then
+  the object's usage by id (`thenUsage()` in `app/routes.ts`), into a
+  `usageSlot()` in `data/<area>.ts` (`readSlot()` for combined reads,
+  `instanceSlot()` for one instance-wide answer, both in
+  `data/slot.ts`). The view draws `valueFor(id)` in `UsageSection`, with
+  `SpendLines` for turns or answers, tokens and cost. So a page seen
+  before draws its numbers at once; never keep an aside's answer in the
+  view or in one signal for every id.
+- **A New page is `NewCard`** (`views/admin/NewCard.tsx`): every field
+  in one card, Create and a Cancel link, Create off until `ready` and
+  while `taken` names a clash (`nameTaken()` in `lib/names.ts`). It
+  opens the created object's page, and like every navigation after a
+  call (a rename, `SettingDelete`'s `leaveTo`) only while `address()`
+  is still the one the call started on.
+- **Tabs keep their drafts.** The Config board and Web access keep every
+  tab's cards mounted and hide the others, since their drafts live in
+  the cards. An agent's and an MCP server's tabs may unmount, since the
+  page holds their drafts. Deciders and Decisions are two addresses
+  under one pair of tabs; the rail keeps Deciders lit through the zone
+  page's `also` in `app/zones.ts`.
+- **Limits.** A limit is a `NumberBox` text box, never a number input.
+  A `LimitsSetting` card sends only its own limits, and Use defaults
+  fills the draft without saving. A save that lowers the days archived
+  chats are kept asks first (`deleteAsk()` in `Limits.model.ts`).
+- **Page rules that are not visible in one file.**
+  - A provider is never edited, only made and deleted; Delete is off
+    while an agent or a decider runs on it, since the server refuses.
+  - A user's aside is their personal project alone, since a team
+    project's turns are not one user's. The admin's own page has no
+    Reset password nor Disable, and `roleLock()` fixes their role and
+    the last admin's.
+  - A credential's and an MCP server's name are fixed once made.
+  - An agent's MCP link is Read or Read and write; write alone is
+    refused by the server. The MCP tab's prompt preview is
+    `promptPreview()` over `offeredServers()` and `promptSnapshot()` from
+    `shared/mcp.ts`, the bytes a send would carry; never compute it
+    apart. "Default for new users" is sent only when flipped. The model
+    card's clearing rules (a provider change, a pick, Cancel) live in
+    `AgentDrafts`. `ModelPicker` is the catalog search inside
+    `ModelFields` (an agent, New agent) and `DeciderModelFields` (a
+    decider, New decider). Preferred provider shows only
+    on an OpenRouter provider.
+  - An MCP server's matchers decide in the order of `decide()` in
+    `shared/mcp.ts`: excluded, then read, then write, and an empty write
+    list takes every tool no matcher holds. `moveTools()` never names a
+    tool into an empty write list nor takes its last name. The Matchers
+    card and the tools list share one draft and one Save held by the
+    page.
+  - A decider has no output tokens; its asides show input tokens only.
+    New decider shows only while a provider's wire is in
+    `DECIDER_WIRES`. `deciderFieldOf()` and `decisionFieldOf()` match
+    the server's whole phrases, so a changed server message changes
+    them. A decision is the code's and has no Delete.
+- **The boards poll only while seen.** `watchOverview()`,
+  `watchUsage()` (`data/overview.ts`) and `watchAccessBoard()` stop
+  while the tab is hidden (`lib/poll.ts`) and ask every 30 seconds, just
+  over the server's 25 second keep; the load samples on its own timer,
+  one request at a time, and Usage asks again only for the current
+  month. The Monitor shows no money; cost is on Usage and the asides. A
+  Needs attention row opens the page that fixes it (`attentionRow()`).
+  The board's pieces are in `docs/ui.md`, the routes in
+  `docs/admin.md`.

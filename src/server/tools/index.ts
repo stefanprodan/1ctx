@@ -7,6 +7,8 @@
 import type {
   PatchToolRequest,
   ToolsResponse,
+  VisualCounts,
+  WebCounts,
 } from "../../shared/api/tools.ts";
 import {
   KNOWLEDGE,
@@ -82,7 +84,7 @@ export {
   parseToolPatch,
   parseWebDomains,
 } from "./parse.ts";
-export { type ToolRow, ToolStore } from "./store.ts";
+export { ToolStore } from "./store.ts";
 export type {
   ChatMemoryPort,
   KeepPort,
@@ -114,6 +116,10 @@ export type ToolsDeps = {
   credentials?: CredentialsPort & CredentialKeysPort;
   fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
+  usage?: {
+    visuals(since: number, until: number): VisualCounts;
+    web(since: number, until: number): WebCounts;
+  };
 };
 
 export type Tools = {
@@ -439,6 +445,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
   area.routes = routes({
     clock: deps.clock,
+    visuals: (since, until) =>
+      deps.usage?.visuals(since, until) ?? { drawn: 0, failed: 0, opened: 0 },
+    web: (since, until) =>
+      deps.usage?.web(since, until) ?? { fetches: 0, searches: 0, failed: 0 },
     response,
     patch,
     visualHosts: () =>

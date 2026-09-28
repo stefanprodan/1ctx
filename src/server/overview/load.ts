@@ -52,16 +52,15 @@ export function processProbe(): Probe {
   };
 }
 
-export type Samples = { at: number[]; cpu: number[]; rss: number[] };
+type Samples = { at: number[]; cpu: number[]; rss: number[] };
 
-export type Sampler = {
+type Sampler = {
   sample(): void;
   samples(): Samples;
 };
 
-// The first sample shares the CPU the process used since it started, so
-// a fresh ring still says something; every later one the time since
-// the sample before.
+// the first reading is only a baseline: startup spends more CPU than
+// wall time and would read as 100%
 export function sampler(deps: {
   clock: Clock;
   probe: Probe;
@@ -73,11 +72,13 @@ export function sampler(deps: {
   return {
     sample() {
       const now = deps.probe.read();
-      const cpuMicros = now.cpuMicros - (last?.cpuMicros ?? 0);
-      const wallMs = last === null ? now.uptimeMs : now.ms - last.ms;
+      const before = last;
+      last = now;
+      if (before === null) return;
+      const cpuMicros = now.cpuMicros - before.cpuMicros;
+      const wallMs = now.ms - before.ms;
       const share =
         wallMs > 0 ? cpuMicros / 1000 / wallMs / deps.probe.cores : 0;
-      last = now;
       ring.at.push(deps.clock());
       ring.cpu.push(Math.min(1, Math.max(0, share)));
       ring.rss.push(now.rss);

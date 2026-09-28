@@ -4,7 +4,10 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import type { OverviewResponse } from "../../../src/shared/api/admin.ts";
+import type {
+  OverviewResponse,
+  UsageResponse,
+} from "../../../src/shared/api/admin.ts";
 import type { AgentImpactResponse } from "../../../src/shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../../src/shared/api/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
@@ -335,10 +338,17 @@ describe("deleting an agent", () => {
     const res = await chat.admin.call("GET", "/api/admin/overview?tz=UTC");
     expect(res.status).toBe(200);
     const body: OverviewResponse = await res.json();
-    expect(body.lengths).toEqual([
-      expect.objectContaining({ provider: "local", model: FLASH, turns: 1 }),
-    ]);
     expect(body.instance.agents).toBe(0);
+    const month = new Date(chat.app.now.value).toISOString().slice(0, 7);
+    const used = await chat.admin.call(
+      "GET",
+      `/api/admin/usage?tz=UTC&month=${month}`,
+    );
+    expect(used.status).toBe(200);
+    const usage: UsageResponse = await used.json();
+    expect(usage.by.models).toEqual([
+      expect.objectContaining({ provider: null, model: FLASH }),
+    ]);
     await chat.app.shutdown();
   });
 });

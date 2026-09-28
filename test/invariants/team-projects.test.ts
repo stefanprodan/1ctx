@@ -16,6 +16,7 @@ import {
   startChat,
   tick,
 } from "../helpers/chat.ts";
+import { createTeam } from "../helpers/projects.ts";
 
 type FakeConn = Conn & {
   frames: SocketEvent[];
@@ -71,13 +72,6 @@ async function makeUser(
   const client = chat.app.client();
   await client.login(username, "pw");
   return { user, client };
-}
-async function createTeam(chat: ChatApp, name: string): Promise<ProjectDetail> {
-  const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
-  });
-  expect(res.status).toBe(201);
-  return (await res.json()).project;
 }
 async function addMember(chat: ChatApp, projectId: string, userId: string) {
   const res = await chat.admin.call(
@@ -146,28 +140,30 @@ describe("team project administration", () => {
     const chat = await chatApp();
     // every personal project is named personal, so a team may not be
     const reserved = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "personal" },
+      body: { name: "personal", description: "A team project." },
     });
     expect(reserved.status).toBe(409);
     expect(await reserved.json()).toEqual({ error: "name is taken" });
     // a username names no project any more
-    expect((await createTeam(chat, "casey")).name).toBe("casey");
-    expect((await createTeam(chat, "on_call")).name).toBe("on_call");
-    expect((await createTeam(chat, "a".repeat(80))).name).toHaveLength(80);
+    expect((await createTeam(chat.admin, "casey")).name).toBe("casey");
+    expect((await createTeam(chat.admin, "on_call")).name).toBe("on_call");
+    expect((await createTeam(chat.admin, "a".repeat(80))).name).toHaveLength(
+      80,
+    );
     for (const name of ["on.call", "On-call", "a".repeat(81)]) {
       const refused = await chat.admin.call("POST", "/api/projects", {
-        body: { name },
+        body: { name, description: "A team project." },
       });
       expect(refused.status).toBe(400);
       expect((await refused.json()).error).toBe(
         "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
       );
     }
-    const ops = await createTeam(chat, "ops");
+    const ops = await createTeam(chat.admin, "ops");
     expect(
       (
         await chat.admin.call("POST", "/api/projects", {
-          body: { name: "ops" },
+          body: { name: "ops", description: "A team project." },
         })
       ).status,
     ).toBe(409);
@@ -176,7 +172,7 @@ describe("team project administration", () => {
     });
     expect(same.status).toBe(200);
     expect((await same.json()).project.name).toBe("ops");
-    const other = await createTeam(chat, "other");
+    const other = await createTeam(chat.admin, "other");
     expect(
       (
         await chat.admin.call("PATCH", `/api/projects/${other.id}`, {
@@ -236,7 +232,7 @@ describe("team project administration", () => {
     });
     chat.app.socket.dispose();
   });
-  test("a description is set on create, changed alone, and checked", async () => {
+  test("a team project needs a description, a personal one may not", async () => {
     const chat = await chatApp();
     const made = await chat.admin.call("POST", "/api/projects", {
       body: { name: "ops", description: "Incidents and pages" },
@@ -244,14 +240,24 @@ describe("team project administration", () => {
     expect(made.status).toBe(201);
     const ops: ProjectDetail = (await made.json()).project;
     expect(ops.description).toBe("Incidents and pages");
-    expect((await createTeam(chat, "other")).description).toBe("");
-    const changed = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+    for (const body of [
+      { name: "other" },
+      { name: "other", description: "" },
+    ]) {
+      const refused = await chat.admin.call("POST", "/api/projects", { body });
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toBe("description is required");
+    }
+    const cleared = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
       body: { description: "" },
     });
-    expect(changed.status).toBe(200);
-    expect((await changed.json()).project).toMatchObject({
-      name: "ops",
-      description: "",
+    expect(cleared.status).toBe(400);
+    const renamed = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+      body: { name: "pager" },
+    });
+    expect((await renamed.json()).project).toMatchObject({
+      name: "pager",
+      description: "Incidents and pages",
     });
     for (const description of [" padded", "two\nlines", "x".repeat(281), 7]) {
       const bad = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
@@ -263,6 +269,10 @@ describe("team project administration", () => {
       body: {},
     });
     expect(empty.status).toBe(400);
+    const own = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "" },
+    });
+    expect(own.status).toBe(200);
     chat.app.socket.dispose();
   });
 
@@ -288,7 +298,7 @@ describe("team project administration", () => {
 
   test("a chat names its authors, an admin outside the project too", async () => {
     const chat = await chatApp();
-    const ops = await createTeam(chat, "ops");
+    const ops = await createTeam(chat.admin, "ops");
     await addMember(chat, ops.id, chat.memberId);
     const { script, sessionId } = await startChat(
       chat,
@@ -309,7 +319,7 @@ describe("team project administration", () => {
   test("the list follows visibility and keeps the personal project first", async () => {
     const chat = await chatApp();
     const second = await makeUser(chat, "stefan", "admin");
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     const response = await second.client.call("GET", "/api/projects");
     expect(response.status).toBe(200);
     const { projects } = await response.json();
@@ -351,7 +361,7 @@ describe("team project administration", () => {
     "membership changes publish and grant then revoke the project",
     async () => {
       const chat = await chatApp();
-      const project = await createTeam(chat, "ops");
+      const project = await createTeam(chat.admin, "ops");
       const conn = await connection(chat, chat.member);
       chat.app.socket.open(conn);
       conn.frames = [];
@@ -390,7 +400,7 @@ describe("team project administration", () => {
     const conn = await connection(chat, second.client);
     chat.app.socket.open(conn);
     conn.frames = [];
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     expect(chat.app.projects.isMember(project.id, second.user.id)).toBe(false);
     expect(conn.frames).toEqual([{ type: "granted", projectId: project.id }]);
     conn.frames = [];
@@ -406,7 +416,7 @@ describe("team project administration", () => {
   test.serial("adding an admin member emits no visibility frame", async () => {
     const chat = await chatApp();
     const second = await makeUser(chat, "stefan", "admin");
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     const conn = await connection(chat, second.client);
     chat.app.socket.open(conn);
     conn.frames = [];
@@ -427,7 +437,7 @@ describe("team project administration", () => {
 describe("team project chat lifecycle", () => {
   test("project deletion removes every chat row and keeps its usage", async () => {
     const chat = await chatApp();
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     await addMember(chat, project.id, chat.memberId);
     const started = await startChat(chat, "team chat", chat.member, project.id);
     await finish(chat, started.script);
@@ -453,7 +463,7 @@ describe("team project chat lifecycle", () => {
   });
   test("project deletion refuses a running send admitted in the same tick", async () => {
     const chat = await chatApp();
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     await addMember(chat, project.id, chat.memberId);
     const pending = chat.scripted.next();
     const detail = chat.app.runner.start(
@@ -481,7 +491,7 @@ describe("team project chat lifecycle", () => {
   });
   test("removing a member does not stop their active send", async () => {
     const chat = await chatApp();
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     await addMember(chat, project.id, chat.memberId);
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
@@ -528,7 +538,7 @@ describe("team project chat lifecycle", () => {
   test("team chats are changed by their owner or an admin, not another writer", async () => {
     const chat = await chatApp();
     const writer = await makeUser(chat, "maria");
-    const project = await createTeam(chat, "ops");
+    const project = await createTeam(chat.admin, "ops");
     await addMember(chat, project.id, chat.memberId);
     await addMember(chat, project.id, writer.user.id);
     const changed = await startChat(chat, "first", chat.member, project.id);

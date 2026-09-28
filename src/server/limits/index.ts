@@ -3,7 +3,7 @@
 //
 // The limits area: the defaults with an admin's overrides on top.
 // current() is read once when a send starts and copied onto its policy,
-// so a change on the Tools page reaches the next send and never one in
+// so a change on an admin page reaches the next send and never one in
 // flight; the run caps are read at each admission. A value saved equal
 // to its default drops the override rather than store it, so the rows
 // are exactly what an admin changed.
@@ -23,15 +23,13 @@ export {
   DEFAULT_LIMITS,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
-  type LimitDefinition,
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
-  type RunCaps,
   TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
-export { type LimitOverride, LimitStore } from "./store.ts";
+export { LimitStore } from "./store.ts";
 
 export type LimitsDeps = {
   db: Db;
@@ -45,7 +43,7 @@ export type LimitsArea = {
   routes: RouteDescriptor[];
   current(): Limits;
   rows(): LimitRow[];
-  set(values: Limits, now: number): void;
+  set(values: Partial<Limits>, now: number): void;
   reset(): void;
 };
 
@@ -90,13 +88,14 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
     write();
     if (runCaps() !== before) deps.runCapsChanged?.();
   };
-  const set = (values: Limits, now: number): void =>
+  const set = (values: Partial<Limits>, now: number): void =>
     noticing(() => {
       transact(deps.db, () => {
         for (const name of LIMIT_NAMES) {
-          if (values[name] === LIMIT_DEFINITIONS[name].default)
-            store.delete(name);
-          else store.set(name, values[name], now);
+          const value = values[name];
+          if (value === undefined) continue;
+          if (value === LIMIT_DEFINITIONS[name].default) store.delete(name);
+          else store.set(name, value, now);
         }
         return { result: undefined };
       });

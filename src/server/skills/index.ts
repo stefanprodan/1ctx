@@ -7,18 +7,18 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import { type AgentsPort, routes } from "./routes.ts";
+import { type AgentsPort, routes, type UsagePort } from "./routes.ts";
 import { SkillStore } from "./store.ts";
 import { switchable } from "./switchable.ts";
 
 export { cleanText } from "./clean.ts";
 export { fetchSource, fetchText } from "./fetch.ts";
-export { type ParsedSkill, parseSkillMd } from "./frontmatter.ts";
+export { parseSkillMd } from "./frontmatter.ts";
 export * from "./limits.ts";
 export { changeOf, discover, type LoadedSkill, loadSkill } from "./load.ts";
 export { parseAdd, parseDiscover, parseFile } from "./parse.ts";
 export { parseIndex, pick, resolve, validPath } from "./source.ts";
-export { type SkillRow, SkillStore, summary } from "./store.ts";
+export { SkillStore, summary } from "./store.ts";
 
 export type SkillsDeps = {
   db: Db;
@@ -26,6 +26,7 @@ export type SkillsDeps = {
   log: Log;
   fetcher: typeof fetch;
   agents: AgentsPort;
+  usage: UsagePort;
   // takes a deleted skill's key out of every disabled set; a closure,
   // since sessions and automations are built later
   capabilities: { forget(key: string): void };

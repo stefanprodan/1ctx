@@ -47,6 +47,11 @@
     padding: 0 var(--space-2);
     color: var(--fg);
   }
+  .rail-face {
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
 
   /* on the rail's ground the lit fill is the card's, as for the page
      on screen: the hover fill is too close to the ground in light */
@@ -86,28 +91,13 @@
     background: var(--card);
     color: var(--fg);
   }
-  /* a group's row is a button: the same row, the chevron at its end,
-     lit while one of its pages is on screen */
-  .rail-group {
-    width: 100%;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    text-align: left;
-  }
   .rail-item-in {
     color: var(--fg);
   }
-  .rail-item-chevron {
-    margin-left: auto;
-    color: var(--faint);
-    transition: transform 120ms;
-  }
-  .rail-item-chevron-open {
-    transform: rotate(180deg);
+  .rail-sub + .rail-zone {
+    margin-top: var(--space-2);
   }
 
-  /* a project under Projects: indented past the icon, in mono */
   /* a block, not a flex row: text-overflow cuts only a block's own text,
      and a name may be 80 characters */
   .rail-sub {
@@ -145,6 +135,27 @@
   .rail-sub-on {
     background: var(--card);
     color: var(--fg);
+  }
+
+  .rail-band {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-top: auto;
+    padding: 0 var(--space-3) 0 22px;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .rail-band:hover {
+    background: var(--hover);
+  }
+  .rail-band-open {
+    margin-left: auto;
+    color: var(--dim);
   }
 
   .rail-user {

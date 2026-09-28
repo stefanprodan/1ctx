@@ -170,3 +170,14 @@ fields.
   `GET /api/providers` answers the `provider-` key names beside the rows.
   The form picks one with `Select`, or No key; a missing file stays named
   and marked on its provider row.
+- **A provider's usage is its rows'.** `GET /api/providers/:id/usage`
+  sums the chat and run rounds that ran on it over `lastDays()`, every
+  agent together, the retired included; the `usage_provider_activity`
+  index serves it. A decider's answers are `decision_usage` and are not
+  in it.
+- **A decider's usage and a decision's are their answers.**
+  `GET /api/deciders/:id/usage` counts a decider's `decision_usage`
+  rows over `lastDays()`, Checks included, and
+  `GET /api/decisions/:id/usage` a decision's (its purpose), whichever
+  decider answered: answers, input tokens and cost, since a decider has
+  no output tokens.

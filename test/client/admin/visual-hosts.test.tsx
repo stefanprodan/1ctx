@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { render } from "preact-render-to-string";
 import { ApiError } from "../../../src/client/data/api.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
@@ -13,14 +12,12 @@ import {
   toolsError,
 } from "../../../src/client/data/tools.ts";
 import { Save } from "../../../src/client/lib/save.ts";
-import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
+import { hostsCount } from "../../../src/client/views/admin/Tools.model.ts";
 import {
   defaultHosts,
-  hostsCount,
   hostsFieldOf,
   hostsOf,
-} from "../../../src/client/views/admin/Tools.model.ts";
-import { VisualHosts } from "../../../src/client/views/admin/VisualHosts.tsx";
+} from "../../../src/client/views/admin/Visuals.model.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import {
   DEFAULT_VISUAL_HOSTS,
@@ -125,22 +122,6 @@ describe("the visual hosts box", () => {
       save.dispose();
     }
     expect(hostsFieldOf("the server could not save")).toBeUndefined();
-  });
-
-  test("a failed Reset uses the shared form's notice", async () => {
-    const save = new Save(async () => {}, 0, hostsFieldOf);
-    for (const action of ["reset the hosts"]) {
-      await save.act(action, async () => {
-        throw new ApiError(500, "the server could not save");
-      });
-      expect(save.notice()).toEqual({
-        action,
-        error: "the server could not save",
-        status: 500,
-      });
-      expect(save.fieldError("hosts")).toBeNull();
-    }
-    save.dispose();
   });
 });
 
@@ -247,81 +228,5 @@ describe("the visual hosts entity", () => {
     release(Response.json(response(visual.hosts)));
     await loading;
     expect(tools.value?.visualize.hosts).toEqual([]);
-  });
-});
-
-describe("the CDNs section", () => {
-  let held: typeof tools.value;
-  beforeEach(() => {
-    held = tools.value;
-  });
-  afterEach(() => {
-    tools.value = held;
-  });
-
-  test.serial("one form: the box, Save, Reset to defaults, the count", () => {
-    tools.value = response(["https://a.example.com", "https://b.example.com"]);
-    const html = render(<VisualHosts off={false} />);
-    expect(html.match(/<form/g)).toHaveLength(1);
-    expect(html).toContain('<h2 class="section-title">CDNs</h2>');
-    expect(html).toContain('aria-label="CDNs"');
-    expect(html).toMatch(/section-fact-end">2 of 16</);
-    expect(html).toMatch(
-      /<textarea name="hosts"[^>]*>https:\/\/a\.example\.com\nhttps:\/\/b\.example\.com</,
-    );
-    expect(html).toContain(
-      "Visuals load scripts, styles and fonts only from these CDNs.",
-    );
-    expect(html).not.toContain('class="hint"');
-    expect(html).toMatch(/foot-label-on">Save</);
-    // nothing to save until the box is edited, Save first, Reset beside it
-    expect(html).toMatch(/type="submit"[^>]*disabled/);
-    expect(html).toMatch(/<button type="button" class="btn">Reset to defaults/);
-    expect(html.indexOf('type="submit"')).toBeLessThan(
-      html.indexOf("Reset to defaults"),
-    );
-    expect(html).not.toContain('role="switch"');
-  });
-
-  test.serial("an empty list says visuals use inline code", () => {
-    tools.value = response([]);
-    const html = render(<VisualHosts off={false} />);
-    expect(html).toContain("No CDNs. Visuals use inline code only.");
-    expect(html).toMatch(/section-fact-end">0 of 16</);
-    expect(html).toContain('placeholder="https://cdn.example.com"');
-  });
-
-  test.serial("Reset waits while the list is the defaults", () => {
-    tools.value = response([...DEFAULT_VISUAL_HOSTS]);
-    expect(render(<VisualHosts off={false} />)).toMatch(
-      /<button type="button" class="btn" disabled>Reset to defaults/,
-    );
-  });
-
-  test.serial("off with visualize: faded, locked, the list kept", () => {
-    tools.value = response(["https://a.example.com"]);
-    const html = render(<VisualHosts off />);
-    expect(html).toContain('class="section section-off"');
-    expect(html).toMatch(/<textarea name="hosts"[^>]*disabled/);
-    expect(html).toMatch(/type="submit"[^>]*disabled/);
-    expect(html).toMatch(/<button type="button" class="btn" disabled>Reset/);
-    expect(html).toContain("https://a.example.com");
-    // the row says it is off, the word in place of its tokens
-    const row = render(
-      <ToolRow
-        tool={{ ...visual, enabled: false }}
-        open={false}
-        onToggle={() => {}}
-      />,
-    );
-    expect(row).toContain("rows-item-off");
-    expect(row).toContain('rows-meta-long">Off<');
-    expect(row).not.toContain("tokens");
-  });
-
-  test("the visualize row carries no hosts form", () => {
-    expect(
-      render(<ToolRow tool={visual} open onToggle={() => {}} />),
-    ).not.toContain("<form");
   });
 });

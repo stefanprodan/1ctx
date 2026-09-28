@@ -13,6 +13,11 @@ import { memoryDb } from "../../helpers/db.ts";
 import { link, seedServer } from "../mcp/switches.helpers.ts";
 import { context } from "./memory.helpers.ts";
 
+const NO_USAGE = {
+  calls: () => ({ calls: 0, failed: 0, tools: [] }),
+  servers: () => ({ calls: 0, failed: 0, servers: [] }),
+};
+
 function setup(
   large = false,
   knowledge?: Parameters<typeof toolsArea>[0]["knowledge"],
@@ -30,6 +35,7 @@ function setup(
     version: "test",
     render: (text) => text,
     capabilities: { forget: () => {} },
+    usage: NO_USAGE,
   });
   const flux = seedServer(mcp.store, "flux", large ? 48 : 1);
   const docs = seedServer(mcp.store, "docs");

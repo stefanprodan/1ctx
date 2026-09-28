@@ -1,0 +1,17 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .decider-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .decider-list-provider {
+    max-width: 200px;
+    font-family: var(--mono);
+  }
+  .decider-list-facts {
+    font-family: var(--mono);
+  }
+}

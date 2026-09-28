@@ -22,6 +22,7 @@ import {
   NO_TOOLS,
   startChat,
 } from "../helpers/chat.ts";
+import { createTeam } from "../helpers/projects.ts";
 
 const loaded = (
   name: string,
@@ -44,23 +45,6 @@ const loaded = (
   droppedMore: 0,
   files,
 });
-
-async function team(chat: ChatApp, name: string, members: string[]) {
-  const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
-  });
-  expect(res.status).toBe(201);
-  const { project } = await res.json();
-  for (const userId of members) {
-    const added = await chat.admin.call(
-      "POST",
-      `/api/projects/${project.id}/members`,
-      { body: { userId } },
-    );
-    expect(added.status).toBe(201);
-  }
-  return project.id as string;
-}
 
 describe("the directory", () => {
   test("a member opens another user's page with the email, zone and about", async () => {
@@ -110,11 +94,11 @@ describe("the directory", () => {
       mustChangePassword: false,
       now: chat.app.now.value,
     });
-    await team(chat, "shared", [chat.memberId, other.id]);
-    await team(chat, "theirs", [other.id]);
-    await team(chat, "mine", [chat.memberId]);
+    await createTeam(chat.admin, "shared", [chat.memberId, other.id]);
+    await createTeam(chat.admin, "theirs", [other.id]);
+    await createTeam(chat.admin, "mine", [chat.memberId]);
     // made last, listed first: the projects read by name
-    await team(chat, "also", [chat.memberId, other.id]);
+    await createTeam(chat.admin, "also", [chat.memberId, other.id]);
     const names = async (client: ChatApp["member"], username: string) => {
       const body: DirectoryUserResponse = await (
         await client.call("GET", `/api/directory/users/${username}`)

@@ -13,11 +13,10 @@ import type { AgentServer } from "./contracts/mcp.ts";
 import { escapeText } from "./skills.ts";
 import type { McpMode } from "./words.ts";
 
-// the wire name mcp__<server>__<tool>, in the OpenAI rule, else null
-export const MAX_WIRE_NAME = 64;
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export const WIRE_PREFIX = "mcp__";
 
+// the wire name mcp__<server>__<tool>, in the OpenAI rule, else null
 export function wireName(server: string, tool: string): string | null {
   const name = `${WIRE_PREFIX}${server}__${tool}`;
   return WIRE_RE.test(name) ? name : null;
@@ -49,8 +48,41 @@ function matches(pattern: string, name: string): boolean {
   return name === pattern;
 }
 
-function matchesAny(patterns: string[], name: string): boolean {
-  return patterns.some((pattern) => matches(pattern, name));
+function firstMatch(patterns: string[], name: string): string | null {
+  return patterns.find((pattern) => matches(pattern, name)) ?? null;
+}
+
+// by is null for an unusable tool, and for a write by default, when the
+// write list is empty and nothing else matched
+export type Decided = { side: ToolSide; by: string | null };
+
+export function decide(
+  server: string,
+  tools: { name: string; unusable: string | null }[],
+  patterns: Patterns,
+): Map<string, Decided> {
+  const out = new Map<string, Decided>();
+  for (const tool of tools) {
+    if (tool.unusable !== null || wireName(server, tool.name) === null) {
+      out.set(tool.name, { side: "unusable", by: null });
+      continue;
+    }
+    const excluded = firstMatch(patterns.excluded, tool.name);
+    const read = firstMatch(patterns.read, tool.name);
+    const write = firstMatch(patterns.write, tool.name);
+    if (excluded !== null) {
+      out.set(tool.name, { side: "excluded", by: excluded });
+    } else if (read !== null) {
+      out.set(tool.name, { side: "read", by: read });
+    } else if (patterns.write.length === 0) {
+      out.set(tool.name, { side: "write", by: null });
+    } else if (write !== null) {
+      out.set(tool.name, { side: "write", by: write });
+    } else {
+      out.set(tool.name, { side: "excluded", by: null });
+    }
+  }
+  return out;
 }
 
 export function classify(
@@ -59,21 +91,8 @@ export function classify(
   patterns: Patterns,
 ): Map<string, ToolSide> {
   const out = new Map<string, ToolSide>();
-  for (const tool of tools) {
-    if (tool.unusable !== null || wireName(server, tool.name) === null) {
-      out.set(tool.name, "unusable");
-    } else if (matchesAny(patterns.excluded, tool.name)) {
-      out.set(tool.name, "excluded");
-    } else if (matchesAny(patterns.read, tool.name)) {
-      out.set(tool.name, "read");
-    } else if (
-      patterns.write.length === 0 ||
-      matchesAny(patterns.write, tool.name)
-    ) {
-      out.set(tool.name, "write");
-    } else {
-      out.set(tool.name, "excluded");
-    }
+  for (const [name, { side }] of decide(server, tools, patterns)) {
+    out.set(name, side);
   }
   return out;
 }
@@ -223,7 +242,6 @@ export function sortOffered<T extends { wireName: string }>(tools: T[]): T[] {
 }
 
 // decision 11: the instructions block, and decision 17's digest
-export const MAX_SERVER_INSTRUCTIONS = 16_000;
 export const MAX_INSTRUCTIONS_BLOCK = 32_000;
 // decision 14: the offered schemas of one send, as JSON, in all
 export const MAX_SCHEMAS_BYTES = 1024 * 1024;

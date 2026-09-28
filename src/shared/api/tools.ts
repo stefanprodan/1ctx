@@ -12,6 +12,7 @@ import type {
 } from "../contracts/tool.ts";
 import type { WebAccess, WebAccessMode } from "../web.ts";
 import type { SearchProvider } from "../words.ts";
+import type { Windowed } from "./admin.ts";
 
 // GET /api/tools, and what PATCH /api/tools/:name answers
 export type ToolsResponse = {
@@ -33,3 +34,11 @@ export type PatchToolRequest = {
   enabled?: boolean;
   hosts?: string[];
 };
+
+// opened counts the files `open` put on a chat page as visuals
+export type VisualCounts = { drawn: number; failed: number; opened: number };
+export type WebCounts = { fetches: number; searches: number; failed: number };
+
+// GET /api/usage/visuals and /api/usage/web: the last 30 days
+export type VisualsUsageResponse = Windowed<VisualCounts>;
+export type WebUsageResponse = Windowed<WebCounts>;

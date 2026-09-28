@@ -1,14 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The one design of a list of things: a card of rows on a page, or an
-// inset list of the same rows inside a form or an open row. A row is
-// RowsOpen (opens in place), RowsGo (a link), RowsButton (an action) or
-// RowsLine (neither); its head is only the parts below: RowsAvatar,
-// RowsTitle, RowsMeta, and at its end RowsEnd, RowsSwitch, RowsCheck or
-// a small button. RowsTree is the rows of a folder tree. A view fills
-// the rows and styles only what an open row's body holds; a new list
-// never draws a row of its own.
 
 import type { ComponentChildren } from "preact";
 import { useId } from "preact/hooks";
@@ -20,15 +11,14 @@ import "./rows.css";
 export {
   RowsCheck,
   RowsEnd,
-  type RowsFilter,
   RowsFilters,
   RowsRadio,
+  RowsRemove,
   RowsSwitch,
 } from "./RowsControls.tsx";
 export { RowsOpen } from "./RowsOpen.tsx";
 export { RowsTree, type RowsTreeNode } from "./RowsTree.tsx";
 
-// the page's column of cards
 export function Rows({ children }: { children: ComponentChildren }) {
   return <div class="rows">{children}</div>;
 }
@@ -40,21 +30,23 @@ export function RowsCard({
   action,
   hint,
   live,
+  count,
+  wrap,
+  hintBelow,
   class: extra,
   children,
 }: {
   label: string;
-  // a search box in place of the label, for a list long enough to need
-  // one; the label still names the card to a screen reader
   search?: ComponentChildren;
-  // tabs in place of the label, which still names the card aloud
   tabs?: ComponentChildren;
   action?: ComponentChildren;
   hint?: string;
-  // the hint follows a selection in the card, so a screen reader hears
-  // each change
   live?: boolean;
-  // the owner's class beside the card's: a board's panel
+  count?: string;
+  wrap?: boolean;
+  // on a phone the hint takes its own line under the label, held even
+  // while empty, so a hint that follows the pointer never moves the card
+  hintBelow?: boolean;
   class?: string;
   children?: ComponentChildren;
 }) {
@@ -69,16 +61,25 @@ export function RowsCard({
       <div
         class={`rows-head${search ? " rows-head-search" : ""}${
           tabs ? " rows-head-tabs" : ""
-        }`}
+        }${wrap ? " rows-head-wrap" : ""}${hintBelow ? " rows-head-below" : ""}`}
       >
-        {slot ?? (
-          <span class="label" id={id}>
-            {label}
-          </span>
+        {wrap && slot ? (
+          <div class="rows-head-slot">{slot}</div>
+        ) : (
+          (slot ?? (
+            <span class="label" id={id}>
+              {label}
+            </span>
+          ))
         )}
-        {hint && (
+        {(hint || hintBelow) && (
           <span class="rows-hint cut" aria-live={live ? "polite" : undefined}>
             {hint}
+          </span>
+        )}
+        {count !== undefined && (
+          <span class="rows-count" aria-live="polite">
+            {count}
           </span>
         )}
         {action}
@@ -88,7 +89,6 @@ export function RowsCard({
   );
 }
 
-// the head's New button
 export function RowsAdd({
   label,
   disabled,
@@ -111,7 +111,6 @@ export function RowsAdd({
   );
 }
 
-// the head's link to where the rows are managed
 export function RowsLink({ label, href }: { label: string; href: string }) {
   return (
     <a class="btn btn-small rows-add" href={href}>
@@ -120,15 +119,10 @@ export function RowsLink({ label, href }: { label: string; href: string }) {
   );
 }
 
-// a faint line in the card: an empty list, or what the rows add up to
 export function RowsNote({ children }: { children: ComponentChildren }) {
   return <p class="rows-note">{children}</p>;
 }
 
-// a row that does not open, its text lined up with an opening row's;
-// `flush` starts it at the edge, for an avatar or a radio or a box where
-// the chevron is, or in a list where no row opens; a label row lights under the pointer as a row that
-// opens does, unless `off`
 export function RowsLine({
   as = "div",
   flush,
@@ -137,7 +131,6 @@ export function RowsLine({
 }: {
   as?: "div" | "label";
   flush?: boolean;
-  // the row's subject cannot be picked now: its name goes faint
   off?: boolean;
   children: ComponentChildren;
 }) {
@@ -155,23 +148,21 @@ export function RowsLine({
   );
 }
 
-// a row that leads to its page: the line is the link, with the arrow
-// at its end; `end`, a button, sits outside the link after the arrow;
-// `under` is what belongs to the row below its line, links of its own
-// (a search hit's lines), inside the row's rule
 export function RowsGo({
   href,
   end,
   under,
+  off,
   children,
 }: {
   href: string;
   end?: ComponentChildren;
   under?: ComponentChildren;
+  off?: boolean;
   children: ComponentChildren;
 }) {
-  // the arrow marks the line's end; a row with a button there leaves it
-  // out, or it would sit between the words and the button
+  // a row with a button at its end leaves the arrow out, or it would
+  // sit between the words and the button
   const link = (line: boolean) => (
     <a class={line ? "rows-line rows-go" : "rows-go rows-go-part"} href={href}>
       {children}
@@ -179,7 +170,7 @@ export function RowsGo({
     </a>
   );
   return (
-    <div class="rows-item">
+    <div class={`rows-item${off ? " rows-item-off" : ""}`}>
       {end === undefined ? (
         link(true)
       ) : (
@@ -193,14 +184,12 @@ export function RowsGo({
   );
 }
 
-// a row that acts when pressed: the whole line is the button
 export function RowsButton({
   onClick,
   disabled,
   children,
 }: {
   onClick: () => void;
-  // while another action of the form runs
   disabled?: boolean;
   children: ComponentChildren;
 }) {
@@ -218,14 +207,10 @@ export function RowsButton({
   );
 }
 
-// the same rows inset inside a form or an open row
 export function RowsList({ children }: { children: ComponentChildren }) {
   return <div class="rows-list">{children}</div>;
 }
 
-// bare: inside a box that has its own frame, under a rule. ends: some
-// lines carry a remove button, so every line keeps room for one and the
-// notes share an edge
 export function RowsLog({
   children,
   bare,
@@ -261,7 +246,6 @@ export function RowsLogLine({
   bad?: boolean;
   running?: boolean;
   status?: number | null;
-  // a small X at the line's end, in a log drawn with `ends`
   onRemove?: () => void;
 }) {
   return (
@@ -303,7 +287,6 @@ export function RowsLogMore({
   );
 }
 
-// the label over an inset list, and a faint count or word at its right
 export function RowsListHead({
   label,
   hint,
@@ -319,12 +302,10 @@ export function RowsListHead({
   );
 }
 
-// a row of text, not a thing: a prompt, cut by the view
 export function RowsBlock({ children }: { children: ComponentChildren }) {
   return <div class="rows-item rows-block">{children}</div>;
 }
 
-// a list's failed load under its rows: the words, then the status
 export function RowsFailed({ failure }: { failure: Failure }) {
   return (
     <RowsBlock>
@@ -336,7 +317,6 @@ export function RowsFailed({ failure }: { failure: Failure }) {
   );
 }
 
-// the form of a new row, open at the top of the card
 export function RowsNew({ children }: { children: ComponentChildren }) {
   return (
     <div class="rows-item rows-item-open">
@@ -351,7 +331,6 @@ export function RowsAvatar({
   children,
 }: {
   lit?: boolean;
-  // what the avatar stands for, under the pointer
   title?: string;
   children: ComponentChildren;
 }) {
@@ -362,8 +341,6 @@ export function RowsAvatar({
   );
 }
 
-// the name over a faint line; mono for a name that is an identifier,
-// `bad` when the line is a failure
 export function RowsTitle({
   name,
   sub,
@@ -375,8 +352,6 @@ export function RowsTitle({
   sub?: ComponentChildren;
   mono?: boolean;
   bad?: boolean;
-  // the sub line only from 720 up; a phone shows the name alone and the
-  // open row holds the rest
   subWide?: boolean;
 }) {
   return (
@@ -397,43 +372,46 @@ export function RowsTitle({
   );
 }
 
-// a small word in a box beside the name: you
 export function RowsTag({ children }: { children: ComponentChildren }) {
   return <span class="tag">{children}</span>;
 }
 
-// who a line names, in the brand colour; faint once the agent is gone
 export function RowsHandle({ name, gone }: { name: string; gone?: boolean }) {
   return <span class={gone ? "rows-handle-gone" : "rows-handle"}>@{name}</span>;
 }
 
-// the failed part of a line
 export function RowsBad({ children }: { children: ComponentChildren }) {
   return <span class="rows-bad">{children}</span>;
 }
 
-// the faint words at the row's right; under 720 they wrap below
 export function RowsMeta({
   bad,
+  brand,
   short,
   keep,
+  under,
   children,
 }: {
   bad?: boolean;
-  // a meta of boxes, a meter or a strip, which cannot ellipsize: it
-  // keeps its width and the title gives way instead
+  brand?: boolean;
+  // a meta that cannot ellipsize (boxes, a meter): the title gives way
   keep?: boolean;
-  // what a phone shows in place of the whole meta, the rest being in
-  // the open row; empty hides the meta there
+  // a phone's meta; empty hides it there
   short?: string;
+  under?: ComponentChildren;
   children: ComponentChildren;
 }) {
-  const cls = `rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}${
-    short === "" ? " rows-meta-wide" : ""
-  }`;
+  const cls = `rows-meta${bad ? " rows-meta-bad" : ""}${
+    brand ? " rows-meta-brand" : ""
+  }${keep ? " rows-meta-keep" : ""}${short === "" ? " rows-meta-wide" : ""}`;
   return (
     <span class={cls}>
-      {short === undefined ? (
+      {under !== undefined ? (
+        <span class="rows-meta-two">
+          <span>{children}</span>
+          <span class="rows-meta-under">{under}</span>
+        </span>
+      ) : short === undefined ? (
         children
       ) : (
         <>

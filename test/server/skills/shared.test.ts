@@ -21,15 +21,21 @@ describe("skill source forms", () => {
       path: "skills/ops",
     });
     expect(sourceForm("https://files.test/skill.tgz")?.kind).toBe("archive");
+    expect(sourceForm("https://files.test/skill.tar.gz")?.kind).toBe("archive");
+    expect(sourceForm("https://files.test/skill.zip")?.kind).toBe("archive");
     expect(sourceForm("https://files.test/skill.ZIP?download=1")?.kind).toBe(
       "archive",
     );
     expect(sourceForm("https://skills.test")?.kind).toBe("index");
+    expect(sourceForm("https://skills.test/.well-known/index.json")?.kind).toBe(
+      "index",
+    );
     expect(sourceForm("https://skills.test/a/SKILL.md")?.kind).toBe("file");
     expect(
       sourceForm("https://github.com/acme/repo/blob/main/SKILL.md")?.kind,
     ).toBe("file");
     expect(sourceForm("ftp://skills.test/a")).toBeNull();
+    expect(sourceForm("not a url")).toBeNull();
     expect(codeloadUrl({ owner: "a", repo: "b", ref: "main" })).toBe(
       "https://codeload.github.com/a/b/tar.gz/main",
     );

@@ -1,0 +1,22 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .skill-page-mono {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+  }
+  .skill-page-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .skill-page-state {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+  .skill-page-said {
+    margin: 0;
+    font-size: var(--text-ui);
+  }
+}
