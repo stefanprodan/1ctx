@@ -439,11 +439,14 @@ export function RowsBad({ children }: { children: ComponentChildren }) {
 // the faint words at the row's right; under 720 they wrap below
 export function RowsMeta({
   bad,
+  brand,
   short,
   keep,
   children,
 }: {
   bad?: boolean;
+  // in the logo's colour: what is live, an online user
+  brand?: boolean;
   // a meta of boxes, a meter or a strip, which cannot ellipsize: it
   // keeps its width and the title gives way instead
   keep?: boolean;
@@ -452,9 +455,9 @@ export function RowsMeta({
   short?: string;
   children: ComponentChildren;
 }) {
-  const cls = `rows-meta${bad ? " rows-meta-bad" : ""}${keep ? " rows-meta-keep" : ""}${
-    short === "" ? " rows-meta-wide" : ""
-  }`;
+  const cls = `rows-meta${bad ? " rows-meta-bad" : ""}${
+    brand ? " rows-meta-brand" : ""
+  }${keep ? " rows-meta-keep" : ""}${short === "" ? " rows-meta-wide" : ""}`;
   return (
     <span class={cls}>
       {short === undefined ? (

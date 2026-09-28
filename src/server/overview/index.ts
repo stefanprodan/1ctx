@@ -5,8 +5,10 @@
 // is one scan of the file in a worker over its own connection, or
 // inline over the app's when the database is in memory, kept a minute
 // and shaped for the caller's zone at each request. The overview's
-// days are the same worker's other job, kept a minute per zone and range, and the
-// usage page's month a third, kept a minute per zone and month. The
+// days are the same worker's other job and the usage page's month a
+// third, each kept 25 seconds per zone and range or month, under the
+// pages' 30 second poll, while the scan of the whole file is kept the
+// minute. The
 // load is the process's word at each request: its pools, its sockets
 // and its CPU and memory, sampled from the start; so is what needs
 // attention, read from the config areas through a port.
@@ -26,7 +28,7 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { monthWindow } from "../usage/index.ts";
 import { type AttentionInput, attention } from "./attention.ts";
-import { scanCache } from "./cache.ts";
+import { BOARD_KEEP_MS, scanCache } from "./cache.ts";
 import { type Probe, processProbe, sampler } from "./load.ts";
 import {
   daysOf,
@@ -52,7 +54,7 @@ import {
 import { type Scanner, workerScanner } from "./worker.ts";
 
 export { type AttentionInput, attention } from "./attention.ts";
-export { KEEP_MS } from "./cache.ts";
+export { BOARD_KEEP_MS, KEEP_MS } from "./cache.ts";
 export {
   type Probe,
   processProbe,
@@ -162,6 +164,7 @@ export function overviewArea(deps: OverviewDeps): Overview {
     storageResponse(await scans.get(), timeZone, deps.limits.current());
   const ranges = scanCache<RangeResult>({
     clock: deps.clock,
+    keepMs: BOARD_KEEP_MS,
     run: (key) =>
       failing("overview read failed", () => {
         const [timeZone, range] = key.split("\n") as [string, OverviewRange];
@@ -184,6 +187,7 @@ export function overviewArea(deps: OverviewDeps): Overview {
   };
   const months = scanCache<MonthResult>({
     clock: deps.clock,
+    keepMs: BOARD_KEEP_MS,
     run: (key) =>
       failing("usage read failed", () => {
         const [timeZone, name] = key.split("\n") as [string, string];

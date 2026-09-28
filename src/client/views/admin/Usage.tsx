@@ -9,6 +9,7 @@
 // keeps the last month on screen, faded, until the new one lands.
 
 import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
 import type { UsageResponse } from "../../../shared/api/admin.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
@@ -17,6 +18,7 @@ import {
   usageError,
   usageLoading,
   usageMonth,
+  watchUsage,
 } from "../../data/overview.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { BarsGhost } from "../../ui/Bones.tsx";
@@ -219,6 +221,7 @@ function MonthSteps({ month, first }: { month: string; first: string | null }) {
 }
 
 export function Usage() {
+  useEffect(() => watchUsage(), []);
   const answer = usage.value;
   const error = usageError.value;
   const busy = usageLoading.value;

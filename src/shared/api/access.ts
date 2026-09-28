@@ -19,12 +19,19 @@ export type ErrorResponse = { error: string };
 // a day of the Access board's chart, in the reader's zone
 export type AccessDay = { day: string; start: number; signedIn: number };
 
+// a user who used the app: when last, and whether a tab of theirs is
+// open now
+export type AccessRecent = { userId: string; at: number; online: boolean };
+
 // GET /api/admin/access?tz=: the last 30 days, the users who signed in
-// each day and over them, and the team projects with a turn or a run
+// each day and over them, the ten users seen in those days (the online
+// first, then the newest, none disabled), and the team projects with a
+// turn or a run
 export type AccessBoardResponse = {
   since: number;
   until: number;
   days: AccessDay[];
   signedIn: number;
+  recent: AccessRecent[];
   activeProjectIds: string[];
 };

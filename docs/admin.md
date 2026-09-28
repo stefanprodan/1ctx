@@ -53,9 +53,11 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   entry point of `bun build --compile`, where a relative URL resolves
   against the compile root, `src/server`, so `compose.ts` builds the URL
   and passes it in. `cache.ts` keeps one read in flight per key and its
-  answer a minute on the clock port; a failed read keeps nothing, is a
-  warning (`storage scan failed`, `overview read failed`, `usage read
-  failed`) and the router's 500.
+  answer on the clock port, the storage scan a minute (`KEEP_MS`) and
+  the overview and the month 25 seconds (`BOARD_KEEP_MS`, under the
+  pages' 30 second poll); a failed read keeps nothing, is a warning
+  (`storage scan failed`, `overview read failed`, `usage read failed`)
+  and the router's 500.
 - **Overview.**
   `GET /api/admin/overview?tz=&range=` (`admin`, one `tz`, a `range` of
   `OVERVIEW_RANGES`, 30d when not given) answers `OverviewResponse`: the
@@ -75,7 +77,7 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   are summed from `decision_usage` by `created_at` into `decisions`,
   `decisionTokens` (input tokens), `pricedDecisions` and
   `decisionCost` on the days and the totals; `cost` stays the rounds'
-  alone. The answer is kept a minute per zone and range.
+  alone. The answer is kept 25 seconds per zone and range.
 - **Usage.** `GET /api/admin/usage?tz=&month=YYYY-MM` (`admin`, one
   `tz`, one `month` matching `MONTH_PATTERN`) answers `UsageResponse`:
   the month's days in the zone (`monthWindow()` in `usage/`), up to
@@ -88,7 +90,7 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   agent or provider's model without tokens is left out. `month()` in `range.ts` is the worker's third job and
   `breakdowns.ts` its queries: a breakdown sums tokens from `usage` and
   sends from `sends` apart and joins them by key, so a send of many
-  rounds counts once. The answer is kept a minute per zone and month.
+  rounds counts once. The answer is kept 25 seconds per zone and month.
 - **Attention is read at each request.** `GET /api/admin/attention`
   (`admin`, no parameter) answers what an admin should fix, from the
   config rows and the key files through the `attention` port

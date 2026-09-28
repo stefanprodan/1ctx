@@ -42,6 +42,16 @@ export class VisitStore {
     return new Map(rows.map((row) => [row.user_id, row.day]));
   }
 
+  // each user's latest day's first instant, for one who signed out
+  latestAt(): Map<string, number> {
+    const rows = this.db
+      .query<{ user_id: string; at: number }, []>(
+        "select user_id, max(at) as at from visits group by user_id",
+      )
+      .all();
+    return new Map(rows.map((row) => [row.user_id, row.at]));
+  }
+
   latestFor(userId: string): string | null {
     return (
       this.db

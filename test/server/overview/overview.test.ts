@@ -11,6 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
+  BOARD_KEEP_MS,
   KEEP_MS,
   overviewArea,
   type Probe,
@@ -925,7 +926,11 @@ describe("the overview cache", () => {
     } as never);
     expect(spelled?.status).toBe(200);
     expect(keys).toHaveLength(2);
-    app.now.value += KEEP_MS;
+    // kept for the page's poll period, not the storage scan's minute
+    app.now.value += BOARD_KEEP_MS - 1;
+    await built.overview("UTC");
+    expect(keys).toHaveLength(2);
+    app.now.value += 1;
     await built.overview("UTC");
     expect(keys).toHaveLength(3);
     built.close();
