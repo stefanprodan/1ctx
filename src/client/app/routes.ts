@@ -135,7 +135,7 @@ const configAgentPage = async (name: string) => {
 };
 const configAgentRoutes = (["", "/skills", "/mcp"] as const).map(
   (tab): Route => ({
-    path: `/config/agents/:name${tab}`,
+    path: `/admin/config/agents/:name${tab}`,
     view: configAgentView,
     title: (params) => `@${params.name}`,
     role: "admin",
@@ -156,7 +156,7 @@ const configSkillView = lazy<{ params: Params }>(() =>
 );
 const configSkillRoutes = (["", "/files"] as const).map(
   (tab): Route => ({
-    path: `/config/skills/:name${tab}`,
+    path: `/admin/config/skills/:name${tab}`,
     view: configSkillView,
     title: (params) => (tab === "" ? params.name : `${params.name} files`),
     role: "admin",
@@ -170,7 +170,7 @@ const configSkillRoutes = (["", "/files"] as const).map(
 
 const configMcpRoutes = (["", "/tools"] as const).map(
   (tab): Route => ({
-    path: `/config/mcp/:name${tab}`,
+    path: `/admin/config/mcp/:name${tab}`,
     view: configMcpView,
     title: (params) => (tab === "" ? params.name : `${params.name} tools`),
     role: "admin",
@@ -434,7 +434,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/monitor",
+    path: "/admin/monitor",
     view: lazy(() =>
       import("../views/admin/Overview.tsx").then((m) => m.Overview),
     ),
@@ -445,14 +445,14 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/monitor/usage",
+    path: "/admin/monitor/usage",
     view: lazy(() => import("../views/admin/Usage.tsx").then((m) => m.Usage)),
     title: () => "Usage",
     role: "admin",
     load: (_params, q) => loadUsage(q.get("month")),
   },
   {
-    path: "/monitor/storage",
+    path: "/admin/monitor/storage",
     view: lazy(() =>
       import("../views/admin/Storage.tsx").then((m) => m.Storage),
     ),
@@ -461,7 +461,7 @@ export const ROUTES: Route[] = [
     load: () => loadStorage(),
   },
   {
-    path: "/access",
+    path: "/admin/access",
     // a board that lists the zone's pages, until the zone's is designed
     view: lazy(() =>
       import("../views/admin/ZoneBoard.tsx").then((m) => m.AccessBoard),
@@ -470,14 +470,14 @@ export const ROUTES: Route[] = [
     role: "admin",
   },
   {
-    path: "/access/users",
+    path: "/admin/access/users",
     view: lazy(() => import("../views/admin/Users.tsx").then((m) => m.Users)),
     title: () => "Users",
     role: "admin",
     load: () => loadUsers(),
   },
   {
-    path: "/access/projects",
+    path: "/admin/access/projects",
     view: lazy(() =>
       import("../views/admin/AdminProjects.tsx").then((m) => m.AdminProjects),
     ),
@@ -494,7 +494,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config",
+    path: "/admin/config",
     view: lazy(() =>
       import("../views/admin/ZoneBoard.tsx").then((m) => m.ConfigBoard),
     ),
@@ -502,7 +502,7 @@ export const ROUTES: Route[] = [
     role: "admin",
   },
   {
-    path: "/config/providers",
+    path: "/admin/config/providers",
     view: lazy(() =>
       import("../views/admin/Providers.tsx").then((m) => m.Providers),
     ),
@@ -516,7 +516,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/providers/:name",
+    path: "/admin/config/providers/:name",
     view: lazy(() =>
       import("../views/admin/ProviderPage.tsx").then((m) => m.ProviderPage),
     ),
@@ -531,13 +531,13 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/agents",
+    path: "/admin/config/agents",
     view: lazy(() =>
       import("../views/admin/AgentList.tsx").then((m) => m.AgentList),
     ),
     title: (_params) => "Agents",
     role: "admin",
-    // New agent is the list's `?new`, since /config/agents/new would be
+    // New agent is the list's `?new`, since /admin/config/agents/new would be
     // an agent's page; the rows' failing lines read the skills and servers
     load: async () => {
       await Promise.all([
@@ -551,7 +551,7 @@ export const ROUTES: Route[] = [
   },
   ...configAgentRoutes,
   {
-    path: "/config/deciders",
+    path: "/admin/config/deciders",
     view: lazy(() =>
       import("../views/admin/DeciderLists.tsx").then((m) => m.DeciderList),
     ),
@@ -569,7 +569,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/deciders/:name",
+    path: "/admin/config/deciders/:name",
     view: lazy(() =>
       import("../views/admin/DeciderPage.tsx").then((m) => m.DeciderPage),
     ),
@@ -584,7 +584,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/decisions",
+    path: "/admin/config/decisions",
     view: lazy(() =>
       import("../views/admin/DeciderLists.tsx").then((m) => m.DecisionList),
     ),
@@ -595,7 +595,7 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/decisions/:id",
+    path: "/admin/config/decisions/:id",
     view: lazy(() =>
       import("../views/admin/DecisionPage.tsx").then((m) => m.DecisionPage),
     ),
@@ -612,14 +612,14 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/tools",
+    path: "/admin/config/tools",
     view: toolsView,
     title: () => "Tools",
     role: "admin",
     load: () => loadTools(),
   },
   {
-    path: "/config/tools/web",
+    path: "/admin/config/tools/web",
     view: toolsView,
     title: () => "Web tools",
     role: "admin",
@@ -628,21 +628,21 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/config/tools/visuals",
+    path: "/admin/config/tools/visuals",
     view: toolsView,
     title: () => "Visuals",
     role: "admin",
     load: () => loadTools(),
   },
   {
-    path: "/config/tools/limits",
+    path: "/admin/config/tools/limits",
     view: toolsView,
     title: () => "Limits",
     role: "admin",
     load: () => loadTools(),
   },
   {
-    path: "/config/skills",
+    path: "/admin/config/skills",
     view: lazy(() =>
       import("../views/admin/SkillList.tsx").then((m) => m.SkillList),
     ),
@@ -656,7 +656,7 @@ export const ROUTES: Route[] = [
   },
   ...configSkillRoutes,
   {
-    path: "/config/mcp",
+    path: "/admin/config/mcp",
     view: lazy(() =>
       import("../views/admin/McpList.tsx").then((m) => m.McpList),
     ),

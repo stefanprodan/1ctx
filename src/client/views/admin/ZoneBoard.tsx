@@ -8,8 +8,8 @@ import { ZONES } from "../../app/zones.ts";
 import { Page } from "../../ui/Page.tsx";
 import { Rows, RowsCard, RowsGo, RowsTitle } from "../../ui/Rows.tsx";
 
-export const AccessBoard = () => <ZoneBoard href="/access" />;
-export const ConfigBoard = () => <ZoneBoard href="/config" />;
+export const AccessBoard = () => <ZoneBoard href="/admin/access" />;
+export const ConfigBoard = () => <ZoneBoard href="/admin/config" />;
 
 function ZoneBoard({ href }: { href: string }) {
   const zone = ZONES.find((z) => z.href === href)!;

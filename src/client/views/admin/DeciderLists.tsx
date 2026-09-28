@@ -52,16 +52,18 @@ function ListTabs({ on }: { on: "deciders" | "decisions" }) {
       tabs={[
         {
           label: "Deciders",
-          href: "/config/deciders",
+          href: "/admin/config/deciders",
           count: deciders.value?.length,
         },
         {
           label: "Decisions",
-          href: "/config/decisions",
+          href: "/admin/config/decisions",
           count: decisions.value?.length,
         },
       ]}
-      active={on === "deciders" ? "/config/deciders" : "/config/decisions"}
+      active={
+        on === "deciders" ? "/admin/config/deciders" : "/admin/config/decisions"
+      }
     />
   );
 }
@@ -74,7 +76,7 @@ function Aside() {
     <AsideSection
       label="Last 30 days"
       action={
-        <a class="split-link" href="/monitor">
+        <a class="split-link" href="/admin/monitor">
           Usage
         </a>
       }
@@ -149,7 +151,10 @@ function Deciders() {
                 // in the card's head, so both tabs' page heads match and
                 // a tab switch moves nothing
                 canAdd && (
-                  <a class="btn btn-small rows-add" href="/config/deciders?new">
+                  <a
+                    class="btn btn-small rows-add"
+                    href="/admin/config/deciders?new"
+                  >
                     <Icon name="plus" size={14} />
                     New decider
                   </a>

@@ -27,8 +27,8 @@ import "./agent-page.css";
 import "./agent-new.css";
 
 const STEPS = [
-  { label: "Config", href: "/config" },
-  { label: "Agents", href: "/config/agents" },
+  { label: "Config", href: "/admin/config" },
+  { label: "Agents", href: "/admin/config/agents" },
 ];
 
 export function NewAgent() {
@@ -45,7 +45,7 @@ export function NewAgent() {
         (rows.length === 0 ? (
           <p class="page-state">
             An agent runs on a provider's model.{" "}
-            <a href="/config/providers">Add a provider</a> first.
+            <a href="/admin/config/providers">Add a provider</a> first.
           </p>
         ) : (
           <Form
@@ -95,7 +95,7 @@ function Form({ providerId }: { providerId: string }) {
   const back =
     from !== null && providers.value?.some((p) => p.name === from)
       ? configProviderHref(from)
-      : "/config/agents";
+      : "/admin/config/agents";
   const taken = nameTaken(name, agents.value, "");
   return (
     <form

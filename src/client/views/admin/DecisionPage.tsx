@@ -50,7 +50,7 @@ import "./decider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Decisions", href: "/config/decisions" },
+  { label: "Decisions", href: "/admin/config/decisions" },
 ];
 
 const SWITCH = [
@@ -419,7 +419,7 @@ function Aside({ decision }: { decision: DecisionSummary }) {
     <AsideSection
       label="Last 30 days"
       action={
-        <a class="split-link" href="/monitor">
+        <a class="split-link" href="/admin/monitor">
           Usage
         </a>
       }

@@ -402,11 +402,11 @@ describe("the list", () => {
     keys.value = ["mcp-github"];
     agents.value = [agent("sre", false)];
     const html = render(<McpList />);
-    expect(html).toContain('href="/config/mcp/flux"');
+    expect(html).toContain('href="/admin/config/mcp/flux"');
     expect(html).toContain(flux.url);
     expect(html).toContain("1 agent");
     expect(html).toContain("2 read · write off");
-    expect(html).toContain('href="/config/mcp?new"');
+    expect(html).toContain('href="/admin/config/mcp?new"');
     expect(html).toContain("mcp-github.key");
     expect(html).toContain("unused");
   });
@@ -430,20 +430,20 @@ describe("the list", () => {
 
 describe("a server's page", () => {
   test.serial("the tab is the step after the name", () => {
-    expect(mcpTabOf("/config/mcp/flux")).toBe("general");
-    expect(mcpTabOf("/config/mcp/flux/tools")).toBe("tools");
-    expect(mcpTabOf("/config/mcp/tools")).toBe("general");
+    expect(mcpTabOf("/admin/config/mcp/flux")).toBe("general");
+    expect(mcpTabOf("/admin/config/mcp/flux/tools")).toBe("tools");
+    expect(mcpTabOf("/admin/config/mcp/tools")).toBe("general");
   });
 
   test.serial("General: the facts, the endpoint, the agents on it", () => {
     servers.value = [flux];
     agents.value = [agent("sre", true)];
-    path.value = "/config/mcp/flux";
+    path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain("flux-operator-mcp 1.0.0");
     expect(html).toContain("2026-07-28");
     expect(html).toContain(`value="${flux.url}"`);
-    expect(html).toContain('href="/config/agents/sre/mcp"');
+    expect(html).toContain('href="/admin/config/agents/sre/mcp"');
     expect(html).toContain("Read and write");
     expect(html).toContain("1 agent uses it. Remove it from that agent first.");
     // the server refuses a server an agent uses, so Delete waits
@@ -454,7 +454,7 @@ describe("a server's page", () => {
   test.serial("waits for the agents, so Delete never opens early", () => {
     servers.value = [flux];
     agents.value = null;
-    path.value = "/config/mcp/flux";
+    path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain("Loading");
     expect(html).not.toContain("Delete flux");
@@ -470,7 +470,7 @@ describe("a server's page", () => {
       }),
     ];
     agents.value = [];
-    path.value = "/config/mcp/flux";
+    path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain("Discovery failed. Last refresh 1m ago.");
     expect(html).toContain("The server sent no instructions.");
@@ -488,7 +488,7 @@ describe("a server's page", () => {
       }),
     ];
     agents.value = [];
-    path.value = "/config/mcp/flux";
+    path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toMatch(/fold-more">[^<]*<button[^>]*>Show all \d+ lines</);
   });
@@ -498,7 +498,7 @@ describe("a server's page", () => {
     () => {
       servers.value = [server({ readPatterns: ["get_*", "trace_*", "gte_*"] })];
       agents.value = [];
-      path.value = "/config/mcp/flux/tools";
+      path.value = "/admin/config/mcp/flux/tools";
       const html = render(<McpPage params={{ name: "flux" }} />);
       // get_* decides one tool, a typo matches none and is marked
       expect(html).toMatch(
@@ -520,7 +520,7 @@ describe("a server's page", () => {
     () => {
       servers.value = [flux];
       agents.value = [];
-      path.value = "/config/mcp/flux";
+      path.value = "/admin/config/mcp/flux";
       serverUsage.value = null;
       const page = () => render(<McpPage params={{ name: "flux" }} />);
       expect(page()).toContain("Loading");

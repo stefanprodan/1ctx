@@ -91,7 +91,7 @@ export function DeleteCard({ server }: { server: McpServerSummary }) {
                 void save.act("delete", async () => {
                   const from = address();
                   await deleteServer(server.id);
-                  if (address() === from) navigate("/config/mcp");
+                  if (address() === from) navigate("/admin/config/mcp");
                 });
               }}
             />

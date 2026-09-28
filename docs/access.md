@@ -21,7 +21,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   counts each as one action.
 - **Every user has an email, a zone and flags.** The email is unique and
   lowercased; an admin sets it with the username and the role on
-  `/access/users` (the routes in `access/users.ts`, since a reset needs
+  `/admin/access/users` (the routes in `access/users.ts`, since a reset needs
   the login store), and the profile shows it. The admin create API also
   accepts `about`, `disabled` and `mustChangePassword`, defaulting to
   empty, false and true; its PATCH accepts `about` but never a password

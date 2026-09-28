@@ -21,37 +21,37 @@ export type Zone = {
 export const ZONES: Zone[] = [
   {
     label: "Monitor",
-    href: "/monitor",
+    href: "/admin/monitor",
     icon: "visual",
     pages: [
-      { label: "Usage", href: "/monitor/usage" },
-      { label: "Storage", href: "/monitor/storage" },
+      { label: "Usage", href: "/admin/monitor/usage" },
+      { label: "Storage", href: "/admin/monitor/storage" },
     ],
   },
   {
     label: "Access",
-    href: "/access",
+    href: "/admin/access",
     icon: "users",
     pages: [
-      { label: "Users", href: "/access/users" },
-      { label: "Projects", href: "/access/projects" },
+      { label: "Users", href: "/admin/access/users" },
+      { label: "Projects", href: "/admin/access/projects" },
     ],
   },
   {
     label: "Config",
-    href: "/config",
+    href: "/admin/config",
     icon: "config",
     pages: [
-      { label: "Providers", href: "/config/providers" },
-      { label: "Agents", href: "/config/agents" },
+      { label: "Providers", href: "/admin/config/providers" },
+      { label: "Agents", href: "/admin/config/agents" },
       {
         label: "Deciders",
-        href: "/config/deciders",
-        also: ["/config/decisions"],
+        href: "/admin/config/deciders",
+        also: ["/admin/config/decisions"],
       },
-      { label: "MCP Servers", href: "/config/mcp" },
-      { label: "Skills", href: "/config/skills" },
-      { label: "Tools", href: "/config/tools" },
+      { label: "MCP Servers", href: "/admin/config/mcp" },
+      { label: "Skills", href: "/admin/config/skills" },
+      { label: "Tools", href: "/admin/config/tools" },
     ],
   },
 ];

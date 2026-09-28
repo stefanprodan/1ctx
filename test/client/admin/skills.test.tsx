@@ -458,14 +458,14 @@ describe("the list", () => {
     agents.value = [agent("sre", ["s1"])];
     allSkillUsage.value = null;
     const html = render(<SkillList />);
-    expect(html).toContain('href="/config/skills/gitops-knowledge"');
+    expect(html).toContain('href="/admin/config/skills/gitops-knowledge"');
     expect(html).toContain("Flux CD and Flux Operator expert.");
     expect(html).not.toContain("Use for Flux questions.");
     // SKILL.md counted with the files
     expect(html).toContain("3 files");
     expect(html).toContain("No agents");
     expect(html).toContain("1 agent");
-    expect(html).toContain('href="/config/skills?new"');
+    expect(html).toContain('href="/admin/config/skills?new"');
     expect(html).toContain("Loading");
   });
 
@@ -505,7 +505,7 @@ describe("the list", () => {
     expect(html).toContain("Most loaded");
     // a deleted skill is named but not linked, one never loaded is left out
     expect(html).toContain("gone");
-    expect(html).not.toContain('href="/config/skills/gone"');
+    expect(html).not.toContain('href="/admin/config/skills/gone"');
     expect(html).not.toContain("read-only");
     allSkillUsage.value = { usage: null };
     expect(render(<SkillList />)).toContain("Did not load.");
@@ -521,7 +521,7 @@ describe("Add skill", () => {
       "a GitHub directory, a raw SKILL.md, or a zip or tar archive",
     );
     expect(html).toContain("Add skill");
-    expect(html).toContain('href="/config/skills"');
+    expect(html).toContain('href="/admin/config/skills"');
     expect(html).not.toContain('name="path"');
     // the submit sits in the form
     expect(html).toMatch(/<form[^>]*>[\s\S]*type="submit"[\s\S]*<\/form>/);
@@ -530,9 +530,9 @@ describe("Add skill", () => {
 
 describe("a skill's page", () => {
   test.serial("the tab is the step after the name", () => {
-    expect(skillTabOf("/config/skills/timoni")).toBe("general");
-    expect(skillTabOf("/config/skills/timoni/files")).toBe("files");
-    expect(skillTabOf("/config/skills/files")).toBe("general");
+    expect(skillTabOf("/admin/config/skills/timoni")).toBe("general");
+    expect(skillTabOf("/admin/config/skills/timoni/files")).toBe("files");
+    expect(skillTabOf("/admin/config/skills/files")).toBe("general");
   });
 
   test.serial(
@@ -540,19 +540,19 @@ describe("a skill's page", () => {
     () => {
       skills.value = [gitops, timoni];
       agents.value = [agent("sre", ["s1"])];
-      path.value = "/config/skills/timoni";
+      path.value = "/admin/config/skills/timoni";
       const html = render(<SkillPage params={{ name: "timoni" }} />);
       expect(html).toContain("Apache-2.0");
       expect(html).toContain("author: stefanprodan\nversion: 1.0");
       expect(html).toContain("timoni.sh, digest checked");
       expect(html).toContain("0123456789ab · Same as");
-      expect(html).toContain('href="/config/agents/sre/skills"');
+      expect(html).toContain('href="/admin/config/agents/sre/skills"');
       expect(html).toContain(
         "1 agent carries it. Remove it from that agent first.",
       );
       // the server refuses a skill an agent carries, so Delete waits
       expect(html).toMatch(/<button[^>]*disabled[^>]*>Delete</);
-      expect(html).toContain('href="/config/skills/timoni/files"');
+      expect(html).toContain('href="/admin/config/skills/timoni/files"');
     },
   );
 
@@ -566,7 +566,7 @@ describe("a skill's page", () => {
       },
     ];
     agents.value = [];
-    path.value = "/config/skills/timoni";
+    path.value = "/admin/config/skills/timoni";
     const html = render(<SkillPage params={{ name: "timoni" }} />);
     expect(html).toContain(
       "The host timoni.sh answered 502. Last refresh 1m ago.",
@@ -582,7 +582,7 @@ describe("a skill's page", () => {
     bodies.value = {
       s2: Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n"),
     };
-    path.value = "/config/skills/gitops-knowledge/files";
+    path.value = "/admin/config/skills/gitops-knowledge/files";
     const html = render(<SkillPage params={{ name: "gitops-knowledge" }} />);
     expect(html).toContain("SKILL.md");
     expect(html).toMatch(/Show all \d+ lines/);
@@ -594,7 +594,7 @@ describe("a skill's page", () => {
   test.serial("the aside has its last 30 days and its most read files", () => {
     skills.value = [gitops];
     agents.value = [];
-    path.value = "/config/skills/gitops-knowledge";
+    path.value = "/admin/config/skills/gitops-knowledge";
     skillUsage.value = null;
     const page = () =>
       render(<SkillPage params={{ name: "gitops-knowledge" }} />);
@@ -622,7 +622,7 @@ describe("a skill's page", () => {
   test.serial("waits for the agents, so Delete never opens early", () => {
     skills.value = [timoni];
     agents.value = null;
-    path.value = "/config/skills/timoni";
+    path.value = "/admin/config/skills/timoni";
     const html = render(<SkillPage params={{ name: "timoni" }} />);
     expect(html).toContain("Loading");
     expect(html).not.toContain("Delete timoni");

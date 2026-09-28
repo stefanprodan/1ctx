@@ -280,13 +280,13 @@ describe("the pages", () => {
     expect(html).not.toContain("rows-item-off");
     expect(html).toContain('aria-label="Decisions"');
     expect(html).toContain('placeholder="Search decisions"');
-    expect(html).toContain('href="/config/decisions/run-attention"');
+    expect(html).toContain('href="/admin/config/decisions/run-attention"');
     expect(html).toContain("Mark task runs that need attention");
     expect(html).toContain(DECISION_WORDS["run-attention"].sub);
     expect(html).toContain(">on · small · custom");
     expect(html).toContain('<span class="rows-meta-short">on · small</span>');
     // the tabs lead to both lists, each counted
-    expect(html).toContain('href="/config/deciders"');
+    expect(html).toContain('href="/admin/config/deciders"');
     expect(html).toMatch(/aria-current="page"[^>]*>Decisions/);
   });
 

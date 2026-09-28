@@ -122,8 +122,8 @@ export function AgentSkills({
           <RowsNote>The skills did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No skills yet. <a href="/config/skills?new">Add one</a> and it shows
-            here.
+            No skills yet. <a href="/admin/config/skills?new">Add one</a> and it
+            shows here.
           </RowsNote>
         ) : !takesTools ? (
           <RowsNote>This model takes no tools.</RowsNote>

@@ -32,7 +32,7 @@ import "./decider-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "Deciders", href: "/config/deciders" },
+  { label: "Deciders", href: "/admin/config/deciders" },
 ];
 
 export function NewDecider() {
@@ -50,7 +50,7 @@ export function NewDecider() {
         (offered.length === 0 ? (
           <p class="page-state">
             A decider runs on an OpenRouter or OpenAI-compatible provider.{" "}
-            <a href="/config/providers?new">Add a provider</a> first.
+            <a href="/admin/config/providers?new">Add a provider</a> first.
           </p>
         ) : (
           <Form
@@ -128,7 +128,7 @@ function Form({ providerId }: { providerId: string }) {
               </SettingHint>
             }
             before={
-              <a class="btn" href="/config/deciders">
+              <a class="btn" href="/admin/config/deciders">
                 Cancel
               </a>
             }

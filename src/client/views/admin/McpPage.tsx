@@ -37,12 +37,12 @@ import "./mcp-page.css";
 
 const STEPS = [
   zoneStep("Config"),
-  { label: "MCP Servers", href: "/config/mcp" },
+  { label: "MCP Servers", href: "/admin/config/mcp" },
 ];
 
 // the step after the name, so a server named tools opens on General
 export function mcpTabOf(pathname: string): McpTab {
-  return pathname.split("/")[4] === "tools" ? "tools" : "general";
+  return pathname.split("/")[5] === "tools" ? "tools" : "general";
 }
 
 // the most called tools the aside names

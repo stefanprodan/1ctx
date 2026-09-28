@@ -33,8 +33,8 @@ import { money } from "./Overview.model.ts";
 import "./agent-page.css";
 
 const STEPS = [
-  { label: "Config", href: "/config" },
-  { label: "Agents", href: "/config/agents" },
+  { label: "Config", href: "/admin/config" },
+  { label: "Agents", href: "/admin/config/agents" },
 ];
 
 const TABS: { tab: AgentTab; label: string }[] = [
@@ -45,7 +45,7 @@ const TABS: { tab: AgentTab; label: string }[] = [
 
 // the step after the name, so an agent named mcp opens on General
 export function tabOf(pathname: string): AgentTab {
-  const tab = pathname.split("/")[4];
+  const tab = pathname.split("/")[5];
   return tab === "skills" || tab === "mcp" ? tab : "general";
 }
 
@@ -195,7 +195,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
       <AsideSection
         label="Last 30 days"
         action={
-          <a class="split-link" href="/monitor">
+          <a class="split-link" href="/admin/monitor">
             Usage
           </a>
         }

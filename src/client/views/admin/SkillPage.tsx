@@ -26,11 +26,14 @@ import { SkillFiles } from "./SkillFiles.tsx";
 import { SkillGeneral } from "./SkillGeneral.tsx";
 import "./skill-page.css";
 
-const STEPS = [zoneStep("Config"), { label: "Skills", href: "/config/skills" }];
+const STEPS = [
+  zoneStep("Config"),
+  { label: "Skills", href: "/admin/config/skills" },
+];
 
 // the step after the name, so a skill named files opens on General
 export function skillTabOf(pathname: string): SkillTab {
-  return pathname.split("/")[4] === "files" ? "files" : "general";
+  return pathname.split("/")[5] === "files" ? "files" : "general";
 }
 
 // the most read files the aside names

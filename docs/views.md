@@ -239,7 +239,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   binary), exact only for OpenAI models; a skill
   body's count is kept per skill until its digest moves. For an admin
   the agent's Settings aside has Manage, which opens
-  `/config/agents/:name`.
+  `/admin/config/agents/:name`.
 - **The profile.** The profile's aside is the account (email, role, joined),
   its head the name and the handle, and the email where the aside is
   hidden.
@@ -257,7 +257,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
-  `/access/projects?open=<id>` and `/config/agents`.
+  `/admin/access/projects?open=<id>` and `/admin/config/agents`.
   The aside under every tab (`Frame.tsx`) is About, the Activity weeks
   (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
@@ -419,9 +419,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has four tabs,** one view over `/config/tools`
-  (Built-in), `/config/tools/web`, `/config/tools/visuals` and
-  `/config/tools/limits`: Built-in lists every built-in schema, including
+- **The Tools page has four tabs,** one view over `/admin/config/tools`
+  (Built-in), `/admin/config/tools/web`, `/admin/config/tools/visuals` and
+  `/admin/config/tools/limits`: Built-in lists every built-in schema, including
   `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
   each row `RowsTitle` (the name over the first sentence) with its
   tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
@@ -460,7 +460,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   saving the full set with the other scopes' saved values. A save or a
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
-- **Config › MCP Servers.** `/config/mcp` (`McpList.tsx`) is one
+- **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one
   card of links by name, the name over the URL, or over the failed
   refresh in red, the agents that use it over `sidesLine()` at the
   right ("25 read · write off", a side the server has off saying so);
@@ -470,7 +470,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   The aside is every server's calls over the last 30 days (`GET
   /api/mcp/usage`), the most called five, and the `mcp-` key files
   with the server that reads each.
-  A server's page, `/config/mcp/:name` and `/tools`, is one view
+  A server's page, `/admin/config/mcp/:name` and `/tools`, is one view
   (`McpPage.tsx`, drafts in `McpPage.state.ts`), the crumb's own step
   the switcher, a failed refresh over the tabs. General
   (`McpGeneral.tsx`, `McpUsedBy.tsx`) is About (what the server says
@@ -502,7 +502,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   keeps a saved tag the list lacks as a choice; the agent row says
   `via <tag>`. The New provider form fills OpenRouter's base URL,
   replaced on a preset change unless the admin typed another one.
-- **Config › Providers.** `/config/providers` (`Providers.tsx`) is one
+- **Config › Providers.** `/admin/config/providers` (`Providers.tsx`) is one
   card of providers by name (`byName()` in `lib/search.ts`), named by
   its search, which filters its rows. A provider row
   is a link: its service's mark, the name over the base URL, a missing
@@ -511,7 +511,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   30 days and the key files in the secrets directory by name, each
   linking to the provider that reads it or "unused" (`quiet` on
   `AsideLine`).
-  A provider's page, `/config/providers/:name` (`ProviderPage.tsx`),
+  A provider's page, `/admin/config/providers/:name` (`ProviderPage.tsx`),
   is never edited: the crumb's own step switches providers, then
   Connection (the type, the base URL, the key file, red when missing,
   and when it was added), Used by (the agents linked to their pages,
@@ -524,7 +524,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   New provider is the list's `?new` (`NewProvider.tsx`): the presets,
   the name, the key file and the base URL in one card, Create opening
   the new provider's page.
-- **Config › Agents.** `/config/agents` (`AgentList.tsx`) is a Split:
+- **Config › Agents.** `/admin/config/agents` (`AgentList.tsx`) is a Split:
   one card of links, one row per agent by name, the avatar, `@name`
   and "default", the model through `Fit` under it, when it last ran
   ("running", "ran 3d ago", "never ran", from `GET /api/agents`'s
@@ -540,7 +540,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `AgentDrafts`, the search open on the default agent's provider and
   no Cancel until a pick. Create sends no skills, no servers and no
   default mark and opens the agent's page, where they are set.
-- **An agent's page.** `/config/agents/:name`, `/skills` and `/mcp`
+- **An agent's page.** `/admin/config/agents/:name`, `/skills` and `/mcp`
   are one view (`AgentPage.tsx`), so the drafts in
   `AgentPage.state.ts` outlive a tab switch and go with a pick of
   another agent. The crumb's own step is the switcher, a `Finder` of
@@ -565,7 +565,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   /api/agents/:id/usage` and the `/impact` counts.
 - **Config › Deciders and Decisions.** Two lists at their own
   addresses under one pair of tabs (`DeciderLists.tsx`): the rail's
-  Deciders row stays lit on `/config/decisions` through the zone page's
+  Deciders row stays lit on `/admin/config/decisions` through the zone page's
   `also`. A decider row is a link, the name and "default" over the
   model, the provider over `deciderMeta()` at the right; New decider,
   in the card's head so both tabs' heads match, only while a
@@ -630,7 +630,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `views/admin/OpenParam.ts`. A pick of a few labelled options with a
   line of text each is `Choices` from `views/admin/Choices.tsx` over
   base's `.choice`.
-- **Config › Skills.** `/config/skills` (`SkillList.tsx`) is one card
+- **Config › Skills.** `/admin/config/skills` (`SkillList.tsx`) is one card
   of links by name, the name over the description's first sentence, or
   over the failed refresh in red, the agents that carry it (from the
   agents list, as the skill's page counts them) over its files
@@ -640,7 +640,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   entries each with its own Add; an add opens the skill's page. The
   aside is every skill's loads, file reads and failures over the last
   30 days (`GET /api/usage/skills`) and the five most loaded. A
-  skill's page, `/config/skills/:name` and `/files`, is one view
+  skill's page, `/admin/config/skills/:name` and `/files`, is one view
   (`SkillPage.tsx`) with nothing to draft, waiting for the agents as
   an MCP server's page does so Delete never opens early, the crumb's
   own step the switcher, a failed refresh over the tabs. General

@@ -17,40 +17,40 @@ export function agentHref(name: string): string {
 
 // a provider's page under Config
 export function configProviderHref(name: string): string {
-  return `/config/providers/${encodeURIComponent(name)}`;
+  return `/admin/config/providers/${encodeURIComponent(name)}`;
 }
 
 // New agent, opened on a provider's models
 export function newAgentHref(provider: string): string {
-  return `/config/agents?new&provider=${encodeURIComponent(provider)}`;
+  return `/admin/config/agents?new&provider=${encodeURIComponent(provider)}`;
 }
 
 // a decider's page, and a decision's, under Config
 export function configDeciderHref(name: string): string {
-  return `/config/deciders/${encodeURIComponent(name)}`;
+  return `/admin/config/deciders/${encodeURIComponent(name)}`;
 }
 export function configDecisionHref(id: string): string {
-  return `/config/decisions/${encodeURIComponent(id)}`;
+  return `/admin/config/decisions/${encodeURIComponent(id)}`;
 }
 
 // an MCP server's page under Config, on General or Tools
 export type McpTab = "general" | "tools";
 export function configMcpHref(name: string, tab: McpTab = "general") {
-  const base = `/config/mcp/${encodeURIComponent(name)}`;
+  const base = `/admin/config/mcp/${encodeURIComponent(name)}`;
   return tab === "general" ? base : `${base}/${tab}`;
 }
 
 // a skill's page under Config, on General or Files
 export type SkillTab = "general" | "files";
 export function configSkillHref(name: string, tab: SkillTab = "general") {
-  const base = `/config/skills/${encodeURIComponent(name)}`;
+  const base = `/admin/config/skills/${encodeURIComponent(name)}`;
   return tab === "general" ? base : `${base}/${tab}`;
 }
 
 // an agent's page under Config, on one of its tabs
 export type AgentTab = "general" | "skills" | "mcp";
 export function configAgentHref(name: string, tab: AgentTab = "general") {
-  const base = `/config/agents/${encodeURIComponent(name)}`;
+  const base = `/admin/config/agents/${encodeURIComponent(name)}`;
   return tab === "general" ? base : `${base}/${tab}`;
 }
 

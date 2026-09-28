@@ -58,7 +58,7 @@ function List() {
       title="Skills"
       split
       actions={
-        <a class="btn btn-small" href="/config/skills?new">
+        <a class="btn btn-small" href="/admin/config/skills?new">
           <Icon name="plus" size={14} />
           Add skill
         </a>

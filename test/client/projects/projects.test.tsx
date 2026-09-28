@@ -486,9 +486,9 @@ describe("the pages", () => {
       expect(html).toContain(">only you<");
       expect(html).toContain(">3 members<");
       // a member does not manage teams
-      expect(html).not.toContain('href="/access/projects"');
+      expect(html).not.toContain('href="/admin/access/projects"');
       me.value = { ...casey, role: "admin" };
-      expect(render(<Projects />)).toContain('href="/access/projects"');
+      expect(render(<Projects />)).toContain('href="/admin/access/projects"');
     },
   );
 
@@ -641,8 +641,8 @@ describe("the pages", () => {
       expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
       me.value = { ...casey, role: "admin" };
       const html = render(<Members params={{ id: "p1" }} />);
-      expect(html).toContain('href="/access/projects?open=p1">Manage<');
-      expect(html).toContain('href="/config/agents">Manage<');
+      expect(html).toContain('href="/admin/access/projects?open=p1">Manage<');
+      expect(html).toContain('href="/admin/config/agents">Manage<');
     },
   );
 

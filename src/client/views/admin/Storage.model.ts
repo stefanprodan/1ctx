@@ -212,7 +212,7 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
       sub: partWords(row, 2).join(" · "),
       href: personal
         ? null
-        : `/access/projects?open=${encodeURIComponent(row.id ?? "")}`,
+        : `/admin/access/projects?open=${encodeURIComponent(row.id ?? "")}`,
     };
   }
   if (kind === "chats") {
