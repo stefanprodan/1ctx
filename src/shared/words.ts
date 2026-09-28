@@ -339,8 +339,7 @@ export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
 // the stream's search box
 export const MAX_SEARCH = 100;
 
-// the tools that reach the web, each with a server-wide switch on the
-// tools page
+// the tools that reach the web, each set on its own admin page
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
 export type WebTool = (typeof WEB_TOOLS)[number];
 export function isWebTool(value: unknown): value is WebTool {
@@ -476,8 +475,8 @@ export function isSkillSource(value: unknown): value is SkillSource {
   return SKILL_SOURCES.includes(value as SkillSource);
 }
 
-// the two tools an agent's skills bring to a send, never on the Tools
-// page: `skill` loads a body, `skill_file` reads one of its files
+// the two tools an agent's skills bring to a send, never switched on
+// their own: `skill` loads a body, `skill_file` reads one of its files
 export const SKILL_TOOLS = ["skill", "skill_file"] as const;
 export type SkillTool = (typeof SKILL_TOOLS)[number];
 export function isSkillTool(value: unknown): value is SkillTool {

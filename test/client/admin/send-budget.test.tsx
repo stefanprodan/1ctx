@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
 import { limits, tools, toolsError } from "../../../src/client/data/tools.ts";
+import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
 import {
   defaultLine,
   displayOf,
@@ -12,7 +13,6 @@ import {
   limitFieldOf,
   problem,
 } from "../../../src/client/views/admin/Tools.model.ts";
-import { Tools } from "../../../src/client/views/admin/Tools.tsx";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 
 const tokenLimit: LimitRow = {
@@ -61,7 +61,7 @@ describe("send budget fields", () => {
     }
   });
 
-  test.serial("the Limits tab puts each labelled row in its own form", () => {
+  test.serial("the Turns card holds both limits", () => {
     const previous = {
       path: path.value,
       limits: limits.value,
@@ -69,7 +69,7 @@ describe("send budget fields", () => {
       error: toolsError.value,
     };
     try {
-      path.value = "/admin/config/tools/limits";
+      path.value = "/admin/config/limits";
       limits.value = rows;
       tools.value = {
         builtin: [],
@@ -90,21 +90,18 @@ describe("send budget fields", () => {
         },
       };
       toolsError.value = null;
-      const html = render(<Tools />);
+      const html = render(<ConfigBoard />);
       const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
-      expect(forms).toHaveLength(5);
-      const send = forms[0]!;
-      const call = forms[1]!;
-      expect(send).toContain("Tool-work tokens");
-      expect(send).toContain('name="toolWorkTokens"');
-      expect(send).toContain('value="750000"');
-      expect(send).toContain("default 500000 tokens");
-      expect(send).not.toContain('name="maxBashCalls"');
-      expect(call).toContain("Bash calls per turn");
-      expect(call).toContain('name="maxBashCalls"');
-      expect(call).toContain('value="200"');
-      expect(call).toContain("default 100");
-      expect(call).not.toContain('name="toolWorkTokens"');
+      const turns = forms[0]!;
+      expect(turns).toContain(">Turns<");
+      expect(turns).toContain('name="toolWorkTokens"');
+      expect(turns).toContain('value="750000"');
+      expect(turns).toContain("default 500000 tokens");
+      expect(turns).toContain("Bash calls per turn");
+      expect(turns).toContain('name="maxBashCalls"');
+      expect(turns).toContain('value="200"');
+      expect(turns).toContain("default 100");
+      expect(forms[1]).not.toContain('name="maxBashCalls"');
     } finally {
       path.value = previous.path;
       limits.value = previous.limits;

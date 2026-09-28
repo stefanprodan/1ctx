@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The built-ins as the tools page lists them. Each schema comes from the
+// The built-ins as the Config board lists them. Each schema comes from the
 // factory a send uses, called with sample inputs, so the page never
 // restates a schema. A schema that lists skill or MCP tool names is shown
 // with none, since the names are the send's; memory_edit is the chat's,

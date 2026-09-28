@@ -45,7 +45,7 @@ export type ToolWhen =
   | "web"
   | "webSearch";
 
-// a tool as the tools page shows it: the schema the model gets, with
+// a tool as the admin pages show it: the schema the model gets, with
 // the year already filled, and its tokens as the wire carries it. The
 // text is read-only: the built-ins' words are the code's.
 type ToolSchema = {

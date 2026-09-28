@@ -3,7 +3,7 @@
 //
 // The limits area: the defaults with an admin's overrides on top.
 // current() is read once when a send starts and copied onto its policy,
-// so a change on the Tools page reaches the next send and never one in
+// so a change on an admin page reaches the next send and never one in
 // flight; the run caps are read at each admission. A value saved equal
 // to its default drops the override rather than store it, so the rows
 // are exactly what an admin changed.

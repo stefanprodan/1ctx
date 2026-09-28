@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tools page's model: the unit each limit is typed in and the
+// The tools and limits model: the unit each limit is typed in and the
 // conversion both ways, the range check in the page's words, the
 // draft and what a Save collects, the search lines; the entity that
 // loads both routes and replaces what it holds on a write; and the
-// page rendered over the rows.
+// Config board rendered over the rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -21,6 +21,16 @@ import {
   toolsError,
 } from "../../../src/client/data/tools.ts";
 import { firstSentence } from "../../../src/client/lib/format.ts";
+import {
+  builtinsOf,
+  CONFIG_TABS,
+  configTab,
+  instanceLines,
+  LIMITS_CARDS,
+  offered,
+  STORAGE_CARDS,
+} from "../../../src/client/views/admin/Config.model.ts";
+import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
   collect,
@@ -35,17 +45,16 @@ import {
   read,
   seedOf,
   show,
-  TOOLS_TABS,
-  toolsTab,
   totalTokens,
   WHEN_WORDS,
 } from "../../../src/client/views/admin/Tools.model.ts";
-import { Tools } from "../../../src/client/views/admin/Tools.tsx";
+import { VISUAL_LIMITS } from "../../../src/client/views/admin/Visuals.model.ts";
 import {
   domainsFieldOf,
   domainsOf,
   keyLine,
   searchLine,
+  WEB_LIMITS,
 } from "../../../src/client/views/admin/WebAccess.model.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
@@ -422,17 +431,56 @@ describe("the tools entity", () => {
   });
 });
 
-describe("the page", () => {
-  test.serial("the tab is the address, and Tools stays lit on it", () => {
-    expect(toolsTab("/admin/config/tools")).toBe("builtin");
-    expect(toolsTab("/admin/config/tools/limits")).toBe("limits");
-    expect(TOOLS_TABS.map((t) => t.label)).toEqual(["Built-in", "Limits"]);
-    expect(onPage("/admin/config/tools/limits", "/admin/config/tools")).toBe(
-      true,
-    );
-    expect(onPage("/admin/config/tools", "/admin/config/tools")).toBe(true);
-    expect(onPage("/admin/config/toolsx", "/admin/config/tools")).toBe(false);
+describe("the Config board", () => {
+  test("the tab is the address", () => {
+    expect(configTab("/admin/config")).toBe("overview");
+    expect(configTab("/admin/config/limits")).toBe("limits");
+    expect(configTab("/admin/config/storage")).toBe("storage");
+    expect(CONFIG_TABS.map((t) => t.label)).toEqual([
+      "Overview",
+      "Limits",
+      "Storage",
+    ]);
+    expect(onPage("/admin/config/limits", "/admin/config")).toBe(true);
     expect(WHEN_WORDS.always).not.toBe("");
+  });
+
+  test("every limit is on one card of one page", () => {
+    const placed = [
+      ...LIMITS_CARDS.flatMap((c) => c.names),
+      ...STORAGE_CARDS.flatMap((c) => c.names),
+      ...WEB_LIMITS,
+      ...VISUAL_LIMITS,
+    ];
+    expect([...placed].sort()).toEqual([...LIMIT_NAMES].sort());
+    expect(LIMITS_CARDS.map((c) => c.title)).toEqual(["Turns", "Automations"]);
+    expect(STORAGE_CARDS.map((c) => c.title)).toEqual([
+      "Knowledge",
+      "Scratch",
+      "Chats",
+      "MCP results",
+    ]);
+  });
+
+  test("a tool is off while no turn is offered it", () => {
+    const state = body();
+    expect(builtinsOf(state).map((t) => t.name)).toEqual([
+      "datetime",
+      "visualize",
+    ]);
+    expect(offered(time, state)).toBe(true);
+    const webfetch = { ...time, name: "webfetch" as const };
+    const websearch = { ...time, name: "websearch" as const };
+    expect(offered(webfetch, state)).toBe(true);
+    expect(offered(websearch, state)).toBe(true);
+    const off = body(fetchTool, { ...access, mode: "off" });
+    expect(offered(webfetch, off)).toBe(false);
+    expect(offered(websearch, off)).toBe(false);
+    expect(
+      offered(websearch, { ...state, search: { ...search, provider: null } }),
+    ).toBe(false);
+    const hidden = body({ ...fetchTool, enabled: false });
+    expect(offered(hidden.visualize, hidden)).toBe(false);
   });
 
   test("an open row names the description and counts the schema's lines", () => {
@@ -467,64 +515,101 @@ describe("the page", () => {
     );
   });
 
-  test.serial("Built-in renders the rows with tokens and no switch", () => {
-    tools.value = body();
+  test("the aside counts what is loaded and says what turns get", () => {
+    const lines = instanceLines(body(), {
+      providers: [1, 2],
+      agents: [1],
+      deciders: [],
+      servers: null,
+      skills: [1, 2, 3],
+      credentials: [1],
+    });
+    expect(lines.map((l) => [l.label, l.value, l.quiet])).toEqual([
+      ["Providers", "2", false],
+      ["Agents", "1", false],
+      ["Deciders", "0", true],
+      ["Skills", "3", false],
+      ["Visuals", "On", false],
+      ["Web access", "All domains", false],
+      ["Search", "exa", false],
+      ["Credentials", "1", false],
+    ]);
+    expect(lines.find((l) => l.label === "Credentials")?.href).toBe(
+      "/admin/config/web/credentials",
+    );
+    const off = instanceLines(
+      {
+        ...body({ ...fetchTool, enabled: false }, { ...access, mode: "off" }),
+        search: { ...search, provider: null },
+      },
+      {
+        providers: null,
+        agents: null,
+        deciders: null,
+        servers: null,
+        skills: null,
+        credentials: null,
+      },
+    );
+    expect(off.map((l) => [l.label, l.value, l.quiet])).toEqual([
+      ["Visuals", "Off", true],
+      ["Web access", "Off", true],
+      ["Search", "None", true],
+    ]);
+  });
+
+  test.serial("Overview lists every built-in with its tokens", () => {
+    tools.value = body({ ...fetchTool, enabled: false });
     limits.value = rows;
-    path.value = "/admin/config/tools";
-    const html = render(<Tools />);
+    path.value = "/admin/config";
+    const html = render(<ConfigBoard />);
     expect(html).toContain('class="tabs"');
-    expect(html).toContain("Built-in");
     expect(html).toContain("datetime");
     expect(html).toContain("The current date and time in a timezone.");
-    expect(html).toContain("96 tokens");
-    expect(html).toMatch(/rows-hint[^>]*>96 tokens/);
-    // the admin rows' own pieces: the name over the sentence, the meta
+    expect(html).toMatch(/rows-hint[^>]*>2.81K tokens/);
     expect(html).toContain(
       '<span class="rows-name rows-name-mono"><span class="cut">datetime',
     );
-    expect(html).toContain(
-      '<span class="rows-sub">The current date and time in a timezone.',
-    );
-    expect(html).toContain('<span class="rows-meta">96 tokens');
+    // visualize is switched off: Off in place of its tokens
+    expect(html).toContain("rows-item rows-item-off");
     expect(html).not.toContain('role="switch"');
-    expect(html).not.toContain("webfetch");
     expect(html).not.toContain("md-pre");
-    expect(html).not.toContain("Per turn");
+    // the cards of the other tabs are drawn, hidden
+    expect(html.match(/config-board-away/g)).toHaveLength(2);
+    expect(html).toContain(">Instance<");
+    expect(html).toContain('href="/admin/config/visuals"');
+    path.value = "/";
   });
 
-  test.serial("Limits renders the fields", () => {
+  test.serial("Limits and Storage draw their cards", () => {
     tools.value = body();
     limits.value = rows;
-    path.value = "/admin/config/tools/limits";
-    const html = render(<Tools />);
-    expect(html).toContain("Per turn");
-    expect(html).toContain("Per call");
-    expect(html).toContain("Knowledge");
-    expect(html).toContain("Scheduled tasks");
+    path.value = "/admin/config/limits";
+    const html = render(<ConfigBoard />);
+    expect(html).toContain(">Turns<");
+    expect(html).toContain(">Automations<");
+    expect(html).toContain(">Knowledge<");
+    expect(html.match(/<form/g)).toHaveLength(6);
     expect(html).toContain("Runs per user");
-    expect(html).toContain(">Chats<");
-    expect(html.match(/<form/g)).toHaveLength(5);
-    expect(html).not.toContain("Visuals per turn");
-    // the web limits are on Web access
     expect(html).toContain("Call timeout");
-    expect(html).not.toContain("Search body");
-    expect(html).not.toContain(">Limits</span>");
-    expect(html).toContain('inputmode="decimal"');
-    expect(html).not.toContain('type="number"');
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");
-    expect(html).not.toContain("rows-hint");
-    expect(html).not.toContain('role="switch"');
+    // the web and visual limits are on their own pages
+    expect(html).not.toContain('name="searchBodyBytes"');
+    expect(html).not.toContain('name="maxVisuals"');
+    expect(html).not.toContain("Disk use");
+    path.value = "/admin/config/storage";
+    expect(render(<ConfigBoard />)).toContain('href="/admin/monitor/storage"');
     path.value = "/";
   });
 
   test.serial("says it is loading, then the failure", () => {
-    expect(render(<Tools />)).toContain("Loading");
+    expect(render(<ConfigBoard />)).toContain("Loading");
     toolsError.value = {
       words: "the server failed while answering",
       status: 500,
     };
-    const html = render(<Tools />);
+    const html = render(<ConfigBoard />);
     expect(html).toContain("The server failed while answering.");
     expect(html).toContain('<span class="code-tag">HTTP 500</span>');
   });

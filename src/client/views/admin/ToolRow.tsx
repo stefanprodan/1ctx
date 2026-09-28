@@ -3,9 +3,8 @@
 //
 // A tool's row, built like every admin row: the name over the first
 // sentence of its description, the tokens its schema costs as the
-// row's meta, and for a web tool its switch, the name and the switch
-// alone on a phone, and from 720 up Off in place of the tokens while it
-// is off. It opens in place to when a send
+// row's meta, Off in its place while no turn is offered it, and on the
+// Visuals page only from 720 up. It opens in place to when a send
 // carries it, the text and the parameters the model gets.
 
 import { useEffect } from "preact/hooks";
@@ -32,10 +31,13 @@ export function ToolRow({
   tool,
   open,
   onToggle,
+  offered,
 }: {
   tool: BuiltinToolSummary | WebToolSummary;
   open: boolean;
   onToggle: () => void;
+  // the Config board's list: Off while no turn is offered it
+  offered?: boolean;
 }) {
   // the parameters are cut to a height, Show all at the block's foot,
   // since a box that scrolls on its own inside the page's scroll leaves
@@ -59,26 +61,27 @@ export function ToolRow({
     return () => el.removeEventListener("click", on);
   }, [open]);
   const builtin = "when" in tool ? tool : null;
+  // on the Config board the board says; elsewhere visualize's switch
+  const board = offered !== undefined;
+  const on = offered ?? ("enabled" in tool ? tool.enabled : true);
   return (
     <RowsOpen
       open={open}
       onToggle={onToggle}
       indent="chevron"
-      off={"enabled" in tool && !tool.enabled}
+      off={!on}
       head={
         <>
           <RowsTitle
             name={tool.name}
             sub={firstSentence(tool.description)}
             mono
-            subWide={builtin === null}
+            subWide={!board && builtin === null}
           />
-          {builtin ? (
-            <RowsMeta>{tokensText(tool.tokens)}</RowsMeta>
-          ) : "enabled" in tool && tool.enabled ? (
-            <RowsMeta short="">{tokensText(tool.tokens)}</RowsMeta>
+          {board || builtin ? (
+            <RowsMeta>{on ? tokensText(tool.tokens) : "Off"}</RowsMeta>
           ) : (
-            <RowsMeta short="">Off</RowsMeta>
+            <RowsMeta short="">{on ? tokensText(tool.tokens) : "Off"}</RowsMeta>
           )}
         </>
       }

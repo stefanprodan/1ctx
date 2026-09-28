@@ -419,13 +419,23 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has two tabs,** one view over `/admin/config/tools`
-  (Built-in) and `/admin/config/tools/limits`: Built-in lists every
-  built-in schema, including
-  `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
+- **Config's board has three tabs,** one view (`ConfigBoard.tsx`, the
+  tabs and the cards' limits in `Config.model.ts`) over `/admin/config`
+  (Overview), `/admin/config/limits` and `/admin/config/storage`.
+  Overview lists every built-in schema, `visualize` included, by name,
   each row `RowsTitle` (the name over the first sentence) with its
-  tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
-  parameters are cut by `ui/Fold.tsx`, framed.
+  tokens by `wireTokens()` as `RowsMeta`, Off while no turn is offered
+  it (`offered()`); an open row's parameters are cut by `ui/Fold.tsx`,
+  framed. Limits (Turns, Automations) and Storage (Knowledge, Scratch,
+  Chats, MCP results) are `LimitsSetting` cards; every limit is on one
+  card of the board, Web access or Visuals. The cards of every tab stay
+  drawn, hidden on another, so a draft outlives a tab switch. Storage
+  links Monitor › Storage in the head, which links back. The page is a
+  Split whose aside, the same on every tab, is Instance
+  (`instanceLines()`): how many providers, agents, deciders, MCP
+  servers and skills there are, then visuals, web access, search and
+  how many credentials, a list that did not load left out, each a link
+  to its page.
 - **Config › Web access has two tabs,** one view (`WebAccess.tsx`, its
   tabs and the Access draft in `WebAccess.model.ts`) over
   `/admin/config/web` (General) and `/admin/config/web/credentials`,
@@ -469,20 +479,17 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   head, a box of origins one per line checked through
   `parseVisualHosts()` in `shared/visual.ts` (the rule the server's
   `parseHosts()` runs per entry), saved whole. Limits: the visual limits
-  side by side (`LimitsSetting.tsx`, `useLimitsForm()` from
-  `LimitsCard.tsx` over their names), a changed one's default beside its
-  label. CDNs and Limits have
+  side by side (`LimitsSetting.tsx` over their names), a changed one's
+  default beside its label. CDNs and Limits have
   Use defaults in the head, which fills the draft and saves nothing. The
   cards stay editable while the switch is off. The aside is the last 30
   days from `GET /api/usage/visuals`: visualize calls drawn and failed,
   and the files `open` put on a chat page as visuals.
-- **The Limits tab is a form per scope.** Limit fields are text boxes
-  with `inputmode="decimal"`, never number inputs. Limits is a form per
-  scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
-  saving only its own limits; the web and visual limits are on their
-  pages. A save or a
-  reset that lowers the days archived chats are kept asks in the foot
-  first (`deleteAsk()`), Delete then Keep.
+- **A card of limits saves only its own.** Limit fields are text boxes
+  with `inputmode="decimal"`, never number inputs. Each `LimitsSetting`
+  card sends only its limits, Use defaults filling the draft. A save
+  that lowers the days archived chats are kept asks in the foot first
+  (`deleteAsk()`), Delete then Keep, Keep taking back only the days.
 - **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one
   card of links by name, the name over the URL, or over the failed
   refresh in red, the agents that use it over `sidesLine()` at the right

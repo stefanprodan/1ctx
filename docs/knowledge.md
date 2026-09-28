@@ -61,7 +61,7 @@ our changes to just-bash and the upstream sync are in
   `scratchIdleDays`, `uploadBytes`, `uploadFiles`, `mcpKeptBytes` and
   `mcpKeptFiles`. The project byte ceiling is 64 MiB; stored
   overrides are clamped to their ranges for both effective limits and
-  the Limits tab.
+  the Config board's Storage tab.
 
 ## Uploads
 

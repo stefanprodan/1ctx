@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the tools page shows and checks without a DOM: the words of
-// each limit, the unit each row is typed in (seconds for a
-// millisecond cap, KB or MB for a byte cap) and the conversion both
-// ways, the range check the server applies, the visual hosts box, the
-// tabs and when a send carries a built-in.
+// What the tool rows and the limits cards show and check without a
+// DOM: the words of each limit, the unit each row is typed in (seconds
+// for a millisecond cap, KB or MB for a byte cap) and the conversion
+// both ways, the range check the server applies, the visual hosts box
+// and when a send carries a built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import {
@@ -20,27 +20,27 @@ import { pluralCommas, sentence } from "../../lib/format.ts";
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   rounds: {
     label: "Rounds",
-    text: "Provider requests a turn may make, the answer round included.",
+    text: "Provider requests in one turn, the answer included.",
   },
   callsPerRound: {
     label: "Calls per round",
-    text: "Tool calls one round may launch, in parallel.",
+    text: "Tool calls one round may run in parallel.",
   },
   callsPerSend: {
     label: "Calls per turn",
-    text: "Tool calls a turn may launch across its rounds.",
+    text: "Tool calls across a turn's rounds.",
   },
   toolMs: {
     label: "Tool time",
-    text: "Wall clock spent in tools over a turn, every round summed.",
+    text: "Time in tools over a turn, every round summed.",
   },
   resultBytes: {
     label: "Result bytes",
-    text: "Stored tool results over a turn, weighed before a round launches.",
+    text: "Tool results stored over a turn.",
   },
   toolWorkTokens: {
     label: "Tool-work tokens",
-    text: "Tokens a turn may spend on tools before it must answer. Cached input counts as a tenth.",
+    text: "Tokens a turn may spend on tools before it answers.",
   },
   callTimeoutMs: {
     label: "Call timeout",
@@ -48,11 +48,11 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   resultCut: {
     label: "Result cut",
-    text: "Characters a result is cut to before the model reads it.",
+    text: "What the model reads of one result.",
   },
   maxBashCalls: {
     label: "Bash calls per turn",
-    text: "bash calls a turn may make.",
+    text: "bash calls in one turn. More are refused.",
   },
   maxFetches: {
     label: "Fetches per turn",
@@ -92,95 +92,95 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept in the window. Reaching it ends tool work and answers. A chat then summarizes.",
+    text: "Room kept free in the context window.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",
-    text: "Tokens a summary may run to, the reserve at most.",
+    text: "The longest a chat summary may be.",
   },
   memoryPhaseMs: {
     label: "Memory time",
-    text: "How long an automation may spend updating its memory.",
+    text: "How long a run may spend updating memory.",
   },
   memoryPhaseRounds: {
     label: "Memory rounds",
-    text: "Provider requests an automation may make updating its memory.",
+    text: "Provider requests a run may make updating memory.",
   },
   runDeadlineMs: {
     label: "Run deadline",
-    text: "How long an automation's run may take. An automation may set less.",
+    text: "How long one run may take.",
   },
   sendDeadlineMs: {
     label: "Chat deadline",
-    text: "How long one chat turn may take, tools included.",
+    text: "How long one chat turn may take.",
   },
   knowledgeFileBytes: {
     label: "File size",
-    text: "Bytes one knowledge file may hold.",
+    text: "The largest a file may be.",
   },
   knowledgeFiles: {
     label: "Files per project",
-    text: "Knowledge files a project may hold.",
+    text: "Files one project may hold.",
   },
   knowledgeProjectBytes: {
     label: "Base size",
-    text: "Bytes a project's knowledge files may hold together.",
+    text: "A project's files together.",
   },
   knowledgeVersions: {
     label: "Versions per file",
-    text: "Past versions kept per file. Older ones go as a write lands.",
+    text: "Past versions kept of one file.",
   },
   knowledgeHistoryBytes: {
     label: "History size",
-    text: "Bytes of past versions a project keeps. The oldest go first.",
+    text: "Past versions a project keeps, oldest dropped first.",
   },
   knowledgeHistoryDays: {
     label: "History days",
-    text: "How long a deleted file's versions are kept.",
+    text: "How long a deleted file's versions stay.",
   },
   scratchBytes: {
-    label: "Scratch size",
-    text: "Bytes a session's scratch files may hold together.",
+    label: "Size",
+    text: "A session's scratch files together.",
   },
   scratchFiles: {
-    label: "Scratch files",
-    text: "Scratch files a session may hold.",
+    label: "Files",
+    text: "Scratch files one session may hold.",
   },
   scratchIdleDays: {
-    label: "Scratch idle days",
-    text: "How long an unused session scratch is kept.",
+    label: "Idle days",
+    text: "How long an unused scratch is kept.",
   },
   uploadBytes: {
     label: "Chat files size",
-    text: "Bytes the files added to one chat may hold together.",
+    text: "The files added to one chat together.",
   },
   uploadFiles: {
     label: "Chat files",
     text: "Files one chat may hold.",
   },
   mcpKeptBytes: {
-    label: "Kept MCP results size",
-    text: "Bytes of MCP results kept for one chat past the result cut.",
+    label: "Size",
+    text: "The results one chat keeps together.",
   },
   mcpKeptFiles: {
-    label: "Kept MCP files",
-    text: "MCP results and resources kept for one chat.",
+    label: "Files",
+    text: "Results and resources one chat keeps.",
   },
   runsPerUser: {
     label: "Runs per user",
-    text: "Runs one person may have going at once. A scheduled run waits for a free slot.",
+    text: "Runs one person may have going at once.",
   },
   runsRunning: {
     label: "Runs at once",
-    text: "Runs the server may have going at once, every user counted.",
+    text: "Runs going at once, every user counted.",
   },
   archiveIdleDays: {
     label: "Archive idle chats",
-    text: "Days a chat may go without a turn before it is archived.",
+    text: "Days without a turn before a chat is archived.",
   },
   archivedDeleteDays: {
     label: "Delete archived chats",
-    text: "Days an archived chat is kept before it is deleted.",
+    text: "Days an archived chat is kept.",
   },
 };
 
@@ -218,18 +218,6 @@ export function hostsCount(text: string): number {
 // a card's tokens: every schema in it together
 export function totalTokens(rows: { tokens: number }[]): number {
   return rows.reduce((n, row) => n + row.tokens, 0);
-}
-
-// the page's tabs, each an address
-type ToolsTab = "builtin" | "limits";
-
-export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
-  { tab: "builtin", label: "Built-in", href: "/admin/config/tools" },
-  { tab: "limits", label: "Limits", href: "/admin/config/tools/limits" },
-];
-
-export function toolsTab(pathname: string): ToolsTab {
-  return TOOLS_TABS.find((t) => t.href === pathname)?.tab ?? "builtin";
 }
 
 // the unit a row is typed in and how many of the runner's units it is
