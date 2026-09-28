@@ -28,15 +28,11 @@ import {
   defaultsOf,
   dirty,
   displayOf,
-  domainsFieldOf,
-  domainsOf,
   draftOf,
   jsonLines,
-  keyLine,
   LIMIT_WORDS,
   problem,
   read,
-  searchLine,
   seedOf,
   show,
   TOOLS_TABS,
@@ -45,6 +41,12 @@ import {
   WHEN_WORDS,
 } from "../../../src/client/views/admin/Tools.model.ts";
 import { Tools } from "../../../src/client/views/admin/Tools.tsx";
+import {
+  domainsFieldOf,
+  domainsOf,
+  keyLine,
+  searchLine,
+} from "../../../src/client/views/admin/WebAccess.model.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
 import type {

@@ -4,7 +4,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
-import { credentials } from "../../../src/client/data/credentials.ts";
+import {
+  credentials,
+  credentialsError,
+} from "../../../src/client/data/credentials.ts";
 import {
   limits,
   tools,
@@ -13,11 +16,11 @@ import {
 } from "../../../src/client/data/tools.ts";
 import {
   ACCESS_WORDS,
-  DOMAINS_HINT,
-} from "../../../src/client/views/admin/Tools.model.ts";
-import {
   accessBody,
   accessDirty,
+  DOMAINS_HINT,
+  domainsCount,
+  searchDirty,
   WEB_LIMITS,
   webTab,
 } from "../../../src/client/views/admin/WebAccess.model.ts";
@@ -150,6 +153,21 @@ describe("the Web access words", () => {
     });
     expect(WEB_LIMITS).toHaveLength(6);
   });
+
+  test("the count is the hosts a save stores, of the most allowed", () => {
+    expect(domainsCount("a.example.com\nA.example.com\n\n")).toBe("1 of 200");
+    // a box that does not parse counts its lines
+    expect(domainsCount("a.example.com\nhttp://x/y")).toBe("2 of 200");
+    expect(domainsCount("")).toBe("0 of 200");
+  });
+
+  test("None against None is no change", () => {
+    const none = { ...search, provider: null };
+    expect(searchDirty(null, none)).toBe(false);
+    expect(searchDirty("exa", none)).toBe(true);
+    expect(searchDirty(null, search)).toBe(true);
+    expect(searchDirty("exa", search)).toBe(false);
+  });
 });
 
 describe("the Web access page", () => {
@@ -230,7 +248,7 @@ describe("the Web access page", () => {
     const html = render(<WebAccess />);
     expect(html).toMatch(/seg-on" aria-pressed="true">Listed domains/);
     expect(html).toContain(ACCESS_WORDS.listed);
-    expect(html).toMatch(/setting-count">2</);
+    expect(html).toMatch(/setting-count">2 of 200</);
     expect(html).toMatch(
       /<textarea name="domains"[^>]*>docs\.example\.com\ngithub\.com</,
     );
@@ -252,8 +270,23 @@ describe("the Web access page", () => {
     credentials.value = [];
     path.value = "/admin/config/web/credentials";
     const html = render(<WebAccess />);
-    expect(html).not.toContain("setting-title");
     expect(html).toMatch(/Credentials<span class="tabs-count">0</);
+    // General stays drawn, hidden, so its drafts outlive the look
+    expect(html).toContain('class="web-access-cards web-access-away"');
+    expect(html).toContain("setting-title");
+  });
+
+  test.serial("the credentials' failure fails their tab alone", () => {
+    tools.value = response();
+    limits.value = rows;
+    credentialsError.value = { words: "the list did not load", status: 500 };
+    try {
+      expect(render(<WebAccess />)).not.toContain("The list did not load.");
+      path.value = "/admin/config/web/credentials";
+      expect(render(<WebAccess />)).toContain("The list did not load.");
+    } finally {
+      credentialsError.value = null;
+    }
   });
 
   test.serial("the aside counts the last 30 days, or says it failed", () => {

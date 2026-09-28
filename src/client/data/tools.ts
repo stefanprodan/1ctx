@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The tools pages' entities: the built-ins, web access with the search
-// state, visualize, the limits and the usage asides, all admin's, loaded when the page is
-// reached and dropped with the signed-in user. A write answers the
-// server's rows, so what shows is what was saved; a change applies to
-// the next send.
+// state, visualize, the limits and the usage asides, all admin's,
+// loaded when a page that shows them is reached and dropped with the
+// signed-in user. A write answers the server's rows, so what shows is
+// what was saved; a change applies to the next send.
 
 import { effect, signal } from "@preact/signals";
 import type {

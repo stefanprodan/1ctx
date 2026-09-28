@@ -39,20 +39,19 @@ import { CredentialsCard } from "./CredentialsCard.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { LimitsSetting } from "./LimitsSetting.tsx";
 import { ToolRow } from "./ToolRow.tsx";
+import { totalTokens } from "./Tools.model.ts";
 import {
   ACCESS_MODES,
   ACCESS_WORDS,
-  DOMAINS_HINT,
-  domainsFieldOf,
-  hostsCount,
-  keyLine,
-  searchLine,
-  totalTokens,
-} from "./Tools.model.ts";
-import {
   accessBody,
   accessDirty,
+  DOMAINS_HINT,
+  domainsCount,
+  domainsFieldOf,
   domainsText,
+  keyLine,
+  searchDirty,
+  searchLine,
   WEB_LIMITS,
   WEB_TABS,
   webTab,
@@ -86,18 +85,22 @@ export function WebAccess() {
               }))}
               active={WEB_TABS.find((t) => t.tab === tab)!.href}
             />
-            {tab === "general" && (
-              <>
-                <Access state={state} />
-                <Search state={state} />
-                <LimitsSetting
-                  rows={rows}
-                  names={WEB_LIMITS}
-                  line="How much one turn may fetch and search."
-                />
-                <Tools state={state} />
-              </>
-            )}
+            {/* hidden, not unmounted, so a draft outlives a look at
+                Credentials */}
+            <div
+              class={`web-access-cards${
+                tab === "general" ? "" : " web-access-away"
+              }`}
+            >
+              <Access state={state} />
+              <Search state={state} />
+              <LimitsSetting
+                rows={rows}
+                names={WEB_LIMITS}
+                line="How much agents may fetch and search."
+              />
+              <Tools state={state} />
+            </div>
             {tab === "credentials" && <CredentialsCard />}
           </div>
         </Split>
@@ -143,7 +146,7 @@ function Access({ state }: { state: ToolsResponse }) {
     >
       <Setting
         title="Access"
-        count={mode === "listed" ? count(hostsCount(typed)) : undefined}
+        count={mode === "listed" ? domainsCount(typed) : undefined}
         line={ACCESS_WORDS[mode]}
         action={
           <Seg
@@ -156,6 +159,11 @@ function Access({ state }: { state: ToolsResponse }) {
             }))}
             onPick={(next) => {
               drafted.value = next;
+              // back on a saved mode that hides the box, what was typed
+              // in it goes, so Listed shows the saved list again
+              if (next === access.mode && next !== "listed") {
+                text.value = null;
+              }
               save.touch();
             }}
           />
@@ -232,7 +240,7 @@ function Search({ state }: { state: ToolsResponse }) {
         foot={
           <DraftFoot
             save={save}
-            dirty={provider !== search.provider}
+            dirty={searchDirty(provider, search)}
             onDiscard={() => {
               drafted.value = null;
             }}
