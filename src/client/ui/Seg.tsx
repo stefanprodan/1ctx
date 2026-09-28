@@ -6,11 +6,10 @@
 
 import type { ComponentChildren } from "preact";
 
-export type SegOption<T extends string> = {
+type SegOption<T extends string> = {
   value: T;
   label: ComponentChildren;
   disabled?: boolean;
-  // said on hover: why an option is off
   title?: string;
 };
 

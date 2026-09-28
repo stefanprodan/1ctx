@@ -25,7 +25,7 @@ import {
 } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
-import { startSocket, type Wire } from "../../../src/client/data/socket.ts";
+import { startSocket } from "../../../src/client/data/socket.ts";
 import { users, usersError } from "../../../src/client/data/users.ts";
 import { nameProblem } from "../../../src/client/lib/names.ts";
 import { Save } from "../../../src/client/lib/save.ts";
@@ -34,7 +34,6 @@ import {
   deleteLine,
   descriptionProblem,
   memberOptions,
-  nameTaken,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectPage } from "../../../src/client/views/admin/ProjectPage.tsx";
@@ -43,24 +42,13 @@ import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../../src/shared/contracts/project.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { settle } from "../../helpers/async.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture, user } from "../../helpers/client-fixtures.ts";
+import { FakeWire } from "../../helpers/client-socket.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
-const root: AdminUser = {
-  ...admin,
-  email: "admin@1ctx.dev",
-  tz: "UTC",
-  createdAt: new Date(2026, 8, 12).getTime(),
-  disabled: false,
-  lastVisitDay: null,
-  projectIds: [],
-};
+const admin = adminFixture();
+const root = user();
 const casey: AdminUser = {
   id: "u2",
   username: "casey",
@@ -97,36 +85,33 @@ const detail: ProjectDetail = {
   latestFiles: [],
 };
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 let stopSocket: (() => void) | null = null;
 
 beforeEach(() => {
+  // a new sign-in drops every answer, the aside's included
+  me.value = null;
   me.value = admin;
   adminProjects.value = null;
   adminProjectsError.value = null;
   adminProject.value = null;
   adminProjectError.value = null;
-  projectUsage.value = {};
   projects.value = null;
   users.value = [root, casey];
   usersError.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
 });
 
 afterEach(() => {
   stopSocket?.();
   stopSocket = null;
   me.value = undefined;
-  globalThis.fetch = realFetch;
 });
 
 const rail = (rows: ProjectSummary[]) => Response.json({ projects: rows });
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("the words", () => {
-  test("writes the member count and what a delete takes", () => {
+  test.serial("writes the member count and what a delete takes", () => {
     expect(countLine(detail)).toBe("1 member");
     expect(deleteLine(detail)).toBe(
       "Deletes its 3 chats, scheduled tasks and memory. This cannot be undone.",
@@ -139,33 +124,32 @@ describe("the words", () => {
     );
   });
 
-  test("a name is taken by another team project or the reserved one", () => {
-    expect(nameTaken([team], "platform")).toBe(true);
-    expect(nameTaken([team], "platform", "p2")).toBe(false);
-    expect(nameTaken([team], "personal")).toBe(true);
-    expect(nameTaken([team], "ops")).toBe(false);
-  });
-
-  test("New project asks for a description", () => {
+  test.serial("New project asks for a description", () => {
     expect(descriptionProblem("  ")).toBe("Describe the project");
     expect(descriptionProblem("Incidents")).toBeNull();
   });
 
-  test("Add member offers the users not drafted in, by full name", () => {
-    const mira: AdminUser = {
-      ...casey,
-      id: "u3",
-      username: "mira",
-      fullName: "Mira Pop",
-      email: "mira@corp.dev",
-      disabled: true,
-    };
-    const offered = memberOptions([mira, root, casey], ["u2"]);
-    expect(offered.map((o) => o.label)).toEqual(["Mira Pop", "Stefan Prodan"]);
-    expect(offered[0].sub).toBe("@mira · disabled");
-    expect(offered[1].sub).toBe("@admin");
-    expect(offered[0].keywords).toContain("corp.dev");
-  });
+  test.serial(
+    "Add member offers the users not drafted in, by full name",
+    () => {
+      const mira: AdminUser = {
+        ...casey,
+        id: "u3",
+        username: "mira",
+        fullName: "Mira Pop",
+        email: "mira@corp.dev",
+        disabled: true,
+      };
+      const offered = memberOptions([mira, root, casey], ["u2"]);
+      expect(offered.map((o) => o.label)).toEqual([
+        "Mira Pop",
+        "Stefan Prodan",
+      ]);
+      expect(offered[0].sub).toBe("@mira · disabled");
+      expect(offered[1].sub).toBe("@admin");
+      expect(offered[0].keywords).toContain("corp.dev");
+    },
+  );
 });
 
 describe("the entity", () => {
@@ -279,33 +263,27 @@ describe("the entity", () => {
     expect(projects.value).toEqual([personal, team]);
   });
 
-  test.serial("delete removes the row and reloads the rail", async () => {
-    adminProjects.value = [team];
-    adminProject.value = detail;
-    answer = (_url, init) =>
-      init?.method === "DELETE"
-        ? Response.json({ deleted: 3 })
-        : rail([personal]);
-
-    expect(await deleteProject("p2")).toBe(3);
-    expect(adminProjects.value).toEqual([]);
-    expect(adminProject.value).toBeNull();
-    await settle();
-    expect(projects.value).toEqual([personal]);
-  });
-
-  test.serial("a project already gone is deleted all the same", async () => {
-    adminProjects.value = [team];
-    adminProject.value = detail;
-    answer = (_url, init) =>
-      init?.method === "DELETE"
-        ? Response.json({ error: "no such project" }, { status: 404 })
-        : rail([personal]);
-    expect(await deleteProject("p2")).toBe(0);
-    expect(adminProjects.value).toEqual([]);
-    expect(adminProject.value).toBeNull();
-    await settle();
-  });
+  for (const [status, response, deleted] of [
+    [200, { deleted: 3 }, 3],
+    [404, { error: "no such project" }, 0],
+  ] as const) {
+    test.serial(
+      `delete ${status} removes the row and reloads the rail`,
+      async () => {
+        adminProjects.value = [team];
+        adminProject.value = detail;
+        answer = (_url, init) =>
+          init?.method === "DELETE"
+            ? Response.json(response, { status })
+            : rail([personal]);
+        expect(await deleteProject("p2")).toBe(deleted);
+        expect(adminProjects.value).toEqual([]);
+        expect(adminProject.value).toBeNull();
+        await settle();
+        expect(projects.value).toEqual([personal]);
+      },
+    );
+  }
 
   test.serial(
     "a members save adds then removes, and a refusal rereads the detail",
@@ -453,7 +431,8 @@ describe("the entity", () => {
           : Response.json({ error: "no such project" }, { status: 404 });
       await loadProjectUsage("p2");
       await loadProjectUsage("p9");
-      expect(projectUsage.value).toEqual({ p2: body, p9: null });
+      expect(projectUsage.valueFor("p2")).toEqual(body);
+      expect(projectUsage.valueFor("p9")).toBeNull();
     },
   );
 
@@ -511,27 +490,30 @@ describe("the entity", () => {
 });
 
 describe("the page", () => {
-  test("the list links each team project to its page and counts both kinds", () => {
-    adminProjects.value = [{ ...team, memberCount: 3 }];
-    const html = render(<AdminProjects />);
-    expect(html).toContain('href="/admin/access/projects?new"');
-    expect(html).toContain('href="/admin/access/projects/p2"');
-    expect(html).toContain(
-      'class="rows-name rows-name-mono"><span class="cut">platform<',
-    );
-    expect(html).toContain('class="rows-sub">3 members<');
-    expect(html).toContain(">since 14 September 2026<");
-    expect(html).toContain(">Team<");
-    expect(html).toContain(">Personal<");
-    expect(html).not.toContain("Casey Doe");
-  });
+  test.serial(
+    "the list links each team project to its page and counts both kinds",
+    () => {
+      adminProjects.value = [{ ...team, memberCount: 3 }];
+      const html = render(<AdminProjects />);
+      expect(html).toContain('href="/admin/access/projects?new"');
+      expect(html).toContain('href="/admin/access/projects/p2"');
+      expect(html).toContain(
+        'class="rows-name rows-name-mono"><span class="cut">platform<',
+      );
+      expect(html).toContain('class="rows-sub">3 members<');
+      expect(html).toContain(">since 14 September 2026<");
+      expect(html).toContain(">Team<");
+      expect(html).toContain(">Personal<");
+      expect(html).not.toContain("Casey Doe");
+    },
+  );
 
-  test("?new is the New project form", () => {
+  test.serial("?new is the New project form", () => {
     adminProjects.value = [team];
     query.value = "?new";
     const html = render(<AdminProjects />);
     query.value = "";
-    expect(html).toContain('class="admin-projects-page"');
+    expect(html).toContain('aria-label="New project"');
     expect(html).toContain(">Create project<");
     expect(html).toContain('href="/admin/access/projects"');
     expect(html).toContain('name="name"');
@@ -539,12 +521,12 @@ describe("the page", () => {
     expect(html).toContain('aria-required="true" rows="3"');
   });
 
-  test("a project's page has its cards and its aside", () => {
+  test.serial("a project's page has its cards and its aside", async () => {
+    answer = () =>
+      Response.json({ since: 0, until: 1, sends: 4, tokens: 1200, cost: null });
+    await loadProjectUsage("p2");
     adminProjects.value = [team];
     adminProject.value = { ...detail, description: "Incidents and pages" };
-    projectUsage.value = {
-      p2: { since: 0, until: 1, sends: 4, tokens: 1200, cost: null },
-    };
     const html = render(<ProjectPage params={{ id: "p2" }} />);
     expect(html).toContain('value="platform"');
     expect(html).toContain(">Incidents and pages</textarea>");
@@ -557,7 +539,7 @@ describe("the page", () => {
     expect(html).toContain(">not priced<");
   });
 
-  test("a detail that failed shows while the list still loads", () => {
+  test.serial("a detail that failed shows while the list still loads", () => {
     adminProjectError.value = {
       words: "the server did not answer",
       status: 500,
@@ -566,7 +548,7 @@ describe("the page", () => {
     expect(html).toContain("This page did not load");
   });
 
-  test("an id no team project has says so", () => {
+  test.serial("an id no team project has says so", () => {
     adminProjects.value = [team];
     const html = render(<ProjectPage params={{ id: "p9" }} />);
     expect(html).toContain("No team project by that id.");
@@ -577,35 +559,20 @@ describe("the rail", () => {
   test.serial(
     "granted and revoked refresh the rail and admin list",
     async () => {
-      class FakeWire implements Wire {
-        readyState = 1;
-        onopen: ((event: unknown) => void) | null = null;
-        onmessage: ((event: { data: unknown }) => void) | null = null;
-        onclose: ((event: { code: number }) => void) | null = null;
-        onerror: ((event: unknown) => void) | null = null;
-        send(): void {}
-        close(): void {
-          this.readyState = 3;
-        }
-        message(value: unknown): void {
-          this.onmessage?.({ data: JSON.stringify(value) });
-        }
-      }
-
       const wire = new FakeWire();
       stopSocket = startSocket({ connect: () => wire });
       projects.value = [personal];
       adminProjects.value = [];
       answer = () => rail([personal, team]);
 
-      wire.message({ type: "granted", projectId: "p2" });
+      wire.message(JSON.stringify({ type: "granted", projectId: "p2" }));
       await settle();
       expect(projects.value).toEqual([personal, team]);
       expect(adminProjects.value).toEqual([team]);
 
       adminProject.value = detail;
       answer = () => rail([personal]);
-      wire.message({ type: "revoked", projectId: "p2" });
+      wire.message(JSON.stringify({ type: "revoked", projectId: "p2" }));
       await settle();
       expect(projects.value).toEqual([personal]);
       expect(adminProjects.value).toEqual([]);

@@ -4,10 +4,9 @@
 import type {
   DiscoverResponse,
   SkillFileResponse,
+  SkillLoads,
   SkillResponse,
   SkillsResponse,
-  SkillsUsageResponse,
-  SkillUsageResponse,
 } from "../../shared/api/skills.ts";
 import { skillKey } from "../../shared/capabilities.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -16,29 +15,15 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound, ServiceUnavailable } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { lastDays } from "../usage/index.ts";
 import { MAX_REFRESH_ERROR } from "./limits.ts";
 import { changeOf, discover, loadSkill } from "./load.ts";
 import { parseAdd, parseDiscover, parseFile } from "./parse.ts";
 import { loaded, type SkillRow, type SkillStore, summary } from "./store.ts";
 
 export type AgentsPort = { agentNames(ids: string[]): string[] };
-// the skill and skill_file calls in a window, by the skill they named
 export type UsagePort = {
-  loads(
-    since: number,
-    until: number,
-  ): {
-    loads: number;
-    reads: number;
-    failed: number;
-    skills: {
-      name: string;
-      loads: number;
-      reads: number;
-      failed: number;
-      files: { path: string; reads: number }[];
-    }[];
-  };
+  loads(since: number, until: number): SkillLoads;
 };
 export type RoutesDeps = {
   db: Db;
@@ -52,8 +37,6 @@ export type RoutesDeps = {
   shutdown: AbortSignal;
   refreshing: Set<string>;
 };
-
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   const show = (row: SkillRow) =>
@@ -147,18 +130,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/usage/skills",
       policy: "admin",
       handle() {
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const all = deps.usage.loads(since, until);
-        const body: SkillsUsageResponse = {
-          since,
-          until,
-          loads: all.loads,
-          reads: all.reads,
-          failed: all.failed,
-          skills: all.skills.map(({ files: _, ...skill }) => skill),
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) => {
+            const { skills, ...all } = deps.usage.loads(since, until);
+            return {
+              ...all,
+              skills: skills.map(({ files: _, ...skill }) => skill),
+            };
+          }),
+        );
       },
     },
     {
@@ -167,20 +147,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         const row = find(ctx.params.id);
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const one = deps.usage
-          .loads(since, until)
-          .skills.find((s) => s.name === row.name);
-        const body: SkillUsageResponse = {
-          since,
-          until,
-          loads: one?.loads ?? 0,
-          reads: one?.reads ?? 0,
-          failed: one?.failed ?? 0,
-          files: one?.files ?? [],
-        };
-        return json(body);
+        return json(
+          lastDays(deps.clock(), (since, until) => {
+            const one = deps.usage
+              .loads(since, until)
+              .skills.find((s) => s.name === row.name);
+            return {
+              loads: one?.loads ?? 0,
+              reads: one?.reads ?? 0,
+              failed: one?.failed ?? 0,
+              files: one?.files ?? [],
+            };
+          }),
+        );
       },
     },
     {

@@ -1,14 +1,6 @@
-/* Config › Visuals: the cards stacked, the CDN box in mono. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .visuals {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 960px;
-  }
   .visuals-hosts {
     font-family: var(--mono);
     font-size: var(--text-label);

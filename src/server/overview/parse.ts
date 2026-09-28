@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The storage route takes the caller's zone and nothing else, the
-// overview the zone and a range, the usage route the zone and a month, the load and the
-// attention routes nothing; anything unexpected is a 400.
 
 import {
   isOverviewRange,
@@ -36,13 +32,11 @@ function zone(url: URL): string {
     .timeZone;
 }
 
-// the storage and the overview routes take the zone and nothing else
 export function parseZoneQuery(url: URL): string {
   only(url, ["tz"]);
   return zone(url);
 }
 
-// the overview takes the zone and its range, 30d when not given
 export function parseOverviewQuery(url: URL): {
   timeZone: string;
   range: OverviewRange;
@@ -55,7 +49,6 @@ export function parseOverviewQuery(url: URL): {
   return { timeZone: zone(url), range };
 }
 
-// a calendar month in the zone, "2026-09"
 export function parseUsageQuery(url: URL): {
   timeZone: string;
   month: string;
@@ -66,7 +59,6 @@ export function parseUsageQuery(url: URL): {
   return { timeZone: zone(url), month };
 }
 
-// the load is the process's, in no zone, and so is what needs attention
-export function parseLoadQuery(url: URL): void {
+export function parseNoQuery(url: URL): void {
   only(url, []);
 }

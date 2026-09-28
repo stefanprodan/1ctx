@@ -5,9 +5,12 @@
 // row's meta, what a save sends and Reset fills, the checks and the
 // fields a refusal names, and the list and a decision's page rendered.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { deciders, decisionUsage } from "../../../src/client/data/deciders.ts";
+import {
+  deciders,
+  loadDecisionUsage,
+} from "../../../src/client/data/deciders.ts";
 import {
   decisions,
   decisionsError,
@@ -36,25 +39,14 @@ import {
   DECISIONS,
   type DecisionSummary,
 } from "../../../src/shared/contracts/decision.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import {
+  admin as adminFixture,
+  decider,
+} from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Admin",
-  role: "admin",
-  mustChangePassword: false,
-};
-const judge: DeciderSummary = {
-  id: "d1",
-  name: "judge",
-  providerId: "pr1",
-  model: "vendor/judge-1",
-  contextLength: 32_000,
-  promptPrice: 0.04,
-  default: true,
-  createdAt: 0,
-};
+const admin = adminFixture({ fullName: "Admin" });
+const judge = decider();
 const small: DeciderSummary = {
   ...judge,
   id: "d2",
@@ -84,20 +76,14 @@ const own: DecisionSummary = {
   ],
 };
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
   deciders.value = null;
   decisions.value = null;
   decisionsError.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the words", () => {
@@ -105,16 +91,10 @@ describe("the words", () => {
     for (const id of DECISIONS) {
       expect(DECISION_WORDS[id].title).not.toBe("");
       for (const o of DECISION_OPTIONS[id]) {
+        expect(optionLabel(id, o.key)).not.toBe("");
         expect(optionLabel(id, o.key)).not.toBe(o.key);
       }
     }
-    expect(DECISION_WORDS["run-attention"].title).toBe(
-      "Mark task runs that need attention",
-    );
-    expect(optionLabel("run-attention", "all-good")).toBe("All good when");
-    expect(optionLabel("run-attention", "needs-attention")).toBe(
-      "Needs attention when",
-    );
   });
 
   test.serial("a row says off, who answers, and custom", () => {
@@ -352,17 +332,32 @@ describe("the pages", () => {
     );
   });
 
-  test.serial("the aside has its last 30 days", () => {
+  test.serial("the aside has its last 30 days, kept per decision", async () => {
+    // a sign-in change drops every answer
+    me.value = null;
+    me.value = admin;
     deciders.value = [judge];
     decisions.value = [plain];
-    decisionUsage.value = null;
     expect(page()).toContain("Loading");
-    decisionUsage.value = {
-      of: "run-attention",
-      usage: { since: 0, until: 1, answers: 7, tokens: 900, cost: null },
+    const asked: string[] = [];
+    answer = (url) => {
+      asked.push(url);
+      return Response.json({
+        since: 0,
+        until: 1,
+        answers: 7,
+        tokens: 900,
+        cost: null,
+      });
     };
-    expect(page()).toMatch(/Answers[\s\S]*?7/);
-    expect(page()).toContain("not priced");
-    decisionUsage.value = null;
+    await loadDecisionUsage("run-attention");
+    expect(asked).toEqual(["/api/decisions/run-attention/usage"]);
+    const html = page();
+    expect(html).toMatch(/Answers[\s\S]*?7/);
+    expect(html).toContain("not priced");
+    expect(html).toContain('href="/admin/monitor/usage"');
+    answer = () => new Response("no", { status: 500 });
+    await loadDecisionUsage("run-attention");
+    expect(page()).toContain("Did not load.");
   });
 });

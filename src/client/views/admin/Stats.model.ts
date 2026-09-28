@@ -1,21 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The words of the Monitor's Stats, pure: the Active users and Failure
-// rate tiles, and its two day charts, activity (turns and runs a day,
-// the failed ones on top) and how long chat turns took (the median and
-// the 95th percentile a day). A line names the range at rest and the
-// day under the pointer.
 
 import type {
   OverviewDay,
   OverviewTotals,
   TurnLengths,
 } from "../../../shared/api/admin.ts";
-import { commas, dayMonth, pluralCommas, share } from "../../lib/format.ts";
-import { lengthWord } from "./Usage.model.ts";
+import {
+  commas,
+  dayMonth,
+  lengthWord,
+  pluralCommas,
+  share,
+} from "../../lib/format.ts";
 
-// the stack, bottom first: what did not fail, then every failure
+const failedOf = (t: { turnsFailed: number; runsFailed: number }) =>
+  t.turnsFailed + t.runsFailed;
+const ranOf = (t: { turns: number; runs: number }) => t.turns + t.runs;
+
+// bottom first: what did not fail, then every failure
 export function activitySeries(days: OverviewDay[]) {
   return [
     {
@@ -38,7 +41,7 @@ export function activityHint(
   at: OverviewDay | null,
 ): string {
   if (at) {
-    const failed = at.turnsFailed + at.runsFailed;
+    const failed = failedOf(at);
     return [
       dayMonth(at.start),
       pluralCommas(at.turns, "turn", "turns"),
@@ -46,8 +49,8 @@ export function activityHint(
       ...(failed > 0 ? [`${commas(failed)} failed`] : []),
     ].join(" · ");
   }
-  const all = totals.turns + totals.runs;
-  const failed = totals.turnsFailed + totals.runsFailed;
+  const all = ranOf(totals);
+  const failed = failedOf(totals);
   return all === 0
     ? ""
     : `${commas(all)} · ${failed === 0 ? "none" : share(failed, all)} failed`;
@@ -80,7 +83,7 @@ export function lengthHint(range: TurnLengths, at: OverviewDay | null): string {
 
 const S = 1000;
 const M = 60 * S;
-// the turn length axis in round steps of time, never 50s or 1m 40s
+// round steps of time, never 50s or 1m 40s
 export const LENGTH_STEPS = [
   S,
   2 * S,
@@ -98,11 +101,9 @@ export const LENGTH_STEPS = [
   120 * M,
 ];
 
-// an axis value: 0, then the length in words
 export const lengthAxis = (ms: number): string =>
   ms === 0 ? "0" : lengthWord(ms);
 
-// the users with a turn or a run in the range, against every user
 export function activeTile(
   active: number,
   users: number,
@@ -116,11 +117,6 @@ export function activeTile(
       : `of ${commas(users)}`,
   };
 }
-
-// the share of turns and runs that failed, a day's in the day's words
-const failedOf = (t: { turnsFailed: number; runsFailed: number }) =>
-  t.turnsFailed + t.runsFailed;
-const ranOf = (t: { turns: number; runs: number }) => t.turns + t.runs;
 
 export function failureTile(totals: OverviewTotals, at: OverviewDay | null) {
   const figure = share(failedOf(totals), ranOf(totals));
@@ -147,6 +143,5 @@ export function failureTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// a day's failed share, 0 on a day with nothing run
 export const failureSeries = (days: OverviewDay[]): number[] =>
   days.map((d) => (ranOf(d) === 0 ? 0 : failedOf(d) / ranOf(d)));

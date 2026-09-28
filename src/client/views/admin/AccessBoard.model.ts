@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Access board's words and groups: the users who used the app last,
-// and the accounts and the team projects that need an admin, each
-// account in one group only: disabled, else inactive when not seen in
-// 30 days.
 
 import type { AccessDay, AccessRecent } from "../../../shared/api/access.ts";
 import type { AdminUser } from "../../../shared/api/users.ts";
@@ -14,7 +9,7 @@ import { idleDays } from "./Users.model.ts";
 
 export const BOARD_DAYS = 30;
 
-export type AccountGroups = {
+type AccountGroups = {
   inactive: AdminUser[];
   disabled: AdminUser[];
 };
@@ -34,8 +29,7 @@ export function accountGroups(
   return groups;
 }
 
-// the server's recent users with their rows, in its order; one the
-// users list does not hold yet is left out
+// one the users list does not hold yet is left out
 export function recentUsers(
   recent: readonly AccessRecent[],
   users: readonly AdminUser[],
@@ -50,12 +44,11 @@ export function recentUsers(
   return rows;
 }
 
-export type ProjectGroups = {
+type ProjectGroups = {
   empty: ProjectSummary[];
   quiet: ProjectSummary[];
 };
 
-// a project with nobody in it is only in the first group
 export function projectGroups(
   projects: readonly ProjectSummary[],
   activeIds: readonly string[],
@@ -67,7 +60,6 @@ export function projectGroups(
   };
 }
 
-// the chart's line: the day under the pointer, else the whole span
 export function signedInHint(
   signedIn: number,
   users: number,
@@ -78,7 +70,5 @@ export function signedInHint(
     : `${dayMonth(at.start)} · ${plural(at.signedIn, "user")}`;
 }
 
-// a recent user's time: "online" while a tab of theirs is open, then
-// how long ago
 export const recentWhen = (r: AccessRecent, now: number): string =>
   r.online ? "online" : ago(r.at, now);

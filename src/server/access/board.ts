@@ -1,14 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Access board's numbers: who signed in over the last 30 days, day
-// by day, and which team projects had a turn or a run. A visit counts
-// on its user's own date, as the Users page reads it, so the chart and
-// the board's Inactive agree however far apart the zones are; the
-// days are the reader's last 30. Recent is the ten users seen in them,
-// a disabled one left out, the ones with a tab open first, then by
-// their latest signed-in request. The lists of accounts and projects
-// are the users and projects routes'.
 
 import type {
   AccessBoardResponse,
@@ -16,17 +7,11 @@ import type {
 } from "../../shared/api/access.ts";
 import type { Clock } from "../lib/clock.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { daysWindow, parseZoneQuery } from "../usage/index.ts";
+import { daysWindow, nextDay, parseZoneQuery } from "../usage/index.ts";
 import type { LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
 
 const BOARD_DAYS = 30;
-
-// "2026-09-28" to "2026-09-29"
-const nextDay = (day: string): string =>
-  new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000)
-    .toISOString()
-    .slice(0, 10);
 
 export type BoardUsagePort = {
   activeProjects(ids: string[], since: number, until: number): string[];
@@ -38,9 +23,9 @@ export type PresencePort = { onlineUserIds(): string[] };
 
 export type BoardUsersPort = { byId(id: string): { disabled: boolean } | null };
 
-export const RECENT_USERS = 10;
+const RECENT_USERS = 10;
 
-export type BoardRoutesDeps = {
+type BoardRoutesDeps = {
   visits: VisitStore;
   logins: LoginStore;
   presence: PresencePort;
@@ -63,8 +48,9 @@ export function boardRoutes(deps: BoardRoutesDeps): RouteDescriptor[] {
         const last = window.days.length - 1;
         const users = window.days.map(() => new Set<string>());
         const everyone = new Set<string>();
-        // a user east of the reader may already be on the reader's
-        // tomorrow: that day is today's bar
+        // a visit counts on its user's own date, as the Users page reads
+        // it, so the chart and Inactive agree across zones; one east of
+        // the reader already on tomorrow counts on today
         const through = nextDay(window.days[last]!);
         for (const visit of deps.visits.onDays(window.days[0]!, through)) {
           const i = index.get(visit.day) ?? last;
@@ -93,13 +79,12 @@ export function boardRoutes(deps: BoardRoutesDeps): RouteDescriptor[] {
   ];
 }
 
-// A user seen since the window opened, by the newer of their visit and
-// their login rows. A visit's instant is the day's first request and a
-// login is touched at most hourly, so a user who signed out may read
-// hours earlier than their last request. Online while a socket of
-// theirs is open. One without a visit is inactive on the board.
+// a login is touched at most hourly, so a signed out user may read
+// hours early; a user with no visit is left out
 function recent(deps: BoardRoutesDeps, since: number): AccessRecent[] {
-  const latest = deps.visits.latestAt();
+  const latest = new Map(
+    [...deps.visits.latest()].map(([userId, { at }]) => [userId, at]),
+  );
   for (const [userId, at] of deps.logins.latestSeen()) {
     const held = latest.get(userId);
     if (held !== undefined && at > held) latest.set(userId, at);

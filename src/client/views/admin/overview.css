@@ -1,31 +1,14 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .overview-wide {
-    display: flex;
-    flex-direction: column;
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-  /* the day columns while the first answer loads */
-  .overview-ghost-days {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 6px;
-    padding: 0 var(--space-2) 24px 52px;
-  }
-  /* the two day charts under the Stats tiles */
   .overview-charts {
     margin-top: 14px;
   }
-  /* the rows Refresh reads again, spaced as the board is */
   .overview-past {
     display: flex;
     flex-direction: column;
     gap: 14px;
   }
-  /* a row's head: its name, and its scope or its trouble */
   .overview-section {
     display: flex;
     align-items: baseline;
@@ -47,17 +30,9 @@
   .overview-section-stale .overview-section-note {
     color: var(--failed);
   }
-
-  /* a failed read keeps the last answer on screen, faded */
-  .overview-stale {
+  /* the rows' heads stay whole, so their failure reads in full */
+  .overview-past-stale > :not(.overview-section) {
     opacity: 0.5;
     transition: opacity 0.2s;
-  }
-  /* the rows' heads stay whole, so their failure reads in full */
-  .overview-past.overview-stale {
-    opacity: 1;
-  }
-  .overview-past.overview-stale > :not(.overview-section) {
-    opacity: 0.5;
   }
 }

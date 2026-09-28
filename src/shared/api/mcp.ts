@@ -4,6 +4,7 @@
 // Request and response bodies of the MCP routes, all for admins.
 
 import type { McpServerSummary } from "../contracts/mcp.ts";
+import type { Windowed } from "./admin.ts";
 
 // GET /api/mcp: the rows, the names of the mcp- key files the form may
 // pick (names alone, never a value), the limits' call timeout a server
@@ -47,24 +48,14 @@ export type PatchMcpSettings = Partial<{
 export type PatchMcpEndpoint = Partial<{ url: string; keyName: string | null }>;
 export type PatchMcpRequest = PatchMcpSettings | PatchMcpEndpoint;
 
-// GET /api/mcp/:id/usage, the server's last 30 days: its tool calls in
-// every chat and run, the failed among them, and the calls per tool,
+export type McpCalls = { calls: number; failed: number };
 // the most called first
-export type McpUsageResponse = {
-  since: number;
-  until: number;
-  calls: number;
-  failed: number;
-  tools: { name: string; calls: number }[];
+export type McpUsage = McpCalls & { tools: { name: string; calls: number }[] };
+// the most called first, a deleted server's calls under its name
+export type McpServersUsage = McpCalls & {
+  servers: ({ name: string } & McpCalls)[];
 };
 
-// GET /api/mcp/usage, every server's last 30 days: the tool calls and
-// the failed among them, and per server name, the most called first,
-// a deleted server's calls under its name
-export type McpUsageAllResponse = {
-  since: number;
-  until: number;
-  calls: number;
-  failed: number;
-  servers: { name: string; calls: number; failed: number }[];
-};
+// GET /api/mcp/:id/usage and /api/mcp/usage: the last 30 days
+export type McpUsageResponse = Windowed<McpUsage>;
+export type McpUsageAllResponse = Windowed<McpServersUsage>;

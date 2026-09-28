@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A server's Tools tab, tested without a DOM: the three matcher lists
-// in their order (excluded, then read, then write, an empty write taking
-// every tool nothing else matched), how many tools each matcher decides,
-// a matcher typed in, the tools shown by the search and the side, and a
-// move of picked tools to a side, which writes exact names and says
-// which tools a matcher earlier in the order keeps where they are.
 
 import type { McpToolSummary } from "../../../shared/contracts/mcp.ts";
 import {
@@ -20,8 +13,7 @@ import { isPattern, MAX_PATTERNS } from "../../../shared/words.ts";
 import { plural } from "../../lib/format.ts";
 import { matches } from "../../lib/search.ts";
 
-// the three lists, as the page names them, in the order they are
-// applied
+// the page's order; decide() applies excluded, then read, then write
 export type MatcherSide = "excluded" | "read" | "write";
 export const MATCHER_SIDES: { side: MatcherSide; label: string }[] = [
   { side: "read", label: "Read" },
@@ -38,9 +30,8 @@ export const SIDE_WORDS: Record<ToolSide, string> = {
 
 type Tools = Pick<McpToolSummary, "name" | "unusable">[];
 
-// each matcher with the tools it decides, and whether it matches any
-// tool at all: a matcher an earlier one outranks decides none but is
-// not a typo
+// a matcher an earlier one outranks decides none but still matches,
+// so it is not marked as a typo
 export type Matcher = { pattern: string; decides: number; matches: boolean };
 
 export function matchers(
@@ -66,7 +57,6 @@ export function matchers(
   return { read: of("read"), write: of("write"), excluded: of("excluded") };
 }
 
-// a matcher typed into a side's box: the list with it, or why not
 export function addMatcher(
   patterns: Patterns,
   side: MatcherSide,
@@ -96,7 +86,6 @@ export function removeMatcher(
   return { ...patterns, [side]: patterns[side].filter((p) => p !== pattern) };
 }
 
-// the words under a tool's name at the right: what decided its side
 export function decidedWords(d: Decided): string {
   if (d.side === "unusable") return "";
   if (d.by !== null) return `by ${d.by}`;
@@ -105,7 +94,6 @@ export function decidedWords(d: Decided): string {
 
 export type SideFilter = "all" | ToolSide;
 
-// the tools the search and the side leave, in name order
 export function shownTools<T extends Tools[number] & { description: string }>(
   tools: T[],
   decided: Map<string, Decided>,
@@ -129,10 +117,9 @@ export function sideCounts(
   return out;
 }
 
-// a tool a move left where it was, and the matcher that keeps it there
-export type Stay = { name: string; side: ToolSide; by: string };
+type Stay = { name: string; side: ToolSide; by: string };
 
-export type Moved = {
+type Moved = {
   patterns: Patterns;
   moved: number;
   stays: Stay[];
@@ -201,15 +188,12 @@ export function moveTools(
   return { patterns: next, moved, stays };
 }
 
-// what a move did, as the bar says it: "2 tools moved to Read", then
-// per matcher that held some, "get_me stays read by get_*"
 export function moveWords(result: Moved, target: MatcherSide): string[] {
   const out: string[] = [];
   const label = MATCHER_SIDES.find((s) => s.side === target)!.label;
   if (result.moved > 0) {
     out.push(`${plural(result.moved, "tool", "tools")} moved to ${label}`);
   }
-  // per matcher that held some: the tool when one, else how many
   const held = new Map<string, Stay[]>();
   for (const s of result.stays) {
     const key = `${s.side}\n${s.by}`;

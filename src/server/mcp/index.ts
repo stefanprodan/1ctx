@@ -4,7 +4,6 @@
 import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
-  type McpDigest,
   offeredServers,
   type PromptServer,
   promptSnapshot,
@@ -65,11 +64,6 @@ export type OfferedServer = {
   refreshFailedAt: number | null;
 };
 
-export type McpPrompt = {
-  text: string;
-  digest: McpDigest;
-};
-
 export type McpOffer = {
   servers: OfferedServer[];
   prompt: ReturnType<typeof promptSnapshot>;
@@ -94,7 +88,7 @@ export type McpDeps = {
   callTimeoutMs: () => number;
   render: (markdown: string, streaming?: boolean) => string;
   capabilities: { forget(key: string): void };
-  // the sessions area, built later: a closure called only on a request
+  // a closure, sessions is built later
   usage: UsagePort;
 };
 
@@ -333,7 +327,7 @@ export function mcpArea(deps: McpDeps): Mcp {
   return area;
 }
 
-export { type DiscoveryResult, discover, fingerprint } from "./discover.ts";
+export { discover, fingerprint } from "./discover.ts";
 export { changeNote } from "./note.ts";
 export { RefreshCoordinator } from "./refresh.ts";
 export {

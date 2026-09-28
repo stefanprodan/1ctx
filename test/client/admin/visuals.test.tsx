@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   limits,
+  loadVisualsUsage,
   tools,
   toolsError,
-  visualsUsage,
 } from "../../../src/client/data/tools.ts";
 import { ToolRow } from "../../../src/client/views/admin/ToolRow.tsx";
 import {
@@ -100,43 +100,41 @@ describe("the Visuals words", () => {
 });
 
 describe("the Visuals page", () => {
-  let held: [
-    typeof tools.value,
-    typeof limits.value,
-    typeof visualsUsage.value,
-  ];
+  const realFetch = globalThis.fetch;
+  let held: [typeof tools.value, typeof limits.value];
   beforeEach(() => {
-    held = [tools.value, limits.value, visualsUsage.value];
+    held = [tools.value, limits.value];
   });
   afterEach(() => {
-    [tools.value, limits.value, visualsUsage.value] = held;
+    [tools.value, limits.value] = held;
     toolsError.value = null;
+    globalThis.fetch = realFetch;
   });
 
   test.serial("three cards, each its own form, nothing to save at rest", () => {
     tools.value = response();
     limits.value = rows;
-    visualsUsage.value = null;
     const html = render(<Visuals />);
-    expect(html.match(/<form/g)).toHaveLength(3);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(3);
     expect(
       [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
     ).toEqual(["Visuals", "CDNs", "Limits"]);
-    // the switch sits in the first card's head, the tool as its row
+    expect(forms[0]).toContain('role="switch"');
+    expect(forms[0]).toContain(">visualize<");
+    expect(forms[1]).toContain('name="hosts"');
+    expect(forms[2]).toContain('name="visualBytes"');
     expect(html.match(/role="switch"/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Visuals on"');
-    expect(html).toContain(visualsLine(true));
+    expect(html).toContain("Allows agents to draw HTML and SVG visuals.");
     expect(html).toContain(">visualize<");
     expect(html).toMatch(/204 tokens/);
-    // every Save waits for a change
     expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(3);
     expect(html).not.toContain("Unsaved changes");
-    // the CDNs: the count, the box as saved
     expect(html).toMatch(/setting-count">2 of 16</);
     expect(html).toMatch(
       /<textarea name="hosts"[^>]*>https:\/\/a\.example\.com\nhttps:\/\/b\.example\.com</,
     );
-    // the visual limits alone, typed as text, a changed one's default
     expect(html).toContain('name="visualBytes"');
     expect(html).toContain('name="maxVisuals"');
     expect(html).not.toContain('name="rounds"');
@@ -144,7 +142,6 @@ describe("the Visuals page", () => {
     expect(html).toContain("default 256 KB");
     expect(html).not.toContain('type="number"');
     expect(html).toContain('inputmode="decimal"');
-    // the aside waits for its read
     expect(html).toContain("Last 30 days");
     expect(html).toContain("Loading");
   });
@@ -169,7 +166,7 @@ describe("the Visuals page", () => {
     limits.value = rows;
     const html = render(<Visuals />);
     expect(html).toContain('aria-label="Visuals off"');
-    expect(html).toContain(visualsLine(false));
+    expect(html).toContain("In-line visualizations are disabled.");
     expect(html).toContain("No CDNs. Visuals use inline code only.");
     expect(html).toMatch(/setting-count">0 of 16</);
     // the other cards stay editable while it is off
@@ -186,19 +183,34 @@ describe("the Visuals page", () => {
     expect(row).not.toContain('role="switch"');
   });
 
-  test.serial("the aside counts the last 30 days, or says it failed", () => {
-    tools.value = response();
-    limits.value = rows;
-    visualsUsage.value = {
-      usage: { since: 0, until: 1, drawn: 12, failed: 1, opened: 3 },
-    };
-    const html = render(<Visuals />);
-    expect(html).toMatch(/Drawn<span class="split-strong">12</);
-    expect(html).toMatch(/Failed<span class="split-strong">1</);
-    expect(html).toMatch(/Files opened<span class="split-strong">3</);
-    visualsUsage.value = { usage: null };
-    expect(render(<Visuals />)).toContain("Did not load.");
-  });
+  test.serial(
+    "the aside counts the last 30 days, or says it failed",
+    async () => {
+      tools.value = response();
+      limits.value = rows;
+      globalThis.fetch = (async () =>
+        Response.json({
+          since: 0,
+          until: 1,
+          drawn: 12,
+          failed: 1,
+          opened: 3,
+        })) as unknown as typeof fetch;
+      await loadVisualsUsage();
+      const html = render(<Visuals />);
+      expect(html).toMatch(/Drawn<span class="split-strong">12</);
+      expect(html).toMatch(/Failed<span class="split-strong">1</);
+      expect(html).toMatch(/Files opened<span class="split-strong">3</);
+      expect(html).toContain('href="/admin/monitor/usage"');
+      globalThis.fetch = (async () =>
+        Response.json(
+          { error: "nope" },
+          { status: 500 },
+        )) as unknown as typeof fetch;
+      await loadVisualsUsage();
+      expect(render(<Visuals />)).toContain("Did not load.");
+    },
+  );
 
   test.serial("says it is loading, then the failure", () => {
     tools.value = null;

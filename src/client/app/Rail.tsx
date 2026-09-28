@@ -1,16 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The rail, with two faces the address picks. The working face lists the
-// pages the route table marks with the user's projects under Projects,
-// personal first; the admin face has the zones, each a header link with
-// its pages under it, and a faint Admin after the logo. An admin gets a
-// band over the user row between the faces, each opening the last page
-// seen on the other. At the bottom the user row with its menu: the
-// profile, the dark theme's switch and sign out. A sign out the server
-// refuses stays in the menu with the reason. As a drawer the hide button is a close, it takes the focus
-// when the drawer opens, and any link closes the drawer, the one to the
-// page already shown included, since that is no navigation.
 
 import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
@@ -42,7 +31,6 @@ function Sub({
   here: string;
   // inside the link's page, not only on it
   on?: boolean;
-  // a project's kind; a zone's pages have none
   icon?: IconName;
   follow?: () => void;
   children: string;
@@ -66,9 +54,6 @@ function Sub({
   );
 }
 
-// the admin face: every zone open, its header the zone's overview; one
-// link is lit, the longest that holds the address, so an agent's page
-// lights Agents
 function Zones({ here, follow }: { here: string; follow?: () => void }) {
   const lit = zoneLit(here);
   return (
@@ -129,6 +114,8 @@ export function Rail({
       ?.querySelector(".rail-sub-on")
       ?.scrollIntoView({ block: "nearest" });
   }, [here, inProject, projects.value]);
+  // a link to the page on screen is no navigation, so the link closes
+  // the drawer itself
   const follow = narrow ? onHide : undefined;
   return (
     <aside class={`rail${narrow ? " rail-drawer" : ""}`}>

@@ -1,14 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A settings card, as Vercel's settings: a title, one line, the control,
-// and a foot with its hint and its own Save, so each card saves apart.
-// A card of what an object carries is `list`: the title, a count and
-// its Add in a band over rows that run edge to edge. `danger` is the
-// Delete card, last on its page, in the failed colour. A view composes
-// this, never restyles it.
 
+import { type Signal, useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
+import { address, navigate } from "../app/router.ts";
+import { Icon } from "../lib/icons.tsx";
+import {
+  type Problem,
+  type Save,
+  useFocusField,
+  useSave,
+} from "../lib/save.ts";
+import { AskDelete, Foot } from "./Foot.tsx";
 import "./setting.css";
 
 export function Setting({
@@ -25,29 +29,36 @@ export function Setting({
   // names the card aloud when it has no title
   label?: string;
   title?: string;
-  // faint after the title: "3 of 20"
   count?: string;
   line?: ComponentChildren;
-  // at the head's right: an Add, a Change
   action?: ComponentChildren;
   danger?: boolean;
   list?: boolean;
   foot?: ComponentChildren;
   children?: ComponentChildren;
 }) {
-  const head = (title !== undefined || action !== undefined) && (
-    <div class={`setting-head${line === undefined ? " setting-head-one" : ""}`}>
-      <div class="setting-words">
-        {title !== undefined && (
-          <h2 class="setting-title">
-            {title}
-            {count !== undefined && <span class="setting-count">{count}</span>}
-          </h2>
-        )}
-        {line !== undefined && <p class="setting-line">{line}</p>}
-      </div>
-      {action}
-    </div>
+  const inner = (
+    <>
+      {(title !== undefined || action !== undefined) && (
+        <div
+          class={`setting-head${line === undefined ? " setting-head-one" : ""}`}
+        >
+          <div class="setting-words">
+            {title !== undefined && (
+              <h2 class="setting-title">
+                {title}
+                {count !== undefined && (
+                  <span class="setting-count">{count}</span>
+                )}
+              </h2>
+            )}
+            {line !== undefined && <p class="setting-line">{line}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
+    </>
   );
   return (
     <section
@@ -56,23 +67,148 @@ export function Setting({
       }`}
       aria-label={title === undefined ? label : undefined}
     >
-      {list ? (
-        <>
-          {head}
-          {children}
-        </>
-      ) : (
-        <div class="setting-body">
-          {head}
-          {children}
-        </div>
-      )}
-      {foot !== undefined && <div class="setting-foot">{foot}</div>}
+      {list ? inner : <div class="setting-body">{inner}</div>}
+      {foot !== undefined && <SettingFoot>{foot}</SettingFoot>}
     </section>
   );
 }
 
-// the words at the foot's left: what a save does, or that a draft waits
+export function SettingFoot({ children }: { children: ComponentChildren }) {
+  return <div class="setting-foot">{children}</div>;
+}
+
 export function SettingHint({ children }: { children: ComponentChildren }) {
   return <span class="setting-hint">{children}</span>;
+}
+
+export function SettingStack({ children }: { children: ComponentChildren }) {
+  return <div class="setting-stack">{children}</div>;
+}
+
+export function SettingForm({
+  save,
+  check,
+  class: owner,
+  children,
+}: {
+  save: Save;
+  check?: () => Problem | string | null;
+  class?: string;
+  children: ComponentChildren;
+}) {
+  const form = useRef<HTMLFormElement>(null);
+  useFocusField(save, form);
+  return (
+    <form
+      ref={form}
+      class={owner}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save.run(check?.() ?? null);
+      }}
+    >
+      {children}
+    </form>
+  );
+}
+
+export function SettingFacts({ children }: { children: ComponentChildren }) {
+  return <div class="setting-facts">{children}</div>;
+}
+
+export function SettingFact({
+  label,
+  mono,
+  bad,
+  pre,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  bad?: boolean;
+  pre?: boolean;
+  children: ComponentChildren;
+}) {
+  return (
+    <>
+      <span class="label">{label}</span>
+      <span
+        class={`setting-fact${mono ? " setting-fact-mono" : ""}${
+          pre ? " setting-fact-pre" : ""
+        }${bad ? " error" : ""}`}
+      >
+        {children}
+      </span>
+    </>
+  );
+}
+
+export function SettingAlert({ children }: { children: ComponentChildren }) {
+  return (
+    <p class="setting-alert" role="status">
+      <Icon name="alert" size={16} class="setting-alert-icon" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+export function SettingDelete({
+  title,
+  line,
+  ask,
+  off,
+  lock,
+  onAsk,
+  onDelete,
+  leaveTo,
+}: {
+  title: string;
+  line: ComponentChildren;
+  ask: string;
+  // in use
+  off?: boolean;
+  // the page's saving flag: set while the delete runs, so no card saves
+  lock?: Signal<boolean>;
+  onAsk?: () => Promise<void>;
+  // throws to refuse
+  onDelete: () => Promise<void>;
+  leaveTo: string;
+}) {
+  const asking: Signal<boolean> = useSignal(false);
+  const save = useSave(async () => {});
+  return (
+    <Setting
+      danger
+      title={title}
+      line={line}
+      foot={
+        <Foot save={save}>
+          <div class="setting-delete">
+            <AskDelete
+              save={save}
+              asking={asking}
+              busy={save.busy || off === true || lock?.value === true}
+              words={ask}
+              wordsClass="setting-ask"
+              onAsk={onAsk}
+              // the list drops the row as the call ends, which takes this
+              // card away before act answers: the call leaves
+              onDelete={() => {
+                void save.act("delete", async () => {
+                  const from = address();
+                  if (lock) lock.value = true;
+                  try {
+                    await onDelete();
+                  } finally {
+                    if (lock) lock.value = false;
+                  }
+                  if (address() === from) navigate(leaveTo);
+                });
+              }}
+            />
+          </div>
+        </Foot>
+      }
+    />
+  );
 }

@@ -1,17 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Config › Web access, in two tabs. General: who agents may reach, the
-// search provider, how much one turn may fetch and search, and the two
-// tools it offers, each a card that drafts and saves apart. Credentials:
-// the list of what bash's curl signs with, each a link to its page, New
-// credential in the head and `?new` its form. The aside has the last 30
-// days, and on Credentials the http- key files. Nothing saves before
-// Save, the mode and the provider included. A change applies to the
-// next turn.
 
 import { useSignal } from "@preact/signals";
-import { useRef } from "preact/hooks";
 import type { ToolsResponse } from "../../../shared/api/tools.ts";
 import type { WebAccessMode } from "../../../shared/web.ts";
 import {
@@ -33,19 +23,20 @@ import {
   webUsage,
 } from "../../data/tools.ts";
 import { count, tokensText } from "../../lib/format.ts";
-import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { CREDENTIALS_HREF } from "../../lib/hrefs.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageNew } from "../../ui/Page.tsx";
 import { RowsLine, RowsMeta, RowsRadio, RowsTitle } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { Setting } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Setting, SettingForm } from "../../ui/Setting.tsx";
+import { AsideLine, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { KeyFilesSection, UsageSection } from "./AdminAside.tsx";
 import { CredentialList } from "./CredentialList.tsx";
-import { keyUsers } from "./Credentials.model.ts";
+import { keyReader } from "./Credentials.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 import { LimitsSetting } from "./LimitsSetting.tsx";
 import { NewCredential } from "./NewCredential.tsx";
 import { ToolRow } from "./ToolRow.tsx";
@@ -61,8 +52,7 @@ import {
   domainsCount,
   domainsFieldOf,
   domainsText,
-  keyLine,
-  searchDirty,
+  searchKeyLine,
   searchLine,
   WEB_LIMITS,
   WEB_TABS,
@@ -81,10 +71,10 @@ export function WebAccess() {
 function Tabbed({ tab }: { tab: "general" | "credentials" }) {
   const state = tools.value;
   const rows = limits.value;
-  // the Credentials tab fails with its list too
   const error =
     toolsError.value ?? (tab === "credentials" ? credentialsError.value : null);
-  const listed = credentials.value?.length;
+  // an empty list says no count
+  const listed = credentials.value?.length || undefined;
   return (
     <Page
       steps={[zoneStep("Config")]}
@@ -92,10 +82,7 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
       split
       actions={
         tab === "credentials" ? (
-          <a class="btn btn-small" href={`${CREDENTIALS_HREF}?new`}>
-            <Icon name="plus" size={14} />
-            New credential
-          </a>
+          <PageNew href={`${CREDENTIALS_HREF}?new`} label="New credential" />
         ) : undefined
       }
       loading={(state === null || rows === null) && error === null}
@@ -112,8 +99,7 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
               }))}
               active={WEB_TABS.find((t) => t.tab === tab)!.href}
             />
-            {/* hidden, not unmounted, so a draft outlives a look at
-                Credentials */}
+            {/* hidden, not unmounted, so a draft outlives a look */}
             <div
               class={`web-access-cards${
                 tab === "general" ? "" : " web-access-away"
@@ -136,17 +122,12 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
   );
 }
 
-// the mode in the head, the line under the title saying what the
-// drafted mode lets agents do; Listed domains opens the box. The drafts
-// are null until a pick or a keystroke, so the card shows what was
-// saved, a load that lands after the first draw included
+// null until a pick, so a load that lands late shows through
 function Access({ state }: { state: ToolsResponse }) {
   const access = state.access;
   const drafted = useSignal<WebAccessMode | null>(null);
   const text = useSignal<string | null>(null);
-  const form = useRef<HTMLFormElement>(null);
-  const latest = useRef(access);
-  latest.current = access;
+  const latest = useLatest(access);
   const save = useSave(async () => {
     const saved = latest.current;
     const got = accessBody(
@@ -158,17 +139,15 @@ function Access({ state }: { state: ToolsResponse }) {
     drafted.value = null;
     text.value = null;
   }, domainsFieldOf);
-  useFocusField(save, form);
   const mode = drafted.value ?? access.mode;
   const typed = text.value ?? domainsText(access.domains);
   const invalid = save.fieldError("domains") !== null;
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
+    <SettingForm
+      save={save}
+      check={() => {
         const got = accessBody(mode, typed);
-        void save.run("error" in got ? at("domains", got.error) : null);
+        return "error" in got ? at("domains", got.error) : null;
       }}
     >
       <Setting
@@ -186,8 +165,7 @@ function Access({ state }: { state: ToolsResponse }) {
             }))}
             onPick={(next) => {
               drafted.value = next;
-              // back on a saved mode that hides the box, what was typed
-              // in it goes, so Listed shows the saved list again
+              // back on a saved mode, the typed hosts go
               if (next === access.mode && next !== "listed") {
                 text.value = null;
               }
@@ -232,17 +210,14 @@ function Access({ state }: { state: ToolsResponse }) {
           </label>
         )}
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// None first, then a row per provider with whether its key file is
-// there; the line follows the drafted pick
 function Search({ state }: { state: ToolsResponse }) {
   const search = state.search;
   const drafted = useSignal<{ provider: SearchProvider | null } | null>(null);
-  const latest = useRef(search);
-  latest.current = search;
+  const latest = useLatest(search);
   const save = useSave(async () => {
     const provider = (drafted.value ?? latest.current).provider;
     await patchTool("websearch", { provider });
@@ -254,12 +229,7 @@ function Search({ state }: { state: ToolsResponse }) {
     save.touch();
   };
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Search"
         line={searchLine({ ...search, provider }, state.access.mode)}
@@ -267,7 +237,7 @@ function Search({ state }: { state: ToolsResponse }) {
         foot={
           <DraftFoot
             save={save}
-            dirty={searchDirty(provider, search)}
+            dirty={provider !== search.provider}
             onDiscard={() => {
               drafted.value = null;
             }}
@@ -294,15 +264,14 @@ function Search({ state }: { state: ToolsResponse }) {
               onChange={() => pick(p)}
             />
             <RowsTitle name={p} mono />
-            <RowsMeta>{keyLine(p, search.keys[p])}</RowsMeta>
+            <RowsMeta>{searchKeyLine(p, search.keys[p])}</RowsMeta>
           </RowsLine>
         ))}
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// webfetch and websearch as the model gets them, one open at a time
 function Tools({ state }: { state: ToolsResponse }) {
   const open = useSignal<string | null>(null);
   const rows = state.builtin.filter(
@@ -325,60 +294,24 @@ function Tools({ state }: { state: ToolsResponse }) {
 }
 
 function Aside({ tab }: { tab: "general" | "credentials" }) {
-  const known = webUsage.value;
-  const usage = known?.usage ?? null;
+  const list = credentials.value;
   return (
     <>
-      <AsideSection label="Last 30 days">
-        {known === null ? (
-          <p class="split-empty">Loading</p>
-        ) : usage === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
+      <UsageSection value={webUsage.value()}>
+        {(usage) => (
           <>
             <AsideLine label="Fetches">{count(usage.fetches)}</AsideLine>
             <AsideLine label="Searches">{count(usage.searches)}</AsideLine>
             <AsideLine label="Failed">{count(usage.failed)}</AsideLine>
           </>
         )}
-      </AsideSection>
-      {tab === "credentials" && <KeyFiles />}
-    </>
-  );
-}
-
-// the http- files in the secrets directory, each with the credential
-// that reads it, or how many share it
-function KeyFiles() {
-  const list = credentials.value;
-  if (list === null) return null;
-  const files = credentialKeys.value
-    .map((k) => k.name)
-    .sort((a, b) => a.localeCompare(b));
-  return (
-    <AsideSection label="Key files">
-      {files.length === 0 ? (
-        <p class="split-empty">None in the secrets directory.</p>
-      ) : (
-        files.map((file) => {
-          const users = keyUsers(file, list);
-          return (
-            <AsideLine
-              key={file}
-              label={`${file}.key`}
-              cut
-              href={
-                users.name !== null
-                  ? configCredentialHref(users.name)
-                  : undefined
-              }
-              quiet={users.count === 0}
-            >
-              {users.label}
-            </AsideLine>
-          );
-        })
+      </UsageSection>
+      {tab === "credentials" && list !== null && (
+        <KeyFilesSection
+          files={credentialKeys.value.map((k) => k.name)}
+          reader={keyReader(list)}
+        />
       )}
-    </AsideSection>
+    </>
   );
 }

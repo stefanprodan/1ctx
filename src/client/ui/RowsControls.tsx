@@ -1,17 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The controls of a list's rows, kept apart from Rows.tsx for its size
-// and exported through it: a card head's filters, and a row's end with
-// its switch, radio and box.
 
 import type { ComponentChildren } from "preact";
 import { Icon, type IconName } from "../lib/icons.tsx";
 import "./rows.css";
 
-// a card head's few filters, one lit: links when each is an address,
-// buttons when the page holds the pick
-export type RowsFilter = {
+type RowsFilter = {
   label: string;
   on: boolean;
   icon?: IconName;
@@ -61,9 +55,6 @@ export function RowsFilters({
   );
 }
 
-// the row's end: its buttons, after the words that ask or the failure
-// of the last try; under 720 an end with words wraps below the head,
-// and any end that does not fit beside the name wraps below it
 export function RowsEnd({
   words,
   error,
@@ -87,7 +78,6 @@ export function RowsEnd({
   );
 }
 
-// a server-wide switch at a row's end
 export function RowsSwitch({
   on,
   label,
@@ -114,7 +104,6 @@ export function RowsSwitch({
   );
 }
 
-// a pick of one, first in a label row
 export function RowsRadio({
   name,
   value,
@@ -141,8 +130,7 @@ export function RowsRadio({
   );
 }
 
-// a box: first in a label row, or with its words at a row's end. The
-// native box stays for the keyboard and a screen reader, drawn over.
+// the native box stays for the keyboard and a screen reader, drawn over
 export function RowsCheck({
   name,
   value,
@@ -158,14 +146,11 @@ export function RowsCheck({
   value?: string;
   checked: boolean;
   disabled?: boolean;
-  // the side cannot take effect: its words go faint, the note says why
   faint?: boolean;
   note?: string;
-  // what a box alone says aloud, with no words beside it nor a row
-  // around it as its label; the box is then a label of its own
+  // a box alone, with no words nor a label row: it is its own label
   label?: string;
   onChange: () => void;
-  // the words beside the box; without them the row is the label
   children?: ComponentChildren;
 }) {
   const box = (
@@ -214,5 +199,28 @@ export function RowsCheck({
       {children}
       {note && <span class="rows-check-note">{note}</span>}
     </label>
+  );
+}
+
+export function RowsRemove({
+  name,
+  disabled,
+  onRemove,
+}: {
+  name: string;
+  disabled?: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      class="btn-icon rows-remove"
+      aria-label={`Remove ${name}`}
+      title="Remove"
+      disabled={disabled}
+      onClick={onRemove}
+    >
+      <Icon name="close" size={14} />
+    </button>
   );
 }

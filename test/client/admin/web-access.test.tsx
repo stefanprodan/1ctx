@@ -10,9 +10,9 @@ import {
 } from "../../../src/client/data/credentials.ts";
 import {
   limits,
+  loadWebUsage,
   tools,
   toolsError,
-  webUsage,
 } from "../../../src/client/data/tools.ts";
 import {
   ACCESS_WORDS,
@@ -23,7 +23,6 @@ import {
   DOMAINS_PLACEHOLDER,
   domainsCount,
   domainsText,
-  searchDirty,
   WEB_LIMITS,
   webTab,
 } from "../../../src/client/views/admin/WebAccess.model.ts";
@@ -169,81 +168,68 @@ describe("the Web access words", () => {
     expect(boxRows("a.example.com")).toBe(6);
     expect(boxRows(Array(8).fill("a.example.com").join("\n"))).toBe(9);
   });
-
-  test("None against None is no change", () => {
-    const none = { ...search, provider: null };
-    expect(searchDirty(null, none)).toBe(false);
-    expect(searchDirty("exa", none)).toBe(true);
-    expect(searchDirty(null, search)).toBe(true);
-    expect(searchDirty("exa", search)).toBe(false);
-  });
 });
+
+const realFetch = globalThis.fetch;
 
 describe("the Web access page", () => {
   let held: [
     typeof tools.value,
     typeof limits.value,
-    typeof webUsage.value,
     typeof credentials.value,
     string,
   ];
   beforeEach(() => {
-    held = [
-      tools.value,
-      limits.value,
-      webUsage.value,
-      credentials.value,
-      path.value,
-    ];
+    held = [tools.value, limits.value, credentials.value, path.value];
     path.value = "/admin/config/web";
   });
   afterEach(() => {
-    [tools.value, limits.value, webUsage.value, credentials.value, path.value] =
-      held;
+    [tools.value, limits.value, credentials.value, path.value] = held;
     toolsError.value = null;
+    globalThis.fetch = realFetch;
   });
 
   test.serial("General: four cards, three forms, nothing to save", () => {
     tools.value = response();
     limits.value = rows;
-    webUsage.value = null;
     const html = render(<WebAccess />);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(3);
     expect(
       [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
     ).toEqual(["Access", "Search", "Limits", "Tools"]);
-    expect(html.match(/<form/g)).toHaveLength(3);
+    expect(forms[0]).toContain('aria-pressed="true"');
+    expect(forms[1]).toContain('value="exa"');
+    expect(forms[2]).toContain(`name="${WEB_LIMITS[0]}"`);
     expect(html.match(/type="submit"[^>]*disabled/g)).toHaveLength(3);
     expect(html).not.toContain("Unsaved changes");
-    // the tabs, General lit
     expect(html).toMatch(/General/);
     expect(html).toContain("Credentials");
-    // the mode as saved, its words, no box while All domains
-    expect(html).toMatch(/seg-on" aria-pressed="true">All domains/);
+    expect(html).toMatch(
+      /<button\b(?=[^>]*\bseg-on\b)[^>]*aria-pressed="true"[^>]*>All domains/,
+    );
     expect(html).toContain(ACCESS_WORDS.all);
     expect(html).not.toContain('name="domains"');
-    // None first, the saved provider picked, the key files
     expect(html.indexOf('value="none"')).toBeLessThan(
       html.indexOf('value="exa"'),
     );
-    expect(html).toMatch(/value="exa" checked/);
+    expect(html).toMatch(
+      /<input\b(?=[^>]*value="exa")(?=[^>]*\bchecked)[^>]*>/,
+    );
     expect(html).toContain("search-exa.key present");
     expect(html).toContain("search-tavily.key keyless");
     expect(html).toContain("websearch runs on exa.");
-    // the web limits alone, a changed one's default
-    // fetch's three over search's, as listed, not as the rows come
     expect(
-      [
-        ...html.matchAll(/<input class="numberbox-input" name="([a-zA-Z]+)"/g),
-      ].map((m) => m[1]),
+      [...forms[2]!.matchAll(/<input\b[^>]*name="([a-zA-Z]+)"/g)].map(
+        (m) => m[1],
+      ),
     ).toEqual([...WEB_LIMITS]);
     expect(html).not.toContain('name="callTimeoutMs"');
     expect(html).toContain("default 2 MB");
-    // the two web tools, their tokens together, bash left out
     expect(html).toContain(">webfetch<");
     expect(html).toContain(">websearch<");
     expect(html).not.toContain(">bash<");
     expect(html).toMatch(/setting-count">200 tokens</);
-    // the aside waits for its read
     expect(html).toContain("Last 30 days");
     expect(html).toContain("Loading");
   });
@@ -284,13 +270,14 @@ describe("the Web access page", () => {
     expect(html).toMatch(/value="none" checked/);
   });
 
-  test.serial("Credentials: the list's card, the count on its tab", () => {
+  test.serial("Credentials: the list's card, no count on an empty tab", () => {
     tools.value = response();
     limits.value = rows;
     credentials.value = [];
     path.value = "/admin/config/web/credentials";
     const html = render(<WebAccess />);
-    expect(html).toMatch(/Credentials<span class="tabs-count">0</);
+    expect(html).toContain("Credentials</a>");
+    expect(html).not.toContain("tabs-count");
     // General stays drawn, hidden, so its drafts outlive the look
     expect(html).toContain('class="web-access-cards web-access-away"');
     expect(html).toContain("setting-title");
@@ -309,19 +296,34 @@ describe("the Web access page", () => {
     }
   });
 
-  test.serial("the aside counts the last 30 days, or says it failed", () => {
-    tools.value = response();
-    limits.value = rows;
-    webUsage.value = {
-      usage: { since: 0, until: 1, fetches: 9, searches: 4, failed: 2 },
-    };
-    const html = render(<WebAccess />);
-    expect(html).toMatch(/Fetches<span class="split-strong">9</);
-    expect(html).toMatch(/Searches<span class="split-strong">4</);
-    expect(html).toMatch(/Failed<span class="split-strong">2</);
-    webUsage.value = { usage: null };
-    expect(render(<WebAccess />)).toContain("Did not load.");
-  });
+  test.serial(
+    "the aside counts the last 30 days, or says it failed",
+    async () => {
+      tools.value = response();
+      limits.value = rows;
+      globalThis.fetch = (async () =>
+        Response.json({
+          since: 0,
+          until: 1,
+          fetches: 9,
+          searches: 4,
+          failed: 2,
+        })) as unknown as typeof fetch;
+      await loadWebUsage();
+      const html = render(<WebAccess />);
+      expect(html).toMatch(/Fetches<span class="split-strong">9</);
+      expect(html).toMatch(/Searches<span class="split-strong">4</);
+      expect(html).toMatch(/Failed<span class="split-strong">2</);
+      expect(html).toContain('href="/admin/monitor/usage"');
+      globalThis.fetch = (async () =>
+        Response.json(
+          { error: "nope" },
+          { status: 500 },
+        )) as unknown as typeof fetch;
+      await loadWebUsage();
+      expect(render(<WebAccess />)).toContain("Did not load.");
+    },
+  );
 
   test.serial("says it is loading, then the failure", () => {
     tools.value = null;

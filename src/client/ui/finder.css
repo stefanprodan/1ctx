@@ -1,6 +1,3 @@
-/* A list of names under a button, a search pinned on top: the
-   switcher, a filter, an Add. */
-
 @layer tokens, base, owners;
 
 @layer owners {
@@ -10,7 +7,6 @@
     min-width: 0;
   }
 
-  /* placed on the screen by the view, from the button's box */
   .finder-panel {
     position: fixed;
     z-index: 3;
@@ -19,41 +15,11 @@
     overflow: hidden;
   }
 
-  .finder-search {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--space-2);
-    height: 40px;
-    padding: 0 var(--space-3);
-    border-bottom: 1px solid var(--line);
-  }
-  .finder-glass {
-    flex-shrink: 0;
-    color: var(--faint);
-  }
-  .finder-input {
-    flex-grow: 1;
-    min-width: 0;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--fg);
-    font-size: var(--text-input);
-    outline: none;
-  }
-
   .finder-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
     min-height: 0;
-    padding: var(--space-1);
-    overflow-y: auto;
   }
-  /* the names sit under the search's glass: the list's inset and the
-     row's padding make the search's */
+  /* the list's inset and the row's padding line the names up under the
+     search's glass */
   .finder-item.menu-item {
     flex-direction: column;
     align-items: flex-start;
@@ -85,17 +51,8 @@
     line-height: 1.4;
     color: var(--faint);
   }
-  .finder-none {
-    margin: 0;
-    padding: var(--space-2);
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
 
   @media (pointer: coarse) {
-    .finder-input {
-      font-size: var(--text-touch);
-    }
     .finder-item.menu-item {
       min-height: 44px;
     }

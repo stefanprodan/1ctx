@@ -1,15 +1,6 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An agent's MCP tab: one card of the servers it may use, each its name
-// over its last refresh, the tools a turn gets and the access, Read or
-// Read and write, a side the server has off disabled; Add over the
-// servers it does not use yet, a new one on Read. Under it the tool
-// schemas mode and the instructions the prompt would carry from the
-// draft, each card a draft of its own. A model that takes no tools says
-// so and shows neither, the saved links kept.
 
-import { useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   AgentServer,
@@ -19,33 +10,39 @@ import { MAX_INSTRUCTIONS_BLOCK, offeredServers } from "../../../shared/mcp.ts";
 import { updateAgent } from "../../data/agents.ts";
 import { servers as serverRows } from "../../data/mcp.ts";
 import { commas, showAll } from "../../lib/format.ts";
-import { Icon } from "../../lib/icons.tsx";
+import { MCP_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
 import { Fold } from "../../ui/Fold.tsx";
-import { RowsEnd, RowsLine, RowsNote, RowsTitle } from "../../ui/Rows.tsx";
-import { Seg } from "../../ui/Seg.tsx";
-import { Setting } from "../../ui/Setting.tsx";
-import { serverLine, serverMeta } from "../people/People.model.ts";
-import { cardBody, cardFieldOf } from "./AgentPage.model.ts";
-import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
-import { listed } from "./Agents.model.ts";
-import { DraftFoot } from "./DraftFoot.tsx";
 import {
+  RowsEnd,
+  RowsLine,
+  RowsNote,
+  RowsRemove,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
+import { Seg } from "../../ui/Seg.tsx";
+import { Setting, SettingForm } from "../../ui/Setting.tsx";
+import { serverLine, serverMeta } from "../people/People.model.ts";
+import {
+  cardBody,
   isModeValue,
   MODE_HINT,
   MODE_OPTIONS,
   promptPreview,
-} from "./Mcp.model.ts";
+} from "./AgentPage.model.ts";
+import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
+import { listed } from "./Agents.model.ts";
+import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 
 const OFF = "Disabled in the server config";
 
 type Access = "read" | "write" | "none";
 
-// the tools a turn gets from a server with these sides on
 const toolCount = (server: McpServerSummary, link: AgentServer) =>
   offeredServers([server], [link])[0]?.tools.length ?? 0;
 
@@ -76,23 +73,19 @@ function Servers({
   drafts: AgentDrafts;
   takesTools: boolean;
 }) {
-  const latest = useRef(agent);
-  latest.current = agent;
+  const latest = useLatest(agent);
   const all = serverRows.value;
   const now = useNow(60_000);
-  // a server deleted since the save drops from it
   const chosen = () =>
     listed(d.servers.value, (s) => s.serverId, serverRows.value);
-  const save = useSave(
-    () =>
-      d.save(async () => {
-        const saved = await updateAgent(
-          latest.current.id,
-          cardBody(latest.current, { servers: chosen() }, loadedRows()),
-        );
-        d.resetServers(saved);
-      }),
-    cardFieldOf([]),
+  const save = useSave(() =>
+    d.save(async () => {
+      const saved = await updateAgent(
+        latest.current.id,
+        cardBody(latest.current, { servers: chosen() }, loadedRows()),
+      );
+      d.resetServers(saved);
+    }),
   );
   const links = chosen();
   const linkOf = (id: string) => links.find((l) => l.serverId === id);
@@ -105,14 +98,8 @@ function Servers({
     save.touch();
   };
   const listable = takesTools && all !== null && all.length > 0;
-  // Save is the foot's submit
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         list
         title="MCP servers"
@@ -120,12 +107,7 @@ function Servers({
           listable && (
             <Finder
               label="MCP servers"
-              trigger={
-                <>
-                  <Icon name="plus" size={14} />
-                  Add server
-                </>
-              }
+              add="Add server"
               disabled={save.busy}
               options={byName(
                 all.filter((s) => linkOf(s.id) === undefined),
@@ -147,7 +129,6 @@ function Servers({
               })}
               mono
               wide
-              align="right"
               placeholder="Find a server"
               none="No server matches"
               empty="Every server is added"
@@ -172,8 +153,8 @@ function Servers({
           <RowsNote>The servers did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No MCP servers yet. <a href="/admin/config/mcp">Add one</a> and it
-            shows here.
+            No MCP servers yet. <a href={MCP_HREF}>Add one</a> and it shows
+            here.
           </RowsNote>
         ) : !takesTools ? (
           <RowsNote>This model takes no tools.</RowsNote>
@@ -183,7 +164,6 @@ function Servers({
           rows.map((server) => {
             const link = linkOf(server.id)!;
             const line = serverLine(server, now);
-            // what a turn gets: the link's sides the server has on too
             const access: Access = !server.read
               ? "none"
               : link.write && server.write
@@ -230,23 +210,18 @@ function Servers({
                   />
                 </span>
                 <RowsEnd>
-                  <button
-                    type="button"
-                    class="btn-icon agent-page-remove"
-                    aria-label={`Remove ${server.name}`}
-                    title="Remove"
+                  <RowsRemove
+                    name={server.name}
                     disabled={save.busy}
-                    onClick={() => set(server.id, null)}
-                  >
-                    <Icon name="close" size={14} />
-                  </button>
+                    onRemove={() => set(server.id, null)}
+                  />
                 </RowsEnd>
               </RowsLine>
             );
           })
         )}
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
@@ -257,31 +232,22 @@ function Schemas({
   agent: AgentSummary;
   drafts: AgentDrafts;
 }) {
-  const latest = useRef(agent);
-  latest.current = agent;
-  const save = useSave(
-    () =>
-      d.save(async () => {
-        const saved = await updateAgent(
-          latest.current.id,
-          cardBody(latest.current, { mcpMode: d.mode.value }, loadedRows()),
-        );
-        d.resetMode(saved);
-      }),
-    cardFieldOf([]),
+  const latest = useLatest(agent);
+  const save = useSave(() =>
+    d.save(async () => {
+      const saved = await updateAgent(
+        latest.current.id,
+        cardBody(latest.current, { mcpMode: d.mode.value }, loadedRows()),
+      );
+      d.resetMode(saved);
+    }),
   );
   const preview = promptPreview(
     serverRows.value ?? [],
     listed(d.servers.value, (s) => s.serverId, serverRows.value),
   );
-  // Save is the foot's submit
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Tool schemas"
         line={MODE_HINT[d.mode.value]}
@@ -310,7 +276,7 @@ function Schemas({
           <Instructions preview={preview} />
         )}
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 

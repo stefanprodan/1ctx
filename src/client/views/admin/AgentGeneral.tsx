@@ -1,36 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An agent's General tab: the name and avatar side by side with the
-// system prompt and the default mark under them, one Save for the four;
-// the model; and Delete, last, saying what goes with it and asking in
-// its foot.
 
-import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import { address, navigate } from "../../app/router.ts";
+import { navigate } from "../../app/router.ts";
 import {
   agents,
   deleteAgent,
-  facts,
+  factsFor,
   loadFacts,
   updateAgent,
 } from "../../data/agents.ts";
-import { configAgentHref } from "../../lib/hrefs.ts";
-import { nameProblem } from "../../lib/names.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
-import { AskDelete, Foot } from "../../ui/Foot.tsx";
-import { Setting } from "../../ui/Setting.tsx";
+import { AGENTS_HREF, configAgentHref } from "../../lib/hrefs.ts";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
+import { at, useSave } from "../../lib/save.ts";
+import { Setting, SettingDelete, SettingForm } from "../../ui/Setting.tsx";
 import { AgentModel } from "./AgentModel.tsx";
-import {
-  cardBody,
-  cardFieldOf,
-  deleteLine,
-  nameTaken,
-} from "./AgentPage.model.ts";
+import { cardBody, cardFieldOf, deleteLine } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 import { NameFields } from "./NameFields.tsx";
 
 export function AgentGeneral({
@@ -44,22 +32,27 @@ export function AgentGeneral({
     <>
       <Identity agent={agent} drafts={drafts} />
       <AgentModel agent={agent} drafts={drafts} />
-      <DeleteCard agent={agent} drafts={drafts} />
+      <SettingDelete
+        title={`Delete @${agent.name}`}
+        line={deleteLine(factsFor(agent.id)?.impact ?? null)}
+        ask={`Delete @${agent.name}?`}
+        lock={drafts.saving}
+        onAsk={() => loadFacts(agent.name)}
+        onDelete={() => deleteAgent(agent.id)}
+        leaveTo={AGENTS_HREF}
+      />
     </>
   );
 }
 
 function Identity({
   agent,
-  drafts,
+  drafts: d,
 }: {
   agent: AgentSummary;
   drafts: AgentDrafts;
 }) {
-  // the save is made once, so it reads the latest row when it runs
-  const latest = useRef(agent);
-  latest.current = agent;
-  const d = drafts;
+  const latest = useLatest(agent);
   const save = useSave(
     () =>
       d.save(async () => {
@@ -88,25 +81,19 @@ function Identity({
       }),
     cardFieldOf(["name", "prompt"]),
   );
-  const form = useRef<HTMLFormElement>(null);
-  useFocusField(save, form);
-  const dirty = d.generalDirty(agent);
-  const taken = nameTaken(d.name.value, agents.value, agent.id);
+  const taken = nameTaken(agents.value, d.name.value, agent.id);
   const kept = agent.default && agents.value?.[0]?.id === agent.id;
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(at("name", nameProblem(d.name.value)));
-      }}
+    <SettingForm
+      save={save}
+      check={() => at("name", nameProblem(d.name.value))}
     >
       <Setting
         title="Identity"
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
+            dirty={d.generalDirty(agent)}
             blocked={taken || d.name.value.trim() === ""}
             locked={d.saving.value}
             hint={
@@ -120,57 +107,6 @@ function Identity({
       >
         <NameFields drafts={d} save={save} kept={kept} />
       </Setting>
-    </form>
-  );
-}
-
-function DeleteCard({
-  agent,
-  drafts: d,
-}: {
-  agent: AgentSummary;
-  drafts: AgentDrafts;
-}) {
-  const asking = useSignal(false);
-  const save = useSave(async () => {});
-  const impact = facts.value?.agentId === agent.id ? facts.value.impact : null;
-  // Escape takes the ask back
-  useEffect(() => {
-    if (!asking.value) return;
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") asking.value = false;
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [asking.value]);
-  return (
-    <Setting
-      danger
-      title={`Delete @${agent.name}`}
-      line={deleteLine(impact)}
-      foot={
-        <Foot save={save}>
-          <div class="agent-page-delete">
-            <AskDelete
-              save={save}
-              asking={asking}
-              busy={save.busy || d.saving.value}
-              words={`Delete @${agent.name}?`}
-              wordsClass="agent-page-ask"
-              onAsk={() => loadFacts(agent.name)}
-              // the list drops the agent as the call ends, which takes
-              // this card away before act answers: the call leaves
-              onDelete={() => {
-                void save.act("delete", async () => {
-                  const from = address();
-                  await deleteAgent(agent.id);
-                  if (address() === from) navigate("/admin/config/agents");
-                });
-              }}
-            />
-          </div>
-        </Foot>
-      }
-    />
+    </SettingForm>
   );
 }

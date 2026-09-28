@@ -5,7 +5,7 @@
 // entity that follows the signed-in user, and the pages rendered over
 // the rows.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
@@ -23,7 +23,6 @@ import {
 import { NewUser } from "../../../src/client/views/admin/NewUser.tsx";
 import { UserPage } from "../../../src/client/views/admin/UserPage.tsx";
 import {
-  activeLine,
   adminCount,
   disableLock,
   emailProblem,
@@ -40,29 +39,12 @@ import {
 import { Users } from "../../../src/client/views/admin/Users.tsx";
 import type { AdminUser } from "../../../src/shared/api/users.ts";
 import type { ProjectSummary } from "../../../src/shared/contracts/project.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import { admin as adminFixture, user } from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
+const admin = adminFixture();
 const NOW = Date.parse("2026-09-28T12:00:00Z");
-const root: AdminUser = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  email: "admin@1ctx.dev",
-  tz: "UTC",
-  createdAt: new Date(2026, 8, 12).getTime(),
-  disabled: false,
-  mustChangePassword: false,
-  lastVisitDay: "2026-09-28",
-  projectIds: [],
-};
+const root = user({ lastVisitDay: "2026-09-28" });
 const casey: AdminUser = {
   id: "u2",
   username: "casey",
@@ -84,103 +66,103 @@ const team = (id: string, name: string): ProjectSummary => ({
   memberCount: 1,
 });
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
+  // a new sign-in drops every answer, the aside's included
+  me.value = null;
   me.value = admin;
-  users.value = null;
   usersError.value = null;
-  userUsage.value = {};
   projects.value = null;
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the words", () => {
-  test("the handle with the email, the role and when last active", () => {
-    expect(metaLine(casey)).toBe("@casey · casey@example.com");
-    expect(stateLine(root, NOW)).toBe("admin · active today");
-    expect(stateLine(casey, NOW)).toBe("member · password to change");
-    expect(stateLine({ ...casey, disabled: true }, NOW)).toBe(
-      "member · disabled",
-    );
-    expect(stateLine({ ...casey, mustChangePassword: false }, NOW)).toBe(
-      "member · never active",
-    );
-  });
+  test.serial(
+    "the handle with the email, the role and when last active",
+    () => {
+      expect(metaLine(casey)).toBe("@casey · casey@example.com");
+      expect(stateLine(root, NOW)).toBe("admin · active today");
+      expect(stateLine(casey, NOW)).toBe("member · password to change");
+      expect(stateLine({ ...casey, disabled: true }, NOW)).toBe(
+        "member · disabled",
+      );
+      expect(stateLine({ ...casey, mustChangePassword: false }, NOW)).toBe(
+        "member · never active",
+      );
+    },
+  );
 
-  test("last active counts the user's own days, never hours", () => {
-    const utc = (lastVisitDay: string | null) => ({ lastVisitDay, tz: "UTC" });
-    expect(activeLine(utc("2026-09-28"), NOW)).toBe("active today");
-    expect(activeLine(utc("2026-09-27"), NOW)).toBe("active yesterday");
-    expect(activeLine(utc("2026-09-25"), NOW)).toBe("active 3d ago");
-    expect(activeLine(utc(null), NOW)).toBe("never active");
+  test.serial("last active counts the user's own days, never hours", () => {
+    const line = (lastVisitDay: string | null, tz = "UTC") =>
+      stateLine({ ...root, lastVisitDay, tz }, NOW);
+    expect(line("2026-09-28")).toBe("admin · active today");
+    expect(line("2026-09-27")).toBe("admin · active yesterday");
+    expect(line("2026-09-25")).toBe("admin · active 3d ago");
+    expect(line(null)).toBe("admin · never active");
     // noon UTC is already the 29th on Kiritimati, whatever the reader's
     // zone
-    expect(
-      activeLine({ lastVisitDay: "2026-09-28", tz: "Pacific/Kiritimati" }, NOW),
-    ).toBe("active yesterday");
-    expect(
-      activeLine({ lastVisitDay: "2026-09-28", tz: "Not/AZone" }, NOW),
-    ).toBe("active today");
+    expect(line("2026-09-28", "Pacific/Kiritimati")).toBe(
+      "admin · active yesterday",
+    );
+    expect(line("2026-09-28", "Not/AZone")).toBe("admin · active today");
     // past four weeks the date itself, the year once it differs
-    expect(activeLine(utc("2026-08-02"), NOW)).toBe("active 2 Aug");
-    expect(activeLine(utc("2025-12-31"), NOW)).toBe("active 31 Dec 2025");
+    expect(line("2026-08-02")).toBe("admin · active 2 Aug");
+    expect(line("2025-12-31")).toBe("admin · active 31 Dec 2025");
   });
 
-  test("a generated password passes the rule and skips look-alikes", () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 50; i++) {
-      const p = generatePassword();
-      expect(p).toHaveLength(20);
-      expect(p).toMatch(/^[a-km-zA-HJ-NP-Z2-9]+$/);
-      expect(passwordProblem(p)).toBeNull();
-      seen.add(p);
-    }
-    expect(seen.size).toBe(50);
-  });
+  test.serial(
+    "a generated password passes the rule and skips look-alikes",
+    () => {
+      const seen = new Set<string>();
+      for (let i = 0; i < 50; i++) {
+        const p = generatePassword();
+        expect(p).toHaveLength(20);
+        expect(p).toMatch(/^[a-km-zA-HJ-NP-Z2-9]+$/);
+        expect(passwordProblem(p)).toBeNull();
+        seen.add(p);
+      }
+      expect(seen.size).toBe(50);
+    },
+  );
 
-  test("the list's aside counts by role, the disabled apart", () => {
+  test.serial("the list's aside counts by role, the disabled apart", () => {
     expect(
       userCounts([root, casey, { ...casey, id: "u3", disabled: true }]),
     ).toEqual({ admins: 1, members: 2, disabled: 1 });
   });
 
-  test("the disable lock: the admin's own row and the last enabled admin", () => {
-    expect(disableLock(root, "u1", 1)).toContain("yourself");
-    expect(disableLock(root, "u2", 1)).toContain("last admin");
-    expect(disableLock(root, "u2", 2)).toBeNull();
-    expect(disableLock(casey, "u1", 1)).toBeNull();
-    expect(
-      adminCount([root, { ...casey, role: "admin", disabled: true }]),
-    ).toBe(1);
-    expect(roleLock({ ...root, disabled: true }, "u2", 0)).toBeNull();
-  });
-
-  test("the role lock: the admin's own row and the last admin", () => {
-    expect(roleLock(root, "u1", 1)).toContain("own role");
-    expect(roleLock(root, "u2", 1)).toContain("last admin");
-    expect(roleLock(root, "u2", 2)).toBeNull();
-    expect(roleLock(casey, "u1", 1)).toBeNull();
-    expect(adminCount([root, casey])).toBe(1);
-  });
+  for (const [name, lock, self] of [
+    ["disable", disableLock, "yourself"],
+    ["role", roleLock, "own role"],
+  ] as const) {
+    test.serial(`${name} protects yourself and the last enabled admin`, () => {
+      expect(lock(root, "u1", 1)).toContain(self);
+      expect(lock(root, "u2", 1)).toContain("last admin");
+      expect(lock(root, "u2", 2)).toBeNull();
+      expect(lock(casey, "u1", 1)).toBeNull();
+      expect(lock({ ...root, disabled: true }, "u2", 0)).toBeNull();
+      expect(adminCount([root, casey])).toBe(1);
+      expect(
+        adminCount([root, { ...casey, role: "admin", disabled: true }]),
+      ).toBe(1);
+    });
+  }
 });
 
 describe("the checks", () => {
-  test("leaves the username rule to the server and catches an empty one", () => {
-    expect(usernameProblem("casey")).toBeNull();
-    expect(usernameProblem("ab")).toBeNull();
-    expect(usernameProblem("-casey")).toBeNull();
-    expect(usernameProblem("")).toBe("Enter a username");
-    expect(usernameProblem("  ")).toBe("Enter a username");
-  });
+  test.serial(
+    "leaves the username rule to the server and catches an empty one",
+    () => {
+      expect(usernameProblem("casey")).toBeNull();
+      expect(usernameProblem("ab")).toBeNull();
+      expect(usernameProblem("-casey")).toBeNull();
+      expect(usernameProblem("")).toBe("Enter a username");
+      expect(usernameProblem("  ")).toBe("Enter a username");
+    },
+  );
 
-  test("the email rule", () => {
+  test.serial("the email rule", () => {
     expect(emailProblem("casey@example.com")).toBeNull();
     expect(emailProblem(" Casey@Example.com ")).toBeNull();
     expect(emailProblem("")).toBe("Enter an email");
@@ -191,19 +173,18 @@ describe("the checks", () => {
     expect(emailProblem(`${"a".repeat(250)}@b.co`)).toContain("under 254");
   });
 
-  test("the password rule", () => {
+  test.serial("the password rule", () => {
     expect(passwordProblem("longenough")).toBeNull();
     expect(passwordProblem("short")).toContain("at least 8");
     expect(passwordProblem("é".repeat(513))).toContain("at most 1024 bytes");
   });
 
-  test("the patch carries only what changed, lowercased", () => {
+  test.serial("the patch carries only what changed, lowercased", () => {
     expect(
       patchOf(casey, {
         username: "casey",
         fullName: "Casey Doe",
         email: "casey@example.com",
-        role: "member",
         tz: "Europe/Bucharest",
       }),
     ).toBeNull();
@@ -212,16 +193,14 @@ describe("the checks", () => {
         username: " casey2 ",
         fullName: "Casey Doe",
         email: "Casey@Example.com",
-        role: "admin",
         tz: "Europe/Bucharest",
       }),
-    ).toEqual({ username: "casey2", role: "admin" });
+    ).toEqual({ username: "casey2" });
     expect(
       patchOf(casey, {
         username: "casey",
         fullName: "Casey",
         email: "o@example.com",
-        role: "member",
         tz: "Asia/Tokyo",
       }),
     ).toEqual({ fullName: "Casey", email: "o@example.com", tz: "Asia/Tokyo" });
@@ -229,7 +208,7 @@ describe("the checks", () => {
 });
 
 describe("the refusals", () => {
-  test("each server refusal names the field to fix", () => {
+  test.serial("each server refusal names the field to fix", () => {
     expect(userFieldOf("username is taken")).toBe("username");
     expect(userFieldOf("username must be 3 to 32 lowercase")).toBe("username");
     expect(userFieldOf("full name must be 1 to 64 characters")).toBe(
@@ -361,7 +340,11 @@ describe("the entity", () => {
         ? Response.json(usage)
         : Response.json({ error: "no" }, { status: 500 });
     await Promise.all([loadUserUsage("u2"), loadUserUsage("u1")]);
-    expect(userUsage.value).toEqual({ u1: usage, u2: null });
+    expect(userUsage.valueFor("u1")).toEqual(usage);
+    expect(userUsage.valueFor("u2")).toBeNull();
+    expect(userUsage.valueFor("u3")).toBeUndefined();
+    me.value = null;
+    expect(userUsage.valueFor("u1")).toBeUndefined();
   });
 
   test.serial("a refusal is the error shown", async () => {
@@ -373,28 +356,31 @@ describe("the entity", () => {
 });
 
 describe("the pages", () => {
-  test("the list links every user with the handle, the email and the role", () => {
-    users.value = [root, casey];
-    const html = render(<Users />);
-    expect(html).toContain("Stefan Prodan");
-    expect(html).toContain("@admin · admin@1ctx.dev");
-    expect(html).toContain("@casey · casey@example.com");
-    expect(html).toContain('href="/admin/access/users/casey"');
-    expect(html).toContain("member · password to change");
-    expect(html).toContain(">you<");
-    expect(html).toContain('href="/admin/access/users?new"');
-    expect(html).toContain(">Admins<");
-    expect(html).not.toContain("passwordHash");
-  });
+  test.serial(
+    "the list links every user with the handle, the email and the role",
+    () => {
+      users.value = [root, casey];
+      const html = render(<Users />);
+      expect(html).toContain("Stefan Prodan");
+      expect(html).toContain("@admin · admin@1ctx.dev");
+      expect(html).toContain("@casey · casey@example.com");
+      expect(html).toContain('href="/admin/access/users/casey"');
+      expect(html).toContain("member · password to change");
+      expect(html).toContain(">you<");
+      expect(html).toContain('href="/admin/access/users?new"');
+      expect(html).toContain(">Admins<");
+      expect(html).not.toContain("passwordHash");
+    },
+  );
 
-  test("the list shows the load's refusal", () => {
+  test.serial("the list shows the load's refusal", () => {
     usersError.value = { words: "forbidden", status: 403 };
     const html = render(<Users />);
     expect(html).toContain("This page did not load");
     expect(html).toContain("Forbidden.");
   });
 
-  test("New user asks who, the role and the password once", () => {
+  test.serial("New user asks who, the role and the password once", () => {
     users.value = [root];
     const html = render(<NewUser />);
     expect(html).toContain("Create user");
@@ -405,35 +391,47 @@ describe("the pages", () => {
     expect(html).toContain('aria-label="Copy"');
   });
 
-  test("another user's page has every card and their personal usage", () => {
-    users.value = [root, casey];
-    projects.value = [team("p1", "platform"), team("p2", "ops")];
-    userUsage.value = {
-      u2: { since: 0, until: 1, sends: 4, tokens: 1200, cost: null },
-    };
-    const html = render(<UserPage params={{ username: "casey" }} />);
-    expect(html).toContain('aria-label="Profile"');
-    expect(html).toContain(">Role<");
-    expect(html).not.toContain("Works in");
-    expect(html).toContain(">platform<");
-    expect(html).not.toContain(">ops<");
-    expect(html).toContain("Reset password");
-    expect(html).toContain("Disable @casey");
-    expect(html).toContain("Personal, last 30 days");
-    expect(html).toContain("1.2K");
-    expect(html).toContain("not priced");
-  });
+  test.serial(
+    "another user's page has every card and their personal usage",
+    async () => {
+      users.value = [root, casey];
+      projects.value = [team("p1", "platform"), team("p2", "ops")];
+      answer = () =>
+        Response.json({
+          since: 0,
+          until: 1,
+          sends: 4,
+          tokens: 1200,
+          cost: null,
+        });
+      await loadUserUsage("u2");
+      const html = render(<UserPage params={{ username: "casey" }} />);
+      expect(html).toContain('aria-label="Profile"');
+      expect(html).toContain(">Role<");
+      expect(html).not.toContain("Works in");
+      expect(html).toContain(">platform<");
+      expect(html).not.toContain(">ops<");
+      expect(html).toContain("Reset password");
+      expect(html).toContain("Disable @casey");
+      expect(html).toContain("Personal, last 30 days");
+      expect(html).toContain("1.2K");
+      expect(html).toContain("not priced");
+    },
+  );
 
-  test("the admin's own page fixes the role and has no reset or disable", () => {
-    users.value = [root, casey];
-    projects.value = [];
-    const html = render(<UserPage params={{ username: "admin" }} />);
-    expect(html).toContain("You cannot change your own role.");
-    expect(html).not.toContain("Reset password");
-    expect(html).not.toContain("Disable @admin");
-  });
+  test.serial(
+    "the admin's own page fixes the role and has no reset or disable",
+    () => {
+      users.value = [root, casey];
+      projects.value = [];
+      const html = render(<UserPage params={{ username: "admin" }} />);
+      expect(html).toContain("You cannot change your own role.");
+      expect(html).not.toContain("Reset password");
+      expect(html).not.toContain("Disable @admin");
+    },
+  );
 
-  test("a disabled user's page offers Enable", () => {
+  test.serial("a disabled user's page offers Enable", () => {
     users.value = [root, { ...casey, disabled: true }];
     projects.value = [];
     const html = render(<UserPage params={{ username: "casey" }} />);
@@ -441,7 +439,7 @@ describe("the pages", () => {
     expect(html).toContain("They cannot sign in.");
   });
 
-  test("an unknown handle says so", () => {
+  test.serial("an unknown handle says so", () => {
     users.value = [root];
     const html = render(<UserPage params={{ username: "nobody" }} />);
     expect(html).toContain("No user by that name.");

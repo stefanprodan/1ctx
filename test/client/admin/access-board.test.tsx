@@ -6,7 +6,7 @@ import { render } from "preact-render-to-string";
 import {
   accessBoard,
   BOARD_EVERY_MS,
-  loadAccessBoard,
+  refreshAccessBoard,
   watchAccessBoard,
 } from "../../../src/client/data/access-board.ts";
 import { adminProjects } from "../../../src/client/data/admin-projects.ts";
@@ -23,6 +23,7 @@ import { AccessBoard } from "../../../src/client/views/admin/AccessBoard.tsx";
 import type { AccessBoardResponse } from "../../../src/shared/api/access.ts";
 import type { AdminUser } from "../../../src/shared/api/users.ts";
 import type { ProjectSummary } from "../../../src/shared/contracts/project.ts";
+import { pollTab } from "../../helpers/poll.ts";
 
 const NOW = Date.parse("2026-09-28T12:00:00Z");
 
@@ -232,11 +233,13 @@ test.serial("loads the board in the browser's zone", async () => {
   const realFetch = globalThis.fetch;
   let asked = "";
   globalThis.fetch = (async (url: string) => {
+    if (url === "/api/users") return Response.json({ users: [] });
+    if (url === "/api/projects") return Response.json({ projects: [] });
     asked = url;
     return Response.json(board());
   }) as unknown as typeof fetch;
   try {
-    await loadAccessBoard();
+    await refreshAccessBoard();
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -255,47 +258,25 @@ test.serial(
       if (url === "/api/users") return Response.json({ users: [] });
       return Response.json({ projects: [] });
     }) as unknown as typeof fetch;
-    let hidden = false;
-    let now = 0;
-    const heard = new Set<() => void>();
-    const ticks = new Set<() => void>();
-    const tab = {
-      hidden: () => hidden,
-      listen(change: () => void) {
-        heard.add(change);
-        return () => heard.delete(change);
-      },
-      now: () => now,
-      every(_ms: number, tick: () => void) {
-        ticks.add(tick);
-        return () => ticks.delete(tick);
-      },
-    };
-    const tick = () => {
-      now += BOARD_EVERY_MS;
-      for (const t of [...ticks]) t();
-    };
-    const show = (seen: boolean) => {
-      hidden = !seen;
-      for (const change of [...heard]) change();
-    };
+    const page = pollTab(BOARD_EVERY_MS);
     try {
-      const stop = watchAccessBoard(tab);
+      const stop = watchAccessBoard(page.tab);
       // the route has just loaded: nothing at once
       expect(asked).toEqual([]);
-      tick();
+      page.tick();
       expect(asked).toHaveLength(3);
       expect(asked[0]).toStartWith("/api/admin/access?tz=");
       expect(asked.slice(1)).toEqual(["/api/users", "/api/projects"]);
-      show(false);
-      expect(ticks.size).toBe(0);
-      now += BOARD_EVERY_MS;
+      page.set("hidden");
+      expect(page.timers()).toBe(0);
+      page.tick();
+      expect(asked).toHaveLength(3);
       // seen again past a period: at once
-      show(true);
+      page.set("visible");
       expect(asked).toHaveLength(6);
       stop();
-      expect(ticks.size).toBe(0);
-      expect(heard.size).toBe(0);
+      expect(page.timers()).toBe(0);
+      expect(page.listeners()).toBe(0);
     } finally {
       globalThis.fetch = realFetch;
     }

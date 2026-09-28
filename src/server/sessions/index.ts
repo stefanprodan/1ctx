@@ -6,6 +6,9 @@
 // runner below writes them through the store this area builds.
 
 import type { AgentActivity } from "../../shared/api/agents.ts";
+import type { McpServersUsage, McpUsage } from "../../shared/api/mcp.ts";
+import type { SkillLoads } from "../../shared/api/skills.ts";
+import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
@@ -17,6 +20,7 @@ import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import {
+  agentActivity,
   mcpCalls,
   mcpServerCalls,
   personDays,
@@ -24,12 +28,7 @@ import {
   visualCounts,
   webCounts,
 } from "./activity.ts";
-import {
-  agentActivity,
-  agentChats,
-  agentRunning,
-  archivedEvent,
-} from "./archive.ts";
+import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import {
   type AccessPort,
@@ -44,7 +43,6 @@ import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
 export { ARCHIVED, refuseArchived } from "./archive.ts";
 export {
-  type FeedCursor,
   parseFeedCursor,
   parseRunsCursor,
   type RunsCursor,
@@ -74,13 +72,12 @@ export {
   cutResult,
   offWire,
   RESULT_DISPLAY_CHARS,
-  type RepairedSession,
   type ReplyFinish,
   type SessionRow,
   STREAM_LIMIT,
   type UsagePort,
 } from "./rows.ts";
-export { type ScratchPort, SessionStore } from "./store.ts";
+export { SessionStore } from "./store.ts";
 export type { ChatSweep } from "./sweep.ts";
 
 export const RESTART_ERROR = "the server restarted";
@@ -114,22 +111,11 @@ export type Sessions = {
   // a person's posts, chats and manual runs on each day of a window,
   // in every project
   personDays(userId: string, starts: number[], until: number): number[];
-  // an MCP server's calls in a window, for its page
-  mcpCalls(
-    server: string,
-    since: number,
-    until: number,
-  ): ReturnType<typeof mcpCalls>;
-  mcpServerCalls(
-    since: number,
-    until: number,
-  ): ReturnType<typeof mcpServerCalls>;
-  // the skill loads and file reads in a window, by skill name
-  skillLoads(since: number, until: number): ReturnType<typeof skillLoads>;
-  // the visuals drawn and opened in a window
-  visualCounts(since: number, until: number): ReturnType<typeof visualCounts>;
-  // the webfetch and websearch calls in a window
-  webCounts(since: number, until: number): ReturnType<typeof webCounts>;
+  mcpCalls(server: string, since: number, until: number): McpUsage;
+  mcpServerCalls(since: number, until: number): McpServersUsage;
+  skillLoads(since: number, until: number): SkillLoads;
+  visualCounts(since: number, until: number): VisualCounts;
+  webCounts(since: number, until: number): WebCounts;
   sessionInfo(sessionId: string): Memory["session"];
   // a run's answer before its memory phase, null when it has none
   runAnswer(sendId: string, memoryRound: number | null): string | null;

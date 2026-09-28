@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An agent page's drafts, one per card that saves apart: the name,
-// avatar and instructions; the model with its facts, thinking, effort
-// and preferred provider; the skills; the MCP servers; the tool schemas
-// mode. The page holds one per agent, so a draft outlives a tab switch
-// and goes with a pick of another agent. A card's save puts the saved
-// row back into its own draft only.
 
 import { signal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
@@ -24,8 +17,8 @@ import {
   statedModel,
   statedProblem,
 } from "./Agents.model.ts";
+import { holding } from "./drafts.ts";
 
-// what Change found, put back by Cancel
 type ModelDraft = {
   providerId: string;
   model: CatalogMatch | null;
@@ -47,17 +40,14 @@ export class AgentDrafts {
   readonly thinking = signal<"on" | "off" | null>(null);
   readonly effort = signal<Effort | null>(null);
   readonly upstream = signal<string | null>(null);
-  // the window and tools an admin states when the catalog is silent
   readonly windowText = signal("");
   readonly takesTools = signal(false);
   // the model the upstream was chosen for: a tag names a provider of it
   upstreamOf: string | null = null;
-  // the search row is open; what it found is put back by Cancel
   readonly changing = signal(false);
   private before: ModelDraft | null = null;
 
-  // a card's save in flight: every card waits, so each body is built
-  // from the row the last save answered and none undoes another
+  // every card waits for a save, so none undoes another
   readonly saving = signal(false);
 
   readonly skills = signal<string[]>([]);
@@ -76,8 +66,6 @@ export class AgentDrafts {
     return drafts;
   }
 
-  // a new agent's: no name, the search open on the provider given, and
-  // no Cancel until a pick gives it something to go back to
   static blank(providerId: string): AgentDrafts {
     const drafts = new AgentDrafts("");
     drafts.providerId.value = providerId;
@@ -117,19 +105,24 @@ export class AgentDrafts {
     this.mode.value = agent.mcpMode;
   }
 
-  async save<T>(call: () => Promise<T>): Promise<T> {
-    this.saving.value = true;
-    try {
-      return await call();
-    } finally {
-      this.saving.value = false;
-    }
+  save<T>(call: () => Promise<T>): Promise<T> {
+    return holding(this.saving, call);
   }
 
-  // Another card's save answers the row with the model as the catalog
-  // describes it now, so an untouched model draft follows the new row
-  // rather than read as changed; an edited one stays as it is
+  // the row changed under the page: what the admin left alone follows;
+  // another card's save answers the model as the catalog describes it now
   follow(before: AgentSummary, after: AgentSummary): void {
+    if (this.name.value.trim() === before.name) this.name.value = after.name;
+    if (this.avatar.value === before.avatar) this.avatar.value = after.avatar;
+    if (this.prompt.value.trim() === before.prompt) {
+      this.prompt.value = after.prompt;
+    }
+    if (this.isDefault.value === before.default) {
+      this.isDefault.value = after.default;
+    }
+    if (!this.skillsDirty(before)) this.resetSkills(after);
+    if (!this.serversDirty(before)) this.resetServers(after);
+    if (!this.modeDirty(before)) this.resetMode(after);
     const untouched =
       !this.changing.value &&
       this.providerId.value === before.providerId &&
@@ -158,12 +151,10 @@ export class AgentDrafts {
     this.changing.value = true;
   }
 
-  // Cancel has a model to go back to
   get cancellable(): boolean {
     return this.before?.model != null;
   }
 
-  // the draft as Change found it, a provider changed since included
   cancel(): void {
     const b = this.before;
     if (b !== null) {
@@ -179,8 +170,6 @@ export class AgentDrafts {
     this.changing.value = false;
   }
 
-  // a pick clears a preferred provider chosen for another model, resets
-  // a thinking the model fixes, and empties the stated window and tools
   pick(model: CatalogMatch, fixed: boolean): void {
     this.model.value = model;
     if (model.id !== this.upstreamOf) this.upstream.value = null;
@@ -192,8 +181,6 @@ export class AgentDrafts {
     this.changing.value = false;
   }
 
-  // another provider means another catalog and another set of levels:
-  // the pick, the effort and the preferred provider go with it
   chooseProvider(id: string): void {
     if (id === this.providerId.value) return;
     this.providerId.value = id;
@@ -211,7 +198,6 @@ export class AgentDrafts {
     );
   }
 
-  // the model's part of a save's body; the wire is read when it runs
   modelBody(wire: Wire | undefined) {
     const m = this.model.value!;
     return {
@@ -224,7 +210,6 @@ export class AgentDrafts {
     };
   }
 
-  // what stops a save before it is sent, on the field that says it
   modelProblem(): Problem | null {
     return (
       at("model", this.model.value === null ? "Pick a model" : null) ??
@@ -276,7 +261,6 @@ export class AgentDrafts {
   }
 }
 
-// the skills and servers as loaded, which a card's body filters by
 export const loadedRows = () => ({
   skills: skills.value,
   servers: servers.value,

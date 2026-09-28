@@ -1,60 +1,7 @@
-/* Config › MCP Servers: a list row's meta, and a server's page: the
-   failure line over the tabs, the facts and fields of General's cards,
-   and the Tools card's matchers, bar and tool rows. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  .mcp-page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 960px;
-  }
   .mcp-page-mono {
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
-
-  /* the list: the agents over the sides, right-aligned */
-  .mcp-page-list-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    font-family: var(--sans);
-  }
-  .mcp-page-list-sides {
-    color: var(--faint);
-  }
-
-  .mcp-page-bad {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--text-ui);
-    line-height: 1.5;
-    color: var(--attention);
-  }
-  .mcp-page-bad-icon {
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-
-  /* General: a label and a value per line */
-  .mcp-page-facts {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    align-items: baseline;
-    gap: var(--space-2) var(--space-4);
-    font-size: var(--text-ui);
-  }
-  .mcp-page-fact {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-  .mcp-page-fact-mono {
     font-family: var(--mono);
     font-size: var(--text-small);
   }
@@ -100,22 +47,7 @@
     font-family: var(--mono);
     font-size: var(--text-small);
   }
-  .mcp-page-delete {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    width: 100%;
-  }
-  .mcp-page-ask {
-    margin-right: auto;
-    font-size: var(--text-ui);
-    color: var(--fg);
-  }
 
-  /* Tools: a line per side, its label then the matchers and the box
-     that adds one, the hint under them */
   .mcp-page-matchers {
     display: flex;
     flex-direction: column;
@@ -168,7 +100,6 @@
     width: 24px;
     height: 24px;
   }
-  /* a field's box, as short as a matcher */
   .mcp-page-matcher-body .mcp-page-add {
     flex: 0 1 160px;
     min-width: 100px;
@@ -177,8 +108,6 @@
     font-size: var(--text-small);
   }
 
-  /* the line over the rows: the filter, the box at the rows' boxes'
-     place */
   .mcp-page-bar {
     display: flex;
     align-items: center;
@@ -187,8 +116,7 @@
     padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--line);
   }
-  /* the picks' moves, in the filter's place, on one line so the rows
-     never move */
+  /* one line, so the rows never move */
   .mcp-page-move {
     display: flex;
     flex-wrap: nowrap;
@@ -204,18 +132,6 @@
     font-size: var(--text-ui);
     white-space: nowrap;
   }
-  /* the list's foot, as a settings card's under the matchers */
-  .mcp-page-foot {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 52px;
-    padding: var(--space-2) var(--space-4);
-    border-top: 1px solid var(--line);
-    border-bottom-left-radius: var(--radius-card);
-    border-bottom-right-radius: var(--radius-card);
-    background: var(--page);
-  }
   .mcp-page-tools {
     display: flex;
     flex-direction: column;
@@ -226,7 +142,6 @@
     margin-left: auto;
   }
 
-  /* a tool's meta: the side, then what set it, faint */
   .mcp-page-side {
     font-family: var(--sans);
   }
@@ -255,11 +170,6 @@
   @media (max-width: 719px) {
     .mcp-page-move-to {
       display: none;
-    }
-    .mcp-page-list-meta {
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--space-2);
     }
     .mcp-page-matcher {
       flex-direction: column;

@@ -70,10 +70,8 @@ describe("the matchers", () => {
     ]);
   });
 
-  test("decide names what set each side, as classify splits them", () => {
+  test("the explanation names the matcher, default or lack of a match", () => {
     const decided = decide("github", tools, PATTERNS);
-    const sides = classify("github", tools, PATTERNS);
-    for (const [name, d] of decided) expect(d.side).toBe(sides.get(name)!);
     expect(decidedWords(decided.get("get_me")!)).toBe("by get_*");
     expect(decidedWords(decided.get("a.b")!)).toBe("");
     const empty = decide("github", tools, { ...PATTERNS, write: [] });

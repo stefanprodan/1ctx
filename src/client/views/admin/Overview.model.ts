@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Monitor's words and numbers, pure: the Now tiles from the load,
-// the days' tiles and a day's words, what needs attention, and the
-// faint line. A chat's send is a turn and a task's a run;
-// "send" is never shown.
 
 import type {
   AttentionItem,
@@ -21,32 +16,27 @@ import {
   count,
   dayMonth,
   elapsed,
+  money,
   pluralCommas,
   share,
   size,
   sizeParts,
 } from "../../lib/format.ts";
 import {
+  configCredentialHref,
   configMcpHref,
   configProviderHref,
   configSkillHref,
+  WEB_HREF,
 } from "../../lib/hrefs.ts";
 
-// a container's memory past this share is marked
 const MEMORY_FULL = 0.8;
-
-// "$4.12", "<$0.01" for a cost that is there but under a cent
-export function money(n: number): string {
-  if (n > 0 && n < 0.01) return "<$0.01";
-  return `$${n.toFixed(2)}`;
-}
 
 export const tokensOf = (t: {
   promptTokens: number;
   completionTokens: number;
 }): number => t.promptTokens + t.completionTokens;
 
-// a pool's tile: the sends running against the process's cap
 function pool(running: number, cap: number, sub: string) {
   return {
     figure: String(running),
@@ -83,7 +73,6 @@ export function cpuTile(load: LoadResponse) {
   };
 }
 
-// memory against the host's, or a container's limit with a meter
 export function memoryTile(load: LoadResponse) {
   const rss = load.samples.rss.at(-1) ?? 0;
   const parts = sizeParts(rss);
@@ -99,24 +88,19 @@ export function memoryTile(load: LoadResponse) {
   };
 }
 
-// a sample under the cursor: "11:32 · 4%"
 export const sampleLine = (at: number, words: string): string =>
   `${clock(at)} · ${words}`;
 
-// The memory line's scale: the window's lowest to highest with room
-// around it, so a steady process draws through the middle and a climb
-// leaves the top; a flat window gets 2% either side.
+// room around the window, so a steady process draws through the middle
+// and a climb leaves the top; a flat window gets 2% either side
 export function zoomed(min: number, max: number): [number, number] {
   const pad = Math.max((max - min) * 0.3, max * 0.02);
   return [Math.max(0, min - pad), max + pad];
 }
 
-// a row whose read failed: since when its numbers are, or that there
-// are none yet
 export const staleWords = (at: number | null): string =>
   at === null ? "Did not load" : `Not updated since ${clock(at)}`;
 
-// "1% failed", or that there was none
 function failedLine(failed: number, of: number): string {
   if (of === 0) return "none yet";
   return failed === 0 ? "none failed" : `${share(failed, of)} failed`;
@@ -140,19 +124,14 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// Usage has no Decisions tile, so the decisions ride along there,
-// runs being what asks them; the Monitor gives them their own
-export function runsTile(
-  totals: OverviewTotals,
-  at: OverviewDay | null,
-  withDecisions = true,
-) {
+// Usage has no Decisions tile, so its decisions ride with the runs
+export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
   const t = at ?? totals;
   const line = at
     ? pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed)
     : failedLine(totals.runsFailed, totals.runs);
   const words =
-    withDecisions && t.decisions > 0
+    t.decisions > 0
       ? `${line} · ${pluralCommas(t.decisions, "decision", "decisions")}`
       : line;
   return {
@@ -162,7 +141,6 @@ export function runsTile(
   };
 }
 
-// the decisions answered and the input tokens they read
 function decisionsLine(t: OverviewTotals): string {
   return t.decisions === 0 ? "none yet" : `${count(t.decisionTokens)} tokens`;
 }
@@ -177,8 +155,7 @@ export function decisionsTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// how much of the input a cache served
-export function cachedLine(t: OverviewTotals): string {
+function cachedLine(t: OverviewTotals): string {
   if (t.promptTokens === 0) return "none yet";
   return `${share(t.cachedTokens, t.promptTokens)} cached`;
 }
@@ -190,8 +167,7 @@ export function tokensTile(totals: OverviewTotals, at: OverviewDay | null) {
   };
 }
 
-// the rounds' cost and the decisions' together: a null counts as 0
-// beside a priced one, and both null is no price at all
+// a null counts as 0 beside a priced one; both null is no price at all
 export function costOf(t: {
   cost: number | null;
   decisionCost: number | null;
@@ -200,8 +176,7 @@ export function costOf(t: {
   return (t.cost ?? 0) + (t.decisionCost ?? 0);
 }
 
-// the cost of rounds and decisions: never $0 where no provider priced
-// either
+// never $0 where no provider priced either
 function costWords(t: OverviewTotals) {
   const asked = t.rounds + t.decisions;
   const cost = costOf(t);
@@ -220,7 +195,6 @@ export function costTile(totals: OverviewTotals, at: OverviewDay | null) {
     : words;
 }
 
-// the tokens chart's hint, at rest and on a day
 export const tokensHint = (t: OverviewTotals): string =>
   `${count(tokensOf(t))} tokens`;
 
@@ -232,7 +206,6 @@ export function dayTokensHint(day: OverviewDay): string {
   return parts.join(" · ");
 }
 
-// the build and how long it has been up
 export const buildLine = (
   instance: OverviewResponse["instance"],
   now: number,
@@ -263,19 +236,19 @@ const ATTENTION: Record<
     icon: "key",
     what: "Credential",
     line: "key file missing",
-    href: () => "/admin/config/web/credentials",
+    href: configCredentialHref,
   },
   "credential-unusable": {
     icon: "key",
     what: "Credential",
     line: "key file unusable",
-    href: () => "/admin/config/web/credentials",
+    href: configCredentialHref,
   },
   "search-key": {
     icon: "key",
     what: "Web search",
     line: "key file missing",
-    href: () => "/admin/config/web",
+    href: () => WEB_HREF,
   },
   "mcp-refresh": {
     icon: "mcp",
@@ -291,9 +264,6 @@ const ATTENTION: Record<
   },
 };
 
-// a row of what needs attention: the name, what failed and when, what
-// kind of thing it is and its icon (an MCP server's or a skill's own,
-// a key for the rest), and the page that fixes it
 export function attentionRow(item: AttentionItem, now: number) {
   const words = ATTENTION[item.kind];
   return {

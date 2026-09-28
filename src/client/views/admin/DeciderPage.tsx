@@ -1,17 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A decider's page under Config, as an agent's: the crumb is the head,
-// its own step the switcher to the other deciders; then the name with
-// the default mark, the model, Check, which asks the saved decider one
-// yes/no, and Delete, each its own card and form. The aside has its
-// last 30 days and the decisions that ask it.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
 import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
+import { MAX_NAME } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
-import { address, navigate } from "../../app/router.ts";
+import { navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
   checkDecider,
@@ -24,19 +18,26 @@ import {
 } from "../../data/deciders.ts";
 import { decisions, loadDecisions } from "../../data/decisions.ts";
 import { providersError } from "../../data/providers.ts";
-import { count, says } from "../../lib/format.ts";
-import { configDeciderHref, configDecisionHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
+import { says } from "../../lib/format.ts";
+import {
+  configDeciderHref,
+  configDecisionHref,
+  DECIDERS_HREF,
+} from "../../lib/hrefs.ts";
 import { nameProblem, shapedInput } from "../../lib/names.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { Finder } from "../../ui/Finder.tsx";
-import { AskDelete, Foot } from "../../ui/Foot.tsx";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { RowsCheck } from "../../ui/Rows.tsx";
-import { Setting } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  Setting,
+  SettingDelete,
+  SettingForm,
+  SettingStack,
+} from "../../ui/Setting.tsx";
+import { AsideSection, Split } from "../../ui/Split.tsx";
+import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { DeciderModelFields } from "./DeciderModelFields.tsx";
 import { DeciderDrafts } from "./DeciderPage.state.ts";
 import {
@@ -47,48 +48,43 @@ import {
 } from "./Deciders.model.ts";
 import { DECISION_WORDS } from "./Decisions.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
-import { money } from "./Overview.model.ts";
+import { holding, useLatest, useRowDrafts, useShownRow } from "./drafts.ts";
 import "./decider-page.css";
 
-const STEPS = [
-  zoneStep("Config"),
-  { label: "Deciders", href: "/admin/config/deciders" },
-];
+const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
 
 export function DeciderPage({ params }: { params: Params }) {
   const list = deciders.value;
-  // the decider on screen by its id too: a rename changes the list a
-  // moment before the address follows
-  const shown = useRef<{ id: string; name: string } | null>(null);
-  const held = shown.current?.name === params.name ? shown.current : null;
-  const decider =
-    list?.find((d) => d.name === params.name) ??
-    list?.find((d) => d.id === held?.id) ??
-    null;
-  const leaving = decider === null && held !== null;
-  if (decider !== null && decider.name === params.name) {
-    shown.current = { id: decider.id, name: decider.name };
-  }
-  // one set of drafts per decider: a pick of another starts afresh
-  const drafts = useRef<DeciderDrafts | null>(null);
-  const row = useRef<DeciderSummary | null>(null);
-  if (decider !== null && drafts.current?.deciderId !== decider.id) {
-    drafts.current = DeciderDrafts.of(decider);
-  } else if (
-    decider !== null &&
-    row.current !== null &&
-    row.current !== decider
-  ) {
-    drafts.current?.follow(row.current, decider);
-  }
-  row.current = decider;
+  const { row: decider, leaving } = useShownRow(
+    list,
+    params.name,
+    (d) => d.name,
+  );
+  const drafts = useRowDrafts(decider, DeciderDrafts.of, (d, before, after) =>
+    d.follow(before, after),
+  );
   const error = decidersError.value ?? providersError.value;
   return (
     <Page
       steps={STEPS}
       title={params.name}
       titleMono
-      menu={decider !== null ? <Switcher decider={decider} /> : undefined}
+      menu={
+        decider !== null ? (
+          <PageSwitcher
+            label="Deciders"
+            current={decider.id}
+            name={decider.name}
+            items={byName(list ?? []).map((d) => ({
+              id: d.id,
+              label: d.name,
+              href: configDeciderHref(d.name),
+            }))}
+            placeholder="Find a decider"
+            none="No decider matches"
+          />
+        ) : undefined
+      }
       split
       loading={list === null && error === null}
       empty={
@@ -98,53 +94,37 @@ export function DeciderPage({ params }: { params: Params }) {
       }
       error={error}
     >
-      {decider !== null && drafts.current !== null && (
+      {decider !== null && drafts !== null && (
         <Split aside={<Aside decider={decider} />}>
-          <div class="decider-page" key={decider.id}>
-            <Identity decider={decider} drafts={drafts.current} />
-            <Model decider={decider} drafts={drafts.current} />
+          <SettingStack key={decider.id}>
+            <Identity decider={decider} drafts={drafts} />
+            <Model decider={decider} drafts={drafts} />
             {/* an answer is about the model that gave it */}
             <Check key={decider.model} decider={decider} />
-            <DeleteCard decider={decider} drafts={drafts.current} />
-          </div>
+            <SettingDelete
+              title={`Delete ${decider.name}`}
+              line={deciderDeleteLine(
+                decider,
+                list ?? [],
+                askedBy(decider, decisions.value ?? []).length,
+              )}
+              ask={`Delete ${decider.name}?`}
+              lock={drafts.saving}
+              onDelete={async () => {
+                await deleteDecider(decider.id);
+                // a decision that named it names none now
+                void loadDecisions();
+              }}
+              leaveTo={DECIDERS_HREF}
+            />
+          </SettingStack>
         </Split>
       )}
     </Page>
   );
 }
 
-function Switcher({ decider }: { decider: DeciderSummary }) {
-  const list = byName(deciders.value ?? []);
-  if (list.length < 2) {
-    return <span class="page-crumb-on page-crumb-path">{decider.name}</span>;
-  }
-  return (
-    <Finder
-      label="Deciders"
-      triggerClass="page-pill"
-      title={decider.name}
-      trigger={
-        <>
-          <span class="cut">{decider.name}</span>
-          <Icon name="chevron" size={14} class="page-pill-chevron" />
-        </>
-      }
-      options={list.map((d) => ({
-        value: d.id,
-        label: d.name,
-        href: configDeciderHref(d.name),
-      }))}
-      value={decider.id}
-      mono
-      wide
-      placeholder="Find a decider"
-      none="No decider matches"
-    />
-  );
-}
-
-// what a decider's save sends: every field, the mark only when flipped
-// so a save never moves a mark set since
+// the mark only when flipped, so a save never moves a mark set since
 const body = (d: DeciderSummary, over: Partial<DeciderSummary>) => {
   const next = { ...d, ...over };
   return {
@@ -162,12 +142,10 @@ function Identity({
   decider: DeciderSummary;
   drafts: DeciderDrafts;
 }) {
-  // the save is made once, so it reads the latest row when it runs
-  const latest = useRef(decider);
-  latest.current = decider;
+  const latest = useLatest(decider);
   const save = useSave(
     () =>
-      d.save(async () => {
+      holding(d.saving, async () => {
         const was = latest.current;
         const saved = await updateDecider(
           was.id,
@@ -180,23 +158,17 @@ function Identity({
       }),
     deciderFieldOf,
   );
-  const form = useRef<HTMLFormElement>(null);
-  useFocusField(save, form);
   const name = d.name.value.trim();
   const taken = (deciders.value ?? []).some(
     (x) => x.name === name && x.id !== decider.id,
   );
-  // the oldest, while it is the default, keeps the mark: No hands it to
-  // the oldest
+  // the oldest keeps the mark while default: No hands it to the oldest
   const kept = decider.default && deciders.value?.[0]?.id === decider.id;
   const busy = save.busy;
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(at("name", nameProblem(d.name.value)));
-      }}
+    <SettingForm
+      save={save}
+      check={() => at("name", nameProblem(d.name.value))}
     >
       <Setting
         title="Identity"
@@ -219,6 +191,7 @@ function Identity({
             name="name"
             autocomplete="off"
             spellcheck={false}
+            maxLength={MAX_NAME}
             aria-invalid={save.fieldError("name") !== null || undefined}
             disabled={busy}
             value={d.name.value}
@@ -243,7 +216,7 @@ function Identity({
           Default decider
         </RowsCheck>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
@@ -254,11 +227,10 @@ function Model({
   decider: DeciderSummary;
   drafts: DeciderDrafts;
 }) {
-  const latest = useRef(decider);
-  latest.current = decider;
+  const latest = useLatest(decider);
   const save = useSave(
     () =>
-      d.save(async () => {
+      holding(d.saving, async () => {
         const was = latest.current;
         const saved = await updateDecider(
           was.id,
@@ -271,17 +243,10 @@ function Model({
       }),
     deciderFieldOf,
   );
-  const form = useRef<HTMLFormElement>(null);
-  useFocusField(save, form);
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(
-          at("model", d.model.value === null ? "Pick a model" : null),
-        );
-      }}
+    <SettingForm
+      save={save}
+      check={() => at("model", d.model.value === null ? "Pick a model" : null)}
     >
       <Setting
         title="Model"
@@ -298,11 +263,11 @@ function Model({
       >
         <DeciderModelFields drafts={d} save={save} currentId={decider.model} />
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// the saved decider answers one fixed yes/no, whatever a draft holds
+// the saved decider answers, whatever a draft holds
 function Check({ decider }: { decider: DeciderSummary }) {
   const answer = useSignal<string | null>(null);
   const failed = useSignal<string | null>(null);
@@ -347,87 +312,20 @@ function Check({ decider }: { decider: DeciderSummary }) {
   );
 }
 
-function DeleteCard({
-  decider,
-  drafts: d,
-}: {
-  decider: DeciderSummary;
-  drafts: DeciderDrafts;
-}) {
-  const asking = useSignal(false);
-  const save = useSave(async () => {});
-  const asks = askedBy(decider, decisions.value ?? []).length;
-  // Escape takes the ask back
-  useEffect(() => {
-    if (!asking.value) return;
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") asking.value = false;
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [asking.value]);
-  return (
-    <Setting
-      danger
-      title={`Delete ${decider.name}`}
-      line={deciderDeleteLine(decider, deciders.value ?? [], asks)}
-      foot={
-        <Foot save={save}>
-          <div class="decider-page-foot">
-            <AskDelete
-              save={save}
-              asking={asking}
-              busy={save.busy || d.saving.value}
-              words={`Delete ${decider.name}?`}
-              wordsClass="decider-page-ask"
-              // the list drops the decider as the call ends, which takes
-              // this card away before act answers: the call leaves
-              onDelete={() => {
-                void save.act("delete", async () => {
-                  const from = address();
-                  await deleteDecider(decider.id);
-                  // a decision that named it names none now
-                  void loadDecisions();
-                  if (address() === from) navigate("/admin/config/deciders");
-                });
-              }}
-            />
-          </div>
-        </Foot>
-      }
-    />
-  );
-}
-
 function Aside({ decider }: { decider: DeciderSummary }) {
-  const known =
-    deciderUsage.value?.of === decider.id ? deciderUsage.value : null;
-  const usage = known?.usage ?? null;
   const asks = askedBy(decider, decisions.value ?? []);
   return (
     <>
-      <AsideSection
-        label="Last 30 days"
-        action={
-          <a class="split-link" href="/admin/monitor">
-            Usage
-          </a>
-        }
-      >
-        {known === null ? (
-          <p class="split-empty">Loading</p>
-        ) : usage === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
-          <>
-            <AsideLine label="Answers">{count(usage.answers)}</AsideLine>
-            <AsideLine label="Tokens">{count(usage.tokens)}</AsideLine>
-            <AsideLine label="Cost">
-              {usage.cost === null ? "not priced" : money(usage.cost)}
-            </AsideLine>
-          </>
+      <UsageSection value={deciderUsage.valueFor(decider.id)}>
+        {(usage) => (
+          <SpendLines
+            label="Answers"
+            count={usage.answers}
+            tokens={usage.tokens}
+            cost={usage.cost}
+          />
         )}
-      </AsideSection>
+      </UsageSection>
       <AsideSection label="Asked by">
         {asks.length === 0 ? (
           <p class="split-empty">No decision.</p>

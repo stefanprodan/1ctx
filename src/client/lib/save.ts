@@ -1,24 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What a form's buttons go through: idle until something changed, busy
-// while a call runs, done for a moment after a save, or the refusal
-// until the next edit. The submit and the other actions of the form
-// (delete, disable, reset) share one object, so while any of them runs
-// every button waits, and one refusal is shown at a time. A refusal that
-// names a field is shown at that field; any other is the form's notice
-// in the foot, naming the action that failed. One object per form,
-// disposed with it, so a call that answers after the form is gone
-// changes nothing.
 
 import { signal, useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { failure, says, sentence } from "./format.ts";
+import { touch } from "./touch.ts";
 
-// the words of a refusal; the field to blame, when there is one; the
-// action other than the submit that was refused; and the HTTP status
-// when the server answered with one
 export type Problem = {
   error: string;
   field?: string;
@@ -28,16 +16,12 @@ export type Problem = {
 
 export type Status = "idle" | "busy" | "done" | Problem;
 
-// which field a server refusal is about, from its words; undefined
-// when it is about the form as a whole
 export type FieldOf = (message: string) => string | undefined;
 
-// a check's words pinned to its field, or null when the check passed
 export function at(field: string, error: string | null): Problem | null {
   return error === null ? null : { error, field };
 }
 
-// the notice's words: the action that failed, then why
 export function noticeOf(problem: Problem): string {
   const why = sentence(problem.error);
   return problem.action === undefined
@@ -49,7 +33,6 @@ const DONE_MS = 2000;
 
 export class Save {
   readonly status = signal<Status>("idle");
-  // the action other than the submit that is running, for its label
   readonly pending = signal<string | null>(null);
   private timer: ReturnType<typeof setTimeout> | null = null;
   private live = true;
@@ -60,12 +43,10 @@ export class Save {
     private readonly fieldOf: FieldOf = () => undefined,
   ) {}
 
-  // any call of the form in flight
   get busy(): boolean {
     return this.status.value === "busy" || this.pending.value !== null;
   }
 
-  // the refusal to show at a field, or null
   fieldError(field: string): string | null {
     const status = this.status.value;
     return typeof status === "object" && status.field === field
@@ -73,7 +54,6 @@ export class Save {
       : null;
   }
 
-  // the refusal about the form as a whole, or null
   notice(): Problem | null {
     const status = this.status.value;
     return typeof status === "object" && status.field === undefined
@@ -81,8 +61,7 @@ export class Save {
       : null;
   }
 
-  // an edit clears a stale reason, and cuts a Saved short so the button
-  // wakes for the new change
+  // cuts a Saved short, so the button wakes for the new change
   touch(): void {
     if (this.busy) return;
     this.clear();
@@ -114,21 +93,12 @@ export class Save {
     }, this.doneMs);
   }
 
-  // another button of the form: "delete", "disable", named as the notice
-  // says it ("Could not delete."). Answers whether the call went through,
-  // so the form can close after a delete. `whole` keeps the refusal off
-  // the fields, for an action whose words are not about the form's
-  // values, such as a check against a remote service.
-  async act(
-    action: string,
-    call: () => Promise<unknown>,
-    { whole = false }: { whole?: boolean } = {},
-  ): Promise<boolean> {
+  async act(action: string, call: () => Promise<unknown>): Promise<boolean> {
     if (this.busy) return false;
     this.clear();
     this.status.value = "idle";
     this.pending.value = action;
-    const failed = await this.attempt(call, whole);
+    const failed = await this.attempt(call);
     if (!this.live) return false;
     this.pending.value = null;
     if (failed !== null) {
@@ -138,7 +108,6 @@ export class Save {
     return true;
   }
 
-  // a text field's input: the new value, and the edit clears the refusal
   bind = (s: { value: string }) => (e: Event) => {
     s.value = (e.currentTarget as HTMLInputElement).value;
     this.touch();
@@ -149,16 +118,13 @@ export class Save {
     this.clear();
   }
 
-  private async attempt(
-    call: () => Promise<unknown>,
-    whole = false,
-  ): Promise<Problem | null> {
+  private async attempt(call: () => Promise<unknown>): Promise<Problem | null> {
     try {
       await call();
       return null;
     } catch (err) {
       const { words: error, status } = failure(err);
-      const field = whole ? undefined : this.fieldOf(error);
+      const field = this.fieldOf(error);
       return {
         error,
         ...(field === undefined ? {} : { field }),
@@ -173,7 +139,8 @@ export class Save {
   }
 }
 
-// one Save per form, gone with it
+// disposed with the form, so a call that answers after it is gone
+// changes nothing
 export function useSave(call: () => Promise<void>, fieldOf?: FieldOf): Save {
   const ref = useRef<Save | null>(null);
   if (ref.current === null) ref.current = new Save(call, DONE_MS, fieldOf);
@@ -181,8 +148,6 @@ export function useSave(call: () => Promise<void>, fieldOf?: FieldOf): Save {
   return ref.current;
 }
 
-// an action in place outside a form: a switch or a pick that writes at
-// once, busy while it runs and its refusal in words until the next try
 export function useAction() {
   const busy = useSignal(false);
   const failed = useSignal<string | null>(null);
@@ -199,8 +164,6 @@ export function useAction() {
   return { busy, failure: failed, run };
 }
 
-// a refusal at a field takes the focus there, so the fix is one keystroke
-// away; the control carries the field's name
 export function useFocusField(
   save: Pick<Save, "status" | "busy">,
   form: RefObject<HTMLElement | null>,
@@ -214,4 +177,17 @@ export function useFocusField(
       ?.querySelector<HTMLElement>(`[name="${CSS.escape(field)}"]`)
       ?.focus();
   }, [status, busy]);
+}
+
+// on a touch screen nothing takes the focus, so the keyboard stays down
+export function useArrivalFocus(
+  form: RefObject<HTMLElement | null>,
+  name: string,
+): void {
+  useEffect(() => {
+    if (touch()) return;
+    form.current
+      ?.querySelector<HTMLElement>(`[name="${CSS.escape(name)}"]`)
+      ?.focus();
+  }, []);
 }

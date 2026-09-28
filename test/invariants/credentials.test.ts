@@ -16,6 +16,7 @@ import { MAX_CREDENTIALS_PER_PROJECT } from "../../src/shared/contracts/credenti
 import { type TestApp, type TestClient, testApp } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp } from "../helpers/chat.ts";
+import { createTeam } from "../helpers/projects.ts";
 
 const KEY = "0123456789abcdef-key";
 
@@ -31,14 +32,6 @@ async function admin(secrets: Record<string, string> = {}) {
   const client = app.client();
   await client.login("admin", "hunter2-test");
   return { app, client };
-}
-
-async function team(client: TestClient, name: string): Promise<string> {
-  const res = await client.call("POST", "/api/projects", {
-    body: { name, description: "A team project." },
-  });
-  expect(res.status).toBe(201);
-  return (await res.json()).project.id;
 }
 
 const body = (fields: Record<string, unknown> = {}) => ({
@@ -66,7 +59,7 @@ async function closed(app: TestApp) {
 test("an admin saves a credential in canonical form and the list never holds a key", async () => {
   const { app, client } = await admin();
   try {
-    const finops = await team(client, "finops");
+    const finops = (await createTeam(client, "finops")).id;
     const res = await create(client, {
       prefix: "https://Quotes.Example.test.:443/api/v1/",
       methods: ["HEAD", "GET"],
@@ -190,8 +183,8 @@ test("a personal project cannot be bound, and a name is taken once", async () =>
 test("two credentials in one project never overlap, either way round", async () => {
   const { app, client } = await admin();
   try {
-    const finops = await team(client, "finops");
-    const other = await team(client, "other");
+    const finops = (await createTeam(client, "finops")).id;
+    const other = (await createTeam(client, "other")).id;
     const narrow = await create(client, {
       name: "narrow",
       prefix: "https://quotes.example.test/api/v1/",
@@ -259,7 +252,7 @@ test("two credentials in one project never overlap, either way round", async () 
 test("a project holds at most ten credentials", async () => {
   const { app, client } = await admin();
   try {
-    const finops = await team(client, "finops");
+    const finops = (await createTeam(client, "finops")).id;
     for (let i = 0; i < MAX_CREDENTIALS_PER_PROJECT; i++) {
       const res = await create(client, {
         name: `api-${i}`,
@@ -306,8 +299,8 @@ test("a project holds at most ten credentials", async () => {
 test("a change keeps what it omits and a supplied list replaces", async () => {
   const { app, client } = await admin();
   try {
-    const a = await team(client, "alpha");
-    const b = await team(client, "beta");
+    const a = (await createTeam(client, "alpha")).id;
+    const b = (await createTeam(client, "beta")).id;
     const res = await create(client, {
       template: "Bearer {key}",
       methods: ["GET", "POST"],
@@ -343,7 +336,7 @@ test("a change keeps what it omits and a supplied list replaces", async () => {
 test("deleting a project takes its links, the credential stays", async () => {
   const { app, client } = await admin();
   try {
-    const finops = await team(client, "finops");
+    const finops = (await createTeam(client, "finops")).id;
     const res = await create(client, { projectIds: [finops] });
     const { credential } = (await res.json()) as CredentialResponse;
     expect(

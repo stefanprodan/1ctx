@@ -1,14 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Config › Visuals, a settings page: the switch over the visualize tool
-// it offers, the CDNs a visual may load from, and how much one turn may
-// draw, each a card that drafts and saves apart; the aside has the last
-// 30 days. Nothing saves before Save, the switch included. A change
-// applies to the next turn.
 
 import { useSignal } from "@preact/signals";
-import { useRef } from "preact/hooks";
 import type { WebToolSummary } from "../../../shared/contracts/tool.ts";
 import { MAX_VISUAL_HOSTS } from "../../../shared/visual.ts";
 import { zoneStep } from "../../app/zones.ts";
@@ -20,18 +13,23 @@ import {
   visualsUsage,
 } from "../../data/tools.ts";
 import { count } from "../../lib/format.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsSwitch } from "../../ui/Rows.tsx";
-import { Setting } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
+import { AsideLine, Split } from "../../ui/Split.tsx";
+import { UsageSection } from "./AdminAside.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
+import { useLatest } from "./drafts.ts";
 import { LimitsSetting } from "./LimitsSetting.tsx";
 import { ToolRow } from "./ToolRow.tsx";
-import { hostsCount, hostsFieldOf, hostsLine, hostsOf } from "./Tools.model.ts";
+import { hostsCount } from "./Tools.model.ts";
 import {
   hostsDirty,
+  hostsFieldOf,
+  hostsLine,
+  hostsOf,
   hostsText,
   isDefaultHosts,
   VISUAL_LIMITS,
@@ -53,7 +51,7 @@ export function Visuals() {
     >
       {state && rows && (
         <Split aside={<Aside />}>
-          <div class="visuals">
+          <SettingStack>
             <Switch tool={state.visualize} />
             <Hosts tool={state.visualize} />
             <LimitsSetting
@@ -61,36 +59,27 @@ export function Visuals() {
               names={VISUAL_LIMITS}
               line="How much one turn may draw."
             />
-          </div>
+          </SettingStack>
         </Split>
       )}
     </Page>
   );
 }
 
-// the switch in the head, the tool it offers as the card's one row; the
-// line and the row follow the draft, so a flip says what Save will do.
-// The draft is null until a flip, so the switch shows what was saved, a
-// load that lands after the first draw included
+// a flip saves only on Save; the draft is null until one, so a load
+// that lands after the first draw shows through
 function Switch({ tool }: { tool: WebToolSummary }) {
   const drafted = useSignal<boolean | null>(null);
   const open = useSignal(false);
-  const latest = useRef(tool);
-  latest.current = tool;
+  const latest = useLatest(tool);
   const save = useSave(async () => {
     const enabled = drafted.value ?? latest.current.enabled;
     await patchTool("visualize", { enabled });
     drafted.value = null;
   });
   const on = drafted.value ?? tool.enabled;
-  const dirty = on !== tool.enabled;
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(null);
-      }}
-    >
+    <SettingForm save={save}>
       <Setting
         title="Visuals"
         line={visualsLine(on)}
@@ -109,7 +98,7 @@ function Switch({ tool }: { tool: WebToolSummary }) {
         foot={
           <DraftFoot
             save={save}
-            dirty={dirty}
+            dirty={on !== tool.enabled}
             onDiscard={() => {
               drafted.value = null;
             }}
@@ -124,34 +113,28 @@ function Switch({ tool }: { tool: WebToolSummary }) {
           }}
         />
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// a box of origins, one per line, saved whole; Use defaults puts the
-// list a fresh instance starts with in the box. The draft is null until
-// someone types, so the box shows the saved list as the server wrote it
+// null until typing, so the box shows the list as the server wrote it
 function Hosts({ tool }: { tool: WebToolSummary }) {
   const drafted = useSignal<string | null>(null);
-  const form = useRef<HTMLFormElement>(null);
-  const latest = useRef(tool);
-  latest.current = tool;
+  const latest = useLatest(tool);
   const save = useSave(async () => {
     const parsed = hostsOf(drafted.value ?? hostsText(latest.current.hosts));
     if ("error" in parsed) return;
     await patchTool("visualize", { hosts: parsed.hosts });
     drafted.value = null;
   }, hostsFieldOf);
-  useFocusField(save, form);
   const typed = drafted.value ?? hostsText(tool.hosts);
   const invalid = save.fieldError("hosts") !== null;
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
+    <SettingForm
+      save={save}
+      check={() => {
         const parsed = hostsOf(typed);
-        void save.run("error" in parsed ? at("hosts", parsed.error) : null);
+        return "error" in parsed ? at("hosts", parsed.error) : null;
       }}
     >
       <Setting
@@ -203,26 +186,20 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
           <FieldError save={save} field="hosts" />
         </label>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
 function Aside() {
-  const known = visualsUsage.value;
-  const usage = known?.usage ?? null;
   return (
-    <AsideSection label="Last 30 days">
-      {known === null ? (
-        <p class="split-empty">Loading</p>
-      ) : usage === null ? (
-        <p class="split-empty">Did not load.</p>
-      ) : (
+    <UsageSection value={visualsUsage.value()}>
+      {(usage) => (
         <>
           <AsideLine label="Drawn">{count(usage.drawn)}</AsideLine>
           <AsideLine label="Failed">{count(usage.failed)}</AsideLine>
           <AsideLine label="Files opened">{count(usage.opened)}</AsideLine>
         </>
       )}
-    </AsideSection>
+    </UsageSection>
   );
 }

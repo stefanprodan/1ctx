@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A page in two columns: the content, and a quiet aside at its right
-// with a few sections of plain lines, as a repository page has its
-// About column. Wide screens get structure instead of rows stretched
-// across them; under 1100, a tablet or a phone, the aside is hidden
-// and the content has the width.
 
 import type { ComponentChildren } from "preact";
 import "./split.css";
@@ -25,8 +19,6 @@ export function Split({
   );
 }
 
-// a section of the aside: a label, an optional action at its right,
-// then the lines the page puts under it
 export function AsideSection({
   label,
   action,
@@ -47,8 +39,6 @@ export function AsideSection({
   );
 }
 
-// a fact of the aside: its label, then the value, a link with `href`;
-// `cut` keeps a long value to one line
 export function AsideLine({
   label,
   cut,
@@ -59,7 +49,6 @@ export function AsideLine({
   label: string;
   cut?: boolean;
   href?: string;
-  // the value says there is none: faint, not bright
   quiet?: boolean;
   children: ComponentChildren;
 }) {
@@ -75,5 +64,30 @@ export function AsideLine({
         </a>
       )}
     </div>
+  );
+}
+
+// undefined while the read runs, null when it failed
+export function AsideRead<T>({
+  label,
+  action,
+  value,
+  children,
+}: {
+  label: string;
+  action?: ComponentChildren;
+  value: T | null | undefined;
+  children: (value: T) => ComponentChildren;
+}) {
+  return (
+    <AsideSection label={label} action={action}>
+      {value === undefined ? (
+        <p class="split-empty">Loading</p>
+      ) : value === null ? (
+        <p class="split-empty">Did not load.</p>
+      ) : (
+        children(value)
+      )}
+    </AsideSection>
   );
 }

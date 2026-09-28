@@ -1,12 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The overview answer from one read: the quarter hours laid on the
-// range's days in the zone, their totals and the instance. The usage
-// page's answer lays a month the same way and adds the ten largest
-// rows of each breakdown and the ten models with the most turns.
 
 import type {
+  DaysAnswer,
   OverviewDay,
   OverviewRange,
   OverviewResponse,
@@ -20,8 +16,9 @@ import {
   daysWindow,
   type UsageWindow,
 } from "../usage/index.ts";
+import type { GroupRow } from "./breakdowns.ts";
 import type {
-  GroupRow,
+  DayReads,
   MonthResult,
   RangeResult,
   SendSlot,
@@ -31,30 +28,23 @@ import { SLOT_MS } from "./range.ts";
 
 const TOP = 10;
 
-export type Instance = Pick<
-  OverviewResponse["instance"],
-  "version" | "startedAt"
->;
+type Instance = Pick<OverviewResponse["instance"], "version" | "startedAt">;
 
 const DAY_MS = 86_400_000;
 
-// a fixed range's days in the zone; all is laid from its read
 export const daysOf = (
   now: number,
   timeZone: string,
   range: "30d" | "90d",
 ): UsageWindow => daysWindow(now, timeZone, range === "30d" ? 30 : 90);
 
-// the first slot any of the sums fell in, as an instant, null for none
-export function firstOf(result: Slots): number | null {
+export function firstOf(result: DayReads): number | null {
   const firsts = [result.sends, result.usage, result.decisions]
     .map((rows) => rows[0]?.slot)
     .filter((slot): slot is number => slot !== undefined);
   return firsts.length === 0 ? null : Math.min(...firsts) * SLOT_MS;
 }
 
-// the range's days: a fixed one's, or all's from the day the first sum
-// fell on to today, today alone before any
 export function windowOf(
   now: number,
   timeZone: string,
@@ -155,31 +145,36 @@ const usageOf = (row: Omit<UsageSlot, "slot">): Usage => ({
   cost: row.cost,
 });
 
-// each slot's row onto the day it falls in; a slot before the window
-// is skipped, one past it ends the walk
+// ats sorted; one outside [bounds[0], the last bound) is skipped
+function eachDay(
+  ats: readonly number[],
+  bounds: readonly number[],
+  visit: (day: number, k: number) => void,
+): void {
+  const until = bounds[bounds.length - 1]!;
+  let day = 0;
+  ats.forEach((at, k) => {
+    if (at < bounds[0]! || at >= until) return;
+    while (at >= bounds[day + 1]!) day++;
+    visit(day, k);
+  });
+}
+
 function lay<T extends { slot: number }>(
   rows: T[],
   bounds: number[],
   add: (into: OverviewTotals, row: T) => void,
   buckets: OverviewTotals[],
 ): void {
-  let day = 0;
-  for (const row of rows) {
-    const at = row.slot * SLOT_MS;
-    if (at < bounds[0]!) continue;
-    while (day < buckets.length && at >= bounds[day + 1]!) day++;
-    if (day >= buckets.length) break;
-    add(buckets[day]!, row);
-  }
+  eachDay(
+    rows.map((row) => row.slot * SLOT_MS),
+    bounds,
+    (day, k) => add(buckets[day]!, rows[k]!),
+  );
 }
 
-type Slots = Pick<
-  RangeResult,
-  "sends" | "usage" | "decisions" | "ended" | "actives"
->;
-
-// the nearest rank: the least length at least 95% of the turns took
-export function p95(values: number[]): number | null {
+// nearest rank
+function p95(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.ceil(sorted.length * 0.95) - 1]!;
@@ -191,32 +186,27 @@ const lengthsOf = (values: number[]): TurnLengths => ({
 });
 
 function days(
-  result: Slots,
+  result: DayReads,
   window: UsageWindow,
-): Pick<OverviewResponse, "days" | "totals" | "turnLength" | "activeUsers"> {
+): Omit<DaysAnswer, "readAt"> {
   const bounds = [...window.starts, window.until];
   const buckets = window.starts.map(empty);
-  // each ended turn on the day it started, in order as the days are
   const lengths: number[][] = window.starts.map(() => []);
   const all: number[] = [];
-  let on = 0;
-  result.ended.at.forEach((at, k) => {
-    if (at < bounds[0]! || at >= window.until) return;
-    while (at >= bounds[on + 1]!) on++;
-    lengths[on]!.push(result.ended.ms[k]!);
+  eachDay(result.ended.at, bounds, (day, k) => {
+    lengths[day]!.push(result.ended.ms[k]!);
     all.push(result.ended.ms[k]!);
   });
-  // each user once a day and once over the range
   const users = window.starts.map(() => new Set<number>());
   const everyone = new Set<number>();
-  let day = 0;
-  result.actives.slot.forEach((slot, k) => {
-    const at = slot * SLOT_MS;
-    if (at < bounds[0]! || at >= window.until) return;
-    while (at >= bounds[day + 1]!) day++;
-    users[day]!.add(result.actives.user[k]!);
-    everyone.add(result.actives.user[k]!);
-  });
+  eachDay(
+    result.actives.slot.map((slot) => slot * SLOT_MS),
+    bounds,
+    (day, k) => {
+      users[day]!.add(result.actives.user[k]!);
+      everyone.add(result.actives.user[k]!);
+    },
+  );
   lay(result.sends, bounds, addSends, buckets);
   lay(
     result.usage,
@@ -288,7 +278,7 @@ function by(result: MonthResult): UsageResponse["by"] {
   };
 }
 
-export function median(values: number[]): number | null {
+function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = sorted.length >> 1;

@@ -20,6 +20,7 @@ import {
   startRun,
 } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
 const mapped = () => Object.values(STORAGE_TABLES).flat();
 
@@ -55,21 +56,6 @@ async function settledChat(chat: ChatApp, projectId = chat.projectId) {
 async function relogin(chat: ChatApp) {
   await chat.admin.login("admin", "hunter2-test");
   await chat.member.login("casey", "pw");
-}
-
-async function team(chat: ChatApp, name: string): Promise<string> {
-  const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name, description: "A team project." },
-  });
-  expect(res.status).toBe(201);
-  const { project } = await res.json();
-  const added = await chat.admin.call(
-    "POST",
-    `/api/projects/${project.id}/members`,
-    { body: { userId: chat.memberId } },
-  );
-  expect(added.status).toBe(201);
-  return project.id as string;
 }
 
 describe("the storage area map", () => {
@@ -172,7 +158,9 @@ describe("the storage answer", () => {
 
   test("sums a chat's messages and names it only in a team project", async () => {
     const chat = await chatApp();
-    const projectId = await team(chat, "research");
+    const projectId = (
+      await createTeam(chat.admin, "research", [chat.memberId])
+    ).id;
     const personal = await settledChat(chat);
     const shared = await settledChat(chat, projectId);
     const body = await storage(chat);
@@ -332,7 +320,8 @@ describe("the storage answer", () => {
 
   test("sums a project's live files, their versions and deleted history", async () => {
     const chat = await chatApp();
-    const projectId = await team(chat, "docs");
+    const projectId = (await createTeam(chat.admin, "docs", [chat.memberId]))
+      .id;
     const base = `/api/projects/${projectId}/knowledge`;
     const first = await chat.member.call("POST", base, {
       body: { name: "notes.md", text: "one" },
@@ -422,7 +411,8 @@ describe("the storage answer", () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-06-10T12:00:00Z");
     await relogin(chat);
-    const projectId = await team(chat, "docs");
+    const projectId = (await createTeam(chat.admin, "docs", [chat.memberId]))
+      .id;
     const base = `/api/projects/${projectId}/knowledge`;
     const created = await chat.member.call("POST", base, {
       body: { name: "notes.md", text: "one" },

@@ -1,17 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The foot of a form: the notice of a refusal that names no field, on
-// its own line over the buttons so they never move when it shows, or
-// in the start's place in a card's foot, whose buttons sit at the
-// right whatever the start says; and
-// a line of the view's over both, what an ask is about; the submit
-// button that says what a Save is going through; and room on the
-// left for the form's other actions. A view composes this, never
-// restyles it.
 
 import type { Signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useEffect } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import { noticeOf, type Save } from "../lib/save.ts";
 import "./foot.css";
@@ -34,18 +26,14 @@ export function Foot({
   dirty?: boolean;
   label?: string;
   children?: ComponentChildren;
-  // what sits at the left end, apart from the submit: a Delete
   start?: ComponentChildren;
-  // what sits right before the submit: a Cancel
   before?: ComponentChildren;
-  // a line over the notice and the buttons: what a Delete asked about
-  // would do; its class, which takes the whole line, is the owner's
+  // its class, which takes the whole line, is the owner's
   above?: ComponentChildren;
-  // on a phone the start takes its own line and the buttons the next,
-  // at the right: a hint too long to share a line with them
+  // on a phone the start takes its own line: a hint too long to share
+  // one with the buttons
   stack?: boolean;
-  // the notice in the start's place, red words in the buttons' line;
-  // the start wraps beside the buttons on a phone, never over them
+  // the notice in the start's place, so the buttons never move
   inline?: boolean;
 }) {
   const status = save.status.value;
@@ -110,8 +98,6 @@ export function Foot({
   );
 }
 
-// A foot's start for a row that can be deleted: Delete, then the words
-// that ask, the danger Delete and Keep. `wordsClass` is the owner's.
 export function AskDelete({
   save,
   asking,
@@ -127,12 +113,20 @@ export function AskDelete({
   busy: boolean;
   words?: string;
   wordsClass?: string;
-  // the danger button's word
   label?: string;
-  // read what the delete would do before asking; it never throws
+  // it never throws
   onAsk?: () => Promise<void>;
   onDelete: () => void;
 }) {
+  useEffect(() => {
+    if (!asking.value) return;
+    // on window: an open picker stops its Escape on the document first
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") asking.value = false;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [asking.value]);
   if (!asking.value) {
     return (
       <button

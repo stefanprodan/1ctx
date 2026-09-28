@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the Config board shows without a DOM: its tabs, the limits of
-// each card on Limits and Storage, and for each built-in tool whether
-// a turn is offered it.
 
 import type { ToolsResponse } from "../../../shared/api/tools.ts";
 import type {
@@ -11,20 +7,32 @@ import type {
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import type { LimitName } from "../../../shared/words.ts";
+import {
+  AGENTS_HREF,
+  CONFIG_HREF,
+  CONFIG_STORAGE_HREF,
+  CREDENTIALS_HREF,
+  DECIDERS_HREF,
+  LIMITS_HREF,
+  MCP_HREF,
+  PROVIDERS_HREF,
+  SKILLS_HREF,
+  VISUALS_HREF,
+  WEB_HREF,
+} from "../../lib/hrefs.ts";
 
 type ConfigTab = "overview" | "limits" | "storage";
 
 export const CONFIG_TABS: { tab: ConfigTab; label: string; href: string }[] = [
-  { tab: "overview", label: "Overview", href: "/admin/config" },
-  { tab: "limits", label: "Limits", href: "/admin/config/limits" },
-  { tab: "storage", label: "Storage", href: "/admin/config/storage" },
+  { tab: "overview", label: "Overview", href: CONFIG_HREF },
+  { tab: "limits", label: "Limits", href: LIMITS_HREF },
+  { tab: "storage", label: "Storage", href: CONFIG_STORAGE_HREF },
 ];
 
 export function configTab(pathname: string): ConfigTab {
   return CONFIG_TABS.find((t) => t.href === pathname)?.tab ?? "overview";
 }
 
-// a card of limits: its title, its line and its fields in order
 export type LimitsGroup = {
   title: string;
   line: string;
@@ -100,16 +108,12 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
 
 type AnyTool = BuiltinToolSummary | WebToolSummary;
 
-// every built-in in one list, visualize with them, by name
 export function builtinsOf(state: ToolsResponse): AnyTool[] {
   return [...state.builtin, state.visualize].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
 }
 
-// whether a turn may be offered the tool: the web tools follow web
-// access and the search provider, visualize its switch, the rest follow
-// what the turn has
 export function offered(tool: AnyTool, state: ToolsResponse): boolean {
   if (tool.name === "webfetch") return state.access.mode !== "off";
   if (tool.name === "websearch") {
@@ -119,8 +123,7 @@ export function offered(tool: AnyTool, state: ToolsResponse): boolean {
   return true;
 }
 
-// a line of the aside: what it counts or names, and the page it opens
-export type InstanceLine = {
+type InstanceLine = {
   label: string;
   value: string;
   href: string;
@@ -133,9 +136,7 @@ const MODE_WORDS: Record<ToolsResponse["access"]["mode"], string> = {
   listed: "Listed domains",
 };
 
-// the aside's Instance: how many of each thing the instance has, a list
-// not loaded yet left out, with what turns get from visuals and the web
-// before the credentials, which belong to web access
+// a list not loaded yet is left out
 export function instanceLines(
   state: ToolsResponse,
   lists: {
@@ -159,33 +160,29 @@ export function instanceLines(
   const provider = state.search.provider;
   const drawn = state.visualize.enabled;
   return [
-    ...counted("Providers", lists.providers, "/admin/config/providers"),
-    ...counted("Agents", lists.agents, "/admin/config/agents"),
-    ...counted("Deciders", lists.deciders, "/admin/config/deciders"),
-    ...counted("MCP servers", lists.servers, "/admin/config/mcp"),
-    ...counted("Skills", lists.skills, "/admin/config/skills"),
+    ...counted("Providers", lists.providers, PROVIDERS_HREF),
+    ...counted("Agents", lists.agents, AGENTS_HREF),
+    ...counted("Deciders", lists.deciders, DECIDERS_HREF),
+    ...counted("MCP servers", lists.servers, MCP_HREF),
+    ...counted("Skills", lists.skills, SKILLS_HREF),
     {
       label: "Visuals",
       value: drawn ? "On" : "Off",
-      href: "/admin/config/visuals",
+      href: VISUALS_HREF,
       quiet: !drawn,
     },
     {
       label: "Web access",
       value: MODE_WORDS[mode],
-      href: "/admin/config/web",
+      href: WEB_HREF,
       quiet: mode === "off",
     },
     {
       label: "Search",
       value: provider ?? "None",
-      href: "/admin/config/web",
+      href: WEB_HREF,
       quiet: provider === null,
     },
-    ...counted(
-      "Credentials",
-      lists.credentials,
-      "/admin/config/web/credentials",
-    ),
+    ...counted("Credentials", lists.credentials, CREDENTIALS_HREF),
   ];
 }

@@ -1,5 +1,3 @@
-/* A number typed with its unit inside the box, at the right. */
-
 @layer tokens, base, owners;
 
 @layer owners {

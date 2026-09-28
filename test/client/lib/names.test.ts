@@ -5,7 +5,11 @@
 // value to its form.
 
 import { describe, expect, test } from "bun:test";
-import { nameProblem, shapedInput } from "../../../src/client/lib/names.ts";
+import {
+  nameProblem,
+  nameTaken,
+  shapedInput,
+} from "../../../src/client/lib/names.ts";
 
 const typed = (value: string) => {
   const box = { value };
@@ -36,4 +40,17 @@ describe("nameProblem", () => {
       expect(nameProblem(value)).toBeNull();
     },
   );
+});
+
+test("a name is taken by another row or a reserved name", () => {
+  const rows = [
+    { id: "a1", name: "coder" },
+    { id: "a2", name: "writer" },
+  ];
+  expect(nameTaken(rows, "writer", "a1")).toBe(true);
+  expect(nameTaken(rows, " writer ")).toBe(true);
+  expect(nameTaken(rows, "writer", "a2")).toBe(false);
+  expect(nameTaken(rows, "ops")).toBe(false);
+  expect(nameTaken(null, "writer")).toBe(false);
+  expect(nameTaken(rows, "personal", "", ["personal"])).toBe(true);
 });

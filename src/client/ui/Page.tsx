@@ -1,13 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The head of a view and its states in one place: a label over the
-// title, or a crumb with the title on one line for a page whose title
-// is a noun (one parent, or several steps), actions on the right, a
-// notice row across the head for what a page that saves from its head
-// asks or refuses, then either the content, a loading line, an empty
-// line or the page's failure: what failed, the words, and Try again. A
-// view composes this, never restyles it.
 
 import { useSignal } from "@preact/signals";
 import { type ComponentChildren, Fragment } from "preact";
@@ -18,14 +10,12 @@ import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import "./page.css";
 import { CodeTag } from "./CodeTag.tsx";
+import { Finder } from "./Finder.tsx";
 
-// a step of a crumb, a link back when it has an address; a path's step
-// is in mono and keeps its own case
 export type PageStep = {
   label: string;
   href?: string;
   mono?: boolean;
-  // shown on hover: a step's whole name, or what a collapsed one holds
   title?: string;
 };
 
@@ -48,36 +38,23 @@ export function Page({
   children,
 }: {
   label?: string;
-  // "Account / Profile" on one line, the title in the foreground; an
-  // empty crumb is the one-line head with the title alone
+  // an empty crumb is the one-line head with the title alone
   crumb?: string;
-  // where the crumb's parent leads, when it is a page
   crumbHref?: string;
-  // the crumb's steps before the title, in place of `crumb`; a phone
-  // keeps the nearest and the title
   steps?: PageStep[];
-  // the title is a path's step: mono, its own case
   titleMono?: boolean;
-  // where the title leads, the crumb's last step then a link: a file's
-  // page from any of its views, its history or a past revision
   titleHref?: string;
   title: string;
-  // the title's node when the view wraps it in a control: a chat's
-  // menu, opened by the title itself. The view renders the title text
-  // and its heading, since what the control opens is no part of it
+  // the view renders the title text and its heading, since what the
+  // control opens is no part of it
   menu?: ComponentChildren;
   actions?: ComponentChildren;
-  // a PageNotice under the crumb and the actions, spanning the head, so
-  // it stays in view with them
   notice?: ComponentChildren;
   loading?: boolean;
   empty?: string;
-  // the load's failure, or a view's own words for why there is nothing
   error?: Failure | string | null;
   // the view has a foot stuck to the bottom and spends the inset there
   flush?: boolean;
-  // the content is a Split: the head's row ends where its main column
-  // does, so no action sits over the aside
   split?: boolean;
   children?: ComponentChildren;
 }) {
@@ -91,7 +68,6 @@ export function Page({
         ? null
         : { words: error, status: null }
       : (error ?? null);
-  // content has scrolled under the head: it casts its shadow
   const stuck = useSignal(false);
   useEffect(() => {
     const el = head.current;
@@ -109,7 +85,6 @@ export function Page({
       {steps !== undefined ? (
         <Crumb class="page-crumb">
           {steps.map((step, i) => {
-            // every step but the nearest folds away on a phone
             const far = i < steps.length - 1 ? " page-crumb-far" : "";
             const mono = step.mono ? " page-crumb-path" : "";
             return (
@@ -202,8 +177,7 @@ export function Page({
             </p>
             <p class="page-failed-text">{sentence(failed.words)}</p>
           </div>
-          {/* A full reload runs the route's load again, and the shell's
-              with it, which is what a failed first answer needs. */}
+          {/* a full reload runs the shell's load again too */}
           <button
             type="button"
             class="btn page-failed-retry"
@@ -223,14 +197,10 @@ export function Page({
   );
 }
 
-// the loading line of a page whose head is drawn while a part of its
-// content loads
 export function PageLoading() {
   return <p class="page-state">Loading</p>;
 }
 
-// the head's notice: words, then the buttons that answer them. `failed`
-// for a refusal or an ask that loses something, read out at once
 export function PageNotice({
   tone = "info",
   words,
@@ -249,5 +219,64 @@ export function PageNotice({
       <span class="page-notice-words">{words}</span>
       {children && <span class="page-notice-acts">{children}</span>}
     </div>
+  );
+}
+
+export function PageNew({ href, label }: { href: string; label: string }) {
+  return (
+    <a class="btn btn-small" href={href}>
+      <Icon name="plus" size={14} />
+      {label}
+    </a>
+  );
+}
+
+// the caller orders the items
+export function PageSwitcher({
+  label,
+  current,
+  name,
+  items,
+  mono = true,
+  placeholder,
+  none,
+}: {
+  label: string;
+  current: string;
+  name: string;
+  items: { id: string; label: string; href: string }[];
+  mono?: boolean;
+  placeholder: string;
+  none: string;
+}) {
+  if (items.length < 2) {
+    return (
+      <span class={`page-crumb-on${mono ? " page-crumb-path" : ""}`}>
+        {name}
+      </span>
+    );
+  }
+  return (
+    <Finder
+      label={label}
+      triggerClass="page-pill"
+      title={name}
+      trigger={
+        <>
+          <span class="cut">{name}</span>
+          <Icon name="chevron" size={14} class="page-pill-chevron" />
+        </>
+      }
+      options={items.map((i) => ({
+        value: i.id,
+        label: i.label,
+        href: i.href,
+      }))}
+      value={current}
+      mono={mono}
+      wide
+      placeholder={placeholder}
+      none={none}
+    />
   );
 }

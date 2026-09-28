@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the user's visible projects spent: the last seven days, the year
-// of days and the recent weeks of days. Kept only for the user it was
-// asked for, as every entity is.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -16,8 +12,7 @@ import { me } from "./me.ts";
 
 export const week = signal<WeekUsageResponse | null>(null);
 
-// the weeks Home's aside asks for: as many as its 240px column holds at
-// the heatmap's cell size
+// as many weeks as Home's 240px aside holds at the heatmap's cell size
 export const RECENT_WEEKS = 16;
 
 const MAX_TIMEOUT = 2_147_483_647;
@@ -30,12 +25,10 @@ const MIN_RELOAD = 60_000;
 let owner: string | null = null;
 let weekTurn = 0;
 
-// One days answer and its lifecycle: its own turn, so loads of the year
-// and of the recent weeks never discard each other, and its own midnight
-// timer, since each window gains the new day.
+// its own turn, so loads of the year and of the recent weeks never
+// discard each other, and its own midnight timer
 function daysEntity(weeks: number | null) {
   const answer = signal<DaysUsageResponse | null>(null);
-  // a first load that failed: the page stops drawing the loading state
   const failed = signal(false);
   let turn = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -97,11 +90,9 @@ function daysEntity(weeks: number | null) {
 const year = daysEntity(null);
 const recent = daysEntity(RECENT_WEEKS);
 
-// the year, for the Projects page
 export const days = year.answer;
 export const daysFailed = year.failed;
 export const loadDays = year.load;
-// the last weeks, for Home's aside
 export const recentDays = recent.answer;
 export const recentDaysFailed = recent.failed;
 export const loadRecentDays = recent.load;

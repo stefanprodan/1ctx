@@ -1,12 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// New project, the Projects list's `?new`: the name and the description,
-// both required, with one Create, as New user. Create opens the
-// project's page, where its members are added.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { RESERVED_PROJECT_NAMES } from "../../../shared/words.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
@@ -15,20 +11,16 @@ import {
   createProject,
 } from "../../data/admin-projects.ts";
 import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
-import { nameProblem } from "../../lib/names.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
-import { touch } from "../../lib/touch.ts";
-import { Foot } from "../../ui/Foot.tsx";
+import { nameProblem, nameTaken } from "../../lib/names.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { Page } from "../../ui/Page.tsx";
-import { Setting, SettingHint } from "../../ui/Setting.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import {
   DESCRIPTION_PLACEHOLDER,
   descriptionProblem,
-  nameTaken,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
-import "./admin-projects.css";
+import { NewCard } from "./NewCard.tsx";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
 
@@ -49,13 +41,6 @@ export function NewProject() {
 function Form() {
   const name = useSignal("");
   const description = useSignal("");
-  const form = useRef<HTMLFormElement>(null);
-  // with a mouse the name takes the caret on arrival
-  useEffect(() => {
-    if (!touch()) {
-      form.current?.querySelector<HTMLInputElement>('[name="name"]')?.focus();
-    }
-  }, []);
   const save = useSave(async () => {
     const from = address();
     const created = await createProject({
@@ -64,67 +49,52 @@ function Form() {
     });
     if (address() === from) navigate(adminProjectHref(created.id));
   }, projectFieldOf);
-  useFocusField(save, form);
   const trimmed = name.value.trim();
-  const taken = nameTaken(adminProjects.value ?? [], trimmed);
+  const taken = nameTaken(
+    adminProjects.value,
+    trimmed,
+    "",
+    RESERVED_PROJECT_NAMES,
+  );
   return (
-    <form
-      class="admin-projects-page"
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
+    <NewCard
+      label="New project"
+      create="Create project"
+      cancel={PROJECTS_HREF}
+      save={save}
+      ready={trimmed !== ""}
+      taken={taken ? trimmed : null}
+      first="name"
+      onSubmit={() =>
         void save.run(
           at("name", nameProblem(name.value)) ??
             at("description", descriptionProblem(description.value)),
-        );
-      }}
+        )
+      }
     >
-      <Setting
-        label="New project"
-        foot={
-          <Foot
-            save={save}
-            dirty={trimmed !== "" && !taken}
-            label="Create project"
-            stack={taken}
-            // the hint's place holds the buttons at the right
-            start={
-              <SettingHint>
-                {taken && <span class="error">{trimmed} is taken.</span>}
-              </SettingHint>
-            }
-            before={
-              <a class="btn" href={PROJECTS_HREF}>
-                Cancel
-              </a>
-            }
-          />
-        }
-      >
-        <div class="pair">
-          <NameField
-            disabled={save.busy}
-            error={save.fieldError("name")}
-            value={name.value}
-            onInput={(value) => {
-              name.value = value;
-              save.touch();
-            }}
-          />
-          <DescriptionField
-            class="pair-wide"
-            required
-            placeholder={DESCRIPTION_PLACEHOLDER}
-            disabled={save.busy}
-            error={save.fieldError("description")}
-            value={description.value}
-            onInput={(value) => {
-              description.value = value;
-              save.touch();
-            }}
-          />
-        </div>
-      </Setting>
-    </form>
+      <div class="pair">
+        <NameField
+          disabled={save.busy}
+          error={save.fieldError("name")}
+          value={name.value}
+          onInput={(value) => {
+            name.value = value;
+            save.touch();
+          }}
+        />
+        <DescriptionField
+          class="pair-wide"
+          required
+          placeholder={DESCRIPTION_PLACEHOLDER}
+          disabled={save.busy}
+          error={save.fieldError("description")}
+          value={description.value}
+          onInput={(value) => {
+            description.value = value;
+            save.touch();
+          }}
+        />
+      </div>
+    </NewCard>
   );
 }

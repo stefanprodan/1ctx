@@ -37,12 +37,7 @@ import { m0028 } from "./0028-user-activity.ts";
 import { m0029 } from "./0029-agent-pick.ts";
 import { m0030 } from "./0030-archived-chats.ts";
 import { m0031 } from "./0031-deciders.ts";
-import { m0032 } from "./0032-agent-activity.ts";
-import { m0033 } from "./0033-provider-activity.ts";
-import { m0034 } from "./0034-decision-activity.ts";
-import { m0035 } from "./0035-usage-cost-index.ts";
-import { m0036 } from "./0036-mcp-activity.ts";
-import { m0037 } from "./0037-visits-day.ts";
+import { m0032 } from "./0032-admin-activity.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -77,9 +72,4 @@ export const MIGRATIONS: Migration[] = [
   m0030,
   m0031,
   m0032,
-  m0033,
-  m0034,
-  m0035,
-  m0036,
-  m0037,
 ];

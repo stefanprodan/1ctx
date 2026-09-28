@@ -5,7 +5,7 @@
 // latest answer, the two entities that follow the signed-in user, the
 // Admin group in the rail, and the page rendered over the rows.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   priceLine,
@@ -31,7 +31,6 @@ import {
   loadProviderUsage,
   providers,
   providersError,
-  providerUsage,
   searchCatalog,
 } from "../../../src/client/data/providers.ts";
 import { keyOptions } from "../../../src/client/lib/secrets.ts";
@@ -44,10 +43,6 @@ import {
   defaultThinking,
   effortApplies,
   effortChoices,
-  keyLine,
-  preset,
-  presetBaseUrl,
-  providerFieldOf,
   sentEffort,
   statedFields,
   statedModel,
@@ -57,35 +52,29 @@ import {
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
+import { ProviderPage } from "../../../src/client/views/admin/ProviderPage.tsx";
 import {
-  ProviderPage,
+  keyLine,
+  preset,
+  presetBaseUrl,
   providerDeleteLine,
-} from "../../../src/client/views/admin/ProviderPage.tsx";
+  providerFieldOf,
+} from "../../../src/client/views/admin/Providers.model.ts";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
-import type { DeciderSummary } from "../../../src/shared/contracts/decider.ts";
 import type {
   CatalogMatch,
   ProviderSummary,
 } from "../../../src/shared/contracts/provider.ts";
-import type { Me } from "../../../src/shared/contracts/user.ts";
+import { clientFetch } from "../../helpers/client-fetch.ts";
+import {
+  admin as adminFixture,
+  decider,
+  provider,
+} from "../../helpers/client-fixtures.ts";
 
-const admin: Me = {
-  id: "u1",
-  username: "admin",
-  fullName: "Stefan Prodan",
-  role: "admin",
-  mustChangePassword: false,
-};
-const router: ProviderSummary = {
-  id: "pr1",
-  name: "router",
-  wire: "openrouter",
-  baseUrl: "http://models.test/v1",
-  keyName: "provider-router",
-  hasKey: false,
-  createdAt: 0,
-};
+const admin = adminFixture();
+const router = provider();
 const flash: CatalogMatch = {
   id: "deepseek/deepseek-v4-flash",
   name: "DeepSeek: V4 Flash",
@@ -115,8 +104,8 @@ const coder: AgentSummary = {
   createdAt: 0,
 };
 
-const realFetch = globalThis.fetch;
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;
+clientFetch((url, init) => answer(url, init));
 
 beforeEach(() => {
   me.value = admin;
@@ -129,12 +118,6 @@ beforeEach(() => {
   // have their own suites
   deciders.value = [];
   decisions.value = [];
-  globalThis.fetch = (async (url: string, init?: RequestInit) =>
-    answer(url, init)) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe("the words", () => {
@@ -332,70 +315,73 @@ describe("a model its catalog does not describe", () => {
     },
   );
 
-  test("Preferred provider lists any provider first and leaves out what cannot serve tools", () => {
-    const endpoint = {
-      tag: "inference-net/fp4",
-      name: "InferenceNet",
-      quantization: "fp4",
-      promptPrice: 0.045,
-      completionPrice: 0.14,
-      discount: 0.5,
-      tools: true,
-      reasoning: true,
-    };
-    const endpoints = [
-      endpoint,
-      { ...endpoint, tag: "sail/us", name: "Sail", quantization: "fp8" },
-      { ...endpoint, tag: "sail/fp8", name: "Sail", quantization: "fp8" },
-      {
-        ...endpoint,
-        tag: "relace",
-        name: "Relace",
-        quantization: null,
-        discount: 0,
-        tools: false,
-      },
-    ];
-    expect(upstreamOptions(endpoints, true, null)).toEqual([
-      { value: "", label: "Any provider", detail: "OpenRouter picks" },
-      {
-        value: "inference-net/fp4",
-        label: "InferenceNet fp4",
-        detail: "$0.045 / $0.14 · 50% off",
-        keywords: "inference-net/fp4",
-      },
-      // two with one name are told apart by their tags
-      {
-        value: "sail/us",
-        label: "sail/us",
-        detail: "$0.045 / $0.14 · 50% off",
-        keywords: "sail/us",
-      },
-      {
-        value: "sail/fp8",
-        label: "sail/fp8",
-        detail: "$0.045 / $0.14 · 50% off",
-        keywords: "sail/fp8",
-      },
-    ]);
-    expect(upstreamOptions(endpoints, false, null).at(-1)).toEqual({
-      value: "relace",
-      label: "Relace",
-      detail: "$0.045 / $0.14",
-      keywords: "relace",
-    });
-    // a saved tag no longer listed stays a choice
-    expect(upstreamOptions([], true, "gone").at(-1)).toEqual({
-      value: "gone",
-      label: "gone",
-      detail: "not listed now",
-    });
-    // a list that did not load says nothing of it
-    expect(upstreamOptions(null, true, "kept")).toEqual([
-      { value: "", label: "Any provider", detail: "OpenRouter picks" },
-      { value: "kept", label: "kept" },
-    ]);
-  });
+  test.serial(
+    "Preferred provider lists any provider first and leaves out what cannot serve tools",
+    () => {
+      const endpoint = {
+        tag: "inference-net/fp4",
+        name: "InferenceNet",
+        quantization: "fp4",
+        promptPrice: 0.045,
+        completionPrice: 0.14,
+        discount: 0.5,
+        tools: true,
+        reasoning: true,
+      };
+      const endpoints = [
+        endpoint,
+        { ...endpoint, tag: "sail/us", name: "Sail", quantization: "fp8" },
+        { ...endpoint, tag: "sail/fp8", name: "Sail", quantization: "fp8" },
+        {
+          ...endpoint,
+          tag: "relace",
+          name: "Relace",
+          quantization: null,
+          discount: 0,
+          tools: false,
+        },
+      ];
+      expect(upstreamOptions(endpoints, true, null)).toEqual([
+        { value: "", label: "Any provider", detail: "OpenRouter picks" },
+        {
+          value: "inference-net/fp4",
+          label: "InferenceNet fp4",
+          detail: "$0.045 / $0.14 · 50% off",
+          keywords: "inference-net/fp4",
+        },
+        // two with one name are told apart by their tags
+        {
+          value: "sail/us",
+          label: "sail/us",
+          detail: "$0.045 / $0.14 · 50% off",
+          keywords: "sail/us",
+        },
+        {
+          value: "sail/fp8",
+          label: "sail/fp8",
+          detail: "$0.045 / $0.14 · 50% off",
+          keywords: "sail/fp8",
+        },
+      ]);
+      expect(upstreamOptions(endpoints, false, null).at(-1)).toEqual({
+        value: "relace",
+        label: "Relace",
+        detail: "$0.045 / $0.14",
+        keywords: "relace",
+      });
+      // a saved tag no longer listed stays a choice
+      expect(upstreamOptions([], true, "gone").at(-1)).toEqual({
+        value: "gone",
+        label: "gone",
+        detail: "not listed now",
+      });
+      // a list that did not load says nothing of it
+      expect(upstreamOptions(null, true, "kept")).toEqual([
+        { value: "", label: "Any provider", detail: "OpenRouter picks" },
+        { value: "kept", label: "kept" },
+      ]);
+    },
+  );
 
   test.serial(
     "only an undescribed pick sends and shows what was stated",
@@ -684,11 +670,9 @@ describe("the page", () => {
     keys.value = ["provider-spare", "provider-router"];
     const html = render(<Providers />);
     expect(html).toMatch(
-      /provider-router\.key<a class="split-strong cut" href="\/admin\/config\/providers\/router">router</,
+      /provider-router\.key<a\b[^>]*href="\/admin\/config\/providers\/router"[^>]*>router</,
     );
-    expect(html).toMatch(
-      /provider-spare\.key<span class="split-strong cut split-quiet">unused</,
-    );
+    expect(html).toMatch(/provider-spare\.key<span\b[^>]*>unused</);
     // by name, whatever order the server answered
     expect(html.indexOf("provider-router.key")).toBeLessThan(
       html.indexOf("provider-spare.key"),
@@ -706,16 +690,7 @@ describe("the page", () => {
 });
 
 describe("a provider's page", () => {
-  const judge: DeciderSummary = {
-    id: "d1",
-    name: "judge",
-    providerId: "pr1",
-    model: "vendor/judge-1",
-    contextLength: 32_000,
-    promptPrice: 0.04,
-    default: true,
-    createdAt: 0,
-  };
+  const judge = decider();
 
   test.serial("says what it connects to and what runs on it", () => {
     providers.value = [router];
@@ -747,25 +722,40 @@ describe("a provider's page", () => {
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
   });
 
-  test.serial("the aside has its last 30 days, or says it did not load", () => {
-    providers.value = [router];
-    agents.value = [];
-    providerUsage.value = null;
-    const page = () => render(<ProviderPage params={{ name: "router" }} />);
-    expect(page()).toContain("Loading");
-    providerUsage.value = {
-      providerId: "pr1",
-      usage: { since: 0, until: 1, sends: 12, tokens: 3400, cost: null },
-    };
-    expect(page()).toMatch(/Turns[\s\S]*?12/);
-    expect(page()).toContain("not priced");
-    providerUsage.value = { providerId: "pr1", usage: null };
-    expect(page()).toContain("Did not load.");
-    // another provider's answer is not this one's
-    providerUsage.value = { providerId: "pr2", usage: null };
-    expect(page()).not.toContain("Did not load.");
-    providerUsage.value = null;
-  });
+  test.serial(
+    "the aside has its last 30 days, or says it did not load",
+    async () => {
+      me.value = null;
+      me.value = admin;
+      providers.value = [router];
+      agents.value = [];
+      deciders.value = [];
+      const page = () => render(<ProviderPage params={{ name: "router" }} />);
+      expect(page()).toContain('split-empty">Loading');
+      let asked = "";
+      answer = (url) => {
+        asked = url;
+        return Response.json({
+          since: 0,
+          until: 1,
+          sends: 12,
+          tokens: 3400,
+          cost: null,
+        });
+      };
+      await loadProviderUsage("pr1");
+      expect(asked).toBe("/api/providers/pr1/usage");
+      expect(page()).toMatch(/Turns[\s\S]*?12/);
+      expect(page()).toContain("not priced");
+      expect(page()).toContain('href="/admin/monitor/usage"');
+      // another provider's failed read is not this one's
+      answer = () => Response.json({ error: "boom" }, { status: 500 });
+      await loadProviderUsage("pr2");
+      expect(page()).not.toContain("Did not load.");
+      await loadProviderUsage("pr1");
+      expect(page()).toContain("Did not load.");
+    },
+  );
 
   test.serial("waits for the deciders, which Used by and Delete name", () => {
     providers.value = [router];
@@ -790,27 +780,6 @@ describe("a provider's page", () => {
     },
   );
 
-  test.serial("only the latest usage read lands", async () => {
-    const answers: Record<string, (r: Response) => void> = {};
-    answer = (url) =>
-      new Promise<Response>((resolve) => {
-        answers[url] = resolve;
-      });
-    providerUsage.value = null;
-    const first = loadProviderUsage("pa");
-    const second = loadProviderUsage("pb");
-    const body = (n: number) =>
-      Response.json({ since: 0, until: 1, sends: n, tokens: 0, cost: 0 });
-    answers["/api/providers/pb/usage"]!(body(2));
-    await second;
-    answers["/api/providers/pa/usage"]!(body(1));
-    await first;
-    expect(
-      (providerUsage.value as { providerId: string } | null)?.providerId,
-    ).toBe("pb");
-    providerUsage.value = null;
-  });
-
   test.serial("an unknown name is a missing page", () => {
     providers.value = [router];
     agents.value = [];
@@ -819,7 +788,7 @@ describe("a provider's page", () => {
     );
   });
 
-  test("the Delete line counts what keeps it", () => {
+  test.serial("the Delete line counts what keeps it", () => {
     expect(providerDeleteLine(0, 0)).toBe("Nothing runs on it.");
     expect(providerDeleteLine(2, 0)).toBe(
       "2 agents run on it. Move them to another provider first.",

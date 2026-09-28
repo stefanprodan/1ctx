@@ -1,5 +1,3 @@
-/* The head of a view and its states. */
-
 @layer tokens, base, owners;
 
 @layer owners {
@@ -14,7 +12,6 @@
     flex-shrink: 0;
     padding-bottom: var(--shell-inset, 0px);
   }
-  /* a view with its own foot stuck to the bottom spends the inset there */
   .page-flush {
     padding-bottom: 0;
   }
@@ -60,9 +57,7 @@
   }
 
   /* the crumb takes the head's room up to the actions, so a title box
-     in it can fill the row; its items keep their content's width */
-  /* one font and one case throughout, names as written: the steps
-     dim, the page's own in the foreground */
+     in it can fill the row */
   .page-crumb {
     display: flex;
     flex: 1 1 auto;
@@ -75,7 +70,6 @@
     font-weight: 400;
     color: var(--dim);
   }
-  /* a long title, a chat's, keeps the head on one line */
   .page-crumb-sep {
     flex-shrink: 0;
   }
@@ -111,7 +105,6 @@
     font-weight: 500;
   }
 
-  /* a title that leads back to the page it is a part of */
   .page-crumb-link {
     text-decoration: underline;
     text-decoration-color: var(--line-strong);
@@ -121,25 +114,20 @@
     text-decoration-color: currentColor;
   }
 
-  /* a view's control in the title's place: it cuts its own text, and
-     what it opens must show past the edge */
-  /* the menu takes the crumb's remaining room, so a title being
-     edited can fill it; the title button keeps its content's width */
+  /* what the control opens shows past the edge */
   .page-crumb-menu {
     display: flex;
     flex: 1 1 auto;
     overflow: visible;
   }
 
-  /* a path's step, in mono */
   .page-crumb-path {
     font-family: var(--mono);
     font-size: var(--text-mono);
   }
 
-  /* the page's own step as a control: a chat's menu, an object's
-     switcher. The pill overhangs the text line, so the head keeps the
-     height and the centre of every other crumb; a touch takes 44px */
+  /* overhangs the text line, so the head keeps the height and the
+     centre of every other crumb; a touch takes 44px */
   .page-pill {
     position: relative;
     display: flex;
@@ -182,8 +170,6 @@
     transform: rotate(180deg);
   }
 
-  /* a notice row across the head, under the crumb and the actions, for
-     what a page that saves from its head asks or refuses */
   .page-head-notice {
     flex-wrap: wrap;
   }
@@ -247,14 +233,12 @@
     display: flex;
     gap: var(--space-2);
   }
-  .page-heading + .page-actions,
-  .page-crumb + .page-actions {
+  .page-heading + .page-actions {
     margin-left: auto;
   }
-  /* beside a crumb the actions take no height and centre on its line,
-     so a taller control never moves the crumb: it sits where it does
-     on a page with no actions */
+  /* takes no height, so a taller control never moves the crumb */
   .page-crumb + .page-actions {
+    margin-left: auto;
     align-self: center;
     align-items: center;
     height: 0;
@@ -265,8 +249,6 @@
     color: var(--faint);
   }
 
-  /* a page whose load failed: one card in the content column, the
-     failure's words and the way out */
   .page-failed {
     display: flex;
     flex-wrap: wrap;
@@ -312,15 +294,12 @@
   /* below 720 the rail's button floats on this row, 32px tall: the
      crumb takes its height to centre on it */
   @media (max-width: 719px) {
-    /* the button drops under the words, lined up with them */
     .page-failed-retry {
       margin-left: calc(20px + var(--space-3));
     }
     .page-crumb {
       line-height: 32px;
     }
-    /* a crumb of steps keeps the nearest and the title, which share
-       the room */
     .page-crumb-far {
       display: none;
     }

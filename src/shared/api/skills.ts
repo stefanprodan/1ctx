@@ -4,6 +4,7 @@
 // Request and response bodies of the skill routes, all for admins.
 
 import type { IndexEntry, SkillSummary } from "../contracts/skill.ts";
+import type { Windowed } from "./admin.ts";
 
 // GET /api/skills
 export type SkillsResponse = { skills: SkillSummary[] };
@@ -29,26 +30,19 @@ export type SkillFileResponse = {
   bytes: number;
 };
 
-// GET /api/skills/:id/usage, the skill's last 30 days in every chat and
-// run: its loads, its file reads, the failed among them, and the reads
-// per file, the most read first
-export type SkillUsageResponse = {
-  since: number;
-  until: number;
-  loads: number;
-  reads: number;
-  failed: number;
+export type SkillCounts = { loads: number; reads: number; failed: number };
+// the files most read first
+export type SkillUsage = SkillCounts & {
   files: { path: string; reads: number }[];
 };
-
-// GET /api/usage/skills, every skill's last 30 days: the loads, the file
-// reads and the failed among them, and per skill name, the most loaded
-// first, a deleted skill's under its name
-export type SkillsUsageResponse = {
-  since: number;
-  until: number;
-  loads: number;
-  reads: number;
-  failed: number;
-  skills: { name: string; loads: number; reads: number; failed: number }[];
+// every skill by name, the most loaded first, a deleted skill's under
+// its name
+export type SkillLoads = SkillCounts & {
+  skills: ({ name: string } & SkillUsage)[];
 };
+
+// GET /api/skills/:id/usage and /api/usage/skills: the last 30 days
+export type SkillUsageResponse = Windowed<SkillUsage>;
+export type SkillsUsageResponse = Windowed<
+  SkillCounts & { skills: ({ name: string } & SkillCounts)[] }
+>;

@@ -72,13 +72,13 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   prompt, only when set. A team project's is required, on create and
   on every change (`description is required`); a personal project's
   may be empty. A team project is open to its members and to
-  admins. Deleting one takes its chats and their
+  admins. Deleting one takes its chats, keeps their
   usage and is refused while a chat runs.
   `GET /api/projects/:id/usage` (admin, a team project alone) sums its
   last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
   board's: the users who signed in each of the reader's last 30 days
   and over them, each visit on its user's own date, the recent users
-  (ten seen in the window, none disabled, the newer of the visit and
+  (ten seen in the window or online now, none disabled, the newer of the visit and
   the login touch, online while the socket holds a connection of
   theirs, the online first), and the team projects with a turn or a
   run. A visit's instant is the day's first request and a login is

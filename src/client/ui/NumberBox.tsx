@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A number typed as text with its unit inside the box: the limits on a
-// settings page, a server's call timeout in its card. The caller parses
-// the text and names the field, so a refusal's focus finds it.
 
 import "./numberbox.css";
 
@@ -18,8 +14,8 @@ export function NumberBox({
   class: extra,
   onInput,
 }: {
-  // names the box aloud when no <label> holds it
   label?: string;
+  // a refusal's focus finds the box by it
   name: string;
   value: string;
   unit: string;

@@ -36,7 +36,6 @@ function parseDescription(value: unknown): string {
   return value;
 }
 
-// a team project always says what it is for; a personal one may not
 function parseTeamDescription(value: unknown): string {
   if (value === undefined || value === "") {
     throw new BadRequest("description is required");

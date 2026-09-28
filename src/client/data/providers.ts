@@ -1,21 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The providers entity: the admin's list, loaded when its page is
-// reached and dropped with the signed-in user, and the calls that
-// change it. A write
-// answers the new list from the server's row, so what shows is what
-// was saved. The catalog search and a model's endpoints are plain
-// calls: their answers belong to the form that asked, not here.
 
 import { effect, signal } from "@preact/signals";
+import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   CatalogResponse,
   CreateProviderRequest,
   EndpointsResponse,
   ProviderResponse,
   ProvidersResponse,
-  ProviderUsageResponse,
 } from "../../shared/api/providers.ts";
 import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
@@ -26,16 +19,15 @@ import type {
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
+import { usageSlot } from "./slot.ts";
 
 export const providers = signal<ProviderSummary[] | null>(null);
 export const keys = signal<string[]>([]);
 export const providersError = signal<Failure | null>(null);
-// a provider page's last 30 days, for the provider it was read for;
-// usage is null when the read failed
-export const providerUsage = signal<{
-  providerId: string;
-  usage: ProviderUsageResponse | null;
-} | null>(null);
+export const providerUsage = usageSlot<SendTotalsResponse>(
+  (id) => `/api/providers/${encodeURIComponent(id)}/usage`,
+);
+export const loadProviderUsage = providerUsage.load;
 
 let owner: string | null = null;
 
@@ -46,13 +38,9 @@ effect(() => {
   providers.value = null;
   keys.value = [];
   providersError.value = null;
-  providerUsage.value = null;
 });
 
-// a load's answer is kept only when it is still the one wanted: for
-// the signed-in user of the moment and the latest word on the list, a
-// failure included, since a route arrival reloads and a write can land
-// while a load is in flight
+// a write can land while a load is in flight: only the latest word lands
 let turn = 0;
 
 export async function loadProviders(): Promise<void> {
@@ -95,25 +83,6 @@ export async function deleteProvider(id: string): Promise<void> {
   }
 }
 
-// a failure is the aside's "Did not load", never the page's; only the
-// latest read lands, so a switch between providers keeps the last one
-let usageTurn = 0;
-
-export async function loadProviderUsage(id: string): Promise<void> {
-  const forUser = owner;
-  const mine = ++usageTurn;
-  let usage: ProviderUsageResponse | null = null;
-  try {
-    usage = await api<ProviderUsageResponse>(
-      `/api/providers/${encodeURIComponent(id)}/usage`,
-    );
-  } catch {}
-  if (owner === forUser && usageTurn === mine) {
-    providerUsage.value = { providerId: id, usage };
-  }
-}
-
-// the chat models by default, or the decision models a decider picks
 export async function searchCatalog(
   id: string,
   q: string,

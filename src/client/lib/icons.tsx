@@ -76,12 +76,10 @@ const PATHS = {
   lock: "M4.5 7.5h7a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1zM5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2",
   hash: "M6.5 2.5 5 13.5M11 2.5 9.5 13.5M3 6h10.5M2.5 10h10.5",
   settings: "M2.5 4.5h11M2.5 8h11M2.5 11.5h11",
-  // two sliders: Config's header; settings' three lines read as a menu
+  // settings' three lines read as a menu
   config: "M2.5 4.5h11M2.5 11.5h11M5.5 2.75v3.5M10.5 9.75v3.5",
-  // four tiles: the way to the admin face
   panel:
     "M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z",
-  // a box with an arrow out: the whole view changes
   open: "M9 2.5h4.5V7M13.5 2.5 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3",
   plus: "M8 3v10M3 8h10",
   chevron: "M5 6.5l3 3 3-3",
@@ -152,7 +150,6 @@ const PATHS = {
   list: "M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01",
   // three dots: a menu of more actions
   more: "M4.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM9 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM13.5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0z",
-  // an eye: show what a password box hides, crossed out to hide it again
   eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   "eye-off":
     "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2.5 2.5l11 11",

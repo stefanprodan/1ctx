@@ -5,11 +5,11 @@
 // transaction as each write so the response names the field instead of
 // exposing a unique-index error.
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   AdminUser,
   UserResponse,
   UsersResponse,
-  UserUsageResponse,
 } from "../../shared/api/users.ts";
 import type { Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -17,12 +17,11 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { lastDays } from "../usage/index.ts";
 import { account, type UserFields, type UserRow } from "../users/index.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
-
-const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type UsersPort = {
   list(): UserRow[];
@@ -49,11 +48,7 @@ export type UsersProjectsPort = {
 };
 
 export type UsersUsagePort = {
-  projectTotal(
-    projectId: string,
-    since: number,
-    until: number,
-  ): { sends: number; tokens: number; cost: number | null };
+  projectTotal(projectId: string, since: number, until: number): SendTotals;
 };
 
 export type UsersRoutesDeps = {
@@ -78,14 +73,20 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       throw new Conflict("username is taken");
     }
   };
-  // the team projects a user is in, of the team ids read once per answer
-  const teamsOf = (userId: string, teams: Set<string>) =>
-    deps.projects.memberProjectIds(userId).filter((id) => teams.has(id));
-  const adminUser = (user: UserRow): AdminUser => ({
+  const teamIds = () => new Set(deps.projects.teamProjectIds());
+  const adminUser = (
+    user: UserRow,
+    lastVisitDay: string | null,
+    teams: Set<string>,
+  ): AdminUser => ({
     ...account(user),
-    lastVisitDay: deps.visits.latestFor(user.id),
-    projectIds: teamsOf(user.id, new Set(deps.projects.teamProjectIds())),
+    lastVisitDay,
+    projectIds: deps.projects
+      .memberProjectIds(user.id)
+      .filter((id) => teams.has(id)),
   });
+  const oneUser = (user: UserRow): AdminUser =>
+    adminUser(user, deps.visits.latestFor(user.id), teamIds());
   const emailAvailable = (email: string, except: string | null) => {
     const other = deps.users.byEmail(email);
     if (other !== null && other.id !== except) {
@@ -99,13 +100,13 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const visits = deps.visits.latest();
-        const teams = new Set(deps.projects.teamProjectIds());
+        const teams = teamIds();
         const body: UsersResponse = {
-          users: deps.users.list().map((user) => ({
-            ...account(user),
-            lastVisitDay: visits.get(user.id) ?? null,
-            projectIds: teamsOf(user.id, teams),
-          })),
+          users: deps.users
+            .list()
+            .map((user) =>
+              adminUser(user, visits.get(user.id)?.day ?? null, teams),
+            ),
         };
         return json(body);
       },
@@ -144,7 +145,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           }
           return { result: find(created.id) };
         });
-        const body: UserResponse = { user: adminUser(user) };
+        const body: UserResponse = { user: oneUser(user) };
         return json(body, 201);
       },
     },
@@ -226,7 +227,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             ],
           };
         });
-        const body: UserResponse = { user: adminUser(changed) };
+        const body: UserResponse = { user: oneUser(changed) };
         return json(body);
       },
     },
@@ -235,18 +236,14 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       path: "/api/users/:id/usage",
       policy: "admin",
       handle(_req, ctx) {
-        const user = find(ctx.params.id);
-        const until = deps.clock();
-        const since = until - USAGE_WINDOW_MS;
-        const own = deps.projects.personal(user.id);
-        const body: UserUsageResponse = {
-          since,
-          until,
-          ...(own === null
-            ? { sends: 0, tokens: 0, cost: 0 }
-            : deps.usage.projectTotal(own.id, since, until)),
-        };
-        return json(body);
+        const own = deps.projects.personal(find(ctx.params.id).id);
+        return json(
+          lastDays(deps.clock(), (since, until) =>
+            own === null
+              ? { sends: 0, tokens: 0, cost: 0 }
+              : deps.usage.projectTotal(own.id, since, until),
+          ),
+        );
       },
     },
     {

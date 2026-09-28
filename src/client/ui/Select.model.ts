@@ -1,13 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What the searchable select decides without a DOM: which options a
-// query keeps, and where the highlight goes as the keys move it.
 
 export type Option = {
   value: string;
   label: string;
-  // the faint text after the label: an offset and a country
   detail?: string;
   // what a search also matches but the option does not show: the
   // cities of a zone
@@ -24,8 +20,6 @@ const fold = (text: string) =>
     .toLowerCase()
     .replace(/[\p{P}\p{S}]+/gu, " ");
 
-// every word of the query in the label, the detail or the keywords, in
-// any order
 export function filterOptions<T extends Option>(
   options: T[],
   query: string,
@@ -38,22 +32,33 @@ export function filterOptions<T extends Option>(
   });
 }
 
-// the picked option when a list opens, or its first row; -1 for none
 export function initialHighlight(options: Option[], value: string): number {
   if (options.length === 0) return -1;
   const picked = options.findIndex((option) => option.value === value);
   return picked === -1 ? 0 : picked;
 }
 
-// an index held while the options changed, back into the shown list
+// an index held while the options changed
 export function clampHighlight(at: number, count: number): number {
   if (count === 0 || at < 0) return -1;
   return at < count ? at : 0;
 }
 
-// the highlight one step up or down, wrapping at the ends; -1 for none
 export function stepHighlight(at: number, count: number, move: 1 | -1) {
   if (count === 0) return -1;
   if (at < 0) return move === 1 ? 0 : count - 1;
   return (at + move + count) % count;
+}
+
+// a list's arrows and Enter: the new highlight, a pick, or not a key
+// the list takes
+export function keyMove(
+  key: string,
+  at: number,
+  count: number,
+): number | "pick" | null {
+  if (key === "ArrowDown") return stepHighlight(at, count, 1);
+  if (key === "ArrowUp") return stepHighlight(at, count, -1);
+  if (key === "Enter") return "pick";
+  return null;
 }

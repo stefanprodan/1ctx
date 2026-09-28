@@ -176,6 +176,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     },
   });
+  const projectTotal = (projectId: string, since: number, until: number) =>
+    usage.total({ projectId }, since, until);
   const providers = providersArea({
     db,
     clock,
@@ -189,7 +191,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     usage: {
       providerTotal: (providerId, since, until) =>
-        usage.providerTotal(providerId, since, until),
+        usage.total({ providerId }, since, until),
     },
   });
   const deciders = decidersArea({
@@ -250,7 +252,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       counts: (projectId) => knowledge.counts(projectId),
       latest: (projectId, limit) => knowledge.latest(projectId, limit),
     },
-    usage,
+    usage: { projectTotal },
   });
   const credentials = credentialsArea({
     db,
@@ -266,7 +268,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secureCookie: options.secureCookie,
     users,
     projects,
-    usage,
+    usage: {
+      projectTotal,
+      activeProjects: (ids, since, until) =>
+        usage.activeProjects(ids, since, until),
+    },
     activity: { personDays: (...args) => sessions.personDays(...args) },
     presence: { onlineUserIds: () => socket.onlineUserIds() },
   });
@@ -289,7 +295,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage: {
       agentDays: (agentId, timeZone) => usage.agentDays(agentId, timeZone),
       agentTotal: (agentId, since, until) =>
-        usage.agentTotal(agentId, since, until),
+        usage.total({ agentId }, since, until),
     },
     users,
   });

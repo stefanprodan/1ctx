@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import type {
-  AgentsResponse,
-  AgentUsageResponse,
-} from "../../../src/shared/api/agents.ts";
+import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
+import type { AgentsResponse } from "../../../src/shared/api/agents.ts";
 import { chatApp, FLASH, startChat, tick } from "../../helpers/chat.ts";
 
 async function activity(chat: Awaited<ReturnType<typeof chatApp>>) {
@@ -47,11 +45,13 @@ test("an agent's usage sums its last 30 days, cost 0 with none and null when unp
   const started = await startChat(chat);
   started.script.reply("done");
   for (let i = 0; i < 50; i++) {
+    // the window is [since, until): a row stamped now is not in it yet
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/agents/${chat.agentId}/usage`,
     );
-    const body = (await res.json()) as AgentUsageResponse;
+    const body = (await res.json()) as SendTotalsResponse;
     if (body.sends === 1) {
       expect(body.tokens).toBeGreaterThan(0);
       expect(body.cost).toBeNull();

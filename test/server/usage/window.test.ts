@@ -5,7 +5,10 @@ import { describe, expect, test } from "bun:test";
 import {
   countByDay,
   daysWindow,
+  LAST_DAYS_MS,
+  lastDays,
   monthWindow,
+  nextDay,
   usageWindow,
   weekWindow,
 } from "../../../src/server/usage/window.ts";
@@ -230,5 +233,29 @@ describe("monthWindow", () => {
     const window = monthWindow(now, "UTC", "2026-11");
     expect(window.days).toEqual([]);
     expect(window.until).toBe(window.since);
+  });
+});
+
+describe("lastDays", () => {
+  test("reads 30 days of 24 hours back from now and names the bounds", () => {
+    const now = Date.UTC(2026, 2, 29, 12);
+    const seen: number[][] = [];
+    const body = lastDays(now, (since, until) => {
+      seen.push([since, until]);
+      return { sends: 1 };
+    });
+    expect(seen).toEqual([[now - LAST_DAYS_MS, now]]);
+    expect(body).toEqual({ since: now - 30 * 24 * HOUR, until: now, sends: 1 });
+  });
+});
+
+describe("nextDay", () => {
+  test.each([
+    ["2026-09-28", "2026-09-29"],
+    ["2026-09-30", "2026-10-01"],
+    ["2026-12-31", "2027-01-01"],
+    ["2028-02-28", "2028-02-29"],
+  ])("%s to %s", (day, next) => {
+    expect(nextDay(day)).toBe(next);
   });
 });

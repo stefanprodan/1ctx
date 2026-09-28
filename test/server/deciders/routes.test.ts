@@ -292,6 +292,7 @@ describe("deciders", () => {
       model: "kev-latest",
     });
     const read = async (path: string) => {
+      app.now.value += 1;
       const res = await client.call("GET", path);
       expect(res.status).toBe(200);
       return (await res.json()) as DecisionUsageResponse;

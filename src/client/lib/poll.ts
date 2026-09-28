@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What drives a page's poll: whether the browser tab is seen, a way
-// to hear that change, the time and a repeating timer, so a test can
-// drive them.
 
 export type PollDriver = {
   hidden(): boolean;
@@ -25,9 +21,8 @@ export const browserTab: PollDriver = {
   },
 };
 
-// Calls tick every ms while the tab is seen, until the stop it answers.
-// The page has just loaded, so the first call waits a whole period; a
-// tab seen again past one calls at once.
+// the page has just loaded, so the first call waits a whole period; a
+// tab seen again past one calls at once
 export function pollWhileSeen(
   ms: number,
   tick: () => void,

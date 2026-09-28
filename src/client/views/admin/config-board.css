@@ -1,6 +1,3 @@
-/* Config's board: the tabs over the cards stacked, the cards of a tab
-   not shown kept drawn but hidden. */
-
 @layer tokens, base, owners;
 
 @layer owners {

@@ -4,6 +4,7 @@
 // Request and response bodies of the decider routes, all for admins.
 
 import type { DeciderSummary } from "../contracts/decider.ts";
+import type { Windowed } from "./admin.ts";
 
 // GET /api/deciders, oldest first
 export type DecidersResponse = { deciders: DeciderSummary[] };
@@ -22,17 +23,17 @@ export type SaveDeciderRequest = {
   default?: boolean;
 };
 
-// GET /api/deciders/:id/usage and GET /api/decisions/:id/usage: the
-// last 30 days of a decider's answers, checks included, or of a
-// decision's whoever answered: how many, their input tokens and the
-// cost, null when answers came and none was priced
-export type DecisionUsageResponse = {
-  since: number;
-  until: number;
+// checks included; a decider has no output tokens, so tokens are its
+// input; cost is null when answers came and none was priced
+export type DecisionTotals = {
   answers: number;
   tokens: number;
   cost: number | null;
 };
+
+// GET /api/deciders/:id/usage and /api/decisions/:id/usage: the last 30
+// days of a decider's answers or of a decision's, whoever answered
+export type DecisionUsageResponse = Windowed<DecisionTotals>;
 
 // POST /api/deciders/:id/check: one fixed yes/no answered. probability
 // is the chance of the answer given, ms the whole call, cost in USD

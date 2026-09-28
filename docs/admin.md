@@ -1,8 +1,8 @@
 # Admin: overview, provision, service and staging
 
 Governs `src/server/overview/`, `provision/`, `service/`,
-`scripts/staging.sh` and the staging targets. The Overview, Usage and
-Storage pages are in `docs/views.md` and `docs/ui.md`.
+`scripts/staging.sh` and the staging targets. The Monitor's pages are
+in `docs/views.md` and `docs/ui.md`.
 
 - **`overview/` is what an admin reads about the instance.** `overview/`
   is the area after `automations/` and before `provision/`:
@@ -58,39 +58,27 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   pages' 30 second poll); a failed read keeps nothing, is a warning
   (`storage scan failed`, `overview read failed`, `usage read failed`)
   and the router's 500.
-- **Overview.**
-  `GET /api/admin/overview?tz=&range=` (`admin`, one `tz`, a `range` of
-  `OVERVIEW_RANGES`, 30d when not given) answers `OverviewResponse`: the
-  range's days in the zone, today last, and their totals, a chat's sends
-  counted as turns and a task's as runs apart, the median and the p95
-  (nearest rank) of ended chat turns' lengths a day and over the range
-  (`turnLength`, from `sends` with their start in the range; a run's
-  length is its task's), the users with a turn or a run a day and over
-  the range (`activeUsers`), and the instance. 30d and
-  90d are the last 30 and 90 days; all reads every sum there is and
-  lays them from the day of the first one (`windowOf()`), today alone
-  before any.
-  `range.ts` is the worker's second job, one read transaction over the
-  same connection: sends by `started_at` and tokens, rounds and cost by
-  `usage.created_at`, summed by quarter hour and laid on the zone's days
-  in `overview.ts`. Decisions
-  are summed from `decision_usage` by `created_at` into `decisions`,
-  `decisionTokens` (input tokens), `pricedDecisions` and
-  `decisionCost` on the days and the totals; `cost` stays the rounds'
-  alone. The answer is kept 25 seconds per zone and range.
-- **Usage.** `GET /api/admin/usage?tz=&month=YYYY-MM` (`admin`, one
-  `tz`, one `month` matching `MONTH_PATTERN`) answers `UsageResponse`:
-  the month's days in the zone (`monthWindow()` in `usage/`), up to
-  today in this month and none for a later one, laid and totalled as
-  the overview's, the ten largest projects, agents and models by tokens
-  with the priced rounds' cost (a model's rounds and decisions summed in
-  one row, under the model that answered when a router served another
-  than the one asked for), the deciders by decisions with their input
-  and output tokens, and the first send's start. A deleted project,
-  agent or provider's model without tokens is left out. `month()` in `range.ts` is the worker's third job and
-  `breakdowns.ts` its queries: a breakdown sums tokens from `usage` and
-  sends from `sends` apart and joins them by key, so a send of many
-  rounds counts once. The answer is kept 25 seconds per zone and month.
+- **Overview.** `GET /api/admin/overview?tz=&range=` (`admin`, a
+  `range` of `OVERVIEW_RANGES`, 30d when not given) answers
+  `OverviewResponse`, shaped in `shared/api/admin.ts`. 30d and 90d are
+  calendar days in the zone; all lays every sum from the day of the
+  first one (`windowOf()`). A chat's sends count as turns and a task's
+  as runs, apart; turn lengths are ended chat turns only, a run's length
+  being its task's. `range.ts` is the worker's second job, one read
+  transaction over the same connection: sends by `started_at`, and
+  tokens, rounds and cost by `usage.created_at`, summed by quarter hour
+  and laid on the zone's days in `overview.ts`. Decisions are summed
+  from `decision_usage` into their own fields; `cost` stays the rounds'
+  alone.
+- **Usage.** `GET /api/admin/usage?tz=&month=YYYY-MM` answers
+  `UsageResponse` for the month's days in the zone (`monthWindow()` in
+  `usage/`), up to today. `month()` in `range.ts` is the worker's third
+  job and `breakdowns.ts` its queries: a breakdown sums tokens from
+  `usage` and sends from `sends` apart and joins them by key, so a send
+  of many rounds counts once. A model's row is the model that answered,
+  when a router served another than the one asked for, its rounds and
+  decisions together. A deleted project, agent or provider's model
+  without tokens in the month is left out.
 - **Attention is read at each request.** `GET /api/admin/attention`
   (`admin`, no parameter) answers what an admin should fix, from the
   config rows and the key files through the `attention` port
@@ -98,6 +86,15 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   service's key file missing, a credential's key missing or unusable,
   then the MCP servers and skills whose last refresh failed, newest
   first (`attention.ts`, pure).
+- **An object's last 30 days is `lastDays()`.** Every usage route of
+  one object or admin page (a provider, agent, decider, decision, user,
+  team project, MCP server, skill, web access, visuals) answers through
+  `lastDays()` in `usage/window.ts`: 30 times 24 hours ending now, not
+  calendar days, so it takes no zone, and the answer carries `since`
+  and `until`. Every window, these, the overview's and the month's, is
+  half-open, `[since, until)`: a query reads `created_at >= ? and
+  created_at < ?`, so adjacent windows never count a row twice. A cost
+  total is 0 with no rows and null when rows came and none was priced.
 - **Load is read from memory.**
   `GET /api/admin/load` (`admin`, no parameter) is read from memory at
   every request, never kept: the pools from `runner.registry.running()`

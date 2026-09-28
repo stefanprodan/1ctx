@@ -1,10 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The scan worker: one read-only connection to the file, one job per
-// message, the storage scan, the overview's range or the usage page's
-// month, the result or the failure posted back. bun:sqlite is
-// synchronous, so this runs off the thread that serves the streams.
+// bun:sqlite is synchronous, so the reads run off the thread that
+// serves the streams.
 
 import { Database } from "bun:sqlite";
 import {

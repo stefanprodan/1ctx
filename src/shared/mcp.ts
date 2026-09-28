@@ -13,11 +13,10 @@ import type { AgentServer } from "./contracts/mcp.ts";
 import { escapeText } from "./skills.ts";
 import type { McpMode } from "./words.ts";
 
-// the wire name mcp__<server>__<tool>, in the OpenAI rule, else null
-export const MAX_WIRE_NAME = 64;
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export const WIRE_PREFIX = "mcp__";
 
+// the wire name mcp__<server>__<tool>, in the OpenAI rule, else null
 export function wireName(server: string, tool: string): string | null {
   const name = `${WIRE_PREFIX}${server}__${tool}`;
   return WIRE_RE.test(name) ? name : null;
@@ -49,14 +48,12 @@ function matches(pattern: string, name: string): boolean {
   return name === pattern;
 }
 
-// the first pattern of a list that matches the name, or null
 function firstMatch(patterns: string[], name: string): string | null {
   return patterns.find((pattern) => matches(pattern, name)) ?? null;
 }
 
-// a tool's side and the pattern that put it there: null for an
-// unusable tool, and for a write by default, when the write list is
-// empty and nothing else matched
+// by is null for an unusable tool, and for a write by default, when the
+// write list is empty and nothing else matched
 export type Decided = { side: ToolSide; by: string | null };
 
 export function decide(
@@ -245,7 +242,6 @@ export function sortOffered<T extends { wireName: string }>(tools: T[]): T[] {
 }
 
 // decision 11: the instructions block, and decision 17's digest
-export const MAX_SERVER_INSTRUCTIONS = 16_000;
 export const MAX_INSTRUCTIONS_BLOCK = 32_000;
 // decision 14: the offered schemas of one send, as JSON, in all
 export const MAX_SCHEMAS_BYTES = 1024 * 1024;

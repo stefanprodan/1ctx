@@ -1,28 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What a day plot draws around uPlot's canvas: the key over it and the
-// table a screen reader reads in its place. Plot.tsx fills the box.
 
 import type { Ref } from "preact";
 import { dayMonth } from "../lib/format.ts";
 import "./chart.css";
 
-// the key over a day plot, a swatch class a series, and the table a
-// screen reader reads in its place. One series needs no key: the
-// panel's label names it
+// one series needs no key: the panel's label names it
 export function DayPlot({
   label,
   days,
   series,
-  swatch,
+  swatches,
   words,
   box,
 }: {
   label: string;
   days: number[];
   series: { label: string; values: (number | null)[] }[];
-  swatch: (k: number) => string;
+  // a colour token a series, in the series' order
+  swatches: readonly string[];
   words: (value: number) => string;
   box: Ref<HTMLDivElement>;
 }) {
@@ -32,7 +28,10 @@ export function DayPlot({
         <div class="chart-key" aria-hidden="true">
           {series.map((s, k) => (
             <span key={s.label} class="chart-key-item">
-              <span class={`chart-swatch ${swatch(k)}`} />
+              <span
+                class="chart-swatch"
+                style={{ background: `var(${swatches[k] ?? "--heat-3"})` }}
+              />
               {s.label}
             </span>
           ))}

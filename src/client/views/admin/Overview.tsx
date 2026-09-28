@@ -1,22 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The instance at a glance, headed Monitor / Live. The first tiles are
-// the server's load, polled while the page is on screen
-// (OverviewNow.tsx); the head says when they were read, or that a poll
-// failed, with Refresh, as Storage's. Needs attention lists what an
-// admin should fix, each row opening the page that fixes it. Stats is
-// four tiles on one cursor over 30 days, 90 days or all, the
-// breakdowns being on Usage. The page keeps
-// itself current while it is seen (watchOverview()); the first load
-// draws the board in bones, and a failed read keeps the last answer
-// faded and says since when.
 
 import { useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import {
   OVERVIEW_RANGES,
-  type OverviewRange,
   type OverviewResponse,
 } from "../../../shared/api/admin.ts";
 import {
@@ -35,6 +24,7 @@ import {
 import type { Failure } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
+import { CodeTag } from "../../ui/CodeTag.tsx";
 import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -47,11 +37,42 @@ import {
 } from "../../ui/Rows.tsx";
 import { RowsFilters } from "../../ui/RowsControls.tsx";
 import { ActivityPanel, DaysTiles, LengthPanel } from "./Days.tsx";
-import { attentionRow, buildLine } from "./Overview.model.ts";
-import { BoardRow, NowRow, OverviewGhost, Trouble } from "./OverviewNow.tsx";
+import { attentionRow, buildLine, staleWords } from "./Overview.model.ts";
+import { NowRow, OverviewGhost } from "./OverviewNow.tsx";
 import "./overview.css";
 
 const DAYS_SYNC = "overview";
+
+function BoardRow({
+  label,
+  note,
+  stale,
+  action,
+}: {
+  label: string;
+  note?: ComponentChildren;
+  stale?: boolean;
+  action?: ComponentChildren;
+}) {
+  return (
+    <div class={`overview-section${stale ? " overview-section-stale" : ""}`}>
+      <span class="label">{label}</span>
+      {note && <span class="overview-section-note">{note}</span>}
+      {action && <span class="overview-section-action">{action}</span>}
+    </div>
+  );
+}
+
+// nothing while the row keeps up
+function Trouble({ error, at }: { error: Failure | null; at: number | null }) {
+  if (error === null) return null;
+  return (
+    <>
+      {staleWords(at)}
+      <CodeTag status={error.status} />
+    </>
+  );
+}
 
 function Attention() {
   const now = useNow(60_000);
@@ -59,7 +80,7 @@ function Attention() {
   const error = attentionError.value;
   if (answer === null) {
     return error ? (
-      <RowsCard label="Needs attention" class="overview-stale">
+      <RowsCard label="Needs attention" class="chart-stale">
         <RowsNote>Did not load.</RowsNote>
       </RowsCard>
     ) : null;
@@ -69,7 +90,7 @@ function Attention() {
     <RowsCard
       label="Needs attention"
       count={rows.length > 0 ? String(rows.length) : undefined}
-      class={error ? "overview-stale" : undefined}
+      class={error ? "chart-stale" : undefined}
     >
       {rows.length === 0 ? (
         <RowsNote>Nothing needs attention.</RowsNote>
@@ -88,12 +109,6 @@ function Attention() {
   );
 }
 
-const RANGE_LABELS: Record<OverviewRange, string> = {
-  "30d": "30d",
-  "90d": "90d",
-  all: "All",
-};
-
 function Stats({
   answer,
   error,
@@ -104,7 +119,7 @@ function Stats({
   const day = useSignal<number | null>(null);
   const range = overviewRange.value;
   const filters = OVERVIEW_RANGES.map((r) => ({
-    label: RANGE_LABELS[r],
+    label: r === "all" ? "All" : r,
     on: range === r,
     onPick: () => {
       day.value = null;
@@ -120,8 +135,7 @@ function Stats({
         action={<RowsFilters label="Stats over" filters={filters} />}
       />
       {answer ? (
-        // another range keeps the last one faded until it lands
-        <div class={answer.range !== range ? "overview-stale" : undefined}>
+        <div class={answer.range !== range ? "chart-stale" : undefined}>
           <DaysTiles
             days={answer.days}
             totals={answer.totals}
@@ -161,11 +175,10 @@ export function Overview() {
   const busy = overviewLoading.value;
   return (
     <Page
-      // the zone's own page: the step names the zone, no link to itself
+      // the zone's own page, so no link to itself
       steps={[{ label: "Monitor" }]}
       title="Live"
       actions={
-        // when the live tiles were last read; Refresh reads it all again
         <Loaded
           readAt={serverLoad.value?.at ?? null}
           busy={overviewLoading.value}
@@ -178,13 +191,14 @@ export function Overview() {
       <div class="chart-board" aria-busy={answer === null && busy}>
         <NowRow />
         <Attention />
-        {/* a failed read keeps the last answer, faded */}
-        <div class={`overview-past${answer && error ? " overview-stale" : ""}`}>
+        <div
+          class={`overview-past${answer && error ? " overview-past-stale" : ""}`}
+        >
           <Stats answer={answer} error={error} />
         </div>
         {answer && (
           <p class="chart-facts">
-            {/* the uptime runs on with the load; the answer is kept */}
+            {/* the uptime runs on with the live load, not the kept answer */}
             {buildLine(answer.instance, serverLoad.value?.at ?? answer.readAt)}
           </p>
         )}

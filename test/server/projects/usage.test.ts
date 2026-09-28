@@ -2,47 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import type { ProjectUsageResponse } from "../../../src/shared/api/projects.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
+import { chatApp, startChat } from "../../helpers/chat.ts";
+import { createTeam } from "../../helpers/projects.ts";
+import { waitAgentSends } from "../../helpers/usage.ts";
 
 test("a team project's usage counts every turn in it, and only there", async () => {
   const chat = await chatApp();
-  const { project } = await (
-    await chat.admin.call("POST", "/api/projects", {
-      body: { name: "ops", description: "A team project." },
-    })
-  ).json();
-  await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
-    body: { userId: chat.memberId },
-  });
+  const project = await createTeam(chat.admin, "ops", [chat.memberId]);
   const usage = async () => {
+    // the window is [since, until): a row stamped now is not in it yet
+    chat.app.now.value += 1;
     const res = await chat.admin.call(
       "GET",
       `/api/projects/${project.id}/usage`,
     );
     expect(res.status).toBe(200);
-    return (await res.json()) as ProjectUsageResponse;
-  };
-  const agentSends = async () => {
-    const res = await chat.admin.call(
-      "GET",
-      `/api/agents/${chat.agentId}/usage`,
-    );
-    return ((await res.json()) as { sends: number }).sends;
-  };
-  const settled = async (sends: number) => {
-    for (let i = 0; i < 50 && (await agentSends()) < sends; i++) await tick();
-    expect(await agentSends()).toBe(sends);
+    return (await res.json()) as SendTotalsResponse;
   };
   expect(await usage()).toMatchObject({ sends: 0, tokens: 0, cost: 0 });
   // a turn in the member's personal project is not the team's
   const own = await startChat(chat);
   own.script.reply("done");
-  await settled(1);
+  await waitAgentSends(chat, 1);
   expect((await usage()).sends).toBe(0);
   const team = await startChat(chat, "in the team", chat.member, project.id);
   team.script.reply("done");
-  await settled(2);
+  await waitAgentSends(chat, 2);
   const body = await usage();
   expect(body.sends).toBe(1);
   expect(body.tokens).toBeGreaterThan(0);

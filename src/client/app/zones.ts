@@ -1,16 +1,27 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The admin face's tree: three zones, each a header that opens its
-// overview, with its pages under it. The rail draws it and a zone's
-// board lists it; the route table has a route for every address here,
-// which the table test checks.
 
+import {
+  ACCESS_HREF,
+  AGENTS_HREF,
+  CONFIG_HREF,
+  DECIDERS_HREF,
+  DECISIONS_HREF,
+  MCP_HREF,
+  MONITOR_HREF,
+  PROJECTS_HREF,
+  PROVIDERS_HREF,
+  SKILLS_HREF,
+  STORAGE_HREF,
+  USAGE_HREF,
+  USERS_HREF,
+  VISUALS_HREF,
+  WEB_HREF,
+} from "../lib/hrefs.ts";
 import type { IconName } from "../lib/icons.tsx";
 
-// `also` are addresses the page stands for too: a tab of it at an
-// address of its own
-export type ZonePage = { label: string; href: string; also?: string[] };
+// `also`: a tab of the page at an address of its own
+type ZonePage = { label: string; href: string; also?: string[] };
 export type Zone = {
   label: string;
   href: string;
@@ -21,43 +32,42 @@ export type Zone = {
 export const ZONES: Zone[] = [
   {
     label: "Monitor",
-    href: "/admin/monitor",
+    href: MONITOR_HREF,
     icon: "visual",
     pages: [
-      { label: "Usage", href: "/admin/monitor/usage" },
-      { label: "Storage", href: "/admin/monitor/storage" },
+      { label: "Usage", href: USAGE_HREF },
+      { label: "Storage", href: STORAGE_HREF },
     ],
   },
   {
     label: "Access",
-    href: "/admin/access",
+    href: ACCESS_HREF,
     icon: "users",
     pages: [
-      { label: "Users", href: "/admin/access/users" },
-      { label: "Projects", href: "/admin/access/projects" },
+      { label: "Users", href: USERS_HREF },
+      { label: "Projects", href: PROJECTS_HREF },
     ],
   },
   {
     label: "Config",
-    href: "/admin/config",
+    href: CONFIG_HREF,
     icon: "config",
     pages: [
-      { label: "Providers", href: "/admin/config/providers" },
-      { label: "Agents", href: "/admin/config/agents" },
+      { label: "Providers", href: PROVIDERS_HREF },
+      { label: "Agents", href: AGENTS_HREF },
       {
         label: "Deciders",
-        href: "/admin/config/deciders",
-        also: ["/admin/config/decisions"],
+        href: DECIDERS_HREF,
+        also: [DECISIONS_HREF],
       },
-      { label: "MCP Servers", href: "/admin/config/mcp" },
-      { label: "Skills", href: "/admin/config/skills" },
-      { label: "Visuals", href: "/admin/config/visuals" },
-      { label: "Web access", href: "/admin/config/web" },
+      { label: "MCP Servers", href: MCP_HREF },
+      { label: "Skills", href: SKILLS_HREF },
+      { label: "Visuals", href: VISUALS_HREF },
+      { label: "Web access", href: WEB_HREF },
     ],
   },
 ];
 
-// a crumb's zone step, a link to the zone's overview
 export function zoneStep(label: "Monitor" | "Access" | "Config") {
   const zone = ZONES.find((z) => z.label === label)!;
   return { label: zone.label, href: zone.href };

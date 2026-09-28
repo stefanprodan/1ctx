@@ -1,13 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Access's board: who signed in over the last 30 days and the users
-// who used the app last, then the accounts and the team projects that
-// need an admin, a card per group and only when it holds any, each row
-// opening its page. Inactive holds the users and the team projects not
-// seen in 30 days under one switch. It asks again every 30 seconds
-// while seen (watchAccessBoard()). What runs and what it costs are
-// Monitor's. The aside counts the users and the projects.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
@@ -24,9 +16,10 @@ import {
   adminProjectsError,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
-import { count, initials, sinceLine } from "../../lib/format.ts";
-import { adminProjectHref, adminUserHref } from "../../lib/hrefs.ts";
+import { initials } from "../../lib/format.ts";
+import { adminUserHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
+import { countOf } from "../../lib/search.ts";
 import { ChartPanel } from "../../ui/Chart.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { DayBars } from "../../ui/Plot.tsx";
@@ -40,16 +33,18 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Split } from "../../ui/Split.tsx";
 import {
   accountGroups,
+  BOARD_DAYS,
   projectGroups,
   recentUsers,
   recentWhen,
   signedInHint,
 } from "./AccessBoard.model.ts";
-import { countLine } from "./AdminProjects.model.ts";
-import { lastActive, userCounts } from "./Users.model.ts";
+import { ProjectCountsSection, ProjectRow } from "./AdminProjects.tsx";
+import { lastActive } from "./Users.model.ts";
+import { RolesSection } from "./Users.tsx";
 
 export function AccessBoard() {
   const board = accessBoard.value;
@@ -68,7 +63,14 @@ export function AccessBoard() {
       error={ready ? null : error}
     >
       {ready && (
-        <Split aside={<Aside people={people} teams={teams} />}>
+        <Split
+          aside={
+            <>
+              <RolesSection users={people} label="Users" />
+              <ProjectCountsSection teams={teams} users={people} />
+            </>
+          }
+        >
           <Body board={board} people={people} teams={teams} />
         </Split>
       )}
@@ -126,7 +128,6 @@ function SignedIn({
           series={series}
           stack="activity"
           whole
-          words={(v) => (v === 0 ? "0" : count(v))}
           sync="access-board"
           onCursor={(i) => {
             day.value = i;
@@ -178,12 +179,12 @@ function Inactive({
 }) {
   const picked = useSignal<InactiveTab | null>(null);
   if (users.length === 0 && projects.length === 0) return null;
-  // opens on the users unless only projects are inactive
   const tab = picked.value ?? (users.length > 0 ? "users" : "projects");
+  const shown = tab === "users" ? users.length : projects.length;
   return (
     <RowsCard
       label="Inactive"
-      count={String(tab === "users" ? users.length : projects.length)}
+      count={countOf(shown, shown)}
       action={
         <Seg
           label="Inactive"
@@ -198,12 +199,14 @@ function Inactive({
     >
       {tab === "users" ? (
         users.length === 0 ? (
-          <RowsNote>Every user signed in within 30 days.</RowsNote>
+          <RowsNote>{`Every user signed in within ${BOARD_DAYS} days.`}</RowsNote>
         ) : (
           users.map((u) => <AccountRow key={u.id} user={u} now={now} />)
         )
       ) : projects.length === 0 ? (
-        <RowsNote>Every team project had a turn or a run in 30 days.</RowsNote>
+        <RowsNote>
+          {`Every team project had a turn or a run in ${BOARD_DAYS} days.`}
+        </RowsNote>
       ) : (
         projects.map((p) => <ProjectRow key={p.id} project={p} />)
       )}
@@ -254,39 +257,5 @@ function Projects({ label, rows }: { label: string; rows: ProjectSummary[] }) {
         <ProjectRow key={p.id} project={p} />
       ))}
     </RowsCard>
-  );
-}
-
-function ProjectRow({ project: p }: { project: ProjectSummary }) {
-  return (
-    <RowsGo href={adminProjectHref(p.id)}>
-      <RowsTitle name={p.name} sub={countLine(p)} mono />
-      <RowsMeta>{sinceLine(p)}</RowsMeta>
-    </RowsGo>
-  );
-}
-
-function Aside({
-  people,
-  teams,
-}: {
-  people: AdminUser[];
-  teams: ProjectSummary[];
-}) {
-  const n = userCounts(people);
-  return (
-    <>
-      <AsideSection label="Users">
-        <AsideLine label="Admins">{count(n.admins)}</AsideLine>
-        <AsideLine label="Members">{count(n.members)}</AsideLine>
-        <AsideLine label="Disabled" quiet={n.disabled === 0}>
-          {count(n.disabled)}
-        </AsideLine>
-      </AsideSection>
-      <AsideSection label="Projects">
-        <AsideLine label="Team">{count(teams.length)}</AsideLine>
-        <AsideLine label="Personal">{count(people.length)}</AsideLine>
-      </AsideSection>
-    </>
   );
 }

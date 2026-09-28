@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A password an admin sets for someone else, New user's and the reset's:
-// one box holding Generate, Show and Copy, as a number box holds its
-// unit. The admin hands it over and the person changes it at first
-// sign-in, so it is typed once. Generate shows what it made, so it can
-// be read off. The label names the box alone, not its buttons.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -23,9 +17,7 @@ export function PasswordField({
   save,
   onChange,
 }: {
-  // the box's id, for its label
   id: string;
-  // the field a refusal names
   name: string;
   label: string;
   value: string;

@@ -23,15 +23,13 @@ export {
   DEFAULT_LIMITS,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
-  type LimitDefinition,
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
-  type RunCaps,
   TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
-export { type LimitOverride, LimitStore } from "./store.ts";
+export { LimitStore } from "./store.ts";
 
 export type LimitsDeps = {
   db: Db;
@@ -90,7 +88,6 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
     write();
     if (runCaps() !== before) deps.runCapsChanged?.();
   };
-  // only the names given; the rest keep what they hold
   const set = (values: Partial<Limits>, now: number): void =>
     noticing(() => {
       transact(deps.db, () => {

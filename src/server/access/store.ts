@@ -83,7 +83,6 @@ export class LoginStore {
     this.db.query("delete from logins where id = ?").run(id);
   }
 
-  // each user's latest touch over their logins
   latestSeen(): Map<string, number> {
     const rows = this.db
       .query<{ user_id: string; at: number }, []>(

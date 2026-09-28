@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A skill's Files tab: SKILL.md's body, then the files beside it, each
-// opening in place, all shown as the text an agent follows, never
-// rendered, and the files the fetch did not keep.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -34,7 +30,7 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
         />
       </Setting>
       {(skill.files.length > 0 || dropped !== "") && (
-        // the tab counts the files, SKILL.md with them
+        // no count: the tab has it
         <Setting list title="Files">
           {skill.files.map((file) => (
             <RowsOpen
@@ -64,7 +60,6 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
   );
 }
 
-// a text loaded on open: the body or a file, as the bytes are
 function Text({
   load,
   held,
@@ -91,8 +86,8 @@ function Text({
     return <p class="skill-page-state error">{failure.value}</p>;
   }
   if (held === undefined) return <p class="skill-page-state">Loading</p>;
-  // cut to its first lines, since a box that scrolls on its own inside
-  // the page's scroll leaves the page's sticky head behind
+  // cut, not scrolled: a box scrolling inside the page leaves the
+  // sticky head behind
   const box = textBox(held, expanded.value);
   return (
     <Fold

@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DaysUsageResponse,
   DayUsage,
@@ -251,51 +252,30 @@ export class UsageStore {
     return { total, projects };
   }
 
-  // an agent's turns and runs, tokens and cost after since up to until,
-  // every project together; the cost is null when rounds ran and none
-  // named one
-  agentTotal(
-    agentId: string,
+  // cost is 0 with no rows, null when rows ran and none was priced
+  total(
+    by: { agentId: string } | { providerId: string } | { projectId: string },
     since: number,
     until: number,
-  ): { sends: number; tokens: number; cost: number | null } {
+  ): SendTotals {
+    const [column, value] =
+      "agentId" in by
+        ? ["agent_id", by.agentId]
+        : "providerId" in by
+          ? ["provider_id", by.providerId]
+          : ["project_id", by.projectId];
     return this.db
-      .query<
-        { sends: number; tokens: number; cost: number | null },
-        [string, number, number]
-      >(
+      .query<SendTotals, [string, number, number]>(
         `select ${countLive("usage", "send_id")} as sends,
                 coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
                 case when count(*) = 0 then 0 else sum(cost) end as cost
            from usage
-          where agent_id = ? and created_at > ? and created_at <= ?`,
+          where ${column} = ? and created_at >= ? and created_at < ?`,
       )
-      .get(agentId, since, until)!;
+      .get(value, since, until)!;
   }
 
-  // the same for a provider: every agent's turns and runs on it, the
-  // retired included, since the rows keep the provider they ran on
-  providerTotal(
-    providerId: string,
-    since: number,
-    until: number,
-  ): { sends: number; tokens: number; cost: number | null } {
-    return this.db
-      .query<
-        { sends: number; tokens: number; cost: number | null },
-        [string, number, number]
-      >(
-        `select ${countLive("usage", "send_id")} as sends,
-                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
-                case when count(*) = 0 then 0 else sum(cost) end as cost
-           from usage
-          where provider_id = ? and created_at > ? and created_at <= ?`,
-      )
-      .get(providerId, since, until)!;
-  }
-
-  // those of the projects with a turn or a run in the window, one index
-  // seek each: the Access board's quiet team projects are the rest
+  // one index seek per project
   activeProjects(ids: string[], since: number, until: number): string[] {
     const any = this.db.query<{ one: number }, [string, number, number]>(
       `select 1 as one from usage
@@ -303,26 +283,6 @@ export class UsageStore {
         limit 1`,
     );
     return ids.filter((id) => any.get(id, since, until) !== null);
-  }
-
-  // the same for one project: every agent's turns and runs in it
-  projectTotal(
-    projectId: string,
-    since: number,
-    until: number,
-  ): { sends: number; tokens: number; cost: number | null } {
-    return this.db
-      .query<
-        { sends: number; tokens: number; cost: number | null },
-        [string, number, number]
-      >(
-        `select ${countLive("usage", "send_id")} as sends,
-                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
-                case when count(*) = 0 then 0 else sum(cost) end as cost
-           from usage
-          where project_id = ? and created_at > ? and created_at <= ?`,
-      )
-      .get(projectId, since, until)!;
   }
 
   // one agent's days in every project, one series: the agent page's

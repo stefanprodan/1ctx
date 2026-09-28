@@ -1,41 +1,35 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An agent's page under Config: the crumb is the head, its own step the
-// switcher to the other agents; a line over the tabs only when a server
-// or a skill of the agent is failing, each count opening its tab; then
-// the tabs General, Skills and MCP, one view for the three so the
-// drafts outlive a tab switch. The aside has the agent's last 30 days
-// and the chats and scheduled tasks on it.
 
-import { useRef } from "preact/hooks";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
-import { agents, agentsError, facts } from "../../data/agents.ts";
+import { zoneStep } from "../../app/zones.ts";
+import { agents, agentsError, factsFor } from "../../data/agents.ts";
 import { servers } from "../../data/mcp.ts";
 import { providersError } from "../../data/providers.ts";
 import { skills } from "../../data/skills.ts";
 import { count, pluralCommas } from "../../lib/format.ts";
-import { type AgentTab, configAgentHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
+import {
+  AGENTS_HREF,
+  type AgentTab,
+  configAgentHref,
+} from "../../lib/hrefs.ts";
 import { byName } from "../../lib/search.ts";
-import { Finder } from "../../ui/Finder.tsx";
-import { Page } from "../../ui/Page.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { Page, PageSwitcher } from "../../ui/Page.tsx";
+import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
+import { AsideLine, AsideRead, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { AgentGeneral } from "./AgentGeneral.tsx";
 import { AgentMcp } from "./AgentMcp.tsx";
 import { failing } from "./AgentPage.model.ts";
 import { AgentDrafts } from "./AgentPage.state.ts";
 import { AgentSkills } from "./AgentSkills.tsx";
-import { money } from "./Overview.model.ts";
+import { useRowDrafts, useShownRow } from "./drafts.ts";
 import "./agent-page.css";
 
-const STEPS = [
-  { label: "Config", href: "/admin/config" },
-  { label: "Agents", href: "/admin/config/agents" },
-];
+const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 
 const TABS: { tab: AgentTab; label: string }[] = [
   { tab: "general", label: "General" },
@@ -51,83 +45,44 @@ export function tabOf(pathname: string): AgentTab {
 
 export function AgentPage({ params }: { params: Params }) {
   const list = agents.value;
-  // the agent on screen by its id too: a rename or a delete changes the
-  // list a moment before the address follows
-  // while the address still names it
-  const shown = useRef<{ id: string; name: string } | null>(null);
-  const held = shown.current?.name === params.name ? shown.current : null;
-  const agent =
-    list?.find((a) => a.name === params.name) ??
-    list?.find((a) => a.id === held?.id) ??
-    null;
-  const leaving = agent === null && held !== null;
-  if (agent !== null && agent.name === params.name) {
-    shown.current = { id: agent.id, name: agent.name };
-  }
+  const { row: agent, leaving } = useShownRow(list, params.name, (a) => a.name);
   const error = agentsError.value ?? providersError.value;
   const missing = list !== null && agent === null && !leaving;
-  // one set of drafts per agent: a pick of another starts afresh
-  const drafts = useRef<AgentDrafts | null>(null);
-  const row = useRef<AgentSummary | null>(null);
-  if (agent !== null && drafts.current?.agentId !== agent.id) {
-    drafts.current = AgentDrafts.of(agent);
-  } else if (agent !== null && row.current !== null && row.current !== agent) {
-    drafts.current?.follow(row.current, agent);
-  }
-  row.current = agent;
+  const drafts = useRowDrafts(agent, AgentDrafts.of, (d, before, after) =>
+    d.follow(before, after),
+  );
   const tab = tabOf(path.value);
   return (
     <Page
       steps={STEPS}
       title={`@${params.name}`}
-      menu={agent !== null ? <Switcher agent={agent} tab={tab} /> : undefined}
+      menu={
+        agent !== null ? (
+          <PageSwitcher
+            label="Agents"
+            current={agent.id}
+            name={`@${agent.name}`}
+            items={byName(list ?? []).map((a) => ({
+              id: a.id,
+              label: `@${a.name}`,
+              href: configAgentHref(a.name, tab),
+            }))}
+            placeholder="Find an agent"
+            none="No agent matches"
+          />
+        ) : undefined
+      }
       split
       loading={list === null && error === null}
       empty={missing ? "No agent by that name." : undefined}
       error={error}
     >
-      {agent !== null && drafts.current !== null && (
+      {agent !== null && drafts !== null && (
         <Split aside={<Aside agent={agent} />}>
-          <Body
-            key={agent.id}
-            agent={agent}
-            tab={tab}
-            drafts={drafts.current}
-          />
+          <Body key={agent.id} agent={agent} tab={tab} drafts={drafts} />
         </Split>
       )}
     </Page>
-  );
-}
-
-// the crumb's own step: the other agents, by name, a pick opening its
-// page on the same tab
-function Switcher({ agent, tab }: { agent: AgentSummary; tab: AgentTab }) {
-  const list = byName(agents.value ?? []);
-  const name = `@${agent.name}`;
-  if (list.length < 2) return <span class="page-crumb-on">{name}</span>;
-  return (
-    <Finder
-      label="Agents"
-      triggerClass="page-pill"
-      title={name}
-      trigger={
-        <>
-          <span class="cut">{name}</span>
-          <Icon name="chevron" size={14} class="page-pill-chevron" />
-        </>
-      }
-      options={list.map((a) => ({
-        value: a.id,
-        label: `@${a.name}`,
-        href: configAgentHref(a.name, tab),
-      }))}
-      value={agent.id}
-      mono
-      wide
-      placeholder="Find an agent"
-      none="No agent matches"
-    />
   );
 }
 
@@ -142,10 +97,9 @@ function Body({
 }) {
   const bad = failing(agent, servers.value, skills.value);
   return (
-    <div class="agent-page">
+    <SettingStack>
       {(bad.servers > 0 || bad.skills > 0) && (
-        <p class="agent-page-bad" role="status">
-          <Icon name="alert" size={16} class="agent-page-bad-icon" />
+        <SettingAlert>
           {bad.servers > 0 && (
             <a
               class="agent-page-bad-link"
@@ -164,7 +118,7 @@ function Body({
             </a>
           )}{" "}
           failing
-        </p>
+        </SettingAlert>
       )}
       <Tabs
         tabs={TABS.map((t) => ({
@@ -182,44 +136,31 @@ function Body({
       {tab === "general" && <AgentGeneral agent={agent} drafts={drafts} />}
       {tab === "skills" && <AgentSkills agent={agent} drafts={drafts} />}
       {tab === "mcp" && <AgentMcp agent={agent} drafts={drafts} />}
-    </div>
+    </SettingStack>
   );
 }
 
 function Aside({ agent }: { agent: AgentSummary }) {
-  const known = facts.value?.agentId === agent.id ? facts.value : null;
-  const usage = known?.usage ?? null;
-  const impact = known?.impact ?? null;
+  const facts = factsFor(agent.id);
   return (
     <>
-      <AsideSection
-        label="Last 30 days"
-        action={
-          <a class="split-link" href="/admin/monitor">
-            Usage
-          </a>
-        }
+      <UsageSection
+        value={facts === undefined ? undefined : (facts?.usage ?? null)}
       >
-        {known === null ? (
-          <p class="split-empty">Loading</p>
-        ) : usage === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
-          <>
-            <AsideLine label="Turns">{count(usage.sends)}</AsideLine>
-            <AsideLine label="Tokens">{count(usage.tokens)}</AsideLine>
-            <AsideLine label="Cost">
-              {usage.cost === null ? "not priced" : money(usage.cost)}
-            </AsideLine>
-          </>
+        {(usage) => (
+          <SpendLines
+            label="Turns"
+            count={usage.sends}
+            tokens={usage.tokens}
+            cost={usage.cost}
+          />
         )}
-      </AsideSection>
-      <AsideSection label="Used in">
-        {known === null ? (
-          <p class="split-empty">Loading</p>
-        ) : impact === null ? (
-          <p class="split-empty">Did not load.</p>
-        ) : (
+      </UsageSection>
+      <AsideRead
+        label="Used in"
+        value={facts === undefined ? undefined : (facts?.impact ?? null)}
+      >
+        {(impact) => (
           <>
             <AsideLine label="Chats">{count(impact.chats)}</AsideLine>
             <AsideLine label="Scheduled tasks">
@@ -227,7 +168,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
             </AsideLine>
           </>
         )}
-      </AsideSection>
+      </AsideRead>
     </>
   );
 }

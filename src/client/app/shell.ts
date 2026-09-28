@@ -4,13 +4,12 @@
 // The shell's state: whether the window is narrow, whether the rail is
 // hidden on a wide window (a choice that is kept), and whether it is
 // open full screen on a phone (never kept). The width that splits the
-// two is the one shell.css and rail.css use. The last page of each
-// face, which the band between the faces opens, is kept for the tab's
-// life only.
+// two is the one shell.css and rail.css use.
 
 import { effect, signal } from "@preact/signals";
+import { MONITOR_HREF } from "../lib/hrefs.ts";
 import { adminFace } from "./Rail.model.ts";
-import { path, query } from "./router.ts";
+import { address, path } from "./router.ts";
 
 export const NARROW = "(max-width: 719px)";
 const KEY = "rail";
@@ -62,15 +61,14 @@ export function watchWidth(): void {
   query.addEventListener("change", apply);
 }
 
-export const lastAdmin = signal("/admin/monitor");
+export const lastAdmin = signal(MONITOR_HREF);
 export const lastWork = signal("/");
 
-// follows the address; sign in is no working page to return to, and an
-// address with no page (an alias, a typo) is none to open again
+// an address with no page (an alias, a typo) is none to open again
 export function watchPages(hasPage: (pathname: string) => boolean): () => void {
   return effect(() => {
     if (!hasPage(path.value)) return;
-    const here = path.value + query.value;
+    const here = address();
     if (adminFace(path.value)) lastAdmin.value = here;
     else if (path.value !== "/login") lastWork.value = here;
   });

@@ -1,15 +1,10 @@
-/* The model search with its glass and the select with its chevron,
-   shared by an agent's model and effort and a decider's model. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  /* the model field: the glass at the left end of the search */
   .agents-search {
     position: relative;
     display: flex;
   }
-  /* a dropdown: the field with the chevron drawn over its right edge */
   .agents-select {
     position: relative;
     display: flex;
@@ -36,7 +31,6 @@
     color: var(--faint);
     pointer-events: none;
   }
-  /* the field draws the box; room for the glass at its left */
   .agents-search-input {
     width: 100%;
     padding-left: 34px;

@@ -1,9 +1,6 @@
-/* A tool's open row: its schema, read-only. */
-
 @layer tokens, base, owners;
 
 @layer owners {
-  /* the schema, read-only: its labels over their text */
   .tools-schema {
     display: flex;
     flex-direction: column;
@@ -15,9 +12,5 @@
     color: var(--dim);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-  }
-  .tools-json-cut {
-    max-height: 320px;
-    overflow: clip;
   }
 }

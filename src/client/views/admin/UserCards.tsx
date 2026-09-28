@@ -1,54 +1,34 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The user page's cards about signing in: Reset password, and Disable
-// or Enable, with the page's lock every card saves under.
 
 import { type Signal, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import type { AdminUser } from "../../../shared/api/users.ts";
 import { me } from "../../data/me.ts";
 import { resetPassword, updateUser, users } from "../../data/users.ts";
-import { at, useFocusField, useSave } from "../../lib/save.ts";
+import { at, useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
-import { Setting } from "../../ui/Setting.tsx";
+import { Setting, SettingForm } from "../../ui/Setting.tsx";
+import { holding } from "./drafts.ts";
 import { PasswordField } from "./PasswordField.tsx";
 import { adminCount, disableLock, passwordProblem } from "./Users.model.ts";
 
 export type CardProps = { user: AdminUser; saving: Signal<boolean> };
 
-// a card's call under the page's lock
-export async function locked<T>(
-  saving: Signal<boolean>,
-  call: () => Promise<T>,
-): Promise<T> {
-  saving.value = true;
-  try {
-    return await call();
-  } finally {
-    saving.value = false;
-  }
-}
-
 export function PasswordCard({ user, saving }: CardProps) {
   const next = useSignal("");
-  const form = useRef<HTMLFormElement>(null);
   const save = useSave(
     async () => {
       const password = next.value;
-      await locked(saving, () => resetPassword(user.id, { password }));
+      await holding(saving, () => resetPassword(user.id, { password }));
       next.value = "";
     },
     (message) => (message.startsWith("password") ? "next" : undefined),
   );
-  useFocusField(save, form);
   return (
-    <form
-      ref={form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save.run(at("next", passwordProblem(next.value)));
-      }}
+    <SettingForm
+      save={save}
+      check={() => at("next", passwordProblem(next.value))}
     >
       <Setting
         title="Reset password"
@@ -84,12 +64,11 @@ export function PasswordCard({ user, saving }: CardProps) {
           />
         </div>
       </Setting>
-    </form>
+    </SettingForm>
   );
 }
 
-// Disable in the failed colour while they can sign in, Enable once they
-// cannot; either takes effect on the click, as it is undone as easily
+// no ask before Disable, as it is undone as easily
 export function SwitchCard({ user, saving }: CardProps) {
   const save = useSave(async () => {});
   const lock = disableLock(
@@ -121,7 +100,7 @@ export function SwitchCard({ user, saving }: CardProps) {
             disabled={save.busy || lock !== null || saving.value}
             onClick={() =>
               void save.act(action, () =>
-                locked(saving, () =>
+                holding(saving, () =>
                   updateUser(user.id, { disabled: !user.disabled }),
                 ),
               )

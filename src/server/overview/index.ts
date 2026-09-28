@@ -1,17 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The overview area: what an admin reads about the instance. Storage
-// is one scan of the file in a worker over its own connection, or
-// inline over the app's when the database is in memory, kept a minute
-// and shaped for the caller's zone at each request. The overview's
-// days are the same worker's other job and the usage page's month a
-// third, each kept 25 seconds per zone and range or month, under the
-// pages' 30 second poll, while the scan of the whole file is kept the
-// minute. The
-// load is the process's word at each request: its pools, its sockets
-// and its CPU and memory, sampled from the start; so is what needs
-// attention, read from the config areas through a port.
 
 import {
   type AttentionResponse,
@@ -55,36 +43,13 @@ import { type Scanner, workerScanner } from "./worker.ts";
 
 export { type AttentionInput, attention } from "./attention.ts";
 export { BOARD_KEEP_MS, KEEP_MS } from "./cache.ts";
+export { type Probe, type Reading, sampler } from "./load.ts";
 export {
-  type Probe,
-  processProbe,
-  type Reading,
-  sampler,
-} from "./load.ts";
-export {
-  daysOf,
-  firstOf,
-  median,
-  overviewResponse,
-  usageResponse,
-  windowOf,
-} from "./overview.ts";
-export {
-  parseLoadQuery,
+  parseNoQuery,
   parseOverviewQuery,
   parseUsageQuery,
   parseZoneQuery,
 } from "./parse.ts";
-export {
-  type MonthResult,
-  month,
-  type RangeInput,
-  type RangeResult,
-  range,
-} from "./range.ts";
-export { type ScanInput, type ScanResult, scan } from "./scan.ts";
-export { STORAGE_TABLES, storageResponse } from "./storage.ts";
-export { type Scanner, workerScanner } from "./worker.ts";
 
 export type OverviewDeps = {
   db: Db;
@@ -100,8 +65,7 @@ export type OverviewDeps = {
   online(): number;
   // every automation, and those whose fire waits for a run slot
   automations(): { total: number; waiting: number };
-  // the config rows and their key files; the areas are above, but the
-  // secrets are read through compose's ports
+  // the secrets are read through compose's ports
   attention(): AttentionInput;
   // a test's process; absent, this one, sampled every LOAD_SAMPLE_MS
   probe?: Probe;
@@ -126,7 +90,7 @@ export type Overview = {
 
 const DAY_MS = 86_400_000;
 
-export function inlineScanner(db: Db): Scanner {
+function inlineScanner(db: Db): Scanner {
   return {
     scan: (input: ScanInput) => Promise.resolve(scan(db, input)),
     range: (input: RangeInput) => Promise.resolve(range(db, input)),
@@ -169,7 +133,6 @@ export function overviewArea(deps: OverviewDeps): Overview {
       failing("overview read failed", () => {
         const [timeZone, range] = key.split("\n") as [string, OverviewRange];
         const now = deps.clock();
-        // all reads every sum there is and lays its days from the first
         const window =
           range === "all"
             ? { since: 0, until: windowOf(now, timeZone, range, null).until }
