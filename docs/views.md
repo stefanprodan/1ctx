@@ -458,8 +458,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   projects. The name is fixed once made. A save that finds the row gone
   drops it from the list, so the page says so. `?new` on the tab
   (`NewCredential.tsx`) is every field in one card, the same Add
-  project, Create on once every required field is filled and opening
-  the page.
+  project, Create saying which required field is empty and opening the
+  page.
 - **Config › Visuals is a page of cards.** `/admin/config/visuals`
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved

@@ -187,9 +187,13 @@ export function patchBody(
 ): PatchCredentialRequest {
   const body: PatchCredentialRequest = {};
   if (d.keyName !== c.keyName) body.keyName = d.keyName;
-  if (d.prefix.trim() !== c.prefix) body.prefix = d.prefix.trim();
-  if (d.header.trim() !== c.header) body.header = d.header.trim();
-  if (d.template.trim() !== c.template) body.template = d.template.trim();
+  // trimmed on both sides: the server keeps a value as it was given, so
+  // a row may hold spaces round it that the box would never change
+  if (d.prefix.trim() !== c.prefix.trim()) body.prefix = d.prefix.trim();
+  if (d.header.trim() !== c.header.trim()) body.header = d.header.trim();
+  if (d.template.trim() !== c.template.trim()) {
+    body.template = d.template.trim();
+  }
   if (!sameIds(d.methods, c.methods)) body.methods = d.methods;
   const ids = c.projects.map((p) => p.id);
   if (!sameIds(d.projectIds, ids)) body.projectIds = d.projectIds;
@@ -274,15 +278,12 @@ export function cardFieldOf(
 export function keyUsers(
   file: string,
   list: readonly Pick<CredentialSummary, "name" | "keyName">[],
-): { label: string; name: string | null } {
+): { label: string; name: string | null; count: number } {
   const users = list.filter((c) => c.keyName === file);
-  if (users.length === 0) return { label: "unused", name: null };
-  if (users.length === 1)
-    return { label: users[0]!.name, name: users[0]!.name };
-  return { label: `${users.length} credentials`, name: null };
-}
-
-// what New credential may create: every required field filled
-export function canCreate(d: CredentialDraft): boolean {
-  return problemOf(d, true) === null;
+  const count = users.length;
+  if (count === 0) return { label: "unused", name: null, count };
+  if (count === 1) {
+    return { label: users[0]!.name, name: users[0]!.name, count };
+  }
+  return { label: `${count} credentials`, name: null, count };
 }

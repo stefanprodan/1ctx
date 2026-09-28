@@ -147,7 +147,7 @@ function Body({ credential }: { credential: CredentialSummary }) {
       <RequestCard credential={credential} saving={saving} />
       <MethodsCard credential={credential} saving={saving} />
       <ProjectsCard credential={credential} saving={saving} />
-      <DeleteCard credential={credential} />
+      <DeleteCard credential={credential} saving={saving} />
     </div>
   );
 }
@@ -347,7 +347,7 @@ function ProjectsCard(props: CardProps) {
   );
 }
 
-function DeleteCard({ credential }: { credential: CredentialSummary }) {
+function DeleteCard({ credential, saving }: CardProps) {
   const asking = useSignal(false);
   const save = useSave(async () => {});
   // Escape takes the ask back
@@ -370,7 +370,8 @@ function DeleteCard({ credential }: { credential: CredentialSummary }) {
             <AskDelete
               save={save}
               asking={asking}
-              busy={save.busy}
+              // a card's save in flight could put the row back
+              busy={save.busy || saving.value}
               words={`Delete ${credential.name}?`}
               wordsClass="credentials-ask"
               // the list drops the row as the call ends, which takes

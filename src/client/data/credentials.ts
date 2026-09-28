@@ -112,16 +112,23 @@ export async function patchCredential(
     ),
   );
   if (owner !== forUser) return answer.credential;
+  // a delete that landed first keeps the row out
+  if (!(credentials.value ?? []).some((c) => c.id === id)) {
+    return answer.credential;
+  }
   turn++;
   return keep(answer);
 }
 
+// a row already gone is what a delete wants: no refusal
 export async function deleteCredential(id: string): Promise<void> {
   const forUser = owner;
   turn++;
-  await gone(id, () =>
-    api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE"),
-  );
+  try {
+    await api(`/api/credentials/${encodeURIComponent(id)}`, "DELETE");
+  } catch (err) {
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
+  }
   if (owner === forUser) {
     turn++;
     credentials.value = (credentials.value ?? []).filter((c) => c.id !== id);

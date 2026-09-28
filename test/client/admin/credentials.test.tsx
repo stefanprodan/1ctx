@@ -23,7 +23,6 @@ import { tools } from "../../../src/client/data/tools.ts";
 import { CredentialList } from "../../../src/client/views/admin/CredentialList.tsx";
 import { CredentialPage } from "../../../src/client/views/admin/CredentialPage.tsx";
 import {
-  canCreate,
   cardBody,
   cardFieldOf,
   cardProblem,
@@ -248,9 +247,20 @@ describe("the entity", () => {
       Response.json({ error: "no such credential" }, { status: 404 });
     await expect(patchCredential("c1", { methods: ["GET"] })).rejects.toThrow();
     expect(credentials.value?.map((c) => c.id)).toEqual(["c2"]);
-    await expect(deleteCredential("c2")).rejects.toThrow();
+    // a delete of a row already gone is done, not refused
+    await deleteCredential("c2");
     expect(credentials.value).toEqual([]);
   });
+
+  test.serial(
+    "a save answered after its row was deleted keeps it out",
+    async () => {
+      credentials.value = [credential({ id: "c2", name: "x" })];
+      answer = () => Response.json({ credential: credential() });
+      await patchCredential("c1", { methods: ["GET"] });
+      expect(credentials.value?.map((c) => c.id)).toEqual(["c2"]);
+    },
+  );
 
   test.serial("a failed load is the page's error", async () => {
     answer = () => Response.json({ error: "nope" }, { status: 500 });
@@ -307,6 +317,10 @@ describe("a card of the page", () => {
     });
     expect(cardBody(draftOf(row), row, ["methods"])).toEqual({});
     expect(cardBody(draftOf(row), row, ["keyName"])).toEqual({});
+    // the card that owns it is not dirty over those spaces either
+    expect(
+      cardBody(draftOf(row), row, ["prefix", "header", "template"]),
+    ).toEqual({});
   });
 
   test("checks only its own fields before a call", () => {
@@ -335,22 +349,18 @@ describe("a card of the page", () => {
     expect(keyUsers("http-finnhub", list)).toEqual({
       label: "finnhub",
       name: "finnhub",
+      count: 1,
     });
     expect(keyUsers("http-shared", list)).toEqual({
       label: "2 credentials",
       name: null,
+      count: 2,
     });
     expect(keyUsers("http-none", list)).toEqual({
       label: "unused",
       name: null,
+      count: 0,
     });
-  });
-
-  test("Create waits for every required field", () => {
-    const d = { ...draftOf(credential()), name: "x" };
-    expect(canCreate(d)).toBe(true);
-    expect(canCreate({ ...d, template: " " })).toBe(false);
-    expect(canCreate({ ...d, name: "" })).toBe(false);
   });
 });
 
@@ -502,7 +512,9 @@ describe("the pages", () => {
 
   test.serial("the pages wait for the list", () => {
     credentials.value = null;
-    expect(render(<CredentialList />)).not.toContain("No credentials yet");
+    const waiting = render(<CredentialList />);
+    expect(waiting).toContain("Loading");
+    expect(waiting).not.toContain("No credentials yet");
     expect(render(<CredentialPage params={{ name: "x" }} />)).toContain(
       "Loading",
     );

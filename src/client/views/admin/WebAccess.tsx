@@ -98,12 +98,7 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
           </a>
         ) : undefined
       }
-      loading={
-        (state === null ||
-          rows === null ||
-          (tab === "credentials" && credentials.value === null)) &&
-        error === null
-      }
+      loading={(state === null || rows === null) && error === null}
       error={error}
     >
       {state && rows && (
@@ -377,7 +372,7 @@ function KeyFiles() {
                   ? configCredentialHref(users.name)
                   : undefined
               }
-              quiet={users.label === "unused"}
+              quiet={users.count === 0}
             >
               {users.label}
             </AsideLine>

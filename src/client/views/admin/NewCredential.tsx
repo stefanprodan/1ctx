@@ -32,7 +32,6 @@ import {
 } from "./CredentialFields.tsx";
 import {
   type CredentialDraft,
-  canCreate,
   createBody,
   credentialFieldOf,
   draftOf,
@@ -102,7 +101,7 @@ function Form() {
         foot={
           <Foot
             save={save}
-            dirty={canCreate(d) && !taken}
+            dirty={name !== "" && !taken}
             label="Create credential"
             stack={taken}
             start={

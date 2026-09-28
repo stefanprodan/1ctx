@@ -30,8 +30,14 @@ import "./credentials.css";
 
 export function CredentialList() {
   const q = useSignal("");
-  // the page says Loading until the list is there
-  if (credentials.value === null) return null;
+  // General's cards stay drawn beside, so the tab waits on its own
+  if (credentials.value === null) {
+    return (
+      <RowsCard label="Credentials">
+        <RowsNote>Loading</RowsNote>
+      </RowsCard>
+    );
+  }
   const all = credentials.value;
   const shown = all.filter((c) =>
     matches(q.value, [
