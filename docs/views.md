@@ -465,40 +465,40 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   first (`deleteAsk()`), Delete then Keep.
 - **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one
   card of links by name, the name over the URL, or over the failed
-  refresh in red, the agents that use it over `sidesLine()` at the
-  right ("25 read · write off", a side the server has off saying so);
-  New server is in the page's head, and `?new` (`NewMcpServer.tsx`) is
-  the name, the key file and the URL in one card, Create listing the
-  tools and opening the Tools tab, read matching nothing and write off.
-  The aside is every server's calls over the last 30 days (`GET
-  /api/mcp/usage`), the most called five, and the `mcp-` key files
-  with the server that reads each.
-  A server's page, `/admin/config/mcp/:name` and `/tools`, is one view
-  (`McpPage.tsx`, drafts in `McpPage.state.ts`), the crumb's own step
-  the switcher, a failed refresh over the tabs. General
-  (`McpGeneral.tsx`, `McpUsedBy.tsx`) is About (what the server says
-  of itself, its tools and last change, Refresh), Endpoint (its save
-  lists the tools there first, a refusal keeping what was typed),
-  Offered to agents (Off, Read, or Read and write, one `Seg`; write
-  alone has no option), Call timeout (seconds, empty for the limits'),
-  Instructions (the switch, a line that follows its draft, and the
-  block as `serverBlock()` gives it, trimmed to 12 lines), Used by
-  (only when an agent does) and Delete, off while an agent uses it.
-  Each card sends only its own fields, so none waits on another, and a
-  card at rest follows the row a save or a refresh answered. Tools (`McpTools.tsx`, its logic in
-  `McpTools.model.ts` over `decide()` in `shared/mcp.ts`) is one draft
-  form: the Matchers card, the Read, Write and Excluded matchers, each
-  a chip with the tools it decides, in red when it matches none, and a
-  box that adds one; then the tools as `Rows` by name, the search in
-  the card's head band, a side `Seg`, in whose place Move to shows
-  while tools are picked so the rows never move, then each tool with its side and the matcher that
-  set it. Picked tools move to a side by `moveTools()`: their exact
-  names leave the other lists and join the side's unless they land
-  there without one, an empty write list never gets a name nor loses
-  its last. The Matchers card and the list end in the same foot, either
-  saving the draft, its hint saying what moved and naming a tool a
-  matcher earlier in the order keeps. The aside
-  is `GET /api/mcp/:id/usage` and the most called five tools.
+  refresh in red, the agents that use it over `sidesLine()` at the right
+  ("25 read · write off", a side the server has off saying so); New
+  server is in the page's head, and `?new` (`NewMcpServer.tsx`) is the
+  name, the key file and the URL in one card, Create listing the tools
+  and opening the Tools tab, read matching nothing and write off. The
+  aside is every server's calls over the last 30 days (`GET
+  /api/mcp/usage`), the most called five, and the `mcp-` key files with
+  the server that reads each. A server's page, `/admin/config/mcp/:name`
+  and `/tools`, is one view (`McpPage.tsx`, drafts in
+  `McpPage.state.ts`), the crumb's own step the switcher, a failed
+  refresh over the tabs. General (`McpGeneral.tsx`, `McpUsedBy.tsx`) is
+  About (what the server says of itself, its tools and last change,
+  Refresh), Endpoint (its save lists the tools there first, a refusal
+  keeping what was typed), Offered to agents (Off, Read, or Read and
+  write, one `Seg`; write alone has no option), Call timeout (seconds,
+  empty for the limits'), Instructions (the switch, a line that follows
+  its draft, and the block as `serverBlock()` gives it, trimmed to 12
+  lines), Used by (only when an agent does) and Delete, off while an
+  agent uses it. Each card sends only its own fields, so none waits on
+  another, and a card at rest follows the row a save or a refresh
+  answered. Tools (`McpTools.tsx`, its logic in `McpTools.model.ts` over
+  `decide()` in `shared/mcp.ts`) is one draft form: the Matchers card,
+  the Read, Write and Excluded matchers, each a chip with the tools it
+  decides, in red when it matches none, and a box that adds one; then
+  the tools as `Rows` by name, the search in the card's head band, a
+  side `Seg`, in whose place Move to shows while tools are picked so the
+  rows never move, then each tool with its side and the matcher that set
+  it. Picked tools move to a side by `moveTools()`: their exact names
+  leave the other lists and join the side's unless they land there
+  without one, an empty write list never gets a name nor loses its last.
+  The Matchers card and the list end in the same foot, either saving the
+  draft, its hint saying what moved and naming a tool a matcher earlier
+  in the order keeps. The aside is `GET /api/mcp/:id/usage` and the most
+  called five tools.
 - **The agent form's Preferred provider.** On an OpenRouter provider,
   a `Select` under the model (`UpstreamField.tsx`) asks for the
   model's endpoints each time one is picked, Any provider first, and
