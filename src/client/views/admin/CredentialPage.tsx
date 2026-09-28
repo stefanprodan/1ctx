@@ -8,7 +8,8 @@
 // aside has the key file's state, the projects and the last change. The
 // name is fixed once made.
 
-import { useSignal } from "@preact/signals";
+import { type Signal, useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type {
   CredentialSummary,
@@ -37,23 +38,24 @@ import { RowsNote } from "../../ui/Rows.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import {
+  AddProject,
   KeyField,
   MethodsField,
-  ProjectLines,
+  ProjectRows,
   TextField,
 } from "./CredentialFields.tsx";
 import {
   type CredentialDraft,
-  credentialFieldOf,
+  type CredentialField,
+  cardBody,
+  cardFieldOf,
+  cardProblem,
   deleteLine,
-  dirtyOf,
   draftOf,
   HEADER_PLACEHOLDER,
   keyHint,
   keyLine,
   PREFIX_HINT,
-  patchBody,
-  problemOf,
   TEMPLATE_HINT,
   TEMPLATE_PLACEHOLDER,
   teamsOf,
@@ -130,6 +132,9 @@ function Switcher({ credential }: { credential: CredentialSummary }) {
 
 function Body({ credential }: { credential: CredentialSummary }) {
   const off = tools.value?.access.mode === "off";
+  // one card saves at a time, so a slower answer never puts back what
+  // a later save changed
+  const saving = useSignal(false);
   return (
     <div class="credentials-page">
       {off && (
@@ -138,23 +143,30 @@ function Body({ credential }: { credential: CredentialSummary }) {
           {WEB_OFF_NOTE}
         </p>
       )}
-      <KeyCard credential={credential} />
-      <RequestCard credential={credential} />
-      <MethodsCard credential={credential} />
-      <ProjectsCard credential={credential} />
+      <KeyCard credential={credential} saving={saving} />
+      <RequestCard credential={credential} saving={saving} />
+      <MethodsCard credential={credential} saving={saving} />
+      <ProjectsCard credential={credential} saving={saving} />
       <DeleteCard credential={credential} />
     </div>
   );
 }
 
-// A card's save: its fields over the saved row, so the body carries
-// only what this card changed. The row is read through a ref when the
-// save runs, so a save of another card in between is not undone.
-function useCard<T>(
-  credential: CredentialSummary,
-  fields: (d: CredentialDraft) => T,
+type CardProps = {
+  credential: CredentialSummary;
+  saving: Signal<boolean>;
+};
+
+// A card's draft over the saved row: null until edited, then the card's
+// own fields. Its body and its dirt are what it changed of those alone,
+// and a refusal naming another card's field is its notice. The row is
+// read through a ref when the save runs, so a save of another card in
+// between is not undone.
+function useCard(
+  { credential, saving }: CardProps,
+  keys: readonly CredentialField[],
 ) {
-  const drafted = useSignal<T | null>(null);
+  const drafted = useSignal<Partial<CredentialDraft> | null>(null);
   const latest = useRef(credential);
   latest.current = credential;
   const form = useRef<HTMLFormElement>(null);
@@ -164,49 +176,56 @@ function useCard<T>(
   });
   const save = useSave(async () => {
     const row = latest.current;
-    await patchCredential(row.id, patchBody(merged(row), row));
+    saving.value = true;
+    try {
+      await patchCredential(row.id, cardBody(merged(row), row, keys));
+    } finally {
+      saving.value = false;
+    }
     drafted.value = null;
-  }, credentialFieldOf);
+  }, cardFieldOf(keys));
   useFocusField(save, form);
   const d = merged(credential);
+  const dirty = Object.keys(cardBody(d, credential, keys)).length > 0;
   return {
     d,
     save,
     form,
-    dirty: dirtyOf(d, credential),
-    set: (patch: Partial<T>) => {
-      drafted.value = { ...fields(d), ...(drafted.value ?? {}), ...patch };
+    foot: (hint?: ComponentChildren) => (
+      <DraftFoot
+        save={save}
+        dirty={dirty}
+        locked={saving.value && !save.busy}
+        hint={hint}
+        onDiscard={() => {
+          drafted.value = null;
+        }}
+      />
+    ),
+    set: (patch: Partial<CredentialDraft>) => {
+      drafted.value = { ...(drafted.value ?? {}), ...patch };
       save.touch();
-    },
-    discard: () => {
-      drafted.value = null;
     },
     submit: (e: Event) => {
       e.preventDefault();
-      void save.run(problemOf(d, false));
+      void save.run(cardProblem(d, keys));
     },
   };
 }
 
-function KeyCard({ credential }: { credential: CredentialSummary }) {
-  const card = useCard(credential, (d) => ({ keyName: d.keyName }));
+function KeyCard(props: CardProps) {
+  const card = useCard(props, ["keyName"]);
   return (
     <form ref={card.form} onSubmit={card.submit}>
       <Setting
         title="Key"
         line="The http- file whose value goes in the header."
-        foot={
-          <DraftFoot
-            save={card.save}
-            dirty={card.dirty}
-            onDiscard={card.discard}
-          />
-        }
+        foot={card.foot()}
       >
         <div class="pair">
           <KeyField
             value={card.d.keyName}
-            hint={keyHint(card.d.keyName, credential)}
+            hint={keyHint(card.d.keyName, props.credential)}
             save={card.save}
             bare
             onChange={(keyName) => card.set({ keyName })}
@@ -217,24 +236,14 @@ function KeyCard({ credential }: { credential: CredentialSummary }) {
   );
 }
 
-function RequestCard({ credential }: { credential: CredentialSummary }) {
-  const card = useCard(credential, (d) => ({
-    prefix: d.prefix,
-    header: d.header,
-    template: d.template,
-  }));
+function RequestCard(props: CardProps) {
+  const card = useCard(props, ["prefix", "header", "template"]);
   return (
     <form ref={card.form} onSubmit={card.submit}>
       <Setting
         title="Request"
-        line="curl sends the header on requests under the prefix."
-        foot={
-          <DraftFoot
-            save={card.save}
-            dirty={card.dirty}
-            onDiscard={card.discard}
-          />
-        }
+        line="curl adds the header to requests under the prefix."
+        foot={card.foot()}
       >
         <div class="pair">
           <TextField
@@ -273,20 +282,14 @@ function RequestCard({ credential }: { credential: CredentialSummary }) {
   );
 }
 
-function MethodsCard({ credential }: { credential: CredentialSummary }) {
-  const card = useCard(credential, (d) => ({ methods: d.methods }));
+function MethodsCard(props: CardProps) {
+  const card = useCard(props, ["methods"]);
   return (
     <form ref={card.form} onSubmit={card.submit}>
       <Setting
         title="Methods"
-        line="What curl may send under the prefix. Other methods are refused."
-        foot={
-          <DraftFoot
-            save={card.save}
-            dirty={card.dirty}
-            onDiscard={card.discard}
-          />
-        }
+        line="What curl may use under the prefix. Other methods are refused."
+        foot={card.foot()}
       >
         <MethodsField
           value={card.d.methods}
@@ -298,39 +301,43 @@ function MethodsCard({ credential }: { credential: CredentialSummary }) {
   );
 }
 
-function ProjectsCard({ credential }: { credential: CredentialSummary }) {
-  const card = useCard(credential, (d) => ({ projectIds: d.projectIds }));
-  const teams = teamsOf(projects.value ?? [], credential);
+// the projects it is bound to, each with a remove, and Add project over
+// the team projects it is not
+function ProjectsCard(props: CardProps) {
+  const card = useCard(props, ["projectIds"]);
+  const loaded = projects.value !== null;
+  const teams = teamsOf(projects.value ?? [], props.credential);
+  const ids = card.d.projectIds;
+  const refused = card.save.fieldError("projectIds");
   return (
     <form ref={card.form} onSubmit={card.submit}>
       <Setting
         title="Projects"
-        count={
-          teams.length > 0
-            ? `${card.d.projectIds.length} of ${teams.length}`
-            : undefined
-        }
+        count={String(ids.length)}
         line="Chats and runs in these projects sign with it."
         list
-        foot={
-          <DraftFoot
-            save={card.save}
-            dirty={card.dirty}
-            hint={
-              card.save.fieldError("projectIds") !== null ? (
-                <span class="error">{card.save.fieldError("projectIds")}</span>
-              ) : undefined
-            }
-            onDiscard={card.discard}
-          />
+        action={
+          loaded && (
+            <AddProject
+              teams={teams}
+              value={ids}
+              disabled={card.save.busy}
+              onChange={(projectIds) => card.set({ projectIds })}
+            />
+          )
         }
+        foot={card.foot(
+          refused !== null ? <span class="error">{refused}</span> : undefined,
+        )}
       >
-        {teams.length === 0 ? (
-          <RowsNote>No team projects yet.</RowsNote>
+        {!loaded ? (
+          <RowsNote>Loading</RowsNote>
+        ) : ids.length === 0 ? (
+          <RowsNote>No projects. It signs nothing until one is added.</RowsNote>
         ) : (
-          <ProjectLines
+          <ProjectRows
             teams={teams}
-            value={card.d.projectIds}
+            value={ids}
             save={card.save}
             onChange={(projectIds) => card.set({ projectIds })}
           />

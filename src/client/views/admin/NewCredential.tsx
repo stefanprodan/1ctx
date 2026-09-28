@@ -18,18 +18,21 @@ import { projects } from "../../data/projects.ts";
 import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
 import { useFocusField, useSave } from "../../lib/save.ts";
 import { touch } from "../../lib/touch.ts";
+import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { RowsList, RowsListHead } from "../../ui/Rows.tsx";
+import { RowsList } from "../../ui/Rows.tsx";
 import { Setting, SettingHint } from "../../ui/Setting.tsx";
 import {
+  AddProject,
   KeyField,
   MethodsField,
-  ProjectLines,
+  ProjectRows,
   TextField,
 } from "./CredentialFields.tsx";
 import {
   type CredentialDraft,
+  canCreate,
   createBody,
   credentialFieldOf,
   draftOf,
@@ -99,7 +102,7 @@ function Form() {
         foot={
           <Foot
             save={save}
-            dirty={name !== "" && !taken}
+            dirty={canCreate(d) && !taken}
             label="Create credential"
             stack={taken}
             start={
@@ -168,19 +171,24 @@ function Form() {
             onChange={(methods) => set({ methods })}
           />
           <div class="field pair-wide">
-            <RowsListHead
-              label="Projects"
-              hint={
-                teams.length > 0
-                  ? `${d.projectIds.length} of ${teams.length}`
-                  : undefined
-              }
-            />
-            {teams.length === 0 ? (
-              <span class="hint">No team projects yet</span>
+            <div class="credentials-projects-head">
+              <span class="label">Projects</span>
+              {projects.value !== null && (
+                <AddProject
+                  teams={teams}
+                  value={d.projectIds}
+                  disabled={save.busy}
+                  onChange={(projectIds) => set({ projectIds })}
+                />
+              )}
+            </div>
+            {d.projectIds.length === 0 ? (
+              <span class="hint">
+                None yet. It signs nothing until a project is added.
+              </span>
             ) : (
               <RowsList>
-                <ProjectLines
+                <ProjectRows
                   teams={teams}
                   value={d.projectIds}
                   save={save}
@@ -188,6 +196,7 @@ function Form() {
                 />
               </RowsList>
             )}
+            <FieldError save={save} field="projectIds" />
           </div>
         </div>
       </Setting>

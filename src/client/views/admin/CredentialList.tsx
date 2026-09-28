@@ -29,8 +29,10 @@ import {
 import "./credentials.css";
 
 export function CredentialList() {
-  const all = credentials.value ?? [];
   const q = useSignal("");
+  // the page says Loading until the list is there
+  if (credentials.value === null) return null;
+  const all = credentials.value;
   const shown = all.filter((c) =>
     matches(q.value, [
       c.name,

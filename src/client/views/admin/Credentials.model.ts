@@ -36,7 +36,7 @@ export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
 export const TEMPLATE_HINT = "The key goes where {key} is";
 export const PREFIX_HINT = "Requests under it are signed. Narrow is better";
 export const LIST_NOTE =
-  "curl in a chat or run of a bound project sends the header for URLs under the prefix. The key never reaches the chat.";
+  "In a chat or run of one of its projects, curl adds the header to URLs under the prefix. The key never reaches the chat.";
 export const WEB_OFF_NOTE =
   "Web access is off. Credentials sign nothing until it is on.";
 
@@ -108,7 +108,7 @@ export function toggledMethod(
   return HTTP_METHODS.filter((m) => next.includes(m));
 }
 
-type CredentialField =
+export type CredentialField =
   | "name"
   | "keyName"
   | "prefix"
@@ -231,4 +231,58 @@ export function teamsOf(
 // Delete's line: what stops when it goes
 export function deleteLine(c: Pick<CredentialSummary, "prefix">): string {
   return `curl stops signing requests under ${c.prefix}.`;
+}
+
+// A card of a credential's page owns some fields. Its body is what it
+// changed of them alone, compared to the row as saved, so a field
+// another card owns never rides along, however the row holds it.
+export function cardBody(
+  d: CredentialDraft,
+  c: CredentialSummary,
+  keys: readonly CredentialField[],
+): PatchCredentialRequest {
+  const body = patchBody(d, c) as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) =>
+      keys.includes(key as CredentialField),
+    ),
+  ) as PatchCredentialRequest;
+}
+
+// the first empty field among the card's own
+export function cardProblem(
+  d: CredentialDraft,
+  keys: readonly CredentialField[],
+): { error: string; field: CredentialField } | null {
+  const problem = problemOf(d, false);
+  return problem !== null && keys.includes(problem.field) ? problem : null;
+}
+
+// a refusal names a field of this card, or it is the card's notice: an
+// overlap refused while saving Projects names the prefix, which is on
+// another card
+export function cardFieldOf(
+  keys: readonly CredentialField[],
+): (message: string) => CredentialField | undefined {
+  return (message) => {
+    const field = credentialFieldOf(message);
+    return field !== undefined && keys.includes(field) ? field : undefined;
+  };
+}
+
+// who reads a key file: the one credential, or how many do
+export function keyUsers(
+  file: string,
+  list: readonly Pick<CredentialSummary, "name" | "keyName">[],
+): { label: string; name: string | null } {
+  const users = list.filter((c) => c.keyName === file);
+  if (users.length === 0) return { label: "unused", name: null };
+  if (users.length === 1)
+    return { label: users[0]!.name, name: users[0]!.name };
+  return { label: `${users.length} credentials`, name: null };
+}
+
+// what New credential may create: every required field filled
+export function canCreate(d: CredentialDraft): boolean {
+  return problemOf(d, true) === null;
 }

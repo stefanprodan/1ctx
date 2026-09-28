@@ -44,6 +44,7 @@ import { Setting } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { CredentialList } from "./CredentialList.tsx";
+import { keyUsers } from "./Credentials.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { LimitsSetting } from "./LimitsSetting.tsx";
 import { NewCredential } from "./NewCredential.tsx";
@@ -97,7 +98,12 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
           </a>
         ) : undefined
       }
-      loading={(state === null || rows === null) && error === null}
+      loading={
+        (state === null ||
+          rows === null ||
+          (tab === "credentials" && credentials.value === null)) &&
+        error === null
+      }
       error={error}
     >
       {state && rows && (
@@ -347,9 +353,10 @@ function Aside({ tab }: { tab: "general" | "credentials" }) {
 }
 
 // the http- files in the secrets directory, each with the credential
-// that reads it
+// that reads it, or how many share it
 function KeyFiles() {
-  const list = credentials.value ?? [];
+  const list = credentials.value;
+  if (list === null) return null;
   const files = credentialKeys.value
     .map((k) => k.name)
     .sort((a, b) => a.localeCompare(b));
@@ -359,16 +366,20 @@ function KeyFiles() {
         <p class="split-empty">None in the secrets directory.</p>
       ) : (
         files.map((file) => {
-          const user = list.find((c) => c.keyName === file);
+          const users = keyUsers(file, list);
           return (
             <AsideLine
               key={file}
               label={`${file}.key`}
               cut
-              href={user ? configCredentialHref(user.name) : undefined}
-              quiet={user === undefined}
+              href={
+                users.name !== null
+                  ? configCredentialHref(users.name)
+                  : undefined
+              }
+              quiet={users.label === "unused"}
             >
-              {user?.name ?? "unused"}
+              {users.label}
             </AsideLine>
           );
         })

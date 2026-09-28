@@ -23,6 +23,10 @@ import { tools } from "../../../src/client/data/tools.ts";
 import { CredentialList } from "../../../src/client/views/admin/CredentialList.tsx";
 import { CredentialPage } from "../../../src/client/views/admin/CredentialPage.tsx";
 import {
+  canCreate,
+  cardBody,
+  cardFieldOf,
+  cardProblem,
   createBody,
   credentialFieldOf,
   deleteLine,
@@ -31,6 +35,7 @@ import {
   keyHint,
   keyLine,
   keyOptions,
+  keyUsers,
   patchBody,
   problemOf,
   projectsLine,
@@ -38,7 +43,10 @@ import {
   toggledMethod,
 } from "../../../src/client/views/admin/Credentials.model.ts";
 import { NewCredential } from "../../../src/client/views/admin/NewCredential.tsx";
-import type { CredentialSummary } from "../../../src/shared/contracts/credential.ts";
+import type {
+  CredentialSummary,
+  HttpMethod,
+} from "../../../src/shared/contracts/credential.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
 
 const admin: Me = {
@@ -234,6 +242,16 @@ describe("the entity", () => {
     ]);
   });
 
+  test.serial("a write that finds the row gone drops it", async () => {
+    credentials.value = [credential(), credential({ id: "c2", name: "x" })];
+    answer = () =>
+      Response.json({ error: "no such credential" }, { status: 404 });
+    await expect(patchCredential("c1", { methods: ["GET"] })).rejects.toThrow();
+    expect(credentials.value?.map((c) => c.id)).toEqual(["c2"]);
+    await expect(deleteCredential("c2")).rejects.toThrow();
+    expect(credentials.value).toEqual([]);
+  });
+
   test.serial("a failed load is the page's error", async () => {
     answer = () => Response.json({ error: "nope" }, { status: 500 });
     await loadCredentials();
@@ -275,6 +293,64 @@ describe("the entity", () => {
       "PATCH /api/credentials/c1",
       "DELETE /api/credentials/c1",
     ]);
+  });
+});
+
+describe("a card of the page", () => {
+  test("sends and counts only its own fields", () => {
+    // a template the server kept with a space round it: trimmed by the
+    // draft, yet no other card may carry it
+    const row = credential({ template: "Bearer {key} " });
+    const d = { ...draftOf(row), methods: ["GET", "POST"] as HttpMethod[] };
+    expect(cardBody(d, row, ["methods"])).toEqual({
+      methods: ["GET", "POST"],
+    });
+    expect(cardBody(draftOf(row), row, ["methods"])).toEqual({});
+    expect(cardBody(draftOf(row), row, ["keyName"])).toEqual({});
+  });
+
+  test("checks only its own fields before a call", () => {
+    const d = { ...draftOf(credential()), prefix: "" };
+    expect(cardProblem(d, ["methods"])).toBeNull();
+    expect(cardProblem(d, ["prefix", "header", "template"])?.field).toBe(
+      "prefix",
+    );
+  });
+
+  test("a refusal about another card's field is its notice", () => {
+    const projects = cardFieldOf(["projectIds"]);
+    expect(projects("the prefix overlaps github in finops")).toBeUndefined();
+    expect(projects("finops has 10 credentials")).toBe("projectIds");
+    expect(cardFieldOf(["prefix"])("the prefix overlaps a in b")).toBe(
+      "prefix",
+    );
+  });
+
+  test("a key file names its one reader, or counts them", () => {
+    const list = [
+      credential(),
+      credential({ id: "c2", name: "b", keyName: "http-shared" }),
+      credential({ id: "c3", name: "c", keyName: "http-shared" }),
+    ];
+    expect(keyUsers("http-finnhub", list)).toEqual({
+      label: "finnhub",
+      name: "finnhub",
+    });
+    expect(keyUsers("http-shared", list)).toEqual({
+      label: "2 credentials",
+      name: null,
+    });
+    expect(keyUsers("http-none", list)).toEqual({
+      label: "unused",
+      name: null,
+    });
+  });
+
+  test("Create waits for every required field", () => {
+    const d = { ...draftOf(credential()), name: "x" };
+    expect(canCreate(d)).toBe(true);
+    expect(canCreate({ ...d, template: " " })).toBe(false);
+    expect(canCreate({ ...d, name: "" })).toBe(false);
   });
 });
 
@@ -387,7 +463,11 @@ describe("the pages", () => {
     expect(html).toContain('value="https://finnhub.io/api/v1/"');
     expect(html).toContain('value="X-Finnhub-Token"');
     expect(html).toContain("http-finnhub.key is present");
-    expect(html).toMatch(/setting-count">1 of 1</);
+    // only what it is bound to, each with a remove, Add over the rest
+    expect(html).toMatch(/setting-count">1</);
+    expect(html).toContain('aria-label="Remove finops"');
+    expect(html).toContain("Add project");
+    expect(html).not.toContain('name="projectIds"');
     expect(html).toContain(
       "curl stops signing requests under https://finnhub.io/api/v1/.",
     );
@@ -415,13 +495,14 @@ describe("the pages", () => {
     expect(html).toContain("Create credential");
     expect(html).toMatch(/type="submit"[^>]*disabled/);
     expect(html).toContain('href="/admin/config/web/credentials"');
-    expect(html).toContain("No team projects yet");
+    expect(html).toContain("It signs nothing until a project is added.");
     // GET and HEAD are on for a new one
     expect(html.match(/rows-check-on/g)).toHaveLength(2);
   });
 
   test.serial("the pages wait for the list", () => {
     credentials.value = null;
+    expect(render(<CredentialList />)).not.toContain("No credentials yet");
     expect(render(<CredentialPage params={{ name: "x" }} />)).toContain(
       "Loading",
     );

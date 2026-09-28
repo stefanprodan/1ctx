@@ -450,11 +450,16 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   (`CredentialPage.tsx`, the fields in `CredentialFields.tsx`, the words
   and bodies in `Credentials.model.ts`), the crumb's own step a switcher
   to the others: Key, Request (prefix, header, value), Methods (GET and
-  HEAD new) and Projects (the rail's team projects, and any the row
-  names besides) are `Setting` cards, each drafting over the saved row
-  and sending only its own changed fields, then Delete. The name is
-  fixed once made. `?new` on the tab (`NewCredential.tsx`) is every
-  field in one card, Create opening the page.
+  HEAD new) and Projects are `Setting` cards, each drafting over the
+  saved row and sending and comparing only its own fields
+  (`cardBody()`), a refusal naming another card's field its notice, one
+  saving at a time; then Delete. Projects lists only what it is bound
+  to, each with a remove, Add project a `Finder` over the other team
+  projects. The name is fixed once made. A save that finds the row gone
+  drops it from the list, so the page says so. `?new` on the tab
+  (`NewCredential.tsx`) is every field in one card, the same Add
+  project, Create on once every required field is filled and opening
+  the page.
 - **Config › Visuals is a page of cards.** `/admin/config/visuals`
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved

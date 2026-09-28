@@ -3,17 +3,20 @@
 //
 // A credential's fields, drawn alike by New credential and by the cards
 // of its page: a text field with its hint or its refusal, the key file,
-// the methods in one line and the team projects as boxes.
+// the methods in one line, and the projects it is bound to with the
+// picker that adds one.
 
 import {
   HTTP_METHODS,
   type HttpMethod,
 } from "../../../shared/contracts/credential.ts";
 import { credentialKeys } from "../../data/credentials.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { toggledId } from "../../lib/ids.ts";
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
-import { RowsCheck, RowsLine, RowsTitle } from "../../ui/Rows.tsx";
+import { Finder } from "../../ui/Finder.tsx";
+import { RowsCheck, RowsEnd, RowsLine, RowsTitle } from "../../ui/Rows.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { keyOptions, toggledMethod } from "./Credentials.model.ts";
 import "./credentials.css";
@@ -136,8 +139,8 @@ export function MethodsField({
   );
 }
 
-// one line per team project, a box each, edge to edge in a list card
-export function ProjectLines({
+// the projects a credential is bound to, by name, each with a remove
+export function ProjectRows({
   teams,
   value,
   save,
@@ -150,18 +153,60 @@ export function ProjectLines({
 }) {
   return (
     <>
-      {teams.map((p) => (
-        <RowsLine key={p.id} as="label" flush>
-          <RowsCheck
-            name="projectIds"
-            value={p.id}
-            checked={value.includes(p.id)}
-            disabled={save.busy}
-            onChange={() => onChange(toggledId(value, p.id))}
-          />
-          <RowsTitle name={p.name} mono />
-        </RowsLine>
-      ))}
+      {teams
+        .filter((p) => value.includes(p.id))
+        .map((p) => (
+          <RowsLine key={p.id} flush>
+            <RowsTitle name={p.name} mono />
+            <RowsEnd>
+              <button
+                type="button"
+                class="btn-icon credentials-remove"
+                aria-label={`Remove ${p.name}`}
+                title="Remove"
+                disabled={save.busy}
+                onClick={() => onChange(toggledId(value, p.id))}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </RowsEnd>
+          </RowsLine>
+        ))}
     </>
+  );
+}
+
+// Add project: the team projects not bound yet, by name, with a search
+export function AddProject({
+  teams,
+  value,
+  disabled,
+  onChange,
+}: {
+  teams: { id: string; name: string }[];
+  value: string[];
+  disabled: boolean;
+  onChange: (projectIds: string[]) => void;
+}) {
+  return (
+    <Finder
+      label="Projects"
+      trigger={
+        <>
+          <Icon name="plus" size={14} />
+          Add project
+        </>
+      }
+      disabled={disabled}
+      options={teams
+        .filter((p) => !value.includes(p.id))
+        .map((p) => ({ value: p.id, label: p.name }))}
+      mono
+      align="right"
+      placeholder="Find a project"
+      none="No project matches"
+      empty="Every team project is added"
+      onPick={(id) => onChange(toggledId(value, id))}
+    />
   );
 }
