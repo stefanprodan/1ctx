@@ -280,10 +280,14 @@ const dayCursor = (sync?: string): uPlot.Cursor => ({
   points: { show: false },
 });
 
+// the steps of an axis that counts whole things, people or runs
+const WHOLE_STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000];
+
 // Bars over days with their parts stacked, bottom first and without a
-// gap, on one y axis in the units words gives, and a key above them.
-// The day under the cursor keeps its shades while the others fade, and
-// onCursor hears it; a sync key shares the cursor with sparklines.
+// gap, on one y axis in the units words gives, and a key above them
+// when there are two parts or more. The day under the cursor keeps its
+// shades while the others fade, and onCursor hears it; a sync key
+// shares the cursor with sparklines.
 export function DayBars({
   label,
   days,
@@ -292,6 +296,7 @@ export function DayBars({
   onCursor,
   sync,
   stack = "tokens",
+  whole,
 }: {
   // names the table a screen reader reads in place of the plot
   label: string;
@@ -305,6 +310,8 @@ export function DayBars({
   sync?: string;
   // the parts' colours
   stack?: Stack;
+  // counts of whole things: no tick between two
+  whole?: boolean;
 }) {
   const hear = useRef(onCursor);
   hear.current = onCursor;
@@ -329,7 +336,7 @@ export function DayBars({
             x: { time: true, range: padded },
             y: { range: (_u, _min, max) => [0, max > 0 ? max * 1.1 : 1] },
           },
-          axes: dayAxes(say),
+          axes: dayAxes(say, whole ? WHOLE_STEPS : undefined),
           series: [
             {},
             ...Array.from({ length: parts }, (_, k) => {
@@ -357,7 +364,7 @@ export function DayBars({
         el,
       );
     },
-    [parts, sync, stack],
+    [parts, sync, stack, whole],
   );
 
   useLayoutEffect(() => {

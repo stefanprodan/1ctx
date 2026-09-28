@@ -9,7 +9,8 @@ import { dayMonth } from "../lib/format.ts";
 import "./chart.css";
 
 // the key over a day plot, a swatch class a series, and the table a
-// screen reader reads in its place
+// screen reader reads in its place. One series needs no key: the
+// panel's label names it
 export function DayPlot({
   label,
   days,
@@ -27,14 +28,16 @@ export function DayPlot({
 }) {
   return (
     <div class="chart-days">
-      <div class="chart-key" aria-hidden="true">
-        {series.map((s, k) => (
-          <span key={s.label} class="chart-key-item">
-            <span class={`chart-swatch ${swatch(k)}`} />
-            {s.label}
-          </span>
-        ))}
-      </div>
+      {series.length > 1 && (
+        <div class="chart-key" aria-hidden="true">
+          {series.map((s, k) => (
+            <span key={s.label} class="chart-key-item">
+              <span class={`chart-swatch ${swatch(k)}`} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
       <div class="chart-plot" ref={box} aria-hidden="true" />
       <div class="chart-table">
         <table>

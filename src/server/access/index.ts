@@ -15,6 +15,7 @@ import {
   type UsersPort as AuthUsersPort,
   auth,
 } from "./auth.ts";
+import { type BoardUsagePort, boardRoutes } from "./board.ts";
 import {
   type ActivityPort,
   type ProjectsPort as DirectoryProjectsPort,
@@ -81,7 +82,7 @@ export type AccessDeps = {
     DirectoryUsersPort;
   projects: AuthProjectsPort & DirectoryProjectsPort & UsersProjectsPort;
   // the users pages' last 30 days of a personal project
-  usage: UsersUsagePort;
+  usage: UsersUsagePort & BoardUsagePort;
   // a person's posts, chats and manual runs: a closure, since sessions
   // is built after access
   activity: ActivityPort;
@@ -132,6 +133,12 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         projects: deps.projects,
         usage: deps.usage,
+        clock: deps.clock,
+      }),
+      ...boardRoutes({
+        visits,
+        usage: deps.usage,
+        projects: deps.projects,
         clock: deps.clock,
       }),
       ...directoryRoutes({

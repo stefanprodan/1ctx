@@ -12,6 +12,7 @@
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter } from "../../shared/words.ts";
+import { loadAccessBoard } from "../data/access-board.ts";
 import {
   loadAdminProject,
   loadAdminProjects,
@@ -502,12 +503,14 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/admin/access",
-    // a board that lists the zone's pages, until the zone's is designed
     view: lazy(() =>
-      import("../views/admin/ZoneBoard.tsx").then((m) => m.AccessBoard),
+      import("../views/admin/AccessBoard.tsx").then((m) => m.AccessBoard),
     ),
     title: () => "Access",
     role: "admin",
+    load: async () => {
+      await Promise.all([loadAccessBoard(), loadUsers(), loadAdminProjects()]);
+    },
   },
   {
     path: "/admin/access/users",

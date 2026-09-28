@@ -97,6 +97,19 @@ function todayIn(tz: string, now: number): string {
 
 const todayYear = (ms: number) => String(new Date(ms).getUTCFullYear());
 
+const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
+
+// whole days from the user's last visit to their today, both their own
+// dates; null for never
+export function idleDays(
+  user: Pick<AdminUser, "lastVisitDay" | "tz">,
+  now: number,
+): number | null {
+  if (user.lastVisitDay === null) return null;
+  const today = dayMs(todayIn(user.tz, now));
+  return Math.round((today - dayMs(user.lastVisitDay)) / 86_400_000);
+}
+
 // the last day a user used the app against today, both the user's own
 // dates, so a reader in another zone never moves the day: "today",
 // "yesterday", "3d ago", or "never". A visit is kept per day, so an
@@ -105,11 +118,10 @@ export function lastActive(
   user: Pick<AdminUser, "lastVisitDay" | "tz">,
   now: number,
 ): string {
-  if (user.lastVisitDay === null) return "never";
-  const ms = (day: string) => Date.parse(`${day}T00:00:00Z`);
-  const today = ms(todayIn(user.tz, now));
-  const last = ms(user.lastVisitDay);
-  const days = Math.round((today - last) / 86_400_000);
+  const days = idleDays(user, now);
+  if (days === null || user.lastVisitDay === null) return "never";
+  const today = dayMs(todayIn(user.tz, now));
+  const last = dayMs(user.lastVisitDay);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 28) return ago(last, today);

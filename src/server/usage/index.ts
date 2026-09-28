@@ -55,6 +55,7 @@ export type Usage = {
   agentTotal: UsageStore["agentTotal"];
   providerTotal: UsageStore["providerTotal"];
   projectTotal: UsageStore["projectTotal"];
+  activeProjects: UsageStore["activeProjects"];
   decisionTotal: DecisionUsageStore["total"];
   routes: RouteDescriptor[];
 };
@@ -75,6 +76,8 @@ export function usageArea(deps: UsageDeps): Usage {
       store.providerTotal(providerId, since, until),
     projectTotal: (projectId, since, until) =>
       store.projectTotal(projectId, since, until),
+    activeProjects: (ids, since, until) =>
+      store.activeProjects(ids, since, until),
     decisionTotal: (by, since, until) => decisions.total(by, since, until),
     agentDays(agentId, timeZone) {
       const { days, starts, since, until } = usageWindow(

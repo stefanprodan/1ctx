@@ -75,7 +75,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   admins. Deleting one takes its chats and their
   usage and is refused while a chat runs.
   `GET /api/projects/:id/usage` (admin, a team project alone) sums its
-  last 30 days. Anyone who may open a chat
+  last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
+  board's: the users who signed in each of the reader's last 30 days
+  and over them, each visit on its user's own date, and the team
+  projects with a turn or a run. Anyone who may open a chat
   may archive it: every member of a team project, the owner of a
   personal one, and an admin wherever `access.project` lets them see
   it; rename and delete stay the owner's or an admin's. A handler gets a project

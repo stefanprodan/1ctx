@@ -42,6 +42,7 @@ import { m0033 } from "./0033-provider-activity.ts";
 import { m0034 } from "./0034-decision-activity.ts";
 import { m0035 } from "./0035-usage-cost-index.ts";
 import { m0036 } from "./0036-mcp-activity.ts";
+import { m0037 } from "./0037-visits-day.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -80,4 +81,5 @@ export const MIGRATIONS: Migration[] = [
   m0034,
   m0035,
   m0036,
+  m0037,
 ];
