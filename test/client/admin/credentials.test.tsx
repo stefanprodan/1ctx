@@ -411,7 +411,8 @@ describe("the pages", () => {
     const html = render(<CredentialList />);
     expect(html).toContain('href="/admin/config/web/credentials/finnhub"');
     expect(html).toContain('href="/admin/config/web/credentials/github"');
-    expect(html).toContain("The key never reaches the chat.");
+    // no note over the rows while web access is on
+    expect(html).not.toContain("credentials-off");
     expect(html).toContain("https://finnhub.io/api/v1/ · finops");
     expect(html).toContain("http-github.key missing");
     expect(html.match(/rows-meta-bad/g)?.length).toBe(1);
@@ -443,7 +444,6 @@ describe("the pages", () => {
     expect(html).toContain(
       "Web access is off. Credentials sign nothing until it is on.",
     );
-    expect(html).not.toContain("The key never reaches the chat.");
   });
 
   test.serial("an empty list says what New credential takes", () => {

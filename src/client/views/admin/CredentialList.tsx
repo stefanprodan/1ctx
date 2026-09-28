@@ -20,12 +20,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import {
-  keyLine,
-  LIST_NOTE,
-  projectsLine,
-  WEB_OFF_NOTE,
-} from "./Credentials.model.ts";
+import { keyLine, projectsLine, WEB_OFF_NOTE } from "./Credentials.model.ts";
 import "./credentials.css";
 
 export function CredentialList() {
@@ -68,15 +63,12 @@ export function CredentialList() {
             : String(all.length)
       }
     >
-      <RowsNote>
-        {off ? <span class="credentials-off">{WEB_OFF_NOTE}</span> : LIST_NOTE}
-      </RowsNote>
-      {all.length === 0 && (
+      {off && (
         <RowsNote>
-          No credentials yet. New credential takes an http- key file and the URL
-          prefix it signs.
+          <span class="credentials-off">{WEB_OFF_NOTE}</span>
         </RowsNote>
       )}
+      {all.length === 0 && <RowsNote>No credentials yet.</RowsNote>}
       {all.length > 0 && shown.length === 0 && (
         <RowsNote>No credential matches.</RowsNote>
       )}

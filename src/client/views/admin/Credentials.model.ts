@@ -35,8 +35,6 @@ export const HEADER_PLACEHOLDER = "Authorization";
 export const TEMPLATE_PLACEHOLDER = "Bearer {key}";
 export const TEMPLATE_HINT = "The key goes where {key} is";
 export const PREFIX_HINT = "Requests under it are signed. Narrow is better";
-export const LIST_NOTE =
-  "In a chat or run of one of its projects, curl adds the header to URLs under the prefix. The key never reaches the chat.";
 export const WEB_OFF_NOTE =
   "Web access is off. Credentials sign nothing until it is on.";
 
