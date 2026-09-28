@@ -1,5 +1,4 @@
-/* Config › Visuals: the cards stacked, the CDN box in mono, and the
-   limits side by side, one under another on a phone. */
+/* Config › Visuals: the cards stacked, the CDN box in mono. */
 
 @layer tokens, base, owners;
 
@@ -13,22 +12,5 @@
   .visuals-hosts {
     font-family: var(--mono);
     font-size: var(--text-label);
-  }
-  .visuals-limits {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-4);
-  }
-  .visuals-label {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-
-  @media (max-width: 719px) {
-    .visuals-limits {
-      grid-template-columns: minmax(0, 1fr);
-    }
   }
 }

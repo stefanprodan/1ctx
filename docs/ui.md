@@ -90,7 +90,8 @@ client change. What each page draws is in `docs/views.md`.
   inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`.
 - **An object's settings are cards.** An object page's tab (an
-  agent's) and an admin settings page (Config › Visuals) stack
+  agent's) and an admin settings page (Config › Visuals, Web access)
+  stack
   `ui/Setting.tsx` cards, as Vercel's settings: a
   title, one line, the control, and a foot with its hint and its own
   Save, so each card saves apart; `list` puts the title, a count and

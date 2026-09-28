@@ -147,6 +147,25 @@ export function visualCounts(
   return { ...calls, opened: files.opened };
 }
 
+export type WebCounts = { fetches: number; searches: number; failed: number };
+
+// the webfetch and websearch calls in a window; curl in bash is not a
+// tool row of its own, so it is not counted
+export function webCounts(db: Db, since: number, until: number): WebCounts {
+  return db
+    .query<WebCounts, [number, number]>(
+      `select coalesce(sum(tool_name = 'webfetch' and status = 'done'), 0)
+                as fetches,
+              coalesce(sum(tool_name = 'websearch' and status = 'done'), 0)
+                as searches,
+              coalesce(sum(status = 'failed'), 0) as failed
+         from messages
+        where kind = 'tool' and tool_name in ('webfetch', 'websearch')
+          and created_at > ? and created_at <= ?`,
+    )
+    .get(since, until)!;
+}
+
 export type SkillLoads = {
   loads: number;
   reads: number;

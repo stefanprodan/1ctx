@@ -1,5 +1,4 @@
-/* Tools: the schema an open row shows, the boxes of hosts and the
-   limits form. */
+/* Tools: the schema an open row shows and the limits form. */
 
 @layer tokens, base, owners;
 
@@ -27,20 +26,6 @@
     flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-4);
-  }
-
-  /* a box of lines under the card's note, the hosts of Listed
-     domains, so the form gives up its top room */
-  .tools-lines {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: 0 var(--space-4) var(--space-4);
-  }
-  .tools-lines-box {
-    min-height: 120px;
-    font-family: var(--mono);
-    font-size: var(--text-label);
   }
 
   /* the ask before a save that deletes */

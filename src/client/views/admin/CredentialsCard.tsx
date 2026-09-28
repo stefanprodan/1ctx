@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Web tab's Credentials card: a row per HTTP credential, the name
+// Web access's Credentials card: a row per HTTP credential, the name
 // over its prefix, its projects and its key file at the right, marked
 // when the file is missing or cannot be used. New credential opens the
 // form at the top; a row opens to the same fields, Save and Delete

@@ -419,23 +419,30 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 
 ## Admin
 
-- **The Tools page has three tabs,** one view over `/admin/config/tools`
-  (Built-in), `/admin/config/tools/web` and `/admin/config/tools/limits`: Built-in lists every built-in schema, including
+- **The Tools page has two tabs,** one view over `/admin/config/tools`
+  (Built-in) and `/admin/config/tools/limits`: Built-in lists every
+  built-in schema, including
   `bash`, `webfetch` and `websearch`, by name from `tools/catalog.ts`,
   each row `RowsTitle` (the name over the first sentence) with its
   tokens by `wireTokens()` as `RowsMeta`, read-only. An open tool row's
   parameters are cut by `ui/Fold.tsx`, framed.
-- **The Web tab is three cards.**
-  On the page Web is three cards. Web access (`WebAccessCard.tsx`) has
-  its modes, Off, All domains and Listed domains, in the card's head as
-  `RowsFilters` and one `RowsNote` saying what the picked mode means; Off
-  and All domains save on the click, Listed domains opens the hosts box,
-  checked through `parseDomains()` in `shared/web.ts`, and saves the mode
-  with the list. Web search is the providers as radio rows with None
-  first. Credentials
+- **Config › Web access has two tabs,** one view (`WebAccess.tsx`, its
+  tabs and the Access draft in `WebAccess.model.ts`) over
+  `/admin/config/web` (General) and `/admin/config/web/credentials`,
+  a Split whose aside is the last 30 days from `GET /api/usage/web`:
+  webfetch and websearch calls done, and the ones that failed. General
+  is `Setting` cards, nothing saved before Save, the mode and the
+  provider included. Access: the modes, Off, All domains and Listed
+  domains, as a `Seg` in the head, the line following the draft; Listed
+  domains opens the hosts box, checked through `parseDomains()` in
+  `shared/web.ts`, the count in the head, and Save sends the mode with
+  the list. Search: the providers as radio rows with None first, each
+  with its key file. Limits: the web limits (`LimitsSetting.tsx`, the
+  same card as Visuals'). Tools: the `webfetch` and `websearch` rows.
+  Credentials
   (`CredentialsCard.tsx`, its words and bodies in
   `CredentialsCard.model.ts`, the rows and `http-` keys in
-  `data/credentials.ts`, loaded by the Web route) is `Rows`: the name
+  `data/credentials.ts`, loaded by the Web access routes) is `Rows`: the name
   over the prefix and its projects, the key file as `RowsMeta`, `bad`
   when missing or unusable; New credential and an open row are one
   form, the key a `Select` marking unusable and missing files, the
@@ -451,8 +458,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   head, a box of origins one per line checked through
   `parseVisualHosts()` in `shared/visual.ts` (the rule the server's
   `parseHosts()` runs per entry), saved whole. Limits: the visual limits
-  side by side (`useLimitsForm()` from `LimitsCard.tsx` over their
-  names), a changed one's default beside its label. CDNs and Limits have
+  side by side (`LimitsSetting.tsx`, `useLimitsForm()` from
+  `LimitsCard.tsx` over their names), a changed one's default beside its
+  label. CDNs and Limits have
   Use defaults in the head, which fills the draft and saves nothing. The
   cards stay editable while the switch is off. The aside is the last 30
   days from `GET /api/usage/visuals`: visualize calls drawn and failed,
@@ -460,7 +468,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **The Limits tab is a form per scope.** Limit fields are text boxes
   with `inputmode="decimal"`, never number inputs. Limits is a form per
   scope (Per turn, Per call, Knowledge, Scheduled tasks, Chats), each
-  saving only its own limits. A save or a
+  saving only its own limits; the web and visual limits are on their
+  pages. A save or a
   reset that lowers the days archived chats are kept asks in the foot
   first (`deleteAsk()`), Delete then Keep.
 - **Config › MCP Servers.** `/admin/config/mcp` (`McpList.tsx`) is one

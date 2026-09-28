@@ -502,7 +502,7 @@ describe("needs attention", () => {
       attentionRow({ kind: "credential-unusable", name: "gh", at: null }, now),
     ).toMatchObject({
       line: "key file unusable",
-      href: "/admin/config/tools/web",
+      href: "/admin/config/web/credentials",
     });
   });
 });
@@ -609,14 +609,14 @@ describe("the rail", () => {
     const hrefs = [
       "/admin/monitor",
       "/admin/monitor/storage",
-      "/admin/config/tools",
+      "/admin/config/web",
     ];
     expect(litPage("/admin/monitor/storage", hrefs)).toBe(
       "/admin/monitor/storage",
     );
     expect(litPage("/admin/monitor", hrefs)).toBe("/admin/monitor");
-    expect(litPage("/admin/config/tools/web", hrefs)).toBe(
-      "/admin/config/tools",
+    expect(litPage("/admin/config/web/credentials", hrefs)).toBe(
+      "/admin/config/web",
     );
     expect(litPage("/projects", hrefs)).toBeNull();
   });

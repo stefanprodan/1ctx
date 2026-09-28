@@ -70,7 +70,7 @@ import {
   loadSkillUsage,
   skills,
 } from "../data/skills.ts";
-import { loadTools, loadVisualsUsage } from "../data/tools.ts";
+import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers } from "../data/users.ts";
@@ -193,6 +193,11 @@ const userPage = async (username: string) => {
 // the tools page's tabs share one view the same way
 const toolsView = lazy<{ params: Params }>(() =>
   import("../views/admin/Tools.tsx").then((m) => m.Tools),
+);
+
+// and Web access's two
+const webAccessView = lazy<{ params: Params }>(() =>
+  import("../views/admin/WebAccess.tsx").then((m) => m.WebAccess),
 );
 
 // addresses with no page of their own that open another in place
@@ -617,6 +622,24 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    path: "/admin/config/web",
+    view: webAccessView,
+    title: () => "Web access",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadTools(), loadWebUsage(), loadCredentials()]);
+    },
+  },
+  {
+    path: "/admin/config/web/credentials",
+    view: webAccessView,
+    title: () => "Credentials",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadTools(), loadWebUsage(), loadCredentials()]);
+    },
+  },
+  {
     path: "/admin/config/visuals",
     view: lazy(() =>
       import("../views/admin/Visuals.tsx").then((m) => m.Visuals),
@@ -633,15 +656,6 @@ export const ROUTES: Route[] = [
     title: () => "Tools",
     role: "admin",
     load: () => loadTools(),
-  },
-  {
-    path: "/admin/config/tools/web",
-    view: toolsView,
-    title: () => "Web tools",
-    role: "admin",
-    load: async () => {
-      await Promise.all([loadTools(), loadCredentials()]);
-    },
   },
   {
     path: "/admin/config/tools/limits",

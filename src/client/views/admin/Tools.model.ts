@@ -4,19 +4,16 @@
 // What the tools page shows and checks without a DOM: the words of
 // each limit, the unit each row is typed in (seconds for a
 // millisecond cap, KB or MB for a byte cap) and the conversion both
-// ways, the range check the server applies, the lines of the search
-// section, the visual hosts box, the tabs and when a send carries a
-// built-in.
+// ways, the range check the server applies, the visual hosts box, the
+// tabs and when a send carries a built-in.
 
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import {
   DEFAULT_VISUAL_HOSTS,
-  type SearchState,
   type ToolWhen,
 } from "../../../shared/contracts/tool.ts";
 import { parseVisualHosts } from "../../../shared/visual.ts";
-import { parseDomains, type WebAccessMode } from "../../../shared/web.ts";
-import type { LimitName, SearchProvider } from "../../../shared/words.ts";
+import type { LimitName } from "../../../shared/words.ts";
 import { pluralCommas, sentence } from "../../lib/format.ts";
 
 // the label over each field and the line under it
@@ -224,11 +221,10 @@ export function totalTokens(rows: { tokens: number }[]): number {
 }
 
 // the page's tabs, each an address
-type ToolsTab = "builtin" | "web" | "limits";
+type ToolsTab = "builtin" | "limits";
 
 export const TOOLS_TABS: { tab: ToolsTab; label: string; href: string }[] = [
   { tab: "builtin", label: "Built-in", href: "/admin/config/tools" },
-  { tab: "web", label: "Web", href: "/admin/config/tools/web" },
   { tab: "limits", label: "Limits", href: "/admin/config/tools/limits" },
 ];
 
@@ -371,24 +367,6 @@ export function defaultLine(row: LimitRow): string {
   return `default ${show(row, row.default)}${word === "" ? "" : ` ${word}`}`;
 }
 
-// the key file of a provider and whether it is there; every provider
-// answers without one, so a missing file is a rate, not a fault
-export function keyLine(provider: SearchProvider, present: boolean): string {
-  return `search-${provider}.key ${present ? "present" : "keyless"}`;
-}
-
-// what the search section says under the providers
-export function searchLine(state: SearchState, mode: WebAccessMode): string {
-  if (mode === "off") return "Web access is off. websearch is not offered.";
-  if (state.provider === null) return "websearch is not offered.";
-  const line = `websearch runs on ${state.provider}`;
-  if (!state.keys[state.provider]) {
-    const key = `search-${state.provider}.key`;
-    return `${line} keyless. Add ${key} for a higher rate.`;
-  }
-  return `${line}.`;
-}
-
 // what the section says beside the box
 export function hostsLine(hosts: readonly string[]): string {
   return hosts.length === 0
@@ -406,7 +384,7 @@ export function defaultHosts(hosts: readonly string[]): boolean {
 
 // a list's refusal: the line and its entry, or the words alone when the
 // list as a whole is refused
-function lineError(result: {
+export function lineError(result: {
   line: number;
   value: string;
   error: string;
@@ -427,39 +405,4 @@ export function hostsOf(text: string): { hosts: string[] } | { error: string } {
 
 export function hostsFieldOf(message: string): "hosts" | undefined {
   return message.startsWith("hosts ") ? "hosts" : undefined;
-}
-
-// web access: the three modes in the card's head, and what each means
-export const ACCESS_MODES: { value: WebAccessMode; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "all", label: "All domains" },
-  { value: "listed", label: "Listed domains" },
-];
-
-export const ACCESS_WORDS: Record<WebAccessMode, string> = {
-  off: "Agents cannot fetch pages, search the web or use curl.",
-  all: "Agents fetch pages, search the web and use curl in bash, on any address this server reaches.",
-  listed: "Agents fetch pages and use curl in bash, only on these hosts.",
-};
-
-export const DOMAINS_HINT =
-  "One host per line. A subdomain needs its own line.";
-
-// the box as typed to the list a save sends, or the words for its field
-export function domainsOf(
-  text: string,
-): { domains: string[] } | { error: string } {
-  const result = parseDomains(text.split("\n"));
-  if (!result.ok) {
-    return { error: lineError(result) };
-  }
-  if (result.domains.length === 0) return { error: "List at least one host." };
-  return { domains: result.domains };
-}
-
-// a refusal of the web row that names the list belongs to the box
-export function domainsFieldOf(message: string): "domains" | undefined {
-  return message.startsWith("domains ") || message.includes("host")
-    ? "domains"
-    : undefined;
 }
