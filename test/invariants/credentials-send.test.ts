@@ -33,7 +33,7 @@ async function setup() {
   });
   chat.app.automationScheduler.stop();
   const created = await chat.admin.call("POST", "/api/projects", {
-    body: { name: "finops" },
+    body: { name: "finops", description: "A team project." },
   });
   const { project } = await created.json();
   const member = await chat.admin.call(

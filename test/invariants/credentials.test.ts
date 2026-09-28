@@ -35,7 +35,7 @@ async function admin(secrets: Record<string, string> = {}) {
 
 async function team(client: TestClient, name: string): Promise<string> {
   const res = await client.call("POST", "/api/projects", {
-    body: { name, description: "" },
+    body: { name, description: "A team project." },
   });
   expect(res.status).toBe(201);
   return (await res.json()).project.id;

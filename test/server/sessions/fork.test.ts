@@ -97,7 +97,7 @@ async function detail(
 
 async function teamProject(chat: ChatApp): Promise<string> {
   const response = await chat.admin.call("POST", "/api/projects", {
-    body: { name: "fork-team", description: "" },
+    body: { name: "fork-team", description: "A team project." },
   });
   expect(response.status).toBe(201);
   const { project } = await response.json();

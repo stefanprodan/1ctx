@@ -124,7 +124,7 @@ describe("credential preflight", () => {
     // a project the same input makes is known
     check(
       documents(
-        object("Project", "newteam", {}),
+        object("Project", "newteam", { description: "A team project." }),
         credential("quotes", { projects: ["newteam"] }),
       ),
     );
@@ -191,8 +191,8 @@ async function instance(): Promise<TestApp> {
   });
   await app.provision.apply(
     documents(
-      object("Project", "finops", {}),
-      object("Project", "research", {}),
+      object("Project", "finops", { description: "A team project." }),
+      object("Project", "research", { description: "A team project." }),
     ),
     () => {},
   );

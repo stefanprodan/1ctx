@@ -230,7 +230,7 @@ test("project agents answer the skills each agent carries, in name order", async
   const { chat, gitops, plain } = await setup();
   try {
     const created = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "team" },
+      body: { name: "team", description: "A team project." },
     });
     const { project } = await created.json();
     await chat.admin.call("POST", `/api/projects/${project.id}/members`, {

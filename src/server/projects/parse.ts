@@ -36,14 +36,21 @@ function parseDescription(value: unknown): string {
   return value;
 }
 
+// a team project always says what it is for; a personal one may not
+function parseTeamDescription(value: unknown): string {
+  if (value === undefined || value === "") {
+    throw new BadRequest("description is required");
+  }
+  return parseDescription(value);
+}
+
 export function parseCreateProject(
   body: unknown,
 ): Required<CreateProjectRequest> {
   const b = fields(body, ["name", "description"]);
   return {
     name: parseName(b.name),
-    description:
-      b.description === undefined ? "" : parseDescription(b.description),
+    description: parseTeamDescription(b.description),
   };
 }
 
@@ -56,7 +63,7 @@ export function parseUpdateProject(body: unknown): UpdateProjectRequest {
     ...(b.name === undefined ? {} : { name: parseName(b.name) }),
     ...(b.description === undefined
       ? {}
-      : { description: parseDescription(b.description) }),
+      : { description: parseTeamDescription(b.description) }),
   };
 }
 

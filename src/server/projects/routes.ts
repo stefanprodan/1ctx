@@ -5,6 +5,7 @@ import type {
   DeleteProjectResponse,
   ProjectResponse,
   ProjectsResponse,
+  ProjectUsageResponse,
 } from "../../shared/api/projects.ts";
 import type {
   KnowledgeCounts,
@@ -47,6 +48,15 @@ export type KnowledgePort = {
   latest(projectId: string, limit: number): KnowledgeFile[];
 };
 
+// a project's totals over a window, an area built earlier
+export type UsagePort = {
+  projectTotal(
+    projectId: string,
+    since: number,
+    until: number,
+  ): { sends: number; tokens: number; cost: number | null };
+};
+
 export type RoutesDeps = {
   db: Db;
   store: ProjectStore;
@@ -54,8 +64,11 @@ export type RoutesDeps = {
   users: UsersPort;
   sessions: SessionsPort;
   knowledge: KnowledgePort;
+  usage: UsagePort;
   clock: Clock;
 };
+
+const USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 const uniqueName = (error: unknown): boolean =>
   typeof error === "object" &&
@@ -226,6 +239,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           };
         });
         const body: DeleteProjectResponse = { deleted };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/usage",
+      policy: "admin",
+      handle(_req, ctx) {
+        const project = findTeam(ctx.params.id);
+        const until = deps.clock();
+        const since = until - USAGE_WINDOW_MS;
+        const body: ProjectUsageResponse = {
+          since,
+          until,
+          ...deps.usage.projectTotal(project.id, since, until),
+        };
         return json(body);
       },
     },

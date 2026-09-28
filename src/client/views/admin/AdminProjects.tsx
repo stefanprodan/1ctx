@@ -1,147 +1,110 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Team projects: a row each, the name over the member count and since
-// when, all from the list. Opening a row loads the detail for its form.
+// Access › Projects: one card of links, a row per team project by name,
+// the member count under it and since when at the right. New project is
+// in the page's head and opens its own page; a row opens the project's
+// page. Personal projects are counted in the aside, never listed.
 
 import { useSignal } from "@preact/signals";
-import type { ProjectSummary } from "../../../shared/contracts/project.ts";
+import { query } from "../../app/router.ts";
+import { zoneStep } from "../../app/zones.ts";
 import {
-  adminProject,
-  adminProjectError,
   adminProjects,
   adminProjectsError,
-  loadAdminProject,
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
-import { sinceLine } from "../../lib/format.ts";
+import { count, sinceLine } from "../../lib/format.ts";
+import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { matches } from "../../lib/search.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
-  Rows,
-  RowsAdd,
   RowsCard,
+  RowsGo,
   RowsMeta,
-  RowsNew,
   RowsNote,
-  RowsOpen,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
+import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { countLine } from "./AdminProjects.model.ts";
-import { useOpenParam } from "./OpenParam.ts";
-import { ProjectForm } from "./ProjectForm.tsx";
-import "./admin-projects.css";
-import { zoneStep } from "../../app/zones.ts";
-
-function ProjectRow({
-  project,
-  open,
-  onToggle,
-}: {
-  project: ProjectSummary;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const detail = adminProject.value;
-  return (
-    <RowsOpen
-      open={open}
-      onToggle={onToggle}
-      indent="chevron"
-      head={
-        <>
-          <RowsTitle name={project.name} sub={countLine(project)} mono />
-          <RowsMeta>{sinceLine(project)}</RowsMeta>
-        </>
-      }
-    >
-      {detail?.id === project.id ? (
-        <ProjectForm
-          project={detail}
-          users={users.value ?? []}
-          onDone={onToggle}
-        />
-      ) : adminProjectError.value !== null ? (
-        <div class="hint error">{adminProjectError.value}</div>
-      ) : (
-        <div class="hint">Loading</div>
-      )}
-    </RowsOpen>
-  );
-}
+import { NewProject } from "./NewProject.tsx";
 
 export function AdminProjects() {
+  if (new URLSearchParams(query.value).has("new")) return <NewProject />;
+  return <List />;
+}
+
+function List() {
   const list = adminProjects.value;
-  const open = useOpenParam();
-  const adding = useSignal(false);
-  const error = adminProjectsError.value ?? usersError.value;
+  const error = adminProjectsError.value;
   const q = useSignal("");
-  const shown = (list ?? []).filter((project) =>
-    matches(q.value, [project.name]),
-  );
+  const all = list ?? [];
+  const shown = all.filter((p) => matches(q.value, [p.name]));
   return (
     <Page
       steps={[zoneStep("Access")]}
       title="Projects"
-      loading={(list === null || users.value === null) && error === null}
+      split
+      actions={
+        <a class="btn btn-small" href={`${PROJECTS_HREF}?new`}>
+          <Icon name="plus" size={14} />
+          New project
+        </a>
+      }
+      loading={list === null && error === null}
       error={error}
     >
-      <Rows>
-        <RowsCard
-          label="Projects"
-          search={
-            <Search
-              value={q.value}
-              onChange={(next) => {
-                q.value = next;
-              }}
-              placeholder="Search projects"
-            />
-          }
-          action={
-            <RowsAdd
-              label="New project"
-              disabled={adding.value}
-              onClick={() => {
-                adding.value = true;
-                open.value = null;
-              }}
-            />
-          }
-        >
-          {adding.value && (
-            <RowsNew>
-              <ProjectForm
-                project={null}
-                users={users.value ?? []}
-                onDone={() => {
-                  adding.value = false;
+      {list !== null && (
+        <Split aside={<Aside />}>
+          <RowsCard
+            label="Projects"
+            search={
+              <Search
+                value={q.value}
+                onChange={(next) => {
+                  q.value = next;
                 }}
+                placeholder="Search projects"
               />
-            </RowsNew>
-          )}
-          {list?.length === 0 && !adding.value && (
-            <RowsNote>No team projects yet.</RowsNote>
-          )}
-          {q.value.trim() !== "" && shown.length === 0 && (
-            <RowsNote>No projects found</RowsNote>
-          )}
-          {shown.map((project) => (
-            <ProjectRow
-              key={project.id}
-              project={project}
-              open={open.value === project.id}
-              onToggle={() => {
-                const next = open.value === project.id ? null : project.id;
-                open.value = next;
-                adding.value = false;
-                if (next !== null) void loadAdminProject(next);
-              }}
-            />
-          ))}
-        </RowsCard>
-      </Rows>
+            }
+            count={
+              shown.length !== all.length
+                ? `${shown.length} of ${all.length}`
+                : String(all.length)
+            }
+          >
+            {all.length === 0 ? (
+              <RowsNote>No team projects yet.</RowsNote>
+            ) : (
+              shown.length === 0 && <RowsNote>No project matches.</RowsNote>
+            )}
+            {shown.map((p) => (
+              <RowsGo key={p.id} href={adminProjectHref(p.id)}>
+                <RowsTitle name={p.name} sub={countLine(p)} mono />
+                <RowsMeta>{sinceLine(p)}</RowsMeta>
+              </RowsGo>
+            ))}
+          </RowsCard>
+        </Split>
+      )}
     </Page>
+  );
+}
+
+// every user has a personal project, so the users count them
+function Aside() {
+  const people = users.value;
+  const failed = usersError.value !== null;
+  return (
+    <AsideSection label="Projects">
+      <AsideLine label="Team">
+        {count(adminProjects.value?.length ?? 0)}
+      </AsideLine>
+      <AsideLine label="Personal">
+        {people !== null ? count(people.length) : failed ? "Did not load." : ""}
+      </AsideLine>
+    </AsideSection>
   );
 }

@@ -17,6 +17,12 @@ export function adminUserHref(username: string): string {
   return `${USERS_HREF}/${encodeURIComponent(username)}`;
 }
 
+// a team project's admin page, under Access, by id
+export const PROJECTS_HREF = "/admin/access/projects";
+export function adminProjectHref(id: string): string {
+  return `${PROJECTS_HREF}/${encodeURIComponent(id)}`;
+}
+
 export function agentHref(name: string): string {
   return `/agents/${encodeURIComponent(name)}`;
 }

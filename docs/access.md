@@ -69,9 +69,13 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   Admins make, rename, describe, fill and delete team projects; team
   project names are unique. A project's description is one trimmed line
   (`isDescription`) that goes into the system prompt after the agent's
-  prompt, only when set. A team project is open to its members and to
+  prompt, only when set. A team project's is required, on create and
+  on every change (`description is required`); a personal project's
+  may be empty. A team project is open to its members and to
   admins. Deleting one takes its chats and their
-  usage and is refused while a chat runs. Anyone who may open a chat
+  usage and is refused while a chat runs.
+  `GET /api/projects/:id/usage` (admin, a team project alone) sums its
+  last 30 days. Anyone who may open a chat
   may archive it: every member of a team project, the owner of a
   personal one, and an admin wherever `access.project` lets them see
   it; rename and delete stay the owner's or an admin's. A handler gets a project

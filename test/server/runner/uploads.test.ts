@@ -135,7 +135,7 @@ describe("uploads claimed by a send", () => {
       const chat = await chatApp();
       try {
         const projectResponse = await chat.admin.call("POST", "/api/projects", {
-          body: { name: "shared-files", description: "" },
+          body: { name: "shared-files", description: "A team project." },
         });
         expect(projectResponse.status).toBe(201);
         const { project } = await projectResponse.json();

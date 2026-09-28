@@ -329,7 +329,10 @@ describe("scratch lifecycle", () => {
           let projectId = chat.projectId;
           if (otherProject) {
             const response = await chat.admin.call("POST", "/api/projects", {
-              body: { name: "scratch-isolation", description: "" },
+              body: {
+                name: "scratch-isolation",
+                description: "A team project.",
+              },
             });
             expect(response.status).toBe(201);
             projectId = (await response.json()).project.id;

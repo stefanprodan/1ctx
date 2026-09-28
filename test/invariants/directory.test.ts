@@ -47,7 +47,7 @@ const loaded = (
 
 async function team(chat: ChatApp, name: string, members: string[]) {
   const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
+    body: { name, description: "A team project." },
   });
   expect(res.status).toBe(201);
   const { project } = await res.json();

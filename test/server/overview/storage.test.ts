@@ -59,7 +59,7 @@ async function relogin(chat: ChatApp) {
 
 async function team(chat: ChatApp, name: string): Promise<string> {
   const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
+    body: { name, description: "A team project." },
   });
   expect(res.status).toBe(201);
   const { project } = await res.json();

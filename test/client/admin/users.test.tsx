@@ -394,7 +394,7 @@ describe("the pages", () => {
     expect(html).toContain("Forbidden.");
   });
 
-  test("New user asks who, the role and the password twice", () => {
+  test("New user asks who, the role and the password once", () => {
     users.value = [root];
     const html = render(<NewUser />);
     expect(html).toContain("Create user");

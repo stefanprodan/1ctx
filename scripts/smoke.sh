@@ -79,6 +79,7 @@ kind: Project
 metadata:
   name: smoke-team
 spec:
+  description: The smoke test team.
   members: [admin]
 YAML
 printf 'not an object\n' >"$RUN/config/README.txt"

@@ -74,7 +74,7 @@ async function makeUser(
 }
 async function createTeam(chat: ChatApp, name: string): Promise<ProjectDetail> {
   const res = await chat.admin.call("POST", "/api/projects", {
-    body: { name },
+    body: { name, description: "A team project." },
   });
   expect(res.status).toBe(201);
   return (await res.json()).project;
@@ -146,7 +146,7 @@ describe("team project administration", () => {
     const chat = await chatApp();
     // every personal project is named personal, so a team may not be
     const reserved = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "personal" },
+      body: { name: "personal", description: "A team project." },
     });
     expect(reserved.status).toBe(409);
     expect(await reserved.json()).toEqual({ error: "name is taken" });
@@ -156,7 +156,7 @@ describe("team project administration", () => {
     expect((await createTeam(chat, "a".repeat(80))).name).toHaveLength(80);
     for (const name of ["on.call", "On-call", "a".repeat(81)]) {
       const refused = await chat.admin.call("POST", "/api/projects", {
-        body: { name },
+        body: { name, description: "A team project." },
       });
       expect(refused.status).toBe(400);
       expect((await refused.json()).error).toBe(
@@ -167,7 +167,7 @@ describe("team project administration", () => {
     expect(
       (
         await chat.admin.call("POST", "/api/projects", {
-          body: { name: "ops" },
+          body: { name: "ops", description: "A team project." },
         })
       ).status,
     ).toBe(409);
@@ -236,7 +236,7 @@ describe("team project administration", () => {
     });
     chat.app.socket.dispose();
   });
-  test("a description is set on create, changed alone, and checked", async () => {
+  test("a team project needs a description, a personal one may not", async () => {
     const chat = await chatApp();
     const made = await chat.admin.call("POST", "/api/projects", {
       body: { name: "ops", description: "Incidents and pages" },
@@ -244,14 +244,24 @@ describe("team project administration", () => {
     expect(made.status).toBe(201);
     const ops: ProjectDetail = (await made.json()).project;
     expect(ops.description).toBe("Incidents and pages");
-    expect((await createTeam(chat, "other")).description).toBe("");
-    const changed = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+    for (const body of [
+      { name: "other" },
+      { name: "other", description: "" },
+    ]) {
+      const refused = await chat.admin.call("POST", "/api/projects", { body });
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toBe("description is required");
+    }
+    const cleared = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
       body: { description: "" },
     });
-    expect(changed.status).toBe(200);
-    expect((await changed.json()).project).toMatchObject({
-      name: "ops",
-      description: "",
+    expect(cleared.status).toBe(400);
+    const renamed = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
+      body: { name: "pager" },
+    });
+    expect((await renamed.json()).project).toMatchObject({
+      name: "pager",
+      description: "Incidents and pages",
     });
     for (const description of [" padded", "two\nlines", "x".repeat(281), 7]) {
       const bad = await chat.admin.call("PATCH", `/api/projects/${ops.id}`, {
@@ -263,6 +273,10 @@ describe("team project administration", () => {
       body: {},
     });
     expect(empty.status).toBe(400);
+    const own = await chat.member.call("PATCH", "/api/profile/project", {
+      body: { description: "" },
+    });
+    expect(own.status).toBe(200);
     chat.app.socket.dispose();
   });
 

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The admin's team projects: the list its page opens, the detail of the
-// row being edited, and the five writes. A write keeps the server's
-// detail and reloads the shared project list so the rail follows it.
+// project page on screen, its last 30 days, and the writes. A write
+// keeps the server's detail and reloads the shared project list so the
+// rail follows it.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -12,6 +13,7 @@ import type {
   DeleteProjectResponse,
   ProjectResponse,
   ProjectsResponse,
+  ProjectUsageResponse,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
@@ -20,7 +22,7 @@ import type {
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
 import { loadProjects } from "./projects.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -29,10 +31,27 @@ export const adminProjects = signal<ProjectSummary[] | null>(null);
 export const adminProjectsError = signal<Failure | null>(null);
 export const adminProject = signal<ProjectDetail | null>(null);
 export const adminProjectError = signal<Failure | null>(null);
+// by project id: null for a read that failed, missing until it answers
+export const projectUsage = signal<Record<string, ProjectUsageResponse | null>>(
+  {},
+);
 
 let owner: string | null = null;
 let listTurn = 0;
 let detailTurn = 0;
+// every project read or written, so a page seen before draws at once
+const seen = new Map<string, ProjectDetail>();
+
+// the users list keeps each user's projects: it hears every membership
+// the server answers, without this module importing it
+type MembersListener = (projectId: string, memberIds: string[]) => void;
+const membersListeners: MembersListener[] = [];
+export function onProjectMembers(fn: MembersListener): void {
+  membersListeners.push(fn);
+}
+const heard = (projectId: string, memberIds: string[]) => {
+  for (const fn of membersListeners) fn(projectId, memberIds);
+};
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -44,6 +63,8 @@ effect(() => {
   adminProjectsError.value = null;
   adminProject.value = null;
   adminProjectError.value = null;
+  projectUsage.value = {};
+  seen.clear();
 });
 
 const byName = (a: ProjectSummary, b: ProjectSummary) =>
@@ -77,33 +98,51 @@ export async function loadAdminProject(id: string): Promise<void> {
   const forUser = owner;
   const turn = ++detailTurn;
   adminProjectError.value = null;
-  if (adminProject.value !== null && adminProject.value.id !== id) {
-    adminProject.value = null;
-  }
+  if (adminProject.value?.id !== id) adminProject.value = seen.get(id) ?? null;
   try {
     const body = await api<ProjectResponse>(
       `/api/projects/${encodeURIComponent(id)}`,
     );
     if (owner === forUser && detailTurn === turn) {
       adminProject.value = body.project;
+      seen.set(id, body.project);
     }
   } catch (err) {
     if (owner === forUser && detailTurn === turn) {
+      // deleted meanwhile, from another tab: it leaves the list too
+      if (err instanceof ApiError && err.status === 404) drop(id);
       adminProjectError.value = failure(err);
     }
   }
+}
+
+function drop(id: string): void {
+  listTurn++;
+  seen.delete(id);
+  if (adminProjects.value !== null) {
+    adminProjects.value = adminProjects.value.filter((p) => p.id !== id);
+  }
+  if (adminProject.value?.id === id) adminProject.value = null;
 }
 
 function take(project: ProjectDetail, forUser: string | null): void {
   if (owner !== forUser) return;
   listTurn++;
   detailTurn++;
+  seen.set(project.id, project);
   adminProject.value = project;
   adminProjectError.value = null;
-  adminProjects.value = [
-    ...(adminProjects.value ?? []).filter((p) => p.id !== project.id),
-    summary(project),
-  ].sort(byName);
+  // a list never loaded stays unloaded: one row would pass for all
+  if (adminProjects.value !== null) {
+    adminProjects.value = [
+      ...adminProjects.value.filter((p) => p.id !== project.id),
+      summary(project),
+    ].sort(byName);
+  }
+  heard(
+    project.id,
+    project.members.map((m) => m.id),
+  );
 }
 
 async function followRail(forUser: string | null): Promise<void> {
@@ -135,54 +174,140 @@ export async function updateProject(
   return project;
 }
 
+// a project another tab deleted is gone all the same; the rail follows
+// without holding the page, which leaves as the list drops the row
 export async function deleteProject(id: string): Promise<number> {
   const forUser = owner;
-  const { deleted } = await api<DeleteProjectResponse>(
-    `/api/projects/${encodeURIComponent(id)}`,
-    "DELETE",
-  );
-  if (owner === forUser) {
-    listTurn++;
-    detailTurn++;
-    adminProjects.value = (adminProjects.value ?? []).filter(
-      (p) => p.id !== id,
-    );
-    if (adminProject.value?.id === id) adminProject.value = null;
-    adminProjectError.value = null;
+  let deleted = 0;
+  try {
+    ({ deleted } = await api<DeleteProjectResponse>(
+      `/api/projects/${encodeURIComponent(id)}`,
+      "DELETE",
+    ));
+  } catch (err) {
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
   }
-  await followRail(forUser);
+  if (owner === forUser) {
+    detailTurn++;
+    drop(id);
+    adminProjectError.value = null;
+    heard(id, []);
+  }
+  void followRail(forUser);
   return deleted;
+}
+
+// a membership already as asked, which another tab or page made so, is
+// done: false tells the caller its detail is behind
+const already = (err: unknown, words: string) =>
+  err instanceof ApiError &&
+  err.status === 409 &&
+  err.message.toLowerCase().includes(words);
+
+async function add(
+  id: string,
+  body: AddMemberRequest,
+  forUser: string | null,
+): Promise<boolean> {
+  try {
+    const { project } = await api<ProjectResponse>(
+      `/api/projects/${encodeURIComponent(id)}/members`,
+      "POST",
+      body,
+    );
+    take(project, forUser);
+    return true;
+  } catch (err) {
+    if (already(err, "already a member")) return false;
+    throw err;
+  }
+}
+
+async function remove(
+  id: string,
+  userId: string,
+  forUser: string | null,
+): Promise<boolean> {
+  try {
+    const { project } = await api<ProjectResponse>(
+      `/api/projects/${encodeURIComponent(id)}/members/${encodeURIComponent(
+        userId,
+      )}`,
+      "DELETE",
+    );
+    take(project, forUser);
+    return true;
+  } catch (err) {
+    if (already(err, "not a member")) return false;
+    throw err;
+  }
 }
 
 export async function addProjectMember(
   id: string,
   body: AddMemberRequest,
-): Promise<ProjectDetail> {
+): Promise<void> {
   const forUser = owner;
-  const { project } = await api<ProjectResponse>(
-    `/api/projects/${encodeURIComponent(id)}/members`,
-    "POST",
-    body,
-  );
-  take(project, forUser);
+  await add(id, body, forUser);
   await followRail(forUser);
-  return project;
 }
 
 export async function removeProjectMember(
   id: string,
   userId: string,
-): Promise<ProjectDetail> {
+): Promise<void> {
   const forUser = owner;
-  const { project } = await api<ProjectResponse>(
-    `/api/projects/${encodeURIComponent(id)}/members/${encodeURIComponent(
-      userId,
-    )}`,
-    "DELETE",
-  );
-  take(project, forUser);
+  await remove(id, userId, forUser);
   await followRail(forUser);
-  return project;
+}
+
+// the members as the project page's card drafts them: the adds, then
+// the removes, one at a time. Each answer is the detail, so the calls
+// before a refusal show and the refusal is what the card says. A
+// refusal, or a membership found already as asked, rereads the detail,
+// since another tab's change, which no frame tells this one, is what
+// either most often means
+export async function setProjectMembers(
+  project: ProjectDetail,
+  userIds: string[],
+): Promise<void> {
+  const forUser = owner;
+  const had = project.members.map((m) => m.id);
+  let failed: unknown = null;
+  let behind = false;
+  try {
+    for (const userId of userIds) {
+      if (!had.includes(userId)) {
+        behind = !(await add(project.id, { userId }, forUser)) || behind;
+      }
+    }
+    for (const userId of had) {
+      if (!userIds.includes(userId)) {
+        behind = !(await remove(project.id, userId, forUser)) || behind;
+      }
+    }
+  } catch (err) {
+    failed = err;
+  }
+  if ((failed !== null || behind) && owner === forUser) {
+    await loadAdminProject(project.id);
+  }
+  await followRail(forUser);
+  if (failed !== null) throw failed;
+}
+
+// a failure is the aside's "Did not load", never the page's
+export async function loadProjectUsage(id: string): Promise<void> {
+  const forUser = owner;
+  let usage: ProjectUsageResponse | null = null;
+  try {
+    usage = await api<ProjectUsageResponse>(
+      `/api/projects/${encodeURIComponent(id)}/usage`,
+    );
+  } catch {}
+  if (owner === forUser) {
+    projectUsage.value = { ...projectUsage.value, [id]: usage };
+  }
 }
 
 function onAccessChanged(event: SocketEvent): void {
