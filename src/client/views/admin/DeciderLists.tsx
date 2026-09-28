@@ -138,7 +138,12 @@ function Deciders() {
                     }
                     sub={d.model}
                   />
-                  <RowsMeta keep under={deciderMeta(d)}>
+                  <RowsMeta
+                    keep
+                    under={
+                      <span class="decider-list-facts">{deciderMeta(d)}</span>
+                    }
+                  >
                     <span class="decider-list-provider cut">
                       {providerName(d)}
                     </span>

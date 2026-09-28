@@ -269,13 +269,14 @@ describe("the Web access page", () => {
     expect(html).toMatch(/value="none" checked/);
   });
 
-  test.serial("Credentials: the list's card, the count on its tab", () => {
+  test.serial("Credentials: the list's card, no count on an empty tab", () => {
     tools.value = response();
     limits.value = rows;
     credentials.value = [];
     path.value = "/admin/config/web/credentials";
     const html = render(<WebAccess />);
-    expect(html).toMatch(/Credentials<span class="tabs-count">0</);
+    expect(html).toContain("Credentials</a>");
+    expect(html).not.toContain("tabs-count");
     // General stays drawn, hidden, so its drafts outlive the look
     expect(html).toContain('class="web-access-cards web-access-away"');
     expect(html).toContain("setting-title");

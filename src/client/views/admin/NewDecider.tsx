@@ -116,12 +116,7 @@ function Form({ providerId }: { providerId: string }) {
       </label>
       <div class="decider-page-new-model">
         <span class="label">Model</span>
-        <DeciderModelFields
-          drafts={d}
-          save={save}
-          currentId={null}
-          autofocus={false}
-        />
+        <DeciderModelFields drafts={d} save={save} currentId={null} />
       </div>
     </NewCard>
   );

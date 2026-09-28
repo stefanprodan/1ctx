@@ -23,7 +23,7 @@ import { Search } from "../../ui/Search.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { TopSection, UsageSection } from "./AdminAside.tsx";
 import { NewSkill } from "./NewSkill.tsx";
-import { LoadLines } from "./SkillPage.tsx";
+import { LoadLines } from "./SkillLoads.tsx";
 import { carriersOf } from "./Skills.model.ts";
 
 export function SkillList() {

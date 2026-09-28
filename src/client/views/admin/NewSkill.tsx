@@ -7,6 +7,7 @@ import type {
   SkillSummary,
 } from "../../../shared/contracts/skill.ts";
 import { address, navigate } from "../../app/router.ts";
+import { zoneStep } from "../../app/zones.ts";
 import {
   addSkill,
   discoverSkills,
@@ -26,7 +27,6 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { NewCard } from "./NewCard.tsx";
-import { SKILL_STEPS } from "./SkillPage.tsx";
 import {
   formKind,
   pathProblem,
@@ -36,11 +36,13 @@ import {
 } from "./Skills.model.ts";
 import "./skill-page.css";
 
+const STEPS = [zoneStep("Config"), { label: "Skills", href: SKILLS_HREF }];
+
 export function NewSkill() {
   const error = skillsError.value;
   return (
     <Page
-      steps={SKILL_STEPS}
+      steps={STEPS}
       title="Add skill"
       loading={skills.value === null && error === null}
       error={error}

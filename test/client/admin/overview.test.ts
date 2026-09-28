@@ -263,8 +263,6 @@ describe("the last 30 days", () => {
       "13 Sep · 1 run · 1 decision",
     );
     expect(runsTile(totals({ runs: 10 }), null).sub).toBe("none failed");
-    // the Monitor gives them their own tile
-    expect(runsTile(t, null, false).sub).toBe("none failed");
   });
 
   test("the decisions tile counts them and the tokens they read", () => {

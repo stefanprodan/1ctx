@@ -20,6 +20,7 @@ import { tools } from "../../data/tools.ts";
 import { ago, pluralCommas } from "../../lib/format.ts";
 import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
+import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { RowsNote } from "../../ui/Rows.tsx";
 import {
@@ -45,7 +46,6 @@ import {
   WEB_OFF_NOTE,
 } from "./Credentials.model.ts";
 import { type DraftCard, useDraftCard } from "./DraftCard.tsx";
-import { holding } from "./drafts.ts";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
 
@@ -112,10 +112,9 @@ function Body({ credential }: { credential: CredentialSummary }) {
         title={`Delete ${credential.name}`}
         line={deleteLine(credential)}
         ask={`Delete ${credential.name}?`}
-        // a card's save in flight could put the row back
-        off={saving.value}
-        // and a save during the delete would 404
-        onDelete={() => holding(saving, () => deleteCredential(credential.id))}
+        // a save in flight could put the row back, one during it would 404
+        lock={saving}
+        onDelete={() => deleteCredential(credential.id)}
         leaveTo={CREDENTIALS_HREF}
       />
     </SettingStack>
@@ -231,7 +230,7 @@ function ProjectsCard(props: CardProps) {
     <CardForm card={card} keys={PROJECTS}>
       <Setting
         title="Projects"
-        count={String(ids.length)}
+        count={countOf(ids.length, ids.length)}
         line="Chats and runs in these projects can use it."
         list
         action={

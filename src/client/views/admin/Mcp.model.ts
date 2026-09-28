@@ -8,13 +8,14 @@ import type {
 } from "../../../shared/contracts/mcp.ts";
 import { classify, serverBlock } from "../../../shared/mcp.ts";
 import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
-import { ago, plural, pluralCommas } from "../../lib/format.ts";
+import { ago, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
 
 export function changeLine(change: McpChange | null, now: number): string {
   if (change === null) return "";
   const parts: string[] = [];
-  const word = (n: number, what: string) => `${plural(n, "tool")} ${what}`;
+  const word = (n: number, what: string) =>
+    `${n} ${n === 1 ? "tool" : "tools"} ${what}`;
   if (change.added.length > 0) parts.push(word(change.added.length, "added"));
   if (change.removed.length > 0) {
     parts.push(

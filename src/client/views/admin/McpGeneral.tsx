@@ -16,7 +16,7 @@ import {
   patchServer,
   refreshServer,
 } from "../../data/mcp.ts";
-import { ago, commas, plural, showAll } from "../../lib/format.ts";
+import { ago, commas, showAll } from "../../lib/format.ts";
 import { configAgentHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { at, useAction, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
@@ -126,7 +126,7 @@ function About({ server, now }: { server: McpServerSummary; now: number }) {
           {server.protocolVersion || "unknown"}
         </SettingFact>
         <SettingFact label="Tools">
-          {`${plural(server.tools.length, "tool")}, listed ${ago(server.checkedAt, now)}`}
+          {`${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}, listed ${ago(server.checkedAt, now)}`}
         </SettingFact>
         {server.lastChange !== null && (
           <SettingFact label="Last change">

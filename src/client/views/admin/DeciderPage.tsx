@@ -109,7 +109,7 @@ export function DeciderPage({ params }: { params: Params }) {
                 askedBy(decider, decisions.value ?? []).length,
               )}
               ask={`Delete ${decider.name}?`}
-              off={drafts.saving.value}
+              lock={drafts.saving}
               onDelete={async () => {
                 await deleteDecider(decider.id);
                 // a decision that named it names none now

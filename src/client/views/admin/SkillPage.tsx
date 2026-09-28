@@ -1,14 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SkillCounts } from "../../../shared/api/skills.ts";
 import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { skills, skillsError, skillUsage } from "../../data/skills.ts";
-import { count } from "../../lib/format.ts";
 import {
   configSkillHref,
   SKILLS_HREF,
@@ -17,18 +15,16 @@ import {
 import { useNow } from "../../lib/now.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
-import { AsideLine, Split } from "../../ui/Split.tsx";
+import { Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { TopSection, UsageSection } from "./AdminAside.tsx";
 import { refreshLine } from "./refresh.ts";
 import { SkillFiles } from "./SkillFiles.tsx";
 import { SkillGeneral } from "./SkillGeneral.tsx";
+import { LoadLines } from "./SkillLoads.tsx";
 import "./skill-page.css";
 
-export const SKILL_STEPS = [
-  zoneStep("Config"),
-  { label: "Skills", href: SKILLS_HREF },
-];
+const STEPS = [zoneStep("Config"), { label: "Skills", href: SKILLS_HREF }];
 
 // by index, so a skill named files opens on General
 export function skillTabOf(pathname: string): SkillTab {
@@ -43,7 +39,7 @@ export function SkillPage({ params }: { params: Params }) {
   const tab = skillTabOf(path.value);
   return (
     <Page
-      steps={SKILL_STEPS}
+      steps={STEPS}
       title={params.name}
       titleMono
       menu={
@@ -102,16 +98,6 @@ function Body({ skill, tab }: { skill: SkillSummary; tab: SkillTab }) {
       {tab === "general" && <SkillGeneral skill={skill} now={now} />}
       {tab === "files" && <SkillFiles skill={skill} />}
     </SettingStack>
-  );
-}
-
-export function LoadLines({ counts }: { counts: SkillCounts }) {
-  return (
-    <>
-      <AsideLine label="Loads">{count(counts.loads)}</AsideLine>
-      <AsideLine label="File reads">{count(counts.reads)}</AsideLine>
-      <AsideLine label="Failed">{count(counts.failed)}</AsideLine>
-    </>
   );
 }
 

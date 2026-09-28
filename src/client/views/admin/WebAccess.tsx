@@ -73,7 +73,8 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
   const rows = limits.value;
   const error =
     toolsError.value ?? (tab === "credentials" ? credentialsError.value : null);
-  const listed = credentials.value?.length;
+  // an empty list says no count
+  const listed = credentials.value?.length || undefined;
   return (
     <Page
       steps={[zoneStep("Config")]}

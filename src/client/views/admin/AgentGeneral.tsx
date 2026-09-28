@@ -36,7 +36,7 @@ export function AgentGeneral({
         title={`Delete @${agent.name}`}
         line={deleteLine(factsFor(agent.id)?.impact ?? null)}
         ask={`Delete @${agent.name}?`}
-        off={drafts.saving.value}
+        lock={drafts.saving}
         onAsk={() => loadFacts(agent.name)}
         onDelete={() => deleteAgent(agent.id)}
         leaveTo={AGENTS_HREF}

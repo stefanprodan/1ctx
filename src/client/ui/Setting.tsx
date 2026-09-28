@@ -157,6 +157,7 @@ export function SettingDelete({
   line,
   ask,
   off,
+  lock,
   onAsk,
   onDelete,
   leaveTo,
@@ -164,8 +165,10 @@ export function SettingDelete({
   title: string;
   line: ComponentChildren;
   ask: string;
-  // in use, or another card saving
+  // in use
   off?: boolean;
+  // the page's saving flag: set while the delete runs, so no card saves
+  lock?: Signal<boolean>;
   onAsk?: () => Promise<void>;
   // throws to refuse
   onDelete: () => Promise<void>;
@@ -184,7 +187,7 @@ export function SettingDelete({
             <AskDelete
               save={save}
               asking={asking}
-              busy={save.busy || off === true}
+              busy={save.busy || off === true || lock?.value === true}
               words={ask}
               wordsClass="setting-ask"
               onAsk={onAsk}
@@ -193,7 +196,12 @@ export function SettingDelete({
               onDelete={() => {
                 void save.act("delete", async () => {
                   const from = address();
-                  await onDelete();
+                  if (lock) lock.value = true;
+                  try {
+                    await onDelete();
+                  } finally {
+                    if (lock) lock.value = false;
+                  }
                   if (address() === from) navigate(leaveTo);
                 });
               }}

@@ -14,12 +14,10 @@ export function DeciderModelFields({
   drafts: d,
   save,
   currentId,
-  autofocus,
 }: {
   drafts: DeciderDrafts;
   save: Save;
   currentId: string | null;
-  autofocus?: boolean;
 }) {
   const search = useRef<CatalogSearch | null>(null);
   if (search.current === null) {
@@ -40,7 +38,7 @@ export function DeciderModelFields({
       cancellable={d.cancellable}
       currentId={currentId}
       matchMeta={deciderMeta}
-      autofocus={autofocus}
+      autofocus={false}
       onChange={() => d.change()}
       onCancel={() => d.cancel()}
       onProvider={(id) => d.chooseProvider(id)}

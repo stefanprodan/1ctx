@@ -156,7 +156,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   runsPerUser: {
     label: "Runs per user",
-    text: "Runs one person may have going at once.",
+    text: "Runs one user may have going at once.",
   },
   runsRunning: {
     label: "Runs at once",

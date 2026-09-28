@@ -9,5 +9,9 @@
 
   .decider-list-provider {
     max-width: 200px;
+    font-family: var(--mono);
+  }
+  .decider-list-facts {
+    font-family: var(--mono);
   }
 }

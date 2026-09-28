@@ -7,7 +7,7 @@ import type {
   McpToolSummary,
 } from "../../../shared/contracts/mcp.ts";
 import { decide, type Patterns, type ToolSide } from "../../../shared/mcp.ts";
-import { firstSentence, plural } from "../../lib/format.ts";
+import { firstSentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import type { Save } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
@@ -100,7 +100,6 @@ export function McpTools({
         label="Tools"
         search={<Search query={d.q} placeholder="Search tools" />}
         count={countOf(shown.length, n)}
-        wrap
       >
         {n === 0 ? (
           <RowsNote>The server listed no tools.</RowsNote>
@@ -197,7 +196,7 @@ function MatcherLine({
               class={`tag mcp-page-chip${m.matches ? "" : " mcp-page-chip-none"}`}
               title={
                 m.matches
-                  ? `${m.pattern} decides ${plural(m.decides, "tool")}`
+                  ? `${m.pattern} decides ${m.decides} ${m.decides === 1 ? "tool" : "tools"}`
                   : `${m.pattern} matches no tool`
               }
             >

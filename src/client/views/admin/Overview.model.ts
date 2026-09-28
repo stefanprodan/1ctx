@@ -125,17 +125,13 @@ export function turnsTile(totals: OverviewTotals, at: OverviewDay | null) {
 }
 
 // Usage has no Decisions tile, so its decisions ride with the runs
-export function runsTile(
-  totals: OverviewTotals,
-  at: OverviewDay | null,
-  withDecisions = true,
-) {
+export function runsTile(totals: OverviewTotals, at: OverviewDay | null) {
   const t = at ?? totals;
   const line = at
     ? pluralCommas(at.runs, "run", "runs") + failedOn(at.runsFailed)
     : failedLine(totals.runsFailed, totals.runs);
   const words =
-    withDecisions && t.decisions > 0
+    t.decisions > 0
       ? `${line} · ${pluralCommas(t.decisions, "decision", "decisions")}`
       : line;
   return {

@@ -50,7 +50,6 @@ import {
   projectFieldOf,
 } from "./AdminProjects.model.ts";
 import { useDraftCard } from "./DraftCard.tsx";
-import { holding } from "./drafts.ts";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
 
@@ -128,11 +127,10 @@ function Body({ project }: { project: ProjectDetail }) {
         title={`Delete ${project.name}`}
         line={deleteLine(project)}
         ask={`Delete ${project.name}?`}
-        // a card's save in flight could put the project back
-        off={saving.value}
-        // and a save during the delete would 404
+        // a save in flight could put the project back, one during it would 404
+        lock={saving}
         onDelete={async () => {
-          await holding(saving, () => deleteProject(project.id));
+          await deleteProject(project.id);
         }}
         leaveTo={PROJECTS_HREF}
       />

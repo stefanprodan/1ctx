@@ -120,11 +120,12 @@ export function AskDelete({
 }) {
   useEffect(() => {
     if (!asking.value) return;
+    // on window: an open picker stops its Escape on the document first
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") asking.value = false;
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [asking.value]);
   if (!asking.value) {
     return (
