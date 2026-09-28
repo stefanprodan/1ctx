@@ -56,19 +56,19 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   maxFetches: {
     label: "Fetches per turn",
-    text: "webfetch calls a turn may make. Zero keeps the tool but spends nothing.",
+    text: "webfetch calls in one turn. More are refused.",
   },
   maxSearches: {
     label: "Searches per turn",
-    text: "websearch calls a turn may make. Zero keeps the tool but spends nothing.",
+    text: "websearch calls in one turn. More are refused.",
   },
   fetchBodyBytes: {
-    label: "Fetch body",
-    text: "Bytes a fetched page is read up to.",
+    label: "Response size",
+    text: "Largest answer from webfetch, curl or an MCP tool.",
   },
   searchBodyBytes: {
     label: "Search body",
-    text: "Bytes a search answer is read up to.",
+    text: "The largest answer a search provider may return.",
   },
   visualBytes: {
     label: "Visual size",
@@ -84,7 +84,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   fetchDeadlineMs: {
     label: "Fetch deadline",
-    text: "How long one page request may take.",
+    text: "How long one webfetch or curl request may take.",
   },
   searchDeadlineMs: {
     label: "Search deadline",
