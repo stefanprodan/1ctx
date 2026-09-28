@@ -80,8 +80,10 @@ const rows: LimitRow[] = [
 
 describe("the Visuals words", () => {
   test("the line says what the saved switch does", () => {
-    expect(visualsLine(true)).toContain("Agents may draw");
-    expect(visualsLine(false)).toContain("as code");
+    expect(visualsLine(true)).toBe(
+      "Allows agents to draw HTML and SVG visuals.",
+    );
+    expect(visualsLine(false)).toBe("In-line visualizations are disabled.");
   });
 
   test("the box is dirty only when its origins differ", () => {

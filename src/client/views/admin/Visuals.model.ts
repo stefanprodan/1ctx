@@ -15,11 +15,11 @@ export const VISUAL_LIMITS: readonly LimitName[] = [
   "maxVisuals",
 ];
 
-// the saved state: what an agent and `open` do with HTML and SVG
+// the saved state
 export function visualsLine(on: boolean): string {
   return on
-    ? "Agents may draw HTML and SVG visuals, and open draws HTML and SVG files."
-    : "No agent draws visuals, and open shows HTML and SVG files as code.";
+    ? "Allows agents to draw HTML and SVG visuals."
+    : "In-line visualizations are disabled.";
 }
 
 export function hostsText(
