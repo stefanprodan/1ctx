@@ -77,7 +77,6 @@ function Form() {
   const w = who.value;
   const username = w.username.trim();
   const taken = (users.value ?? []).some((u) => u.username === username);
-  const _invalid = (field: string) => save.fieldError(field) !== null;
   return (
     <form
       class="users-page"

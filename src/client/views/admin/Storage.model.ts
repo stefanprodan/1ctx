@@ -23,7 +23,7 @@ import {
   size,
   sizeParts,
 } from "../../lib/format.ts";
-import { automationHref, chatHref } from "../../lib/hrefs.ts";
+import { adminProjectHref, automationHref, chatHref } from "../../lib/hrefs.ts";
 
 export const AREA_NAMES: Record<StorageAreaKey, string> = {
   chats: "Chats",
@@ -210,9 +210,7 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
       name: personal ? `personal of @${row.owner}` : (row.name ?? ""),
       mono: !personal,
       sub: partWords(row, 2).join(" · "),
-      href: personal
-        ? null
-        : `/admin/access/projects?open=${encodeURIComponent(row.id ?? "")}`,
+      href: personal ? null : adminProjectHref(row.id ?? ""),
     };
   }
   if (kind === "chats") {

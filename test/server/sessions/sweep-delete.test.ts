@@ -256,7 +256,7 @@ describe("usage is permanent", () => {
     const dropped = await createAutomation(chat, { name: "dropped" });
     await ran(chat, dropped.id);
     const created = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "ops" },
+      body: { name: "ops", description: "A team project." },
     });
     expect(created.status).toBe(201);
     const team = (await created.json()).project.id as string;

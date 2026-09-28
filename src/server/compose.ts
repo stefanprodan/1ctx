@@ -250,6 +250,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       counts: (projectId) => knowledge.counts(projectId),
       latest: (projectId, limit) => knowledge.latest(projectId, limit),
     },
+    usage,
   });
   const credentials = credentialsArea({
     db,

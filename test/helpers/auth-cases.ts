@@ -129,18 +129,23 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/projects",
-    body: { name: "matrix-team" },
+    body: { name: "matrix-team", description: "A team project." },
     expect: { anonymous: 401, member: 403, admin: 201 },
   },
   {
     method: "PATCH",
     path: "/api/projects/:id",
-    body: { name: "matrix-team" },
+    body: { name: "matrix-team", description: "A team project." },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
     method: "DELETE",
     path: "/api/projects/:id",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/usage",
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {

@@ -17,7 +17,9 @@ async function listed(chat: Awaited<ReturnType<typeof chatApp>>) {
 test("the admin's list says each user's last visit and team projects", async () => {
   const chat = await chatApp();
   const { project } = await (
-    await chat.admin.call("POST", "/api/projects", { body: { name: "ops" } })
+    await chat.admin.call("POST", "/api/projects", {
+      body: { name: "ops", description: "A team project." },
+    })
   ).json();
   await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
     body: { userId: chat.memberId },
@@ -59,7 +61,9 @@ test("a user's usage counts their personal project alone", async () => {
   const chat = await chatApp();
   // a turn in a team project they are in is not theirs alone
   const { project } = await (
-    await chat.admin.call("POST", "/api/projects", { body: { name: "ops" } })
+    await chat.admin.call("POST", "/api/projects", {
+      body: { name: "ops", description: "A team project." },
+    })
   ).json();
   await chat.admin.call("POST", `/api/projects/${project.id}/members`, {
     body: { userId: chat.memberId },

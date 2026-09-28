@@ -202,7 +202,7 @@ client change. What each page draws is in `docs/views.md`.
 
 - **A form's refusals have two places.** One `useSave()` per form runs
   the submit (`run`) and every other button of the form (`act("delete",
-  ...)`: Delete, Disable, Reset, a member's Add or Remove), so while one
+  ...)`: Delete, Disable or Enable, a skill's Add), so while one
   runs every button waits. A refusal that names a field, a check pinned
   with `at(field, ...)` or a server word the form's `fieldOf` maps, is
   shown at that field: `aria-invalid` on the control (the failed border

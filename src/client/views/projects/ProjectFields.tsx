@@ -51,6 +51,7 @@ export function NameField({
 export function DescriptionField({
   value,
   placeholder,
+  required,
   disabled,
   error,
   class: owner,
@@ -59,6 +60,7 @@ export function DescriptionField({
   value: string;
   // none where the section's text already says it
   placeholder?: string;
+  required?: boolean;
   disabled?: boolean;
   // a refusal that names the field
   error?: string | null;
@@ -67,9 +69,12 @@ export function DescriptionField({
 }) {
   return (
     <label class={withOwner(owner)}>
-      <span class="label">Description</span>
+      <span class={`label${required ? " label-required" : ""}`}>
+        Description
+      </span>
       <textarea
         name="description"
+        aria-required={required ? "true" : undefined}
         rows={3}
         maxLength={MAX_DESCRIPTION}
         placeholder={placeholder}

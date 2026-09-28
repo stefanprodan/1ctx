@@ -257,7 +257,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Knowledge, then Members for a team or Settings for a personal one.
   A team project's Members tab is the
   same rows, linking an admin to
-  `/admin/access/projects?open=<id>` and `/admin/config/agents`.
+  `/admin/access/projects/<id>` and `/admin/config/agents`.
   The aside under every tab (`Frame.tsx`) is About, the Activity weeks
   (`GhostGrid` without labels while they load), then Latest
   knowledge (the three knowledge files changed last, from the held
@@ -493,6 +493,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   personal project's last 30 days alone (`GET /api/users/:id/usage`),
   since a team project's turns are not one person's, and the account's
   dates. The public user page's Account section has Manage for an admin.
+- **Access › Projects.** `/admin/access/projects` (`AdminProjects.tsx`,
+  its words in `AdminProjects.model.ts`) is one card of links, a team
+  project each by name, its member count under it and since when at
+  the right; the aside counts the team projects and the personal ones by
+  the users, never listing those. New project is in the head, its `?new`
+  (`NewProject.tsx`) the name and description, both required, Create
+  opening the page. `/admin/access/projects/:id` (`ProjectPage.tsx`) is
+  by id, so a rename keeps the address, its crumb step a switcher to
+  the others: the name and description in one card, both required,
+  Members (Add member a `Finder` over the users, one membership call
+  per change through `setProjectMembers()`), and Delete. The aside is the project's last 30 days
+  (`GET /api/projects/:id/usage`) and what it holds.
 - **Config › Visuals is a page of cards.** `/admin/config/visuals`
   (`Visuals.tsx`, its words in `Visuals.model.ts`) is a Split of three
   `Setting` cards, each its own form with a `DraftFoot`, nothing saved
@@ -678,11 +690,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `promptPreview()` in `Mcp.model.ts` over `offeredServers()` and
   `promptSnapshot()`, so the preview is the bytes a send starting on
   those rows would carry. A model without the tools flag says so.
-- **Admin lists share their parts.** A row that a Manage link opens
-  reads `?open=<id>` through `useOpenParam()` in
-  `views/admin/OpenParam.ts`. A pick of a few labelled options with a
-  line of text each is `Choices` from `views/admin/Choices.tsx` over
-  base's `.choice`.
+- **Admin lists share their parts.** A pick of a few labelled options
+  with a line of text each is `Choices` from `views/admin/Choices.tsx`
+  over base's `.choice`.
 - **Config › Skills.** `/admin/config/skills` (`SkillList.tsx`) is one card
   of links by name, the name over the description's first sentence, or
   over the failed refresh in red, the agents that carry it (from the

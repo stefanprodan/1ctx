@@ -18,7 +18,11 @@ import type {
   UserUsageResponse,
 } from "../../shared/api/users.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { addProjectMember, removeProjectMember } from "./admin-projects.ts";
+import {
+  addProjectMember,
+  onProjectMembers,
+  removeProjectMember,
+} from "./admin-projects.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
 
@@ -37,6 +41,23 @@ effect(() => {
   users.value = null;
   usersError.value = null;
   userUsage.value = {};
+});
+
+// a membership saved from a project's page, or a project deleted, shows
+// in each user's projects at once
+onProjectMembers((projectId, memberIds) => {
+  if (users.value === null) return;
+  users.value = users.value.map((u) => {
+    const has = u.projectIds.includes(projectId);
+    const is = memberIds.includes(u.id);
+    if (has === is) return u;
+    return {
+      ...u,
+      projectIds: is
+        ? [...u.projectIds, projectId]
+        : u.projectIds.filter((id) => id !== projectId),
+    };
+  });
 });
 
 // the list is kept by username, the server's order, so a rename moves

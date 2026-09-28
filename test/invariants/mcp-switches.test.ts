@@ -346,7 +346,7 @@ test("project agents expose the same switchable map to members and admins", asyn
     chat.app.mcp.setAgentServers(plain, [link(empty), link(excluded)]);
     chat.app.mcp.setAgentServers(noTools, [link(flux)]);
     const created = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "team" },
+      body: { name: "team", description: "A team project." },
     });
     expect(created.status).toBe(201);
     const { project } = await created.json();

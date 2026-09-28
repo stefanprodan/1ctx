@@ -264,7 +264,7 @@ describe("visual call delivery", () => {
         ).toBe(404);
       }
       const created = await chat.admin.call("POST", "/api/projects", {
-        body: { name: "visual-team", description: "" },
+        body: { name: "visual-team", description: "A team project." },
       });
       expect(created.status).toBe(201);
       const { project } = await created.json();

@@ -12,7 +12,11 @@
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter } from "../../shared/words.ts";
-import { loadAdminProject, loadAdminProjects } from "../data/admin-projects.ts";
+import {
+  loadAdminProject,
+  loadAdminProjects,
+  loadProjectUsage,
+} from "../data/admin-projects.ts";
 import { loadAgents, loadFacts } from "../data/agents.ts";
 import { loadAutomationPage, loadAutomations } from "../data/automations.ts";
 import { loadCredentials } from "../data/credentials.ts";
@@ -535,13 +539,28 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Projects",
     role: "admin",
-    // ?open=<id> is the project page's Manage: its row opens loaded
-    load: async (_params, query) => {
-      const open = query.get("open");
+    // New project is the list's `?new`; the aside counts the personal
+    // projects by the users
+    load: async () => {
+      await Promise.all([loadAdminProjects(), loadUsers()]);
+    },
+  },
+  {
+    path: "/admin/access/projects/:id",
+    view: lazy(() =>
+      import("../views/admin/ProjectPage.tsx").then((m) => m.ProjectPage),
+    ),
+    // by id, as the project's own page
+    title: () => "Project",
+    role: "admin",
+    // Add member offers the users
+    load: async (params) => {
+      const id = params.id ?? "";
       await Promise.all([
         loadAdminProjects(),
         loadUsers(),
-        open === null ? undefined : loadAdminProject(open),
+        loadAdminProject(id),
+        loadProjectUsage(id),
       ]);
     },
   },

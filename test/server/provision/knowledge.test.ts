@@ -38,7 +38,12 @@ function project(root: string, spec: Record<string, unknown>) {
   return parse([
     {
       path: join(root, "instance.yaml"),
-      text: JSON.stringify(object("Project", "nebula", spec)),
+      text: JSON.stringify(
+        object("Project", "nebula", {
+          description: "A team project.",
+          ...spec,
+        }),
+      ),
     },
   ]);
 }
@@ -100,7 +105,12 @@ describe("provision knowledge folder", () => {
     const documents = parse([
       {
         path: "-",
-        text: JSON.stringify(object("Project", "nebula", { knowledge: "kb" })),
+        text: JSON.stringify(
+          object("Project", "nebula", {
+            description: "A team project.",
+            knowledge: "kb",
+          }),
+        ),
       },
     ]);
     await expect(loadKnowledge(documents)).rejects.toThrow(
@@ -294,7 +304,9 @@ describe("provision knowledge apply", () => {
         parse([
           {
             path: join(root, "instance.yaml"),
-            text: JSON.stringify(object("Project", "nebula", {})),
+            text: JSON.stringify(
+              object("Project", "nebula", { description: "A team project." }),
+            ),
           },
         ]),
         () => {},

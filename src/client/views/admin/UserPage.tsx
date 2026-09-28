@@ -19,7 +19,7 @@ import type { Params } from "../../app/params.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { me } from "../../data/me.ts";
-import { projects } from "../../data/projects.ts";
+import { projects, projectsError } from "../../data/projects.ts";
 import {
   setUserProjects,
   updateUser,
@@ -187,6 +187,10 @@ function ProfileCard({ user, saving }: CardProps) {
     drafted.value = null;
   }, userFieldOf);
   useFocusField(save, form);
+  const username = who.username.trim();
+  const taken =
+    username !== user.username &&
+    (users.value ?? []).some((u) => u.username === username);
   return (
     <form
       ref={form}
@@ -206,7 +210,13 @@ function ProfileCard({ user, saving }: CardProps) {
           <DraftFoot
             save={save}
             dirty={body(user, who) !== null}
+            blocked={taken}
             locked={saving.value && !save.busy}
+            hint={
+              taken ? (
+                <span class="error">@{username} is taken.</span>
+              ) : undefined
+            }
             onDiscard={() => {
               drafted.value = null;
             }}
@@ -348,7 +358,9 @@ function ProjectsCard({ user, saving }: CardProps) {
         }
       >
         {!loaded ? (
-          <RowsNote>Loading</RowsNote>
+          <RowsNote>
+            {projectsError.value !== null ? "Did not load." : "Loading"}
+          </RowsNote>
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (

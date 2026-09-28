@@ -427,7 +427,10 @@ describe("provision through the composed app", () => {
       await app.provision.apply(
         documents(
           user(),
-          object("Project", "nebula", { members: ["admin", "zed-user"] }),
+          object("Project", "nebula", {
+            description: "A team project.",
+            members: ["admin", "zed-user"],
+          }),
         ),
         ignore,
       );
@@ -435,7 +438,10 @@ describe("provision through the composed app", () => {
       const adminId = app.users.byUsername("admin")!.id;
       const zedId = app.users.byUsername("zed-user")!.id;
       const wanted = documents(
-        object("Project", "nebula", { members: ["zed-user"] }),
+        object("Project", "nebula", {
+          description: "A team project.",
+          members: ["zed-user"],
+        }),
       );
       expect((await app.provision.apply(wanted, ignore)).updated).toBe(1);
       expect(app.projects.memberIds(id)).toEqual([zedId]);
@@ -603,7 +609,10 @@ describe("provision through the composed app", () => {
 
   test.each([
     object("Agent", "guide", { provider: "absent", model: "fake-model" }),
-    object("Project", "nebula", { members: ["absent-user"] }),
+    object("Project", "nebula", {
+      description: "A team project.",
+      members: ["absent-user"],
+    }),
     provider({ keyFrom: "provider-absent" }),
   ])("offline refusals leave an empty instance untouched: %j", async (bad) => {
     const { app, fake } = await instance();
@@ -770,7 +779,10 @@ describe("provision through the composed app", () => {
             agent({ model: "missing-model" }),
             user(),
             provider(),
-            object("Project", "nebula", { members: ["zed-user"] }),
+            object("Project", "nebula", {
+              description: "A team project.",
+              members: ["zed-user"],
+            }),
           ),
           (line) => lines.push(line),
         ),

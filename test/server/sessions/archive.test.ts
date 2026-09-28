@@ -263,7 +263,7 @@ describe("archiving by hand", () => {
   test("a member archives a team chat someone else started", async () => {
     const chat = await chatApp();
     const created = await chat.admin.call("POST", "/api/projects", {
-      body: { name: "shared", description: "" },
+      body: { name: "shared", description: "A team project." },
     });
     const { project } = await created.json();
     expect(
