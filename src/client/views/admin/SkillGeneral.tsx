@@ -115,7 +115,8 @@ function About({ skill, now }: { skill: SkillSummary; now: number }) {
           )}`}
         </Fact>
       </div>
-      {refresh.failure.value !== null && (
+      {/* a recorded failure is already the page's head */}
+      {refresh.failure.value !== null && skill.refreshError === null && (
         <p class="error skill-page-said" role="alert">
           {refresh.failure.value}
         </p>

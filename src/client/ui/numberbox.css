@@ -1,0 +1,40 @@
+/* A number typed with its unit inside the box, at the right. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .numberbox {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding-right: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+    border: 1px solid var(--line);
+  }
+  .numberbox:focus-within {
+    border-color: var(--line-strong);
+  }
+  .numberbox .numberbox-input {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    padding: 0 var(--space-3);
+    border: 0;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+  }
+  .numberbox .numberbox-input:focus-visible {
+    outline: 0;
+  }
+  .numberbox-unit {
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .numberbox-invalid,
+  .numberbox-invalid:focus-within {
+    border-color: var(--failed);
+  }
+}

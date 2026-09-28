@@ -36,7 +36,7 @@ export function Setting({
   children?: ComponentChildren;
 }) {
   const head = (title !== undefined || action !== undefined) && (
-    <div class="setting-head">
+    <div class={`setting-head${line === undefined ? " setting-head-one" : ""}`}>
       <div class="setting-words">
         {title !== undefined && (
           <h2 class="setting-title">

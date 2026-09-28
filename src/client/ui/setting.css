@@ -24,14 +24,21 @@
     padding: var(--space-5) var(--space-4);
   }
 
+  /* the action wraps under the words when they would be narrower
+     than 12rem beside it */
   .setting-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     gap: var(--space-3);
   }
+  /* a title alone centres on its action */
+  .setting-head-one {
+    align-items: center;
+  }
   .setting-words {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 1 12rem;
     flex-direction: column;
     gap: var(--space-1);
     min-width: 0;

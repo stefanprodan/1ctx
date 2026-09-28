@@ -21,7 +21,7 @@ import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { Setting, SettingHint } from "../../ui/Setting.tsx";
-import { KEY_HINT, mcpFieldOf } from "./Mcp.model.ts";
+import { mcpFieldOf } from "./Mcp.model.ts";
 import "./mcp-page.css";
 
 const STEPS = [
@@ -128,13 +128,7 @@ function Form() {
                 save.touch();
               }}
             />
-            {invalid("name") ? (
-              <FieldError save={save} field="name" />
-            ) : (
-              <span class="hint">
-                Tools are named mcp__{trimmed || "name"}__tool
-              </span>
-            )}
+            <FieldError save={save} field="name" />
           </label>
           <div class="field">
             <span class="label">Key file</span>
@@ -151,11 +145,7 @@ function Form() {
                 save.touch();
               }}
             />
-            {invalid("keyName") ? (
-              <FieldError save={save} field="keyName" />
-            ) : (
-              <span class="hint">{KEY_HINT}</span>
-            )}
+            <FieldError save={save} field="keyName" />
           </div>
           <label class="field pair-wide">
             <span class="label label-required">URL</span>

@@ -81,11 +81,11 @@ Storage pages are in `docs/views.md` and `docs/ui.md`.
   the month's days in the zone (`monthWindow()` in `usage/`), up to
   today in this month and none for a later one, laid and totalled as
   the overview's, the ten largest projects, agents and models by tokens
-  with the priced rounds' cost, the ten models with the most turns and
-  their median and slowest ended turn (a send counted under the model
-  its last round's usage says answered, when a router served another
-  than the one asked for), the deciders by decisions, and the first
-  send's start. `month()` in `range.ts` is the worker's third job and
+  with the priced rounds' cost (a model's rounds and decisions summed in
+  one row, under the model that answered when a router served another
+  than the one asked for), the deciders by decisions with their input
+  and output tokens, and the first send's start. A deleted project,
+  agent or provider's model without tokens is left out. `month()` in `range.ts` is the worker's third job and
   `breakdowns.ts` its queries: a breakdown sums tokens from `usage` and
   sends from `sends` apart and joins them by key, so a send of many
   rounds counts once. The answer is kept a minute per zone and month.

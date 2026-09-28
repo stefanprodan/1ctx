@@ -19,7 +19,6 @@ import {
   serverBlock,
 } from "../../../shared/mcp.ts";
 import {
-  MCP_KEY_PREFIX,
   MCP_MODES,
   MCP_TIMEOUT_MS,
   type McpMode,
@@ -80,8 +79,6 @@ export function timeoutMs(text: string): number | null {
   const trimmed = text.trim();
   return trimmed === "" ? null : Math.round(Number(trimmed) * 1000);
 }
-
-export const KEY_HINT = `A key file is ${MCP_KEY_PREFIX}<name>.key in the secrets directory, sent as a bearer token.`;
 
 export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
   { value: "auto", label: "Auto" },
@@ -164,6 +161,24 @@ export function promptPreview(
     count: snapshot.text.length,
     from,
   };
+}
+
+// the sides a server offers, as one pick; write alone has no option
+export type Offer = "off" | "read" | "write";
+
+export const OFFER_OPTIONS: { value: Offer; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "read", label: "Read" },
+  { value: "write", label: "Read and write" },
+];
+
+export function offerOf(read: boolean, write: boolean): Offer {
+  if (write) return "write";
+  return read ? "read" : "off";
+}
+
+export function offerSides(offer: Offer): { read: boolean; write: boolean } {
+  return { read: offer !== "off", write: offer === "write" };
 }
 
 // which field of the form a refusal names

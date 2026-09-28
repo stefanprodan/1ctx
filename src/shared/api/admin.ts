@@ -198,9 +198,9 @@ export type UsageRow = {
   runs: number;
 };
 
-// A model by the rounds it answered: provider is the provider's name,
-// null when it is deleted; model is the one that answered, a router's
-// pick included
+// A model by the rounds and the decisions it answered: provider is the
+// provider's name, null when it is deleted; model is the one that
+// answered, a router's pick included
 export type ModelUsage = {
   provider: string | null;
   model: string;
@@ -215,16 +215,6 @@ export type DeciderUsage = {
   decisions: number;
   tokens: number;
   cost: number | null;
-};
-
-// A provider's model over the days: its chat turns, and the median and
-// slowest length of the ended ones
-export type TurnLength = {
-  provider: string;
-  model: string;
-  turns: number;
-  medianMs: number | null;
-  slowestMs: number | null;
 };
 
 // GET /api/admin/overview?tz=&range=: the range's days in the zone,
@@ -286,8 +276,7 @@ export type LoadResponse = {
 
 // GET /api/admin/usage?tz=&month=YYYY-MM: the month's days in the zone,
 // up to today in this month, and their totals, the ten largest rows of
-// each breakdown, the ten models with the most turns and the deciders
-// by decisions, as of readAt. since is the first send's start, null
+// each breakdown and the deciders by decisions, as of readAt. since is the first send's start, null
 // before any, so the page offers the months from it. Read at most once
 // a minute per zone and month
 export type UsageResponse = {
@@ -299,7 +288,6 @@ export type UsageResponse = {
   turnLength: TurnLengths;
   activeUsers: number;
   by: { projects: UsageRow[]; agents: UsageRow[]; models: ModelUsage[] };
-  lengths: TurnLength[];
   deciders: DeciderUsage[];
 };
 

@@ -81,6 +81,10 @@
   .chart-bars-wide .chart-bar {
     grid-template-columns: 200px minmax(0, 1fr) 72px;
   }
+  /* a wide row's second figure is a cost after the tokens */
+  .chart-bars-wide .chart-bar:has(.chart-share) {
+    grid-template-columns: 200px minmax(0, 1fr) 152px;
+  }
   .chart-bar-pick {
     cursor: pointer;
   }
@@ -117,8 +121,8 @@
   .chart-bar-faint .chart-bar-name {
     color: var(--faint);
   }
-  /* a bar whose project or agent is gone, its numbers kept */
-  .chart-gone {
+  /* a small word after a bar's name: deleted, decider */
+  .chart-note {
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--faint);
@@ -137,6 +141,14 @@
     display: inline-block;
     min-width: 5ch;
     color: var(--faint);
+  }
+  /* a cost's slot holds "$1,234.56" with room before it */
+  .chart-bars-wide .chart-share {
+    min-width: 10ch;
+  }
+  /* a cost worth a look */
+  .chart-costly {
+    color: var(--brand);
   }
   .chart-foot {
     margin: auto 0 0;
@@ -249,8 +261,13 @@
     .chart-share {
       display: none;
     }
+    /* a wide row's second figure stays: it is a cost, not a share */
+    .chart-bars-wide .chart-share {
+      display: inline-block;
+    }
     /* a long name takes its own line over the bar, never cut */
-    .chart-bars-wide .chart-bar {
+    .chart-bars-wide .chart-bar,
+    .chart-bars-wide .chart-bar:has(.chart-share) {
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas: "name value" "track track";
       row-gap: var(--space-1);

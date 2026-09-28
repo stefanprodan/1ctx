@@ -560,7 +560,7 @@ describe("a skill's page", () => {
     skills.value = [
       {
         ...timoni,
-        refreshError: "timoni.sh answered 502",
+        refreshError: "the host timoni.sh answered 502",
         refreshFailedAt: Date.now() - 60_000,
         fetchedAt: Date.now() - 2 * HOUR,
       },
@@ -569,7 +569,7 @@ describe("a skill's page", () => {
     path.value = "/config/skills/timoni";
     const html = render(<SkillPage params={{ name: "timoni" }} />);
     expect(html).toContain(
-      "Refresh failed 1m ago: Timoni.sh answered 502. Agents still get the copy fetched 2h ago.",
+      "The host timoni.sh answered 502. Last refresh 1m ago.",
     );
     expect(html).toContain("No agent carries it.");
     expect(html).not.toContain("Used by");

@@ -346,9 +346,6 @@ describe("deleting an agent", () => {
     );
     expect(used.status).toBe(200);
     const usage: UsageResponse = await used.json();
-    expect(usage.lengths).toEqual([
-      expect.objectContaining({ provider: "local", model: FLASH, turns: 1 }),
-    ]);
     expect(usage.by.models).toEqual([
       expect.objectContaining({ provider: null, model: FLASH }),
     ]);

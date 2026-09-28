@@ -348,7 +348,7 @@ function Options({
             save={save}
             dirty={dirty && !saving.value}
             label="Save"
-            stack={dirty}
+            inline
             start={
               <SettingHint>{dirty ? "Unsaved changes" : undefined}</SettingHint>
             }

@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The small shared parts: the status tag, a list's failure, an aside
-// fact, the segmented switch, a board's bones and meters, and the ask
-// before a delete.
+// fact, the segmented switch, a board's bones and meters, the ask
+// before a delete, and a card foot's refusal.
 
 import { describe, expect, test } from "bun:test";
 import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import { shareWidth } from "../../../src/client/lib/format.ts";
+import { Save } from "../../../src/client/lib/save.ts";
 import { ChartPanel, Meter } from "../../../src/client/ui/Chart.tsx";
 import { CodeTag } from "../../../src/client/ui/CodeTag.tsx";
-import { AskDelete } from "../../../src/client/ui/Foot.tsx";
+import { AskDelete, Foot } from "../../../src/client/ui/Foot.tsx";
 import { RowsFailed } from "../../../src/client/ui/Rows.tsx";
 import { Seg } from "../../../src/client/ui/Seg.tsx";
 import { AsideLine } from "../../../src/client/ui/Split.tsx";
@@ -157,6 +158,39 @@ describe("AskDelete", () => {
       ),
     ).toBe(
       '<button type="button" class="btn btn-danger" disabled>Deleting</button><button type="button" class="btn" disabled>Keep</button>',
+    );
+  });
+});
+
+describe("Foot", () => {
+  const failed = () => {
+    const save = new Save(async () => {});
+    save.status.value = { error: "the server did not answer", status: 503 };
+    return save;
+  };
+
+  test("a refusal is a notice over the buttons", () => {
+    const html = plain(render(<Foot save={failed()} label="Save" />));
+    expect(html).toContain('class="notice-failed foot-notice"');
+    expect(html).not.toContain("foot-actions");
+  });
+
+  test("inline, it is red words in the buttons' line, the buttons one group", () => {
+    const html = plain(
+      render(
+        <Foot
+          save={failed()}
+          label="Save"
+          inline
+          start={<span>Unsaved changes</span>}
+          before={<button type="button">Discard</button>}
+        />,
+      ),
+    );
+    expect(html).not.toContain("notice-failed");
+    expect(html).not.toContain("Unsaved changes");
+    expect(html).toContain(
+      '<div class="foot-start foot-start-beside"><span class="error foot-inline" role="alert">The server did not answer.<span class="code-tag foot-notice-code">HTTP 503</span></span></div><div class="foot-actions"><button type="button">Discard</button>',
     );
   });
 });

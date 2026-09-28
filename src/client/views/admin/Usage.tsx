@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A calendar month of use: the month's tiles and its tokens a day, then
-// the tokens by project, agent or model, how long each model's turns
-// take, and the deciders by their decisions. The month is in the
-// address (?month=2026-09), this month without one, and the head's
-// arrows step a month at a time between the first turn's and this one. Loaded when a month
-// is reached; a pick keeps the last month on screen, faded, until the
-// new one lands.
+// the tokens and cost by project, agent (the deciders among them) or
+// model. The month is in the address (?month=2026-09), this month
+// without one, and the head's arrows step a month at a time between the
+// first turn's and this one. Loaded when a month is reached; a pick
+// keeps the last month on screen, faded, until the new one lands.
 
 import { useSignal } from "@preact/signals";
 import type { UsageResponse } from "../../../shared/api/admin.ts";
@@ -27,8 +26,7 @@ import { RowsFilters } from "../../ui/RowsControls.tsx";
 import { DaysTiles, TokensGhost, TokensPanel } from "./Days.tsx";
 import { OverviewGhost } from "./OverviewNow.tsx";
 import {
-  deciderBars,
-  lengthBars,
+  agentBars,
   modelBars,
   monthLabel,
   monthSteps,
@@ -51,23 +49,20 @@ type Bar = {
   key: string;
   name: string;
   value: number;
-  label: string;
+  label: preact.ComponentChildren;
   hint: string;
   mono?: boolean;
-  gone?: boolean;
+  note?: string;
 };
 
 // a panel of bars whose hint follows the pointer
 function BarsPanel({
   label,
-  rest,
   bars,
   none,
   action,
 }: {
   label: string;
-  // the hint with no bar under the pointer
-  rest?: string;
   bars: Bar[];
   none: string;
   action?: preact.ComponentChildren;
@@ -76,7 +71,7 @@ function BarsPanel({
   return (
     <ChartPanel
       label={label}
-      hint={bars.find((b) => b.key === over.value)?.hint ?? rest}
+      hint={bars.find((b) => b.key === over.value)?.hint}
       action={action}
     >
       {bars.length === 0 ? (
@@ -99,7 +94,9 @@ function ByPanel({ answer }: { answer: UsageResponse }) {
   const bars =
     kind.value === "models"
       ? modelBars(answer.by.models)
-      : usageBars(kind.value, answer.by[kind.value]);
+      : kind.value === "agents"
+        ? agentBars(answer.by.agents, answer.deciders)
+        : usageBars(kind.value, answer.by[kind.value]);
   const filters = BY.map((b) => ({
     label: b.label,
     on: kind.value === b.key,
@@ -112,7 +109,21 @@ function ByPanel({ answer }: { answer: UsageResponse }) {
       // a new kind starts with no bar under the pointer
       key={kind.value}
       label="Usage"
-      bars={bars}
+      bars={bars.map(({ cost, costly, ...b }) => ({
+        ...b,
+        // the cost after the tokens, as Storage's share after a size
+        label:
+          cost === undefined ? (
+            b.label
+          ) : (
+            <>
+              {b.label}
+              <span class={`chart-share${costly ? " chart-costly" : ""}`}>
+                {cost}
+              </span>
+            </>
+          ),
+      }))}
       none={NO_TURNS}
       action={<RowsFilters label="Usage by" filters={filters} />}
     />
@@ -139,27 +150,15 @@ function Board({ answer }: { answer: UsageResponse }) {
             none={NO_TURNS}
           />
         </div>
-        <ByPanel answer={answer} />
-        <BarsPanel
-          label="Turn length"
-          rest="median"
-          bars={lengthBars(answer.lengths).map((b) => ({ ...b, mono: true }))}
-          none={NO_TURNS}
-        />
-        {answer.deciders.length > 0 && (
-          <BarsPanel
-            label="Decisions"
-            bars={deciderBars(answer.deciders)}
-            none=""
-          />
-        )}
+        <div class="overview-wide">
+          <ByPanel answer={answer} />
+        </div>
       </div>
     </>
   );
 }
 
 const BAR_WIDTHS = [100, 62, 40, 26, 14];
-const LENGTH_WIDTHS = [100, 48, 30, 12];
 
 function BoardGhost() {
   return (
@@ -169,12 +168,11 @@ function BoardGhost() {
         <div class="overview-wide">
           <TokensGhost at={16} />
         </div>
-        <ChartPanel label="Usage">
-          <BarsGhost widths={BAR_WIDTHS} at={48} wide />
-        </ChartPanel>
-        <ChartPanel label="Turn length">
-          <BarsGhost widths={LENGTH_WIDTHS} at={64} wide />
-        </ChartPanel>
+        <div class="overview-wide">
+          <ChartPanel label="Usage">
+            <BarsGhost widths={BAR_WIDTHS} at={48} wide />
+          </ChartPanel>
+        </div>
       </div>
     </>
   );

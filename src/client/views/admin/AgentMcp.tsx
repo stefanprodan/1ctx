@@ -293,17 +293,19 @@ function Schemas({
             onDiscard={() => d.resetMode(latest.current)}
           />
         }
+        action={
+          <Seg
+            label="Tool schemas"
+            name="mcpMode"
+            value={d.mode.value}
+            options={MODE_OPTIONS.map((o) => ({ ...o, disabled: save.busy }))}
+            onPick={(value) => {
+              if (isModeValue(value)) d.mode.value = value;
+              save.touch();
+            }}
+          />
+        }
       >
-        <Seg
-          label="Tool schemas"
-          name="mcpMode"
-          value={d.mode.value}
-          options={MODE_OPTIONS.map((o) => ({ ...o, disabled: save.busy }))}
-          onPick={(value) => {
-            if (isModeValue(value)) d.mode.value = value;
-            save.touch();
-          }}
-        />
         {(preview.text !== "" || preview.warnings.length > 0) && (
           <Instructions preview={preview} />
         )}
