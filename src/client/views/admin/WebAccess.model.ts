@@ -90,6 +90,13 @@ export const DOMAINS_PLACEHOLDER = [
   "raw.githubusercontent.com",
 ].join("\n");
 
+// the box's height: what is typed or the example, whichever is longer,
+// and a line to spare
+export function boxRows(typed: string): number {
+  const lines = (text: string) => text.split("\n").length;
+  return Math.max(lines(DOMAINS_PLACEHOLDER), lines(typed)) + 1;
+}
+
 export const DOMAINS_HINT =
   "One host per line. A subdomain needs its own line.";
 

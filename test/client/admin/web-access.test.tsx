@@ -18,6 +18,7 @@ import {
   ACCESS_WORDS,
   accessBody,
   accessDirty,
+  boxRows,
   DOMAINS_HINT,
   DOMAINS_PLACEHOLDER,
   domainsCount,
@@ -161,6 +162,12 @@ describe("the Web access words", () => {
     // a box that does not parse counts its lines
     expect(domainsCount("a.example.com\nhttp://x/y")).toBe("2 of 200");
     expect(domainsCount("")).toBe("0 of 200");
+  });
+
+  test("the box fits the example, or what is typed when longer", () => {
+    expect(boxRows("")).toBe(6);
+    expect(boxRows("a.example.com")).toBe(6);
+    expect(boxRows(Array(8).fill("a.example.com").join("\n"))).toBe(9);
   });
 
   test("None against None is no change", () => {

@@ -45,6 +45,7 @@ import {
   ACCESS_WORDS,
   accessBody,
   accessDirty,
+  boxRows,
   DOMAINS_HINT,
   DOMAINS_PLACEHOLDER,
   domainsCount,
@@ -186,7 +187,7 @@ function Access({ state }: { state: ToolsResponse }) {
               name="domains"
               class="web-access-domains"
               aria-label="Allowed hosts"
-              rows={Math.max(4, typed.split("\n").length + 1)}
+              rows={boxRows(typed)}
               spellcheck={false}
               autocomplete="off"
               placeholder={DOMAINS_PLACEHOLDER}
