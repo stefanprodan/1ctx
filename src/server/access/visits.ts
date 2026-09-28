@@ -52,6 +52,16 @@ export class VisitStore {
     );
   }
 
+  // the visits on the days from first to last, both included, each on
+  // its user's own date
+  onDays(first: string, last: string): { userId: string; day: string }[] {
+    return this.db
+      .query<{ userId: string; day: string }, [string, string]>(
+        "select user_id as userId, day from visits where day >= ? and day <= ?",
+      )
+      .all(first, last);
+  }
+
   deleteBefore(at: number): number {
     return this.db.query("delete from visits where at < ?").run(at).changes;
   }

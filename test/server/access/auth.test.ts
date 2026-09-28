@@ -44,7 +44,10 @@ function build(secureCookie: boolean) {
       visibleFor: () => [],
       personal: () => null,
     },
-    usage: { projectTotal: () => ({ sends: 0, tokens: 0, cost: 0 }) },
+    usage: {
+      projectTotal: () => ({ sends: 0, tokens: 0, cost: 0 }),
+      activeProjects: () => [],
+    },
     activity: { personDays: (_userId, starts) => starts.map(() => 0) },
   });
   return { db, user, users, access };

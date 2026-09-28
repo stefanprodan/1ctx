@@ -294,6 +294,17 @@ export class UsageStore {
       .get(providerId, since, until)!;
   }
 
+  // those of the projects with a turn or a run in the window, one index
+  // seek each: the Access board's quiet team projects are the rest
+  activeProjects(ids: string[], since: number, until: number): string[] {
+    const any = this.db.query<{ one: number }, [string, number, number]>(
+      `select 1 as one from usage
+        where project_id = ? and created_at >= ? and created_at < ?
+        limit 1`,
+    );
+    return ids.filter((id) => any.get(id, since, until) !== null);
+  }
+
   // the same for one project: every agent's turns and runs in it
   projectTotal(
     projectId: string,

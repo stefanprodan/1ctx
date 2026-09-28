@@ -493,6 +493,17 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   personal project's last 30 days alone (`GET /api/users/:id/usage`),
   since a team project's turns are not one person's, and the account's
   dates. The public user page's Account section has Manage for an admin.
+- **The Access board.** `/admin/access` (`AccessBoard.tsx`, its groups
+  in `AccessBoard.model.ts`) is who signed in over the last 30 days, a
+  `DayBars` chart from `GET /api/admin/access`: each visit on its
+  user's own date, as the Users page reads it, so the chart and Not
+  seen agree across zones. Then a card per group that holds any:
+  accounts not seen in 30 days, with a password to change, disabled
+  (each account in the first that holds it), team projects without
+  members, and ones with no turn or run in 30 days. Every row opens
+  its page. What runs and what it costs stay on Monitor. The aside
+  counts admins, members and the disabled, then team and personal
+  projects.
 - **Access › Projects.** `/admin/access/projects` (`AdminProjects.tsx`,
   its words in `AdminProjects.model.ts`) is one card of links, a team
   project each by name, its member count under it and since when at
