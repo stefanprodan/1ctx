@@ -19,7 +19,9 @@ import {
   accessBody,
   accessDirty,
   DOMAINS_HINT,
+  DOMAINS_PLACEHOLDER,
   domainsCount,
+  domainsText,
   searchDirty,
   WEB_LIMITS,
   webTab,
@@ -253,7 +255,17 @@ describe("the Web access page", () => {
       /<textarea name="domains"[^>]*>docs\.example\.com\ngithub\.com</,
     );
     expect(html).toContain(DOMAINS_HINT);
-    expect(html).toContain('placeholder="github.com\napi.github.com');
+    // the example is sorted as a save stores it
+    expect(DOMAINS_PLACEHOLDER).toBe(
+      domainsText(
+        (
+          accessBody("listed", DOMAINS_PLACEHOLDER) as {
+            body: { domains: string[] };
+          }
+        ).body.domains,
+      ),
+    );
+    expect(html).toContain('placeholder="api.github.com\ncodeload.github.com');
   });
 
   test.serial("off says what the search line means", () => {

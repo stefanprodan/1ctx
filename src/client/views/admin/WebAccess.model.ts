@@ -81,13 +81,13 @@ export const ACCESS_WORDS: Record<WebAccessMode, string> = {
 };
 
 // what an empty box shows: the hosts a GitHub repo, its API, raw files
-// and release downloads are served from
+// and release downloads are served from, sorted as a save stores them
 export const DOMAINS_PLACEHOLDER = [
-  "github.com",
   "api.github.com",
-  "raw.githubusercontent.com",
   "codeload.github.com",
+  "github.com",
   "objects.githubusercontent.com",
+  "raw.githubusercontent.com",
 ].join("\n");
 
 export const DOMAINS_HINT =
