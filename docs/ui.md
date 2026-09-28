@@ -64,8 +64,10 @@ client change. What each page draws is in `docs/views.md`.
   which shows the short form of a text (the model without its org) when
   the long one overflows its line. An aside section is `AsideSection`
   and a fact in it `AsideLine` (its label, the value, a link with
-  `href`, `cut` for one line), both from `ui/Split.tsx`; `Page` has no
-  aside.
+  `href`, `cut` for one line); a section over a read is `AsideRead`, its
+  value undefined while it runs (Loading) and null when it failed ("Did
+  not load."), all from `ui/Split.tsx`; `Page` has no aside. The admin
+  asides are in `docs/views.md`.
 - **Times and counts.** Times in a list are `ago()` and `elapsed()` in
   `lib/format.ts`: one letter, no space (`23m ago`, `2d ago`, `3w
   ago`), then the date; counts are `count()` (`12.4K`, `2.1M`).
@@ -89,47 +91,49 @@ client change. What each page draws is in `docs/views.md`.
   section or in a card. The page's stylesheet holds only what it puts
   inside a row. Small and danger buttons are `.btn-small` and
   `.btn-danger`, a field's faint line `.hint`, all in `base.css`.
-- **An object's settings are cards.** An object page's tab (an
-  agent's) and an admin settings page (Config › Visuals, Web access)
-  stack
-  `ui/Setting.tsx` cards, as Vercel's settings: a
-  title, one line, the control, and a foot with its hint and its own
-  Save, so each card saves apart; `list` puts the title, a count and
-  an Add in a band over rows edge to edge (flush `RowsLine`s, controls
-  in `RowsEnd`, never a link); `danger` is the Delete card, last. A
-  card with one control (a `Seg`, a `NumberBox`, a `RowsSwitch`) puts
-  it in `action`, at the head's right, never under the line; the head
-  wraps it under the words on a phone, and a card that shows more (a
-  preview, a prompt) keeps that in the body. A card that drafts ends
-  in `admin/DraftFoot.tsx`: "Unsaved changes", a refusal or the view's
-  hint in the buttons' line, wrapping beside them on a phone. Nothing
-  saves before Save, a switch included. The card clips nothing, so a
-  select's list opens past it.
-- **A dashboard is a board, not rows.** The admin's Monitor (`/admin/monitor`,
-  the zone's own page, headed `Monitor / Live`: the live tiles, Needs
-  attention and Stats), Usage (`/admin/monitor/usage`) and Storage (`/admin/monitor/storage`) are `ui/Tiles.tsx` (stat tiles, the
-  figure at `--text-figure`) over `ui/Chart.tsx` panels in a grid:
-  `ChartPanel` wears the Rows card head (a day plot's passes `hintBelow`, so
-  on a phone its hint that follows the pointer has its own line and
-  never moves the plot), `Bars` rank from one baseline
-  in CSS, `Stack` splits a whole, and `ui/Plot.tsx` has uPlot draw what
-  runs over days, `Spark` in a tile, `DayBars` stacked and `DayLines`,
-  each with a key and a table for a screen reader (`ui/DayPlot.tsx`); a plot is made on mount through
-  `usePlot()` inside `ui/Plot.tsx`, fed by a second effect, its colours
-  tokens read at every draw, and tiles share their cursor by sync key.
-  The board's rows are `.chart-board` (`.chart-board-ghost` while it
-  loads), a panel grid `.chart-grid`, an empty panel `.chart-none` and
-  the facts under it `.chart-facts`, all in `ui/chart.css`; a row of
-  tiles loading is `TilesGhost`. Storage's head is `ui/Loaded.tsx` (when
-  the answer was read, Refresh). A first load draws the board in
-  `ui/Bones.tsx` bones at the loaded sizes, never a Loading line; a
-  later Storage load keeps the last answer faded until the next lands.
-  `data/overview.ts` loads Storage on arrival and on Refresh, and a
-  Usage month on arrival; a new month keeps the last one faded. The
-  Overview keeps itself current and has no Refresh: a failed read
-  keeps a row's last answer faded, its head saying since when in the
-  failed colour; the page head is `Loaded` as Storage's, the time of
-  the last live poll and Refresh, which reads every row again.
+- **An object's settings are cards.** An object page and an admin
+  settings page stack `ui/Setting.tsx` cards in a `SettingStack`, as
+  Vercel's settings: a title, one line, the control, and a foot with
+  its own Save, so each card saves apart. A card that edits is wrapped
+  in its own `SettingForm` (the submit, `check` for the client's
+  checks, the focus on a refused field). `list` puts the title, a
+  `count` and an Add in a band over rows edge to edge (flush
+  `RowsLine`s, controls in `RowsEnd`, never a link). Read-only facts are
+  `SettingFacts` of `SettingFact`, never a page's own grid: the label
+  column as wide as its longest label, and on a phone every label
+  stacked over its value; a failure over the cards is `SettingAlert`; the Delete
+  card is `SettingDelete`, last, which asks, deletes, then leaves for
+  `leaveTo`. A card with one control (a `Seg`, a `NumberBox`, a
+  `RowsSwitch`, an Add) puts it in `action`, at the head's right, never
+  under the line; the head wraps it under the words on a phone, and a
+  card that shows more (a preview, a prompt) keeps that in the body. A
+  card that drafts ends in `views/admin/DraftFoot.tsx`: "Unsaved
+  changes", a refusal or the view's hint in the buttons' line, wrapping
+  beside them on a phone, and Discard. Nothing saves before Save, a
+  switch included. A line or hint never restates the title or a
+  label. The card clips nothing, so a select's list opens past it.
+- **A dashboard is a board, not rows.** The admin's Monitor, Usage and
+  Storage are `ui/Tiles.tsx` (stat tiles, the figure at
+  `--text-figure`) over `ui/Chart.tsx` panels in a grid: `ChartPanel`
+  wears the Rows card head (a day plot's passes `hintBelow`, so on a
+  phone its hint that follows the pointer has its own line and never
+  moves the plot), `Bars` rank from one baseline in CSS, `Stack` splits
+  a whole, and `ui/Plot.tsx` has uPlot draw what runs over days, `Spark`
+  in a tile, `DayBars` stacked and `DayLines`, each with a key and a
+  table for a screen reader (`ui/DayPlot.tsx`). A plot is made on mount
+  through `usePlot()` inside `ui/Plot.tsx`, fed by a second effect, its
+  colours tokens read at every draw, and tiles share their cursor by
+  sync key. The board's rows are `.chart-board` (`.chart-board-ghost`
+  while it loads), a panel grid `.chart-grid`, an empty panel
+  `.chart-none` and the facts under it `.chart-facts`, all in
+  `ui/chart.css`; a row of tiles loading is `TilesGhost`. The Monitor's and
+  Storage's head is `ui/Loaded.tsx`: when the answer was read, and
+  Refresh. A first
+  load draws the board in `ui/Bones.tsx` bones at the loaded sizes,
+  never a Loading line; a later load (a Refresh, another month or
+  range) keeps the last answer faded until the next lands. On the
+  Monitor a failed poll keeps a row's last answer faded, its head
+  saying since when in the failed colour.
 
 ## Lists
 
@@ -190,13 +194,13 @@ client change. What each page draws is in `docs/views.md`.
   failure under it, words then the `CodeTag`. The stream draws six
   `Ghosts` for its first load; the Runs tab says Loading, since its
   rows are not the stream row's shape. No infinite scroll.
-- **A growing list has a search.** A card whose
-  list grows (the Projects page, and Users, Projects, Agents, Skills
-  and MCP under Admin) passes `ui/Search.tsx` as `RowsCard`'s `search`, in
-  place of the label, and filters the loaded rows through `matches()`
-  in `lib/search.ts`, with "No ... found" when nothing is left.
-  `count` puts the rows shown after the search ("9", "3 of 9"), before
-  the filters, and `wrap` gives the search its own line on a phone.
+- **A growing list has a search.** A card whose list grows passes
+  `ui/Search.tsx` as `RowsCard`'s `search`, in place of the label, over
+  `useListSearch()` in `lib/search.ts` (`searchList()` outside a
+  component), which filters the loaded rows through `matches()` and
+  gives `count` ("9", "3 of 9", none for an empty list), drawn before
+  the filters. A search that leaves nothing says "No <noun> matches."
+  `wrap` gives the search its own line on a phone.
 
 ## Forms
 
@@ -214,14 +218,17 @@ client change. What each page draws is in `docs/views.md`.
   buttons' line in place of the hint. A card whose control sits in its
   head (a switch, a number box) puts its field refusal there too,
   through `DraftFoot`'s `hint`.
-  An action whose words never name a field (a decider's Check) passes
+  An action whose words never name a field passes
   `{ whole: true }` to `act`, which skips `fieldOf`.
   A text field's input is `save.bind(signal)`, which clears the
   refusal on an edit. A name field's one check is `nameProblem()` in
   `lib/names.ts`. A row that can be deleted starts its foot with
   `AskDelete` from `ui/Foot.tsx` (Delete, then the words that ask, the
   danger button and Keep, `onAsk` reading what the delete would do
-  first), never its own pair.
+  first, Escape taking the ask back), never its own pair; an admin card
+  uses `SettingDelete`, which wraps it. A row's small X is `RowsRemove`
+  inside its `RowsEnd`. A form's first field takes the focus on arrival
+  through `useArrivalFocus()` in `lib/save.ts`, never on touch.
 - **An action outside a form is `useAction()`** from `lib/save.ts`: a
   switch or a pick that writes at once, busy while it runs, its
   refusal in words until the next try.
@@ -231,12 +238,15 @@ client change. What each page draws is in `docs/views.md`.
   `RowsFilters`. A Seg holds a closed set fixed in code (the words in
   `shared/words.ts`, Yes and No, the tool schemas modes), never rows
   from the database, at most five options that fit one line at 390.
-  Named rows are a `Finder`.
+  Named rows are a `Finder`. A pick of a few options with a line of
+  text each is `Choices` in `views/admin/Choices.tsx`, over base's
+  `.choice`.
 - **A list of names is `ui/Finder.tsx`:** a button opening a menu with
   a search pinned on top, the names in the given order, the one on
   screen marked, a row with `href` a link. It is a page's switcher (the
   crumb's own step, `page-pill`), a list's filter (`Provider All`,
-  anchored right) and an Add over what an object may carry. The panel
+  anchored right) and an Add over what an object may carry (`add` gives
+  the plus and the words, anchored right). The panel
   is fixed, placed from the button's box inside 16px gutters, so a
   card never clips it, and spans the gutters on a phone; with a mouse
   the search takes the focus, on touch nothing does. It opens on the
@@ -286,8 +296,7 @@ client change. What each page draws is in `docs/views.md`.
   admin gets a band over the user row, Admin panel or Exit admin
   panel, opening the last page seen on the other face (`lastAdmin`
   and `lastWork` in `shell.ts`), Monitor or Home the first time. A
-  crumb's zone step links to the zone (`zoneStep()`); the Access and
-  Config boards are in `docs/views.md`.
+  crumb's zone step links to the zone (`zoneStep()`).
 - **Touch.**
   On a touch screen (`pointer: coarse`, `lib/touch.ts`) every field is
   `--text-touch`, 16px, since iOS zooms into a smaller one and stays
@@ -309,7 +318,9 @@ client change. What each page draws is in `docs/views.md`.
   written: the steps dim at `--text-ui`, the page's own step in the
   foreground at 500. A control in the title's place (a chat's menu, an
   object's switcher) is the `page-pill` in `ui/page.css`, drawn 24px
-  and tapped at 44px. `Page` takes a `crumb` and its `crumbHref`, or
+  and tapped at 44px. An object's switcher is `PageSwitcher`, a `Finder`
+  of its siblings that draws a plain crumb when the object is alone; a
+  list's New button is `PageNew`, both in `ui/Page.tsx`. `Page` takes a `crumb` and its `crumbHref`, or
   `steps`, several links back before the title (`mono` for a path's
   step, in its own case, cut at 24 characters and giving way before the
   title; a phone keeps the nearest step and the title). A file's crumb
@@ -359,7 +370,9 @@ client change. What each page draws is in `docs/views.md`.
 - **One helper per job, never a copy.** A chip's menu (open on a
   click, shut by a click outside or Escape, a pane's `back` first) is
   `useMenu()` in `lib/menu.ts`. An address is built in `lib/hrefs.ts`
-  (`chatHref()`, `automationHref()`, the user and agent pages). The
+  (`chatHref()`, `automationHref()`, the user and agent pages); an
+  admin address is a `*_HREF` constant or a builder there, never a
+  literal in a view. The
   browser's zone is `browserZone()` in `lib/zone.ts`. A form's picked
   ids compare with `sameIds()` and flip with `toggledId()` in
   `lib/ids.ts`. A text cut to its first lines is `cutLines()` in

@@ -120,9 +120,7 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   stop. `GET /api/agents` answers with the list each agent's last send
   start and whether one runs now (`agentActivity()`, over the
   `sends_agent` and `sends_running` indexes), and `GET
-  /api/agents/:id/usage` its sends, tokens and cost over the last 30
-  days, the cost 0 with none and null when rounds ran and none was
-  priced. Every `AgentStore` read skips a retired agent; history reads
+  /api/agents/:id/usage` its sends, tokens and cost over `lastDays()`. Every `AgentStore` read skips a retired agent; history reads
   its name through its own queries, and `SessionDetail.agents` marks it
   retired. Sends keep `provider_name`, so a provider that served them
   can go.

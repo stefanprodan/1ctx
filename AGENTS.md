@@ -70,7 +70,7 @@ src/client/     the Preact app, bundled by Bun from client/index.html.
                 (api, the entity cache), lib/, ui/ (the primitives, each
                 with its stylesheet), transcript/, composer/, stream/ (the
                 session row Home and the project page draw), agents/ (the
-                agent row the admin page and the project page draw),
+                agent rows and aside the admin and project pages draw),
                 views/<area>/, style/ (tokens.css, base.css only).
 test/           by invariant: invariants/<name>.test.ts for the cross-
                 cutting suites, server/<area>/, client/<area>/ and
@@ -130,7 +130,7 @@ change before making it.
 | Doc | Read it |
 |---|---|
 | `docs/ui.md` | before any change under `src/client/`: the data layer, the primitives, forms, the shell, themes, the shared helpers |
-| `docs/views.md` | before changing what a page draws: a view under `src/client/views/`, the composer, the stream, the Tools, MCP and Skills pages |
+| `docs/views.md` | before changing what a page draws: a view under `src/client/views/`, the composer, the stream, the admin pages |
 | `docs/access.md` | before changing logins, users, names, projects' visibility, secrets or the socket server (`access/`, `users/`, `projects/`, `secrets/`, `web/`) |
 | `docs/providers.md` | before changing `src/server/providers/`, `deciders/` or an agent's provider, model and thinking fields |
 | `docs/sessions.md` | before changing `src/server/sessions/` or the runner's sends: the writer, capabilities, regenerate, fork, rename, compaction |
