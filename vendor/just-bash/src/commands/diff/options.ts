@@ -44,6 +44,19 @@ export interface DiffOptions {
   suppressBlankEmpty: boolean;
   help: boolean;
   version: boolean;
+  /** -r: compare common subdirectories too */
+  recursive: boolean;
+  /** -x patterns, and -X files of them, in the order given */
+  excludes: string[];
+  excludeFiles: string[];
+  /** -S: the first name compared in the top directories */
+  startingFile: string | null;
+  fromFile: string | null;
+  toFile: string | null;
+  ignoreFileNameCase: boolean;
+  noDereference: boolean;
+  /** the arguments read as options, for the line naming each pair */
+  switches: string[];
 }
 
 /** What GNU's -p matches, as its manual gives it. */
@@ -97,6 +110,20 @@ function contextLength(value: string): number {
     throw new DiffUsageError(`invalid context length '${value}'`);
   }
   return Math.min(Number(value), Number.MAX_SAFE_INTEGER);
+}
+
+/** One value an option may be given twice, as GNU's specify_value. */
+function once(
+  o: DiffOptions,
+  key: "startingFile" | "fromFile" | "toFile",
+  value: string,
+  name: string,
+): void {
+  const had = o[key];
+  if (had !== null && had !== value) {
+    throw new DiffUsageError(`conflicting ${name} option value '${value}'`);
+  }
+  o[key] = value;
 }
 
 function number(what: string, value: string, min: number): number {
@@ -155,6 +182,8 @@ const SHORT: Record<string, Spec> = {
   E: flag((o) => (o.ignoreTabExpansion = true)),
   f: later("none"),
   F: { arg: "required", apply: (o, v) => o.functionPatterns.push(v) },
+  h: ignored("none"),
+  H: flag((o) => (o.speedLargeFiles = true)),
   i: flag((o) => (o.ignoreCase = true)),
   I: { arg: "required", apply: (o, v) => o.ignoreMatching.push(v) },
   l: refuse("none", "-l is refused: the shell has no pr to paginate with"),
@@ -162,10 +191,16 @@ const SHORT: Record<string, Spec> = {
   n: later("none"),
   N: flag((o) => (o.newFile = "both")),
   p: flag((o) => (o.showCFunction = true)),
+  P: flag((o) => {
+    if (o.newFile === null) o.newFile = "first";
+  }),
   q: flag((o) => (o.brief = true)),
-  r: ignored("none"),
+  r: flag((o) => (o.recursive = true)),
   s: flag((o) => (o.reportSame = true)),
-  S: ignored("required"),
+  S: {
+    arg: "required",
+    apply: (o, v) => once(o, "startingFile", v, "-S"),
+  },
   t: flag((o) => (o.expandTabs = true)),
   T: flag((o) => (o.initialTab = true)),
   u: flag((o) => {
@@ -176,8 +211,8 @@ const SHORT: Record<string, Spec> = {
   v: flag((o) => (o.version = true)),
   w: flag((o) => (o.ignoreAllSpace = true)),
   W: { arg: "required", apply: (_o, v) => void number("width", v, 1) },
-  x: ignored("required"),
-  X: ignored("required"),
+  x: { arg: "required", apply: (o, v) => o.excludes.push(v) },
+  X: { arg: "required", apply: (o, v) => o.excludeFiles.push(v) },
   y: later("none"),
   Z: flag((o) => (o.ignoreTrailingSpace = true)),
 };
@@ -221,18 +256,22 @@ const LONG: Record<string, Spec> = {
   "suppress-blank-empty": flag((o) => (o.suppressBlankEmpty = true)),
   paginate: refuse("none", "--paginate is refused: the shell has no pr"),
   recursive: SHORT.r,
-  "no-dereference": ignored("none"),
+  "no-dereference": flag((o) => (o.noDereference = true)),
   "new-file": SHORT.N,
-  "unidirectional-new-file": flag((o) => {
-    if (o.newFile === null) o.newFile = "first";
-  }),
-  "ignore-file-name-case": ignored("none"),
-  "no-ignore-file-name-case": ignored("none"),
+  "unidirectional-new-file": SHORT.P,
+  "ignore-file-name-case": flag((o) => (o.ignoreFileNameCase = true)),
+  "no-ignore-file-name-case": flag((o) => (o.ignoreFileNameCase = false)),
   exclude: SHORT.x,
   "exclude-from": SHORT.X,
   "starting-file": SHORT.S,
-  "from-file": later("required"),
-  "to-file": later("required"),
+  "from-file": {
+    arg: "required",
+    apply: (o, v) => once(o, "fromFile", v, "--from-file"),
+  },
+  "to-file": {
+    arg: "required",
+    apply: (o, v) => once(o, "toFile", v, "--to-file"),
+  },
   "ignore-case": SHORT.i,
   "ignore-tab-expansion": SHORT.E,
   "ignore-trailing-space": SHORT.Z,
@@ -256,7 +295,8 @@ const LONG: Record<string, Spec> = {
     arg: "required",
     apply: (o, v) => (o.horizon = number("horizon length", v, 0)),
   },
-  "speed-large-files": flag((o) => (o.speedLargeFiles = true)),
+  "speed-large-files": SHORT.H,
+  "inhibit-hunk-merge": ignored("none"),
   color: {
     arg: "optional",
     apply: (_o, v) => {
@@ -304,11 +344,21 @@ export function parseDiffArgs(args: string[]): {
     suppressBlankEmpty: false,
     help: false,
     version: false,
+    recursive: false,
+    excludes: [],
+    excludeFiles: [],
+    startingFile: null,
+    fromFile: null,
+    toFile: null,
+    ignoreFileNameCase: false,
+    noDereference: false,
+    switches: [],
   };
   const operands: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--") {
+      o.switches.push(arg);
       operands.push(...args.slice(i + 1));
       break;
     }
@@ -316,6 +366,9 @@ export function parseDiffArgs(args: string[]): {
       operands.push(arg);
       continue;
     }
+    // what getopt moves before the operands, a value taken from the next
+    // argument included
+    const start = i;
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
       const name = eq === -1 ? arg.slice(2) : arg.slice(2, eq);
@@ -354,6 +407,7 @@ export function parseDiffArgs(args: string[]): {
       } else {
         throw new DiffUsageError(`option '--${full}' requires an argument`);
       }
+      o.switches.push(...args.slice(start, i + 1));
       continue;
     }
     // a run of digits is the obsolete context length
@@ -378,6 +432,7 @@ export function parseDiffArgs(args: string[]): {
       else throw new DiffUsageError(`option requires an argument -- '${ch}'`);
       break;
     }
+    o.switches.push(...args.slice(start, i + 1));
   }
   if (o.labels.length > 2) throw new DiffUsageError("too many file label options");
   if (o.showCFunction) o.functionPatterns.push(C_FUNCTION);

@@ -42,48 +42,82 @@ export function headerName(name: string): string {
   return `${out}"`;
 }
 
-const SHELL_SPECIAL = new Set("\t\n !\"$&'()*;<>?[\\]^`{|}");
+/** Characters that make a shell word need quotes wherever they stand. */
+const SHELL_SPECIAL = new Set("\t\n !\"$&'()*;<=>?[\\^`|");
+/** What may sit inside double quotes with nothing escaped. */
+const PLAIN = /^[A-Za-z0-9%+,\-./:\]_ ']$/;
 
-/** A name as diff's messages print it, quoted for a shell when it must be. */
-export function shellName(name: string): string {
-  if (name === "") return "''";
-  let special = false;
-  let control = false;
+function needsQuotes(name: string): boolean {
+  if (name === "") return true;
+  if (name === "{" || name === "}") return true;
   for (let i = 0; i < name.length; i++) {
     const ch = name[i];
-    if (isControl(ch.charCodeAt(0))) control = true;
-    else if (SHELL_SPECIAL.has(ch) || (i === 0 && (ch === "#" || ch === "~"))) {
-      special = true;
-    }
+    if (SHELL_SPECIAL.has(ch) || isControl(ch.charCodeAt(0))) return true;
+    if (i === 0 && (ch === "#" || ch === "~")) return true;
   }
-  if (!special && !control) return name;
-  if (!control && name.includes("'") && !/["$`\\!]/.test(name)) {
+  return false;
+}
+
+/**
+ * A name quoted for the shell as gnulib's quotearg quotes it: bare when
+ * nothing in it is special, in double quotes when it holds an apostrophe
+ * and only plain characters besides, else in single quotes. With
+ * `escapes` (diff's messages) a control character is written `$'\n'`,
+ * without (the options on the line naming each pair) as it is.
+ */
+function quoteShell(name: string, escapes: boolean): string {
+  if (!needsQuotes(name)) return name;
+  const chars = [...name];
+  if (
+    name.includes("'") &&
+    chars.every(
+      (ch, i) =>
+        PLAIN.test(ch) ||
+        ch.charCodeAt(0) > 0x7f ||
+        (i === 0 && (ch === "#" || ch === "~")),
+    )
+  ) {
     return `"${name}"`;
   }
   let out = "";
   let run = "";
-  let escapes = "";
+  let escaped = "";
   const flushRun = () => {
     if (run !== "") out += `'${run.replaceAll("'", "'\\''")}'`;
     run = "";
   };
-  const flushEscapes = () => {
-    if (escapes !== "") out += `$'${escapes}'`;
-    escapes = "";
+  const flushEscaped = () => {
+    if (escaped !== "") out += `$'${escaped}'`;
+    escaped = "";
   };
-  for (const ch of name) {
+  for (const ch of chars) {
     const code = ch.charCodeAt(0);
-    if (isControl(code)) {
+    if (escapes && isControl(code)) {
       flushRun();
-      escapes += C_ESCAPES[ch] ?? octal(code);
+      escaped += C_ESCAPES[ch] ?? octal(code);
     } else {
-      flushEscapes();
+      flushEscaped();
       run += ch;
     }
   }
   flushRun();
-  flushEscapes();
-  return out;
+  flushEscaped();
+  return out === "" ? "''" : out;
+}
+
+/** A name as diff's messages print it, quoted for a shell when it must be. */
+export function shellName(name: string): string {
+  return quoteShell(name, true);
+}
+
+/** An option as the line naming each pair of a directory prints it. */
+export function shellWord(arg: string): string {
+  return quoteShell(arg, false);
+}
+
+/** A name as GNU's locale quoting prints it in a UTF-8 locale. */
+export function localeQuote(name: string): string {
+  return `\u2018${name}\u2019`;
 }
 
 const pad = (n: number, width = 2) => String(n).padStart(width, "0");
@@ -112,7 +146,9 @@ function offsetMinutes(date: Date, tz: string | undefined): number {
       get("minute"),
       get("second"),
     );
-    return Math.round((local - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+    return Math.round(
+      (local - Math.floor(date.getTime() / 1000) * 1000) / 60000,
+    );
   } catch {
     return 0;
   }

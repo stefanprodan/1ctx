@@ -3,7 +3,8 @@
 //
 // diff's answers the recorded GNU fixture cannot hold: refusals whose GNU
 // output depends on the clock or a terminal, bytes written through a
-// redirect, and a directory standing for its namesake.
+// redirect, a directory standing for its namesake, directory loops and the
+// limits a walk of two trees is held to.
 
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
@@ -76,6 +77,68 @@ describe("diff", () => {
     const folded = await bash.exec("diff -i a b; echo $?");
     expect(folded.stdout).toBe("2\n");
     expect(folded.stderr).toContain("work limit exceeded");
+  });
+
+  test("sorts a directory's names by bytes in the C locale", async () => {
+    const { bash } = shell({
+      "d1/a": "1\n",
+      "d1/B": "1\n",
+      "d2/a": "2\n",
+      "d2/B": "2\n",
+    });
+    const result = await bash.exec("diff -q d1 d2");
+    expect(result.stdout).toBe(
+      "Files d1/B and d2/B differ\nFiles d1/a and d2/a differ\n",
+    );
+    const collated = await bash.exec("LC_ALL=en_US.UTF-8 diff -q d1 d2");
+    expect(collated.stdout).toBe(
+      "Files d1/a and d2/a differ\nFiles d1/B and d2/B differ\n",
+    );
+  });
+
+  test("stops at a directory that loops back on both sides", async () => {
+    const { fs, bash } = shell({ "d1/f": "a\n", "d2/f": "b\n" });
+    await fs.symlink(".", "/w/d1/self");
+    await fs.symlink(".", "/w/d2/self");
+    const result = await bash.exec("diff -r d1 d2");
+    expect(result.stdout).toBe("diff -r d1/f d2/f\n1c1\n< a\n---\n> b\n");
+    expect(result.stderr).toContain("d1/self: recursive directory loop");
+    expect(result.exitCode).toBe(2);
+  });
+
+  test("charges every pair of a directory to one work limit", async () => {
+    const lines = "x\n".repeat(60000);
+    const fs = new InMemoryFs({}, {});
+    for (const name of ["a", "b"]) {
+      fs.writeFileSync(`/w/d1/${name}`, `${lines}1\n`);
+      fs.writeFileSync(`/w/d2/${name}`, `${lines}2\n`);
+    }
+    const bash = new Bash({
+      fs,
+      cwd: "/w",
+      executionLimits: { maxLoopIterations: 1000 },
+    });
+    const one = await bash.exec("diff d1/a d2/a > /dev/null; echo $?");
+    expect(one.stdout).toBe("1\n");
+    const tree = await bash.exec("diff -r d1 d2 > /dev/null; echo $?");
+    expect(tree.stdout).toBe("2\n");
+    expect(tree.stderr).toContain("work limit exceeded");
+  });
+
+  test("walks directories within the traversal budget", async () => {
+    const fs = new InMemoryFs({}, {});
+    for (let i = 0; i < 20; i++) {
+      fs.writeFileSync(`/w/d1/f${i}`, "a\n");
+      fs.writeFileSync(`/w/d2/f${i}`, "a\n");
+    }
+    const bash = new Bash({
+      fs,
+      cwd: "/w",
+      executionLimits: { maxTraversalEntries: 10 },
+    });
+    const result = await bash.exec("diff -r d1 d2");
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("entry limit exceeded");
   });
 
   test("names each file as the shell would quote it", async () => {
