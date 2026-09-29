@@ -11,7 +11,7 @@ import {
   checkNames,
   parseName,
   textFromBytes,
-} from "../knowledge/index.ts";
+} from "../knowledge/rules.ts";
 import { INTERPRETER_MARGIN_MS } from "./commands.ts";
 import { underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";

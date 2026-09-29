@@ -352,22 +352,14 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   };
 }
 
-export {
-  checkFile,
-  checkNames,
-  checkTotals,
-  checkUsage,
-} from "./check.ts";
+export { checkFile, checkNames, checkTotals } from "./check.ts";
 export type { Change } from "./commit.ts";
-export { languageOf } from "./languages.ts";
-export { parseName } from "./parse.ts";
 export { acquireProcess } from "./queue.ts";
 export {
   type KnowledgeRow,
   KnowledgeStore,
   type MountedDoc,
 } from "./store.ts";
-export { lineCount, textFromBytes } from "./text.ts";
 export {
   type MountedUploads,
   type RestageUploads,

@@ -158,11 +158,17 @@ violation, and every rule has a rejected fixture under
   `shared/`, never `server/`. `server/` imports `client/` only in
   `main.ts`, for the page.
 - Server areas are in a layer order (the `LAYERS` list in the test); an
-  area imports only areas above it, through their `index.ts`. `web/`
+  area imports only areas above it, through their `index.ts` or
+  `rules.ts`. `web/`
   imports only `access` and `lib`; no area imports `web/`, `main.ts` or
   `compose.ts`. The server root holds `main.ts` and `compose.ts` and
   nothing else; those two may import every area. Moving an area in the
   order is a deliberate change to the test in the same commit.
+- An area's `rules.ts` holds pure rules: it imports only its own area's
+  files other than `index.ts`, `lib/` and `shared/`. Neither it nor a
+  `*.worker.ts` loads `db/` or any area's `index.ts` at any depth
+  (type-only imports aside), unless the worker is in
+  `WORKER_EXEMPTIONS` with a reason.
 - No import cycles between files, type-only imports included, comments
   between the clause and `from` included. Dynamic imports are string
   literals, on one line or several; a template with `${}` is not.

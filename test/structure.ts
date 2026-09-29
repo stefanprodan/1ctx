@@ -44,6 +44,13 @@ export const LAYERS = [
 
 export const MAX_LINES = 500;
 
+// workers whose runtime graph may reach the database or an area's
+// index.ts, with the reason
+export const WORKER_EXEMPTIONS: Record<string, string> = {
+  "server/overview/scan.worker.ts":
+    "opens its own database for the storage scan and reads usage's decision slots; it runs on the overview's timer, not per request",
+};
+
 // production files allowed past MAX_LINES, with the reason
 export const LINE_EXEMPTIONS: Record<string, string> = {
   "server/compose.ts":
@@ -169,6 +176,17 @@ function withoutComments(code: string): string {
     .replace(/^[ \t]*\/\/[^\n]*/gm, (c) => " ".repeat(c.length));
 }
 
+// a file inside a server area, and that area's index.ts
+const isAreaFile = (rel: string) => {
+  const area = areaOf(rel);
+  return area.startsWith("server/") && area !== "server/main";
+};
+const isAreaIndex = (rel: string) =>
+  isAreaFile(rel) &&
+  rel.split(sep).length === 3 &&
+  basename(rel) === "index.ts";
+const isWorker = (rel: string) => rel.endsWith(".worker.ts");
+
 const isExternal = (s: string) =>
   !s.startsWith(".") && !s.startsWith("/") && !s.startsWith("@/");
 
@@ -177,6 +195,8 @@ export function check(root: string): Violation[] {
   const files = walk(root);
   const sources = files.filter(isSource);
   const edges = new Map<string, Set<string>>();
+  // the edges that survive transpiling: what a file loads when it runs
+  const runtime = new Map<string, Set<string>>();
 
   for (const file of sources) {
     const rel = relative(root, file);
@@ -221,6 +241,8 @@ export function check(root: string): Violation[] {
       }
     }
     const targets = new Set<string>();
+    const loads = new Set<string>();
+    const isRules = basename(rel) === "rules.ts" && isAreaFile(rel);
     for (const imp of imports) {
       const s = imp.specifier;
       if (isExternal(s)) {
@@ -284,7 +306,20 @@ export function check(root: string): Violation[] {
       }
       if (!isSource(target)) continue;
       targets.add(target);
+      if (imp.kind !== "scan") loads.add(target);
       const targetArea = areaOf(target);
+      if (
+        isRules &&
+        !(targetArea === area && basename(target) !== "index.ts") &&
+        targetArea !== "server/lib" &&
+        targetArea !== "shared"
+      ) {
+        out.push({
+          file: rel,
+          rule: "rules",
+          detail: `imports ${target}; a rules.ts imports only its own area's files, lib and shared`,
+        });
+      }
       if (targetArea === area) continue;
       const detail = `${area} imports ${target}`;
       if (area === "shared") {
@@ -336,17 +371,44 @@ export function check(root: string): Violation[] {
         } else if (
           to !== "lib" &&
           to !== "db" &&
-          basename(target) !== "index.ts"
+          basename(target) !== "index.ts" &&
+          basename(target) !== "rules.ts"
         ) {
           out.push({
             file: rel,
             rule: "facade",
-            detail: `${detail}; use its index.ts`,
+            detail: `${detail}; use its index.ts or rules.ts`,
           });
         }
       }
     }
     edges.set(rel, targets);
+    runtime.set(rel, loads);
+  }
+
+  // a rules.ts and a worker load neither the database nor an area's
+  // index.ts, at any depth, so a worker starts light
+  for (const file of runtime.keys()) {
+    if (!isAreaFile(file)) continue;
+    const rule =
+      basename(file) === "rules.ts"
+        ? "rules"
+        : isWorker(file)
+          ? "worker"
+          : null;
+    if (rule === null || file in WORKER_EXEMPTIONS) continue;
+    const seen = new Set<string>([file]);
+    const queue = [file];
+    while (queue.length > 0) {
+      for (const next of runtime.get(queue.shift()!) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        queue.push(next);
+        if (areaOf(next) === "server/db" || isAreaIndex(next)) {
+          out.push({ file, rule, detail: `loads ${next}` });
+        }
+      }
+    }
   }
 
   // file cycles over the resolved graph, type-only edges included

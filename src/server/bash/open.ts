@@ -9,7 +9,7 @@ import {
   MAX_TITLE,
   VISUAL_FRAME_BYTES,
 } from "../../shared/words.ts";
-import { languageOf, lineCount, textFromBytes } from "../knowledge/index.ts";
+import { languageOf, lineCount, textFromBytes } from "../knowledge/rules.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { MAX_OPENS_PER_COMMAND } from "./commands.ts";
 

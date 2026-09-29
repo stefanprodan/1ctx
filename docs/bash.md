@@ -10,9 +10,12 @@ The docs and uploads a command mounts are knowledge's
 
 ## The area
 
-- **Bash sits after knowledge.** `bash/` imports `knowledge/index.ts`
-  for the pure name, text and language rules, `Change`, the mounted
-  row shapes and `acquireProcess()`; knowledge never imports bash.
+- **Bash sits after knowledge.** `bash/` imports the pure name, text
+  and language rules from `knowledge/rules.ts`, and `Change`, the
+  mounted row shapes and `acquireProcess()` from `knowledge/index.ts`;
+  knowledge never imports bash. The files the command worker loads
+  import only `rules.ts`, so a worker starts without the database, the
+  archives or the renderer; the layout test enforces it.
   `bashArea()` takes the knowledge capability as its port for the
   project's mounted docs, the chat's mounted uploads and `commitDocs`,
   which runs `commitKnowledge` on knowledge's own store inside the

@@ -7,7 +7,8 @@
 
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import { type Db, transact } from "../db/index.ts";
-import { type Change, checkNames, checkUsage } from "../knowledge/index.ts";
+import type { Change } from "../knowledge/index.ts";
+import { checkNames, checkUsage } from "../knowledge/rules.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { output } from "./output.ts";
