@@ -68,6 +68,8 @@ export type AutomationsPort = {
 
 export type RunnerPort = {
   stopAgent(agentId: string): void;
+  // the messages waiting in its chats turn not sent
+  queue: { wake(): void };
 };
 
 export type SkillsPort = {
@@ -323,6 +325,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         deps.automations().scheduler.wake();
         // an archived chat still running ends as a stop does
         deps.runner().stopAgent(agent.id);
+        deps.runner().queue.wake();
         return json({});
       },
     },

@@ -43,6 +43,9 @@ export function prepareSend(fields: {
   changes: readonly (CapabilityChange | undefined)[];
   // the queued messages the turn takes
   claim?: readonly QueuedClaim[];
+  // a start tried in a transaction the caller rolls back: not admitted,
+  // since it asks only whether the rows would start
+  probe?: boolean;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   startKept(
     sessionId: string,
@@ -73,11 +76,13 @@ export function prepareSend(fields: {
       throw new BadRequest("this agent cannot read files");
     }
   }
-  fields.registry.admit(
-    fields.sessionId,
-    { userId: fields.startedBy, projectId: fields.policy.projectId },
-    fields.policy.sendCaps,
-  );
+  if (fields.probe !== true) {
+    fields.registry.admit(
+      fields.sessionId,
+      { userId: fields.startedBy, projectId: fields.policy.projectId },
+      fields.policy.sendCaps,
+    );
+  }
   const sendId = newId();
   const replyId = newId();
   const send = newSend({
@@ -136,16 +141,21 @@ export function prepareSend(fields: {
     throw err;
   }
   let settled = false;
+  let detail: SessionDetail | null = null;
   return {
-    // a send starts only on a chat that is not archived, so no
-    // archive is read and its kept days go unused
-    detail: sessionDetail(
-      fields.sessions,
-      started.session,
-      live(send),
-      0,
-      fields.startedBy,
-    ),
+    // read once, when asked: a queue's start needs none. A send starts
+    // only on a chat that is not archived, so no archive is read and its
+    // kept days go unused
+    get detail() {
+      detail ??= sessionDetail(
+        fields.sessions,
+        started.session,
+        live(send),
+        0,
+        fields.startedBy,
+      );
+      return detail;
+    },
     launch() {
       if (settled) return;
       settled = true;

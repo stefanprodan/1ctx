@@ -71,6 +71,9 @@ export type RoutesDeps = {
   keptDays(): number;
   // the session when the principal may see it, else the one 404
   visible(principal: Principal, id: string): SessionRow;
+  // an archive leaves the chat's waiting messages to the queue, which
+  // turns them not sent
+  wakeQueue(): void;
 };
 
 export function detail(
@@ -349,6 +352,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             events: [archivedEvent(row, deps.store.lastSend(row.id))],
           };
         });
+        deps.wakeQueue();
         return new Response(null, { status: 204 });
       },
     },

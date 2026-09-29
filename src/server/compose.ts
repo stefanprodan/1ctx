@@ -337,6 +337,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     limits,
     uploads: knowledge,
     scratch: bash.scratch,
+    wakeQueue: () => runner.queue.wake(),
   });
   const configuredTools = toolsArea({
     db,

@@ -15,6 +15,7 @@ import { createAutomation, settleRun } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  FLASH,
   type Script,
   setLimits,
   startChat,
@@ -22,7 +23,11 @@ import {
   waitScript,
 } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
-import { stage } from "./uploads-helpers.ts";
+import {
+  stage,
+  send as uploadSend,
+  start as uploadStart,
+} from "./uploads-helpers.ts";
 
 const HOUR = 3_600_000;
 
@@ -65,6 +70,17 @@ const userMessages = (script: Script) =>
   (script.body.messages as { role: string; content: string; name?: string }[])
     .filter((message) => message.role === "user")
     .map(({ content, name }) => ({ content, name }));
+
+const archive = () => new Bun.Archive({ "readme.md": "nested" }).bytes();
+
+// a chat of the member's that holds a file named docs
+async function withDocs(chat: ChatApp) {
+  const docs = await stage(chat, "docs", "root file");
+  const started = await uploadStart(chat, [docs.id]);
+  started.script.reply("done");
+  await settleRun(chat, started.sessionId);
+  return started;
+}
 
 // the admin's own project, where their chats count against them alone
 const adminProject = (chat: ChatApp) =>
@@ -536,20 +552,263 @@ describe("the queue behind a busy chat", () => {
       await queue(other, sessionId, "waits", other.admin);
       script.reply("done");
       await settleRun(other, sessionId);
-      other.app.sessions.archive(
-        sessionId,
-        "manual",
-        null,
-        other.app.now.value,
+      expect(rows(other, sessionId)[0]?.state).toBe("queued");
+      // the archive wakes the queue, with no place freed
+      const archived = await other.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/archive`,
       );
-      busy.script.reply("done");
-      await settleRun(other, busy.sessionId);
-      await tick();
+      expect(archived.status).toBe(204);
       expect(rows(other, sessionId)).toEqual([
         { content: "waits", state: "not-sent", reason: "archived" },
       ]);
+      busy.script.reply("done");
+      await settleRun(other, busy.sessionId);
     } finally {
       await other.app.shutdown();
+    }
+  });
+
+  test("an agent's delete turns an idle chat's waiting rows not sent at once", async () => {
+    const chat = await chatApp();
+    try {
+      await setLimits(chat, { sendsPerUser: 1 });
+      const spare = await chat.makeAgent({ name: "spare", model: FLASH });
+      const { sessionId, script } = await teamChat(chat);
+      const busy = await startChat(
+        chat,
+        "busy",
+        chat.admin,
+        adminProject(chat),
+        spare,
+      );
+      await queue(chat, sessionId, "waits", chat.admin);
+      script.reply("done");
+      await settleRun(chat, sessionId);
+      expect(rows(chat, sessionId)[0]?.state).toBe("queued");
+      const deleted = await chat.admin.call(
+        "DELETE",
+        `/api/agents/${chat.agentId}`,
+      );
+      expect(deleted.status).toBe(200);
+      expect(rows(chat, sessionId)).toEqual([
+        { content: "waits", state: "not-sent", reason: "agent-deleted" },
+      ]);
+      busy.script.reply("done");
+      await settleRun(chat, busy.sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a queued file that clashes with the chat's turns not sent and the process goes on", async () => {
+    const chat = await chatApp();
+    try {
+      const { sessionId } = await withDocs(chat);
+      const busy = await uploadSend(chat, sessionId);
+      const item = await stage(chat, "docs.tar", await archive());
+      await queue(chat, sessionId, "read the archive", chat.member, {
+        uploads: [item.id],
+      });
+      busy.script.reply("done");
+      await settleRun(chat, sessionId);
+      await tick();
+      expect(rows(chat, sessionId)).toEqual([
+        { content: "read the archive", state: "not-sent", reason: "failed" },
+      ]);
+      expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+      expect(chat.scripted.scripts).toHaveLength(2);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a clashing queued file left behind turns not sent on the next message", async () => {
+    const chat = await chatApp();
+    try {
+      const { sessionId } = await withDocs(chat);
+      const item = await stage(chat, "docs.tar", await archive());
+      chat.app.sessions.queue.insert({
+        sessionId,
+        authorId: chat.memberId,
+        text: "left behind",
+        uploads: [item.id],
+        now: chat.app.now.value,
+      });
+      const pending = chat.scripted.next();
+      const sent = await send(chat, sessionId, "fresh");
+      expect(sent.status).toBe(201);
+      const next = await pending;
+      expect(userMessages(next).at(-1)?.content).toBe("fresh");
+      expect(rows(chat, sessionId)).toEqual([
+        { content: "left behind", state: "not-sent", reason: "failed" },
+      ]);
+      next.reply("done");
+      await settleRun(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("of two authors only the row that fails is not sent", async () => {
+    const chat = await chatApp();
+    try {
+      const team = await createTeam(chat.admin, "ops", [chat.memberId]);
+      const docs = await stage(chat, "docs", "root file", chat.member, team.id);
+      const first = await chat.member.call("POST", "/api/sessions", {
+        body: {
+          projectId: team.id,
+          agentId: chat.agentId,
+          message: "first",
+          uploads: [docs.id],
+        },
+      });
+      expect(first.status).toBe(201);
+      const sessionId = (await first.json()).session.id as string;
+      (await waitScript(chat.scripted, 1)).reply("done");
+      await settleRun(chat, sessionId);
+      const running = await send(chat, sessionId, "second");
+      expect(running.status).toBe(201);
+      const script = await waitScript(chat.scripted, 2);
+      const item = await stage(
+        chat,
+        "docs.tar",
+        await archive(),
+        chat.member,
+        team.id,
+      );
+      await queue(chat, sessionId, "clashes", chat.member, {
+        uploads: [item.id],
+      });
+      await queue(chat, sessionId, "plain", chat.admin);
+      script.reply("done");
+      const next = await waitScript(chat.scripted, 3);
+      expect(userMessages(next).slice(-1)).toEqual([
+        { content: "plain", name: "admin" },
+      ]);
+      expect(rows(chat, sessionId)).toEqual([
+        { content: "clashes", state: "not-sent", reason: "failed" },
+      ]);
+      next.reply("done");
+      await settleRun(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("chats whose authors are capped do not hold back the fifth", async () => {
+    const chat = await chatApp();
+    try {
+      await setLimits(chat, {
+        sendsPerUser: 1,
+        sendsPerProject: 4,
+        sendsRunning: 4,
+      });
+      const idle: string[] = [];
+      for (const message of ["a", "b", "c", "d"]) {
+        const done = await startChat(
+          chat,
+          message,
+          chat.admin,
+          adminProject(chat),
+        );
+        done.script.reply("done");
+        await settleRun(chat, done.sessionId);
+        idle.push(done.sessionId);
+      }
+      const mine = await startChat(chat, "mine");
+      mine.script.reply("done");
+      await settleRun(chat, mine.sessionId);
+      // the admin's one place is taken, so their four chats wait
+      const busy = await startChat(
+        chat,
+        "busy",
+        chat.admin,
+        adminProject(chat),
+      );
+      const at = chat.app.now.value;
+      for (const [i, sessionId] of idle.entries()) {
+        chat.app.sessions.queue.insert({
+          sessionId,
+          authorId: chat.adminId,
+          text: `old ${i}`,
+          now: at - 10 + i,
+        });
+      }
+      chat.app.sessions.queue.insert({
+        sessionId: mine.sessionId,
+        authorId: chat.memberId,
+        text: "newest",
+        now: at,
+      });
+      const count = chat.scripted.scripts.length + 1;
+      chat.app.runner.queue.wake();
+      const next = await waitScript(chat.scripted, count);
+      expect(userMessages(next).at(-1)?.content).toBe("newest");
+      for (const sessionId of idle) {
+        expect(rows(chat, sessionId)[0]?.state).toBe("queued");
+      }
+      next.reply("done");
+      await settleRun(chat, mine.sessionId);
+      busy.script.reply("done");
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a capped oldest author does not hold back the others", async () => {
+    const chat = await chatApp();
+    try {
+      await setLimits(chat, { sendsPerUser: 1 });
+      const { sessionId, script } = await teamChat(chat);
+      const other = await startChat(
+        chat,
+        "elsewhere",
+        chat.admin,
+        adminProject(chat),
+      );
+      await queue(chat, sessionId, "from the admin", chat.admin);
+      await queue(chat, sessionId, "from casey");
+      script.reply("first answer");
+      const next = await waitScript(chat.scripted, 3);
+      expect(userMessages(next).slice(-2)).toEqual([
+        { content: "from the admin", name: "admin" },
+        { content: "from casey", name: "casey" },
+      ]);
+      expect(chat.app.runner.registry.get(sessionId)?.startedBy).toBe(
+        chat.memberId,
+      );
+      next.reply("done");
+      other.script.reply("done");
+      await settleRun(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("two authors' capability changes apply in order, the later winning", async () => {
+    const chat = await chatApp();
+    try {
+      const { sessionId, script } = await teamChat(chat);
+      await queue(chat, sessionId, "one", chat.member, {
+        capabilities: { disable: ["web", "memory"] },
+      });
+      await queue(chat, sessionId, "two", chat.admin, {
+        capabilities: { enable: ["web"], disable: ["visualize"] },
+      });
+      script.reply("done");
+      const next = await waitScript(chat.scripted, 2);
+      expect(chat.app.sessions.byId(sessionId)!.disabledCapabilities).toEqual([
+        "memory",
+        "visualize",
+      ]);
+      expect(
+        chat.app.runner.registry.get(sessionId)?.policy.disabledCapabilities,
+      ).toEqual(["memory", "visualize"]);
+      next.reply("done");
+      await settleRun(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
     }
   });
 

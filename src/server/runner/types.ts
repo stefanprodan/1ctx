@@ -91,6 +91,8 @@ export type Runner = {
     sessionId: string,
     messages: readonly TurnMessage[],
     claim?: readonly QueuedClaim[],
+    // the index of the author it counts against, the first by default
+    starter?: number,
   ): SessionDetail;
   // a message: its turn when the chat is free, else queued behind it
   message(

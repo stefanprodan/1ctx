@@ -109,6 +109,8 @@ export type SessionsDeps = {
   uploads: UploadsPort;
   scratch: SweepScratch;
   limits: { current(): { archivedDeleteDays: number } };
+  // the queue's dispatcher, built later in the runner
+  wakeQueue(): void;
 };
 
 export type Sessions = {
@@ -254,6 +256,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         uploads: deps.uploads,
         keptDays: () => deps.limits.current().archivedDeleteDays,
         visible,
+        wakeQueue: () => deps.wakeQueue(),
       }),
       ...queuedRoutes({
         db: deps.db,

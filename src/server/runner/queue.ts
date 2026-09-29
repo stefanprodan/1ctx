@@ -7,10 +7,12 @@
 // run never takes the place a user's message waits for. A wake is
 // level-triggered: a pass reads the chats with queued rows, one indexed
 // read when there are none, and a wake during a pass runs another. A
-// queued row holds no place in any cap. A row that can no longer start
-// turns not sent with its reason; one whose author lost the chat goes.
-// One timer, set to the oldest row's expiry, expires rows in an idle
-// process.
+// queued row holds no place in any cap. A full cap, the lock or a lost
+// claim leaves the rows queued; any other refusal turns the rows that
+// cause it not sent, each found by a start tried in a transaction that
+// is rolled back, and the rest start. One whose author lost the chat
+// goes. One timer, set to the oldest row's expiry, expires rows in an
+// idle process.
 
 import type { SendMessageRequest } from "../../shared/api/sessions.ts";
 import type { QueuedMessage } from "../../shared/contracts/session.ts";
@@ -18,29 +20,24 @@ import type { NotSentReason } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import {
-  BadRequest,
-  Conflict,
-  HttpError,
-  TooManyRequests,
-} from "../lib/errors.ts";
+import { Conflict, HttpError } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { LIMIT_DEFINITIONS, type Limits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
-  MAX_QUEUED_PER_CHAT,
   type QueuedRow,
   queueChanged,
-  queuedOnWire,
   refuseArchived,
   type SessionRow,
   type SessionStore,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
-import type { Registry } from "./registry.ts";
-import type { QueuedClaim } from "./start.ts";
+import { queueMessage } from "./enqueue.ts";
+import type { PreparedRun } from "./prepare.ts";
+import { CapFull, LockHeld, type Registry, RunCapacity } from "./registry.ts";
+import { ClaimLost, type QueuedClaim } from "./start.ts";
 import type { TurnMessage } from "./turn.ts";
 
 const MINUTE_MS = 60_000;
@@ -68,12 +65,33 @@ export type DispatcherDeps = {
       ids: readonly string[],
     ): void;
   };
-  sendTurn(
+  // the turn prepared and not launched; a probe is not admitted, since
+  // it only asks whether the rows start
+  prepareTurn(
     sessionId: string,
     messages: readonly TurnMessage[],
     claim: readonly QueuedClaim[],
-  ): void;
+    starter: number,
+    probe?: boolean,
+  ): PreparedRun;
 };
+
+// what one chat's start came to; a full process ends the pass
+type Outcome = "none" | "started" | "waits" | "process";
+
+// the refusals that leave the rows queued for a later wake, by class
+const keeps = (err: unknown): boolean =>
+  err instanceof CapFull ||
+  err instanceof RunCapacity ||
+  err instanceof LockHeld ||
+  err instanceof ClaimLost;
+
+const processFull = (err: unknown): boolean =>
+  (err instanceof CapFull || err instanceof RunCapacity) &&
+  err.cap === "process";
+
+// a probe's own throw, which rolls its transaction back
+const PROBED = new Error("probed");
 
 export type Dispatcher = {
   // expire what waited too long, start what can, set the timer
@@ -90,9 +108,6 @@ export type Dispatcher = {
   ): QueuedMessage | null;
 };
 
-const waiting = (n: number, what: string) =>
-  `${what} ${n === 1 ? "1 message" : `${n} messages`} waiting`;
-
 export function dispatcher(deps: DispatcherDeps): Dispatcher {
   const { db, sessions, registry } = deps;
   const queue = sessions.queue;
@@ -104,6 +119,16 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
   let token = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let armedMinutes: number | null = null;
+  // one later wake at a time, on a macrotask so others run between
+  let later = false;
+  const wakeLater = () => {
+    if (later || closed) return;
+    later = true;
+    setTimeout(() => {
+      later = false;
+      wake();
+    }, 0);
+  };
 
   const sees = (user: UserRow, projectId: string): boolean => {
     try {
@@ -209,49 +234,115 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     return { session, ready };
   };
 
-  const startChat = (sessionId: string): void => {
-    const sorted = sort(sessionId);
-    if (sorted === null || sorted.ready.length === 0) return;
-    const rows = sorted.ready;
+  const messagesOf = (rows: readonly QueuedRow[]): TurnMessage[] =>
+    rows.map((row) => ({
+      userId: row.authorId,
+      message: row.text,
+      ...(row.uploads.length > 0 ? { uploads: row.uploads } : {}),
+      ...(row.capabilities === undefined
+        ? {}
+        : { capabilities: row.capabilities }),
+    }));
+  const claimsOf = (rows: readonly QueuedRow[]): QueuedClaim[] =>
+    rows.map((row) => ({ id: row.id, revision: row.revision }));
+
+  // the turn counts against its oldest author with room under their own
+  // cap, so a capped author never holds back the others
+  const starterOf = (rows: readonly QueuedRow[]): number => {
+    const cap = deps.limits.current().sendsPerUser;
+    return rows.findIndex((row) => registry.startedBy(row.authorId) < cap);
+  };
+
+  // the start's refusal, or null once it launched
+  const launch = (sessionId: string, rows: readonly QueuedRow[]) => {
+    const starter = starterOf(rows);
+    if (starter < 0) return new CapFull("user", "every author is busy");
     try {
-      deps.sendTurn(
-        sessionId,
-        rows.map((row) => ({
-          userId: row.authorId,
-          message: row.text,
-          ...(row.uploads.length > 0 ? { uploads: row.uploads } : {}),
-          ...(row.capabilities === undefined
-            ? {}
-            : { capabilities: row.capabilities }),
-        })),
-        rows.map((row) => ({ id: row.id, revision: row.revision })),
-      );
-      deps.log.info("queue start", { chat: sessionId, messages: rows.length });
+      deps
+        .prepareTurn(sessionId, messagesOf(rows), claimsOf(rows), starter)
+        .launch();
+      return null;
     } catch (err) {
-      // a full cap, a held lock, a lost claim or a shutdown: the rows
-      // wait for the next wake
-      if (err instanceof TooManyRequests || err instanceof Conflict) return;
-      settle(sessionId, [], new Map([["failed", rows]]));
-      deps.log.warn("queue start failed", {
-        chat: sessionId,
-        messages: rows.length,
-        ...errorFields(err, false),
-      });
+      return err;
     }
+  };
+
+  // the start's refusal, or null, with nothing written
+  const probe = (sessionId: string, rows: readonly QueuedRow[]) => {
+    try {
+      transact(db, () => {
+        deps
+          .prepareTurn(sessionId, messagesOf(rows), claimsOf(rows), 0, true)
+          .abandon();
+        throw PROBED;
+      });
+      return null;
+    } catch (err) {
+      return err === PROBED ? null : err;
+    }
+  };
+
+  // the rows the refusal came from, each tried after those that pass
+  const culprits = (sessionId: string, rows: readonly QueuedRow[]) => {
+    const pass: QueuedRow[] = [];
+    const failing: QueuedRow[] = [];
+    for (const row of rows) {
+      if (probe(sessionId, [...pass, row]) === null) pass.push(row);
+      else failing.push(row);
+    }
+    return { pass, failing };
+  };
+
+  const fail = (
+    sessionId: string,
+    rows: readonly QueuedRow[],
+    err: unknown,
+  ) => {
+    if (rows.length === 0) return;
+    settle(sessionId, [], new Map([["failed", rows]]));
+    deps.log.warn("queue start failed", {
+      chat: sessionId,
+      messages: rows.length,
+      status: err instanceof HttpError ? err.status : 500,
+    });
+  };
+
+  const startChat = (sessionId: string): Outcome => {
+    const sorted = sort(sessionId);
+    if (sorted === null || sorted.ready.length === 0) return "none";
+    // a start that fails frees and wakes; only a lost claim asks again
+    const before = again;
+    let rows = sorted.ready;
+    let err = launch(sessionId, rows);
+    if (err !== null && !keeps(err)) {
+      const found = culprits(sessionId, rows);
+      fail(sessionId, found.failing, err);
+      rows = found.pass;
+      err = rows.length === 0 ? null : launch(sessionId, rows);
+      if (err !== null && !keeps(err)) {
+        fail(sessionId, rows, err);
+        rows = [];
+        err = null;
+      }
+    }
+    if (!(err instanceof ClaimLost)) again = before;
+    if (err === null) {
+      if (rows.length === 0) return "none";
+      deps.log.info("queue start", { chat: sessionId, messages: rows.length });
+      return "started";
+    }
+    return processFull(err) ? "process" : "waits";
   };
 
   const pass = (): void => {
     const held = registry.values().map((send) => send.sessionId);
-    // the ceiling bounds the read, so a wake with nothing queued reads
-    // nothing else; the cap bounds the starts
-    const page = queue.waitingChats(held, SENDS_CEILING);
-    if (page.length === 0) return;
-    const limit = deps.limits.current().sendsRunning;
-    for (const sessionId of page.slice(0, limit)) {
+    // the page is bounded by the ceiling; a chat whose authors or
+    // project are at their cap is passed over, a full process ends it
+    for (const sessionId of queue.waitingChats(held, SENDS_CEILING)) {
       if (closed) return;
       if (registry.get(sessionId) !== null) continue;
       try {
-        startChat(sessionId);
+        if (startChat(sessionId) === "process") return;
       } catch (err) {
         deps.log.error("queue pass failed", {
           chat: sessionId,
@@ -293,7 +384,8 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     armedMinutes = null;
   };
 
-  const arm = (): void => {
+  // floorMs keeps a row that failed to expire from ringing at once
+  const arm = (floorMs = 0): void => {
     disarm();
     if (closed) return;
     const oldest = queue.oldestQueuedAt();
@@ -305,11 +397,11 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       if (mine !== token || closed) return;
       armedMinutes = null;
       expire();
-      arm();
+      arm(queue.oldestQueuedAt() === oldest ? MINUTE_MS : 0);
     };
-    const ms = oldest + minutes * MINUTE_MS - deps.clock();
+    const ms = Math.max(oldest + minutes * MINUTE_MS - deps.clock(), floorMs);
     if (ms <= 0) {
-      queueMicrotask(ring);
+      timer = setTimeout(ring, 0);
     } else if (deps.clock.sleep !== undefined) {
       void deps.clock.sleep(ms).then(ring);
     } else {
@@ -322,7 +414,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     if (!started || closed) return;
     // a pass writes its own transactions, so never inside another
     if (db.inTransaction) {
-      queueMicrotask(wake);
+      wakeLater();
       return;
     }
     if (dispatching) {
@@ -338,7 +430,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       }
       if (again) {
         again = false;
-        queueMicrotask(wake);
+        wakeLater();
       }
     } finally {
       dispatching = false;
@@ -367,44 +459,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       startChat(session.id);
     }
     if (registry.get(session.id) === null) return null;
-    const user = deps.users.byId(principal.userId);
-    if (user === null) throw new BadRequest("the user is gone");
-    if (fields.uploads?.length) {
-      deps.uploads.checkUploads(user.id, session.projectId, fields.uploads);
-    }
-    const now = deps.clock();
-    const queued = transact(db, () => {
-      const mine = queue.userCount(user.id);
-      if (mine >= deps.limits.current().queuedPerUser) {
-        throw new TooManyRequests(
-          `${waiting(mine, "You have")}. Send or discard one first.`,
-        );
-      }
-      const rows = queue.waiting(session.id);
-      if (rows.length >= MAX_QUEUED_PER_CHAT) {
-        throw new TooManyRequests(
-          `${waiting(rows.length, "This chat has")}. Try again when the reply ends.`,
-        );
-      }
-      const taken = new Set(rows.flatMap((row) => row.uploads));
-      if (fields.uploads?.some((id) => taken.has(id))) {
-        throw new BadRequest("each file can be added to one message");
-      }
-      const row = queue.insert({
-        sessionId: session.id,
-        authorId: user.id,
-        text: fields.message,
-        uploads: fields.uploads,
-        capabilities: fields.capabilities,
-        now,
-      });
-      const event = queueChanged(db, sessions, session.id);
-      return {
-        result: queuedOnWire(row, user.username),
-        events: event === null ? [] : [event],
-      };
-    });
-    deps.log.info("queued", { chat: session.id, user: user.username });
+    const queued = queueMessage(deps, session, principal.userId, fields);
     if (started && !closed && armedMinutes === null) arm();
     return queued;
   };

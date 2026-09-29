@@ -42,7 +42,7 @@ import { sendPolicy } from "./send-policy.ts";
 import { shutdownRunner } from "./shutdown.ts";
 import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
-import { applyChanges, checkTurn } from "./turn.ts";
+import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
 import { Writer } from "./writer.ts";
 
@@ -216,6 +216,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     turn: StartFields["turn"];
     changes: readonly (CapabilityChange | undefined)[];
     claim?: readonly QueuedClaim[];
+    probe?: boolean;
   }): PreparedRun => {
     const { event = null, session, user, turn } = fields;
     const disabled = applyChanges(
@@ -249,6 +250,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       turn,
       changes: fields.changes,
       ...(fields.claim === undefined ? {} : { claim: fields.claim }),
+      probe: fields.probe === true,
       title: fields.title,
       kind: event === null ? "chat" : "run",
       origin: event === null ? "chat" : "automation",
@@ -259,11 +261,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
     });
   };
 
-  const begin = (fields: Parameters<typeof prepare>[0]): SessionDetail => {
-    const prepared = prepare(fields);
+  const launched = (prepared: PreparedRun): SessionDetail => {
     prepared.launch();
     return prepared.detail;
   };
+  const begin = (fields: Parameters<typeof prepare>[0]): SessionDetail =>
+    launched(prepare(fields));
 
   const newUser = (
     user: UserRow,
@@ -285,7 +288,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
       user?: UserRow;
     })[],
     claim?: readonly QueuedClaim[],
-  ): SessionDetail => {
+    // the author the turn counts against and whose policy it runs under
+    starter = 0,
+    probe = false,
+  ): PreparedRun => {
     let session: SessionRow | null = null;
     let project: ProjectRow | null = null;
     const authors: UserRow[] = [];
@@ -301,11 +307,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       authors.push(user ?? author(principal));
     }
     const first = session!;
-    return begin({
+    return prepare({
       sessionId: first.id,
       session: first,
       project: project!,
-      user: authors[0]!,
+      user: authors[starter]!,
       agent: agentOf(first.agentId),
       title: first.title,
       turn: {
@@ -315,7 +321,28 @@ export function runnerArea(deps: RunnerDeps): Runner {
       },
       changes: messages.map((fields) => fields.capabilities),
       ...(claim === undefined ? {} : { claim }),
+      probe,
     });
+  };
+
+  const prepareTurn = (
+    sessionId: string,
+    messages: readonly TurnMessage[],
+    claim?: readonly QueuedClaim[],
+    starter?: number,
+    probe?: boolean,
+  ): PreparedRun => {
+    checkTurn(messages);
+    return continueChat(
+      sessionId,
+      messages.map(({ userId, ...fields }) => {
+        const user = liveAuthor(deps.users.byId(userId));
+        return { ...fields, user, principal: principalOf(user) };
+      }),
+      claim,
+      starter,
+      probe,
+    );
   };
 
   const liveOf = (sessionId: string) => {
@@ -341,18 +368,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
       });
     },
     send(principal, sessionId, fields) {
-      return continueChat(sessionId, [{ ...fields, principal }]);
+      return launched(continueChat(sessionId, [{ ...fields, principal }]));
     },
-    sendTurn(sessionId, messages, claim) {
-      checkTurn(messages);
-      return continueChat(
-        sessionId,
-        messages.map(({ userId, ...fields }) => {
-          const user = liveAuthor(deps.users.byId(userId));
-          return { ...fields, user, principal: principalOf(user) };
-        }),
-        claim,
-      );
+    sendTurn(sessionId, messages, claim, starter) {
+      return launched(prepareTurn(sessionId, messages, claim, starter));
     },
     message(principal, sessionId, fields) {
       const queued = runner.queue.enqueue(principal, sessionId, fields);
@@ -460,9 +479,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   runner.queue = dispatcher({
     ...deps,
     registry,
-    sendTurn: (sessionId, messages, claim) => {
-      runner.sendTurn(sessionId, messages, claim);
-    },
+    prepareTurn,
   });
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),

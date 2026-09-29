@@ -48,8 +48,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   message only; the routes send a list of one. It takes each author by
   id and reads them as they are at the start: a missing or disabled
   user is a 400, one who must change their password a 403 as the router
-  gives, and every author must see the chat and write in its project. The send counts against the first author and its policy is
-  theirs. On the
+  gives, and every author must see the chat and write in its project. The send counts against the first author, or the one the
+  dispatcher names, and its policy is theirs. On the
   wire each is its own user message with its author's `name`, since
   every wire is the OpenAI chat shape, which takes consecutive user
   messages. The envelope's `last` is the last message's.
@@ -74,23 +74,39 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   `runner/queue.ts`, started in `compose.ts` after `sessions.repair()`
   and before the scheduler, closed first at shutdown. The `wake` port
   runs a pass before the scheduler hears it, so a freed place goes to a
-  waiting message before a due run; a pass inside a transaction is put
-  off to a microtask, and a wake during a pass runs one more. A pass
-  reads the chats with queued rows whose lock is free, oldest first, at
-  most `sendsRunning` (one indexed read when none waits), and for each
-  sorts its rows: an author who no longer sees the chat loses theirs
-  (deleted); an archived chat (`archived`), a retired agent
-  (`agent-deleted`), a row past `queuedMinutes` from `queued_at`
-  (`expired`), a gone, disabled or must-change-password author or a
-  staged upload that no longer checks (`failed`) turn not sent. The rest
-  start through `sendTurn()` in order, the first author counted, with a
-  claim: `startSend`'s transaction deletes them by id and revision, and
-  one that lost (edited or removed) throws `ClaimLost`, so the start
-  writes nothing and its freed lock wakes again. A full cap, a held
-  lock or a shutdown leaves them queued for the next wake; any other
-  refusal turns them not sent (`failed`). One timer, on the clock port,
-  is set to the oldest queued row's expiry and reset when the limit
-  moves, so an idle process expires rows too; a restart expires at
+  waiting message before a due run; a pass inside a transaction, and
+  what is left after four passes of one wake, is put off to a timer (a
+  macrotask, never a microtask, so the process goes on), and a wake
+  during a pass runs one more. A pass walks the chats with queued rows
+  whose lock is free, oldest first, a page bounded by the ceiling of
+  `sendsRunning` (one indexed read when none waits), passing over a
+  chat whose authors or project are at their cap and ending at a full
+  process. For each chat it sorts the rows: an author who no longer sees
+  the chat loses theirs (deleted); an archived chat (`archived`), a
+  retired agent (`agent-deleted`), a row past `queuedMinutes` from
+  `queued_at` (`expired`), a gone, disabled or must-change-password
+  author or a staged upload that no longer checks (`failed`) turn not
+  sent. The rest start through the runner's turn in order, each with
+  its own author, counted against the oldest author with room under
+  `sendsPerUser`, whose policy the turn runs under; with none, they
+  wait. The start carries a claim: `startSend`'s transaction deletes
+  the rows by id and revision, and one that lost (edited or removed)
+  throws `ClaimLost`, so the start writes nothing and its freed lock
+  wakes again. Only a full cap (`CapFull`, `RunCapacity`), the lock's
+  own refusals (`LockHeld`: held, stopping, shutting down) and
+  `ClaimLost` leave the rows queued, matched by class. Any other
+  refusal (an upload that clashes with the chat's files, the tree's
+  totals, an agent that cannot read files, capability changes that
+  overflow together) finds its rows: each row is tried after those
+  that passed, in a start rolled back with its transaction and not
+  admitted, the ones that fail turn not sent (`failed`, logged with the
+  status alone) and the rest start. A failed start never asks for
+  another pass of its chat. One timer, on the clock port, is set to the
+  oldest queued row's expiry and reset when the limit moves, so an idle
+  process expires rows too; a restart expires at start. An archive and
+  an agent's delete wake the dispatcher, so their chats' rows turn not
+  sent at once. A queue's start builds no session detail; a POST's
+  answer reads it.
   start. Removing a member drops their rows in its transaction. `PATCH`
   and `DELETE /api/sessions/:id/queued/:queuedId` are the author's
   alone, an admin's included (403), each naming the revision seen: a
