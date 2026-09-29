@@ -127,9 +127,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   (reason `agent`, a revision and an envelope each, its scratch
   deleted, never a run) through `SessionStore.archive()`, and suspends
   its active automations as the admin, with an `automation.changed` for
-  every automation of the agent, a paused one included. After the commit the scheduler
-  is woken and the runner stops every send whose policy names the
-  agent, so a chat archived while running ends as a stop does. `GET
+  every automation of the agent, a paused one included. After the
+  commit the scheduler is woken and the runner stops every send whose
+  policy names the agent, so a chat archived while running ends as a
+  stop does. `GET
   /api/agents/:id/impact` counts what it would archive, pause and
   stop. `GET /api/agents` answers with the list each agent's last send
   start and whether one runs now (`agentActivity()`, over the
