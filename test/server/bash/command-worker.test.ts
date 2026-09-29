@@ -289,15 +289,28 @@ describe("the command worker", () => {
   );
 
   test("a loop that yields stops at the interpreter's deadline with its words", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const settled = await workers.run(
+      job("echo x > /knowledge/late; while :; do sleep 0.05; done", {
+        endsAt: Date.now() + 1500,
+      }),
+      hooks,
+      stops(AbortSignal.timeout(60_000)),
+    );
+    expect(settled).toMatchObject({
+      ok: true,
+      answer: { exitCode: 124, changes: null },
+    });
+    expect(settled.ok && settled.answer.stderr).toContain("exceeded");
+  });
+
+  test("the call timeout is the interpreter's deadline, before the backstop", async () => {
     const s = setup();
     try {
       const result = await run(
         s,
         "echo x > /knowledge/late; while :; do sleep 0.05; done",
-        {
-          ...callCaps,
-          callTimeoutMs: 1500,
-        },
+        { ...callCaps, callTimeoutMs: 1500 },
       );
       expect(result.error).toBe(true);
       expect(result.content).toContain("exceeded");

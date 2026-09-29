@@ -55,7 +55,8 @@ mount in `docs/bash.md`.
 - **The server places every row.** A change to a limit or a tool applies to
   the next send, a run cap to the next admission; a send in flight
   keeps the caps and the set it started on. A round's calls run in
-  parallel under the call timeout and the send's signal. A tool row is
+  parallel under the call timeout (plus a tool's `graceMs`, bash's 1.5 s
+  to answer at its own deadline) and the send's signal. A tool row is
   a message of kind `tool`, and each tool's end is one transaction,
   one revision, one envelope; only the reply text streams. Every
   message carries its `send_id` and `round`, and a reply row its

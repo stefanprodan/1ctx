@@ -8,9 +8,9 @@
 export const MAX_OPENS_PER_COMMAND = 10;
 // the cap on a command's commands and on each loop, awk, sed and jq
 export const COMMAND_ITERATIONS = 100_000;
-// the interpreter stops this long before the server's deadline, so its
-// own exit 124 and words usually win and ending the worker is the backstop
-export const INTERPRETER_MARGIN_MS = 200;
+// the interpreter stops at the call timeout and the worker is ended this
+// long after, so the interpreter's exit 124, words and output win
+export const BACKSTOP_MS = 1000;
 
 export const KNOWLEDGE_COMMANDS = [
   "ls",

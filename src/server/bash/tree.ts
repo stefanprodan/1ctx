@@ -12,7 +12,6 @@ import {
   parseName,
   textFromBytes,
 } from "../knowledge/rules.ts";
-import { INTERPRETER_MARGIN_MS } from "./commands.ts";
 import { underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
 
@@ -205,7 +204,7 @@ export function executionLimits(
   remainingMs: number,
 ): NonNullable<BashOptions["executionLimits"]> {
   return {
-    maxExecutionTimeMs: Math.max(1, remainingMs - INTERPRETER_MARGIN_MS),
+    maxExecutionTimeMs: Math.max(1, remainingMs),
     maxOutputSize: job.ioBytes,
     maxHeredocSize: job.knowledgeFileBytes,
     maxStringLength: job.ioBytes,

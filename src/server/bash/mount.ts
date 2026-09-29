@@ -20,7 +20,7 @@ import {
 } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
-import { COMMAND_ITERATIONS } from "./commands.ts";
+import { BACKSTOP_MS, COMMAND_ITERATIONS } from "./commands.ts";
 import { type CommitDocs, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
@@ -126,7 +126,7 @@ export async function run(
   const deadline = new AbortController();
   const timer = setTimeout(
     () => deadline.abort(new Error("command timed out")),
-    caps.callTimeoutMs,
+    caps.callTimeoutMs + BACKSTOP_MS,
   );
   const combined = AbortSignal.any([signal, deadline.signal]);
   let release: (() => void) | undefined;

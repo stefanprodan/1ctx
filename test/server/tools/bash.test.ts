@@ -85,7 +85,8 @@ describe("bash", () => {
       names: false,
       variant: null,
     });
-    expect(listed.tokens).toBe(wireTokens([tool]));
+    const { name, description, parameters } = tool;
+    expect(listed.tokens).toBe(wireTokens([{ name, description, parameters }]));
     expect(tool.description).not.toContain("{{year}}");
     expect(tool.description).toContain("curl calls HTTP APIs on any host,");
     expect(tool.description).not.toContain(";");
