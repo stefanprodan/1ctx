@@ -29,6 +29,10 @@ export type ScratchChanges = {
   cwd: string;
 };
 
+// a file's size counts its name, so empty files cannot store megabytes
+// of paths under the byte cap
+const STORED_BYTES = "length(data) + length(cast(path as blob))";
+
 export class ScratchStore {
   constructor(private readonly db: Db) {}
 
@@ -107,7 +111,7 @@ export class ScratchStore {
     this.db
       .query(
         `update session_scratch set (bytes, files) = (
-           select coalesce(sum(length(data)), 0), count(*)
+           select coalesce(sum(${STORED_BYTES}), 0), count(*)
            from session_scratch_files where session_id = ?
          ) where session_id = ?`,
       )
@@ -119,7 +123,7 @@ export class ScratchStore {
   sizes(sessionId: string): { path: string; bytes: number }[] {
     return this.db
       .query<{ path: string; bytes: number }, [string]>(
-        `select path, length(data) as bytes from session_scratch_files
+        `select path, ${STORED_BYTES} as bytes from session_scratch_files
          where session_id = ?`,
       )
       .all(sessionId);

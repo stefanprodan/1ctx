@@ -9,6 +9,7 @@
 
 import type { FetchResult } from "just-bash";
 import { isKnowledgeName, OPENED_KINDS } from "../../shared/words.ts";
+import { isScratchName } from "./names.ts";
 import type { OpenedRecord } from "./open.ts";
 
 // where a failed command ended, and why, as the tool log counts them
@@ -161,7 +162,7 @@ function isScratchEntry(value: unknown): value is ScratchEntry {
   return (
     isObject(value) &&
     keys(value, ["path", "data", "mode"]) &&
-    isKnowledgeName(value.path) &&
+    isScratchName(value.path) &&
     isBytes(value.data) &&
     isCount(value.mode)
   );
@@ -173,7 +174,7 @@ function isChanges(value: unknown): value is Changes {
     keys(value, ["knowledge", "written", "removed", "cwd"]) &&
     isList(value.knowledge, isKnowledgeChange) &&
     isList(value.written, isScratchEntry) &&
-    isList(value.removed, isKnowledgeName) &&
+    isList(value.removed, isScratchName) &&
     isString(value.cwd)
   );
 }

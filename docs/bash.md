@@ -31,11 +31,12 @@ changes to it, its recorders) in `vendor/README.md`.
   the server drops a message of another id or type, after its job
   settled, or a request number seen before, and fails the job at once
   (`command answer malformed`) on an answer of the wrong shape. It
-  re-derives every decision from what it holds: names and paths by the
-  knowledge name rule, deletes only of mounted files, scratch totals
-  from the rows it wrote, no doc change with the docs off, nothing
-  saved on exit 124 or 126, and an opened record only as `open` would
-  make it (`checkOpened()`).
+  re-derives every decision from what it holds: doc names by the
+  knowledge name rule, scratch paths by the scratch rule on the answer,
+  over the stored rows at commit and at mount, deletes only of mounted
+  files, scratch totals from the rows it wrote, no doc change with the
+  docs off, nothing saved on exit 124 or 126, and an opened record only
+  as `open` would make it (`checkOpened()`).
 - **The worker holds no database and no key.** A kept file is a read
   request the server answers with `readKept`; a failed read is a read
   error in the command. curl's fetch is a request the server runs
@@ -92,14 +93,40 @@ changes to it, its recorders) in `vendor/README.md`.
   overflow rolls both back.
 - **Scratch is the chat's `/tmp`.** `ScratchStore` (`bash/scratch.ts`)
   over `session_scratch` and `session_scratch_files`, cascading with the
-  session, keeps regular files of any bytes and their modes under the
-  knowledge name rules; a symlink or other type fails the command, empty
-  directories are not kept. A missing saved cwd starts in `/knowledge`
-  (`/tmp` with the docs off) with a notice. The hourly sweep drops
-  scratch idle past `scratchIdleDays` (the sweep line's `bash` field);
-  archiving a chat drops its scratch through the sessions area's port.
-  Both skip a chat in the held set, the one in `bash/queue.ts` of chats
-  holding or waiting for a command. An agent's delete keeps scratch.
+  session, keeps regular files of any bytes and their modes; a symlink
+  or other type fails the command, empty directories are not kept. A
+  missing saved cwd starts in `/knowledge` (`/tmp` with the docs off)
+  with a notice. The hourly sweep drops scratch idle past
+  `scratchIdleDays` (the sweep line's `bash` field); archiving a chat
+  drops its scratch through the sessions area's port. Both skip a chat
+  in the held set, the one in `bash/queue.ts` of chats holding or
+  waiting for a command. An agent's delete keeps scratch.
+- **A scratch name is what a real `/tmp` takes.** `bash/names.ts` holds
+  the rule: any character but NUL, case-sensitive, no empty, `.` or `..`
+  segment, well-formed Unicode (a lone surrogate would be stored as
+  U+FFFD), at most 255 bytes a segment (Linux's `NAME_MAX`) and 16
+  segments, so a name stays under `PATH_MAX`. The depth cap is low
+  because just-bash's tree walks grow with depth times entries: at 64,
+  one command could fill `/tmp` so deep that no later `rm -rf` or `ls
+  -R` finished within the deadline. A file and a folder cannot share a
+  path. The knowledge rule stays on `/knowledge`, so copying a spaced
+  scratch file there fails with its words.
+- **Scratch counts names as bytes.** A file's stored size is its bytes
+  plus its path's, so empty files cannot hold megabytes of names under
+  `scratchBytes`. The answer's written list is refused past
+  `scratchFiles` (or the mounted count, if larger) before any row is
+  written, and the commit checks the totals before it walks the names.
+- **A stored row outside the rule is left out, not fatal.** The mount
+  skips it (and a file under a stored file's path) with the notice
+  `left out N files in /tmp whose name is no longer allowed, dropped
+  when the command saves`, and a saving command removes it, so a
+  stricter rule never locks a chat out of its `/tmp`.
+- **A cwd or an opened path is one line.** It is at most `/tmp/` plus
+  the longest scratch name, well-formed, with no control character or
+  line break, and under `/tmp` by the scratch rule; `open` refuses such
+  a name itself rather than failing the command. A visual's fallback
+  title, the file's base name, is cut to `MAX_TITLE`, and becomes
+  `Visual` when the name breaks a line.
 - **`open` copies a file onto the chat page.** `open <file>`
   (`bash/open.ts`, `trusted: false`) copies a mounted text file as it is
   now: `.html`, `.htm` and `.svg` as a visual when Visuals was on at

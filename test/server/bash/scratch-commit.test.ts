@@ -48,20 +48,21 @@ describe("atomic knowledge and scratch commits", () => {
     ["deadline exit", "exit 124", "nothing saved"],
     ["limit exit", "exit 126", "nothing saved"],
     ["loop limit", "while true; do :; done", "exit 126"],
-    ["name", "touch '/tmp/bad name'", "name must be"],
-    ["long segment", `touch /tmp/${"x".repeat(81)}`, "at most 80"],
     [
-      "long name",
-      `touch /tmp/${"a".repeat(70)}/${"b".repeat(70)}/${"c".repeat(70)}`,
-      "200 total",
+      "long segment",
+      `touch /tmp/${"x".repeat(256)}`,
+      "at most 16 parts of 255 bytes",
     ],
     [
-      "depth nine",
-      "mkdir -p /tmp/a/b/c/d/e/f/g/h; touch /tmp/a/b/c/d/e/f/g/h/i",
-      "1 to 8 path segments",
+      "depth 17",
+      "p=/tmp; for i in $(seq 16); do p=$p/d; done; mkdir -p $p; touch $p/f",
+      "at most 16 parts",
     ],
-    ["control character", "touch $'/tmp/bad\\nname'", "name must be"],
-    ["long path", `touch /tmp/${"x".repeat(252)}`, "name must be"],
+    [
+      "doc name",
+      "touch '/tmp/my notes.md'; cp '/tmp/my notes.md' /knowledge/",
+      "name must be 1 to 8 path segments",
+    ],
     ["root file", "rm -rf /tmp; echo file > /tmp", "/tmp is not a directory"],
     [
       "root symlink",
@@ -338,7 +339,7 @@ describe("atomic knowledge and scratch commits", () => {
 
 describe("scratch caps", () => {
   test.each([
-    ["bytes", { scratchBytes: 7 }, "8 bytes, the limit is 7"],
+    ["bytes", { scratchBytes: 19 }, "20 bytes, the limit is 19"],
     ["files", { scratchFiles: 1 }, "2 files, the limit is 1"],
   ])(
     "%s refusal includes the numbers and rolls back everything",
@@ -385,14 +386,14 @@ describe("scratch caps", () => {
         ],
       });
       expect((await run(s, "printf 123 > /tmp/large")).error).toBe(false);
-      expect(scratchState(s)).toMatchObject({ files: 2, bytes: 13 });
+      expect(scratchState(s)).toMatchObject({ files: 2, bytes: 23 });
       const before = scratchState(s);
       expect((await run(s, "printf 456 > /tmp/large")).content).toContain(
         "2 files, the limit is 1",
       );
       expect(scratchState(s)).toEqual(before);
       expect((await run(s, "rm /tmp/other")).error).toBe(false);
-      expect(scratchState(s)).toMatchObject({ files: 1, bytes: 3 });
+      expect(scratchState(s)).toMatchObject({ files: 1, bytes: 8 });
       expect((await run(s, "rm /tmp/large")).error).toBe(false);
       expect(scratchState(s)).toMatchObject({ files: 0, bytes: 0 });
     } finally {

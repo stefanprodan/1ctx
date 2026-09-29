@@ -24,6 +24,7 @@ import { BACKSTOP_MS, COMMAND_ITERATIONS } from "./commands.ts";
 import { type CommitDocs, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
+import { mountableScratch } from "./names.ts";
 import {
   checkOpened,
   mountPath,
@@ -86,16 +87,23 @@ type MountDeps = {
 
 // what the worker answered, held to the mounted trees: no doc changes
 // with the docs off, a delete names a mounted doc, no name twice, and
-// scratch removes only what it mounted, since a command inside could
-// post an answer of its own
+// scratch removes only what it mounted and writes no more files than
+// it may hold, since a command inside could post an answer of its own
 function checked(
   changes: Changes | null,
   docs: ReadonlyMap<string, KnowledgeFile>,
   scratch: Scratch,
   knowledge: boolean,
+  scratchFiles: number,
 ): Changes {
   if (changes === null || (!knowledge && changes.knowledge.length > 0))
     throw new Error("the command worker answered out of protocol");
+  // bounded before a row is written or a name walked; a lowered cap
+  // still lets an oversized scratch rewrite what it holds
+  if (changes.written.length > Math.max(scratchFiles, scratch.files))
+    throw new Error(
+      `the scratch would have ${changes.written.length} files, the limit is ${scratchFiles}`,
+    );
   const names = new Set(changes.knowledge.map((change) => change.name));
   const written = new Set(changes.written.map((file) => file.path));
   const mounted = new Set(scratch.entries.map((file) => file.path));
@@ -152,7 +160,17 @@ export async function run(
     const storage = deps.current();
     const docs = caps.knowledge;
     const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
-    const scratch = deps.scratch.read(sessionId);
+    const stored = deps.scratch.read(sessionId);
+    // the worker writes each row at /tmp/<path>, so a row outside the
+    // rule never mounts; the commit drops it
+    const mountable = mountableScratch(stored.entries);
+    const scratch = { ...stored, entries: mountable.kept };
+    const skipped = mountable.skipped;
+    const left =
+      skipped.length === 0
+        ? ""
+        : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`;
+    notice = left;
     const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
     const uploads = deps.knowledge.mountedUploads(sessionId);
     const kept = listKept(deps.db, sessionId);
@@ -229,13 +247,13 @@ export async function run(
     );
     if (!settled.ok) {
       phase = settled.phase;
-      notice = settled.notice;
+      notice = left + settled.notice;
       ended = settled.cause;
       throw combined.aborted ? combined.reason : settled.error;
     }
     const answer = settled.answer;
     phase = "diff";
-    notice = answer.notice;
+    notice = left + answer.notice;
     combined.throwIfAborted();
     // the exit decides, whatever changes came with it
     if (answer.exitCode === 124 || answer.exitCode === 126) {
@@ -258,7 +276,13 @@ export async function run(
       };
     }
     const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
-    const answered = checked(answer.changes, mounted, scratch, docs);
+    const answered = checked(
+      answer.changes,
+      mounted,
+      scratch,
+      docs,
+      storage.scratchFiles,
+    );
     const opened = checkOpened(answer.opened, {
       knowledgeFileBytes: storage.knowledgeFileBytes,
       visuals: caps.visuals,
@@ -286,7 +310,7 @@ export async function run(
         before: scratch,
         changes: {
           written: answered.written,
-          removed: answered.removed,
+          removed: [...answered.removed, ...skipped],
           cwd: answered.cwd,
         },
       },
