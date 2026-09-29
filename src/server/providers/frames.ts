@@ -31,6 +31,31 @@ export function parseFrame(
   }
 }
 
+// Google names a failure by a word beside its code
+const GOOGLE_STATUS: Record<string, number> = {
+  RESOURCE_EXHAUSTED: 429,
+  INTERNAL: 500,
+  UNAVAILABLE: 503,
+  DEADLINE_EXCEEDED: 504,
+};
+
+// the HTTP status an error frame names, so the round can tell a busy
+// server from a refused request
+export function errorStatus(error: unknown): number | null {
+  if (error === null || typeof error !== "object") return null;
+  const { code, status } = error as { code?: unknown; status?: unknown };
+  const number =
+    typeof code === "number"
+      ? code
+      : typeof code === "string" && /^\d{3}$/.test(code)
+        ? Number(code)
+        : null;
+  if (number !== null && Number.isInteger(number)) {
+    if (number >= 100 && number <= 599) return number;
+  }
+  return typeof status === "string" ? (GOOGLE_STATUS[status] ?? null) : null;
+}
+
 export function frameEvents(body: any): ChatEvent[] {
   if (body?.error) {
     const message =
@@ -39,7 +64,8 @@ export function frameEvents(body: any): ChatEvent[] {
         : typeof body.error === "string"
           ? body.error
           : "the provider failed";
-    return [{ kind: "error", message }];
+    const status = errorStatus(body.error);
+    return [{ kind: "error", message, ...(status === null ? {} : { status }) }];
   }
   const events: ChatEvent[] = [];
   const choice = Array.isArray(body?.choices) ? body.choices[0] : undefined;

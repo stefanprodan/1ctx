@@ -89,7 +89,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
             continue;
           }
           yield {
-            kind: "error",
+            ...event,
             message: scrub(
               openRouter
                 ? openRouterError(event.message)
@@ -106,7 +106,9 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           message: scrub(
             `${row.name} failed: ${err instanceof Error ? err.message : String(err)}`,
           ),
-          ...(err instanceof Unanswered ? { unanswered: true } : {}),
+          ...(err instanceof Unanswered
+            ? { unanswered: true, ...(err.timedOut ? { timedOut: true } : {}) }
+            : {}),
         };
       }
     },

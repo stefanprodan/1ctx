@@ -270,6 +270,7 @@ describe("strict stream", () => {
       {
         kind: "error",
         message: `HTTP 400: ${refused.replace("this model", "[key]")}`,
+        status: 400,
       },
     ]);
   });
