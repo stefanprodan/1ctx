@@ -245,29 +245,34 @@ describe("scratch names", () => {
     }
   });
 
-  test("rm -rf removes a tree at the file cap and the depth cap", async () => {
-    const s = setup();
-    try {
-      const deep = "d/".repeat(14);
-      seedScratch(s, {
-        written: Array.from({ length: s.caps.scratchFiles }, (_, i) => ({
-          path: `${i}/${deep}f`,
-          data: new Uint8Array(),
-          mode: 0o644,
-        })),
-      });
-      expect(scratchState(s).files).toBe(1000);
-      expect(scratchState(s).entries[0]!.path.split("/")).toHaveLength(16);
-      const result = await run(s, "rm -rf /tmp/*; ls -A /tmp | wc -l", {
-        ...callCaps,
-        callTimeoutMs: 20_000,
-      });
-      expect(result.content).toBe("0\n\nexit 0");
-      expect(scratchState(s).files).toBe(0);
-    } finally {
-      s.db.close();
-    }
-  });
+  // the command has the full 20 s deadline; bun's 5 s default would cut it
+  test.serial(
+    "rm -rf removes a tree at the file cap and the depth cap",
+    async () => {
+      const s = setup();
+      try {
+        const deep = "d/".repeat(14);
+        seedScratch(s, {
+          written: Array.from({ length: s.caps.scratchFiles }, (_, i) => ({
+            path: `${i}/${deep}f`,
+            data: new Uint8Array(),
+            mode: 0o644,
+          })),
+        });
+        expect(scratchState(s).files).toBe(1000);
+        expect(scratchState(s).entries[0]!.path.split("/")).toHaveLength(16);
+        const result = await run(s, "rm -rf /tmp/*; ls -A /tmp | wc -l", {
+          ...callCaps,
+          callTimeoutMs: 20_000,
+        });
+        expect(result.content).toBe("0\n\nexit 0");
+        expect(scratchState(s).files).toBe(0);
+      } finally {
+        s.db.close();
+      }
+    },
+    25_000,
+  );
 
   test("an answer writing more files than the cap is refused before the commit", async () => {
     const s = setup({ scratchFiles: 10 });
