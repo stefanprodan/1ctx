@@ -98,6 +98,8 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, five of them over record-cases.ts
                 (vendor/README.md) and deciders-record.ts
+                (diff-record.ts among them, with diff-patch-check.ts
+                beside it; vendor/README.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.

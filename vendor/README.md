@@ -312,6 +312,40 @@ and `-t` lines the fixture does not compare. Where they part:
 - Under `-a` the first command gets all of xargs' stdin and the later
   ones none, as the first reader of GNU's shared stdin drains a pipe;
   a command that reads only part of it leaves nothing for the next.
+### Where our diff still differs from GNU diff
+
+`test/fixtures/just-bash/diff-gnu.json` holds what GNU diffutils 3.12
+answered, recorded by `scripts/diff-record.ts` with every file at one
+time and `TZ=UTC`, and `test/vendor/just-bash/diff-gnu.test.ts` holds
+our diff to it; a case with `accept` pins ours.
+`scripts/diff-patch-check.ts` checks by hand that GNU patch 2.8 applies
+our unified and context output of every pair of text files the fixture
+compares. The large inputs are in `diff-engine.test.ts`, which counts
+the work units each costs. Where they part:
+
+- Where GNU's cost heuristics settle for a larger answer, ours may be
+  smaller: on RFC 7231 against RFC 9110 ours is the smallest, 12934
+  changed lines to GNU's 13390, and on small inputs full of one repeated
+  line GNU sometimes gives up matches the search would find. Where GNU
+  finds the smallest answer, ours is the same, line for line.
+- A default compare that passes a quarter of the work limit takes what
+  is left as whole changes, and `-d` past the limit fails with exit 2;
+  GNU never stops.
+- A NUL in the first 4096 bytes makes a file binary, GNU's first read on
+  the file system the fixture was recorded on; GNU's window is its
+  buffer, which varies.
+- A header's time has zeros past the milliseconds a mount keeps.
+- `-t` and `-E` count a column per byte but UTF-8 continuation bytes,
+  where GNU counts display width. `-i` lowercases with JavaScript's
+  rules where a line is UTF-8.
+- `-l` and `--palette` are refused, `--color` only as `always`, and
+  `--version` names just-bash.
+- Not yet: two directories, `-N`, `--unidirectional-new-file`,
+  `--from-file`, `--to-file`, `-y`, `-e`, `-f`, `-n`, `-D` and the line
+  and group formats are refused by name, exit 2. `-r`, `-x`, `-X`, `-S`,
+  `-W`, `--left-column`, `--suppress-common-lines`, `--no-dereference`
+  and `--ignore-file-name-case` are accepted and change nothing between
+  two files, as in GNU.
 
 ### Where our yq still differs from mikefarah's
 
