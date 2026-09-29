@@ -15,7 +15,7 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { NotFound } from "../lib/errors.ts";
+import { Conflict, NotFound } from "../lib/errors.ts";
 import { refuseArchived, type SessionRow } from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
@@ -55,7 +55,19 @@ export type StartFields = {
   // applied in order, the later winning per key
   changes?: readonly (CapabilityChange | undefined)[];
   mcpDigest: McpDigest | null;
+  // the queued messages the turn opens with, taken by id and revision
+  claim?: readonly QueuedClaim[];
 };
+
+export type QueuedClaim = { id: string; revision: number };
+
+// a queued message was edited or removed before its start took it, so
+// the start writes nothing
+export class ClaimLost extends Conflict {
+  constructor() {
+    super("a waiting message changed");
+  }
+}
 
 export const firstMessageId = (turn: StartFields["turn"]): string =>
   "users" in turn ? turn.users[0]!.id : turn.existing[0]!.id;
@@ -91,6 +103,9 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         });
     if (base === null) throw new NotFound("no such chat");
     refuseArchived(base);
+    if (fields.claim && !deps.sessions.queue.claim(base.id, fields.claim)) {
+      throw new ClaimLost();
+    }
     const changed = applyChanges(
       base.disabledCapabilities,
       fields.changes ?? [],

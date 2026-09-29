@@ -33,7 +33,7 @@ export const STORAGE_DAYS = 30;
 // checks it against the schema. sqlite_schema and migrations are the
 // file's own
 export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
-  chats: ["sessions", "messages", "sends", "opened_files"],
+  chats: ["sessions", "messages", "sends", "opened_files", "queued_messages"],
   knowledge: ["knowledge_files", "knowledge_versions"],
   uploads: [
     "session_uploads",

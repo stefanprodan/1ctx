@@ -713,6 +713,30 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
+    // the author's alone once the chat is seen; no chat here
+    method: "PATCH",
+    path: "/api/sessions/:id/queued/:queuedId",
+    body: { message: "hi", revision: 0 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/sessions/:id/queued/:queuedId",
+    body: { revision: 0 },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    // the caller's own not-sent messages
+    method: "GET",
+    path: "/api/me/not-sent",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/me/not-sent",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "POST",
     path: "/api/sessions/:id/fork",
     body: { messageId: "aaaaaaaaaaaa", agentId: "none" },

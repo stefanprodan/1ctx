@@ -184,7 +184,7 @@ describe("uploads claimed by a send", () => {
   );
 
   test.each([
-    { name: "session lock", perUser: 4, status: 409 },
+    { name: "session lock", perUser: 4, status: 202 },
     { name: "user cap", perUser: 1, status: 429 },
   ])("$name preserves staging and the session tree", async (caps) => {
     const chat = await chatApp();
@@ -194,12 +194,12 @@ describe("uploads claimed by a send", () => {
       const item = await stage(chat, "readme.md");
       const response = await chat.member.call(
         "POST",
-        caps.status === 409
+        caps.status === 202
           ? `/api/sessions/${started.sessionId}/messages`
           : "/api/sessions",
         {
           body: {
-            ...(caps.status === 409
+            ...(caps.status === 202
               ? {}
               : { projectId: chat.projectId, agentId: chat.agentId }),
             message: "read",
@@ -214,6 +214,17 @@ describe("uploads claimed by a send", () => {
         { id: started.sessionId },
       ]);
       expect(chat.scripted.scripts).toHaveLength(1);
+      if (caps.status === 202) {
+        // removed before the reply ends, so the retry claims the file
+        const { queued } = await response.json();
+        const removed = await chat.member.call(
+          "DELETE",
+          `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+          { body: { revision: queued.revision } },
+        );
+        expect(removed.status).toBe(204);
+        expect(staged(chat)).toEqual([item]);
+      }
       await finish(chat, started.sessionId, started.script);
       const retry = await send(chat, started.sessionId, [item.id]);
       await finish(chat, started.sessionId, retry.script);

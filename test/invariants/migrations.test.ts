@@ -46,6 +46,7 @@ const EXPECTED_IDS = [
   "0032-admin-activity",
   "0033-feed-arms",
   "0034-send-limits",
+  "0035-queued-messages",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1071,7 +1072,7 @@ describe("the schema", () => {
           "insert into limits (name, value, updated_at) values (?, ?, ?)",
         );
         for (const row of overrides) insert.run(...row);
-        expect(migrate(db)).toEqual(["0034-send-limits"]);
+        expect(migrate(db)).toEqual(expectedFrom("0034-send-limits"));
         expect(migrate(db)).toEqual([]);
         return db
           .query<{ name: string; value: number; updated_at: number }, []>(
@@ -1139,6 +1140,50 @@ describe("the schema", () => {
     test("an override that converts to the new default leaves no row", () => {
       expect(converted([["runsRunning", 32, 20]])).toEqual([]);
     });
+  });
+
+  test("0035 keeps queued messages apart, checked and deleted with their chat", () => {
+    const db = seed(MIGRATIONS.slice(0, 34));
+    try {
+      expect(migrate(db)).toEqual(["0035-queued-messages"]);
+      const insert = (id: string, state: string, reason: string | null) =>
+        db
+          .query(
+            `insert into queued_messages (id, session_id, author_id, content,
+               state, reason, queued_at, changed_at)
+             values (?, 'sess', 'u', 'text', ?, ?, 0, 0)`,
+          )
+          .run(id, state, reason);
+      insert("q1", "queued", null);
+      insert("q2", "not-sent", "expired");
+      for (const [state, reason] of [
+        ["queued", "expired"],
+        ["not-sent", null],
+        ["not-sent", "lost"],
+        ["sent", null],
+      ] as const) {
+        expect(() => insert("bad", state, reason)).toThrow(/CHECK/);
+      }
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from sqlite_schema where type = 'index' and tbl_name = 'queued_messages' and name not like 'sqlite_%' order by name",
+          )
+          .all()
+          .map((row) => row.name),
+      ).toEqual([
+        "queued_author",
+        "queued_not_sent",
+        "queued_session",
+        "queued_waiting",
+      ]);
+      db.exec("delete from sessions where id = 'sess'");
+      expect(
+        db.query("select count(*) as n from queued_messages").get(),
+      ).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
   });
 
   describe("0030 archived chats migration", () => {

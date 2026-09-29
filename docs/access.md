@@ -73,7 +73,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   on every change (`description is required`); a personal project's
   may be empty. A team project is open to its members and to
   admins. Deleting one takes its chats, keeps their
-  usage and is refused while a chat runs.
+  usage and is refused while a chat runs. Removing a member deletes the
+  messages they had waiting in its chats, queued or not sent, in the
+  same transaction.
   `GET /api/projects/:id/usage` (admin, a team project alone) sums its
   last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
   board's: the users who signed in each of the reader's last 30 days

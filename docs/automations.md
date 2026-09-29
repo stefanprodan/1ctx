@@ -42,7 +42,8 @@ editor are in `docs/views.md`.
   the newest past occurrence; `automations/waits.ts`), then fires the
   active rows with `next_at <= now` oldest first, sweeps retention
   hourly, and sleeps until the earliest `next_at` or a minute, woken
-  early by a store write, a freed place or a moved send cap. `wake()`
+  early by a store write, a freed place or a moved send cap; the queue's
+  dispatcher hears a freed place first (`docs/sessions.md`). `wake()`
   is level-triggered: it bumps a generation the sleep compares, so a
   wake with no sleeper is kept. A fire is one transaction that reads
   the row again, checks the owner's access with the pure rule in

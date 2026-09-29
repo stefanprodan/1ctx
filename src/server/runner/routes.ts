@@ -7,6 +7,7 @@
 
 import type {
   CreateSessionRequest,
+  QueuedResponse,
   RegenerateRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -24,11 +25,15 @@ import {
 
 export type RoutesDeps = {
   start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
-  send(
+  // the turn it started, 201, or the message queued behind a running
+  // one, 202
+  message(
     principal: Principal,
     sessionId: string,
     fields: SendMessageRequest,
-  ): SessionDetail;
+  ):
+    | { status: 201; body: SessionDetail }
+    | { status: 202; body: QueuedResponse };
   regenerate(
     principal: Principal,
     sessionId: string,
@@ -57,7 +62,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       async handle(req, ctx) {
         const fields = parseSendMessage(await jsonBody(req, MAX_SESSION_BODY));
-        return json(deps.send(ctx.principal!, ctx.params.id, fields), 201);
+        const answer = deps.message(ctx.principal!, ctx.params.id, fields);
+        return json(answer.body, answer.status);
       },
     },
     {

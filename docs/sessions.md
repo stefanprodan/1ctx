@@ -29,7 +29,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   `registry.free()` that freed a send (a finalize, a rollback of
   `startSend` or `startCompact`, an abandoned run) calls the `wake`
   port, except a shutdown's, and so does a limits write that moves a
-  send cap; `compose.ts` binds it to the scheduler's `wake()`. A
+  send cap or `queuedMinutes`; `compose.ts` binds it to the queue's
+  dispatcher, then the scheduler's `wake()`. A
   finalize that fails keeps the lock and the send's places until
   `sessions.repair()` at the next start.
 - **The writer has three transactions.** The writer's three transactions:
@@ -52,6 +53,52 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   wire each is its own user message with its author's `name`, since
   every wire is the OpenAI chat shape, which takes consecutive user
   messages. The envelope's `last` is the last message's.
+- **A message to a busy chat waits in the queue.** `POST
+  /api/sessions/:id/messages` on a chat whose lock is held (a turn
+  running or still stopping) writes a `queued_messages` row, never a
+  `messages` row, and answers 202 `{ queued }`; on a free chat it first
+  starts the chat's own queue, then sends as before (201, or the 429 of
+  a full cap). Regenerate, compact, Run now and a new chat never queue.
+  Each message is its own row (text, staged upload ids, capabilities
+  change, author), held to a message's bounds, an upload id in another
+  queued row of the chat a 400. A user holds at most `queuedPerUser`
+  rows, queued and not sent together, and a chat `MAX_QUEUED_PER_CHAT`
+  (16, `MAX_TURN_MESSAGES`) queued ones, each past it a 429 with the
+  count. A queued row holds no place in any cap. Every change to a row
+  (queue, edit, remove, start, not sent, discard) bumps the session's
+  revision alone, with one rows-free envelope (`queueChanged()`);
+  the detail's `queued` lists the chat's queued rows for every viewer
+  and not-sent ones to their author only, oldest first by `queued_at`
+  then `rowid`, which an edit never moves.
+- **The dispatcher starts a chat's queue as one turn.**
+  `runner/queue.ts`, started in `compose.ts` after `sessions.repair()`
+  and before the scheduler, closed first at shutdown. The `wake` port
+  runs a pass before the scheduler hears it, so a freed place goes to a
+  waiting message before a due run; a pass inside a transaction is put
+  off to a microtask, and a wake during a pass runs one more. A pass
+  reads the chats with queued rows whose lock is free, oldest first, at
+  most `sendsRunning` (one indexed read when none waits), and for each
+  sorts its rows: an author who no longer sees the chat loses theirs
+  (deleted); an archived chat (`archived`), a retired agent
+  (`agent-deleted`), a row past `queuedMinutes` from `queued_at`
+  (`expired`), a gone, disabled or must-change-password author or a
+  staged upload that no longer checks (`failed`) turn not sent. The rest
+  start through `sendTurn()` in order, the first author counted, with a
+  claim: `startSend`'s transaction deletes them by id and revision, and
+  one that lost (edited or removed) throws `ClaimLost`, so the start
+  writes nothing and its freed lock wakes again. A full cap, a held
+  lock or a shutdown leaves them queued for the next wake; any other
+  refusal turns them not sent (`failed`). One timer, on the clock port,
+  is set to the oldest queued row's expiry and reset when the limit
+  moves, so an idle process expires rows too; a restart expires at
+  start. Removing a member drops their rows in its transaction. `PATCH`
+  and `DELETE /api/sessions/:id/queued/:queuedId` are the author's
+  alone, an admin's included (403), each naming the revision seen: a
+  row that started or changed is a 409, and an edit takes only a
+  queued row. `GET /api/me/not-sent` is Home's list, the caller's
+  not-sent rows in projects they see, and `DELETE /api/me/not-sent`
+  discards them all. The hourly sweep deletes a not-sent row
+  `NOT_SENT_KEPT_MS` (7 days) after it turned.
 - **An envelope's row is one statement, read after the commit.**
   `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
   does for one session: it seeks the session by id and walks only that

@@ -17,6 +17,7 @@ import { LATEST_FILES } from "../../shared/knowledge.ts";
 import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
@@ -41,6 +42,9 @@ export type UsersPort = {
 export type SessionsPort = {
   count(projectId: string): number;
   running(projectId: string): boolean;
+  // in the caller's transaction: a member who left loses the messages
+  // they had waiting in its chats, with the envelopes to publish
+  dropQueued(projectId: string, userId: string): BusEvent[];
 };
 
 // the knowledge base's counts for the detail, an area built later
@@ -302,6 +306,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return {
             result: detail(current),
             events: [
+              ...deps.sessions.dropQueued(current.id, ctx.params.userId),
               {
                 type: "access.changed" as const,
                 data: { userIds: [ctx.params.userId] },

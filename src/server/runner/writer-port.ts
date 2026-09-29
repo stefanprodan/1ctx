@@ -33,6 +33,14 @@ export type UploadsPort = {
 
 export type SessionsPort = {
   byId(id: string): SessionRow | null;
+  // the queued rows a turn takes, deleted by id and revision; false when
+  // any changed or went
+  queue: {
+    claim(
+      sessionId: string,
+      claims: readonly { id: string; revision: number }[],
+    ): boolean;
+  };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
     id?: string;

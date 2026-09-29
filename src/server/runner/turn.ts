@@ -11,10 +11,10 @@ import {
   type CapabilityChange,
 } from "../../shared/capabilities.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { parseSendMessage } from "../sessions/index.ts";
+import { MAX_QUEUED_PER_CHAT, parseSendMessage } from "../sessions/index.ts";
 
-// the most user messages one turn opens with
-export const MAX_TURN_MESSAGES = 16;
+// the most user messages one turn opens with: a chat's whole queue
+export const MAX_TURN_MESSAGES = MAX_QUEUED_PER_CHAT;
 
 // the author by id: a message may start long after it was written, so
 // the runner reads the author as they are at the start

@@ -15,7 +15,7 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import { BadRequest, Conflict, Forbidden } from "../lib/errors.ts";
+import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -26,11 +26,13 @@ import {
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
+import { liveAuthor, principalOf } from "./authors.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
+import { dispatcher } from "./queue.ts";
 import { regenerateUsers } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
 import { ProviderRefusal, type RoundDeps } from "./round.ts";
@@ -38,7 +40,7 @@ import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
 import { shutdownRunner } from "./shutdown.ts";
-import type { StartFields, StartUser } from "./start.ts";
+import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { applyChanges, checkTurn } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
@@ -47,6 +49,7 @@ import { Writer } from "./writer.ts";
 export type { AttentionPort } from "./attention.ts";
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
+export type { Dispatcher } from "./queue.ts";
 export { Registry, RunCapacity, type Running } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export type { ShutdownResult } from "./shutdown.ts";
@@ -195,28 +198,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return user;
   };
 
-  // a message written earlier starts as its author is now: a role
-  // changed, a login disabled or a project left since counts
-  const liveAuthor = (userId: string): UserRow => {
-    const user = deps.users.byId(userId);
-    if (user === null) throw new BadRequest("the user is gone");
-    if (user.disabled) throw new BadRequest("the user is disabled");
-    // as the router refuses every request of theirs
-    if (user.mustChangePassword) {
-      throw new Forbidden("change your password first");
-    }
-    return user;
-  };
-  const principalOf = (user: UserRow): Principal => ({
-    userId: user.id,
-    username: user.username,
-    fullName: user.fullName,
-    role: user.role,
-    mustChangePassword: user.mustChangePassword,
-    // no login stands behind a message that starts later
-    loginId: "",
-  });
-
   const agentOf = (id: string): AgentRow => {
     const agent = deps.agents.byId(id);
     if (agent === null) throw new BadRequest("no such agent");
@@ -234,6 +215,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     event?: Event | null;
     turn: StartFields["turn"];
     changes: readonly (CapabilityChange | undefined)[];
+    claim?: readonly QueuedClaim[];
   }): PreparedRun => {
     const { event = null, session, user, turn } = fields;
     const disabled = applyChanges(
@@ -266,6 +248,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       op,
       turn,
       changes: fields.changes,
+      ...(fields.claim === undefined ? {} : { claim: fields.claim }),
       title: fields.title,
       kind: event === null ? "chat" : "run",
       origin: event === null ? "chat" : "automation",
@@ -301,6 +284,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       // the author's row when the caller read it already
       user?: UserRow;
     })[],
+    claim?: readonly QueuedClaim[],
   ): SessionDetail => {
     let session: SessionRow | null = null;
     let project: ProjectRow | null = null;
@@ -330,6 +314,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         ),
       },
       changes: messages.map((fields) => fields.capabilities),
+      ...(claim === undefined ? {} : { claim }),
     });
   };
 
@@ -358,15 +343,22 @@ export function runnerArea(deps: RunnerDeps): Runner {
     send(principal, sessionId, fields) {
       return continueChat(sessionId, [{ ...fields, principal }]);
     },
-    sendTurn(sessionId, messages) {
+    sendTurn(sessionId, messages, claim) {
       checkTurn(messages);
       return continueChat(
         sessionId,
         messages.map(({ userId, ...fields }) => {
-          const user = liveAuthor(userId);
+          const user = liveAuthor(deps.users.byId(userId));
           return { ...fields, user, principal: principalOf(user) };
         }),
+        claim,
       );
+    },
+    message(principal, sessionId, fields) {
+      const queued = runner.queue.enqueue(principal, sessionId, fields);
+      return queued === null
+        ? { status: 201, body: runner.send(principal, sessionId, fields) }
+        : { status: 202, body: { queued } };
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = deps.visible(principal, sessionId);
@@ -462,11 +454,19 @@ export function runnerArea(deps: RunnerDeps): Runner {
         () => asks.close(),
       ),
     settled: () => asks.settled(),
+    queue: null!,
     routes: [],
   };
+  runner.queue = dispatcher({
+    ...deps,
+    registry,
+    sendTurn: (sessionId, messages, claim) => {
+      runner.sendTurn(sessionId, messages, claim);
+    },
+  });
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
-    send: (principal, id, fields) => runner.send(principal, id, fields),
+    message: (principal, id, fields) => runner.message(principal, id, fields),
     regenerate: (principal, id, fields) =>
       runner.regenerate(principal, id, fields),
     compact: (principal, id) => runner.compact(principal, id),

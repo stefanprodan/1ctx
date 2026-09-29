@@ -67,6 +67,8 @@ export type OverviewDeps = {
   online(): number;
   // every automation, and those whose fire waits for a free place
   automations(): { total: number; waiting: number };
+  // the messages waiting behind busy chats and those not sent
+  queue(): { queued: number; notSent: number; oldestQueuedAt: number | null };
   // the secrets are read through compose's ports
   attention(): AttentionInput;
   // a test's process; absent, this one, sampled every LOAD_SAMPLE_MS
@@ -187,6 +189,7 @@ export function overviewArea(deps: OverviewDeps): Overview {
     const caps = deps.limits.current();
     const running = deps.running(caps.sendsPerProject);
     const automations = deps.automations();
+    const queue = deps.queue();
     return {
       at: deps.clock(),
       chats: running.chats,
@@ -198,6 +201,9 @@ export function overviewArea(deps: OverviewDeps): Overview {
       online: deps.online(),
       automations: automations.total,
       waiting: automations.waiting,
+      queued: queue.queued,
+      notSent: queue.notSent,
+      oldestQueuedAt: queue.oldestQueuedAt,
       cores: probe.cores,
       memoryLimit: probe.memoryLimit,
       contained: probe.contained,

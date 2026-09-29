@@ -40,6 +40,7 @@ import { m0031 } from "./0031-deciders.ts";
 import { m0032 } from "./0032-admin-activity.ts";
 import { m0033 } from "./0033-feed-arms.ts";
 import { m0034 } from "./0034-send-limits.ts";
+import { m0035 } from "./0035-queued-messages.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -76,4 +77,5 @@ export const MIGRATIONS: Migration[] = [
   m0032,
   m0033,
   m0034,
+  m0035,
 ];

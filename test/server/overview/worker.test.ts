@@ -95,6 +95,7 @@ describe("the scan worker", () => {
       running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      queue: () => ({ queued: 0, notSent: 0, oldestQueuedAt: null }),
       attention: () => ({
         providers: [],
         mcp: [],

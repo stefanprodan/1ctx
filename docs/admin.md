@@ -95,15 +95,17 @@ in `docs/views.md` and `docs/ui.md`.
   half-open, `[since, until)`: a query reads `created_at >= ? and
   created_at < ?`, so adjacent windows never count a row twice. A cost
   total is 0 with no rows and null when rows came and none was priced.
-- **Load is read from memory.**
-  `GET /api/admin/load` (`admin`, no parameter) is read from memory at
-  every request, never kept: the running chats and runs from
-  `runner.registry.running()` in one pass, against `cap`, the current
-  `sendsRunning`; the scheduled runs against `scheduledCap`, their
+- **Load is read at each request.**
+  `GET /api/admin/load` (`admin`, no parameter) is read at every
+  request, never kept, from memory save the queue's counts: the
+  running chats and runs from `runner.registry.running()` in one pass,
+  against `cap`, the current `sendsRunning`; the scheduled runs against `scheduledCap`, their
   share of it; `projectsFull`, the projects at `sendsPerProject`;
   `online` the users
   with a socket through a port to `web/`, the automations and those due
-  past `WAIT_GRACE_MS` through a port to their store, and `load.ts`'s
+  past `WAIT_GRACE_MS` through a port to their store, the queued and
+  not-sent messages and the oldest `queued_at` in one statement over
+  the queue's partial indexes, and `load.ts`'s
   ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start,
   the first reading a baseline that draws nothing:
   the process's CPU over `availableParallelism()` cores and its `rss`

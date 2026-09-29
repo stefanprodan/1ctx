@@ -9,10 +9,12 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type {
   LastLine,
   OpenedFile,
+  QueuedMessage,
   SendSummary,
   SessionDetail,
   SessionSummary,
 } from "../contracts/session.ts";
+import type { NotSentReason } from "../words.ts";
 
 // GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
 // the caller may see, running first, then by last activity, each with
@@ -88,6 +90,36 @@ export type SendMessageRequest = {
   uploads?: string[];
   capabilities?: CapabilityChange;
 };
+
+// the answer of POST /api/sessions/:id/messages, 202, when the chat's
+// turn is running: the message waits and starts when the reply ends
+export type QueuedResponse = { queued: QueuedMessage };
+
+// PATCH /api/sessions/:id/queued/:queuedId: the author's new text, with
+// the revision they saw; 409 once it started or changed. Answers the
+// row as QueuedResponse
+export type EditQueuedRequest = { message: string; revision: number };
+
+// DELETE /api/sessions/:id/queued/:queuedId: the author's Remove,
+// Discard and Send again, with the revision they saw; 204
+export type RemoveQueuedRequest = { revision: number };
+
+// GET /api/me/not-sent: the caller's messages that were not sent, newest
+// first, each with its chat, for Home. line is the text's first line
+export type NotSentRow = {
+  id: string;
+  sessionId: string;
+  title: string;
+  project: string;
+  agent: string;
+  line: string;
+  reason: NotSentReason;
+  changedAt: number;
+};
+export type NotSentResponse = { rows: NotSentRow[] };
+
+// DELETE /api/me/not-sent: every not-sent message of the caller's gone
+export type DiscardNotSentResponse = { deleted: number };
 
 // POST /api/sessions/:id/regenerate: the body is optional
 export type RegenerateRequest = { capabilities?: CapabilityChange };

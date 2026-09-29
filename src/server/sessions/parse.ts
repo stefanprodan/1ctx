@@ -7,8 +7,10 @@
 
 import type {
   CreateSessionRequest,
+  EditQueuedRequest,
   ForkSessionRequest,
   RegenerateRequest,
+  RemoveQueuedRequest,
   RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -109,6 +111,30 @@ export function parseSendMessage(body: unknown): SendMessageRequest {
     ...parseUploads(b),
     ...parseCapabilities(b),
   };
+}
+
+export function parseEditQueued(body: unknown): EditQueuedRequest {
+  const b = fields(body, ["message", "revision"]);
+  return {
+    message: parseMessage(b.message),
+    revision: parseRevision(b.revision),
+  };
+}
+
+export function parseRemoveQueued(body: unknown): RemoveQueuedRequest {
+  const b = fields(body, ["revision"]);
+  return { revision: parseRevision(b.revision) };
+}
+
+export function parseQueuedId(value: unknown): string {
+  return storedId(value, "queuedId");
+}
+
+function parseRevision(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new BadRequest("revision must be a non-negative integer");
+  }
+  return value;
 }
 
 export function parseRegenerate(body: unknown): RegenerateRequest {

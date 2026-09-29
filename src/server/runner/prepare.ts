@@ -16,7 +16,7 @@ import {
 import type { SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
 import { live, newSend, type SendOp } from "./send.ts";
-import { firstMessageId, type StartFields } from "./start.ts";
+import { firstMessageId, type QueuedClaim, type StartFields } from "./start.ts";
 import type { Writer } from "./writer.ts";
 
 export type PreparedRun = {
@@ -41,6 +41,8 @@ export function prepareSend(fields: {
   op: SendOp;
   turn: StartFields["turn"];
   changes: readonly (CapabilityChange | undefined)[];
+  // the queued messages the turn takes
+  claim?: readonly QueuedClaim[];
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   startKept(
     sessionId: string,
@@ -123,6 +125,7 @@ export function prepareSend(fields: {
       policy: fields.policy,
       changes: fields.changes,
       mcpDigest: fields.policy.offered.mcpPrompt.digest,
+      ...(fields.claim === undefined ? {} : { claim: fields.claim }),
     });
     send.mcpNote = changeNote(
       started.previousMcpDigest,
@@ -136,7 +139,13 @@ export function prepareSend(fields: {
   return {
     // a send starts only on a chat that is not archived, so no
     // archive is read and its kept days go unused
-    detail: sessionDetail(fields.sessions, started.session, live(send), 0),
+    detail: sessionDetail(
+      fields.sessions,
+      started.session,
+      live(send),
+      0,
+      fields.startedBy,
+    ),
     launch() {
       if (settled) return;
       settled = true;

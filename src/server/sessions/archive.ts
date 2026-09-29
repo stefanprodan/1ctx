@@ -58,8 +58,8 @@ export function agentRunning(db: Db, agentId: string): number {
     .get(agentId)!.n;
 }
 
-// the one envelope an archive or an attention mark publishes: the row,
-// no messages
+// the one envelope an archive, an attention mark or a queued message's
+// change publishes: the row, no messages
 export function archivedEvent(row: SessionRow, send: SendSummary | null) {
   return {
     type: "session.changed" as const,

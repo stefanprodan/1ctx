@@ -147,6 +147,7 @@ function detail(
     send: null,
     live: null,
     authors: [],
+    queued: [],
     ...changes,
   };
 }

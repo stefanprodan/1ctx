@@ -150,7 +150,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // is made with its personal project, project routes ask sessions
   // and access, an agent's delete reaches what runs on it, the
   // session detail asks the runner for the reply in flight, and a freed
-  // place or a moved send cap wakes the scheduler.
+  // place or a moved send cap wakes the queue's dispatcher, then the
+  // scheduler, so a user's waiting message takes a place before a run.
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
@@ -165,7 +166,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // the instance's start, as the overview reports it
   const startedAt = clock();
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
-  const wake = () => automations.scheduler.wake();
+  const wake = () => {
+    runner.queue.wake();
+    automations.scheduler.wake();
+  };
   const limits = limitsArea({ db, clock, wake });
   const usage = usageArea({
     db,
@@ -245,6 +249,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),
+      dropQueued: (projectId, userId) => sessions.dropQueued(projectId, userId),
     },
     knowledge: {
       counts: (projectId) => knowledge.counts(projectId),
@@ -425,6 +430,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     running: (perProject) => runner.registry.running(perProject),
     online: () => socket.online(),
     automations: () => automations.store.tally(clock() - WAIT_GRACE_MS),
+    queue: () => sessions.store.queue.load(),
     attention: () => {
       const keyed = (kind: SecretKind, name: string | null) =>
         name !== null && secret(kind, name) !== null;
@@ -465,6 +471,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   if (options.activate !== false) {
     await users.bootstrap();
     repaired = sessions.repair();
+    runner.queue.start();
     reconciled = automations.start();
     overview.start();
   }
@@ -554,7 +561,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const scratchRows = bash.sweep(now);
         const digests = sessions.store.sweepDigests();
         const chats = sessions.sweep(now, limits.current());
-        const removed = logins + visits + knowledgeRows + scratchRows + digests;
+        const notSent = sessions.store.queue.sweep(now);
+        const removed =
+          logins + visits + knowledgeRows + scratchRows + digests + notSent;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
@@ -562,6 +571,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             knowledge: knowledgeRows,
             bash: scratchRows,
             digests,
+            not_sent: notSent,
             removed,
             ...chats,
           });
@@ -577,6 +587,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     // that the MCP close then refuses, then any command it left running;
     // nothing touches the db after
     async shutdown() {
+      // first: a start refused while closing leaves its rows queued
+      runner.queue.close();
       skills.close();
       automations.stop();
       const result = await runner.shutdown();
