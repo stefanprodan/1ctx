@@ -38,6 +38,13 @@ export class RunCapacity extends TooManyRequests {
   }
 }
 
+// the count, not the cap: a lowered cap leaves more going
+const going = (n: number): string =>
+  n === 1 ? "1 chat or run" : `${n} chats and runs`;
+
+const projectFull = (n: number): string =>
+  `This project has ${going(n)} going. Try again in a moment.`;
+
 export class Registry {
   private readonly sends = new Map<string, ActiveSend>();
   private closed = false;
@@ -113,10 +120,7 @@ export class Registry {
         project >= caps.sendsPerProject ||
         scheduledHere >= scheduledShare(caps.sendsPerProject)
       ) {
-        throw new RunCapacity(
-          "project",
-          `This project has ${caps.sendsPerProject} chats and runs going. Try again in a moment.`,
-        );
+        throw new RunCapacity("project", projectFull(project));
       }
       if (
         running >= caps.sendsRunning ||
@@ -130,16 +134,12 @@ export class Registry {
       return;
     }
     if (mine >= caps.sendsPerUser) {
-      // the count, not the cap: a lowered cap leaves more going
-      const going = mine === 1 ? "1 chat or run" : `${mine} chats and runs`;
       throw new TooManyRequests(
-        `You have ${going} going. Wait for one to end.`,
+        `You have ${going(mine)} going. Wait for one to end.`,
       );
     }
     if (project >= caps.sendsPerProject) {
-      throw new TooManyRequests(
-        `This project has ${caps.sendsPerProject} chats and runs going. Try again in a moment.`,
-      );
+      throw new TooManyRequests(projectFull(project));
     }
     if (running >= caps.sendsRunning) {
       throw new TooManyRequests(

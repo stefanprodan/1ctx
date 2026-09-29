@@ -101,6 +101,54 @@ describe("admission", () => {
     await chat.app.shutdown();
   });
 
+  test("regenerate and compact in a team chat count against the member who asked and the chat's project", async () => {
+    const chat = await chatApp();
+    await setLimits(chat, { sendsPerUser: 1 });
+    const team = await createTeam(chat.admin, "ops", [chat.memberId]);
+    const owned = await startChat(chat, "question", chat.admin, team.id);
+    owned.script.reply("answer");
+    await settleRun(chat, owned.sessionId);
+    // the member is at their cap, the chat's owner is not
+    const mine = await startChat(chat, "mine");
+    const USER = "You have 1 chat or run going. Wait for one to end.";
+    for (const action of ["regenerate", "compact"]) {
+      const refused = await chat.member.call(
+        "POST",
+        `/api/sessions/${owned.sessionId}/${action}`,
+        { body: {} },
+      );
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toEqual({ error: USER });
+    }
+    mine.script.reply("done");
+    await settleRun(chat, mine.sessionId);
+
+    for (const action of ["regenerate", "compact"]) {
+      const pending = chat.scripted.next();
+      const started = await chat.member.call(
+        "POST",
+        `/api/sessions/${owned.sessionId}/${action}`,
+        { body: {} },
+      );
+      expect(started.status).toBe(action === "compact" ? 200 : 201);
+      const script = await pending;
+      const send = chat.app.runner.registry.get(owned.sessionId)!;
+      expect(send.startedBy).toBe(chat.memberId);
+      expect(send.projectId).toBe(team.id);
+      // it holds the member's one place, not the owner's
+      const other = await chat.member.call("POST", "/api/sessions", {
+        body: { projectId: team.id, agentId: chat.agentId, message: "x" },
+      });
+      expect(await other.json()).toEqual({ error: USER });
+      const theirs = await startChat(chat, "theirs", chat.admin, team.id);
+      script.reply(action === "compact" ? "## Goal" : "again");
+      theirs.script.reply("done");
+      await settleRun(chat, owned.sessionId);
+      await settleRun(chat, theirs.sessionId);
+    }
+    await chat.app.shutdown();
+  });
+
   test("Run now counts against whoever pressed it, not the automation's owner", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

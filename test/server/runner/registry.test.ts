@@ -11,15 +11,15 @@ import {
 } from "../../../src/server/runner/index.ts";
 import type { SendKind } from "../../../src/shared/words.ts";
 
-let next = 0;
-// a user-started send, or a scheduled run when startedBy is null
+// a user-started send, or a scheduled run when startedBy is null; a
+// random id, so concurrent tests share no counter
 const send = (
   kind: SendKind,
   startedBy: string | null,
   projectId: string,
 ): ActiveSend =>
   ({
-    sessionId: `s${++next}`,
+    sessionId: crypto.randomUUID(),
     kind,
     startedBy,
     projectId,
@@ -216,6 +216,35 @@ describe("admission", () => {
       refusal(() => registry.admit("new", user("u1"), caps(4, 16, 64)))
         ?.message,
     ).toBe("You have 6 chats and runs going. Wait for one to end.");
+  });
+
+  test("the project's refusal counts what it has going, not the cap", () => {
+    const registry = new Registry();
+    fill(registry, 4, "u1", "p1");
+    fill(registry, 6, null, "p1");
+    const lowered = caps(4, 4, 64);
+    const chat = refusal(() => registry.admit("new", user("u2"), lowered));
+    expect(chat?.message).toBe(
+      "This project has 10 chats and runs going. Try again in a moment.",
+    );
+    const run = refusal(() => registry.admit("new", scheduled(), lowered));
+    expect((run as RunCapacity).cap).toBe("project");
+    expect(run?.message).toBe(chat!.message);
+  });
+
+  test("the project's refusal says 1 chat or run when one is going", () => {
+    const registry = new Registry();
+    fill(registry, 1, null, "p1");
+    // the scheduled share of a project at 1 is 0, so one run fills it
+    expect(
+      refusal(() =>
+        registry.admit("new", scheduled(), {
+          sendsPerUser: 1,
+          sendsPerProject: 1,
+          sendsRunning: 4,
+        }),
+      )?.message,
+    ).toBe("This project has 1 chat or run going. Try again in a moment.");
   });
 
   test("the caps are read at each admission and a lowered one stops nothing", () => {

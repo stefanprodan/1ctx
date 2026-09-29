@@ -1135,6 +1135,10 @@ describe("the schema", () => {
     test("no override leaves no row", () => {
       expect(converted([])).toEqual([]);
     });
+
+    test("an override that converts to the new default leaves no row", () => {
+      expect(converted([["runsRunning", 32, 20]])).toEqual([]);
+    });
   });
 
   describe("0030 archived chats migration", () => {

@@ -56,7 +56,7 @@ mount in `docs/bash.md`.
   `context_limit` or `tool_loop`; the answer keeps the provider's finish
   reason, except `tool_text`.
 - **The server places every row.** A change to a limit or a tool applies to
-  the next send, a run cap to the next admission; a send in flight
+  the next send, a send cap to the next admission; a send in flight
   keeps the caps and the set it started on. A round's calls run in
   parallel under the call timeout (plus a tool's `graceMs`, bash's 1.5 s
   to answer at its own deadline) and the send's signal. A tool row is
