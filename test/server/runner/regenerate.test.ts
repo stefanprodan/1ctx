@@ -180,17 +180,24 @@ describe("POST /api/sessions/:id/regenerate", () => {
 });
 
 describe("regenerateUsers", () => {
-  const row = (id: string, kind: Message["kind"]) => ({ id, kind }) as Message;
+  const row = (
+    id: string,
+    kind: Message["kind"],
+    sendId: string,
+    seq: number,
+  ) => ({ id, kind, sendId, seq }) as Message;
 
-  test("takes the run of user rows that ends at the last one", () => {
+  test("takes the user rows of the last user row's send", () => {
     const rows = [
-      row("u0", "user"),
-      row("r0", "reply"),
-      row("u1", "user"),
-      row("u2", "user"),
-      row("r1", "reply"),
-      row("t1", "tool"),
-      row("s1", "summary"),
+      row("u0", "user", "a", 1),
+      row("r0", "reply", "a", 2),
+      // a fork keeps a row its own send left unanswered
+      row("k1", "user", "b", 3),
+      row("u1", "user", "c", 4),
+      row("u2", "user", "c", 5),
+      row("r1", "reply", "c", 6),
+      row("t1", "tool", "c", 7),
+      row("s1", "summary", "d", 8),
     ];
     expect(regenerateUsers(rows).map((message) => message.id)).toEqual([
       "u1",
@@ -204,9 +211,9 @@ describe("regenerateUsers", () => {
   test("refuses a chat that ends with a user row or has none", () => {
     expect(() => regenerateUsers([])).toThrow("nothing to regenerate");
     expect(() =>
-      regenerateUsers([row("u0", "user"), row("u1", "user")]),
+      regenerateUsers([row("u0", "user", "a", 1), row("u1", "user", "a", 2)]),
     ).toThrow("nothing to regenerate");
-    expect(() => regenerateUsers([row("s0", "summary")])).toThrow(
+    expect(() => regenerateUsers([row("s0", "summary", "a", 1)])).toThrow(
       "nothing to regenerate",
     );
   });

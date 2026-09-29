@@ -11,13 +11,14 @@ import {
   type CapabilityChange,
 } from "../../shared/capabilities.ts";
 import { BadRequest } from "../lib/errors.ts";
-import type { Principal } from "../lib/http.ts";
 import { parseSendMessage } from "../sessions/index.ts";
 
 // the most user messages one turn opens with
 export const MAX_TURN_MESSAGES = 16;
 
-export type TurnMessage = SendMessageRequest & { principal: Principal };
+// the author by id: a message may start long after it was written, so
+// the runner reads the author as they are at the start
+export type TurnMessage = SendMessageRequest & { userId: string };
 
 export function checkTurn(messages: readonly TurnMessage[]): void {
   if (messages.length === 0 || messages.length > MAX_TURN_MESSAGES) {
@@ -25,12 +26,20 @@ export function checkTurn(messages: readonly TurnMessage[]): void {
       `a turn must open with 1 to ${MAX_TURN_MESSAGES} messages`,
     );
   }
+  const seen = new Set<string>();
   for (const { message, uploads, capabilities } of messages) {
     parseSendMessage({
       message,
       ...(uploads === undefined ? {} : { uploads }),
       ...(capabilities === undefined ? {} : { capabilities }),
     });
+    // a second claim of one staged file would roll the whole turn back
+    for (const id of uploads ?? []) {
+      if (seen.has(id)) {
+        throw new BadRequest("each file can be added to one message");
+      }
+      seen.add(id);
+    }
   }
 }
 

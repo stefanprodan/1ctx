@@ -10,6 +10,7 @@
 // the lock is let go after both the provider iteration and the round's
 // tools have settled.
 
+import type { SendMessageRequest } from "../../shared/api/sessions.ts";
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
@@ -39,7 +40,7 @@ import { sendPolicy } from "./send-policy.ts";
 import { shutdownRunner } from "./shutdown.ts";
 import type { StartFields, StartUser } from "./start.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
-import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
+import { applyChanges, checkTurn } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
 import { Writer } from "./writer.ts";
 
@@ -194,6 +195,24 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return user;
   };
 
+  // a message written earlier starts as its author is now: a role
+  // changed, a login disabled or a project left since counts
+  const liveAuthor = (userId: string): UserRow => {
+    const user = deps.users.byId(userId);
+    if (user === null) throw new BadRequest("the user is gone");
+    if (user.disabled) throw new BadRequest("the user is disabled");
+    return user;
+  };
+  const principalOf = (user: UserRow): Principal => ({
+    userId: user.id,
+    username: user.username,
+    fullName: user.fullName,
+    role: user.role,
+    mustChangePassword: user.mustChangePassword,
+    // no login stands behind a message that starts later
+    loginId: "",
+  });
+
   const agentOf = (id: string): AgentRow => {
     const agent = deps.agents.byId(id);
     if (agent === null) throw new BadRequest("no such agent");
@@ -275,12 +294,16 @@ export function runnerArea(deps: RunnerDeps): Runner {
   // counts against the first
   const continueChat = (
     sessionId: string,
-    messages: readonly TurnMessage[],
+    messages: readonly (SendMessageRequest & {
+      principal: Principal;
+      // the author's row when the caller read it already
+      user?: UserRow;
+    })[],
   ): SessionDetail => {
     let session: SessionRow | null = null;
     let project: ProjectRow | null = null;
     const authors: UserRow[] = [];
-    for (const { principal } of messages) {
+    for (const { principal, user } of messages) {
       const seen = deps.visible(principal, sessionId);
       if (seen.origin === "automation") {
         throw new Conflict("a run cannot continue");
@@ -289,7 +312,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const own = deps.access.project(principal, seen.projectId);
       session ??= seen;
       project ??= own;
-      authors.push(author(principal));
+      authors.push(user ?? author(principal));
     }
     const first = session!;
     return begin({
@@ -335,7 +358,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     sendTurn(sessionId, messages) {
       checkTurn(messages);
-      return continueChat(sessionId, messages);
+      return continueChat(
+        sessionId,
+        messages.map(({ userId, ...fields }) => {
+          const user = liveAuthor(userId);
+          return { ...fields, user, principal: principalOf(user) };
+        }),
+      );
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = deps.visible(principal, sessionId);

@@ -43,9 +43,12 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **A turn may open with several user messages.** `runner.sendTurn()`
   starts one send from 1 to `MAX_TURN_MESSAGES` (16) messages in order
   (`runner/turn.ts`), each its own `messages` row with its own author
-  and seq, and each held to a message's bounds; the routes send a list
-  of one. Every author must see the chat and write in its project; the
-  send counts against the first author and its policy is theirs. On the
+  and seq, and each held to a message's bounds, a staged upload in one
+  message only; the routes send a list of one. It takes each author by
+  id and reads them as they are at the start: a missing or disabled
+  user is a 400, and every author must see the chat and write in its
+  project. The send counts against the first author and its policy is
+  theirs. On the
   wire each is its own user message with its author's `name`, since
   every wire is the OpenAI chat shape, which takes consecutive user
   messages. The envelope's `last` is the last message's.
@@ -260,8 +263,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   automations' pointers to it.
 - **Regenerate replaces the last turn.**
   Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
-  reuses the last turn's user messages, the run of user rows that ends
-  at the last one: inside `startSend`'s transaction they move to the new
+  reuses the last turn's user messages, the user rows of the last user
+  row's send in seq order: inside `startSend`'s transaction they move to the new
   send, the rows after them and every send in that tail go, their usage
   stays, and the envelope names the rows in `removedMessageIds`; 409
   while the session runs, 400 when the last message is the user's. Its
@@ -272,8 +275,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   turn and its following done summaries, never memory phase rows, into
   a chat owned by the caller on the picked agent, recording the source
   session and message ids without foreign keys; at a user message the
-  rows before it stay, an earlier message of its turn included, which
-  regenerate then redoes with the next turn; a user turn is left
+  rows before it stay, an earlier message of its turn included, in its
+  own send that regenerate never redoes; a user turn is left
   unsent, and usage is not copied. The title is the body's, else
   "Fork of <the source's>"; the composer's `/fork <name>` forks at the
   last turn on the same agent under that name, and a run is forked

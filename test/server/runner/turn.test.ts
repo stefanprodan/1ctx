@@ -7,7 +7,6 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
-import type { Principal } from "../../../src/server/lib/http.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   MAX_TURN_MESSAGES,
@@ -35,24 +34,12 @@ async function settled(chat: ChatApp, id: string) {
   throw new Error("send did not settle");
 }
 
-function principal(chat: ChatApp, username: string): Principal {
-  const user = chat.app.users.byUsername(username)!;
-  return {
-    userId: user.id,
-    username: user.username,
-    fullName: user.fullName,
-    role: user.role,
-    mustChangePassword: false,
-    loginId: "test",
-  };
-}
-
 // a team chat the member started, its first turn answered
 async function teamChat(chat: ChatApp): Promise<{
   projectId: string;
   sessionId: string;
-  casey: Principal;
-  admin: Principal;
+  casey: string;
+  admin: string;
 }> {
   const created = await chat.admin.call("POST", "/api/projects", {
     body: { name: "ops", description: "A team project." },
@@ -71,8 +58,8 @@ async function teamChat(chat: ChatApp): Promise<{
   return {
     projectId,
     sessionId: started.sessionId,
-    casey: principal(chat, "casey"),
-    admin: principal(chat, "admin"),
+    casey: chat.memberId,
+    admin: chat.adminId,
   };
 }
 
@@ -107,9 +94,9 @@ describe("a turn of several user messages", () => {
         let detail: ReturnType<typeof chat.app.runner.sendTurn>;
         try {
           detail = chat.app.runner.sendTurn(team.sessionId, [
-            { principal: team.casey, message: "one" },
-            { principal: team.admin, message: "two" },
-            { principal: team.casey, message: "three" },
+            { userId: team.casey, message: "one" },
+            { userId: team.admin, message: "two" },
+            { userId: team.casey, message: "three" },
           ]);
         } finally {
           unsubscribe();
@@ -118,9 +105,9 @@ describe("a turn of several user messages", () => {
         expect(events).toHaveLength(1);
         const rows = events[0]!.data.messages;
         expect(rows.map((row) => [row.kind, row.content, row.userId])).toEqual([
-          ["user", "one", team.casey.userId],
-          ["user", "two", team.admin.userId],
-          ["user", "three", team.casey.userId],
+          ["user", "one", team.casey],
+          ["user", "two", team.admin],
+          ["user", "three", team.casey],
           ["reply", "", null],
         ]);
         expect(new Set(rows.map((row) => row.sendId)).size).toBe(1);
@@ -140,8 +127,8 @@ describe("a turn of several user messages", () => {
 
         // the send counts against the first author
         const active = chat.app.runner.registry.get(team.sessionId)!;
-        expect(active.startedBy).toBe(team.casey.userId);
-        expect(active.policy.userId).toBe(team.casey.userId);
+        expect(active.startedBy).toBe(team.casey);
+        expect(active.policy.userId).toBe(team.casey);
 
         const script = await waitScript(chat.scripted, 2);
         expect(userMessages(script)).toEqual([
@@ -169,8 +156,8 @@ describe("a turn of several user messages", () => {
       try {
         const team = await teamChat(chat);
         chat.app.runner.sendTurn(team.sessionId, [
-          { principal: team.admin, message: "left" },
-          { principal: team.casey, message: "right" },
+          { userId: team.admin, message: "left" },
+          { userId: team.casey, message: "right" },
         ]);
         const script = await waitScript(chat.scripted, 2);
         expect(userMessages(script).slice(-2)).toEqual([
@@ -193,8 +180,8 @@ describe("a turn of several user messages", () => {
       const other = await startChat(chat, "busy", chat.admin, team.projectId);
       expect(() =>
         chat.app.runner.sendTurn(team.sessionId, [
-          { principal: team.admin, message: "one" },
-          { principal: team.casey, message: "two" },
+          { userId: team.admin, message: "one" },
+          { userId: team.casey, message: "two" },
         ]),
       ).toThrow(/going/);
       expect(turnOf(chat, team.sessionId).map((row) => row.content)).toEqual([
@@ -202,11 +189,11 @@ describe("a turn of several user messages", () => {
         "first answer",
       ]);
       const detail = chat.app.runner.sendTurn(team.sessionId, [
-        { principal: team.casey, message: "one" },
-        { principal: team.admin, message: "two" },
+        { userId: team.casey, message: "one" },
+        { userId: team.admin, message: "two" },
       ]);
       expect(chat.app.runner.registry.get(detail.session.id)?.startedBy).toBe(
-        team.casey.userId,
+        team.casey,
       );
       (await waitScript(chat.scripted, 3)).reply("done");
       other.script.reply("done");
@@ -223,12 +210,12 @@ describe("a turn of several user messages", () => {
       const team = await teamChat(chat);
       const detail = chat.app.runner.sendTurn(team.sessionId, [
         {
-          principal: team.casey,
+          userId: team.casey,
           message: "one",
           capabilities: { disable: ["web", "memory"] },
         },
         {
-          principal: team.admin,
+          userId: team.admin,
           message: "two",
           capabilities: { enable: ["web"], disable: ["visualize"] },
         },
@@ -270,13 +257,13 @@ describe("a turn of several user messages", () => {
       // an author cannot attach another's staged file
       expect(() =>
         chat.app.runner.sendTurn(team.sessionId, [
-          { principal: team.casey, message: "one", uploads: [theirs.id] },
+          { userId: team.casey, message: "one", uploads: [theirs.id] },
         ]),
       ).toThrow(/is gone/);
       chat.app.runner.sendTurn(team.sessionId, [
-        { principal: team.casey, message: "one", uploads: [mine.id] },
-        { principal: team.admin, message: "two", uploads: [theirs.id] },
-        { principal: team.casey, message: "three" },
+        { userId: team.casey, message: "one", uploads: [mine.id] },
+        { userId: team.admin, message: "two", uploads: [theirs.id] },
+        { userId: team.casey, message: "three" },
       ]);
       const users = turnOf(chat, team.sessionId).filter(
         (row) => row.kind === "user",
@@ -299,16 +286,16 @@ describe("a turn of several user messages", () => {
     const chat = await chatApp();
     try {
       const team = await teamChat(chat);
-      const one = { principal: team.casey, message: "x" };
+      const one = { userId: team.casey, message: "x" };
       const refused: [TurnMessage[], RegExp][] = [
         [[], /1 to 16/],
         [Array.from({ length: MAX_TURN_MESSAGES + 1 }, () => one), /1 to 16/],
-        [[one, { principal: team.admin, message: " " }], /message/],
+        [[one, { userId: team.admin, message: " " }], /message/],
         [
           [
             one,
             {
-              principal: team.admin,
+              userId: team.admin,
               message: "y",
               uploads: Array.from({ length: 11 }, (_, i) => `u${i}`),
             },
@@ -316,6 +303,14 @@ describe("a turn of several user messages", () => {
           /uploads/,
         ],
       ];
+      // one staged file in two messages would fail the second claim
+      refused.push([
+        [
+          { ...one, uploads: ["same"] },
+          { userId: team.admin, message: "y", uploads: ["same"] },
+        ],
+        /each file can be added to one message/,
+      ]);
       for (const [messages, error] of refused) {
         expect(() =>
           chat.app.runner.sendTurn(team.sessionId, messages),
@@ -327,11 +322,68 @@ describe("a turn of several user messages", () => {
       await settled(chat, personal.sessionId);
       expect(() =>
         chat.app.runner.sendTurn(personal.sessionId, [
-          { principal: team.casey, message: "one" },
-          { principal: team.admin, message: "two" },
+          { userId: team.casey, message: "one" },
+          { userId: team.admin, message: "two" },
         ]),
       ).toThrow(/no such chat/);
       expect(chat.app.sessions.messages(personal.sessionId)).toHaveLength(2);
+      expect(chat.app.sessions.messages(team.sessionId)).toHaveLength(2);
+      expect(chat.app.runner.registry.size).toBe(0);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("reads each author as they are when the turn starts", async () => {
+    const chat = await chatApp();
+    try {
+      const team = await teamChat(chat);
+      const other = chat.app.createUser({
+        username: "dana",
+        fullName: "Dana Roe",
+        email: "dana@example.com",
+        role: "admin",
+        passwordHash: "x",
+        mustChangePassword: false,
+        now: chat.app.now.value,
+      });
+      const turn: TurnMessage[] = [
+        { userId: team.casey, message: "one" },
+        { userId: other.id, message: "two" },
+      ];
+      // an admin demoted since writing no longer sees a project they
+      // are not a member of
+      chat.app.db
+        .query("update users set role = 'member' where id = ?")
+        .run(other.id);
+      expect(() => chat.app.runner.sendTurn(team.sessionId, turn)).toThrow(
+        /no such chat/,
+      );
+      // a member removed from the project since writing
+      const removed = await chat.admin.call(
+        "DELETE",
+        `/api/projects/${team.projectId}/members/${team.casey}`,
+      );
+      expect(removed.status).toBe(200);
+      expect(() =>
+        chat.app.runner.sendTurn(team.sessionId, [
+          { userId: team.admin, message: "one" },
+          { userId: team.casey, message: "two" },
+        ]),
+      ).toThrow(/no such chat/);
+      chat.app.db
+        .query("update users set disabled = 1 where id = ?")
+        .run(other.id);
+      expect(() =>
+        chat.app.runner.sendTurn(team.sessionId, [
+          { userId: other.id, message: "one" },
+        ]),
+      ).toThrow("the user is disabled");
+      expect(() =>
+        chat.app.runner.sendTurn(team.sessionId, [
+          { userId: "gone00000000", message: "one" },
+        ]),
+      ).toThrow("the user is gone");
       expect(chat.app.sessions.messages(team.sessionId)).toHaveLength(2);
       expect(chat.app.runner.registry.size).toBe(0);
     } finally {
@@ -344,8 +396,8 @@ describe("a turn of several user messages", () => {
     try {
       const team = await teamChat(chat);
       chat.app.runner.sendTurn(team.sessionId, [
-        { principal: team.casey, message: "one" },
-        { principal: team.admin, message: "two" },
+        { userId: team.casey, message: "one" },
+        { userId: team.admin, message: "two" },
       ]);
       (await waitScript(chat.scripted, 2)).reply("old");
       await settled(chat, team.sessionId);
@@ -402,8 +454,8 @@ describe("a turn of several user messages", () => {
     try {
       const team = await teamChat(chat);
       chat.app.runner.sendTurn(team.sessionId, [
-        { principal: team.casey, message: "one" },
-        { principal: team.admin, message: "two" },
+        { userId: team.casey, message: "one" },
+        { userId: team.admin, message: "two" },
       ]);
       (await waitScript(chat.scripted, 2)).reply("answer");
       await settled(chat, team.sessionId);
@@ -426,8 +478,8 @@ describe("a turn of several user messages", () => {
       ]);
       expect(fork.draftUploads).toEqual([]);
 
-      // the next turn in the fork follows the kept message, and its
-      // regenerate redoes both
+      // the next turn in the fork follows the kept message, which is its
+      // own send's and stays when the next turn is regenerated
       const next = chat.scripted.next();
       expect(
         (
@@ -452,15 +504,18 @@ describe("a turn of several user messages", () => {
       );
       expect(regenerated.status).toBe(201);
       const detail = await regenerated.json();
+      const rows = detail.messages as Message[];
       expect(
-        (detail.messages as Message[])
+        rows
           .filter((row) => row.sendId === detail.send.id)
           .map((row) => [row.kind, row.content]),
       ).toEqual([
-        ["user", "one"],
         ["user", "two again"],
         ["reply", ""],
       ]);
+      const kept = rows.find((row) => row.content === "one")!;
+      expect(kept.sendId).not.toBe(detail.send.id);
+      expect(chat.app.sessions.send(kept.sendId)).not.toBeNull();
       (await again).reply("done");
       await settled(chat, fork.session.id);
     } finally {
@@ -473,8 +528,8 @@ describe("a turn of several user messages", () => {
     try {
       const team = await teamChat(chat);
       chat.app.runner.sendTurn(team.sessionId, [
-        { principal: team.casey, message: "one" },
-        { principal: team.admin, message: "two" },
+        { userId: team.casey, message: "one" },
+        { userId: team.admin, message: "two" },
       ]);
       (await waitScript(chat.scripted, 2)).reply("both");
       await settled(chat, team.sessionId);
