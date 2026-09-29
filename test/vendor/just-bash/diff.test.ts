@@ -136,6 +136,72 @@ describe("diff", () => {
     expect(long.stderr).toContain("work limit exceeded");
   });
 
+  test("charges what a format writes, widths included", async () => {
+    const { bash } = shell({ a: `${"x".repeat(1000000)}\n`, b: "y\n" });
+    for (const command of [
+      `diff --old-line-format='${"%L".repeat(2000)}' a b`,
+      "diff --line-format='%2000000000dn' a b",
+      "diff --old-group-format='%.300000000dF' a b",
+    ]) {
+      const result = await bash.exec(command);
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain("work limit exceeded");
+    }
+  });
+
+  test("charges the spaces -t and -E expand tabs to", async () => {
+    // tabs on both sides, since ed and RCS scripts print only the second
+    const tabs = "\t".repeat(200);
+    const { bash } = shell({ a: `${tabs}a\n`, b: `${tabs}b\n` });
+    for (const style of ["", "-u", "-c", "-e", "-f", "-n", "-D X"]) {
+      const result = await bash.exec(
+        `diff -t --tabsize=100000000 ${style} a b`,
+      );
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain("work limit exceeded");
+    }
+    const folded = await bash.exec("diff -E --tabsize=100000000 a b");
+    expect(folded.exitCode).toBe(2);
+    expect(folded.stderr).toContain("work limit exceeded");
+  });
+
+  test("charges -x and -X matching to the work limit", async () => {
+    const fs = new InMemoryFs({}, {});
+    const long = "ab".repeat(500);
+    for (let i = 0; i < 20; i++) {
+      fs.writeFileSync(`/w/d1/${long}${i}`, "a\n");
+      fs.writeFileSync(`/w/d2/${long}${i}`, "a\n");
+    }
+    const pattern = `${"*a*b".repeat(10)}*q`;
+    fs.writeFileSync("/w/x", `${pattern}\n`.repeat(200));
+    const bash = new Bash({
+      fs,
+      cwd: "/w",
+      executionLimits: { maxLoopIterations: 1000 },
+    });
+    const result = await bash.exec("diff -r -X x d1 d2");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("work limit exceeded");
+    const one = await bash.exec(`diff -r -x '${pattern}' d1 d2`);
+    expect(one.exitCode).toBe(0);
+  });
+
+  test("lays out a width past 32 bits, failing on the padding", async () => {
+    const { bash } = shell({ a: "a\n", b: "b\n" });
+    const result = await bash.exec("diff -y -W 4294967336 a b");
+    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("work limit exceeded");
+  });
+
+  test("names both files when neither exists under -N", async () => {
+    const { bash } = shell({});
+    const result = await bash.exec("diff -N nope1 nope2");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("nope1: No such file or directory");
+    expect(result.stderr).toContain("nope2: No such file or directory");
+  });
+
   test("walks directories within the traversal budget", async () => {
     const fs = new InMemoryFs({}, {});
     for (let i = 0; i < 20; i++) {

@@ -12,6 +12,8 @@ export interface LineStyle {
   suppressBlankEmpty: boolean;
   /** -t: tabs expanded to spaces at this size, 0 to keep them */
   expandTabs: number;
+  /** takes the spaces -t writes */
+  charge?: (steps: number) => void;
 }
 
 export const NO_NEWLINE = "\\ No newline at end of file\n";
@@ -30,7 +32,9 @@ export function writeLine(
   style: LineStyle,
 ): void {
   let text = file.lines[i];
-  if (style.expandTabs > 0) text = expandTabs(text, style.expandTabs);
+  if (style.expandTabs > 0) {
+    text = expandTabs(text, style.expandTabs, style.charge);
+  }
   let lead: string;
   if (text === "" && style.suppressBlankEmpty) lead = mark.trimEnd();
   else if (style.initialTab) lead = `${mark === " " && gap === "" ? "" : mark}\t`;

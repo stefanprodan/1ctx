@@ -34,6 +34,8 @@ export interface Folding {
   tabSize?: number;
   /** ed styles: an incomplete last line matches a complete one */
   completeLines?: boolean;
+  /** takes the spaces -E expands tabs to */
+  charge?: (steps: number) => void;
 }
 
 export interface Interned {
@@ -110,7 +112,11 @@ export function columns(ch: string): number {
  * Tabs to the next stop, a character taking the columns a terminal gives
  * it and a byte that is not UTF-8 one column, as GNU's manual has it.
  */
-export function expandTabs(line: string, size: number): string {
+export function expandTabs(
+  line: string,
+  size: number,
+  charge?: (steps: number) => void,
+): string {
   if (!line.includes("\t")) return line;
   const text = decodeLine(line);
   let out = "";
@@ -118,6 +124,8 @@ export function expandTabs(line: string, size: number): string {
   for (const ch of text ?? line) {
     if (ch === "\t") {
       const spaces = size - (column % size);
+      // a tab size can ask for more spaces than memory holds
+      charge?.(spaces);
       out += " ".repeat(spaces);
       column += spaces;
     } else {
@@ -149,7 +157,7 @@ export function foldLine(line: string, folding: Folding): string {
     return key.replace(TRAILING, "").replace(RUNS, " ");
   }
   if (folding.ignoreTabExpansion) {
-    key = expandTabs(key, folding.tabSize ?? 8);
+    key = expandTabs(key, folding.tabSize ?? 8, folding.charge);
   }
   if (folding.ignoreTrailingSpace) key = key.replace(TRAILING, "");
   return key;

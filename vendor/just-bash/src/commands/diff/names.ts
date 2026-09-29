@@ -124,10 +124,29 @@ function bracket(
   return [j + 1, matched !== negate];
 }
 
-/** fnmatch(3) with no flags but FNM_CASEFOLD when `fold`. */
-export function fnmatch(pattern: string, name: string, fold: boolean): boolean {
+export type Charge = (steps: number) => void;
+
+/**
+ * fnmatch(3) with no flags but FNM_CASEFOLD when `fold`. Every step is
+ * charged, since a pattern of many stars costs its length times the
+ * name's.
+ */
+export function fnmatch(
+  pattern: string,
+  name: string,
+  fold: boolean,
+  charge: Charge = () => {},
+): boolean {
   const p = [...pattern];
   const s = [...name];
+  let steps = p.length + s.length;
+  const step = (n = 1) => {
+    steps += n;
+    if (steps >= 1024) {
+      charge(steps);
+      steps = 0;
+    }
+  };
   const same = (a: string, b: string) =>
     fold ? a.toLowerCase() === b.toLowerCase() : a === b;
   let pi = 0;
@@ -135,6 +154,7 @@ export function fnmatch(pattern: string, name: string, fold: boolean): boolean {
   let starP = -1;
   let starS = 0;
   while (si < s.length) {
+    step();
     if (pi < p.length) {
       const c = p[pi];
       if (c === "*") {
@@ -149,6 +169,7 @@ export function fnmatch(pattern: string, name: string, fold: boolean): boolean {
       }
       if (c === "[") {
         const found = bracket(p, pi + 1, s[si], fold);
+        step(found === null ? p.length - pi : found[0] - pi);
         if (found === null) {
           if (same("[", s[si])) {
             pi++;
@@ -169,11 +190,15 @@ export function fnmatch(pattern: string, name: string, fold: boolean): boolean {
         }
       }
     }
-    if (starP === -1) return false;
+    if (starP === -1) {
+      charge(steps);
+      return false;
+    }
     pi = starP;
     si = ++starS;
   }
   while (pi < p.length && p[pi] === "*") pi++;
+  charge(steps);
   return pi === p.length;
 }
 
@@ -181,9 +206,10 @@ export function fnmatch(pattern: string, name: string, fold: boolean): boolean {
 export function excluder(
   patterns: string[],
   fold: boolean,
+  charge: Charge,
 ): (name: string) => boolean {
   if (patterns.length === 0) return () => false;
-  return (name) => patterns.some((p) => fnmatch(p, name, fold));
+  return (name) => patterns.some((p) => fnmatch(p, name, fold, charge));
 }
 
 /** An exclude file's patterns: one a line, trailing blanks dropped. */

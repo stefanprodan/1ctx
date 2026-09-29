@@ -152,7 +152,7 @@ export class DiffRun {
   ) {
     this.collate = collates(ctx.env);
     this.order = nameOrder(o.ignoreFileNameCase, this.collate);
-    this.excluded = excluder(excludes, o.ignoreFileNameCase);
+    this.excluded = excluder(excludes, o.ignoreFileNameCase, budget.charge);
     this.traversal = new FileTraversalBudget({
       limits: ctx.limits,
       signal: ctx.signal,
@@ -262,8 +262,10 @@ export class DiffRun {
         side.stdin = true;
         side.stat = { ...STDIN, mtime: new Date() };
       } else if (f === 1 && sides[0].err !== null) {
-        // GNU never stats the second file once the first failed
-        side.stat = UNSTATTED;
+        // GNU still opens the second file once the first failed, and says
+        // when it is missing too, but never stats it
+        await this.statSide(side);
+        if (side.err === null) side.stat = UNSTATTED;
       } else {
         await this.statSide(side);
       }
@@ -409,7 +411,13 @@ export class DiffRun {
       window: side.stdin ? PIPE_WINDOW : BINARY_WINDOW,
     });
     const result = diffTexts(
-      { o, tests: this.tests, budget: this.budget, tz: this.ctx.env.get("TZ") },
+      {
+        o,
+        tests: this.tests,
+        budget: this.budget,
+        tz: this.ctx.env.get("TZ"),
+        grouping: this.collate,
+      },
       file(s0, bytes0),
       file(s1, bytes1),
     );

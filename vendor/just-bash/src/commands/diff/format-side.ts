@@ -29,9 +29,13 @@ export interface SideStyle {
 /** The half width and the right column's offset, as GNU computes them. */
 export function sideColumns(style: SideStyle): [number, number] {
   const t = style.expandTabs ? 1 : style.tabSize;
-  const w = style.width;
+  // past 32 bits, where GNU's intmax_t still holds a width
+  const w = Math.min(style.width, Number.MAX_SAFE_INTEGER);
   const tg = t + 3;
-  const unaligned = (w >> 1) + (tg >> 1) + (w & tg & 1);
+  const unaligned =
+    Math.floor(w / 2) +
+    Math.floor(tg / 2) +
+    (w % 2 === 1 && tg % 2 === 1 ? 1 : 0);
   const off = unaligned - (unaligned % t);
   const half = Math.max(0, Math.min(off - 3, w - off));
   return [half, half ? off : w];
@@ -79,7 +83,7 @@ class Printer {
         at = tab;
       }
     }
-    while (at++ < to) this.out.push(" ");
+    if (at < to) this.out.push(" ".repeat(to - at));
     return to;
   }
 
@@ -98,8 +102,11 @@ class Printer {
         if (inPos === outPos) {
           if (style.expandTabs) {
             if (bound < stop) stop = bound;
-            if (stop > outPos) style.charge(stop - outPos);
-            for (; outPos < stop; outPos++) out.push(" ");
+            if (stop > outPos) {
+              style.charge(stop - outPos);
+              out.push(" ".repeat(stop - outPos));
+              outPos = stop;
+            }
           } else if (stop < bound) {
             outPos = stop;
             out.push(c);
@@ -116,7 +123,8 @@ class Printer {
         i++;
         if (inPos !== 0 && --inPos < bound) {
           if (outPos <= inPos) {
-            for (; outPos < inPos; outPos++) out.push(" ");
+            if (outPos < inPos) out.push(" ".repeat(inPos - outPos));
+            outPos = inPos;
           } else {
             outPos = inPos;
             out.push(c);
@@ -156,7 +164,8 @@ class Printer {
       col = this.halfLine(a.lines[i], 0, this.half);
     }
     if (mark !== " ") {
-      col = this.tabFromTo(col, (this.half + this.offset - 1) >> 1) + 1;
+      col =
+        this.tabFromTo(col, Math.floor((this.half + this.offset - 1) / 2)) + 1;
       if (mark === "|" && b && newline !== complete(b, j)) {
         mark = newline ? "/" : "\\";
       }

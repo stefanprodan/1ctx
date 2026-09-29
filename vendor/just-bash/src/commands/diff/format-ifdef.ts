@@ -25,8 +25,10 @@ interface Ifdef {
   lines: string[];
   /** -t: tabs expanded at this size, 0 to keep them */
   tabSize: number;
-  /** takes a step a byte of each format run, which a long one makes many */
+  /** takes a step a byte of each format run and of what it writes */
   charge: (steps: number) => void;
+  /** the locale groups digits for printf's ' flag */
+  grouping: boolean;
 }
 
 const isDigit = (c: string) => c >= "0" && c <= "9";
@@ -73,6 +75,7 @@ function charLiteral(f: string, at: number): [string, number] | null {
 
 /** printf's %d, %o, %x or %X of a non-negative count with its flags. */
 function printf(
+  grouping: boolean,
   flags: string,
   width: number,
   precision: number | null,
@@ -84,7 +87,7 @@ function printf(
     conv === "o" ? 8 : conv === "d" ? 10 : 16,
   );
   if (conv === "X") digits = digits.toUpperCase();
-  if (flags.includes("'") && conv === "d") {
+  if (grouping && flags.includes("'") && conv === "d") {
     digits = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
   if (precision !== null) {
@@ -107,6 +110,7 @@ function printf(
  * number; a group directive a group letter.
  */
 function printfSpec(
+  run: Ifdef,
   f: string,
   at: number,
   line: number | null,
@@ -144,7 +148,10 @@ function printfSpec(
     value = letterValue(groups as [Group, Group], c1);
     if (value < 0) return null;
   }
-  return [printf(flags, Number(width || "0"), precision, c, value), p];
+  const pad = Number(width || "0");
+  // a width or precision may ask for more than memory holds
+  run.charge(Math.max(pad, precision ?? 0) + 1);
+  return [printf(run.grouping, flags, pad, precision, c, value), p];
 }
 
 function lineBytes(
@@ -154,7 +161,8 @@ function lineBytes(
   newline: boolean,
 ): string {
   let line = file.lines[i];
-  if (run.tabSize > 0) line = expandTabs(line, run.tabSize);
+  if (run.tabSize > 0) line = expandTabs(line, run.tabSize, run.charge);
+  run.charge(line.length + 1);
   const complete = i < file.lines.length - 1 || !file.incomplete;
   return newline && complete ? `${line}\n` : line;
 }
@@ -183,7 +191,7 @@ function printLines(
         out.push(lineBytes(run, group.file, i, d === "L"));
         p++;
       } else {
-        const spec = printfSpec(format, p - 1, i, null);
+        const spec = printfSpec(run, format, p - 1, i, null);
         if (spec === null) {
           out.push("%");
         } else {
@@ -263,7 +271,7 @@ function formatGroup(
       printLines(run, run.lines[NEW], groups[1], out);
       continue;
     } else {
-      const spec = printfSpec(format, f - 2, null, groups);
+      const spec = printfSpec(run, format, f - 2, null, groups);
       if (spec !== null) {
         out?.push(spec[0]);
         f = spec[1];

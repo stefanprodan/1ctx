@@ -49,6 +49,8 @@ export interface TextRun {
   tests: Tests;
   budget: WorkBudget;
   tz: string | undefined;
+  /** the locale groups digits for printf's ' flag */
+  grouping: boolean;
 }
 
 export interface TextResult {
@@ -109,7 +111,11 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
   budget.charge(folds(o) ? FOLD_STEPS * bytes : bytes);
   const la = splitLines(a.bytes, o.stripTrailingCr);
   const lb = splitLines(b.bytes, o.stripTrailingCr);
-  const ids = intern(la, lb, { ...o, completeLines: !robust });
+  const ids = intern(la, lb, {
+    ...o,
+    completeLines: !robust,
+    charge: budget.charge,
+  });
   const raw = folds(o) ? intern(la, lb, { completeLines: !robust }) : null;
   const charged = (test: LineTest | null): LineTest | null =>
     test &&
@@ -165,11 +171,11 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
     );
     began = true;
   } else if (style === "ed") {
-    formatEd(lb, real, tabSize, out);
+    formatEd(lb, real, tabSize, budget.charge, out);
   } else if (style === "forward-ed") {
-    formatForwardEd(lb, real, tabSize, out);
+    formatForwardEd(lb, real, tabSize, budget.charge, out);
   } else if (style === "rcs") {
-    formatRcs(lb, real, tabSize, out);
+    formatRcs(lb, real, tabSize, budget.charge, out);
   } else if (style === "ifdef") {
     const { lines, groups } = formats(o);
     began = formatIfdef(
@@ -177,7 +183,12 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
       lb,
       real,
       groups.map(text),
-      { lines: lines.map(text), tabSize, charge: budget.charge },
+      {
+        lines: lines.map(text),
+        tabSize,
+        charge: budget.charge,
+        grouping: run.grouping,
+      },
       out,
     );
   } else {
@@ -218,6 +229,7 @@ function formatHunks(
     initialTab: o.initialTab,
     suppressBlankEmpty: o.suppressBlankEmpty,
     expandTabs: o.expandTabs ? o.tabSize : 0,
+    charge: run.budget.charge,
   };
   if (style === "normal") {
     formatNormal(la, lb, hunks, lineStyle, out);
