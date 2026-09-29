@@ -354,3 +354,15 @@ export function resolveLimits(
 
   return resolved;
 }
+
+/**
+ * (1ctx) The synchronous work one command may do: grep's matcher and
+ * diff's compare take it.
+ */
+export function commandWorkLimit(
+  limits: Pick<ExecutionLimits, "maxLoopIterations" | "maxArrayElements">,
+): number {
+  const loopLimit = limits.maxLoopIterations ?? DEFAULT_LIMITS.maxLoopIterations;
+  const arrayLimit = limits.maxArrayElements ?? DEFAULT_LIMITS.maxArrayElements;
+  return Math.max(loopLimit, Math.min(arrayLimit, loopLimit * 10));
+}

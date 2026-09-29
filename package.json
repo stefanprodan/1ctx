@@ -40,7 +40,6 @@
     "@types/sprintf-js": "1.1.4",
     "@types/turndown": "5.0.6",
     "@zip.js/zip.js": "2.15.0",
-    "diff": "8.0.4",
     "fast-xml-parser": "5.11.1",
     "file-type": "21.3.4",
     "gpt-tokenizer": "4.0.0",

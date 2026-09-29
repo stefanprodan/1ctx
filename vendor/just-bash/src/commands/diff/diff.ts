@@ -2,8 +2,9 @@
  * diff - Compare files line by line
  */
 
-import * as Diff from "diff";
 import { decodeBytesToUtf8 } from "../../encoding.js";
+import { ExecutionAbortedError } from "../../interpreter/errors.js";
+import { commandWorkLimit } from "../../limits.js";
 import type {
   ExecResult,
   RuntimeCommand,
@@ -11,6 +12,10 @@ import type {
 } from "../../types.js";
 import { parseArgs } from "../../utils/args.js";
 import { hasHelpFlag, showHelp } from "../help.js";
+import { compare } from "./engine.js";
+import { formatUnified } from "./format-unified.js";
+import { changesOf, hunksOf } from "./hunks.js";
+import { intern, splitLines } from "./lines.js";
 
 const diffHelp = {
   name: "diff",
@@ -34,7 +39,40 @@ const argDefs = {
     type: "boolean" as const,
   },
   ignoreCase: { short: "i", long: "ignore-case", type: "boolean" as const },
+  minimal: { short: "d", long: "minimal", type: "boolean" as const },
 };
+
+/** (1ctx) Steps of the compare that make one unit of the work limit. */
+export const STEPS_PER_UNIT = 64;
+
+/** (1ctx) The compare went past the command's work limit. */
+export class DiffWorkLimitError extends Error {}
+
+/**
+ * (1ctx) Charges the compare's steps to the command's work limit, the one
+ * grep's matcher takes; a default compare gives up looking at a quarter
+ * of it, so only -d can run into it.
+ */
+export function workBudget(ctx: RuntimeCommandContext): {
+  charge: (steps: number) => void;
+  giveUp: number;
+  spent: () => number;
+} {
+  const limit = commandWorkLimit(ctx.limits);
+  const maxSteps = limit * STEPS_PER_UNIT;
+  let steps = 0;
+  return {
+    charge: (more: number) => {
+      if (ctx.signal?.aborted) throw new ExecutionAbortedError();
+      steps += more;
+      if (steps > maxSteps) {
+        throw new DiffWorkLimitError(`work limit exceeded (${limit})`);
+      }
+    },
+    giveUp: maxSteps / 4,
+    spent: () => Math.ceil(steps / STEPS_PER_UNIT),
+  };
+}
 
 export const diffCommand: RuntimeCommand = {
   name: "diff",
@@ -51,6 +89,7 @@ export const diffCommand: RuntimeCommand = {
     const brief = parsed.result.flags.brief;
     const reportSame = parsed.result.flags.reportSame;
     const ignoreCase = parsed.result.flags.ignoreCase;
+    const minimal = parsed.result.flags.minimal;
     const files = parsed.result.positional;
 
     // Note: unified flag is accepted but is the default behavior
@@ -91,14 +130,26 @@ export const diffCommand: RuntimeCommand = {
       };
     }
 
-    let t1 = c1,
-      t2 = c2;
-    if (ignoreCase) {
-      t1 = t1.toLowerCase();
-      t2 = t2.toLowerCase();
+    // (1ctx) our own bounded compare, over lines interned to numbers
+    const a = splitLines(c1);
+    const b = splitLines(c2);
+    const ids = intern(a, b, { ignoreCase });
+    const budget = workBudget(ctx);
+    let hunks: ReturnType<typeof hunksOf>;
+    try {
+      const comparison = compare(ids.a, ids.b, ids.count, {
+        ...budget,
+        minimal,
+      });
+      hunks = hunksOf(changesOf(comparison), 3, a.lines.length, b.lines.length);
+    } catch (error) {
+      if (error instanceof DiffWorkLimitError) {
+        return { stdout: "", stderr: `diff: ${error.message}\n`, exitCode: 2 };
+      }
+      throw error;
     }
 
-    if (t1 === t2) {
+    if (hunks.length === 0) {
       if (reportSame)
         // diff emits text; the pipeline handles encoding.
         return {
@@ -118,12 +169,15 @@ export const diffCommand: RuntimeCommand = {
       };
     }
 
-    const output = Diff.createTwoFilesPatch(f1, f2, c1, c2, "", "", {
-      context: 3,
-    });
+    const out = [`--- ${f1}\n`, `+++ ${f2}\n`];
+    formatUnified(a, b, hunks, {
+      initialTab: false,
+      suppressBlankEmpty: false,
+      expandTabs: 0,
+    }, out);
     // diff emits text; the pipeline handles encoding.
     return {
-      stdout: output,
+      stdout: out.join(""),
       stderr: "",
       exitCode: 1,
     };

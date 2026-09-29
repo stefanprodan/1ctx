@@ -111,7 +111,6 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "diff": "^8.0.4",
     "fast-xml-parser": "^5.10.1",
     "file-type": "^21.3.4",
     "ini": "^6.0.0",
