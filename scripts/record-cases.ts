@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what a reference binary answers for each case of a fixture under
-// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts, grep-record.ts
-// and rg-record.ts. Run by hand;
+// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts, grep-record.ts,
+// rg-record.ts and xargs-record.ts. Run by hand;
 // the suite reads the fixture and never needs the binary.
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";

@@ -96,7 +96,7 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 (what `make smoke` runs), vendor-test.sh, brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
-                run by hand, *-record.ts, four of them over record-cases.ts
+                run by hand, *-record.ts, five of them over record-cases.ts
                 (vendor/README.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
