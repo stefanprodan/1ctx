@@ -8,7 +8,7 @@ import type {
   ScratchFile,
 } from "../../../src/server/knowledge/index.ts";
 import { Conflict } from "../../../src/server/lib/errors.ts";
-import { setup } from "./helpers.ts";
+import { setup } from "../knowledge/helpers.ts";
 
 const binary: ScratchFile = {
   path: "work/data.bin",

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AgentStore } from "../../../src/server/agents/index.ts";
+import type { CommandCaps } from "../../../src/server/bash/mount.ts";
+import type { ScratchChanges } from "../../../src/server/bash/scratch.ts";
 import { transact } from "../../../src/server/db/index.ts";
 import { knowledgeArea } from "../../../src/server/knowledge/index.ts";
-import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
-import type { ScratchChanges } from "../../../src/server/knowledge/scratch.ts";
 import { NotFound } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
@@ -21,7 +21,7 @@ import { memoryDb } from "../../helpers/db.ts";
 
 // the real entry, as compose.ts builds it: commands run in a worker here
 export const COMMAND_WORKER = new URL(
-  "../../../src/server/knowledge/command.worker.ts",
+  "../../../src/server/bash/command.worker.ts",
   import.meta.url,
 );
 

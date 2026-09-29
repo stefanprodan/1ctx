@@ -8,12 +8,12 @@
 // drops what a worker posts outside the protocol.
 
 import { describe, expect, test } from "bun:test";
-import type { Job } from "../../../src/server/knowledge/protocol.ts";
-import { acquire, heldSessions } from "../../../src/server/knowledge/queue.ts";
+import type { Job } from "../../../src/server/bash/protocol.ts";
 import {
   type CommandHooks,
   commandWorkers,
-} from "../../../src/server/knowledge/worker.ts";
+} from "../../../src/server/bash/worker.ts";
+import { acquire, heldSessions } from "../../../src/server/knowledge/queue.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import {
@@ -23,7 +23,7 @@ import {
   run,
   setup,
   untilPhase,
-} from "./helpers.ts";
+} from "../knowledge/helpers.ts";
 
 const MiB = 1024 * 1024;
 // limits high enough that a runaway never stops itself
@@ -51,14 +51,8 @@ const stops = (
   phase?: (phase: "run" | "diff") => void,
 ) => ({ signal, deadline, chat: "chat", ...(phase ? { phase } : {}) });
 const BUSY = "while :; do :; done";
-const FORGED = new URL(
-  "../../fixtures/knowledge/forged.worker.ts",
-  import.meta.url,
-);
-const CRASH = new URL(
-  "../../fixtures/knowledge/crash.worker.ts",
-  import.meta.url,
-);
+const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
+const CRASH = new URL("../../fixtures/bash/crash.worker.ts", import.meta.url);
 
 describe("the command worker", () => {
   test.serial(

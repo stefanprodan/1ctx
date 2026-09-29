@@ -24,18 +24,19 @@ import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
 
-export type { OpenedRecord } from "./open.ts";
-export type { CommandEnd } from "./protocol.ts";
+export type { OpenedRecord } from "../bash/open.ts";
+export type { CommandEnd } from "../bash/protocol.ts";
 
+import { startKept } from "../bash/kept.ts";
+import { type CommandCaps, type CommandResult, run } from "../bash/mount.ts";
+import { ScratchStore } from "../bash/scratch.ts";
+import { commandWorkers } from "../bash/worker.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
-import { startKept } from "./kept.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
-import { type CommandCaps, type CommandResult, run } from "./mount.ts";
 import { parseName, parseText } from "./parse.ts";
 import { heldSessions } from "./queue.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
-import { ScratchStore } from "./scratch.ts";
 import { oneAtATime, search } from "./search.ts";
 import { stage } from "./stage.ts";
 import { KnowledgeStore, summary } from "./store.ts";
@@ -44,7 +45,6 @@ import {
   UploadStore,
   type UploadTree,
 } from "./uploads.ts";
-import { commandWorkers } from "./worker.ts";
 
 export type LimitsPort = { current(): KnowledgeCaps };
 export type KnowledgeDeps = {
@@ -410,24 +410,24 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   };
 }
 
-export { checkFile, checkNames, checkTotals } from "./check.ts";
 export {
   type CommandCredential,
   type Refusal,
   scrubKeys,
-} from "./credentials.ts";
+} from "../bash/credentials.ts";
 export {
   copyKeptFiles,
   type KeptFile,
   keptPath,
   writeKeptFiles,
-} from "./kept.ts";
+} from "../bash/kept.ts";
 export {
   type Scratch,
   type ScratchChanges,
   type ScratchFile,
   ScratchStore,
-} from "./scratch.ts";
+} from "../bash/scratch.ts";
+export { checkFile, checkNames, checkTotals } from "./check.ts";
 export { type KnowledgeRow, KnowledgeStore } from "./store.ts";
 export {
   type RestageUploads,

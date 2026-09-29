@@ -13,8 +13,8 @@
 // compile root, so compose.ts builds it and passes it in.
 
 import type { SecureFetch } from "just-bash";
+import { CANCEL_GRACE_MS } from "../knowledge/limits.ts";
 import type { Log } from "../lib/log.ts";
-import { CANCEL_GRACE_MS } from "./limits.ts";
 import {
   type Answer,
   type CommandCause,

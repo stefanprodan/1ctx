@@ -9,7 +9,7 @@ import {
   scratchState,
   seedScratch,
   setup,
-} from "./helpers.ts";
+} from "../knowledge/helpers.ts";
 
 const off = { ...callCaps, knowledge: false };
 const discarded =

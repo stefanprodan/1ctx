@@ -12,7 +12,7 @@ import {
   run,
   type Setup,
   setup,
-} from "./helpers.ts";
+} from "../knowledge/helpers.ts";
 
 const create = (s: Setup, name: string, text: string) =>
   s.area.create(s.projectId, s.author, name, text);

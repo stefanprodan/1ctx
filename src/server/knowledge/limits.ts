@@ -8,7 +8,7 @@
 import { MAX_REQUEST_BYTES } from "../lib/body.ts";
 import { LIMIT_DEFINITIONS } from "../limits/index.ts";
 
-export { KNOWLEDGE_COMMANDS, MAX_OPENS_PER_COMMAND } from "./commands.ts";
+export { KNOWLEDGE_COMMANDS, MAX_OPENS_PER_COMMAND } from "../bash/commands.ts";
 
 export const RECENT_FILES = 5;
 export const KNOWLEDGE_COMMANDS_IN_FLIGHT = 4;

@@ -313,7 +313,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     log: log("knowledge"),
     // built here, at the compile root, so the binary finds its entry
-    worker: new URL("./knowledge/command.worker.ts", import.meta.url),
+    worker: new URL("./bash/command.worker.ts", import.meta.url),
   });
   sessions = sessionsArea({
     db,

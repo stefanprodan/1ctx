@@ -11,7 +11,7 @@ import {
   scratchState,
   seedScratch,
   setup,
-} from "./helpers.ts";
+} from "../knowledge/helpers.ts";
 
 const discarded =
   "changes under /uploads were discarded: copy a file to /tmp to change it";

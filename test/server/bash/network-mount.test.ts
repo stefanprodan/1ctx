@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
-import { callCaps, run, setup } from "./helpers.ts";
+import type { CommandCaps } from "../../../src/server/bash/mount.ts";
+import { callCaps, run, setup } from "../knowledge/helpers.ts";
 
 function serve(handler: (req: Request) => Response | Promise<Response>) {
   const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler });

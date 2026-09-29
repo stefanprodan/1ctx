@@ -5,13 +5,13 @@
 // committed; trimmed to the chat's budget when a send starts.
 
 import { describe, expect, test } from "bun:test";
+import { listKept, startKept } from "../../../src/server/bash/kept.ts";
 import {
   copyKeptFiles,
   type KeptFile,
   writeKeptFiles,
 } from "../../../src/server/knowledge/index.ts";
-import { listKept, startKept } from "../../../src/server/knowledge/kept.ts";
-import { callCaps, run, type Setup, setup } from "./helpers.ts";
+import { callCaps, run, type Setup, setup } from "../knowledge/helpers.ts";
 
 let rows = 0;
 

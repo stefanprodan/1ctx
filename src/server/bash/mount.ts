@@ -12,10 +12,13 @@ import type {
 } from "../../shared/contracts/knowledge.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { Db } from "../db/index.ts";
+import { type Change, commit } from "../knowledge/commit.ts";
+import { acquire, acquireSession } from "../knowledge/queue.ts";
+import type { KnowledgeStore } from "../knowledge/store.ts";
+import type { UploadStore } from "../knowledge/uploads.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { COMMAND_ITERATIONS } from "./commands.ts";
-import { type Change, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
 import {
@@ -31,10 +34,7 @@ import type {
   CommandEnd,
   CommandPhase,
 } from "./protocol.ts";
-import { acquire, acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
-import type { KnowledgeStore } from "./store.ts";
-import type { UploadStore } from "./uploads.ts";
 import type { CommandWorkers } from "./worker.ts";
 
 export type CommandCaps = {

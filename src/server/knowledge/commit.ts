@@ -9,6 +9,8 @@ import type {
   KnowledgeAuthor,
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
+import { output } from "../bash/output.ts";
+import type { Scratch, ScratchChanges, ScratchStore } from "../bash/scratch.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { Conflict } from "../lib/errors.ts";
@@ -19,8 +21,6 @@ import {
   checkScratchTotals,
   checkTotals,
 } from "./check.ts";
-import { output } from "./output.ts";
-import type { Scratch, ScratchChanges, ScratchStore } from "./scratch.ts";
 import type { KnowledgeStore } from "./store.ts";
 import { lineCount } from "./text.ts";
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
+import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";

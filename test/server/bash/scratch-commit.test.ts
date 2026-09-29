@@ -11,7 +11,7 @@ import {
   seedScratch,
   setup,
   untilPhase,
-} from "./helpers.ts";
+} from "../knowledge/helpers.ts";
 
 const edits =
   "echo changed > /knowledge/existing; echo draft > /tmp/new; cd /tmp";

@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
+import {
+  callCaps,
+  run,
+  scratchState,
+  seedScratch,
+  setup,
+} from "../knowledge/helpers.ts";
 
 describe("scratch across commands", () => {
   test("the first command can enter /tmp and the next reads its files", async () => {

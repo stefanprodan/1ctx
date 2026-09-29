@@ -10,17 +10,14 @@
 
 import { describe, expect, test } from "bun:test";
 import type { FetchResult, SecureFetch } from "just-bash";
-import { commandFetch } from "../../../src/server/knowledge/credentials.ts";
-import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
-import type { Job } from "../../../src/server/knowledge/protocol.ts";
-import { commandWorkers } from "../../../src/server/knowledge/worker.ts";
+import { commandFetch } from "../../../src/server/bash/credentials.ts";
+import type { CommandCaps } from "../../../src/server/bash/mount.ts";
+import type { Job } from "../../../src/server/bash/protocol.ts";
+import { commandWorkers } from "../../../src/server/bash/worker.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
+import { COMMAND_WORKER, callCaps, run, setup } from "../knowledge/helpers.ts";
 
-const FORGED = new URL(
-  "../../fixtures/knowledge/forged.worker.ts",
-  import.meta.url,
-);
+const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
 const OUT = "nothing saved: the command worker answered out of protocol";
 const all: CommandCaps = {
   ...callCaps,

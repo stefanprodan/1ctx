@@ -6,10 +6,7 @@
 // one that does not check out is malformed rather than dropped.
 
 import { describe, expect, test } from "bun:test";
-import {
-  fromWorker,
-  MALFORMED,
-} from "../../../src/server/knowledge/protocol.ts";
+import { fromWorker, MALFORMED } from "../../../src/server/bash/protocol.ts";
 
 const changes = {
   knowledge: [{ name: "docs/a.md", text: "a\n" }],

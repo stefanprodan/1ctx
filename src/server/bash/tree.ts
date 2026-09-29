@@ -6,12 +6,12 @@
 // the read-only trees, and the cwd the next command starts in.
 
 import type { BashOptions, InMemoryFs } from "just-bash";
-import { checkFile, checkNames } from "./check.ts";
+import { checkFile, checkNames } from "../knowledge/check.ts";
+import { parseName } from "../knowledge/parse.ts";
+import { textFromBytes } from "../knowledge/text.ts";
 import { INTERPRETER_MARGIN_MS } from "./commands.ts";
 import { underKnowledge } from "./open.ts";
-import { parseName } from "./parse.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
-import { textFromBytes } from "./text.ts";
 
 const same = (a: Uint8Array, b: Uint8Array) =>
   Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(b);

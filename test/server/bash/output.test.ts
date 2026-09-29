@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { output } from "../../../src/server/knowledge/output.ts";
+import { output } from "../../../src/server/bash/output.ts";
 
 describe("command output tails", () => {
   test.each([

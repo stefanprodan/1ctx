@@ -15,7 +15,7 @@ import {
   startChat,
   waitScript,
 } from "../../helpers/chat.ts";
-import { setup } from "./helpers.ts";
+import { setup } from "../knowledge/helpers.ts";
 
 const binary = new Uint8Array([0, 255, 128, 192, 10, 13, 1, 254]);
 const encoded = Buffer.from(binary).toString("base64");

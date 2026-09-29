@@ -5,7 +5,7 @@
 // tell the newest apart; a file a command writes keeps the mount's now.
 
 import { describe, expect, test } from "bun:test";
-import { run, seedScratch, setup } from "./helpers.ts";
+import { run, seedScratch, setup } from "../knowledge/helpers.ts";
 
 const JAN_2 = Date.UTC(2026, 0, 2, 3, 4, 5);
 const JAN_3 = Date.UTC(2026, 0, 3, 3, 4, 5);
