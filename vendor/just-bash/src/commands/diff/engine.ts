@@ -358,10 +358,11 @@ class Search {
 }
 
 /**
- * Slides each group of changed lines in `changed` over equal lines within
- * lo and hi: up then down as far as it goes, merging with the groups it
- * meets, and settles where it lines up with a change in the other file,
- * or else as late as it can.
+ * Moves each group of changed lines in `changed` to where GNU diff puts
+ * it, as its answers show: a group may slide over equal lines within lo
+ * and hi, joining any group it comes to; of the places it can reach it
+ * takes the last one where it lines up with a change in the other file,
+ * or else the last one.
  */
 function slide(
   lines: Int32Array,
@@ -372,56 +373,69 @@ function slide(
   charge: (steps: number) => void,
 ): void {
   const n = changed.length;
-  const m = other.length;
-  let steps = 0;
+  // the other file's unchanged lines, in order: the k-th unchanged line of
+  // this file is matched with kept[k]
+  const kept: number[] = [];
+  for (let j = 0; j < other.length; j++) if (!other[j]) kept.push(j);
+  let steps = other.length + n;
+  let count = 0;
   let i = 0;
-  let j = 0;
-  for (;;) {
-    while (j < m && other[j]) j++;
-    while (i < n && !changed[i]) {
+  while (i < n) {
+    if (!changed[i]) {
+      count++;
       i++;
-      j++;
-      while (j < m && other[j]) j++;
+      continue;
     }
-    if (i >= n) break;
     let start = i;
     let end = i;
     while (end < n && changed[end]) end++;
-    // j is the other file's line matched with the first after the group
-    let length: number;
-    let aligned: number;
-    do {
-      length = end - start;
+    // unchanged lines before the group's start, as it moves
+    let before = count;
+    let top = start;
+    for (let joined = true; joined; ) {
+      joined = false;
       while (start > lo && lines[start - 1] === lines[end - 1]) {
         changed[--start] = 1;
         changed[--end] = 0;
-        while (start > 0 && changed[start - 1]) start--;
-        do j--;
-        while (other[j]);
+        before--;
         steps++;
+        if (start > 0 && changed[start - 1]) {
+          while (start > 0 && changed[start - 1]) start--;
+          joined = true;
+        }
       }
-      aligned = j > 0 && other[j - 1] ? end : -1;
+      top = start;
       while (end < hi && lines[start] === lines[end]) {
         changed[start++] = 0;
         changed[end++] = 1;
-        while (end < n && changed[end]) end++;
-        do j++;
-        while (j < m && other[j]);
-        if (j > 0 && other[j - 1]) aligned = end;
+        before++;
         steps++;
-      }
-    } while (length !== end - start);
-    if (aligned !== -1) {
-      while (end > aligned) {
-        changed[--start] = 1;
-        changed[--end] = 0;
-        do j--;
-        while (other[j]);
-        steps++;
+        if (end < n && changed[end]) {
+          while (end < n && changed[end]) end++;
+          joined = true;
+        }
       }
     }
-    i = end;
-    steps += end - start;
+    // the group now sits at its last place; every start from top on is one
+    // it can take, and its end at start t follows before - (start - t)
+    // unchanged lines
+    const length = end - start;
+    let target = start;
+    for (let t = start; t >= top; t--) {
+      const k = before - (start - t);
+      const j = k < kept.length ? kept[k] : other.length;
+      steps++;
+      if (j > 0 && other[j - 1]) {
+        target = t;
+        break;
+      }
+    }
+    for (let t = start; t > target; t--) {
+      changed[t - 1] = 1;
+      changed[t - 1 + length] = 0;
+    }
+    count = before - (start - target);
+    i = target + length;
   }
-  charge(steps + n);
+  charge(steps);
 }

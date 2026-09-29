@@ -132,6 +132,21 @@ describe("diff's compare", () => {
     );
     expect([...result.inserted]).toEqual([0, 0, 0, 0, 1, 1]);
   });
+
+  test("slides a group to line up with a change in the other file", () => {
+    // GNU diff answers 1,2d0 3a2 5c4 for these
+    const a = ["b", "b", "c", "a", "a"];
+    const b = ["c", "b", "a", "b"];
+    const ids = numbers([...a, ...b]);
+    const result = compare(
+      Int32Array.from(a, (l) => ids.get(l) as number),
+      Int32Array.from(b, (l) => ids.get(l) as number),
+      ids.size,
+      { charge: () => {} },
+    );
+    expect([...result.deleted]).toEqual([1, 1, 0, 0, 1]);
+    expect([...result.inserted]).toEqual([0, 1, 0, 1]);
+  });
 });
 
 describe("diff's cost", () => {
