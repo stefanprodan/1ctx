@@ -353,58 +353,68 @@ describe("awk output files and speed", () => {
     expect(await out.read("/w/out")).toBe(`${" ".repeat(94)}x`);
   });
 
-  // Runners differ in speed, so these compare a run against one a
-  // quarter its size: linear work grows about 4 times, the quadratic bugs
-  // grew 16.
-  const timed = async (bash: Bash, command: string) => {
-    const started = performance.now();
-    const result = await bash.exec(command);
-    return [performance.now() - started, result] as const;
+  // Runners differ in speed and tests here run side by side, so these
+  // compare the fastest of three runs with the fastest of three an eighth
+  // the size, serially: linear work grows about 8 to 11 times (twice that
+  // on a slow runner), the quadratic bugs grew 64.
+  const fastest = async (make: () => Bash, command: string) => {
+    let bash = make();
+    let result = await bash.exec(command);
+    let best = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 3; i++) {
+      bash = make();
+      const started = performance.now();
+      result = await bash.exec(command);
+      best = Math.min(best, performance.now() - started);
+    }
+    return { best, bash, result };
   };
 
-  test("10k files open in linear time", async () => {
-    const files = (n: number) =>
-      `seq 1 ${n} | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`;
-    await new Bash({ cwd: "/w" }).exec(files(2_500));
-    const [quarter] = await timed(new Bash({ cwd: "/w" }), files(2_500));
-    const bash = new Bash({ cwd: "/w" });
-    const [full, r] = await timed(bash, files(10_000));
-    // a flush that walked every open file grew with their square
-    expect(full / quarter).toBeLessThan(8);
-    expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
-    expect(await bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
-  });
+  test.serial(
+    "10k files open in linear time",
+    async () => {
+      const shell = () => new Bash({ cwd: "/w" });
+      const files = (n: number) =>
+        `seq 1 ${n} | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`;
+      const eighth = await fastest(shell, files(1_250));
+      const full = await fastest(shell, files(10_000));
+      // a flush that walked every open file grew with their square
+      expect(full.best / eighth.best).toBeLessThan(32);
+      const r = full.result;
+      expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
+      expect(await full.bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
+    },
+    30_000,
+  );
 
-  test("printf and print > f at 20k lines stay linear", async () => {
-    const shell = () =>
-      new Bash({ cwd: "/w", executionLimits: { maxOutputSize: 10_000_000 } });
-    const printf = (n: number) =>
-      `seq 1 ${n} | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'`;
-    const print = (n: number) =>
-      `seq 1 ${n} | awk '{ print "pod-" $1 > "out" }'`;
-    const both = async (bash: Bash, n: number) => {
-      const [a, out] = await timed(bash, printf(n));
-      const [b, file] = await timed(bash, print(n));
-      return [a + b, out, file] as const;
-    };
-    await both(shell(), 5_000);
-    const [quarter] = await both(shell(), 5_000);
-    const bash = shell();
-    const [full, out, file] = await both(bash, 20_000);
-    // quadratic, the time grew with the square of the lines
-    expect(full / quarter).toBeLessThan(8);
-    const lines = Array.from(
-      { length: 20_000 },
-      (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
-    );
-    expect([out.stdout, out.stderr, out.exitCode]).toEqual([
-      lines.join(""),
-      "",
-      0,
-    ]);
-    expect([file.stdout, file.stderr, file.exitCode]).toEqual(["", "", 0]);
-    expect((await bash.readFile("/w/out")).split("\n")).toHaveLength(20_001);
-  });
+  test.serial(
+    "printf and print > f at 20k lines stay linear",
+    async () => {
+      const shell = () =>
+        new Bash({ cwd: "/w", executionLimits: { maxOutputSize: 10_000_000 } });
+      const lines = (n: number) =>
+        `seq 1 ${n} | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'; ` +
+        `seq 1 ${n} | awk '{ print "pod-" $1 > "out" }'`;
+      const eighth = await fastest(shell, lines(2_500));
+      const full = await fastest(shell, lines(20_000));
+      // quadratic, the time grew with the square of the lines
+      expect(full.best / eighth.best).toBeLessThan(32);
+      const expected = Array.from(
+        { length: 20_000 },
+        (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
+      );
+      const r = full.result;
+      expect([r.stdout, r.stderr, r.exitCode]).toEqual([
+        expected.join(""),
+        "",
+        0,
+      ]);
+      expect((await full.bash.readFile("/w/out")).split("\n")).toHaveLength(
+        20_001,
+      );
+    },
+    30_000,
+  );
 });
 
 describe("gawk features we do not have", () => {
