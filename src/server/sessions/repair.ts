@@ -18,9 +18,12 @@ export function repairRows(
     lastSend(id: string): SendSummary | null;
   },
 ): RepairedSession[] {
+  // the feed indexes hold the running rank but lead with the project, so
+  // walking one for running rows reads every entry and is slower than the
+  // table
   const ids = db
     .query<{ id: string }, []>(
-      `select id from sessions where status = 'running'
+      `select id from sessions not indexed where status = 'running'
        union select session_id from sends where status = 'running'
        union select session_id from messages where status = 'streaming'`,
     )

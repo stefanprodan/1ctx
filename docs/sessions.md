@@ -27,6 +27,19 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   the session's revision once and publishes one `session.changed`
   envelope after commit. Create and send accept up to ten distinct
   staged `uploads` ids.
+- **An envelope's row is one statement, read after the commit.**
+  `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
+  does for one session: it seeks the session by id and walks only that
+  session's messages and sends newest first, stopping at the first
+  match, since `session.changed` fires many times a turn and the list's
+  not-exists form walks a long chat's every message. Both share
+  `lineRow()`, which tests kind and slot before status and content:
+  status sits past content in the row, so testing it first reads every
+  large tool row's overflow pages. The socket reads the row at publish,
+  so envelopes of one transaction for one session all carry the final
+  row. `test/server/sessions/envelope-row.test.ts` holds it to the
+  list's answer, pins that no history table is walked, and checks the
+  column order in the bytecode.
 - **A session's disabled capabilities are one sorted set.**
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
@@ -113,9 +126,11 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and server rows and users' picks of it, archives each of its chats
   (reason `agent`, a revision and an envelope each, its scratch
   deleted, never a run) through `SessionStore.archive()`, and suspends
-  its active automations as the admin. After the commit the scheduler
-  is woken and the runner stops every send whose policy names the
-  agent, so a chat archived while running ends as a stop does. `GET
+  its active automations as the admin, with an `automation.changed` for
+  every automation of the agent, a paused one included. After the
+  commit the scheduler is woken and the runner stops every send whose
+  policy names the agent, so a chat archived while running ends as a
+  stop does. `GET
   /api/agents/:id/impact` counts what it would archive, pause and
   stop. `GET /api/agents` answers with the list each agent's last send
   start and whether one runs now (`agentActivity()`, over the
@@ -179,6 +194,29 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and any count above zero logs the event. No sweep vacuums: SQLite
   reuses the pages a delete frees, and the file keeps its
   `auto_vacuum` mode.
+- **The feed reads ordered project ranges.** `feedRead()`
+  (`sessions/list.ts`) uses a fixed set of statement shapes: the
+  visible projects are one JSON parameter, so neither the SQL nor its
+  plan grows with projects or automations. The feed indexes lead with
+  project, origin and running rank, so SQLite keeps a page-sized top N
+  per project range and moves to the next project once a range cannot
+  improve the page; they carry title so a search filters inside the
+  index, and a search walks only the visible projects. All picks each
+  automation's newest matching run before the cursor applies, so a
+  passed automation never returns. That pick is the one walk bounded by
+  history rather than the page: a search nothing matches reads every
+  retained run of every visible automation, so `sessions_automation`
+  carries order and title and the walk never reads the table.
+- **Session indexes are chosen without stats.** The server never runs
+  `ANALYZE`, so a query over sessions must get a good plan from the
+  planner's defaults, or fix its join order or index in the SQL. The
+  feed indexes hold the running rank behind the project, so a lookup
+  by status alone reads the table. `sessions_automation` is partial
+  (`automation_id is not null`), so no `automation_id is null` lookup
+  can use it: All reads chats and runs whose automation is gone
+  through `sessions_feed_unowned`, and the sweep finds those runs
+  through `sessions_orphan_runs`. Lookups by project use the feed
+  index's prefix; there is no separate project index.
 - **Usage outlives what it measured.** No delete removes a `usage`
   row: a chat's, a run's by retention or the sweep, an automation's
   with its runs, a project's, and a turn regenerate replaces all keep

@@ -6,6 +6,7 @@
 // frame goes to the connections watching that session and carries a
 // sequence per send. A command is what the client sends.
 
+import type { EnvelopeRow } from "./api/sessions.ts";
 import type { AutomationSummary } from "./contracts/automation.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
@@ -19,7 +20,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 13;
+export const PROTOCOL = 14;
 
 export type VisualFrame = {
   type: "visual";
@@ -45,7 +46,10 @@ export type SocketEvent =
   | VisualFrame
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
-  // the stream's last line when the transaction wrote one
+  // the stream's last line when the transaction wrote one. row is the
+  // stream row as it stands after the commit, read once per event;
+  // null when the session was gone by then or the read failed, which
+  // the list treats alike
   | {
       type: "session";
       projectId: string;
@@ -54,6 +58,7 @@ export type SocketEvent =
       removedMessageIds?: string[];
       send: SendSummary | null;
       last?: LastLine;
+      row: EnvelopeRow | null;
     }
   | { type: "deleted"; projectId: string; sessionId: string }
   // an automation's row after a write, by the same revision rule

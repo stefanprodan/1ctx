@@ -111,7 +111,13 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   from `access.visibleProjectIds()` (memberships, plus every team
   project for an admin), and at most one watched session. A durable
   event (`session`, `deleted`) goes to the connections holding its
-  project, and so do `automation` and `automationDeleted`, from the bus's
+  project. A `session` frame carries `row`, the stream row's fields
+  that read the same for every viewer (not `session`, which the frame
+  has, nor `runs`, which hangs on the list's filter), read through the
+  sessions port once per event when the first connection in its
+  audience is met, so an event nobody sees costs no read; `deleted`
+  has no row. `automation` and `automationDeleted` go to the same
+  audience, from the bus's
   `automation.changed` and `automation.deleted`, by the row's revision,
   and `memory`, from `memory.changed`, by the note's revision;
   `knowledge.changed` reaches the same project audience as a `knowledge`
@@ -126,11 +132,15 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   for a project that joined it or `revoked` for one that left it, and
   `role` when the user's role moved, which `data/socket.ts` applies to
   `me`; `login.revoked` removes the login's connections from delivery
-  before closing them, and the expiry sweep publishes it too. Backpressure
-  closes a slow connection; a dropped frame closes with 1013; the
-  client reloads on every open. Socket opens and closes are logged by
-  user; a close carries Bun's code and only a cause the server recorded,
-  never the browser's reason text. The upgrade is `GET /api/socket` with
+  before closing them, and the expiry sweep publishes it too. A durable
+  or stream frame is encoded once per event and the same text goes to
+  each connection, since tabs and watchers multiply it; `hello`,
+  `watched` and the access frames are one connection's own. Every send
+  keeps its own result: backpressure closes a slow connection; a
+  dropped frame closes with 1013; the client reloads on every open.
+  Socket opens and closes are logged by user; a close carries Bun's
+  code and only a cause the server recorded, never the browser's
+  reason text. The upgrade is `GET /api/socket` with
   `upgrade: true` on the descriptor: the router applies the same-origin
   check as for a write and hands the handler `ctx.upgrade()`; without
   an upgrade the route answers 426. The protocol is `shared/socket.ts`.

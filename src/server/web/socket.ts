@@ -9,6 +9,7 @@
 // at once. The connection type is the few methods Bun's socket has, so
 // a test drives the module with fakes.
 
+import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { LiveSend } from "../../shared/contracts/session.ts";
 import {
   isSocketCommand,
@@ -17,7 +18,7 @@ import {
 } from "../../shared/socket.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -62,6 +63,8 @@ export type SocketDeps = {
   sessionProject(principal: Principal, sessionId: string): string | null;
   // the runner's snapshot of the send in flight
   live(sessionId: string): LiveSend | null;
+  // the stream row a session envelope carries, null for a session gone
+  envelopeRow(sessionId: string): EnvelopeRow | null;
 };
 
 export type Socket = {
@@ -97,16 +100,19 @@ export function socketArea(deps: SocketDeps): Socket {
     conn.close(code, reason);
   };
 
-  const deliver = (conn: Conn, event: SocketEvent): void => {
+  const deliverText = (conn: Conn, text: string): void => {
     // 0 is a drop on a dead or overfull connection; -1 is backpressure
     // that Bun caps and closes past the limit
-    const sent = conn.send(JSON.stringify(event));
+    const sent = conn.send(text);
     if (sent === 0) {
       serverClose(conn, CLOSE_DROPPED, "dropped a frame", "dropped");
     } else if (sent < 0) {
       conn.data.closeCause = "backpressure";
     }
   };
+
+  const deliver = (conn: Conn, event: SocketEvent): void =>
+    deliverText(conn, JSON.stringify(event));
 
   const unwatch = (conn: Conn): void => {
     const id = conn.data.watching;
@@ -171,80 +177,94 @@ export function socketArea(deps: SocketDeps): Socket {
     rewatch(conn);
   };
 
+  // a failed read still sends the envelope, without its row, since an
+  // open chat needs the messages
+  const row = (
+    event: Extract<BusEvent, { type: "session.changed" }>,
+  ): EnvelopeRow | null => {
+    try {
+      return deps.envelopeRow(event.data.session.id);
+    } catch (err) {
+      deps.log.error("envelope row failed", {
+        chat: event.data.session.id,
+        ...errorFields(err),
+      });
+      return null;
+    }
+  };
+
+  // A durable frame goes to the connections holding its project. It is
+  // built and encoded on the first connection in its audience, so an
+  // event nobody may see costs neither a read nor an encoding, and one
+  // seen by many tabs is encoded once; each send keeps its own result.
+  const toProject = (
+    projectId: string,
+    frame: () => SocketEvent,
+    before?: (conn: Conn) => void,
+  ): void => {
+    let text: string | undefined;
+    each((conn) => {
+      if (
+        conn.data.principal.mustChangePassword ||
+        !conn.data.projects.has(projectId)
+      ) {
+        return;
+      }
+      before?.(conn);
+      text ??= JSON.stringify(frame());
+      deliverText(conn, text);
+    });
+  };
+
   const onBus = (event: BusEvent): void => {
     switch (event.type) {
       case "session.changed":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            deliver(conn, { type: "session", ...event.data });
-          }
-        });
+        toProject(event.data.projectId, () => ({
+          type: "session",
+          ...event.data,
+          row: row(event),
+        }));
         break;
       case "session.deleted":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
+        toProject(
+          event.data.projectId,
+          () => ({ type: "deleted", ...event.data }),
+          (conn) => {
             if (conn.data.watching === event.data.sessionId) unwatch(conn);
-            deliver(conn, { type: "deleted", ...event.data });
-          }
-        });
+          },
+        );
         break;
       case "automation.changed":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            deliver(conn, { type: "automation", ...event.data });
-          }
-        });
+        toProject(event.data.projectId, () => ({
+          type: "automation",
+          ...event.data,
+        }));
         break;
       case "automation.deleted":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            // a run it watched may be gone with the automation
-            if (event.data.runs) rewatch(conn);
-            deliver(conn, { type: "automationDeleted", ...event.data });
-          }
-        });
+        toProject(
+          event.data.projectId,
+          () => ({ type: "automationDeleted", ...event.data }),
+          // a run it watched may be gone with the automation
+          event.data.runs ? rewatch : undefined,
+        );
         break;
       case "memory.changed":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            deliver(conn, { type: "memory", ...event.data });
-          }
-        });
+        toProject(event.data.projectId, () => ({
+          type: "memory",
+          ...event.data,
+        }));
         break;
       case "knowledge.changed":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            deliver(conn, { type: "knowledge", ...event.data });
-          }
-        });
+        toProject(event.data.projectId, () => ({
+          type: "knowledge",
+          ...event.data,
+        }));
         break;
       case "knowledge.emptied":
-        each((conn) => {
-          if (
-            !conn.data.principal.mustChangePassword &&
-            conn.data.projects.has(event.data.projectId)
-          ) {
-            deliver(conn, { type: "knowledgeEmptied", ...event.data });
-          }
-        });
+        toProject(event.data.projectId, () => ({
+          type: "knowledgeEmptied",
+          ...event.data,
+        }));
         break;
       case "access.changed":
         each((conn) => {
@@ -397,7 +417,8 @@ export function socketArea(deps: SocketDeps): Socket {
     stream(sessionId, frame) {
       const set = watchers.get(sessionId);
       if (set === undefined) return;
-      for (const conn of [...set]) deliver(conn, frame);
+      const text = JSON.stringify(frame);
+      for (const conn of [...set]) deliverText(conn, text);
     },
     closeAll(code, reason) {
       each((conn) => serverClose(conn, code, reason, "shutdown"));

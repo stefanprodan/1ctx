@@ -353,6 +353,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: next,
       messages: [
@@ -373,6 +374,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Ignored" }),
       messages: [message({ id: "m4", seq: 4 })],
@@ -388,6 +390,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Changed" }),
       messages: [],
@@ -432,6 +435,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [],
@@ -443,6 +447,7 @@ describe("the sessions entity", () => {
     const done = { ...sent, status: "done" as const, cause: "finish" as const };
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [],
@@ -455,6 +460,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Old" }),
       messages: [],
@@ -476,6 +482,7 @@ describe("the sessions entity", () => {
       await loadList({ project: null, q: "" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p2",
         session: summary({ id: "s2", projectId: "p2" }),
         messages: [],
@@ -487,6 +494,7 @@ describe("the sessions entity", () => {
       await loadList({ project: null, q: "pods" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ id: "s3", title: "restart pods" }),
         messages: [],
@@ -495,6 +503,7 @@ describe("the sessions entity", () => {
       await loadList({ project: "p1", q: "" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p2",
         session: summary({ id: "s4", projectId: "p2" }),
         messages: [],
@@ -515,9 +524,10 @@ describe("the sessions entity", () => {
     let release: (r: Response) => void = () => {};
     answer = () => new Promise((r) => (release = r));
     const load = loadList({ project: null, q: "" });
-    // nothing is held yet, so the envelope has nothing to update
+    // nothing is held yet: the envelope is replayed over the answer
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3, title: "Newer" }),
       messages: [],
@@ -525,12 +535,13 @@ describe("the sessions entity", () => {
     });
     release(Response.json({ rows: [row({ revision: 2, title: "Older" })] }));
     await load;
-    expect(list.value?.rows[0].session.title).toBe("Older");
+    expect(list.value?.rows[0].session.title).toBe("Newer");
 
     answer = () => new Promise((r) => (release = r));
     const again = loadList({ project: null, q: "" });
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3, title: "Newer" }),
       messages: [],
@@ -557,6 +568,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [streaming],
@@ -566,6 +578,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [message({ id: streaming.id })],
@@ -586,6 +599,7 @@ describe("the sessions entity", () => {
     });
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [streaming],
@@ -594,6 +608,7 @@ describe("the sessions entity", () => {
     expect(live.value.has("sum1")).toBe(true);
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [message({ ...streaming, status: "done", promptTokens: 40 })],
@@ -662,6 +677,7 @@ describe("the sessions entity", () => {
       };
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ revision: 2, archived }),
         messages: [],
@@ -675,6 +691,7 @@ describe("the sessions entity", () => {
       // a later envelope of an archived chat reads nothing more
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ revision: 4, archived }),
         messages: [],
@@ -931,21 +948,19 @@ describe("the sessions entity", () => {
   });
 
   test.serial(
-    "a deletion off screen loads the project's list again",
+    "a deletion off screen drops its row without loading the list",
     async () => {
       list.value = null;
       const calls: string[] = [];
       answer = (url) => {
         calls.push(url);
-        return Response.json({ rows: [row({ id: "s2" })] });
+        return Response.json({ rows: [row({ id: "s2" }), row()] });
       };
       await loadList({ project: "p1", q: "" });
       onSocket({ type: "deleted", projectId: "p1", sessionId: "s2" });
       await settle();
-      expect(calls).toEqual([
-        "/api/sessions?project=p1",
-        "/api/sessions?project=p1",
-      ]);
+      expect(ids(list.value)).toEqual(["s1"]);
+      expect(calls).toEqual(["/api/sessions?project=p1"]);
     },
   );
 
@@ -991,6 +1006,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [
@@ -1174,6 +1190,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2 }),
       messages: [message({ id: "m2", seq: 4, kind: "user" })],
@@ -1578,6 +1595,7 @@ describe("answers held for the way back", () => {
       await loadSession("s2");
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ id: "s1", revision: 2 }),
         messages: [],
@@ -1654,6 +1672,7 @@ describe("the stream's pages", () => {
   const arrived = (id: string, title = "Chat") =>
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ id, lastActivityAt: 60, title }),
       messages: [],
@@ -2033,6 +2052,7 @@ describe("runs grouped in All", () => {
   const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: line(id, at, 0, changes).session,
       messages: [],
@@ -2153,7 +2173,8 @@ describe("runs grouped in All", () => {
       expect(session.value).toBeNull();
       expect(pushed).toEqual(["/projects/p1"]);
       await settle();
-      expect(urls).toHaveLength(2);
+      // nothing takes the line's place, so nothing is asked
+      expect(urls).toHaveLength(1);
       expect(ids(list.value)).toEqual(["c1"]);
     },
   );
@@ -2240,7 +2261,7 @@ describe("runs grouped in All", () => {
     },
   );
 
-  test.serial("a run moved during the first load asks once more", async () => {
+  test.serial("a run moved during the first load takes its line", async () => {
     const urls: string[] = [];
     let release: (r: Response) => void = () => {};
     answer = (url) => {
@@ -2259,8 +2280,10 @@ describe("runs grouped in All", () => {
     release(Response.json({ rows: [line("r1", 5, 3)] }));
     await first;
     await settle();
-    expect(urls).toHaveLength(2);
+    // replayed over the answer, the run takes the line it holds
+    expect(urls).toHaveLength(1);
     expect(ids(list.value)).toEqual(["r2"]);
     expect(list.value?.rows[0]?.runs).toBe(4);
+    expect(list.value?.rows[0]?.session.revision).toBe(2);
   });
 });

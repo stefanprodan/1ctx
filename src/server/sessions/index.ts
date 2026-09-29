@@ -7,6 +7,7 @@
 
 import type { AgentActivity } from "../../shared/api/agents.ts";
 import type { McpServersUsage, McpUsage } from "../../shared/api/mcp.ts";
+import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
@@ -39,6 +40,7 @@ import {
 } from "./routes.ts";
 import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
+import { envelopeRow } from "./stream.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
 export { ARCHIVED, refuseArchived } from "./archive.ts";
@@ -102,6 +104,8 @@ export type Sessions = {
   visible(principal: Principal, id: string): SessionRow;
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
+  // the stream row a session envelope carries, null for a session gone
+  envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chats an agent's delete archives and the sends it stops
   agentImpact(agentId: string): { chats: number; running: number };
   agentActivity(): AgentActivity[];
@@ -156,6 +160,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         throw err;
       }
     },
+    envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
     agentImpact: (agentId) => ({
       chats: agentChats(deps.db, agentId).length,
       running: agentRunning(deps.db, agentId),

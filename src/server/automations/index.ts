@@ -52,7 +52,8 @@ export type Automations = {
   store: AutomationStore;
   scheduler: Scheduler;
   // in the caller's transaction: the agent's active automations
-  // suspended by the admin who deleted it, one envelope each
+  // suspended by the admin who deleted it, and an envelope for every one
+  // of its automations, so a run held on a feed learns the agent is gone
   suspendAgent(agentId: string, by: string, now: number): BusEvent[];
   start(): number;
   stop(): void;
@@ -68,16 +69,10 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     store,
     scheduler: scheduled,
     suspendAgent: (agentId, by, now) =>
-      store.activeOn(agentId).flatMap((id) => {
-        const row = store.suspend(id, by, now);
-        if (row === null) return [];
-        return [
-          {
-            type: "automation.changed" as const,
-            data: { projectId: row.projectId, automation: row },
-          },
-        ];
-      }),
+      store.retireAgent(agentId, by, now).map((row) => ({
+        type: "automation.changed" as const,
+        data: { projectId: row.projectId, automation: row },
+      })),
     start: scheduled.start,
     stop: scheduled.stop,
     dispose: scheduled.dispose,

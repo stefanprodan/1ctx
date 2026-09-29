@@ -17,7 +17,9 @@ editor are in `docs/views.md`.
   now, suspends, resumes and stops a run; the owner or, in a team
   project, an admin edits and deletes it, else 403. At most
   `MAX_AUTOMATIONS_PER_PROJECT`. Deleting an agent suspends its active
-  automations with `suspended_by` the admin; while an automation's agent
+  automations with `suspended_by` the admin and moves the revision of
+  every one of its automations, with an envelope each, since each
+  summary now says the agent is retired; while an automation's agent
   is retired, resume, run now and a PATCH that keeps the agent are a 409
   "its agent was deleted" until a live agent is picked. `next_at` is the next fire and is null exactly while
   suspended (a table check), and `suspended_by` names who suspended it

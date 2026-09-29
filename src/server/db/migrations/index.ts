@@ -38,6 +38,7 @@ import { m0029 } from "./0029-agent-pick.ts";
 import { m0030 } from "./0030-archived-chats.ts";
 import { m0031 } from "./0031-deciders.ts";
 import { m0032 } from "./0032-admin-activity.ts";
+import { m0033 } from "./0033-feed-arms.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -72,4 +73,5 @@ export const MIGRATIONS: Migration[] = [
   m0030,
   m0031,
   m0032,
+  m0033,
 ];

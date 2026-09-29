@@ -81,8 +81,10 @@ export function expiredAutomationRuns(
 ): SessionRow[] {
   const rows = db
     .query<RawSession, [number]>(
-      `select sessions.* from sessions
-       join automations on automations.id = sessions.automation_id
+      // per automation, a seek to its expired runs: without stats SQLite
+      // would otherwise walk every run in index order and read each row
+      `select sessions.* from automations
+       cross join sessions on sessions.automation_id = automations.id
        where sessions.status != 'running'
          and sessions.last_activity_at <
            ? - automations.retention_days * 86400000

@@ -44,6 +44,7 @@ const EXPECTED_IDS = [
   "0030-archived-chats",
   "0031-deciders",
   "0032-admin-activity",
+  "0033-feed-arms",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -979,6 +980,86 @@ describe("the schema", () => {
     db.close();
   });
 
+  test("0033 swaps the project and automation indexes for the feed's and keeps data", () => {
+    const db = seed(MIGRATIONS.slice(0, 32));
+    const FEED = ["sessions_feed", "sessions_feed_unowned"];
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string }, []>(
+          "select name, sql from sqlite_schema where type = 'index' order by name",
+        )
+        .all();
+    const rows = () =>
+      ["sessions", "sends", "messages", "usage", "agents"].map((table) =>
+        db.query(`select * from ${table} order by id`).all(),
+      );
+    const keys = (name: string) =>
+      db
+        .query<{ name: string | null; desc: number; key: number }, []>(
+          `pragma index_xinfo('${name}')`,
+        )
+        .all()
+        .filter((column) => column.key === 1)
+        .map(({ name, desc }) => ({ name, desc }));
+    try {
+      const before = rows();
+      const existing = indexes();
+      expect(migrate(db)).toEqual(["0033-feed-arms"]);
+      expect(rows()).toEqual(before);
+      const kept = (index: { name: string }) =>
+        !FEED.includes(index.name) &&
+        ![
+          "sessions_project",
+          "sessions_automation",
+          "sessions_orphan_runs",
+        ].includes(index.name);
+      expect(indexes().filter(kept)).toEqual(existing.filter(kept));
+      expect(indexes().map((index) => index.name)).not.toContain(
+        "sessions_project",
+      );
+      expect(
+        indexes()
+          .filter((index) => FEED.includes(index.name))
+          .map((index) => index.name),
+      ).toEqual(FEED);
+      for (const name of ["sessions_feed", "sessions_feed_unowned"]) {
+        expect(keys(name)).toEqual([
+          { name: "project_id", desc: 0 },
+          ...(name === "sessions_feed" ? [{ name: "origin", desc: 0 }] : []),
+          { name: null, desc: 1 },
+          { name: "last_activity_at", desc: 1 },
+          { name: "id", desc: 0 },
+          { name: "title", desc: 0 },
+        ]);
+      }
+      expect(keys("sessions_automation")).toEqual([
+        { name: "automation_id", desc: 0 },
+        { name: "last_activity_at", desc: 0 },
+        { name: "id", desc: 1 },
+        { name: "title", desc: 0 },
+      ]);
+      const sql = (name: string) =>
+        indexes().find((index) => index.name === name)?.sql;
+      expect(sql("sessions_feed")).toContain("(status = 'running')");
+      expect(sql("sessions_feed_unowned")).toContain(
+        "where automation_id is null",
+      );
+      expect(sql("sessions_automation")).toContain(
+        "where automation_id is not null",
+      );
+      expect(keys("sessions_orphan_runs")).toEqual([
+        { name: "last_activity_at", desc: 0 },
+      ]);
+      expect(sql("sessions_orphan_runs")).toContain(
+        "where origin = 'automation' and automation_id is null",
+      );
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   describe("0030 archived chats migration", () => {
     const columns = (db: Database, table: string) =>
       db
@@ -1293,7 +1374,7 @@ describe("rebuild migrations", () => {
       .all()
       .map((row) => row.name);
     for (const name of [
-      "sessions_project",
+      "sessions_feed",
       "sessions_agent",
       "sessions_automation",
       "sends_session",

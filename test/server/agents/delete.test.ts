@@ -10,9 +10,11 @@ import type {
 } from "../../../src/shared/api/admin.ts";
 import type { AgentImpactResponse } from "../../../src/shared/api/agents.ts";
 import type { ProjectAgentsResponse } from "../../../src/shared/api/sessions.ts";
+import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { PROVIDER_URL } from "../../helpers/app.ts";
 import {
+  automationBody,
   createAutomation,
   settleRun,
   startRun,
@@ -24,6 +26,7 @@ import {
   startChat,
   tick,
 } from "../../helpers/chat.ts";
+import { frames, watcher } from "../../helpers/socket.ts";
 
 const skill = (name: string) => ({
   name,
@@ -157,6 +160,9 @@ describe("deleting an agent", () => {
       run.main.reply("healthy");
       await settle(chat, run.sessionId);
       const paused = await createAutomation(chat, { name: "paused" });
+      const pausedRun = await startRun(chat, paused.id);
+      pausedRun.main.reply("healthy");
+      await settle(chat, pausedRun.sessionId);
       expect(
         (
           await chat.member.call(
@@ -166,12 +172,32 @@ describe("deleting an agent", () => {
         ).status,
       ).toBe(200);
 
+      // another agent's automation, which the delete leaves alone
+      const other = await chat.member.call(
+        "POST",
+        `/api/projects/${chat.projectId}/automations`,
+        {
+          body: {
+            ...automationBody(chat, { name: "other" }),
+            agentId: helperId,
+          },
+        },
+      );
+      expect(other.status).toBe(201);
+      const untouched = (await other.json()).automation as AutomationSummary;
+
       expect(await impact(chat)).toEqual({
         chats: 2,
         automations: 1,
         running: 0,
       });
 
+      const pausedBefore = app.automations.byId(paused.id)!;
+      // the delete comes later than the pause, so a pause overwritten
+      // would show in its times
+      app.now.value += 60_000;
+      const conn = await watcher(chat);
+      const outside = await watcher(chat, chat.admin);
       const events: BusEvent[] = [];
       const unsubscribe = subscribe((event) => events.push(event), silent);
       const deleted = await chat.admin.call(
@@ -240,7 +266,8 @@ describe("deleting an agent", () => {
         id: chat.memberId,
       });
 
-      // one envelope per chat and per paused automation
+      // one envelope per chat and per automation, the one already
+      // paused included, so its held runs learn the agent is retired
       const changed = events.flatMap((event) =>
         event.type === "session.changed" ? [event.data.session.id] : [],
       );
@@ -248,10 +275,41 @@ describe("deleting an agent", () => {
         [first.sessionId, second.sessionId].sort(),
       );
       expect(
-        events.flatMap((event) =>
-          event.type === "automation.changed" ? [event.data.automation.id] : [],
-        ),
-      ).toEqual([active.id]);
+        events
+          .flatMap((event) =>
+            event.type === "automation.changed"
+              ? [event.data.automation.id]
+              : [],
+          )
+          .sort(),
+      ).toEqual([active.id, paused.id].sort());
+      expect(
+        frames(conn, "automation")
+          .map((frame) => ({
+            projectId: frame.projectId,
+            id: frame.automation.id,
+            agentRetired: frame.automation.agentRetired,
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      ).toEqual(
+        [active.id, paused.id].sort().map((id) => ({
+          projectId: chat.projectId,
+          id,
+          agentRetired: true,
+        })),
+      );
+      // the frames go to the automations' project alone: the admin who
+      // deleted the agent is outside the member's personal project
+      expect(frames(outside, "automation")).toEqual([]);
+      // a client keeps only a newer revision
+      // and the already paused one keeps who paused it and when
+      expect(app.automations.byId(paused.id)).toMatchObject({
+        revision: pausedBefore.revision + 1,
+        suspendedAt: pausedBefore.suspendedAt,
+        suspendedBy: pausedBefore.suspendedBy,
+        updatedAt: pausedBefore.updatedAt,
+      });
+      expect(app.automations.byId(untouched.id)).toEqual(untouched);
 
       // the default and the member's start move on
       const offered: ProjectAgentsResponse = await (
