@@ -54,34 +54,76 @@ export function decodeLine(line: string): string | null {
   }
 }
 
+function toBytes(text: string): string {
+  let out = "";
+  for (const byte of encoder.encode(text)) out += String.fromCharCode(byte);
+  return out;
+}
+
+/**
+ * Case folded one character at a time, as GNU's answers show: no final
+ * sigma, and a capital that lowercases to several characters takes the
+ * first.
+ */
 function lowerBytes(line: string): string {
   const text = decodeLine(line);
   if (text === null) return line.replace(/[A-Z]+/g, (s) => s.toLowerCase());
   if (text === line) return line.toLowerCase();
-  let out = "";
-  for (const byte of encoder.encode(text.toLowerCase())) {
-    out += String.fromCharCode(byte);
+  let lower = "";
+  for (const ch of text) {
+    lower += String.fromCodePoint(ch.toLowerCase().codePointAt(0) as number);
   }
-  return out;
+  return toBytes(lower);
 }
 
-/** Tabs to the next stop; a UTF-8 continuation byte takes no column. */
-function expandTabs(line: string, size: number): string {
+// East Asian wide and fullwidth ranges, two columns each
+const WIDE: [number, number][] = [
+  [0x1100, 0x115f],
+  [0x2e80, 0x303e],
+  [0x3041, 0x33ff],
+  [0x3400, 0x4dbf],
+  [0x4e00, 0x9fff],
+  [0xa000, 0xa4cf],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe30, 0xfe4f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x1f300, 0x1f64f],
+  [0x1f900, 0x1f9ff],
+  [0x20000, 0x3fffd],
+];
+const COMBINING = /^\p{M}$/u;
+
+/** The columns a character takes on a terminal. */
+function columns(ch: string): number {
+  const code = ch.codePointAt(0) as number;
+  if (code < 0x300) return 1;
+  if (COMBINING.test(ch)) return 0;
+  for (const [lo, hi] of WIDE) if (code >= lo && code <= hi) return 2;
+  return 1;
+}
+
+/**
+ * Tabs to the next stop, a character taking the columns a terminal gives
+ * it and a byte that is not UTF-8 one column, as GNU's manual has it.
+ */
+export function expandTabs(line: string, size: number): string {
   if (!line.includes("\t")) return line;
+  const text = decodeLine(line);
   let out = "";
   let column = 0;
-  for (let i = 0; i < line.length; i++) {
-    const code = line.charCodeAt(i);
-    if (code === 9) {
+  for (const ch of text ?? line) {
+    if (ch === "\t") {
       const spaces = size - (column % size);
       out += " ".repeat(spaces);
       column += spaces;
     } else {
-      out += line[i];
-      if ((code & 0xc0) !== 0x80) column++;
+      out += ch;
+      column += text === null ? 1 : columns(ch);
     }
   }
-  return out;
+  return text === null || text === line ? out : toBytes(out);
 }
 
 /** White space as GNU's manual lists it: tab, vertical tab, form feed, return, space. */

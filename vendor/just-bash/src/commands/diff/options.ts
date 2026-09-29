@@ -11,13 +11,14 @@ export type Style = "normal" | "unified" | "context";
 export interface DiffOptions {
   /** the output style an option chose, null for the default */
   style: Style | null;
-  /**
-   * the most lines of context asked for: -C, -U and their long forms ask
-   * for their value, -c and -u for 3
-   */
+  /** the most lines of context -C, -U or their long forms asked for */
   context: number | null;
-  /** the obsolete -NUM, which wins over the rest */
+  /** -c, -u or a long form without a value: 3 lines unless more */
+  implied: boolean;
+  /** the largest obsolete -NUM */
   obsolete: number | null;
+  /** -N: an absent file is empty; --unidirectional-new-file: the first */
+  newFile: "both" | "first" | null;
   brief: boolean;
   reportSame: boolean;
   text: boolean;
@@ -80,6 +81,17 @@ function ask(o: DiffOptions, lines: number): void {
   o.context = o.context === null ? lines : Math.max(o.context, lines);
 }
 
+/**
+ * The lines of context, as GNU's answers show: the largest -C or -U, at
+ * least 3 beside -c or -u, but beside the obsolete -NUM only the largest
+ * of it and -C or -U.
+ */
+export function contextLines(o: DiffOptions): number {
+  if (o.obsolete !== null) return Math.max(o.obsolete, o.context ?? 0);
+  if (o.context !== null) return o.implied ? Math.max(o.context, 3) : o.context;
+  return 3;
+}
+
 function contextLength(value: string): number {
   if (!/^[0-9]+$/.test(value)) {
     throw new DiffUsageError(`invalid context length '${value}'`);
@@ -134,7 +146,7 @@ const SHORT: Record<string, Spec> = {
   B: flag((o) => (o.ignoreBlankLines = true)),
   c: flag((o) => {
     setStyle(o, "context");
-    ask(o, 3);
+    o.implied = true;
   }),
   C: context,
   d: flag((o) => (o.minimal = true)),
@@ -148,7 +160,7 @@ const SHORT: Record<string, Spec> = {
   l: refuse("none", "-l is refused: the shell has no pr to paginate with"),
   L: { arg: "required", apply: (o, v) => o.labels.push(v) },
   n: later("none"),
-  N: later("none"),
+  N: flag((o) => (o.newFile = "both")),
   p: flag((o) => (o.showCFunction = true)),
   q: flag((o) => (o.brief = true)),
   r: ignored("none"),
@@ -158,12 +170,12 @@ const SHORT: Record<string, Spec> = {
   T: flag((o) => (o.initialTab = true)),
   u: flag((o) => {
     setStyle(o, "unified");
-    ask(o, 3);
+    o.implied = true;
   }),
   U: unified,
   v: flag((o) => (o.version = true)),
   w: flag((o) => (o.ignoreAllSpace = true)),
-  W: ignored("required"),
+  W: { arg: "required", apply: (_o, v) => void number("width", v, 1) },
   x: ignored("required"),
   X: ignored("required"),
   y: later("none"),
@@ -178,14 +190,16 @@ const LONG: Record<string, Spec> = {
     arg: "optional",
     apply: (o, v) => {
       setStyle(o, "context");
-      ask(o, v === "" ? 3 : contextLength(v));
+      if (v === "") o.implied = true;
+      else ask(o, contextLength(v));
     },
   },
   unified: {
     arg: "optional",
     apply: (o, v) => {
       setStyle(o, "unified");
-      ask(o, v === "" ? 3 : contextLength(v));
+      if (v === "") o.implied = true;
+      else ask(o, contextLength(v));
     },
   },
   ed: SHORT.e,
@@ -209,7 +223,9 @@ const LONG: Record<string, Spec> = {
   recursive: SHORT.r,
   "no-dereference": ignored("none"),
   "new-file": SHORT.N,
-  "unidirectional-new-file": later("none"),
+  "unidirectional-new-file": flag((o) => {
+    if (o.newFile === null) o.newFile = "first";
+  }),
   "ignore-file-name-case": ignored("none"),
   "no-ignore-file-name-case": ignored("none"),
   exclude: SHORT.x,
@@ -244,18 +260,12 @@ const LONG: Record<string, Spec> = {
   color: {
     arg: "optional",
     apply: (_o, v) => {
-      // never a terminal here, so auto is never
-      if (v === "" || v === "never" || v === "auto" || v === "none") return;
-      if (v === "always" || v === "yes" || v === "force") {
-        throw new DiffUsageError(
-          "--color=always is refused: escape codes say nothing here",
-          false,
-        );
-      }
+      // every form prints plain text: escape codes say nothing to a model
+      if (["", "never", "auto", "always"].includes(v)) return;
       throw new DiffUsageError(`invalid argument '${v}' for '--color'`);
     },
   },
-  palette: refuse("required", "--palette is refused: it only serves --color=always"),
+  palette: ignored("required"),
   binary: ignored("none"),
   help: flag((o) => (o.help = true)),
   version: SHORT.v,
@@ -269,6 +279,8 @@ export function parseDiffArgs(args: string[]): {
     style: null,
     context: null,
     obsolete: null,
+    implied: false,
+    newFile: null,
     brief: false,
     reportSame: false,
     text: false,
@@ -350,7 +362,7 @@ export function parseDiffArgs(args: string[]): {
       const ch = arg[j];
       if (ch >= "0" && ch <= "9") {
         digits += ch;
-        o.obsolete = contextLength(digits);
+        o.obsolete = Math.max(o.obsolete ?? 0, contextLength(digits));
         continue;
       }
       digits = "";

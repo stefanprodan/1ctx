@@ -3,7 +3,7 @@
  * a tab, the text, and GNU's words after a line with no newline.
  */
 
-import type { Lines } from "./lines.js";
+import { expandTabs, type Lines } from "./lines.js";
 
 export interface LineStyle {
   /** -T: a tab after the mark instead of the space */
@@ -15,24 +15,6 @@ export interface LineStyle {
 }
 
 export const NO_NEWLINE = "\\ No newline at end of file\n";
-
-/** Tabs to spaces, counting one column per character. */
-export function expandTabs(text: string, size: number): string {
-  if (!text.includes("\t")) return text;
-  let out = "";
-  let column = 0;
-  for (const ch of text) {
-    if (ch === "\t") {
-      const spaces = size - (column % size);
-      out += " ".repeat(spaces);
-      column += spaces;
-    } else {
-      out += ch;
-      column++;
-    }
-  }
-  return out;
-}
 
 /**
  * Writes line `i` of `file` after `mark`. `gap` is what separates them

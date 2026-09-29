@@ -106,6 +106,11 @@
     "cut2.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
     "s30blank": "line 1\nline 2\nline 3\nline 4\nZ\nline 6\nline 7\nline 8\n\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
     "s30blank2": "line 1\nline 2\nline 3\nline 4\nZ\nline 6\nline 7\nline 8\nline 9\nline 10\n\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "tab1": "é\tx\n€€\ty\n日本\tz\n",
+    "tab2": "é\tX\n€€\tY\n日本\tZ\n",
+    "greek1": "ΣΑΣ\nİ\nΣ\n",
+    "greek2": "σας\ni\nς\n",
+    "greek3": "σασ\nı\nσ\n",
     "wa": " a\nc\n}\nb\nb\n",
     "wb": " a\n}\nb \n",
     "ia": "x\nA\nb\na\n",
@@ -2436,32 +2441,54 @@
       "error": true
     },
     {
-      "name": "color refused",
+      "name": "color always",
       "args": [
         "--color=always",
         "a",
         "b"
       ],
       "accept": {
-        "stdout": "",
-        "exit": 2,
-        "reason": "escape codes spend a model's tokens and say nothing"
+        "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+        "exit": 1,
+        "reason": "GNU colors the output; ours stays plain, escape codes say nothing to a model"
       },
       "stdout": "\u001b[36m1c1\u001b[0m\n\u001b[31m< a\u001b[0m\n---\n\u001b[32m> A\u001b[0m\n\u001b[36m4c4\u001b[0m\n\u001b[31m< d\u001b[0m\n---\n\u001b[32m> D\u001b[0m\n\u001b[36m7a8\u001b[0m\n\u001b[32m> h\u001b[0m\n",
       "exit": 1
     },
     {
-      "name": "palette refused",
+      "name": "color always with a palette",
       "args": [
+        "--color=always",
         "--palette=ad=32",
         "a",
         "b"
       ],
       "accept": {
-        "stdout": "",
-        "exit": 2,
-        "reason": "a palette only serves --color=always, which is refused"
+        "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+        "exit": 1,
+        "reason": "GNU colors the output with the palette; ours stays plain"
       },
+      "stdout": "\u001b[36m1c1\u001b[0m\n\u001b[31m< a\u001b[0m\n---\n\u001b[32m> A\u001b[0m\n\u001b[36m4c4\u001b[0m\n\u001b[31m< d\u001b[0m\n---\n\u001b[32m> D\u001b[0m\n\u001b[36m7a8\u001b[0m\n\u001b[32m> h\u001b[0m\n",
+      "exit": 1
+    },
+    {
+      "name": "color with a bad value",
+      "args": [
+        "--color=yes",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "palette alone",
+      "args": [
+        "--palette=ad=32",
+        "a",
+        "b"
+      ],
       "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
       "exit": 1
     },
@@ -2934,6 +2961,243 @@
         "b"
       ],
       "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "expand tabs after multibyte characters",
+      "args": [
+        "-t",
+        "tab1",
+        "tab2"
+      ],
+      "stdout": "1,3c1,3\n< é       x\n< €€      y\n< 日本    z\n---\n> é       X\n> €€      Y\n> 日本    Z\n",
+      "exit": 1
+    },
+    {
+      "name": "expand tabs after multibyte characters unified",
+      "args": [
+        "-t",
+        "-u",
+        "tab1",
+        "tab2"
+      ],
+      "stdout": "--- tab1\t2026-09-29 12:52:48.311000000 +0000\n+++ tab2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n-é       x\n-€€      y\n-日本    z\n+é       X\n+€€      Y\n+日本    Z\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore tab expansion after multibyte characters",
+      "args": [
+        "-E",
+        "tab1",
+        "tab1"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore case per character, final sigma",
+      "args": [
+        "-i",
+        "greek1",
+        "greek2"
+      ],
+      "stdout": "1c1\n< ΣΑΣ\n---\n> σας\n3c3\n< Σ\n---\n> ς\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case per character, plain sigma",
+      "args": [
+        "-i",
+        "greek1",
+        "greek3"
+      ],
+      "stdout": "2c2\n< İ\n---\n> ı\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case per character, lower pair",
+      "args": [
+        "-i",
+        "greek2",
+        "greek3"
+      ],
+      "stdout": "1,3c1,3\n< σας\n< i\n< ς\n---\n> σασ\n> ı\n> σ\n",
+      "exit": 1
+    },
+    {
+      "name": "digits then a larger length",
+      "args": [
+        "-2",
+        "-U4",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,14 +1,14 @@\n line 1\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n-line 10\n+changed 10\n line 11\n line 12\n line 13\n line 14\n@@ -16,9 +16,9 @@\n line 16\n line 17\n line 18\n line 19\n-line 20\n+changed 20\n line 21\n line 22\n line 23\n line 24\n",
+      "exit": 1
+    },
+    {
+      "name": "digits then a smaller length",
+      "args": [
+        "-4",
+        "-U1",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,14 +1,14 @@\n line 1\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n-line 10\n+changed 10\n line 11\n line 12\n line 13\n line 14\n@@ -16,9 +16,9 @@\n line 16\n line 17\n line 18\n line 19\n-line 20\n+changed 20\n line 21\n line 22\n line 23\n line 24\n",
+      "exit": 1
+    },
+    {
+      "name": "a length then larger digits",
+      "args": [
+        "-U1",
+        "-4",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,14 +1,14 @@\n line 1\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n-line 10\n+changed 10\n line 11\n line 12\n line 13\n line 14\n@@ -16,9 +16,9 @@\n line 16\n line 17\n line 18\n line 19\n-line 20\n+changed 20\n line 21\n line 22\n line 23\n line 24\n",
+      "exit": 1
+    },
+    {
+      "name": "bad width",
+      "args": [
+        "-W",
+        "abc",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "zero width",
+      "args": [
+        "--width=0",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "new file both present",
+      "args": [
+        "-uN",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "new file absent second",
+      "args": [
+        "-N",
+        "a",
+        "nothere"
+      ],
+      "stdout": "1,7d0\n< a\n< b\n< c\n< d\n< e\n< f\n< g\n",
+      "exit": 1
+    },
+    {
+      "name": "new file absent first unified",
+      "args": [
+        "-u",
+        "-N",
+        "nothere",
+        "a"
+      ],
+      "stdout": "--- nothere\t1970-01-01 00:00:00.000000000 +0000\n+++ a\t1970-01-01 00:00:00.000000000 +0000\n@@ -0,0 +1,7 @@\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "new file absent first context",
+      "args": [
+        "-c",
+        "--new-file",
+        "nothere",
+        "a"
+      ],
+      "stdout": "*** nothere\t1970-01-01 00:00:00.000000000 +0000\n--- a\t1970-01-01 00:00:00.000000000 +0000\n***************\n*** 0 ****\n--- 1,7 ----\n+ a\n+ b\n+ c\n+ d\n+ e\n+ f\n+ g\n",
+      "exit": 1
+    },
+    {
+      "name": "new file both absent",
+      "args": [
+        "-N",
+        "nothere",
+        "nothere2"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "new file brief",
+      "args": [
+        "-q",
+        "-N",
+        "a",
+        "nothere"
+      ],
+      "stdout": "Files a and nothere differ\n",
+      "exit": 1
+    },
+    {
+      "name": "new file absent second unified",
+      "args": [
+        "-u",
+        "-N",
+        "a",
+        "nothere"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ nothere\t1970-01-01 00:00:00.000000000 +0000\n@@ -1,7 +0,0 @@\n-a\n-b\n-c\n-d\n-e\n-f\n-g\n",
+      "exit": 1
+    },
+    {
+      "name": "new file absent second with stdin unified",
+      "args": [
+        "-u",
+        "-N",
+        "-",
+        "nothere"
+      ],
+      "stdin": "a\n",
+      "maskTimes": true,
+      "stdout": "--- -\tTIME\n+++ nothere\tTIME\n@@ -1 +0,0 @@\n-a\n",
+      "exit": 1
+    },
+    {
+      "name": "unidirectional absent first",
+      "args": [
+        "--unidirectional-new-file",
+        "nothere",
+        "a"
+      ],
+      "stdout": "0a1,7\n> a\n> b\n> c\n> d\n> e\n> f\n> g\n",
+      "exit": 1
+    },
+    {
+      "name": "unidirectional absent second",
+      "args": [
+        "--unidirectional-new-file",
+        "a",
+        "nothere"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "new file absent with stdin",
+      "args": [
+        "-N",
+        "-",
+        "nothere"
+      ],
+      "stdin": "a\n",
+      "stdout": "1d0\n< a\n",
       "exit": 1
     },
     {

@@ -29,7 +29,12 @@ import { formatUnified } from "./format-unified.js";
 import { headerName, headerTime, shellName } from "./header.js";
 import { changesOf, hunksOf } from "./hunks.js";
 import { folds, intern, splitLines } from "./lines.js";
-import { type DiffOptions, DiffUsageError, parseDiffArgs } from "./options.js";
+import {
+  contextLines,
+  type DiffOptions,
+  DiffUsageError,
+  parseDiffArgs,
+} from "./options.js";
 import {
   anyPattern,
   headings,
@@ -61,6 +66,8 @@ const diffHelp = {
     "-w, --ignore-all-space        ignore all white space",
     "-B, --ignore-blank-lines      ignore changes where lines are all blank",
     "-I, --ignore-matching-lines=RE  ignore changes where all lines match RE",
+    "-N, --new-file                treat absent files as empty",
+    "    --unidirectional-new-file treat absent first files as empty",
     "-a, --text                    treat all files as text",
     "    --strip-trailing-cr       strip trailing carriage return on input",
     "-d, --minimal                 try hard to find a smaller set of changes",
@@ -80,9 +87,14 @@ const VERSION =
 
 /** (1ctx) A NUL in this many first bytes makes a file binary, as GNU's first read. */
 const BINARY_WINDOW = 4096;
+/** (1ctx) GNU reads this much of a pipe at first, so stdin looks further. */
+const PIPE_WINDOW = 65536;
 
 /** (1ctx) Steps of the compare that make one unit of the work limit. */
 export const STEPS_PER_UNIT = 64;
+/** (1ctx) Steps a byte of folding and of regex matching are charged. */
+const FOLD_STEPS = 8;
+const MATCH_STEPS = 8;
 
 /** (1ctx) The compare went past the command's work limit. */
 export class DiffWorkLimitError extends Error {}
@@ -115,6 +127,10 @@ interface Operand {
   name: string;
   bytes: string;
   mtime: Date;
+  /** a NUL in this many first bytes makes it binary */
+  window: number;
+  /** absent, and read as empty under -N */
+  absent?: boolean;
 }
 
 class Trouble extends Error {}
@@ -147,17 +163,22 @@ async function isDirectory(
 async function readOperand(
   ctx: RuntimeCommandContext,
   name: string,
+  mayBeAbsent: boolean,
 ): Promise<Operand> {
   if (name === "-") {
-    return { name, bytes: latin1FromBytes(ctx.stdin), mtime: new Date() };
+    const bytes = latin1FromBytes(ctx.stdin);
+    return { name, bytes, mtime: new Date(), window: PIPE_WINDOW };
   }
   const path = ctx.fs.resolvePath(ctx.cwd, name);
   try {
     const stat = await ctx.fs.stat(path);
     const bytes = latin1FromBytes(await readBytesFrom(ctx.fs, path));
-    return { name, bytes, mtime: stat.mtime };
+    return { name, bytes, mtime: stat.mtime, window: BINARY_WINDOW };
   } catch (error) {
     rethrowFatalExecutionError(error);
+    if (mayBeAbsent && errorWords(error) === "No such file or directory") {
+      return { name, bytes: "", mtime: new Date(0), window: 0, absent: true };
+    }
     throw new Trouble(`${name}: ${errorWords(error)}`);
   }
 }
@@ -196,9 +217,9 @@ function compile(patterns: string[]): LineTest {
   }
 }
 
-function isBinary(bytes: string): boolean {
-  const nul = bytes.indexOf("\0");
-  return nul !== -1 && nul < BINARY_WINDOW;
+function isBinary(file: Operand): boolean {
+  const nul = file.bytes.indexOf("\0");
+  return nul !== -1 && nul < file.window;
 }
 
 /** Text of our own, names included, as the output's bytes. */
@@ -230,7 +251,7 @@ function compareFiles(
   const same = () =>
     result(o.reportSame ? text(`Files ${names} are identical\n`) : "", 0);
   if (a.bytes === b.bytes) return same();
-  if (!o.text && (isBinary(a.bytes) || isBinary(b.bytes))) {
+  if (!o.text && (isBinary(a) || isBinary(b))) {
     return result(
       text(
         o.brief ? `Files ${names} differ\n` : `Binary files ${names} differ\n`,
@@ -238,14 +259,23 @@ function compareFiles(
       1,
     );
   }
+  const budget = workBudget(ctx);
+  const bytes = a.bytes.length + b.bytes.length;
+  // splitting and interning take a step a byte, folding more
+  budget.charge(folds(o) ? FOLD_STEPS * bytes : bytes);
   const la = splitLines(a.bytes, o.stripTrailingCr);
   const lb = splitLines(b.bytes, o.stripTrailingCr);
   const ids = intern(la, lb, o);
   const raw = folds(o) ? intern(la, lb, {}) : null;
+  const charged = (test: LineTest | null): LineTest | null =>
+    test && ((line) => {
+      budget.charge(MATCH_STEPS * (line.length + 1));
+      return test(line);
+    });
   const style = o.style ?? (o.showCFunction ? "context" : "normal");
-  const context = style === "normal" ? 0 : (o.obsolete ?? o.context ?? 3);
+  const context = style === "normal" ? 0 : contextLines(o);
   const comparison = compare(ids.a, ids.b, ids.count, {
-    ...workBudget(ctx),
+    ...budget,
     minimal: o.minimal,
     speedLargeFiles: o.speedLargeFiles,
     // the context shown is never left out of the search, as GNU keeps it
@@ -260,7 +290,7 @@ function compareFiles(
       lb,
       o.ignoreBlankLines,
       o.ignoreAllSpace || o.ignoreSpaceChange || o.ignoreTrailingSpace,
-      tests.matching,
+      charged(tests.matching),
     );
   }
   const hunks = hunksOf(changes, context, la.lines.length, lb.lines.length);
@@ -277,7 +307,9 @@ function compareFiles(
     formatNormal(la, lb, hunks, lineStyle, out);
     return result(out.join(""), 1);
   }
-  const heading = tests.heading ? headings(la, tests.heading) : undefined;
+  const heading = tests.heading
+    ? headings(la, charged(tests.heading) as LineTest)
+    : undefined;
   const header = (mark: string, file: Operand, label: string | undefined) =>
     text(
       label !== undefined
@@ -338,9 +370,16 @@ export const diffCommand: RuntimeCommand = {
           : null,
       };
       const [first, second] = await operandPair(ctx, operands);
-      const a = await readOperand(ctx, first);
+      const a = await readOperand(ctx, first, options.newFile !== null);
       const b =
-        second === first && first === "-" ? a : await readOperand(ctx, second);
+        second === first && first === "-"
+          ? a
+          : await readOperand(ctx, second, options.newFile === "both");
+      if (a.absent && b.absent) {
+        throw new Trouble(`${first}: No such file or directory`);
+      }
+      // GNU stamps both headers with the absent first file's time
+      if (a.absent) b.mtime = a.mtime;
       return compareFiles(ctx, options, tests, a, b);
     } catch (error) {
       if (error instanceof Trouble || error instanceof DiffWorkLimitError) {

@@ -53,6 +53,31 @@ describe("diff", () => {
     expect(backward.stdout).toBe("1c1\n< y\n---\n> x\n");
   });
 
+  test("looks for a NUL further into stdin, as GNU reads a pipe", async () => {
+    const text = `${"x".repeat(30000)}\0\n`;
+    const { bash } = shell({ f: text, other: "b\n" });
+    const piped = await bash.exec("cat f | diff - other");
+    expect(piped.stdout).toBe("Binary files - and other differ\n");
+    const file = await bash.exec("diff f other | head -c 3");
+    expect(file.stdout).toBe("1c1");
+  });
+
+  test("charges folding and matching to the work limit", async () => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/w/a", `${"a".repeat(100000)}\n`);
+    fs.writeFileSync("/w/b", `${"A".repeat(100000)}\n`);
+    const bash = new Bash({
+      fs,
+      cwd: "/w",
+      executionLimits: { maxLoopIterations: 1000 },
+    });
+    const plain = await bash.exec("diff a b > /dev/null; echo $?");
+    expect(plain.stdout).toBe("1\n");
+    const folded = await bash.exec("diff -i a b; echo $?");
+    expect(folded.stdout).toBe("2\n");
+    expect(folded.stderr).toContain("work limit exceeded");
+  });
+
   test("names each file as the shell would quote it", async () => {
     const { bash } = shell({ "a b": "x\n", c: "y\n" });
     const result = await bash.exec("diff -q 'a b' c");
