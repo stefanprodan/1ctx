@@ -18,6 +18,34 @@ export function visualSchemeQuery(
   );
 }
 
+// How a whole page meets the chat's ground. It goes bare when its text
+// reads there and it draws no image. Otherwise a page that paints no
+// background of its own gets the plain backdrop a browser's canvas would
+// give it, light or dark, whichever its text reads on, since the frame
+// itself is see-through.
+export function visualGround(
+  page: {
+    text: number[] | null;
+    chat: number[] | null;
+    image: boolean;
+    color: boolean;
+  },
+  contrast: (a: number[], b: number[]) => number,
+): { bare: boolean; backdrop: "light" | "dark" | null } {
+  const { text, chat } = page;
+  if (!text) return { bare: false, backdrop: null };
+  if (!page.image && chat && contrast(text, chat) >= 4.5)
+    return { bare: true, backdrop: null };
+  if (page.image || page.color) return { bare: false, backdrop: null };
+  return {
+    bare: false,
+    backdrop:
+      contrast(text, [255, 255, 255]) >= contrast(text, [0, 0, 0])
+        ? "light"
+        : "dark",
+  };
+}
+
 // The WCAG contrast ratio of two opaque sRGB colours.
 export function visualContrast(a: number[], b: number[]): number {
   const luminance = ([r, g, b]: number[]) => {

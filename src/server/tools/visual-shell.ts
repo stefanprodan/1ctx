@@ -8,7 +8,11 @@ import {
   visualScript,
 } from "./visual-inert.ts";
 import { bootVisual, visualConnect, visualMessage } from "./visual-painter.ts";
-import { visualContrast, visualSchemeQuery } from "./visual-scheme.ts";
+import {
+  visualContrast,
+  visualGround,
+  visualSchemeQuery,
+} from "./visual-scheme.ts";
 import { VISUAL_THEME_CSS, visualThemeValues } from "./visual-theme.ts";
 
 export {
@@ -49,6 +53,7 @@ export function visualDocument(): string {
     measure: measureVisual,
     query: visualSchemeQuery,
     contrast: visualContrast,
+    ground: visualGround,
   };
   const source = Object.entries(helpers)
     .map(([name, fn]) => `${name}: ${fn.toString()}`)

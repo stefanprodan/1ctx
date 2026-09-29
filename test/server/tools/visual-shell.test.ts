@@ -9,6 +9,7 @@ import type {
 import { bootVisual } from "../../../src/server/tools/visual-painter.ts";
 import {
   visualContrast,
+  visualGround,
   visualSchemeQuery,
 } from "../../../src/server/tools/visual-scheme.ts";
 import {
@@ -266,8 +267,42 @@ test("the shell ETag varies with hosts and answers conditional requests", async 
   ).toBe(200);
 });
 
-function painter(scripts: VisualScript[]) {
+// the computed colours a page shows the frame: its body's text and
+// background, the root's background and the chat's ground
+type Look = {
+  text: string;
+  chat: string;
+  bodyColor?: string;
+  rootColor?: string;
+  rootImage?: string;
+};
+
+// a canvas that resolves #rrggbb and treats anything else as transparent
+function canvas() {
+  let fill = "";
+  return {
+    width: 0,
+    height: 0,
+    getContext: () => ({
+      set fillStyle(value: string) {
+        fill = value;
+      },
+      fillRect() {},
+      getImageData: () => {
+        const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fill);
+        return {
+          data: hex
+            ? [...hex.slice(1).map((pair) => Number.parseInt(pair, 16)), 255]
+            : [0, 0, 0, 0],
+        };
+      },
+    }),
+  };
+}
+
+function painter(scripts: VisualScript[], look?: Look) {
   const events = new Map<string, (event: Record<string, unknown>) => void>();
+  const attributes = new Map<string, string>();
   const frames = new Map<number, () => void>();
   const timers = new Map<number, () => void>();
   const appended: Array<{
@@ -325,13 +360,22 @@ function painter(scripts: VisualScript[]) {
         if (on) flags.add(name);
         else flags.delete(name);
       },
+      setAttribute(name: string, value: string) {
+        flags.add(name);
+        attributes.set(name, value);
+      },
+      removeAttribute(name: string) {
+        flags.delete(name);
+        attributes.delete(name);
+      },
       style: {
         setProperty(name: string, value: string) {
           styles[name] = value;
         },
       },
     },
-    createElement: () => ({ content: tree([]), remove() {} }),
+    createElement: (name: string) =>
+      name === "canvas" ? canvas() : { content: tree([]), remove() {} },
     addEventListener() {},
     body: {
       append: (script: (typeof appended)[number]) => appended.push(script),
@@ -345,8 +389,26 @@ function painter(scripts: VisualScript[]) {
     "MessagePort",
     "Element",
     "clearTimeout",
+    "getComputedStyle",
     `return (${bootVisual.toString()})`,
   ) as (...globals: unknown[]) => typeof bootVisual;
+  // without a look there are no computed styles, as before a frame loads
+  const computed = (element: unknown) => {
+    if (!look) throw new Error("no computed styles");
+    const transparent = "rgba(0, 0, 0, 0)";
+    return element === document.body
+      ? {
+          color: look.text,
+          backgroundColor: look.bodyColor ?? transparent,
+          backgroundImage: "none",
+        }
+      : {
+          backgroundColor: look.rootColor ?? transparent,
+          backgroundImage: look.rootImage ?? "none",
+          getPropertyValue: (name: string) =>
+            name === "--color-background-primary" ? look.chat : "",
+        };
+  };
   const boot = start(
     document,
     window,
@@ -364,6 +426,7 @@ function painter(scripts: VisualScript[]) {
       frames.delete(id);
       timers.delete(id);
     },
+    computed,
   );
   boot(
     {
@@ -381,6 +444,7 @@ function painter(scripts: VisualScript[]) {
       measure: () => 123,
       query: visualSchemeQuery,
       contrast: visualContrast,
+      ground: visualGround,
     },
     { morph: () => morphs.push(final) },
   );
@@ -388,6 +452,7 @@ function painter(scripts: VisualScript[]) {
   const connect = events.get("message")!;
   return {
     port,
+    attributes,
     appended,
     morphs,
     styles,
@@ -628,4 +693,80 @@ test("a fragment keeps the frame's ground untouched", async () => {
   app.port.send({ type: "final", html: "<div>fragment</div>" });
   await tick();
   expect(app.flags.has("data-visual-bare")).toBe(false);
+});
+
+const PAGE = "<html><body><h1>Hello</h1></body></html>";
+const DARK = { text: "#e7e7e9", chat: "#131314" };
+const LIGHT = { text: "#1a1a1c", chat: "#f4f2ec" };
+
+async function grounded(look: Look, html = PAGE) {
+  const app = painter([], look);
+  app.connect();
+  app.port.send({ type: "final", html });
+  await tick();
+  return app;
+}
+
+test.each([
+  ["dark", DARK],
+  ["light", LIGHT],
+])("an unstyled page goes bare on the %s ground", async (_scheme, look) => {
+  const app = await grounded(look);
+  expect(app.flags.has("data-visual-bare")).toBe(true);
+  expect(app.attributes.has("data-visual-backdrop")).toBe(false);
+});
+
+test("a page's own dark text on its own light background keeps both", async () => {
+  const app = await grounded({
+    ...DARK,
+    text: "#111111",
+    bodyColor: "#ffffff",
+  });
+  expect(app.flags.has("data-visual-bare")).toBe(false);
+  expect(app.attributes.has("data-visual-backdrop")).toBe(false);
+});
+
+test("a page's own dark text with no background gets a light backdrop on the dark ground", async () => {
+  const look = { ...DARK, text: "#111111" };
+  const app = await grounded(look);
+  expect(app.flags.has("data-visual-bare")).toBe(false);
+  expect(app.attributes.get("data-visual-backdrop")).toBe("light");
+  // on the light ground the same text reads, so the backdrop goes
+  look.chat = LIGHT.chat;
+  app.port.send({ type: "theme", scheme: "light", values: {} });
+  expect(app.flags.has("data-visual-bare")).toBe(true);
+  expect(app.attributes.has("data-visual-backdrop")).toBe(false);
+});
+
+test("a page's own light text with no background gets a dark backdrop on the light ground", async () => {
+  const app = await grounded({ ...LIGHT, text: "#eeeeee" });
+  expect(app.attributes.get("data-visual-backdrop")).toBe("dark");
+});
+
+test("a fragment's dark text leaves the frame's ground untouched", async () => {
+  const app = await grounded({ ...DARK, text: "#111111" }, "<h1>Hello</h1>");
+  expect(app.flags.size).toBe(0);
+});
+
+test("the ground rule decides bare, backdrop or neither", () => {
+  const white = [255, 255, 255];
+  const ink = [17, 17, 17];
+  const night = [19, 19, 20];
+  const page = { image: false, color: false };
+  const decide = (fields: Partial<Parameters<typeof visualGround>[0]>) =>
+    visualGround(
+      { ...page, text: null, chat: night, ...fields },
+      visualContrast,
+    );
+  expect(decide({ text: white })).toEqual({ bare: true, backdrop: null });
+  expect(decide({ text: ink })).toEqual({ bare: false, backdrop: "light" });
+  expect(decide({ text: ink, color: true })).toEqual({
+    bare: false,
+    backdrop: null,
+  });
+  expect(decide({ text: white, image: true })).toEqual({
+    bare: false,
+    backdrop: null,
+  });
+  expect(decide({})).toEqual({ bare: false, backdrop: null });
 });

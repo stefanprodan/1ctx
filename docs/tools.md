@@ -143,7 +143,12 @@ mount in `docs/bash.md`.
   queries and `matchMedia` to answer the chat's theme, not the system's
   (`tools/visual-scheme.ts`). A whole page (`<html>` or `<body>`) loses its
   plain backdrop, padding and margin only when its text reads on the
-  chat's ground at 4.5:1, and the height counts the body's own spacing.
+  chat's ground at 4.5:1 (`visualGround()`, measured without the
+  frame's own attributes). A page whose text does not read there and
+  that paints no background of its own gets a plain white or dark
+  backdrop, whichever its text reads on, as a browser's canvas would
+  give it, since the frame is see-through; a fragment keeps the chat's
+  ground. The height counts the body's own spacing.
   Change `skills/visualize/` in the same commit as the frame's
   names or the tool's contract.
 
