@@ -386,17 +386,25 @@ describe("a send's disabled capabilities", () => {
         {
           sendId: newId(),
           replyId: newId(),
-          userId: newId(),
           sessionId: stale.id,
           session: stale,
           title: stale.title,
-          text: "again",
+          turn: {
+            users: [
+              {
+                id: newId(),
+                userId: active.policy.userId,
+                username: active.policy.username,
+                text: "again",
+              },
+            ],
+          },
           policy: {
             ...active.policy,
             disabledCapabilities: ["web"],
             web: null,
           },
-          capabilities: { disable: ["web"] },
+          changes: [{ disable: ["web"] }],
           mcpDigest: null,
         },
       );

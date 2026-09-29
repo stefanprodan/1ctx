@@ -5,6 +5,8 @@
 // replacement send's durable rows.
 
 import { describe, expect, test } from "bun:test";
+import { regenerateUsers } from "../../../src/server/runner/regenerate.ts";
+import type { Message } from "../../../src/shared/contracts/session.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import type { ChatApp, Script } from "../../helpers/chat.ts";
 import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
@@ -174,5 +176,38 @@ describe("POST /api/sessions/:id/regenerate", () => {
     );
     expect(response.status).toBe(404);
     chat.app.socket.dispose();
+  });
+});
+
+describe("regenerateUsers", () => {
+  const row = (id: string, kind: Message["kind"]) => ({ id, kind }) as Message;
+
+  test("takes the run of user rows that ends at the last one", () => {
+    const rows = [
+      row("u0", "user"),
+      row("r0", "reply"),
+      row("u1", "user"),
+      row("u2", "user"),
+      row("r1", "reply"),
+      row("t1", "tool"),
+      row("s1", "summary"),
+    ];
+    expect(regenerateUsers(rows).map((message) => message.id)).toEqual([
+      "u1",
+      "u2",
+    ]);
+    expect(
+      regenerateUsers(rows.slice(0, 2)).map((message) => message.id),
+    ).toEqual(["u0"]);
+  });
+
+  test("refuses a chat that ends with a user row or has none", () => {
+    expect(() => regenerateUsers([])).toThrow("nothing to regenerate");
+    expect(() =>
+      regenerateUsers([row("u0", "user"), row("u1", "user")]),
+    ).toThrow("nothing to regenerate");
+    expect(() => regenerateUsers([row("s0", "summary")])).toThrow(
+      "nothing to regenerate",
+    );
   });
 });

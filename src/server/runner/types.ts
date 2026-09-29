@@ -30,6 +30,7 @@ import type { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import type { live } from "./send.ts";
 import type { ShutdownResult } from "./shutdown.ts";
+import type { TurnMessage } from "./turn.ts";
 import type { WriterDeps } from "./writer.ts";
 
 export type RunnerDeps = {
@@ -76,6 +77,9 @@ export type Runner = {
     sessionId: string,
     fields: SendMessageRequest,
   ): SessionDetail;
+  // one turn opened by 1 to MAX_TURN_MESSAGES user messages in order,
+  // each by its own author, counted against the first
+  sendTurn(sessionId: string, messages: readonly TurnMessage[]): SessionDetail;
   regenerate(
     principal: Principal,
     sessionId: string,

@@ -57,10 +57,10 @@ export type SessionsPort = {
     now: number;
   }): Message;
   replaceSend(
-    user: Message,
+    users: readonly Message[],
     newSendId: string,
   ): {
-    user: Message;
+    users: Message[];
     removedMessageIds: string[];
   };
   addReply(fields: {

@@ -10,11 +10,8 @@
 // the lock is let go after both the provider iteration and the round's
 // tools have settled.
 
-import {
-  applyChange,
-  type CapabilityChange,
-} from "../../shared/capabilities.ts";
-import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
+import type { CapabilityChange } from "../../shared/capabilities.ts";
+import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
@@ -33,14 +30,16 @@ import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
-import { regenerateUser } from "./regenerate.ts";
+import { regenerateUsers } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
 import { ProviderRefusal, type RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
 import { shutdownRunner } from "./shutdown.ts";
+import type { StartFields, StartUser } from "./start.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
+import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
 import { Writer } from "./writer.ts";
 
@@ -50,6 +49,7 @@ export type { PreparedRun } from "./prepare.ts";
 export { Registry, RunCapacity, type Running } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export type { ShutdownResult } from "./shutdown.ts";
+export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
 export type { Runner, RunnerDeps } from "./types.ts";
 export {
   HTML_EVERY_MS,
@@ -200,28 +200,27 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return agent;
   };
 
-  const prepare = (
-    sessionId: string,
-    session: SessionRow | null,
-    project: ProjectRow,
-    user: UserRow,
-    agent: AgentRow,
-    text: string,
-    title: string,
-    event: Event | null = null,
-    existingUser: Message | null = null,
-    uploads?: readonly string[],
-    capabilities?: CapabilityChange,
-  ): PreparedRun => {
-    const changed = applyChange(
+  const prepare = (fields: {
+    sessionId: string;
+    session: SessionRow | null;
+    project: ProjectRow;
+    // who starts it: the first author, the regenerator, the automation's
+    user: UserRow;
+    agent: AgentRow;
+    title: string;
+    event?: Event | null;
+    turn: StartFields["turn"];
+    changes: readonly (CapabilityChange | undefined)[];
+  }): PreparedRun => {
+    const { event = null, session, user, turn } = fields;
+    const disabled = applyChanges(
       event?.automation.disabledCapabilities ??
         session?.disabledCapabilities ??
         [],
-      capabilities,
+      fields.changes,
     );
-    if (!changed.ok) throw new BadRequest(changed.error);
     const op: SendOp =
-      event !== null ? "run" : existingUser !== null ? "regenerate" : "message";
+      event !== null ? "run" : "existing" in turn ? "regenerate" : "message";
     return prepareSend({
       registry,
       startedBy: event?.source === "schedule" ? null : user.id,
@@ -230,59 +229,83 @@ export function runnerArea(deps: RunnerDeps): Runner {
       sessions: deps.sessions,
       log: deps.log,
       run: (send) => void run(send),
-      sessionId,
+      sessionId: fields.sessionId,
       session,
       policy: policyFor(
-        sessionId,
-        project,
+        fields.sessionId,
+        fields.project,
         user,
-        agent,
+        fields.agent,
         event,
         true,
-        changed.set,
+        disabled,
       ),
       op,
-      text,
-      title,
+      turn,
+      changes: fields.changes,
+      title: fields.title,
       kind: event === null ? "chat" : "run",
       origin: event === null ? "chat" : "automation",
       automationId: event?.automation.id ?? null,
-      existingUser,
-      uploads,
-      capabilities,
       checkUploads: deps.uploads.checkUploads,
       startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),
       now: deps.clock(),
     });
   };
 
-  const begin = (
-    sessionId: string,
-    session: SessionRow | null,
-    project: ProjectRow,
-    user: UserRow,
-    agent: AgentRow,
-    text: string,
-    title: string,
-    existingUser: Message | null = null,
-    uploads?: readonly string[],
-    capabilities?: CapabilityChange,
-  ): SessionDetail => {
-    const prepared = prepare(
-      sessionId,
-      session,
-      project,
-      user,
-      agent,
-      text,
-      title,
-      null,
-      existingUser,
-      uploads,
-      capabilities,
-    );
+  const begin = (fields: Parameters<typeof prepare>[0]): SessionDetail => {
+    const prepared = prepare(fields);
     prepared.launch();
     return prepared.detail;
+  };
+
+  const newUser = (
+    user: UserRow,
+    text: string,
+    uploads?: readonly string[],
+  ): StartUser => ({
+    id: newId(),
+    userId: user.id,
+    username: user.username,
+    text,
+    ...(uploads === undefined ? {} : { uploads }),
+  });
+
+  // every author sees the chat and may write in its project; the turn
+  // counts against the first
+  const continueChat = (
+    sessionId: string,
+    messages: readonly TurnMessage[],
+  ): SessionDetail => {
+    let session: SessionRow | null = null;
+    let project: ProjectRow | null = null;
+    const authors: UserRow[] = [];
+    for (const { principal } of messages) {
+      const seen = deps.visible(principal, sessionId);
+      if (seen.origin === "automation") {
+        throw new Conflict("a run cannot continue");
+      }
+      refuseArchived(seen);
+      const own = deps.access.project(principal, seen.projectId);
+      session ??= seen;
+      project ??= own;
+      authors.push(author(principal));
+    }
+    const first = session!;
+    return begin({
+      sessionId: first.id,
+      session: first,
+      project: project!,
+      user: authors[0]!,
+      agent: agentOf(first.agentId),
+      title: first.title,
+      turn: {
+        users: messages.map((fields, i) =>
+          newUser(authors[i]!, fields.message, fields.uploads),
+        ),
+      },
+      changes: messages.map((fields) => fields.capabilities),
+    });
   };
 
   const liveOf = (sessionId: string) => {
@@ -296,40 +319,23 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, fields.projectId);
       const user = author(principal);
       const agent = agentOf(fields.agentId);
-      return begin(
-        newId(),
-        null,
+      return begin({
+        sessionId: newId(),
+        session: null,
         project,
         user,
         agent,
-        fields.message,
-        titleFrom(fields.message),
-        null,
-        fields.uploads,
-        fields.capabilities,
-      );
+        title: titleFrom(fields.message),
+        turn: { users: [newUser(user, fields.message, fields.uploads)] },
+        changes: [fields.capabilities],
+      });
     },
     send(principal, sessionId, fields) {
-      const session = deps.visible(principal, sessionId);
-      if (session.origin === "automation") {
-        throw new Conflict("a run cannot continue");
-      }
-      refuseArchived(session);
-      const project = deps.access.project(principal, session.projectId);
-      const user = author(principal);
-      const agent = agentOf(session.agentId);
-      return begin(
-        session.id,
-        session,
-        project,
-        user,
-        agent,
-        fields.message,
-        session.title,
-        null,
-        fields.uploads,
-        fields.capabilities,
-      );
+      return continueChat(sessionId, [{ ...fields, principal }]);
+    },
+    sendTurn(sessionId, messages) {
+      checkTurn(messages);
+      return continueChat(sessionId, messages);
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = deps.visible(principal, sessionId);
@@ -341,22 +347,28 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
-      const existingUser = regenerateUser(deps.sessions.messages(session.id));
+      const existing = regenerateUsers(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const agent = agentOf(session.agentId);
-      return begin(
-        session.id,
+      const lastId = existing.at(-1)!.userId;
+      return begin({
+        sessionId: session.id,
         session,
         project,
         user,
         agent,
-        existingUser.content,
-        session.title,
-        existingUser,
-        undefined,
-        fields.capabilities,
-      );
+        title: session.title,
+        turn: {
+          existing,
+          // the line names who wrote the message, not who regenerated it
+          lastAuthor:
+            lastId === null || lastId === user.id
+              ? user.username
+              : (deps.users.byId(lastId)?.username ?? user.username),
+        },
+        changes: [fields.capabilities],
+      });
     },
     compact(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
@@ -387,16 +399,17 @@ export function runnerArea(deps: RunnerDeps): Runner {
       );
     },
     startRun(event) {
-      return prepare(
-        newId(),
-        null,
-        event.project,
-        event.user,
-        event.agent,
-        event.instructions,
-        event.automation.name,
+      return prepare({
+        sessionId: newId(),
+        session: null,
+        project: event.project,
+        user: event.user,
+        agent: event.agent,
+        title: event.automation.name,
         event,
-      );
+        turn: { users: [newUser(event.user, event.instructions)] },
+        changes: [],
+      });
     },
     stop(principal, sessionId) {
       const session = deps.visible(principal, sessionId);

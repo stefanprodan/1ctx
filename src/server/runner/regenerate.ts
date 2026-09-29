@@ -4,11 +4,15 @@
 import type { Message } from "../../shared/contracts/session.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export function regenerateUser(messages: readonly Message[]): Message {
+// the user messages the last turn opened with: the run of user rows
+// that ends at the last one, so a turn of several is redone whole
+export function regenerateUsers(messages: readonly Message[]): Message[] {
   if (messages.length === 0 || messages.at(-1)?.kind === "user") {
     throw new BadRequest("nothing to regenerate");
   }
-  const user = messages.findLast((message) => message.kind === "user");
-  if (user === undefined) throw new BadRequest("nothing to regenerate");
-  return user;
+  const last = messages.findLastIndex((message) => message.kind === "user");
+  if (last === -1) throw new BadRequest("nothing to regenerate");
+  let first = last;
+  while (first > 0 && messages[first - 1]!.kind === "user") first--;
+  return messages.slice(first, last + 1);
 }

@@ -33,13 +33,22 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   finalize that fails keeps the lock and the send's places until
   `sessions.repair()` at the next start.
 - **The writer has three transactions.** The writer's three transactions:
-  `startSend` (the session when new, the user message, the streaming
+  `startSend` (the session when new, the user messages, the streaming
   reply, the send row, the running state), `finalizeRound` (the
   reply's end and its usage row) and `finalizeSend` (the send's end
   and the session's state, with the last round inside it). Each bumps
   the session's revision once and publishes one `session.changed`
   envelope after commit. Create and send accept up to ten distinct
   staged `uploads` ids.
+- **A turn may open with several user messages.** `runner.sendTurn()`
+  starts one send from 1 to `MAX_TURN_MESSAGES` (16) messages in order
+  (`runner/turn.ts`), each its own `messages` row with its own author
+  and seq, and each held to a message's bounds; the routes send a list
+  of one. Every author must see the chat and write in its project; the
+  send counts against the first author and its policy is theirs. On the
+  wire each is its own user message with its author's `name`, since
+  every wire is the OpenAI chat shape, which takes consecutive user
+  messages. The envelope's `last` is the last message's.
 - **An envelope's row is one statement, read after the commit.**
   `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
   does for one session: it seeks the session by id and walks only that
@@ -63,15 +72,18 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   letters or digits; unknown or unassigned server, skill and credential
   keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
-  it again to the current row in its transaction, with the message's
+  it again to the current row in its transaction, a turn's changes in
+  its messages' order, the later winning per key, with the message's
   revision and envelope. A refused start writes nothing; a later failure
   keeps the choice. Compact takes no change. A fork copies the source
   session's current set, including a run's saved automation set.
 - **A send's uploads are claimed in `startSend`.** For staged uploads,
-  synchronous preflight checks their user, project and lease and requires
+  synchronous preflight checks each message's against its author, project
+  and lease and requires
   `bash` in the offered set. Inside `startSend`, after the session exists,
   the claim rechecks staging and current caps, merges the files in order
-  and writes the bounded `messages.uploads` record with the user message.
+  and writes the bounded `messages.uploads` record with each user message,
+  claimed in the turn's order.
   A later throw rolls back the tree, staging and rows and frees the lock.
   User history appends `uploadsBlock()` from that record alone; a done
   summary gains `UPLOADS_SUMMARY_LINE` only from earlier user records.
@@ -248,16 +260,20 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   automations' pointers to it.
 - **Regenerate replaces the last turn.**
   Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
-  reuses the last user message: inside `startSend`'s transaction the
-  rows after it and their send go, their usage stays, and the envelope
-  names them in `removedMessageIds`; 409 while the session runs, 400 when
-  the last message is the user's. Its optional JSON body goes through
-  `readBody()` under `MAX_REGENERATE_BODY` and `parseRegenerate()`.
+  reuses the last turn's user messages, the run of user rows that ends
+  at the last one: inside `startSend`'s transaction they move to the new
+  send, the rows after them and every send in that tail go, their usage
+  stays, and the envelope names the rows in `removedMessageIds`; 409
+  while the session runs, 400 when the last message is the user's. Its
+  optional JSON body goes through `readBody()` under
+  `MAX_REGENERATE_BODY` and `parseRegenerate()`.
 - **Fork copies a chat through a settled turn.**
   Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
   turn and its following done summaries, never memory phase rows, into
   a chat owned by the caller on the picked agent, recording the source
-  session and message ids without foreign keys; a user turn is left
+  session and message ids without foreign keys; at a user message the
+  rows before it stay, an earlier message of its turn included, which
+  regenerate then redoes with the next turn; a user turn is left
   unsent, and usage is not copied. The title is the body's, else
   "Fork of <the source's>"; the composer's `/fork <name>` forks at the
   last turn on the same agent under that name, and a run is forked
@@ -283,7 +299,7 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **A chat downloads as Markdown.**
   `GET /api/sessions/:id/markdown?tz=` is the chat as a file for
   anyone who sees it (`sessions/markdown.ts`, pure): the title, then
-  per send the user message and the agent's turn under `@author
+  per send each user message and the agent's turn under `@author
   YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
   line (stopped, the error, cut at max tokens); no work, tools,
   summaries or running turns, and the title and errors escaped. User

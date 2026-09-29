@@ -38,8 +38,8 @@ export function chatMarkdown(
   const stamp = timestamp(timeZone);
   const parts = [`# ${escapeInline(title)}`];
   for (const turn of sends(rows)) {
-    const user = turn.find((row) => row.kind === "user");
-    if (user !== undefined) {
+    // a turn may open with several messages, each by its own author
+    for (const user of turn.filter((row) => row.kind === "user")) {
       parts.push(heading(user.author ?? "someone", user.createdAt, stamp));
       parts.push(body(user.content));
       if (user.uploads?.length) {

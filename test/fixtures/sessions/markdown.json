@@ -498,5 +498,45 @@
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\nrun answer\n"
+  },
+  {
+    "name": "a turn of several messages writes each under its author",
+    "rows": [
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "casey",
+        "content": "roll back the deploy",
+        "createdAt": 1000000,
+        "finishedAt": 1000000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "user",
+        "author": "ana",
+        "content": "wait, keep it and scale up",
+        "createdAt": 1060000,
+        "finishedAt": 1060000,
+        "slot": null,
+        "error": null,
+        "finishReason": null
+      },
+      {
+        "sendId": "s1",
+        "kind": "reply",
+        "slot": "answer",
+        "status": "done",
+        "author": "coder",
+        "content": "You disagree, so I did neither.",
+        "createdAt": 1120000,
+        "finishedAt": 1120000,
+        "error": null,
+        "finishReason": null
+      }
+    ],
+    "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nroll back the deploy\n\n## @ana 1970-01-01 00:17\n\nwait, keep it and scale up\n\n## @coder 1970-01-01 00:18\n\nYou disagree, so I did neither.\n"
   }
 ]

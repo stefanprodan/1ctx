@@ -340,8 +340,8 @@ export class SessionStore {
     return this.message(id)!;
   }
 
-  replaceSend(user: Message, newSendId: string) {
-    return replaceSendRows(this.db, user, newSendId);
+  replaceSend(users: readonly Message[], newSendId: string) {
+    return replaceSendRows(this.db, users, newSendId);
   }
   addReply(fields: {
     id?: string;

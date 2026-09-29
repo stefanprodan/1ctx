@@ -2,42 +2,48 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The rows after the last user message may belong to compact sends, so
-// every send in the replaced tail goes, not only the user message's.
+// every send in the replaced tail goes, not only the user messages'.
 // Their usage rows stay: a replaced turn was still spent.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { MESSAGE_COLUMNS, message, type RawMessage } from "./rows.ts";
 
+// users: the turn's user messages in seq order, nothing but them between
+// the first and the last
 export function replaceSendRows(
   db: Db,
-  user: Message,
+  users: readonly Message[],
   newSendId: string,
 ): {
-  user: Message;
+  users: Message[];
   removedMessageIds: string[];
 } {
+  const first = users[0]!;
+  const last = users.at(-1)!;
   const tail = db
     .query<{ id: string; send_id: string }, [string, number]>(
       `select id, send_id from messages
        where session_id = ? and seq >= ? order by seq`,
     )
-    .all(user.sessionId, user.seq);
-  const removedMessageIds = tail.slice(1).map((row) => row.id);
+    .all(first.sessionId, first.seq);
+  const removedMessageIds = tail.slice(users.length).map((row) => row.id);
   const removedSendIds = [...new Set(tail.map((row) => row.send_id))];
   db.query("delete from messages where session_id = ? and seq > ?").run(
-    user.sessionId,
-    user.seq,
+    last.sessionId,
+    last.seq,
   );
-  db.query(
+  const move = db.query(
     "update messages set send_id = ? where id = ? and kind = 'user'",
-  ).run(newSendId, user.id);
+  );
+  for (const user of users) move.run(newSendId, user.id);
   const remove = db.query("delete from sends where id = ?");
   for (const sendId of removedSendIds) remove.run(sendId);
-  const raw = db
-    .query<RawMessage, [string]>(
-      `select ${MESSAGE_COLUMNS} from messages where id = ?`,
-    )
-    .get(user.id)!;
-  return { user: message(raw), removedMessageIds };
+  const read = db.query<RawMessage, [string]>(
+    `select ${MESSAGE_COLUMNS} from messages where id = ?`,
+  );
+  return {
+    users: users.map((user) => message(read.get(user.id)!)),
+    removedMessageIds,
+  };
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The transcript's nodes. Rows are grouped by send and placed by the
-// server's slot: a user row, then the agent's turn, which holds the
+// server's slot: its user rows, then the agent's turn, which holds the
 // work (the rounds that called tools, folded) and the answer. Tool
 // calls are read only after placement, to pair each work round with
 // its result rows.
@@ -129,8 +129,9 @@ export function groupRows(
 
   const nodes: Node[] = [];
   for (const [sendId, rows] of sends) {
-    const user = rows.find((row) => row.kind === "user");
-    if (user !== undefined) nodes.push({ kind: "user", message: user });
+    // a turn may open with several user messages, each by its author
+    const users = rows.filter((row) => row.kind === "user");
+    for (const user of users) nodes.push({ kind: "user", message: user });
 
     const answer =
       rows.find((row) => row.kind === "reply" && row.slot === "answer") ?? null;
@@ -178,7 +179,7 @@ export function groupRows(
         work,
         summary,
         memory,
-        compact: user === undefined && reply === null && work === null,
+        compact: users.length === 0 && reply === null && work === null,
         rows,
         send,
       });
