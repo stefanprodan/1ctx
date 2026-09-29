@@ -176,15 +176,16 @@ function withoutComments(code: string): string {
     .replace(/^[ \t]*\/\/[^\n]*/gm, (c) => " ".repeat(c.length));
 }
 
-// a file inside a server area, and that area's index.ts
+// a file inside a server area, and the two files at an area's root
+// another area may import; a nested file of the same name is private
 const isAreaFile = (rel: string) => {
   const area = areaOf(rel);
   return area.startsWith("server/") && area !== "server/main";
 };
-const isAreaIndex = (rel: string) =>
-  isAreaFile(rel) &&
-  rel.split(sep).length === 3 &&
-  basename(rel) === "index.ts";
+const isAreaRoot = (rel: string, name: string) =>
+  isAreaFile(rel) && rel.split(sep).length === 3 && basename(rel) === name;
+const isAreaIndex = (rel: string) => isAreaRoot(rel, "index.ts");
+const isAreaRules = (rel: string) => isAreaRoot(rel, "rules.ts");
 const isWorker = (rel: string) => rel.endsWith(".worker.ts");
 
 const isExternal = (s: string) =>
@@ -197,6 +198,8 @@ export function check(root: string): Violation[] {
   const edges = new Map<string, Set<string>>();
   // the edges that survive transpiling: what a file loads when it runs
   const runtime = new Map<string, Set<string>>();
+  // the packages and builtins each file loads when it runs
+  const externals = new Map<string, Set<string>>();
 
   for (const file of sources) {
     const rel = relative(root, file);
@@ -242,15 +245,23 @@ export function check(root: string): Violation[] {
     }
     const targets = new Set<string>();
     const loads = new Set<string>();
-    const isRules = basename(rel) === "rules.ts" && isAreaFile(rel);
+    const outside = new Set<string>();
+    const isRules = isAreaRules(rel);
     for (const imp of imports) {
       const s = imp.specifier;
       if (isExternal(s)) {
         const builtin = s.startsWith("bun") || s.startsWith("node:");
+        if (imp.kind !== "scan") outside.add(s);
         if (area === "shared") {
           out.push({ file: rel, rule: "shared", detail: `imports ${s}` });
         } else if (area === "client" && builtin) {
           out.push({ file: rel, rule: "client", detail: `imports ${s}` });
+        } else if (isRules) {
+          out.push({
+            file: rel,
+            rule: "rules",
+            detail: `imports ${s}; a rules.ts imports no package or builtin`,
+          });
         }
         continue;
       }
@@ -310,7 +321,7 @@ export function check(root: string): Violation[] {
       const targetArea = areaOf(target);
       if (
         isRules &&
-        !(targetArea === area && basename(target) !== "index.ts") &&
+        !(targetArea === area && !isAreaIndex(target)) &&
         targetArea !== "server/lib" &&
         targetArea !== "shared"
       ) {
@@ -371,8 +382,8 @@ export function check(root: string): Violation[] {
         } else if (
           to !== "lib" &&
           to !== "db" &&
-          basename(target) !== "index.ts" &&
-          basename(target) !== "rules.ts"
+          !isAreaIndex(target) &&
+          !isAreaRules(target)
         ) {
           out.push({
             file: rel,
@@ -384,23 +395,27 @@ export function check(root: string): Violation[] {
     }
     edges.set(rel, targets);
     runtime.set(rel, loads);
+    externals.set(rel, outside);
   }
 
   // a rules.ts and a worker load neither the database nor an area's
-  // index.ts, at any depth, so a worker starts light
+  // index.ts, at any depth, so a worker starts light; bun:sqlite is the
+  // database too, even opened by a file of the worker's own area
   for (const file of runtime.keys()) {
-    if (!isAreaFile(file)) continue;
-    const rule =
-      basename(file) === "rules.ts"
-        ? "rules"
-        : isWorker(file)
-          ? "worker"
-          : null;
+    const rule = isAreaRules(file)
+      ? "rules"
+      : isAreaFile(file) && isWorker(file)
+        ? "worker"
+        : null;
     if (rule === null || file in WORKER_EXEMPTIONS) continue;
     const seen = new Set<string>([file]);
     const queue = [file];
     while (queue.length > 0) {
-      for (const next of runtime.get(queue.shift()!) ?? []) {
+      const current = queue.shift()!;
+      if (externals.get(current)?.has("bun:sqlite")) {
+        out.push({ file, rule, detail: `loads bun:sqlite through ${current}` });
+      }
+      for (const next of runtime.get(current) ?? []) {
         if (seen.has(next)) continue;
         seen.add(next);
         queue.push(next);

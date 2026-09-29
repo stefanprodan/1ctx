@@ -17,7 +17,7 @@ import {
 const create = (s: Setup, name: string, text: string) =>
   s.knowledge.create(s.projectId, s.author, name, text);
 
-describe("knowledge command mounts", () => {
+describe("bash command mounts", () => {
   test("yq edits a multi-document manifest in place, every document kept", async () => {
     const s = setup();
     try {

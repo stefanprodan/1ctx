@@ -320,7 +320,7 @@ describe("bash", () => {
     expect(calls).toBe(0);
   });
 
-  test("a missing knowledge capability fails explicitly", async () => {
+  test("a missing command capability fails explicitly", async () => {
     expect(
       await new Registry([makeBashTool()]).run(
         call({ command: "ls" }),
@@ -329,7 +329,7 @@ describe("bash", () => {
     ).toEqual({ error: true, content: "Error: knowledge is not configured" });
   });
 
-  test("the call signal reaches knowledge through the registry", async () => {
+  test("the call signal reaches the command through the registry", async () => {
     const ctx = context();
     const controller = new AbortController();
     ctx.signal = controller.signal;

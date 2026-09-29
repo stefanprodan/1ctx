@@ -559,10 +559,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
       try {
         const logins = access.sweep();
         const visits = access.sweepVisits();
-        const knowledgeRows = knowledge.sweep(clock());
-        const scratchRows = bash.sweep(clock());
+        const now = clock();
+        const knowledgeRows = knowledge.sweep(now);
+        const scratchRows = bash.sweep(now);
         const digests = sessions.store.sweepDigests();
-        const chats = sessions.sweep(clock(), limits.current());
+        const chats = sessions.sweep(now, limits.current());
         const removed = logins + visits + knowledgeRows + scratchRows + digests;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {

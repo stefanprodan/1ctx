@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { run, setup } from "./helpers.ts";
 
-describe("knowledge command output", () => {
+describe("bash command output", () => {
   test("stdout then stderr is cut while Unicode, status and receipts stay intact", async () => {
     const s = setup();
     try {
