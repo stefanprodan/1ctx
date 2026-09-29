@@ -7,6 +7,7 @@ import type {
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../types.js";
+import { versionAnswer } from "./version.js";
 
 type CommandLoader = () => Promise<RuntimeCommand>;
 
@@ -531,6 +532,10 @@ function createLazyCommand(def: LazyCommandDef): RuntimeCommand {
       args: string[],
       ctx: RuntimeCommandContext,
     ): Promise<ExecResult> {
+      // (1ctx) answered before the command loads, as the tool it follows
+      const version = versionAnswer(def.name, args);
+      if (version !== null) return { stdout: version, stderr: "", exitCode: 0 };
+
       let cmd = cache.get(def.name);
 
       if (!cmd) {
