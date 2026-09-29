@@ -32,6 +32,8 @@ export interface Folding {
   ignoreSpaceChange?: boolean;
   ignoreAllSpace?: boolean;
   tabSize?: number;
+  /** ed styles: an incomplete last line matches a complete one */
+  completeLines?: boolean;
 }
 
 export interface Interned {
@@ -96,7 +98,7 @@ const WIDE: [number, number][] = [
 const COMBINING = /^\p{M}$/u;
 
 /** The columns a character takes on a terminal. */
-function columns(ch: string): number {
+export function columns(ch: string): number {
   const code = ch.codePointAt(0) as number;
   if (code < 0x300) return 1;
   if (COMBINING.test(ch)) return 0;
@@ -175,7 +177,14 @@ export function intern(a: Lines, b: Lines, folding: Folding): Interned {
       let key = plain ? file.lines[i] : foldLine(file.lines[i], folding);
       // an incomplete line matches a complete one only when white space
       // is ignored
-      if (i === last && file.incomplete && !newlineFolds) key += "\n";
+      if (
+        i === last &&
+        file.incomplete &&
+        !newlineFolds &&
+        !folding.completeLines
+      ) {
+        key += "\n";
+      }
       let id = ids.get(key);
       if (id === undefined) {
         id = ids.size;

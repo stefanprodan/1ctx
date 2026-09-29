@@ -25,7 +25,7 @@ import {
   type NameOrder,
   nameOrder,
 } from "./names.js";
-import type { DiffOptions } from "./options.js";
+import { type DiffOptions, noDiffMeansNoOutput } from "./options.js";
 import { diffTexts, type Tests, text } from "./text.js";
 
 /** (1ctx) A NUL in this many first bytes makes a file binary, as GNU's first read. */
@@ -163,7 +163,7 @@ export class DiffRun {
   }
 
   private message(words: string): void {
-    this.out.push(text(words));
+    this.out.push(text(`${this.o.mergeAssist ? " " : ""}${words}`));
   }
 
   private trouble(name: string, words: string): void {
@@ -188,11 +188,6 @@ export class DiffRun {
       side.err = errorCode(error);
       side.words = errorWords(error);
     }
-  }
-
-  /** Whether an output style prints something for two files the same. */
-  private noDiffMeansNoOutput(): boolean {
-    return true;
   }
 
   /** The file named `base` in `dir`, matched ignoring case when asked. */
@@ -346,7 +341,7 @@ export class DiffRun {
           !s1.stdin &&
           fileType(st0) === fileType(st1) &&
           sameStat(st0, st1)));
-    if (sameFiles && this.noDiffMeansNoOutput()) return 0;
+    if (sameFiles && noDiffMeansNoOutput(o)) return 0;
 
     const pair: Pair = {
       names: [s0.name, s1.name],
@@ -360,6 +355,9 @@ export class DiffRun {
         ((o.newFile === "both" && st1.isDirectory && s0.none) ||
           (o.newFile !== null && st0.isDirectory && s1.none)))
     ) {
+      if (o.style === "ifdef") {
+        throw new Fatal("-D option not supported with directories");
+      }
       if (o.recursive || top) return this.diffDirs(pair);
       this.message(
         `Common subdirectories: ${shellName(s0.name)} and ${shellName(s1.name)}\n`,
@@ -422,6 +420,7 @@ export class DiffRun {
       );
     }
     this.out.push(result.out);
+    if (result.err) this.err.push(result.err);
     return result.status;
   }
 

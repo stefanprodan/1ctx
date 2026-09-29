@@ -6,7 +6,21 @@
  * prefix. Every refusal is exit 2, GNU's trouble.
  */
 
-export type Style = "normal" | "unified" | "context";
+export type Style =
+  | "normal"
+  | "unified"
+  | "context"
+  | "side"
+  | "ed"
+  | "forward-ed"
+  | "rcs"
+  | "ifdef";
+
+/** The indexes of the line and group formats, as GNU numbers them. */
+export const UNCHANGED = 0;
+export const OLD = 1;
+export const NEW = 2;
+export const CHANGED = 3;
 
 export interface DiffOptions {
   /** the output style an option chose, null for the default */
@@ -57,6 +71,18 @@ export interface DiffOptions {
   noDereference: boolean;
   /** the arguments read as options, for the line naming each pair */
   switches: string[];
+  /** --tabsize was given */
+  tabSizeGiven: boolean;
+  /** -W, 0 until given */
+  width: number;
+  leftColumn: boolean;
+  suppressCommonLines: boolean;
+  /** --sdiff-merge-assist, sdiff's side of diff */
+  mergeAssist: boolean;
+  /** --LTYPE-line-format by UNCHANGED, OLD and NEW */
+  lineFormats: (string | null)[];
+  /** --GTYPE-group-format by UNCHANGED, OLD, NEW and CHANGED */
+  groupFormats: (string | null)[];
 }
 
 /** What GNU's -p matches, as its manual gives it. */
@@ -112,19 +138,60 @@ function contextLength(value: string): number {
   return Math.min(Number(value), Number.MAX_SAFE_INTEGER);
 }
 
-/** One value an option may be given twice, as GNU's specify_value. */
+/** A value an option may be given twice, the same, as GNU's specify_value. */
+function specify(had: string | null, value: string, name: string): string {
+  if (had !== null && had !== value) {
+    throw new DiffUsageError(`conflicting ${name} option value '${value}'`);
+  }
+  return value;
+}
+
 function once(
   o: DiffOptions,
   key: "startingFile" | "fromFile" | "toFile",
   value: string,
   name: string,
 ): void {
-  const had = o[key];
-  if (had !== null && had !== value) {
-    throw new DiffUsageError(`conflicting ${name} option value '${value}'`);
-  }
-  o[key] = value;
+  o[key] = specify(o[key], value, name);
 }
+
+/** -W and --tabsize: a second, different value is fatal. */
+function size(
+  o: DiffOptions,
+  key: "width" | "tabSize",
+  what: string,
+  value: string,
+): void {
+  if (!/^\+?[0-9]+$/.test(value) || Number(value) <= 0) {
+    throw new DiffUsageError(`invalid ${what} '${value}'`);
+  }
+  const n = Number(value);
+  const given = key === "width" ? o.width !== 0 : o.tabSizeGiven;
+  if (given && o[key] !== n) {
+    throw new DiffUsageError(`conflicting ${what} options`, false);
+  }
+  o[key] = n;
+  if (key === "tabSize") o.tabSizeGiven = true;
+}
+
+const C_IFDEF = [
+  "%=",
+  "#ifndef @\n%<#endif /* ! @ */\n",
+  "#ifdef @\n%>#endif /* @ */\n",
+  "#ifndef @\n%<#else /* @ */\n%>#endif /* @ */\n",
+];
+
+const LINE_OPTIONS = [
+  "--unchanged-line-format",
+  "--old-line-format",
+  "--new-line-format",
+];
+const GROUP_OPTIONS = [
+  "--unchanged-group-format",
+  "--old-group-format",
+  "--new-group-format",
+  "--changed-group-format",
+];
 
 function number(what: string, value: string, min: number): number {
   if (!/^[0-9]+$/.test(value) || Number(value) < min) {
@@ -141,16 +208,32 @@ const refuse = (arg: Arg, words: string): Spec => ({
   },
 });
 
-/** Kept for a later change; refused so nothing is dropped without a word. */
-const later = (arg: Arg): Spec => ({
-  arg,
-  apply: (_o, _v, name) => {
-    throw new DiffUsageError(`option '${name}' is not supported`, false);
+/** Options that change nothing here. */
+const ignored = (arg: Arg): Spec => ({ arg, apply: () => {} });
+
+const lineFormat = (index: number): Spec => ({
+  arg: "required",
+  apply: (o, v) => {
+    setStyle(o, "ifdef");
+    o.lineFormats[index] = specify(
+      o.lineFormats[index],
+      v,
+      LINE_OPTIONS[index],
+    );
   },
 });
 
-/** Options that change nothing when both operands are files. */
-const ignored = (arg: Arg): Spec => ({ arg, apply: () => {} });
+const groupFormat = (index: number): Spec => ({
+  arg: "required",
+  apply: (o, v) => {
+    setStyle(o, "ifdef");
+    o.groupFormats[index] = specify(
+      o.groupFormats[index],
+      v,
+      GROUP_OPTIONS[index],
+    );
+  },
+});
 
 const context: Spec = {
   arg: "required",
@@ -177,10 +260,22 @@ const SHORT: Record<string, Spec> = {
   }),
   C: context,
   d: flag((o) => (o.minimal = true)),
-  D: later("required"),
-  e: later("none"),
+  D: {
+    arg: "required",
+    apply: (o, v) => {
+      setStyle(o, "ifdef");
+      C_IFDEF.forEach((format, i) => {
+        o.groupFormats[i] = specify(
+          o.groupFormats[i],
+          format.replaceAll("@", v),
+          "-D",
+        );
+      });
+    },
+  },
+  e: flag((o) => setStyle(o, "ed")),
   E: flag((o) => (o.ignoreTabExpansion = true)),
-  f: later("none"),
+  f: flag((o) => setStyle(o, "forward-ed")),
   F: { arg: "required", apply: (o, v) => o.functionPatterns.push(v) },
   h: ignored("none"),
   H: flag((o) => (o.speedLargeFiles = true)),
@@ -188,7 +283,7 @@ const SHORT: Record<string, Spec> = {
   I: { arg: "required", apply: (o, v) => o.ignoreMatching.push(v) },
   l: refuse("none", "-l is refused: the shell has no pr to paginate with"),
   L: { arg: "required", apply: (o, v) => o.labels.push(v) },
-  n: later("none"),
+  n: flag((o) => setStyle(o, "rcs")),
   N: flag((o) => (o.newFile = "both")),
   p: flag((o) => (o.showCFunction = true)),
   P: flag((o) => {
@@ -210,10 +305,10 @@ const SHORT: Record<string, Spec> = {
   U: unified,
   v: flag((o) => (o.version = true)),
   w: flag((o) => (o.ignoreAllSpace = true)),
-  W: { arg: "required", apply: (_o, v) => void number("width", v, 1) },
+  W: { arg: "required", apply: (o, v) => size(o, "width", "width", v) },
   x: { arg: "required", apply: (o, v) => o.excludes.push(v) },
   X: { arg: "required", apply: (o, v) => o.excludeFiles.push(v) },
-  y: later("none"),
+  y: flag((o) => setStyle(o, "side")),
   Z: flag((o) => (o.ignoreTrailingSpace = true)),
 };
 
@@ -242,8 +337,12 @@ const LONG: Record<string, Spec> = {
   rcs: SHORT.n,
   "side-by-side": SHORT.y,
   width: SHORT.W,
-  "left-column": ignored("none"),
-  "suppress-common-lines": ignored("none"),
+  "left-column": flag((o) => (o.leftColumn = true)),
+  "suppress-common-lines": flag((o) => (o.suppressCommonLines = true)),
+  "sdiff-merge-assist": flag((o) => {
+    setStyle(o, "side");
+    o.mergeAssist = true;
+  }),
   "show-c-function": SHORT.p,
   "show-function-line": SHORT.F,
   label: SHORT.L,
@@ -251,7 +350,7 @@ const LONG: Record<string, Spec> = {
   "initial-tab": SHORT.T,
   tabsize: {
     arg: "required",
-    apply: (o, v) => (o.tabSize = number("tabsize", v, 1)),
+    apply: (o, v) => size(o, "tabSize", "tabsize", v),
   },
   "suppress-blank-empty": flag((o) => (o.suppressBlankEmpty = true)),
   paginate: refuse("none", "--paginate is refused: the shell has no pr"),
@@ -282,14 +381,22 @@ const LONG: Record<string, Spec> = {
   text: SHORT.a,
   "strip-trailing-cr": flag((o) => (o.stripTrailingCr = true)),
   ifdef: SHORT.D,
-  "old-group-format": later("required"),
-  "new-group-format": later("required"),
-  "unchanged-group-format": later("required"),
-  "changed-group-format": later("required"),
-  "line-format": later("required"),
-  "old-line-format": later("required"),
-  "new-line-format": later("required"),
-  "unchanged-line-format": later("required"),
+  "old-group-format": groupFormat(OLD),
+  "new-group-format": groupFormat(NEW),
+  "unchanged-group-format": groupFormat(UNCHANGED),
+  "changed-group-format": groupFormat(CHANGED),
+  "line-format": {
+    arg: "required",
+    apply: (o, v) => {
+      setStyle(o, "ifdef");
+      for (let i = 0; i < LINE_OPTIONS.length; i++) {
+        o.lineFormats[i] = specify(o.lineFormats[i], v, "--line-format");
+      }
+    },
+  },
+  "old-line-format": lineFormat(OLD),
+  "new-line-format": lineFormat(NEW),
+  "unchanged-line-format": lineFormat(UNCHANGED),
   minimal: SHORT.d,
   "horizon-lines": {
     arg: "required",
@@ -353,6 +460,13 @@ export function parseDiffArgs(args: string[]): {
     ignoreFileNameCase: false,
     noDereference: false,
     switches: [],
+    tabSizeGiven: false,
+    width: 0,
+    leftColumn: false,
+    suppressCommonLines: false,
+    mergeAssist: false,
+    lineFormats: [null, null, null],
+    groupFormats: [null, null, null, null],
   };
   const operands: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -437,4 +551,30 @@ export function parseDiffArgs(args: string[]): {
   if (o.labels.length > 2) throw new DiffUsageError("too many file label options");
   if (o.showCFunction) o.functionPatterns.push(C_FUNCTION);
   return { options: o, operands };
+}
+
+/** The line and group formats with GNU's defaults filled in. */
+export function formats(o: DiffOptions): {
+  lines: string[];
+  groups: string[];
+} {
+  const g = o.groupFormats;
+  const old = g[OLD] ?? g[CHANGED] ?? "%<";
+  const added = g[NEW] ?? g[CHANGED] ?? "%>";
+  return {
+    lines: o.lineFormats.map((f) => f ?? "%l\n"),
+    groups: [g[UNCHANGED] ?? "%=", old, added, g[CHANGED] ?? old + added],
+  };
+}
+
+/** Whether two files the same print nothing, GNU's no_diff_means_no_output. */
+export function noDiffMeansNoOutput(o: DiffOptions): boolean {
+  if (o.style === "ifdef") {
+    const { lines, groups } = formats(o);
+    return (
+      groups[UNCHANGED] === "" ||
+      (groups[UNCHANGED] === "%=" && lines[UNCHANGED] === "")
+    );
+  }
+  return o.style !== "side" || o.suppressCommonLines;
 }

@@ -3,8 +3,8 @@
  *
  * (1ctx) As GNU diffutils 3.12: files are compared as bytes with our own
  * bounded engine, GNU's options and exit codes (0 the same, 1 different,
- * 2 trouble), GNU's words for binary files and operands, and directories
- * compared as GNU compares them.
+ * 2 trouble), GNU's words for binary files and operands, every output
+ * format, and directories compared as GNU compares them.
  */
 
 import {
@@ -38,6 +38,12 @@ const diffHelp = {
     "-s, --report-identical-files  report when two files are the same",
     "-c, -C NUM, --context[=NUM]   output NUM (default 3) lines of copied context",
     "-u, -U NUM, --unified[=NUM]   output NUM (default 3) lines of unified context",
+    "-e, --ed                      output an ed script",
+    "-n, --rcs                     output an RCS format diff",
+    "-y, --side-by-side            output in two columns",
+    "-W, --width=NUM               output at most NUM (default 130) print columns",
+    "    --left-column             output only the left column of common lines",
+    "    --suppress-common-lines   do not output common lines",
     "-p, --show-c-function         show which C function each change is in",
     "-F, --show-function-line=RE   show the most recent line matching RE",
     "    --label LABEL             use LABEL instead of file name and timestamp",
@@ -65,9 +71,24 @@ const diffHelp = {
     "-I, --ignore-matching-lines=RE  ignore changes where all lines match RE",
     "-a, --text                    treat all files as text",
     "    --strip-trailing-cr       strip trailing carriage return on input",
+    "-D, --ifdef=NAME              output merged file with '#ifdef NAME' diffs",
+    "    --GTYPE-group-format=GFMT format GTYPE input groups with GFMT",
+    "    --line-format=LFMT        format all input lines with LFMT",
+    "    --LTYPE-line-format=LFMT  format LTYPE input lines with LFMT",
+    "  LTYPE is 'old', 'new', or 'unchanged'.  GTYPE is LTYPE or 'changed'.",
+    "  GFMT may contain %< (lines from FILE1), %> (lines from FILE2),",
+    "    %= (lines common to both), %[-][WIDTH][.[PREC]]{doxX}LETTER with",
+    "    LETTER F, L, N, E or M for the new group's first and last line,",
+    "    count, F-1 and L+1 (lower case for the old group), and",
+    "    %(A=B?T:E) for T if A equals B else E",
+    "  LFMT may contain %L (the line), %l (without its newline) and",
+    "    %[-][WIDTH][.[PREC]]{doxX}n (its number)",
+    "  Both may contain %%, %c'C' and %c'\\OOO'",
     "-d, --minimal                 try hard to find a smaller set of changes",
     "    --horizon-lines=NUM       keep NUM lines of the common prefix and suffix",
     "    --speed-large-files       assume large files and many scattered small changes",
+    "    --color[=WHEN]            accepted; the output is never colored",
+    "    --palette=PALETTE         accepted; the output is never colored",
     "    --help                    display this help and exit",
     "-v, --version                 output version information and exit",
   ],
@@ -217,6 +238,9 @@ export const flagsForFuzzing: CommandFuzzInfo = {
     { flag: "-a", type: "boolean" },
     { flag: "-r", type: "boolean" },
     { flag: "-N", type: "boolean" },
+    { flag: "-y", type: "boolean" },
+    { flag: "-e", type: "boolean" },
+    { flag: "-n", type: "boolean" },
   ],
   needsArgs: true,
   minArgs: 2,
