@@ -33,7 +33,12 @@ export function compactSend(
   let lastSummarySeq = 0;
   let lastUser: Message | null = null;
   let hasAnswer = false;
+  // a fork at a later message of a turn keeps the earlier ones in a
+  // send with no reply, which is no turn to compact
+  let replied = false;
   for (const message of messages) {
+    if (message.kind === "user") replied = false;
+    else if (message.kind === "reply") replied = true;
     if (message.kind === "summary" && message.status === "done") {
       lastSummarySeq = message.seq;
       hasAnswer = false;
@@ -47,7 +52,7 @@ export function compactSend(
     }
     if (message.kind === "user") lastUser = message;
   }
-  if (!hasAnswer || lastUser === null) {
+  if (!hasAnswer || !replied || lastUser === null) {
     throw new BadRequest("nothing to compact");
   }
   deps.registry.admit(

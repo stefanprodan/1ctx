@@ -46,8 +46,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and seq, and each held to a message's bounds, a staged upload in one
   message only; the routes send a list of one. It takes each author by
   id and reads them as they are at the start: a missing or disabled
-  user is a 400, and every author must see the chat and write in its
-  project. The send counts against the first author and its policy is
+  user is a 400, one who must change their password a 403 as the router
+  gives, and every author must see the chat and write in its project. The send counts against the first author and its policy is
   theirs. On the
   wire each is its own user message with its author's `name`, since
   every wire is the OpenAI chat shape, which takes consecutive user
@@ -85,8 +85,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and lease and requires
   `bash` in the offered set. Inside `startSend`, after the session exists,
   the claim rechecks staging and current caps, merges the files in order
-  and writes the bounded `messages.uploads` record with each user message,
-  claimed in the turn's order.
+  and writes the bounded `messages.uploads` record with each user message.
+  A turn's messages are claimed in one call, in order, each against its
+  author, reading and writing the tree once (`UploadStore.claimTurn()`),
+  since each write upserts every file in it.
   A later throw rolls back the tree, staging and rows and frees the lock.
   User history appends `uploadsBlock()` from that record alone; a done
   summary gains `UPLOADS_SUMMARY_LINE` only from earlier user records.
@@ -315,4 +317,6 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   the wire's least effort (`EFFORTS[wire][0]`) for a model whose
   catalog says it always thinks (`thinkingRequired`), since a provider
   refuses Off there. History starts from the last done summary. Compact
-  on demand is a send of kind `compact` under the same runner lock.
+  on demand is a send of kind `compact` under the same runner lock; it
+  needs a done answer since the last summary and a reply after the last
+  user row, so a fork's unanswered messages are a 400.

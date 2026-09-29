@@ -61,6 +61,13 @@ export type StageInput = {
   result: KnowledgeUploadResult;
 };
 
+// one message's staged items, checked against its author
+export type UploadClaim = {
+  userId: string;
+  messageId: string;
+  ids: readonly string[];
+};
+
 export type RestageUploads = {
   userId: string;
   projectId: string;
@@ -175,55 +182,80 @@ export class UploadStore {
     caps: UploadCaps,
     now: number,
   ): MessageUpload[] {
-    const items = this.checked(userId, projectId, ids, now);
-    if (items.length === 0) return [];
+    return this.claimTurn(
+      projectId,
+      sessionId,
+      [{ userId, messageId, ids }],
+      caps,
+      now,
+    )[0]!;
+  }
+
+  // The messages of one turn in order, each by its author: the tree is
+  // read and written once, since each write upserts every file in it.
+  claimTurn(
+    projectId: string,
+    sessionId: string,
+    claims: readonly UploadClaim[],
+    caps: UploadCaps,
+    now: number,
+  ): MessageUpload[][] {
+    const staged = claims.map((claim) =>
+      this.checked(claim.userId, projectId, claim.ids, now),
+    );
+    const ids = claims.flatMap((claim) => claim.ids);
+    if (new Set(ids).size !== ids.length) throw new BadRequest(GONE);
+    if (ids.length === 0) return claims.map(() => []);
     const before = this.readStored(sessionId);
     const files = new Map(before.entries.map((file) => [file.name, file]));
-    const records: MessageUpload[] = [];
-    for (const [itemIndex, item] of items.entries()) {
-      const entries = this.db
-        .query<StagedFile, [string]>(
-          `select name, text, bytes from upload_staged_files
-           where upload_id = ? order by position`,
-        )
-        .all(item.id!);
-      for (const [position, file] of entries.entries()) {
-        const previous = files.get(file.name)?.bytes ?? 0;
-        if (file.bytes > caps.knowledgeFileBytes && file.bytes >= previous) {
-          throw new BadRequest(
-            `${skippedName(file.name)} is ${file.bytes} bytes, the limit is ${caps.knowledgeFileBytes}`,
-          );
+    const out = claims.map((claim, index) => {
+      const records: MessageUpload[] = [];
+      for (const [itemIndex, item] of staged[index]!.entries()) {
+        const entries = this.db
+          .query<StagedFile, [string]>(
+            `select name, text, bytes from upload_staged_files
+             where upload_id = ? order by position`,
+          )
+          .all(item.id!);
+        for (const [position, file] of entries.entries()) {
+          const previous = files.get(file.name)?.bytes ?? 0;
+          if (file.bytes > caps.knowledgeFileBytes && file.bytes >= previous) {
+            throw new BadRequest(
+              `${skippedName(file.name)} is ${file.bytes} bytes, the limit is ${caps.knowledgeFileBytes}`,
+            );
+          }
+          if (prefixConflict(file.name, files.keys()) !== null) {
+            throw new Conflict(
+              `${skippedName(file.name)} clashes with an uploaded file`,
+            );
+          }
+          files.set(file.name, {
+            ...file,
+            messageId: claim.messageId,
+            item: item.name,
+            archive: item.archive,
+            folder: item.folder,
+            createdAt: now,
+            itemIndex,
+            position,
+          });
         }
-        if (prefixConflict(file.name, files.keys()) !== null) {
-          throw new Conflict(
-            `${skippedName(file.name)} clashes with an uploaded file`,
-          );
-        }
-        files.set(file.name, {
-          ...file,
-          messageId,
-          item: item.name,
+        records.push({
+          name: item.name,
           archive: item.archive,
-          folder: item.folder,
-          createdAt: now,
-          itemIndex,
-          position,
+          ...totals(entries),
+          saved: entries.map((file) => file.name),
         });
       }
-      records.push({
-        name: item.name,
-        archive: item.archive,
-        ...totals(entries),
-        saved: entries.map((file) => file.name),
-      });
-    }
+      return boundRecord(records);
+    });
     const entries = [...files.values()];
     checkUploadTotals(before, totals(entries), caps);
     this.write(sessionId, before.revision + 1, entries);
     for (const id of ids) {
       this.db.query("delete from upload_staged where id = ?").run(id);
     }
-    return boundRecord(records);
+    return out;
   }
 
   read(sessionId: string): UploadTree {

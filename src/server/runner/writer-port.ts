@@ -19,13 +19,16 @@ import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
 export type UploadsPort = {
+  // one call for a turn, since each tree write upserts every file
   claimUploads(
-    userId: string,
     projectId: string,
     sessionId: string,
-    messageId: string,
-    ids: readonly string[],
-  ): MessageUpload[];
+    claims: readonly {
+      userId: string;
+      messageId: string;
+      ids: readonly string[];
+    }[],
+  ): MessageUpload[][];
 };
 
 export type SessionsPort = {

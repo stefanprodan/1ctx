@@ -129,7 +129,6 @@ export function groupRows(
 
   const nodes: Node[] = [];
   for (const [sendId, rows] of sends) {
-    // a turn may open with several user messages, each by its author
     const users = rows.filter((row) => row.kind === "user");
     for (const user of users) nodes.push({ kind: "user", message: user });
 

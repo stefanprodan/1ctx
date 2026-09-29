@@ -7,6 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { Forbidden } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   MAX_TURN_MESSAGES,
@@ -390,6 +391,96 @@ describe("a turn of several user messages", () => {
       await chat.app.shutdown();
     }
   });
+
+  test("refuses an author who must change their password, first or later", async () => {
+    const chat = await chatApp();
+    try {
+      const team = await teamChat(chat);
+      chat.app.db
+        .query("update users set must_change_password = 1 where id = ?")
+        .run(team.admin);
+      for (const turn of [
+        [
+          { userId: team.admin, message: "one" },
+          { userId: team.casey, message: "two" },
+        ],
+        [
+          { userId: team.casey, message: "one" },
+          { userId: team.admin, message: "two" },
+        ],
+      ]) {
+        expect(() => chat.app.runner.sendTurn(team.sessionId, turn)).toThrow(
+          new Forbidden("change your password first"),
+        );
+      }
+      expect(chat.app.sessions.messages(team.sessionId)).toHaveLength(2);
+      expect(chat.app.runner.registry.size).toBe(0);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test.each([
+    ["first", 200, 201],
+    ["second", 400, 400],
+    ["third", 400, 400],
+  ] as const)(
+    "a fork at the %s message of three compacts %d and regenerates %d",
+    async (at, compacted, regenerated) => {
+      const chat = await chatApp();
+      try {
+        const team = await teamChat(chat);
+        chat.app.runner.sendTurn(team.sessionId, [
+          { userId: team.casey, message: "first" },
+          { userId: team.admin, message: "second" },
+          { userId: team.casey, message: "third" },
+        ]);
+        (await waitScript(chat.scripted, 2)).reply("answer");
+        await settled(chat, team.sessionId);
+        const point = turnOf(chat, team.sessionId).find(
+          (row) => row.kind === "user" && row.content === at,
+        )!;
+        const forked = await chat.member.call(
+          "POST",
+          `/api/sessions/${team.sessionId}/fork`,
+          { body: { messageId: point.id, agentId: chat.agentId } },
+        );
+        expect(forked.status).toBe(201);
+        const fork = (await forked.json()).session.id as string;
+        // the fork ends with the messages before the point, unanswered
+        // unless the point opened its turn
+        const before = chat.app.sessions.messages(fork);
+        expect(before.at(-1)!.kind).toBe(at === "first" ? "reply" : "user");
+
+        const requests = chat.scripted.scripts.length;
+        const compact = await chat.member.call(
+          "POST",
+          `/api/sessions/${fork}/compact`,
+        );
+        expect(compact.status).toBe(compacted);
+        if (compacted === 200) {
+          (await waitScript(chat.scripted, requests + 1)).reply("summary");
+          await settled(chat, fork);
+        } else {
+          expect(await compact.json()).toEqual({ error: "nothing to compact" });
+        }
+        const asked = chat.scripted.scripts.length;
+        const regenerate = await chat.member.call(
+          "POST",
+          `/api/sessions/${fork}/regenerate`,
+        );
+        expect(regenerate.status).toBe(regenerated);
+        if (regenerated === 201) {
+          (await waitScript(chat.scripted, asked + 1)).reply("again");
+          await settled(chat, fork);
+        } else {
+          expect(chat.app.sessions.messages(fork)).toEqual(before);
+        }
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
 
   test("regenerate redoes the whole turn", async () => {
     const chat = await chatApp();

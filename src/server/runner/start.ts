@@ -30,7 +30,6 @@ export type Started = {
   previousMcpDigest: McpDigest | null;
 };
 
-// one user message a send writes, by its own author
 export type StartUser = {
   id: string;
   userId: string;
@@ -48,8 +47,6 @@ export type StartFields = {
   origin?: "chat" | "automation";
   automationId?: string | null;
   kind?: SendKind;
-  // the turn's user messages in order, or the rows a regenerate reuses
-  // with the name of the last one's author
   turn:
     | { users: readonly StartUser[] }
     | { existing: readonly Message[]; lastAuthor: string };
@@ -60,7 +57,6 @@ export type StartFields = {
   mcpDigest: McpDigest | null;
 };
 
-// the send row names the first message its turn opened with
 export const firstMessageId = (turn: StartFields["turn"]): string =>
   "users" in turn ? turn.users[0]!.id : turn.existing[0]!.id;
 
@@ -119,6 +115,22 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     let users: Message[];
     let lastAuthor: string;
     if ("users" in turn) {
+      const attaching = turn.users.filter((user) => user.uploads?.length);
+      const claimed =
+        attaching.length === 0
+          ? []
+          : deps.uploads.claimUploads(
+              policy.projectId,
+              base.id,
+              attaching.map((user) => ({
+                userId: user.userId,
+                messageId: user.id,
+                ids: user.uploads!,
+              })),
+            );
+      const records = new Map(
+        attaching.map((user, index) => [user.id, claimed[index]!]),
+      );
       users = turn.users.map((user) =>
         deps.sessions.addUserMessage({
           id: user.id,
@@ -126,15 +138,7 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
           sendId: send.id,
           userId: user.userId,
           content: user.text,
-          uploads: user.uploads?.length
-            ? deps.uploads.claimUploads(
-                user.userId,
-                policy.projectId,
-                base.id,
-                user.id,
-                user.uploads,
-              )
-            : null,
+          uploads: records.get(user.id) ?? null,
           now,
         }),
       );

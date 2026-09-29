@@ -15,7 +15,7 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import { BadRequest, Conflict } from "../lib/errors.ts";
+import { BadRequest, Conflict, Forbidden } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -201,6 +201,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
     const user = deps.users.byId(userId);
     if (user === null) throw new BadRequest("the user is gone");
     if (user.disabled) throw new BadRequest("the user is disabled");
+    // as the router refuses every request of theirs
+    if (user.mustChangePassword) {
+      throw new Forbidden("change your password first");
+    }
     return user;
   };
   const principalOf = (user: UserRow): Principal => ({
@@ -290,8 +294,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     ...(uploads === undefined ? {} : { uploads }),
   });
 
-  // every author sees the chat and may write in its project; the turn
-  // counts against the first
   const continueChat = (
     sessionId: string,
     messages: readonly (SendMessageRequest & {

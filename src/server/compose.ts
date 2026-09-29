@@ -377,8 +377,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     uploads: {
       checkUploads: (userId, projectId, ids) =>
         knowledge.checkUploads(userId, projectId, ids),
-      claimUploads: (userId, projectId, sessionId, messageId, ids) =>
-        knowledge.claimUploads(userId, projectId, sessionId, messageId, ids),
+      claimUploads: (projectId, sessionId, claims) =>
+        knowledge.claimUploads(projectId, sessionId, claims),
     },
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
