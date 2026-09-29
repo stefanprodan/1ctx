@@ -24,7 +24,8 @@ describe("xargs command", () => {
     it("should handle empty input", async () => {
       const env = new Bash();
       const result = await env.exec('echo "" | xargs');
-      expect(result.stdout).toBe("");
+      // (1ctx) GNU xargs runs the command once when there is no item
+      expect(result.stdout).toBe("\n");
       expect(result.exitCode).toBe(0);
     });
   });

@@ -1756,13 +1756,25 @@
       "exit": 0
     },
     {
-      "name": "-I replaces in the command name too",
+      "name": "-I leaves the command name alone",
       "args": [
         "-I{}",
         "{}echo",
         "hi"
       ],
       "stdin": "x\n",
+      "stdout": "",
+      "exit": 127,
+      "error": true
+    },
+    {
+      "name": "the command name is not replaced",
+      "args": [
+        "-I{}",
+        "{}",
+        "x"
+      ],
+      "stdin": "echo\n",
       "stdout": "",
       "exit": 127,
       "error": true
