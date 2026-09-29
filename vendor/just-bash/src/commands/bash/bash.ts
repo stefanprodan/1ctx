@@ -173,11 +173,14 @@ async function executeScript(
   const result = nestedExec
     ? await nestedExec(scriptToRun, {
         env: positionalEnv,
+        // (1ctx) a child shell sees the exported environment, not the first shell's
+        replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
       })
     : await ctx.exec(scriptToRun, {
         env: positionalEnv,
+        replaceEnv: true,
         cwd: ctx.cwd,
         stdin: latin1FromBytes(ctx.stdin),
         stdinKind: "bytes",
