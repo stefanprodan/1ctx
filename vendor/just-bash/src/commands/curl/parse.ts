@@ -89,6 +89,7 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
     failSilently: false,
     followRedirects: true,
     verbose: false,
+    version: false,
   };
 
   let impliesPost = false;
@@ -294,6 +295,8 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
       options.writeOut = arg.slice(12);
     } else if (arg === "-v" || arg === "--verbose") {
       options.verbose = true;
+    } else if (arg === "-V" || arg === "--version") {
+      options.version = true;
     } else if (arg.startsWith("--") && arg !== "--") {
       return unknownOption("curl", arg);
     } else if (arg.startsWith("-") && arg !== "-") {
@@ -325,6 +328,9 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
             break;
           case "v":
             options.verbose = true;
+            break;
+          case "V":
+            options.version = true;
             break;
           case "G":
             options.getMode = true;

@@ -339,7 +339,8 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       // models check the version to pick mikefarah's syntax (1ctx)
       return {
         stdout:
-          "yq (just-bash) version 4, the syntax of https://github.com/mikefarah/yq/\n",
+          "yq (https://github.com/mikefarah/yq/) version v4.53.3 (just-bash, compatible)\n" +
+          "A sandboxed yq that answers as mikefarah's yq v4.53.3 does; see yq --help.\n",
         stderr: "",
         exitCode: 0,
       };

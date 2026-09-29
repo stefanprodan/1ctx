@@ -39,6 +39,7 @@ export const curlHelp: {
     "    --connect-timeout SECS  Connection timeout",
     "-w, --write-out FMT   Output format after completion",
     "-v, --verbose         Verbose output",
+    "-V, --version         Show version and exit",
     "    --help            Display this help and exit",
     "",
     "Note: Network access must be configured via BashEnv network option.",
