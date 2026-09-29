@@ -8,24 +8,56 @@ import type {
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../../types.js";
-import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
+import { showHelp } from "../help.js";
 import { utf8ByteLength } from "../printf/escapes.js";
+import { parseXargsArgs } from "./xargs-options.js";
 
+// (1ctx) every option GNU xargs 4.11 has, in its words
 const xargsHelp = {
   name: "xargs",
   summary: "build and execute command lines from standard input",
-  usage: "xargs [OPTION]... [COMMAND [INITIAL-ARGS]]",
+  usage: "xargs [OPTION]... [COMMAND [INITIAL-ARGS]...]",
+  description: [
+    "Run COMMAND with arguments INITIAL-ARGS and more arguments read from",
+    "input, as GNU xargs 4.11 does. Items are separated by blanks and",
+    "newlines, and quotes and backslashes protect them.",
+  ],
   options: [
-    "-I REPLACE   replace occurrences of REPLACE with input",
-    "-d DELIM     use DELIM as input delimiter (e.g., -d '\\n' for newline)",
-    "-n NUM       use at most NUM arguments per command line",
-    "-P NUM       run at most NUM processes at a time",
-    "-0, --null   items are separated by null, not whitespace",
-    "-t, --verbose  print commands before executing",
-    "-r, --no-run-if-empty  do not run command if input is empty",
-    "    --help   display this help and exit",
+    "-0, --null               items are separated by a null, not whitespace",
+    "-a, --arg-file=FILE      read arguments from FILE, not standard input",
+    "-d, --delimiter=CHAR     items are separated by CHAR, not by whitespace",
+    "-E END                   stop at an input item END (not with -0 or -d)",
+    "-e, --eof[=END]          -E END, or no end string without END",
+    "-I R                     same as --replace=R",
+    "-i, --replace[=R]        replace R in INITIAL-ARGS with each input line",
+    "                           ({} without R)",
+    "-L, --max-lines=MAX      at most MAX non-blank input lines per command",
+    "-l[MAX]                  -L, one line without MAX",
+    "-n, --max-args=MAX       at most MAX arguments per command",
+    "-o, --open-tty           needs a terminal, which the sandbox has none of",
+    "-P, --max-procs=MAX      run at most MAX commands at a time (at most 16)",
+    "-p, --interactive        needs a terminal, which the sandbox has none of",
+    "    --process-slot-var=VAR  set VAR to the command's slot",
+    "-r, --no-run-if-empty    run nothing when there is no item",
+    "-s, --max-chars=MAX      at most MAX bytes per command line",
+    "    --show-limits        show the command-line limits",
+    "-t, --verbose            print each command on stderr before it runs",
+    "-x, --exit               exit when a command line exceeds -s",
+    "    --help               display this help and exit",
+    "    --version            output version information and exit",
+  ],
+  notes: [
+    "Exit status: 0, 123 when a command exits 1 to 254, 124 when one exits",
+    "255, 126 when it cannot run, 127 when it is not found, 1 for an error.",
   ],
 };
+
+/** (1ctx) The most commands -P runs at once in the sandbox. */
+const MAX_PARALLEL = 16;
+
+const XARGS_VERSION =
+  "xargs (GNU findutils) 4.11.0 (just-bash, compatible)\n" +
+  "A sandboxed xargs that answers as GNU xargs 4.11.0 does; see xargs --help.\n";
 
 function splitExactBounded(
   input: string,
@@ -82,94 +114,30 @@ export const xargsCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
-      return showHelp(xargsHelp);
+    const parsed = parseXargsArgs(args);
+    if (parsed.kind === "error") return parsed.result;
+    if (parsed.kind === "help") return showHelp(xargsHelp);
+    if (parsed.kind === "version") {
+      return { stdout: XARGS_VERSION, stderr: "", exitCode: 0 };
     }
-
-    let replaceStr: string | null = null;
-    let delimiter: string | null = null;
-    let maxArgs: number | null = null;
-    let maxProcs: number | null = null;
-    let nullSeparator = false;
-    let verbose = false;
-    let noRunIfEmpty = false;
-    let commandStart = 0;
-
-    // Parse xargs options
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === "-I" && i + 1 < args.length) {
-        replaceStr = args[++i];
-        commandStart = i + 1;
-      } else if (arg === "-d" && i + 1 < args.length) {
-        // Parse delimiter - handle escape sequences like \n, \t
-        const delimArg = args[++i];
-        delimiter = delimArg
-          .replace(/\\n/g, "\n")
-          .replace(/\\t/g, "\t")
-          .replace(/\\r/g, "\r")
-          .replace(/\\0/g, "\0")
-          .replace(/\\\\/g, "\\");
-        commandStart = i + 1;
-      } else if (arg === "-n" && i + 1 < args.length) {
-        const value = args[++i];
-        const parsedNumber = Number(value);
-        if (
-          !/^\d+$/.test(value) ||
-          !Number.isSafeInteger(parsedNumber) ||
-          parsedNumber < 1
-        ) {
-          return {
-            stdout: "",
-            stderr: `xargs: invalid number for -n: '${value}'\n`,
-            exitCode: 1,
-          };
-        }
-        maxArgs = parsedNumber;
-        commandStart = i + 1;
-      } else if (arg === "-P" && i + 1 < args.length) {
-        const value = args[++i];
-        const parsedNumber = Number(value);
-        if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsedNumber)) {
-          return {
-            stdout: "",
-            stderr: `xargs: invalid number for -P: '${value}'\n`,
-            exitCode: 1,
-          };
-        }
-        maxProcs = parsedNumber;
-        commandStart = i + 1;
-      } else if (arg === "-0" || arg === "--null") {
-        nullSeparator = true;
-        commandStart = i + 1;
-      } else if (arg === "-t" || arg === "--verbose") {
-        verbose = true;
-        commandStart = i + 1;
-      } else if (arg === "-r" || arg === "--no-run-if-empty") {
-        noRunIfEmpty = true;
-        commandStart = i + 1;
-      } else if (arg.startsWith("--")) {
-        return unknownOption("xargs", arg);
-      } else if (arg.startsWith("-") && arg.length > 1) {
-        // Check for unknown short options (only boolean flags allowed in combined form)
-        for (const c of arg.slice(1)) {
-          if (!"0tr".includes(c)) {
-            return unknownOption("xargs", `-${c}`);
-          }
-        }
-        // Handle combined short options
-        if (arg.includes("0")) nullSeparator = true;
-        if (arg.includes("t")) verbose = true;
-        if (arg.includes("r")) noRunIfEmpty = true;
-        commandStart = i + 1;
-      } else if (!arg.startsWith("-")) {
-        commandStart = i;
-        break;
-      }
-    }
+    const options = parsed.options;
+    const replaceStr = options.replace;
+    const delimiter = options.mode === "delimiter" ? options.delimiter : null;
+    const maxArgs = options.maxArgs;
+    // (1ctx) at most 16 at once, -P 0 included, each through ctx.exec
+    const maxProcs = Math.min(
+      options.maxProcs === 0 ? MAX_PARALLEL : options.maxProcs,
+      MAX_PARALLEL,
+    );
+    const nullSeparator = options.mode === "null";
+    const verbose = options.verbose;
+    const noRunIfEmpty = options.noRunIfEmpty;
+    const warnings = options.warnings
+      .map((w) => `xargs: warning: ${w}\n`)
+      .join("");
 
     // Get command and initial args
-    const command = args.slice(commandStart);
+    const command = [...options.command];
     if (command.length === 0) {
       command.push("echo");
     }
@@ -190,12 +158,6 @@ export const xargsCommand: RuntimeCommand = {
       throw new ExecutionLimitError(
         `xargs: input size limit exceeded (${maxStringLength} bytes)`,
         "string_length",
-      );
-    }
-    if (maxProcs !== null && maxProcs > maxArrayElements) {
-      throw new ExecutionLimitError(
-        `xargs: array element limit exceeded (${maxArrayElements})`,
-        "array_elements",
       );
     }
     let items: string[];
@@ -222,11 +184,11 @@ export const xargsCommand: RuntimeCommand = {
 
     if (items.length === 0) {
       if (noRunIfEmpty) {
-        return { stdout: "", stderr: "", exitCode: 0 };
+        return { stdout: "", stderr: warnings, exitCode: 0 };
       }
       // With no -r flag, still run the command with no args
       // (echo with no args just outputs newline)
-      return { stdout: "", stderr: "", exitCode: 0 };
+      return { stdout: "", stderr: warnings, exitCode: 0 };
     }
 
     // Execute commands
@@ -273,6 +235,7 @@ export const xargsCommand: RuntimeCommand = {
       if (value) stderrChunks.push(value);
       outputBytes += addedBytes;
     };
+    if (warnings) appendStderr(warnings);
 
     // Helper to quote an argument if it contains special characters
     const quoteArg = (arg: string): string => {
@@ -327,7 +290,7 @@ export const xargsCommand: RuntimeCommand = {
 
     // Helper to run commands with optional parallelism
     const runCommands = async (cmdArgsList: string[][]): Promise<void> => {
-      if (maxProcs !== null && maxProcs > 1) {
+      if (maxProcs > 1) {
         // Run in parallel batches
         for (let i = 0; i < cmdArgsList.length; i += maxProcs) {
           const batch = cmdArgsList.slice(i, i + maxProcs);

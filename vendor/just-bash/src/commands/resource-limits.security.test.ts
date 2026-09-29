@@ -61,17 +61,26 @@ describe("standalone command resource limits", () => {
     );
   });
 
+  // (1ctx) GNU xargs' words; it caps a huge -n instead of refusing it
   it.each([
-    "0",
-    "-1",
-    "nope",
-    "999999999999999999999999",
-  ])("rejects a non-positive or malformed xargs -n value (%s)", async (value) => {
+    ["0", "xargs: value 0 for -n option should be >= 1"],
+    ["-1", "xargs: value -1 for -n option should be >= 1"],
+    ["nope", 'xargs: invalid number "nope" for -n option'],
+  ])("rejects a non-positive or malformed xargs -n value (%s)", async (value, words) => {
     const bash = new Bash();
     const result = await bash.exec(`printf x | xargs -n ${value} echo`);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("xargs: invalid number for -n");
+    expect(result.stderr).toContain(words);
+  });
+
+  it("caps a huge xargs -n value", async () => {
+    const bash = new Bash();
+    const result = await bash.exec(
+      "printf x | xargs -n 999999999999999999999999 echo",
+    );
+
+    expect(result).toMatchObject({ stdout: "x\n", exitCode: 0 });
   });
 
   it("bounds xargs item arrays while tokenizing", async () => {
