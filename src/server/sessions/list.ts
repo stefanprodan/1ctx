@@ -47,7 +47,9 @@ function arm(
   };
 }
 
-// The cursor must not bring back an automation whose chosen run was passed.
+// A miss reads every retained run of each visible automation, so the
+// index carries the order and the title: the walk never leaves it. The
+// cursor applies after the choice, so a passed automation never returns.
 function newestRuns(
   projects: string,
   search: [string, string],
