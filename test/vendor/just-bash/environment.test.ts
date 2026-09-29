@@ -78,6 +78,19 @@ describe("TZ", () => {
     });
   }
 
+  test.each([
+    ["", "+0000"],
+    ["TZ=Asia/Tokyo; ", "+0000"],
+    ["export TZ=Not/AZone; ", "+0000"],
+    ["export TZ=Asia/Tokyo; export -n TZ; ", "+0000"],
+    ["TZ=Asia/Tokyo ", "+0900"],
+  ])("%sprintf's %%()T is UTC unless TZ is exported", async (set, offset) => {
+    const bash = new Bash({ cwd: "/" });
+    const result = await bash.exec(`${set}printf '%(%z %Z %H)T\\n' 0`);
+    expect(result.stdout.split(" ")[0]).toBe(offset);
+    if (offset === "+0000") expect(result.stdout).toBe("+0000 UTC 00\n");
+  });
+
   test("printf's %()T reads an exported TZ", async () => {
     const bash = new Bash({ cwd: "/" });
     const result = await bash.exec(
