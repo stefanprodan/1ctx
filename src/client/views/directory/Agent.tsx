@@ -132,13 +132,11 @@ function Prompt({ text }: { text: string }) {
   );
 }
 
-function InstructionsTab({ shown }: { shown: DirectoryAgentResponse }) {
+function PromptTab({ shown }: { shown: DirectoryAgentResponse }) {
   return (
     <>
       {shown.agent.prompt === "" ? (
-        <RowsNote>
-          No instructions. The model runs on its own defaults.
-        </RowsNote>
+        <RowsNote>No prompt. The model runs on its own defaults.</RowsNote>
       ) : (
         <Prompt key={shown.agent.id} text={shown.agent.prompt} />
       )}
@@ -214,7 +212,7 @@ function McpTab({
     return (
       <RowsNote>
         {shown.agent.model.tools
-          ? "No MCP servers."
+          ? "No MCP Servers."
           : "The model does not take tools."}
       </RowsNote>
     );
@@ -358,7 +356,7 @@ export function Agent({ params }: { params: Params }) {
                 tabs={<Tabs tabs={tabs} active={tabs[tab].href} head />}
                 hint={agentHint(shown, tab)}
               >
-                {tab === 0 && <InstructionsTab shown={shown} />}
+                {tab === 0 && <PromptTab shown={shown} />}
                 {tab === 1 && <ToolsTab shown={shown} />}
                 {tab === 2 && <SkillsTab shown={shown} now={now} />}
                 {tab === 3 && <McpTab shown={shown} now={now} />}

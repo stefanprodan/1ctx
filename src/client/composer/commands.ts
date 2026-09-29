@@ -22,7 +22,7 @@ export type Command = {
 export const COMMANDS: readonly Command[] = [
   {
     name: "compact",
-    text: "Free up context by summarizing the conversation",
+    text: "Free up context by summarizing the chat",
     arg: null,
   },
   {

@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One chat: the crumb is its project, the title its own and opens the
-// menu, Archive for every member, Rename and Delete for the chat's
-// owner and for an admin, as the server allows; /rename in the
-// composer changes the title; the transcript
-// flows down the page and the composer stays at the bottom of the
-// window in the transcript's foot. A fork names its source over the
+// One chat, or one run at /run with the same page: the crumb is its
+// project, the title its own and opens the menu, Archive for every
+// member, Rename and Delete for the chat's owner and for an admin, as
+// the server allows; /rename in the composer changes the title; the
+// transcript flows down the page and the composer stays at the bottom
+// of the window in the transcript's foot. A fork names its source over the
 // transcript. A run names its automation there and has no composer, no
 // Regenerate and no /compact: its foot is its state, with Stop while it
 // runs, and Fork waits until it is done or stopped. An archived chat
@@ -17,6 +17,7 @@
 // owns the entity, as it does when a chat moves to its fork.
 
 import { useEffect } from "preact/hooks";
+import type { SessionOrigin } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { archiveSession } from "../../data/archive.ts";
@@ -38,7 +39,13 @@ import {
   sessionError,
   stopSession,
 } from "../../data/sessions.ts";
-import { automationHref, chatHref, markdownHref } from "../../lib/hrefs.ts";
+import type { Failure } from "../../lib/format.ts";
+import {
+  automationHref,
+  chatHref,
+  markdownHref,
+  runHref,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
@@ -49,10 +56,31 @@ import { Menu } from "./Menu.tsx";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
 
-export function Chat({ params }: { params: Params }) {
+export const Chat = ({ params }: { params: Params }) => (
+  <SessionPage params={params} origin="chat" />
+);
+
+export const Run = ({ params }: { params: Params }) => (
+  <SessionPage params={params} origin="automation" />
+);
+
+// a chat opens only at /chat and a run only at /run, so a link to the
+// other page is refused as the server refuses an unknown id
+function SessionPage({
+  params,
+  origin,
+}: {
+  params: Params;
+  origin: SessionOrigin;
+}) {
   const id = params.id ?? "";
   const detail = session.value;
-  const shown = detail !== null && detail.session.id === id ? detail : null;
+  const held = detail !== null && detail.session.id === id ? detail : null;
+  const wrong = held !== null && held.session.origin !== origin;
+  const shown = wrong ? null : held;
+  const error: Failure | null = wrong
+    ? { words: origin === "chat" ? "no such chat" : "no such run", status: 404 }
+    : sessionError.value;
   useEffect(() => () => leaveSession(id), [id]);
   const projectId = shown?.session.projectId ?? null;
   const row = project.value;
@@ -103,7 +131,7 @@ export function Chat({ params }: { params: Params }) {
     <Page
       crumb={projectName}
       crumbHref={projectId === null ? undefined : `/projects/${projectId}`}
-      title={shown?.session.title ?? "Chat"}
+      title={shown?.session.title ?? (origin === "chat" ? "Chat" : "Run")}
       menu={
         shown !== null ? (
           <Menu
@@ -128,8 +156,8 @@ export function Chat({ params }: { params: Params }) {
           />
         ) : undefined
       }
-      loading={shown === null && sessionError.value === null}
-      error={sessionError.value}
+      loading={shown === null && error === null}
+      error={error}
       flush
     >
       {shown && (
@@ -143,7 +171,14 @@ export function Chat({ params }: { params: Params }) {
                   a deleted {from.origin === "automation" ? "run" : "chat"}
                 </span>
               ) : (
-                <a class="chat-run-link" href={chatHref(from.id)}>
+                <a
+                  class="chat-run-link"
+                  href={
+                    from.origin === "automation"
+                      ? runHref(from.id)
+                      : chatHref(from.id)
+                  }
+                >
                   {from.title}
                 </a>
               )}

@@ -368,9 +368,9 @@ client change. What each page draws is in `docs/views.md`.
 - **One helper per job, never a copy.** A chip's menu (open on a
   click, shut by a click outside or Escape, a pane's `back` first) is
   `useMenu()` in `lib/menu.ts`. An address is built in `lib/hrefs.ts`
-  (`chatHref()`, `automationHref()`, the user and agent pages); an
-  admin address is a `*_HREF` constant or a builder there, never a
-  literal in a view. The
+  (`chatHref()`, `runHref()`, `automationHref()`, the user and agent
+  pages); an admin address is a `*_HREF` constant or a builder there,
+  never a literal in a view. The
   browser's zone is `browserZone()` in `lib/zone.ts`. A form's picked
   ids compare with `sameIds()` and flip with `toggledId()` in
   `lib/ids.ts`. A text cut to its first lines is `cutLines()` in

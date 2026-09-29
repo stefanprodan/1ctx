@@ -33,7 +33,7 @@ import { AddPane } from "./AddPane.tsx";
 type Pane = "web" | "servers" | "skills";
 const PANES: Record<Pane, { title: string; icon: IconName }> = {
   web: { title: "Web access", icon: "globe" },
-  servers: { title: "MCP servers", icon: "mcp" },
+  servers: { title: "MCP Servers", icon: "mcp" },
   skills: { title: "Skills", icon: "skill" },
 };
 

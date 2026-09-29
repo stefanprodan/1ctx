@@ -142,7 +142,7 @@ export function agentTabHref(name: string, tab: number): string {
 export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
   const base = agentHref(name);
   return [
-    { label: "Instructions", href: base },
+    { label: "Prompt", href: base },
     { label: "Tools", href: `${base}/tools`, count: shown.tools.length },
     { label: "Skills", href: `${base}/skills`, count: shown.skills.length },
     { label: "MCP", href: `${base}/mcp`, count: shown.mcp.servers.length },

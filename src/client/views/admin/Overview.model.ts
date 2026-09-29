@@ -228,7 +228,7 @@ const ATTENTION: Record<
   },
   "mcp-key": {
     icon: "mcp",
-    what: "MCP server",
+    what: "MCP Server",
     line: "key file missing",
     href: configMcpHref,
   },
@@ -252,7 +252,7 @@ const ATTENTION: Record<
   },
   "mcp-refresh": {
     icon: "mcp",
-    what: "MCP server",
+    what: "MCP Server",
     line: "refresh failed",
     href: configMcpHref,
   },

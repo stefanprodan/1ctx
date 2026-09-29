@@ -5,7 +5,6 @@
 // and an agent alike as a handle: linked
 // where the line is not itself a link, as words where it is.
 
-import { chatHref } from "../../lib/hrefs.ts";
 import { RowsHandle } from "../../ui/Rows.tsx";
 import type { AuthorWords } from "./Knowledge.model.ts";
 import "./knowledge.css";
@@ -17,10 +16,10 @@ export function Author({ words }: { words: AuthorWords }) {
       <a class="knowledge-link" href={words.href}>
         <RowsHandle name={words.name} />
       </a>
-      {words.where !== null && words.sessionId !== null && (
+      {words.where !== null && words.whereHref !== null && (
         <>
           {" "}
-          <a class="knowledge-where" href={chatHref(words.sessionId)}>
+          <a class="knowledge-where" href={words.whereHref}>
             {words.where}
           </a>
         </>

@@ -205,9 +205,9 @@ test("what is failing counts the agent's own servers and skills", () => {
     ],
   );
   expect(counts).toEqual({ servers: 1, skills: 1 });
-  expect(failingLine(counts)).toBe("1 MCP server, 1 skill failing");
+  expect(failingLine(counts)).toBe("1 MCP Server, 1 skill failing");
   expect(failingLine({ servers: 5, skills: 3 })).toBe(
-    "5 MCP servers, 3 skills failing",
+    "5 MCP Servers, 3 skills failing",
   );
   expect(failingLine({ servers: 0, skills: 2 })).toBe("2 skills failing");
   expect(failingLine({ servers: 0, skills: 0 })).toBe("");

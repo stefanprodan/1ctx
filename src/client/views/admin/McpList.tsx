@@ -53,13 +53,13 @@ function List() {
       <Split aside={<Aside list={all} />}>
         <Rows>
           <RowsCard
-            label="MCP servers"
+            label="MCP Servers"
             search={<Search query={q} placeholder="Search servers" />}
             count={shownCount}
           >
             {all.length === 0 && (
               <RowsNote>
-                No MCP servers yet. New server takes a URL and lists its tools.
+                No MCP Servers yet. New server takes a URL and lists its tools.
               </RowsNote>
             )}
             {all.length > 0 && shown.length === 0 && (

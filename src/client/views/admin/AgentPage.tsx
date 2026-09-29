@@ -105,7 +105,7 @@ function Body({
               class="agent-page-bad-link"
               href={configAgentHref(agent.name, "mcp")}
             >
-              {pluralCommas(bad.servers, "MCP server", "MCP servers")}
+              {pluralCommas(bad.servers, "MCP Server", "MCP Servers")}
             </a>
           )}
           {bad.servers > 0 && bad.skills > 0 && ", "}

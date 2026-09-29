@@ -44,7 +44,7 @@
     color: var(--faint);
   }
 
-  /* the Instructions tab's row: the prompt, folded at its first lines,
+  /* the Prompt tab's row: the prompt, folded at its first lines,
      Show all in its fade */
   .directory-prompt {
     --clamp: 12;

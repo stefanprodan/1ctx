@@ -548,10 +548,10 @@ describe("the pages", () => {
       expect(html).toContain('</nav><span class="rows-hint cut">7 tokens<');
       // the card is named for the tab on screen
       expect(html).toContain(
-        '<section class="card rows-card" aria-label="Instructions">',
+        '<section class="card rows-card" aria-label="Prompt">',
       );
       expect(html).toContain(
-        'class="tabs-tab tabs-tab-on" href="/agents/coder" aria-current="page">Instructions<',
+        'class="tabs-tab tabs-tab-on" href="/agents/coder" aria-current="page">Prompt<',
       );
       expect(html).toContain(
         'href="/agents/coder/tools">Tools<span class="tabs-count">2<',
@@ -592,7 +592,7 @@ describe("the pages", () => {
 
     path.value = "/agents/coder/mcp";
     html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain("No MCP servers.");
+    expect(html).toContain("No MCP Servers.");
     // an empty tab has no hint
     expect(html).not.toContain("rows-hint");
     agentPage.value = {
@@ -640,7 +640,7 @@ describe("the pages", () => {
     agentDaysFailed.value = true;
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).not.toContain(">Activity<");
-    expect(html).toContain(">Instructions<");
+    expect(html).toContain(">Prompt<");
   });
 
   test.serial("Agent without tools says why", () => {
@@ -655,7 +655,7 @@ describe("the pages", () => {
       tools: [],
     };
     const html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain("No instructions.");
+    expect(html).toContain("No prompt.");
     expect(html).not.toContain("rows-hint");
     expect(html).toContain("Capabilities</span>reasoning<");
     agentPage.value = {
@@ -684,7 +684,7 @@ describe("the pages", () => {
 });
 
 describe("the agent page's words", () => {
-  test("a tab is found by its address, Instructions for any other", () => {
+  test("a tab is found by its address, Prompt for any other", () => {
     expect(agentTab("/agents/coder", "coder")).toBe(0);
     expect(agentTab("/agents/coder/tools", "coder")).toBe(1);
     expect(agentTab("/agents/coder/skills", "coder")).toBe(2);
@@ -697,7 +697,7 @@ describe("the agent page's words", () => {
     expect(
       agentTabs("coder", agent).map((t) => [t.label, t.href, t.count]),
     ).toEqual([
-      ["Instructions", "/agents/coder", undefined],
+      ["Prompt", "/agents/coder", undefined],
       ["Tools", "/agents/coder/tools", 2],
       ["Skills", "/agents/coder/skills", 1],
       ["MCP", "/agents/coder/mcp", 0],

@@ -13,7 +13,7 @@
 import { type ComponentChild, Fragment } from "preact";
 import type { StreamRow } from "../../shared/api/sessions.ts";
 import { count } from "../lib/format.ts";
-import { chatHref } from "../lib/hrefs.ts";
+import { sessionHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import {
   ATTENTION_WORDS,
@@ -52,7 +52,7 @@ export function Row({
   const archived = session.archived !== null;
   const attention = needsAttention(session);
   return (
-    <a class="stream-row" href={chatHref(session.id)}>
+    <a class="stream-row" href={sessionHref(session)}>
       <Icon
         name={iconOf(row)}
         class={`stream-icon ${archived ? "stream-icon-archived" : attention ? "status-attention" : `status-${session.status}`}`}

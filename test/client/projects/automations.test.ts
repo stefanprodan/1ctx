@@ -219,11 +219,9 @@ describe("the row's words", () => {
     expect(waitingSince(waiting, clock)).toBe(nine);
     expect(rowState(waiting, clock)).toEqual({
       bad: "failed 2h ago",
-      text: "waiting for a slot",
+      text: "waiting",
     });
-    expect(nextLine(waiting, clock)).toBe(
-      "Waiting for a free slot since 09:00",
-    );
+    expect(nextLine(waiting, clock)).toBe("Waiting since 09:00");
     expect(nextLine({ ...waiting, nextAt: clock + 2 * HOUR }, clock)).toBe(
       "Next run today 13:20, in 2h",
     );
@@ -231,7 +229,7 @@ describe("the row's words", () => {
       "Next run today 13:20, in 2h",
     );
     expect(nextLine({ ...waiting, nextAt: nine - 24 * HOUR }, clock)).toBe(
-      "Waiting for a free slot since Sun Sep 13 09:00",
+      "Waiting since Sun Sep 13 09:00",
     );
     // a fire the server is starting this moment, or a clock a few
     // seconds ahead, is not a wait

@@ -18,6 +18,8 @@ import {
 } from "../../../src/client/app/routes.ts";
 import { ZONES } from "../../../src/client/app/zones.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { session } from "../../../src/client/data/sessions.ts";
+import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 
 describe("the route table", () => {
   test("every path matches itself and no other route", () => {
@@ -134,6 +136,33 @@ describe("the route table's shape", () => {
   test("a malformed segment matches nothing", () => {
     const routes = [{ ...ROUTES[0], path: "/things/:id" }];
     expect(match("/things/%E0%A4%A", routes)).toBeNull();
+  });
+});
+
+describe("a session's page", () => {
+  test("a chat is at /chat and a run at /run", () => {
+    const chat = match("/chat/s1");
+    const run = match("/run/s1");
+    expect(chat?.route.title(chat.params)).toBe("Chat");
+    expect(run?.route.title(run.params)).toBe("Run");
+    expect(run?.params).toEqual({ id: "s1" });
+    expect(run?.route.view).toBe(match("/run/s2")?.route.view);
+  });
+
+  test.serial("each page refuses the other origin", async () => {
+    const Chat = match("/chat/s1")!.route.view;
+    const Run = match("/run/s1")!.route.view;
+    await Promise.all([Chat.load(), Run.load()]);
+    const detail = (origin: "chat" | "automation") =>
+      ({ session: { id: "s1", origin } }) as SessionDetail;
+    try {
+      session.value = detail("automation");
+      expect(render(<Chat params={{ id: "s1" }} />)).toContain("No such chat.");
+      session.value = detail("chat");
+      expect(render(<Run params={{ id: "s1" }} />)).toContain("No such run.");
+    } finally {
+      session.value = null;
+    }
   });
 });
 

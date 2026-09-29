@@ -80,6 +80,17 @@ export function chatHref(id: string): string {
   return `/chat/${encodeURIComponent(id)}`;
 }
 
+export function runHref(id: string): string {
+  return `/run/${encodeURIComponent(id)}`;
+}
+
+// a session's page by its origin: a chat at /chat, a run at /run
+export const sessionHref = (session: {
+  id: string;
+  origin: "chat" | "automation";
+}): string =>
+  session.origin === "automation" ? runHref(session.id) : chatHref(session.id);
+
 export function automationHref(id: string): string {
   return `/automations/${encodeURIComponent(id)}`;
 }

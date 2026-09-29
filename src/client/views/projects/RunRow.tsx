@@ -10,7 +10,7 @@ import { useSignal } from "@preact/signals";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
 import { stopSession } from "../../data/sessions.ts";
 import { says, stamp } from "../../lib/format.ts";
-import { chatHref } from "../../lib/hrefs.ts";
+import { runHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import {
   ATTENTION_WORDS,
@@ -53,7 +53,7 @@ export function RunRow({
   const share = took === null ? 0 : deadlineShare(took, deadlineMs);
   return (
     <RowsGo
-      href={chatHref(session.id)}
+      href={runHref(session.id)}
       end={
         running ? (
           <RowsEnd>

@@ -78,11 +78,14 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   menu (`menuStep()` knows which); Archive's button is primary, not
   red. A run's menu and an archived chat's have no Rename and no
   Archive (`menuItems()` in `Menu.model.ts`).
-- **A run's chat page.** A run's chat page names its automation over
-  the transcript and has no composer, no Regenerate and no `/compact`;
-  its foot is the state with Stop while it runs (`RunFoot.tsx`), and a
-  done run's length and its send's `tokens` (prompt plus completion over
-  its counted rounds, summed from `usage` by the send queries).
+- **A run's page.** A chat is at `/chat/:id` and a run at `/run/:id`,
+  one view titled Chat or Run; each shows the other origin as not
+  found, so every link picks its page by origin. A run's page names its
+  automation over the transcript and has no composer, no Regenerate
+  and no `/compact`; its foot is the state with Stop while it runs
+  (`RunFoot.tsx`), and a done run's length and its send's `tokens`
+  (prompt plus completion over its counted rounds, summed from `usage`
+  by the send queries).
 - **An archived chat.** An archived chat has the run's foot in the
   composer's place and no Regenerate: the archive icon, why it was
   archived and the day the delete limit removes it (`archivedLine()` in
@@ -175,7 +178,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   off", while the web is not on. Picking another agent keeps pending
   `credential:` flips; Home's composer moving to another project drops
   them.
-- **MCP servers and Skills are panes.** The fifth item, MCP servers, is
+- **MCP servers and Skills are panes.** The fifth item, MCP Servers, is
   there when the picked agent has an entry in `servers` of the same
   answer, held beside `switchable`. It says how many are on (`2 on`, `0
   on`, `onWords()`, as every pane item does) and swaps the menu's rows,
@@ -238,7 +241,7 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   and the price), the Activity card over its turns in every project as
   one series (`GET /api/directory/agents/:name/days?tz=`, loaded apart
   from the page, `ActivityGhost` until it lands, left out when its
-  first load fails), then the same tabbed card: Instructions (the
+  first load fails), then the same tabbed card: Prompt (the
   prompt, its foot the model's capabilities, "text only" for a model
   with neither tools nor reasoning), Tools, Skills and MCP at
   `/agents/:name`, `/tools`, `/skills` and `/mcp`, one view for the
@@ -382,10 +385,10 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   where the rail marks its project through `automationProject`.
 - **The automation page.** The page is the brief (schedule, zone, agent,
   the instructions cut to six lines with Show all, and at its foot the
-  next run, or "Waiting for a free slot since 09:00" while the row is
-  not suspended and its `nextAt` is past the page's clock by
-  `WAIT_GRACE_MS`, which the Automations tab's row says first as waiting
-  for a slot; no field carries it), then Suspend or Resume, Edit and Run
+  next run, or "Waiting since 09:00" while the row is not suspended
+  and its `nextAt` is past the page's clock by `WAIT_GRACE_MS`, which
+  the Automations tab's row says first as "waiting"; no field carries
+  it), then Suspend or Resume, Edit and Run
   now over two tabs: Runs, a log of `RunRow.tsx` rows with the source as
   a bare icon in the state's colour, no avatar disc (who pressed Run now
   its title), and the feed's line, the attention mark by the stream

@@ -187,9 +187,11 @@ describe("the knowledge words", () => {
       name: "sre",
       href: "/agents/sre",
       where: "in a run",
-      sessionId: "s1",
+      whereHref: "/run/s1",
     });
-    expect(authorOf({ ...byAgent, origin: "chat" }).where).toBe("in a chat");
+    const chat = authorOf({ ...byAgent, origin: "chat" });
+    expect(chat.where).toBe("in a chat");
+    expect(chat.whereHref).toBe("/chat/s1");
     const user = authorOf(byUser);
     expect(user.href).toBe("/users/casey");
     // a write from the page belongs to no session

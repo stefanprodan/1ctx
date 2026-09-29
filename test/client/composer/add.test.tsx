@@ -204,7 +204,7 @@ describe("the MCP servers pane", () => {
   test("is a back row, then a switch per server with its tools", () => {
     const html = render(
       <AddPane
-        title="MCP servers"
+        title="MCP Servers"
         icon="mcp"
         rows={[
           {

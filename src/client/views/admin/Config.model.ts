@@ -163,7 +163,7 @@ export function instanceLines(
     ...counted("Providers", lists.providers, PROVIDERS_HREF),
     ...counted("Agents", lists.agents, AGENTS_HREF),
     ...counted("Deciders", lists.deciders, DECIDERS_HREF),
-    ...counted("MCP servers", lists.servers, MCP_HREF),
+    ...counted("MCP Servers", lists.servers, MCP_HREF),
     ...counted("Skills", lists.skills, SKILLS_HREF),
     {
       label: "Visuals",

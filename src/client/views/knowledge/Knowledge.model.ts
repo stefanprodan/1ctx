@@ -14,7 +14,7 @@ import type {
   KnowledgeTotals,
 } from "../../../shared/contracts/knowledge.ts";
 import { ago, count, plural } from "../../lib/format.ts";
-import { agentHref, userHref } from "../../lib/hrefs.ts";
+import { agentHref, chatHref, runHref, userHref } from "../../lib/hrefs.ts";
 import type { IconName } from "../../lib/icons.tsx";
 import { FOLDER_ROWS, type TreeFolder } from "../../lib/tree.ts";
 import type { RowsTreeNode } from "../../ui/Rows.tsx";
@@ -86,7 +86,7 @@ export type AuthorWords = {
   name: string;
   href: string;
   where: string | null;
-  sessionId: string | null;
+  whereHref: string | null;
 };
 
 export function authorOf(author: KnowledgeAuthor): AuthorWords {
@@ -100,7 +100,12 @@ export function authorOf(author: KnowledgeAuthor): AuthorWords {
         : author.origin === "automation"
           ? "in a run"
           : "in a chat",
-    sessionId: author.sessionId,
+    whereHref:
+      author.sessionId === null
+        ? null
+        : author.origin === "automation"
+          ? runHref(author.sessionId)
+          : chatHref(author.sessionId),
   };
 }
 
