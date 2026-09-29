@@ -353,32 +353,46 @@ describe("awk output files and speed", () => {
     expect(await out.read("/w/out")).toBe(`${" ".repeat(94)}x`);
   });
 
-  test("10k files open in linear time", async () => {
-    const bash = new Bash({ cwd: "/w" });
+  // Runners differ in speed, so these compare a run against one a
+  // quarter its size: linear work grows about 4 times, the quadratic bugs
+  // grew 16.
+  const timed = async (bash: Bash, command: string) => {
     const started = performance.now();
-    const r = await bash.exec(
-      `seq 1 10000 | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`,
-    );
-    // a flush that walked every open file took seconds
-    expect(performance.now() - started).toBeLessThan(2_000);
+    const result = await bash.exec(command);
+    return [performance.now() - started, result] as const;
+  };
+
+  test("10k files open in linear time", async () => {
+    const files = (n: number) =>
+      `seq 1 ${n} | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`;
+    await new Bash({ cwd: "/w" }).exec(files(2_500));
+    const [quarter] = await timed(new Bash({ cwd: "/w" }), files(2_500));
+    const bash = new Bash({ cwd: "/w" });
+    const [full, r] = await timed(bash, files(10_000));
+    // a flush that walked every open file grew with their square
+    expect(full / quarter).toBeLessThan(8);
     expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
     expect(await bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
   });
 
   test("printf and print > f at 20k lines stay linear", async () => {
-    const bash = new Bash({
-      cwd: "/w",
-      executionLimits: { maxOutputSize: 10_000_000 },
-    });
-    const started = performance.now();
-    const out = await bash.exec(
-      `seq 1 20000 | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'`,
-    );
-    const file = await bash.exec(
-      `seq 1 20000 | awk '{ print "pod-" $1 > "out" }'`,
-    );
-    // quadratic, this took several seconds
-    expect(performance.now() - started).toBeLessThan(2_000);
+    const shell = () =>
+      new Bash({ cwd: "/w", executionLimits: { maxOutputSize: 10_000_000 } });
+    const printf = (n: number) =>
+      `seq 1 ${n} | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'`;
+    const print = (n: number) =>
+      `seq 1 ${n} | awk '{ print "pod-" $1 > "out" }'`;
+    const both = async (bash: Bash, n: number) => {
+      const [a, out] = await timed(bash, printf(n));
+      const [b, file] = await timed(bash, print(n));
+      return [a + b, out, file] as const;
+    };
+    await both(shell(), 5_000);
+    const [quarter] = await both(shell(), 5_000);
+    const bash = shell();
+    const [full, out, file] = await both(bash, 20_000);
+    // quadratic, the time grew with the square of the lines
+    expect(full / quarter).toBeLessThan(8);
     const lines = Array.from(
       { length: 20_000 },
       (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
