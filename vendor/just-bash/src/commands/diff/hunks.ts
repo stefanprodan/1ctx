@@ -72,7 +72,10 @@ export function hunksOf(
   };
   for (const change of changes) {
     const last = group[group.length - 1];
-    if (last && change.a0 - last.a1 > 2 * context) close();
+    // GNU joins an ignorable change to the hunk before it only within
+    // fewer lines than the context, a real one within twice the context
+    const limit = change.ignorable ? context - 1 : 2 * context;
+    if (last && change.a0 - last.a1 > limit) close();
     group.push(change);
   }
   close();

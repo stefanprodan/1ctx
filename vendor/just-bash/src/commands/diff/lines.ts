@@ -111,15 +111,20 @@ export function foldLine(line: string, folding: Folding): string {
   return key;
 }
 
-export function intern(a: Lines, b: Lines, folding: Folding): Interned {
-  const ids = new Map<string, number>();
-  const plain = !(
+/** Whether any option folds lines before they are compared. */
+export function folds(folding: Folding): boolean {
+  return !!(
     folding.ignoreCase ||
     folding.ignoreTabExpansion ||
     folding.ignoreTrailingSpace ||
     folding.ignoreSpaceChange ||
     folding.ignoreAllSpace
   );
+}
+
+export function intern(a: Lines, b: Lines, folding: Folding): Interned {
+  const ids = new Map<string, number>();
+  const plain = !folds(folding);
   const newlineFolds = foldsNewline(folding);
   const number = (file: Lines): Int32Array => {
     const out = new Int32Array(file.lines.length);

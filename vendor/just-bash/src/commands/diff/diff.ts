@@ -28,7 +28,7 @@ import { formatNormal } from "./format-normal.js";
 import { formatUnified } from "./format-unified.js";
 import { headerName, headerTime, shellName } from "./header.js";
 import { changesOf, hunksOf } from "./hunks.js";
-import { intern, splitLines } from "./lines.js";
+import { folds, intern, splitLines } from "./lines.js";
 import { type DiffOptions, DiffUsageError, parseDiffArgs } from "./options.js";
 import {
   anyPattern,
@@ -232,13 +232,16 @@ function compareFiles(
   if (a.bytes === b.bytes) return same();
   if (!o.text && (isBinary(a.bytes) || isBinary(b.bytes))) {
     return result(
-      text(o.brief ? `Files ${names} differ\n` : `Binary files ${names} differ\n`),
+      text(
+        o.brief ? `Files ${names} differ\n` : `Binary files ${names} differ\n`,
+      ),
       1,
     );
   }
   const la = splitLines(a.bytes, o.stripTrailingCr);
   const lb = splitLines(b.bytes, o.stripTrailingCr);
   const ids = intern(la, lb, o);
+  const raw = folds(o) ? intern(la, lb, {}) : null;
   const style = o.style ?? (o.showCFunction ? "context" : "normal");
   const context = style === "normal" ? 0 : (o.obsolete ?? o.context ?? 3);
   const comparison = compare(ids.a, ids.b, ids.count, {
@@ -247,6 +250,7 @@ function compareFiles(
     speedLargeFiles: o.speedLargeFiles,
     // the context shown is never left out of the search, as GNU keeps it
     horizon: Math.max(o.horizon, context),
+    raw: raw ? [raw.a, raw.b] : undefined,
   });
   const changes = changesOf(comparison);
   if (o.ignoreBlankLines || tests.matching) {
@@ -335,7 +339,8 @@ export const diffCommand: RuntimeCommand = {
       };
       const [first, second] = await operandPair(ctx, operands);
       const a = await readOperand(ctx, first);
-      const b = second === first && first === "-" ? a : await readOperand(ctx, second);
+      const b =
+        second === first && first === "-" ? a : await readOperand(ctx, second);
       return compareFiles(ctx, options, tests, a, b);
     } catch (error) {
       if (error instanceof Trouble || error instanceof DiffWorkLimitError) {

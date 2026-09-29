@@ -19,6 +19,9 @@ export interface CompareOptions {
   horizon?: number;
   /** steps after which the boxes left are taken whole, unless minimal */
   giveUp?: number;
+  /** the lines unfolded, for trimming the common head and tail on the
+   * bytes as GNU does */
+  raw?: [Int32Array, Int32Array];
   /** takes the steps spent; throws to stop the compare */
   charge: (steps: number) => void;
 }
@@ -51,13 +54,14 @@ export function compare(
   const m = b.length;
   const deleted = new Uint8Array(n);
   const inserted = new Uint8Array(m);
+  const [ra, rb] = options.raw ?? [a, b];
   let head = 0;
-  while (head < n && head < m && a[head] === b[head]) head++;
+  while (head < n && head < m && ra[head] === rb[head]) head++;
   let tail = 0;
   while (
     tail < n - head &&
     tail < m - head &&
-    a[n - 1 - tail] === b[m - 1 - tail]
+    ra[n - 1 - tail] === rb[m - 1 - tail]
   ) {
     tail++;
   }
@@ -99,7 +103,8 @@ export function compare(
       );
   search.run();
   for (let i = 0; i < sa.length; i++) if (search.deleted[i]) deleted[xs[i]] = 1;
-  for (let j = 0; j < sb.length; j++) if (search.inserted[j]) inserted[ys[j]] = 1;
+  for (let j = 0; j < sb.length; j++)
+    if (search.inserted[j]) inserted[ys[j]] = 1;
 
   // groups never slide into the common head and tail the search left out
   slide(a, deleted, inserted, x0, x1, options.charge);

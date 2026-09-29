@@ -104,6 +104,12 @@
     "exact2.md": "# exactly forty bytes of heading text 40\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
     "cut1.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nalt\n",
     "cut2.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
+    "s30blank": "line 1\nline 2\nline 3\nline 4\nZ\nline 6\nline 7\nline 8\n\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "s30blank2": "line 1\nline 2\nline 3\nline 4\nZ\nline 6\nline 7\nline 8\nline 9\nline 10\n\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "wa": " a\nc\n}\nb\nb\n",
+    "wb": " a\n}\nb \n",
+    "ia": "x\nA\nb\na\n",
+    "ib": "a\nb\nA\ny\n",
     "hd1": "alpha()\nx1\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\ny\n",
     "hd2": "beta()\nx1\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\nz\n",
     "al1": "a\nc\na\na\na\n",
@@ -2928,6 +2934,81 @@
         "b"
       ],
       "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "blank line just after a change",
+      "args": [
+        "-B",
+        "-u",
+        "s30",
+        "s30blank"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30blank\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,7 +2,7 @@\n line 2\n line 3\n line 4\n-line 5\n+Z\n line 6\n line 7\n line 8\n",
+      "exit": 1
+    },
+    {
+      "name": "blank line two lines after a change",
+      "args": [
+        "-B",
+        "-u",
+        "s30",
+        "s30blank2"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30blank2\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,7 +2,7 @@\n line 2\n line 3\n line 4\n-line 5\n+Z\n line 6\n line 7\n line 8\n",
+      "exit": 1
+    },
+    {
+      "name": "blank line after a change in context",
+      "args": [
+        "-B",
+        "-c",
+        "s30",
+        "s30blank"
+      ],
+      "stdout": "*** s30\t2026-09-29 12:52:48.311000000 +0000\n--- s30blank\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,8 ****\n  line 2\n  line 3\n  line 4\n! line 5\n  line 6\n  line 7\n  line 8\n--- 2,8 ----\n  line 2\n  line 3\n  line 4\n! Z\n  line 6\n  line 7\n  line 8\n",
+      "exit": 1
+    },
+    {
+      "name": "blank line after a change with one line",
+      "args": [
+        "-B",
+        "-U1",
+        "s30",
+        "s30blank"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30blank\t2026-09-29 12:52:48.311000000 +0000\n@@ -4,3 +4,3 @@\n line 4\n-line 5\n+Z\n line 6\n",
+      "exit": 1
+    },
+    {
+      "name": "common lines trimmed as bytes under -w",
+      "args": [
+        "-w",
+        "wa",
+        "wb"
+      ],
+      "stdout": "2d1\n< c\n5d3\n< b\n",
+      "exit": 1
+    },
+    {
+      "name": "common lines trimmed as bytes under -i",
+      "args": [
+        "-i",
+        "ia",
+        "ib"
+      ],
+      "stdout": "1d0\n< x\n4a4\n> y\n",
+      "exit": 1
+    },
+    {
+      "name": "common lines trimmed as bytes under -i unified",
+      "args": [
+        "-i",
+        "-u",
+        "ia",
+        "ib"
+      ],
+      "stdout": "--- ia\t2026-09-29 12:52:48.311000000 +0000\n+++ ib\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,4 @@\n-x\n A\n b\n a\n+y\n",
       "exit": 1
     },
     {
