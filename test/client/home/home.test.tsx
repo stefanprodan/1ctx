@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { notSent } from "../../../src/client/data/not-sent.ts";
 import { projects, projectsError } from "../../../src/client/data/projects.ts";
 import {
   homeProjectId,
@@ -227,6 +228,37 @@ describe("Home", () => {
       const picked = render(<Home />);
       expect(picked).toContain('placeholder="Send a message to platform"');
       expect(picked).toContain('class="composer-chip-name cut">platform<');
+    },
+  );
+
+  test.serial(
+    "the Not sent card sits between the composer and the feed",
+    () => {
+      notSent.value = [
+        {
+          id: "q1",
+          sessionId: "s1",
+          title: "Which pods restarted",
+          project: "personal",
+          agent: "assistant",
+          line: "and the logs too",
+          reason: "failed",
+          changedAt: Date.now(),
+        },
+      ];
+      try {
+        const html = render(<Home />);
+        const composer = html.indexOf('class="composer ');
+        const card = html.indexOf(">Not sent<");
+        const feed = html.indexOf('placeholder="Search sessions"');
+        expect(composer).toBeGreaterThan(-1);
+        expect(card).toBeGreaterThan(composer);
+        expect(feed).toBeGreaterThan(card);
+        expect(html).toContain("could not start");
+      } finally {
+        notSent.value = null;
+      }
+      expect(render(<Home />)).not.toContain(">Not sent<");
     },
   );
 

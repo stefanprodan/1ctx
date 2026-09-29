@@ -19,6 +19,18 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `MAX_LAST_LINE`). Home and a project's Feed tab are one
   `views/home/Feed.tsx`: the stream under the composer, its search and
   filter on the address, and `startChat()` for the composer's send.
+- **Home's Not sent card.** Between Home's composer and the feed,
+  `views/home/NotSent.tsx` shows the user's messages that were not
+  sent, only while there is one: a `RowsCard` titled Not sent with its
+  count and `RowsAction` Discard all in the head (no ask), and a
+  `stream/NotSentRow.tsx` per message in the feed row's shape (the chat
+  icon in the failed colour, the first line, `#project · @agent` and
+  the short reason, when it turned) leading to its chat. `GET
+  /api/me/not-sent` is read by Home's load and after Discard all, never
+  through the feed. While the card is mounted (`watchNotSent()`), an
+  envelope without rows for a chat it lists, or for one where this tab
+  saw a message of the user's wait (`noteWaits()`), reads it again
+  through one `Flight`, so a burst costs one trailing read.
 - **Pages by cursor.** A page is `STREAM_LIMIT`, 50 rows: the server
   reads one more and answers `next`, the cursor of the last row sent,
   or null. `sessions/cursor.ts` holds both shapes, the stream's
