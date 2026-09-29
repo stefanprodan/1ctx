@@ -6,8 +6,8 @@
 // the scratch it mounted. Rows go with the session, or idle, by sweep.
 
 import type { Db } from "../db/index.ts";
-import { heldSessions } from "../knowledge/queue.ts";
 import { Conflict } from "../lib/errors.ts";
+import { heldSessions } from "./queue.ts";
 
 export type ScratchFile = {
   path: string;

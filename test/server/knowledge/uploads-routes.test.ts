@@ -7,7 +7,10 @@ import {
   KNOWLEDGE_COMMANDS_IN_FLIGHT,
   MAX_ARCHIVE_UPLOAD,
 } from "../../../src/server/knowledge/limits.ts";
-import { acquire, acquireUpload } from "../../../src/server/knowledge/queue.ts";
+import {
+  acquireProcess,
+  acquireUpload,
+} from "../../../src/server/knowledge/queue.ts";
 import { stage } from "../../../src/server/knowledge/stage.ts";
 import { Conflict } from "../../../src/server/lib/errors.ts";
 import { setup } from "./helpers.ts";
@@ -16,7 +19,7 @@ import { setupUploads, staged, stalledBody } from "./uploads-helpers.ts";
 async function holdSlots(count = KNOWLEDGE_COMMANDS_IN_FLIGHT) {
   const releases: (() => void)[] = [];
   for (let i = 0; i < count; i++) {
-    releases.push(await acquire(new AbortController().signal));
+    releases.push(await acquireProcess(new AbortController().signal));
   }
   return releases;
 }
@@ -312,7 +315,7 @@ test.serial(
     let probeRelease: (() => void) | undefined;
     try {
       await body.started;
-      probe = acquire(probeStop.signal).then((release) => {
+      probe = acquireProcess(probeStop.signal).then((release) => {
         probeRelease = release;
       });
       s.app.now.value += ARCHIVE_DEADLINE_MS;

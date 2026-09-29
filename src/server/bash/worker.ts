@@ -13,7 +13,6 @@
 // compile root, so compose.ts builds it and passes it in.
 
 import type { SecureFetch } from "just-bash";
-import { CANCEL_GRACE_MS } from "../knowledge/limits.ts";
 import type { Log } from "../lib/log.ts";
 import {
   type Answer,
@@ -63,6 +62,10 @@ export type CommandWorkers = {
   // shutdown: every running job's worker ended
   close(): void;
 };
+
+// a cancelled command's moment to stop on its own before its worker is
+// ended
+export const CANCEL_GRACE_MS = 500;
 
 const SHUTTING_DOWN = "the server is shutting down";
 const KEPT_FAILED = "the kept file could not be read";

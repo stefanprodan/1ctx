@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
+import { KNOWLEDGE_COMMANDS } from "../../../src/server/bash/commands.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {

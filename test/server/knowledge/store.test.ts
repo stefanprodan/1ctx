@@ -3,8 +3,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { getCommandNames } from "just-bash";
+import { KNOWLEDGE_COMMANDS } from "../../../src/server/bash/commands.ts";
 import { transact } from "../../../src/server/db/index.ts";
-import { KNOWLEDGE_COMMANDS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { Conflict, NotFound } from "../../../src/server/lib/errors.ts";
 import { sha256 } from "../../../src/server/lib/ids.ts";

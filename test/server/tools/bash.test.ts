@@ -7,10 +7,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  acquire,
   acquireSession,
   heldSessions,
-} from "../../../src/server/knowledge/queue.ts";
+} from "../../../src/server/bash/queue.ts";
+import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import {
@@ -146,7 +146,7 @@ describe("bash", () => {
       ctx.budget.bashCalls = 1;
       const registry = new Registry([makeBashTool(s.area)]);
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquire(freshSignal())),
+        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
       );
       let releaseSession: (() => void) | undefined;
       try {

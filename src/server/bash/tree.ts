@@ -6,9 +6,12 @@
 // the read-only trees, and the cwd the next command starts in.
 
 import type { BashOptions, InMemoryFs } from "just-bash";
-import { checkFile, checkNames } from "../knowledge/check.ts";
-import { parseName } from "../knowledge/parse.ts";
-import { textFromBytes } from "../knowledge/text.ts";
+import {
+  checkFile,
+  checkNames,
+  parseName,
+  textFromBytes,
+} from "../knowledge/index.ts";
 import { INTERPRETER_MARGIN_MS } from "./commands.ts";
 import { underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";

@@ -7,7 +7,7 @@ import {
   KNOWLEDGE_COMMANDS_IN_FLIGHT,
   MAX_ARCHIVE_UPLOAD,
 } from "../../../src/server/knowledge/limits.ts";
-import { acquire } from "../../../src/server/knowledge/queue.ts";
+import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { serve } from "../../../src/server/web/serve.ts";
 import type { KnowledgeUploadResult } from "../../../src/shared/contracts/knowledge.ts";
 import page from "../../fixtures/body.html";
@@ -141,7 +141,7 @@ function stalledBody() {
 async function holdSlots(count = KNOWLEDGE_COMMANDS_IN_FLIGHT) {
   const slots: (() => void)[] = [];
   for (let i = 0; i < count; i++) {
-    slots.push(await acquire(new AbortController().signal));
+    slots.push(await acquireProcess(new AbortController().signal));
   }
   return slots;
 }
@@ -418,7 +418,7 @@ test.serial(
     let probeRelease: (() => void) | undefined;
     try {
       await body.started;
-      probe = acquire(probeStop.signal).then((release) => {
+      probe = acquireProcess(probeStop.signal).then((release) => {
         probeRelease = release;
       });
       s.app.now.value += ARCHIVE_DEADLINE_MS;

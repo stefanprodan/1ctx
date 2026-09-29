@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { MAX_OPENS_PER_COMMAND } from "../../../src/server/knowledge/limits.ts";
+import { MAX_OPENS_PER_COMMAND } from "../../../src/server/bash/commands.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 import { afterMountRead, callCaps, run, setup } from "../knowledge/helpers.ts";
 

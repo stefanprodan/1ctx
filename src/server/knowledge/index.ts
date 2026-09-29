@@ -29,12 +29,13 @@ export type { CommandEnd } from "../bash/protocol.ts";
 
 import { startKept } from "../bash/kept.ts";
 import { type CommandCaps, type CommandResult, run } from "../bash/mount.ts";
+import { heldSessions } from "../bash/queue.ts";
 import { ScratchStore } from "../bash/scratch.ts";
 import { commandWorkers } from "../bash/worker.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
+import { commitKnowledge } from "./commit.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { parseName, parseText } from "./parse.ts";
-import { heldSessions } from "./queue.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { oneAtATime, search } from "./search.ts";
@@ -207,9 +208,13 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       run(
         {
           db: deps.db,
-          store,
+          knowledge: {
+            mountedDocs: (projectId) => store.mounted(projectId),
+            mountedUploads: (sessionId) => uploads.mounted(sessionId),
+            commitDocs: (projectId, author, changes, caps, now) =>
+              commitKnowledge(store, projectId, author, changes, caps, now),
+          },
           scratch,
-          uploads,
           clock: deps.clock,
           workers,
           current: () => deps.limits.current(),
@@ -427,9 +432,24 @@ export {
   type ScratchFile,
   ScratchStore,
 } from "../bash/scratch.ts";
-export { checkFile, checkNames, checkTotals } from "./check.ts";
-export { type KnowledgeRow, KnowledgeStore } from "./store.ts";
 export {
+  checkFile,
+  checkNames,
+  checkTotals,
+  checkUsage,
+} from "./check.ts";
+export type { Change } from "./commit.ts";
+export { languageOf } from "./languages.ts";
+export { parseName } from "./parse.ts";
+export { acquireProcess } from "./queue.ts";
+export {
+  type KnowledgeRow,
+  KnowledgeStore,
+  type MountedDoc,
+} from "./store.ts";
+export { lineCount, textFromBytes } from "./text.ts";
+export {
+  type MountedUploads,
   type RestageUploads,
   type UploadFile,
   UploadStore,

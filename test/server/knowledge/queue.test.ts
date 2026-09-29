@@ -3,10 +3,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  acquire,
   acquireSession,
   heldSessions,
-} from "../../../src/server/knowledge/queue.ts";
+} from "../../../src/server/bash/queue.ts";
+import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { callCaps, freshSignal, run, scratchState, setup } from "./helpers.ts";
 
 describe("command admission", () => {
@@ -81,7 +81,7 @@ describe("command admission", () => {
     async () => {
       const s = setup();
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquire(freshSignal())),
+        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
       );
       const controller = new AbortController();
       const canceled = run(
@@ -171,7 +171,7 @@ describe("command admission", () => {
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
         for (let i = 0; i < 4; i++)
-          slots.push(await acquire(AbortSignal.timeout(1000)));
+          slots.push(await acquireProcess(AbortSignal.timeout(1000)));
         for (const release of slots) release();
         s.area.store.mounted = read;
         expect((await run(s, "true")).error).toBe(false);
@@ -190,7 +190,7 @@ describe("command admission", () => {
       expect((await run(s, "echo kept > /tmp/file")).error).toBe(false);
       const before = scratchState(s);
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquire(freshSignal())),
+        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
       );
       const controller = new AbortController();
       const pending = run(s, "true", callCaps, controller.signal);

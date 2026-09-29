@@ -12,13 +12,16 @@ import type {
 } from "../../shared/contracts/knowledge.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { Db } from "../db/index.ts";
-import { type Change, commit } from "../knowledge/commit.ts";
-import { acquire, acquireSession } from "../knowledge/queue.ts";
-import type { KnowledgeStore } from "../knowledge/store.ts";
-import type { UploadStore } from "../knowledge/uploads.ts";
+import {
+  acquireProcess,
+  type Change,
+  type MountedDoc,
+  type MountedUploads,
+} from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { COMMAND_ITERATIONS } from "./commands.ts";
+import { type CommitDocs, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
 import {
@@ -34,6 +37,7 @@ import type {
   CommandEnd,
   CommandPhase,
 } from "./protocol.ts";
+import { acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import type { CommandWorkers } from "./worker.ts";
 
@@ -62,11 +66,17 @@ export type CommandResult = {
   // stores a row's fields by name, so it never reaches one
   ended?: CommandEnd;
 };
+// what a command reads and writes of the docs and uploads, bound to
+// knowledge's stores
+export type KnowledgePort = {
+  mountedDocs(projectId: string): MountedDoc[];
+  mountedUploads(sessionId: string): MountedUploads;
+  commitDocs: CommitDocs;
+};
 type MountDeps = {
   db: Db;
-  store: KnowledgeStore;
+  knowledge: KnowledgePort;
   scratch: ScratchStore;
-  uploads: UploadStore;
   clock: Clock;
   workers: CommandWorkers;
   current(): KnowledgeCaps;
@@ -136,15 +146,15 @@ export async function run(
   };
   try {
     releaseSession = await acquireSession(sessionId, combined);
-    release = await acquire(combined);
+    release = await acquireProcess(combined);
     combined.throwIfAborted();
     phase = "mount";
     const storage = deps.current();
     const docs = caps.knowledge;
-    const rows = docs ? deps.store.mounted(projectId) : [];
+    const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
     const scratch = deps.scratch.read(sessionId);
     const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
-    const uploads = deps.uploads.mounted(sessionId);
+    const uploads = deps.knowledge.mountedUploads(sessionId);
     const kept = listKept(deps.db, sessionId);
     const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
     // A lowered cap still permits deleting or shrinking the mounted base.
@@ -262,7 +272,12 @@ export async function run(
     phase = "commit";
     combined.throwIfAborted();
     const printed = commit(
-      deps,
+      {
+        db: deps.db,
+        scratch: deps.scratch,
+        commitDocs: deps.knowledge.commitDocs,
+        current: deps.current,
+      },
       projectId,
       author,
       changes,

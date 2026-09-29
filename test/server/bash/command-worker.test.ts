@@ -9,11 +9,12 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/bash/protocol.ts";
+import { heldSessions } from "../../../src/server/bash/queue.ts";
 import {
   type CommandHooks,
   commandWorkers,
 } from "../../../src/server/bash/worker.ts";
-import { acquire, heldSessions } from "../../../src/server/knowledge/queue.ts";
+import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import {
@@ -279,7 +280,7 @@ describe("the command worker", () => {
         expect(heldSessions().has(s.session.id)).toBe(false);
         const slots: (() => void)[] = [];
         for (let i = 0; i < 4; i++)
-          slots.push(await acquire(AbortSignal.timeout(1000)));
+          slots.push(await acquireProcess(AbortSignal.timeout(1000)));
         for (const release of slots) release();
       } finally {
         s.db.close();
