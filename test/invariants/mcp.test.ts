@@ -8,11 +8,17 @@
 
 import { describe, expect, test } from "bun:test";
 import { sha256 } from "../../src/server/lib/ids.ts";
+import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import type { McpServerSummary } from "../../src/shared/contracts/mcp.ts";
 import { offeredServers, promptSnapshot } from "../../src/shared/mcp.ts";
-import { fakeFetch, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import {
+  collectLogs,
+  fakeFetch,
+  PROVIDER_URL,
+  testApp,
+} from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
 import { fixture, mcpFetch, type RecordedMcp } from "../server/mcp/fake.ts";
@@ -382,6 +388,7 @@ async function sendFixture(options: {
   mode?: "all" | "catalog" | "auto";
   timeoutMs?: number | null;
   wrap?: (fetcher: typeof fetch) => typeof fetch;
+  logFactory?: LogFactory;
 }) {
   const flux = mcpFetch({
     recorded: await fixture("flux"),
@@ -389,6 +396,7 @@ async function sendFixture(options: {
   });
   const chat = await chatApp({
     fetcher: options.wrap?.(flux.fetcher) ?? flux.fetcher,
+    logFactory: options.logFactory,
   });
   const { server } = await (
     await chat.admin.call("POST", "/api/mcp", {
@@ -537,11 +545,13 @@ describe("MCP tools in a send", () => {
   });
 
   test("records an MCP isError answer as a failed tool row", async () => {
+    const logs = collectLogs();
     const { chat } = await sendFixture({
       callResult: {
         content: [{ type: "text", text: "flux refused the call" }],
         isError: true,
       },
+      logFactory: logs.logFactory,
     });
     const started = await startChat(chat);
     started.script.toolRound([
@@ -563,6 +573,13 @@ describe("MCP tools in a send", () => {
     expect(row?.content).toContain("flux refused the call");
     answer.reply("handled");
     await waitDone(chat.app, started.sessionId);
+    // the server's words are the model's; the log keeps a fixed phrase
+    expect(
+      logs.events.filter((event) => event.msg === "tool failed"),
+    ).toMatchObject([
+      { fields: { tool: "mcp:flux", error: "MCP tool answered an error" } },
+    ]);
+    expect(JSON.stringify(logs.events)).not.toContain("flux refused");
   });
 
   test("catalog mode describes and validates calls without changing its tools", async () => {

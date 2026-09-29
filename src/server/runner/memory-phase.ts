@@ -230,7 +230,8 @@ async function runCalls(
       };
     }
     if (result.error) {
-      const tool = deps.tools.toolName?.(offered, call) ?? call.name;
+      // a closed name: the model may call any name at all
+      const tool = deps.tools.logName?.(offered, call) ?? "unknown";
       deps.log.warn("tool failed", {
         chat: send.sessionId,
         tool,
@@ -299,6 +300,7 @@ export type MemoryPhaseDeps = PhaseRowsDeps & {
       ctx: ToolContext,
     ): Promise<ToolResult>;
     toolName?(offered: Offered, call: ToolCall): string;
+    logName?(offered: Offered, call: ToolCall): string;
   };
   log: Log;
   historyOf(send: ActiveSend): Message[];

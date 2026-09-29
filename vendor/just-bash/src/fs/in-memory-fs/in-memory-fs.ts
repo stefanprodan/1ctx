@@ -33,7 +33,6 @@ import {
   MAX_SYMLINK_DEPTH,
   normalizePath,
   resolvePath,
-  resolveSymlinkTarget,
   SYMLINK_MODE,
   validatePath,
 } from "../path-utils.js";
@@ -566,47 +565,7 @@ export class InMemoryFs implements IFileSystem {
    * Used by lstat which should not follow the final symlink.
    */
   private resolveIntermediateSymlinks(path: string): string {
-    const normalized = normalizePath(path);
-    if (normalized === "/") return "/";
-    // (1ctx) no symlink in the tree, nothing to resolve
-    if (this.symlinks === 0) return normalized;
-
-    const parts = normalized.slice(1).split("/");
-    if (parts.length <= 1) return normalized; // No intermediate components
-
-    let resolvedPath = "";
-    const seen = new Set<string>();
-
-    // Process all but the last component
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i];
-      resolvedPath = `${resolvedPath}/${part}`;
-
-      let entry = this.data.get(resolvedPath);
-      let loopCount = 0;
-      const maxLoops = MAX_SYMLINK_DEPTH;
-
-      while (entry && entry.type === "symlink" && loopCount < maxLoops) {
-        if (seen.has(resolvedPath)) {
-          throw new Error(
-            `ELOOP: too many levels of symbolic links, lstat '${path}'`,
-          );
-        }
-        seen.add(resolvedPath);
-        resolvedPath = resolveSymlinkTarget(resolvedPath, entry.target);
-        entry = this.data.get(resolvedPath);
-        loopCount++;
-      }
-
-      if (loopCount >= maxLoops) {
-        throw new Error(
-          `ELOOP: too many levels of symbolic links, lstat '${path}'`,
-        );
-      }
-    }
-
-    // Append the final component without resolving
-    return `${resolvedPath}/${parts[parts.length - 1]}`;
+    return this.resolveComponents(path, false, "lstat");
   }
 
   /**
@@ -615,45 +574,55 @@ export class InMemoryFs implements IFileSystem {
    * would resolve to /home/user/subdir/file.txt
    */
   private resolvePathWithSymlinks(path: string): string {
+    return this.resolveComponents(path, true, "open");
+  }
+
+  /**
+   * (1ctx) Resolve a path one component at a time, as the kernel does: a
+   * link's target goes in front of the components still to resolve, so a
+   * target through another link resolves too, and `..` after a link climbs
+   * from where the link led. One count of links for the whole path, as
+   * MAX_SYMLINK_DEPTH; `followLast` false leaves the last name as it is.
+   */
+  private resolveComponents(
+    path: string,
+    followLast: boolean,
+    operation: string,
+  ): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
     // (1ctx) no symlink in the tree, nothing to resolve
     if (this.symlinks === 0) return normalized;
 
-    const parts = normalized.slice(1).split("/");
-    let resolvedPath = "";
-    const seen = new Set<string>();
-
-    for (const part of parts) {
-      resolvedPath = `${resolvedPath}/${part}`;
-
-      // Check if this path component is a symlink
-      let entry = this.data.get(resolvedPath);
-      let loopCount = 0;
-      const maxLoops = MAX_SYMLINK_DEPTH; // Prevent infinite loops
-
-      while (entry && entry.type === "symlink" && loopCount < maxLoops) {
-        if (seen.has(resolvedPath)) {
+    // the components still to resolve, the next one last
+    const rest = normalized.slice(1).split("/").reverse();
+    let resolved = "";
+    let links = 0;
+    while (rest.length > 0) {
+      const part = rest.pop() as string;
+      if (part === "" || part === ".") continue;
+      if (part === "..") {
+        resolved = resolved.slice(0, resolved.lastIndexOf("/"));
+        continue;
+      }
+      const candidate = `${resolved}/${part}`;
+      const entry = this.data.get(candidate);
+      if (entry?.type === "symlink" && (followLast || rest.length > 0)) {
+        if (++links > MAX_SYMLINK_DEPTH) {
           throw new Error(
-            `ELOOP: too many levels of symbolic links, open '${path}'`,
+            `ELOOP: too many levels of symbolic links, ${operation} '${path}'`,
           );
         }
-        seen.add(resolvedPath);
-
-        // Resolve the symlink
-        resolvedPath = resolveSymlinkTarget(resolvedPath, entry.target);
-        entry = this.data.get(resolvedPath);
-        loopCount++;
+        if (entry.target.startsWith("/")) resolved = "";
+        const parts = entry.target.split("/");
+        for (let index = parts.length - 1; index >= 0; index--) {
+          rest.push(parts[index]);
+        }
+        continue;
       }
-
-      if (loopCount >= maxLoops) {
-        throw new Error(
-          `ELOOP: too many levels of symbolic links, open '${path}'`,
-        );
-      }
+      resolved = candidate;
     }
-
-    return resolvedPath;
+    return resolved === "" ? "/" : resolved;
   }
 
   async mkdir(path: string, options?: MkdirOptions): Promise<void> {
@@ -702,25 +671,19 @@ export class InMemoryFs implements IFileSystem {
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     validatePath(path, "scandir");
-    let normalized = normalizePath(path);
-    let entry = this.data.get(normalized);
-
-    if (!entry) {
-      throw new Error(`ENOENT: no such file or directory, scandir '${path}'`);
+    // (1ctx) every link on the way, the last included, one component at
+    // a time, so a folder under or behind a linked folder is read
+    let normalized: string;
+    try {
+      normalized = this.resolveComponents(path, true, "scandir");
+    } catch (error) {
+      throw error instanceof Error && error.message.startsWith("ELOOP")
+        ? new Error(
+            `ELOOP: too many levels of symbolic links, scandir '${path}'`,
+          )
+        : error;
     }
-
-    // Follow symlinks to get to the actual directory
-    const seen = new Set<string>();
-    while (entry && entry.type === "symlink") {
-      if (seen.has(normalized)) {
-        throw new Error(
-          `ELOOP: too many levels of symbolic links, scandir '${path}'`,
-        );
-      }
-      seen.add(normalized);
-      normalized = resolveSymlinkTarget(normalized, entry.target);
-      entry = this.data.get(normalized);
-    }
+    const entry = this.data.get(normalized);
 
     if (!entry) {
       throw new Error(`ENOENT: no such file or directory, scandir '${path}'`);
@@ -750,7 +713,8 @@ export class InMemoryFs implements IFileSystem {
 
   async rm(path: string, options?: RmOptions): Promise<void> {
     validatePath(path, "rm");
-    const normalized = normalizePath(path);
+    // (1ctx) through linked folders above, never the last name, as unlink
+    const normalized = this.resolveIntermediateSymlinks(path);
     const entry = this.data.get(normalized);
 
     if (!entry) {
@@ -764,9 +728,20 @@ export class InMemoryFs implements IFileSystem {
         if (!options?.recursive) {
           throw new Error(`ENOTEMPTY: directory not empty, rm '${path}'`);
         }
-        for (const child of children) {
-          const childPath = joinPath(normalized, child);
-          await this.rm(childPath, options);
+        // (1ctx) an iterative post-order walk: a deep tree never grows
+        // the call stack, and a link inside is removed, never followed
+        const stack = [{ path: normalized, listed: false }];
+        while (stack.length > 0) {
+          const top = stack[stack.length - 1];
+          if (this.data.get(top.path)?.type === "directory" && !top.listed) {
+            top.listed = true;
+            for (const child of await this.readdir(top.path)) {
+              stack.push({ path: joinPath(top.path, child), listed: false });
+            }
+            continue;
+          }
+          stack.pop();
+          if (top.path !== normalized) this.deleteEntry(top.path);
         }
       }
     }

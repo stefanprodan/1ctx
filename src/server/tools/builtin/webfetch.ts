@@ -9,6 +9,7 @@
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { bytesWords } from "../../lib/bytes.ts";
+import { ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
@@ -85,16 +86,22 @@ export function parseFetchUrl(
   try {
     url = new URL(input);
   } catch {
-    throw new Error(`invalid URL "${input}"`);
+    throw new ToolError(`invalid URL "${input}"`, "invalid URL");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(`scheme "${url.protocol}" is not allowed`);
+    throw new ToolError(
+      `scheme "${url.protocol}" is not allowed`,
+      "scheme not allowed",
+    );
   }
   if (url.username !== "" || url.password !== "") {
     throw new Error("credentials in URLs are not allowed");
   }
   if (web?.mode === "listed" && !originAllowed(url, web.domains)) {
-    throw new Error(`not an allowed domain: ${url.host}`);
+    throw new ToolError(
+      `not an allowed domain: ${url.host}`,
+      "not an allowed domain",
+    );
   }
   const host = normalizedHost(url.hostname);
   if (host === "") throw new Error("URL has no host");
@@ -108,7 +115,10 @@ function mediaType(header: string | null): MediaType {
   }
   const type = header.split(";", 1)[0].trim().toLowerCase();
   if (!/^[a-z0-9!#$%&'*+.^_`|~-]+\/[a-z0-9!#$%&'*+.^_`|~-]+$/u.test(type)) {
-    throw new Error(`media type "${type}" is not allowed`);
+    throw new ToolError(
+      `media type "${type}" is not allowed`,
+      "media type not allowed",
+    );
   }
   const allowed =
     type.startsWith("text/") ||
@@ -116,7 +126,12 @@ function mediaType(header: string | null): MediaType {
     type === "application/xml" ||
     type.endsWith("+json") ||
     type.endsWith("+xml");
-  if (!allowed) throw new Error(`media type "${type}" is not allowed`);
+  if (!allowed) {
+    throw new ToolError(
+      `media type "${type}" is not allowed`,
+      "media type not allowed",
+    );
+  }
   const match = header.match(
     /(?:^|;)\s*charset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^;\s]*))/iu,
   );
@@ -374,7 +389,10 @@ export async function fetchText(
           url = parseFetchUrl(new URL(location, url).href, ctx.web);
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
-          throw new Error(`redirect refused: ${reason}`);
+          throw new ToolError(
+            `redirect refused: ${reason}`,
+            "redirect refused",
+          );
         }
         redirects++;
         continue;

@@ -67,3 +67,16 @@ export class ServiceUnavailable extends HttpError {
     super(503, message);
   }
 }
+
+// A failure whose message names what the caller sent or a server
+// answered (a path, a URL, a body): the caller reads the message, and
+// errorFields() logs only `logged`, a fixed phrase, since a log line
+// never holds tool input, a body or a file name.
+export class ToolError extends Error {
+  constructor(
+    message: string,
+    readonly logged: string,
+  ) {
+    super(message);
+  }
+}

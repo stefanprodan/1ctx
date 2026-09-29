@@ -9,6 +9,7 @@
 // the tool caps on the context.
 
 import { bytesWords } from "../../lib/bytes.ts";
+import { ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
 import * as firecrawl from "./search/firecrawl.ts";
@@ -202,11 +203,12 @@ function errorFromBody(body: string): string | null {
   }
 }
 
+// the provider's words are the model's; the log keeps a fixed phrase
 function providerError(error: ProviderError): Error {
   const text = serverText(error.message);
-  return new Error(
-    error.keyRejected ? `websearch key rejected: ${text}` : text,
-  );
+  return error.keyRejected
+    ? new ToolError(`websearch key rejected: ${text}`, "websearch key rejected")
+    : new ToolError(text, "websearch answer refused");
 }
 
 async function post(
@@ -247,14 +249,14 @@ async function post(
       // provider's words, when it sent readable ones, only follow
       const text = errorFromBody(body);
       const words = (head: string) =>
-        text === null ? head : `${head}: ${text}`;
+        new ToolError(text === null ? head : `${head}: ${text}`, head);
       if (keySent && response.status === 401) {
-        throw new Error(words("websearch key rejected"));
+        throw words("websearch key rejected");
       }
       if (!keySent && response.status === 403) {
-        throw new Error(words("websearch refused"));
+        throw words("websearch refused");
       }
-      throw new Error(words(`websearch failed (HTTP ${response.status})`));
+      throw words(`websearch failed (HTTP ${response.status})`);
     }
     try {
       return parse(body, response.headers.get("content-type"), keySent);
@@ -359,7 +361,9 @@ export function makeWebsearchTool(
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(scrub(message));
+        throw error instanceof ToolError
+          ? new ToolError(scrub(message), error.logged)
+          : new Error(scrub(message));
       }
     },
   };

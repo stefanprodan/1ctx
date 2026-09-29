@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { ToolError } from "../../lib/errors.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../../mcp/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
 import type { Tool } from "../types.ts";
@@ -14,7 +15,12 @@ function named(servers: OfferedServer[], value: unknown): OfferedMcpTool {
     throw new Error("name must be an available MCP tool");
   }
   const tool = flat(servers).find((item) => item.wireName === value);
-  if (tool === undefined) throw new Error(`MCP tool ${value} is not available`);
+  if (tool === undefined) {
+    throw new ToolError(
+      `MCP tool ${value} is not available`,
+      "MCP tool not available",
+    );
+  }
   return tool;
 }
 
@@ -73,7 +79,10 @@ export function checkMcpArguments(
 ): void {
   const error = validate(tool.inputSchema, input);
   if (error !== null) {
-    throw new Error(`arguments for ${tool.wireName} are invalid: ${error}`);
+    throw new ToolError(
+      `arguments for ${tool.wireName} are invalid: ${error}`,
+      "MCP arguments invalid",
+    );
   }
 }
 

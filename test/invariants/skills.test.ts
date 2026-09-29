@@ -4,10 +4,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { LogFactory } from "../../src/server/lib/log.ts";
 import { SKILLS_LEAD } from "../../src/server/runner/context.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import { makeSkillTools } from "../../src/server/tools/builtin/skill.ts";
-import { testApp } from "../helpers/app.ts";
+import { collectLogs, testApp } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -32,8 +33,8 @@ function sources(entries: Record<string, Answer>): typeof fetch {
   }) as typeof fetch;
 }
 
-async function admin(fetcher: typeof fetch) {
-  const app = await testApp({ fetcher });
+async function admin(fetcher: typeof fetch, logFactory?: LogFactory) {
+  const app = await testApp({ fetcher, logFactory });
   const client = app.client();
   await client.login("admin", "hunter2-test");
   return { app, client };
@@ -327,8 +328,10 @@ describe("skill routes", () => {
       new Response(raw("ops", "one")),
       new Response(raw("new-name", "two")),
     ];
+    const logs = collectLogs();
     const { app, client } = await admin(
       sources({ [url]: () => answers.shift()! }),
+      logs.logFactory,
     );
     const created = await (
       await client.call("POST", "/api/skills", { body: { url } })
@@ -339,6 +342,13 @@ describe("skill routes", () => {
     );
     expect(res.status).toBe(409);
     expect(app.skills.byId(created.skill.id)?.name).toBe("ops");
+    // the source's words stay on the row, the log keeps a phrase
+    expect(
+      logs.events.filter((event) => event.msg === "skill refresh failed"),
+    ).toMatchObject([
+      { fields: { error: "skill source refused", status: 409 } },
+    ]);
+    expect(JSON.stringify(logs.events)).not.toContain("new-name");
   });
 
   test("blocks another refresh and delete while one fetch is running", async () => {
@@ -528,7 +538,8 @@ describe("skills in a send", () => {
   });
 
   test("skill and skill_file calls write tool rows and return their text", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const [skill] = assign(chat, [
       loadedSkill("ops", [
         { path: "references/a.md", content: "reference", bytes: 9 },
@@ -562,6 +573,14 @@ describe("skills in a send", () => {
     ).toContain("available paths: references/a.md");
     answer.reply("done");
     await settle(chat);
+    // the model reads the paths, the log only a fixed phrase
+    const failed = logs.events.filter((event) => event.msg === "tool failed");
+    expect(failed).toMatchObject([
+      { fields: { tool: "skill_file", error: "skill file not found" } },
+    ]);
+    const logged = JSON.stringify(logs.events);
+    expect(logged).not.toContain("missing.md");
+    expect(logged).not.toContain("references/a.md");
     const rows = chat.app.sessions
       .messages(started.sessionId)
       .filter((row) => row.kind === "tool");

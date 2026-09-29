@@ -12,7 +12,12 @@ import { skillKey } from "../../shared/capabilities.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, NotFound, ServiceUnavailable } from "../lib/errors.ts";
+import {
+  Conflict,
+  HttpError,
+  NotFound,
+  ServiceUnavailable,
+} from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { lastDays } from "../usage/index.ts";
@@ -207,6 +212,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           deps.log.warn("skill refresh failed", {
             skill: before.name,
             ...errorFields(error, false),
+            // the source's words may name its files; the status says
+            // what failed, and the row keeps the words
+            ...(error instanceof HttpError
+              ? { error: "skill source refused" }
+              : {}),
           });
           throw error;
         } finally {

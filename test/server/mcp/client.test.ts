@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { errorFields } from "../../../src/server/lib/log.ts";
 import { withClient } from "../../../src/server/mcp/client.ts";
 import { discover, fingerprint } from "../../../src/server/mcp/discover.ts";
 import { fixture, mcpFetch } from "./fake.ts";
@@ -552,6 +553,26 @@ describe("MCP SDK client", () => {
       await expect(runCall(fetcher)).rejects.toThrow(
         `the MCP server answered ${status}`,
       );
+    }
+  });
+
+  test("logs a status or a fixed phrase, never the server's words", async () => {
+    const recorded = await fixture();
+    const cases: [() => Response, string][] = [
+      [
+        () => new Response("secret body", { status: 500 }),
+        "the MCP server answered 500",
+      ],
+      [() => jsonRpc({ secret: "body" }), "MCP call failed"],
+    ];
+    for (const [answer, logged] of cases) {
+      const { fetcher } = callFetch(recorded, answer);
+      const failure = await runCall(fetcher).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(errorFields(failure, false).error).toBe(logged);
+      expect(JSON.stringify(errorFields(failure))).not.toContain("secret");
     }
   });
 

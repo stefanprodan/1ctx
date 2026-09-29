@@ -1,4 +1,5 @@
 import { sprintf } from "sprintf-js";
+import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import { getErrorMessage } from "../../interpreter/helpers/errors.js";
 import type {
@@ -149,6 +150,16 @@ const printfHelp = {
   ],
 };
 
+// (1ctx) a zone the runtime resolves, as date checks it
+function knownZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const printfCommand: RuntimeCommand = {
   name: "printf",
 
@@ -242,7 +253,11 @@ export const printfCommand: RuntimeCommand = {
       let errorMessage = "";
 
       // Get TZ from shell environment for strftime formatting
-      const tz = ctx.env.get("TZ");
+      // (1ctx) the exported TZ only, as bash sets its zone from it; with
+      // none, or one the runtime cannot resolve, UTC, as date does, so the
+      // host's own zone never shows
+      const exported = processEnv(ctx).get("TZ");
+      const tz = exported && knownZone(exported) ? exported : "UTC";
 
       do {
         const { result, argsConsumed, error, errMsg, stopped } = formatOnce(

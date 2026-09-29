@@ -14,6 +14,8 @@ import {
   unsafeBytesFromLatin1,
 } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+// (1ctx) a header's time is in the exported TZ, never an unexported one
+import { processEnv } from "../../helpers/env.js";
 import { ExecutionAbortedError } from "../../interpreter/errors.js";
 import { commandWorkLimit } from "../../limits.js";
 import type {
@@ -314,7 +316,7 @@ function compareFiles(
     text(
       label !== undefined
         ? `${mark} ${label}\n`
-        : `${mark} ${headerName(file.name)}\t${headerTime(file.mtime, ctx.env.get("TZ"))}\n`,
+        : `${mark} ${headerName(file.name)}\t${headerTime(file.mtime, processEnv(ctx).get("TZ"))}\n`,
     );
   if (style === "unified") {
     out.push(header("---", a, o.labels[0]), header("+++", b, o.labels[1]));
