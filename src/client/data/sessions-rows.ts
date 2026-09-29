@@ -2,22 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The pure half of the sessions entity: the stream's order, the merge
-// of a later page and of a first page over the held rows, the merge of
-// rows an envelope carries, and the live map a detail seeds.
+// of a later page and of a first page over the held rows, an envelope
+// over the stream's rows, the merge of rows an envelope carries, and
+// the live map a detail seeds.
 
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { EnvelopeRow, StreamRow } from "../../shared/api/sessions.ts";
 import type {
+  LastLine,
   Message,
+  SendSummary,
   SessionDetail,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
+import type { SessionOrigin } from "../../shared/words.ts";
 import { type Live, liveOf, liveOfSnapshot } from "../transcript/stream.ts";
 
-// a row's place: negative when a comes first
-export type RowOrder = (a: SessionSummary, b: SessionSummary) => number;
+// what the order reads of a row, and all a cursor names
+export type Place = Pick<SessionSummary, "status" | "lastActivityAt" | "id">;
 
-const byId = (a: SessionSummary, b: SessionSummary) =>
-  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+// a row's place: negative when a comes first
+export type RowOrder = (a: Place, b: Place) => number;
+
+const byId = (a: Place, b: Place) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // the runs' order, the server's: by last activity, newest first, then id
 export const runOrder: RowOrder = (a, b) =>
@@ -74,7 +80,8 @@ export function oneLine(rows: StreamRow[]): StreamRow[] {
 // older run changes nothing (null). undefined when no line is held
 export function swapRun(
   rows: StreamRow[],
-  next: Pick<StreamRow, "session"> & Partial<Pick<StreamRow, "send" | "last">>,
+  next: Pick<StreamRow, "session"> &
+    Partial<Pick<StreamRow, "send" | "last">> & { row?: EnvelopeRow | null },
 ): StreamRow[] | null | undefined {
   const id = next.session.automationId;
   const line = rows.find(
@@ -84,28 +91,36 @@ export function swapRun(
   const same = line.session.id === next.session.id;
   if (same && line.session.revision >= next.session.revision) return null;
   if (!same && next.session.createdAt <= line.session.createdAt) return null;
-  const swapped: StreamRow = same
-    ? {
-        ...line,
-        session: next.session,
-        send: next.send ?? line.send,
-        last: next.last ?? line.last,
-      }
-    : {
-        session: next.session,
-        // the automation's agent may have changed since the line's run
-        agent:
-          next.session.agentId === line.session.agentId ? line.agent : null,
-        agentRetired:
-          next.session.agentId === line.session.agentId
-            ? line.agentRetired
-            : false,
-        send: next.send ?? null,
-        last: next.last ?? null,
-        automation: line.automation,
-        runBy: null,
-        runs: (line.runs ?? 0) + 1,
-      };
+  const row = next.row ?? null;
+  const swapped: StreamRow =
+    row !== null
+      ? {
+          ...row,
+          session: next.session,
+          runs: same ? line.runs : (line.runs ?? 0) + 1,
+        }
+      : same
+        ? {
+            ...line,
+            session: next.session,
+            send: next.send ?? line.send,
+            last: next.last ?? line.last,
+          }
+        : {
+            session: next.session,
+            // the automation's agent may have changed since the line's run
+            agent:
+              next.session.agentId === line.session.agentId ? line.agent : null,
+            agentRetired:
+              next.session.agentId === line.session.agentId
+                ? line.agentRetired
+                : false,
+            send: next.send ?? null,
+            last: next.last ?? null,
+            automation: line.automation,
+            runBy: null,
+            runs: (line.runs ?? 0) + 1,
+          };
   return ordered([...rows.filter((row) => row !== line), swapped]);
 }
 
@@ -149,6 +164,122 @@ export function refreshHead(
     rows: oneLine(ordered([...head, ...tail], order)),
     next: tail.length > 0 ? next : answer.next,
   };
+}
+
+// the place a feed cursor names, as sessions/cursor.ts on the server
+// writes it: <running 0|1>.<last activity>.<id>; null for anything else
+export function cursorPlace(cursor: string): Place | null {
+  const [rank, at, id, ...rest] = cursor.split(".");
+  if (rest.length > 0 || (rank !== "0" && rank !== "1")) return null;
+  if (at === undefined || !/^(0|[1-9][0-9]*)$/.test(at)) return null;
+  if (id === undefined || id === "") return null;
+  return {
+    status: rank === "1" ? "running" : "done",
+    lastActivityAt: Number(at),
+    id,
+  };
+}
+
+// the server's search: the query trimmed, then a title holding it, ASCII
+// letters in any case and every other character as it is, as SQLite's
+// LIKE folds with % and _ escaped
+const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+export const searched = (title: string, q: string) =>
+  ascii(title).includes(ascii(q.trim()));
+
+// what a session envelope tells the stream: the summary, what the
+// transaction wrote, and the row as it stood after the commit, null
+// when it could not be read
+export type RowEnvelope = {
+  session: SessionSummary;
+  send: SendSummary | null;
+  last?: LastLine;
+  row: EnvelopeRow | null;
+};
+
+// the filter the rows were read under, past the project
+export type Shown = { origin: SessionOrigin | null; q: string };
+
+// an envelope over the stream's rows, next the cursor they page on: the
+// rows it leaves (the same array when it says nothing new to them), or
+// "reload" when only the server can say. A row not held is inserted
+// only where the server would list it: under the filter, holding the
+// search, and above the cursor, since a later page brings one past it
+export function reconcile(
+  rows: StreamRow[],
+  next: string | null,
+  shown: Shown,
+  ev: RowEnvelope,
+): StreamRow[] | "reload" {
+  const { session } = ev;
+  if (shown.origin !== null && shown.origin !== session.origin) return rows;
+  const listed = shown.q === "" || searched(session.title, shown.q);
+  // in All an automation's runs are one line, its newest matching run,
+  // and only the server knows which that is when no line is held
+  const grouped =
+    shown.origin === null &&
+    session.origin === "automation" &&
+    session.automationId !== null;
+  if (grouped) {
+    const swapped = swapRun(rows, ev);
+    if (swapped !== undefined) {
+      return swapped !== null && listed ? swapped : rows;
+    }
+  }
+  const held = rows.find((row) => row.session.id === session.id);
+  if (held !== undefined) {
+    if (held.session.revision >= session.revision) return rows;
+    const moved: StreamRow =
+      ev.row !== null
+        ? { ...ev.row, session, runs: held.runs }
+        : {
+            ...held,
+            session,
+            // without the row, a null send and no last mean unchanged
+            send: ev.send ?? held.send,
+            last: ev.last ?? held.last,
+          };
+    return ordered([...rows.filter((row) => row !== held), moved]);
+  }
+  if (!listed) return rows;
+  // past the cursor a first page would not hold it either: a later page
+  // brings it, as it is then
+  if (next !== null) {
+    const edge = cursorPlace(next);
+    if (edge === null) return "reload";
+    if (streamOrder(session, edge) > 0) return rows;
+  }
+  if (ev.row === null || grouped) return "reload";
+  return ordered([...rows, { ...ev.row, session, runs: null }]);
+}
+
+// what changed the list while a first page was out: an envelope, or
+// rows that went (a delete)
+export type Change =
+  | { ev: RowEnvelope }
+  | { drop: (row: StreamRow) => boolean };
+
+// the changes over an answer read before them, in the order they came,
+// so it holds what they did; reload when one needs the server
+export function replay(
+  answer: StreamRow[],
+  next: string | null,
+  shown: Shown,
+  changes: Change[],
+): { rows: StreamRow[]; reload: boolean } {
+  let rows = answer;
+  let reload = false;
+  for (const change of changes) {
+    if ("drop" in change) {
+      const kept = rows.filter((row) => !change.drop(row));
+      if (kept.length !== rows.length) rows = kept;
+      continue;
+    }
+    const out = reconcile(rows, next, shown, change.ev);
+    if (out === "reload") reload = true;
+    else rows = out;
+  }
+  return { rows, reload };
 }
 
 // the rows whose text streams: a reply, and the summary round's row

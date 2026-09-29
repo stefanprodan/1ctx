@@ -11,9 +11,12 @@
 //
 // A first page loads cold or warm. Cold (a navigation, the socket's
 // open, a change of access) drops every row past it, so nothing missed
-// while the socket was down survives in a kept tail. Warm (a row not
-// held, a delete) keeps the held rows past it, which the envelopes on
-// this connection kept current.
+// while the socket was down survives in a kept tail. Warm (a row only
+// the server can place) keeps the held rows past it, which the
+// envelopes on this connection kept current. An envelope's row is
+// inserted or moved in place without a load; the changes made while a
+// first page is out are replayed over its answer, which was read before
+// them. One first page is out at a time (flight.ts).
 
 import { effect, signal } from "@preact/signals";
 import type { SessionsResponse, StreamRow } from "../../shared/api/sessions.ts";
@@ -21,13 +24,19 @@ import type { SocketEvent } from "../../shared/socket.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
+import { Flight } from "./flight.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import {
+  type Change,
+  cursorPlace,
   mergeNextPage,
   ordered,
+  reconcile,
   refreshHead,
-  swapRun,
+  replay,
+  type Shown,
+  streamOrder,
 } from "./sessions-rows.ts";
 
 // a later page's own state: the rows stay whatever it does
@@ -62,9 +71,9 @@ let head: { size: number; next: string | null } = { size: 0, next: null };
 let settled = true;
 // whether a first page is out, so a grant during it asks again
 let loading = false;
-// whether a row moved while a first page was out with none held, so
-// its answer may predate it: one more page is asked once it lands
-let dirty = false;
+// what changed the rows since the first page out was asked, replayed
+// over its answer
+let changes: Change[] = [];
 // moves when a row is deleted, so a later page read before it cannot
 // bring the row back
 let pages = 0;
@@ -74,14 +83,22 @@ const labels = new Map<
   string,
   { label: StreamRow["automation"]; at: number }
 >();
+// the agents an automation frame said were retired; retiring is for
+// good, so it holds over any answer
+const retired = new Set<string>();
 let frames = 0;
-// the runs that took their automation's line in All, each with the
-// frame's number, replayed over an answer asked before it
-const swaps = new Map<string, { row: StreamRow; at: number }>();
 const kept = new Held<{ rows: StreamRow[]; next: string | null }>();
 
 const keyOf = (f: ListFilter) =>
   JSON.stringify([f.project, f.q, f.origin ?? null]);
+
+// the first page again for the filter on screen, over the rows held
+const flight = new Flight(() =>
+  load(
+    { project: listFor.project, q: listFor.q, origin: listFor.origin },
+    true,
+  ),
+);
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -97,36 +114,32 @@ effect(() => {
   list.value = null;
   kept.clear();
   labels.clear();
-  swaps.clear();
+  retired.clear();
+  changes = [];
+  flight.stop();
   loading = false;
 });
 
 // a row of an automation the frames renamed or deleted since the answer
-// was read carries the frame's word
+// was read carries the frame's word, and a retired agent's row says so
 function relabel(rows: StreamRow[], asked: number): StreamRow[] {
-  if (labels.size === 0) return rows;
+  if (labels.size === 0 && retired.size === 0) return rows;
   return rows.map((row) => {
+    const out = retired.has(row.session.agentId ?? "")
+      ? { ...row, agentRetired: true }
+      : row;
     const id = row.automation?.id ?? row.session.automationId;
     const said = id === null ? undefined : labels.get(id);
-    if (said === undefined || said.at <= asked) return row;
+    if (said === undefined || said.at <= asked) return out;
     const label = said.label;
     // a gone automation's runs are listed one by one
     const runs = label === null ? null : row.runs;
     return row.automation?.name === label?.name &&
       row.automation?.id === label?.id &&
       row.runs === runs
-      ? row
-      : { ...row, automation: label, runs };
+      ? out
+      : { ...out, automation: label, runs };
   });
-}
-
-// a run that took its line after the answer was asked takes it again
-function reswap(rows: StreamRow[], asked: number): StreamRow[] {
-  let out = rows;
-  for (const { row, at } of swaps.values()) {
-    if (at > asked) out = swapRun(out, row) ?? out;
-  }
-  return out;
 }
 
 const sameFilter = (a: ListFilter, b: ListFilter) =>
@@ -141,6 +154,8 @@ const covers = (projectId: string, origin?: SessionOrigin) =>
   (origin === undefined ||
     listFor.origin === null ||
     listFor.origin === origin);
+
+const shown = (): Shown => ({ origin: listFor.origin, q: listFor.q });
 
 // a cold answer over the rows held: a held row that moved past the
 // answer's copy while it was in flight keeps its newer word, and
@@ -158,14 +173,21 @@ function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
   );
 }
 
-// the first page of what is on screen, as a held filter keeps it
+// the first page of what is on screen, as a held filter keeps it: the
+// rows up to its cursor, rows inserted above it included
 function firstPage(rows: StreamRow[]): {
   rows: StreamRow[];
   next: string | null;
 } {
-  return head.next === null
-    ? { rows, next: null }
-    : { rows: rows.slice(0, head.size), next: head.next };
+  if (head.next === null) return { rows, next: null };
+  const edge = cursorPlace(head.next);
+  return {
+    rows:
+      edge === null
+        ? rows.slice(0, head.size)
+        : rows.filter((row) => streamOrder(row.session, edge) <= 0),
+    next: head.next,
+  };
 }
 
 function address(filter: Required<ListFilter>, before: string | null): string {
@@ -198,16 +220,21 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
   listFor = { ...filter, origin: filter.origin ?? null, turn, cold };
   if (!warm) settled = false;
   loading = true;
-  dirty = false;
+  changes = [];
   const since = frames;
   try {
     const answer = await api<SessionsResponse>(address(listFor, null));
     if (listFor.turn !== turn) return;
     loading = false;
-    const body = {
-      ...answer,
-      rows: reswap(relabel(answer.rows, since), since),
-    };
+    const next = answer.next ?? null;
+    const replayed = replay(
+      relabel(answer.rows, since),
+      next,
+      shown(),
+      changes,
+    );
+    changes = [];
+    const body = { rows: replayed.rows, next };
     const held = list.value;
     head = { size: body.rows.length, next: body.next };
     settled = true;
@@ -219,29 +246,18 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
             next: body.next,
             more: IDLE,
           };
-    if (dirty) {
-      dirty = false;
-      void refresh();
-    }
+    if (replayed.reload) flight.ask();
   } catch {
-    if (listFor.turn === turn) loading = false;
+    if (listFor.turn !== turn) return;
+    loading = false;
+    changes = [];
     // a warm load that fails keeps what is held
-    if (listFor.turn === turn && !(warm && list.value !== null)) {
-      list.value = null;
-    }
+    if (!(warm && list.value !== null)) list.value = null;
   }
 }
 
 export function loadList(filter: ListFilter): Promise<void> {
-  return load(filter, false);
-}
-
-// the first page again for the filter on screen, over the rows held
-function refresh(): Promise<void> {
-  return load(
-    { project: listFor.project, q: listFor.q, origin: listFor.origin },
-    true,
-  );
+  return flight.run(() => load(filter, false));
 }
 
 // the page after the rows held; a failure keeps the rows and says so
@@ -279,38 +295,34 @@ export async function loadMore(): Promise<void> {
   }
 }
 
-// the server's search: a title holding the query, ASCII letters in any
-// case and every other character as it is, as SQLite's LIKE folds
-const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
-const titled = (title: string, q: string) =>
-  ascii(title).includes(ascii(q.trim()));
-
 const without = (rows: StreamRow[], keep: (row: StreamRow) => boolean) => {
   const out = rows.filter(keep);
   return out.length === rows.length ? rows : out;
 };
 
-// the row goes, and the first page is loaded again when the filter
-// covers the project, since an answer in flight may still hold the row
-export function dropRow(sessionId: string, projectId: string): void {
-  const keep = (row: StreamRow) => row.session.id !== sessionId;
-  if (covers(projectId)) pages++;
+// rows went: from every held list, from the rows on screen, and from
+// the answer of a first page out, which may have read them before
+function drop(projectId: string, gone: (row: StreamRow) => boolean): void {
+  const keep = (row: StreamRow) => !gone(row);
+  if (covers(projectId)) {
+    pages++;
+    if (loading) changes.push({ drop: gone });
+  }
   kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
   const held = list.value;
   if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
-  if (covers(projectId)) void refresh();
 }
 
-// an automation's runs went with it: its rows go, and the first page is
-// loaded again as for a deleted row
+export function dropRow(sessionId: string, projectId: string): void {
+  drop(projectId, (row) => row.session.id === sessionId);
+}
+
+// an automation's runs went with it
 function dropRuns(automationId: string, projectId: string): void {
-  const keep = (row: StreamRow) =>
-    (row.automation?.id ?? row.session.automationId) !== automationId;
-  if (covers(projectId)) pages++;
-  kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
-  const held = list.value;
-  if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
-  if (held !== null && covers(projectId)) void refresh();
+  drop(
+    projectId,
+    (row) => (row.automation?.id ?? row.session.automationId) === automationId,
+  );
 }
 
 // the project may no longer be seen: its rows go, the whole list when
@@ -328,9 +340,11 @@ export function revokeRows(projectId: string): void {
   // a list of another project cannot hold its rows, and keeps its load
   if (!covers(projectId)) return;
   listFor = { ...listFor, turn: listFor.turn + 1, cold: listFor.cold + 1 };
+  changes = [];
   if (listFor.project === projectId) {
     list.value = null;
     loading = false;
+    flight.stop();
   } else if (listFor.project === null) {
     if (held !== null) {
       list.value = { ...held, rows: without(held.rows, keep), more: IDLE };
@@ -347,12 +361,23 @@ export function grantRows(projectId: string): void {
   }
 }
 
-// the list's copy of the row: the summary and the send are replaced,
-// the last line only when the envelope carries one. A row not held
-// is not guessed from the envelope, whose send and last may mean
-// unchanged: the first page is loaded again, warm, when the filter
-// would list it, a search included, since the row may come from a
-// page not loaded
+// an agent is retired for good: every row of it says so
+function retire(agentId: string): void {
+  retired.add(agentId);
+  const held = list.value;
+  if (held === null) return;
+  let changed = false;
+  const rows = held.rows.map((row) => {
+    if (row.session.agentId !== agentId || row.agentRetired) return row;
+    changed = true;
+    return { ...row, agentRetired: true };
+  });
+  if (changed) list.value = { ...held, rows };
+}
+
+// a rename relabels the automation's rows; a delete leaves its line
+// counting nothing, or takes its runs with it; a retired agent is
+// retired on every row
 export function applyAutomationFrame(
   ev: Extract<SocketEvent, { type: "automation" | "automationDeleted" }>,
 ): void {
@@ -362,6 +387,9 @@ export function applyAutomationFrame(
       ? { id: ev.automation.id, name: ev.automation.name }
       : null;
   labels.set(id, { label, at: ++frames });
+  if (ev.type === "automation" && ev.automation.agentRetired) {
+    retire(ev.automation.agentId);
+  }
   // a first page in flight may hold a line of it: the relabel stops it
   // counting, but only a page asked after the delete lists its runs
   if (label === null && list.value === null && loading) {
@@ -394,57 +422,21 @@ export function applyAutomationFrame(
     return { ...row, automation: label, runs };
   });
   if (changed) list.value = { ...held, rows };
-  if (grouped) void refresh();
+  if (grouped) flight.ask();
 }
 
+// the envelope over the rows on screen (sessions-rows.ts reconcile):
+// a row held moves, a row the filter lists is inserted from the
+// envelope's row, and only what the server alone can place asks for
+// the first page again
 export function applyEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
 ): void {
-  const list0 = list.value;
   if (!covers(ev.projectId, ev.session.origin)) return;
-  // under a search, a row whose title does not hold it is not listed,
-  // and asking again on each of its envelopes would load the page once
-  // per tool call of every chat running
-  const listed = listFor.q === "" || titled(ev.session.title, listFor.q);
-  if (list0 === null) {
-    dirty ||= loading && listed;
-    return;
-  }
-  if (listFor.origin === null) {
-    // a run of an automation with a line held takes it or leaves it
-    const swapped = swapRun(list0.rows, ev);
-    if (swapped !== undefined) {
-      if (swapped !== null && listed) {
-        list.value = { ...list0, rows: swapped };
-        const line = swapped.find((row) => row.session.id === ev.session.id);
-        if (line !== undefined) {
-          swaps.set(ev.session.automationId ?? "", { row: line, at: ++frames });
-        }
-      }
-      return;
-    }
-  }
-  const held = list0.rows.find((row) => row.session.id === ev.session.id);
-  if (held === undefined) {
-    if (listed) void refresh();
-    return;
-  }
-  if (held.session.revision >= ev.session.revision) return;
-  const next: StreamRow = {
-    session: ev.session,
-    agent: held.agent,
-    agentRetired: held.agentRetired,
-    send: ev.send ?? held.send,
-    last: ev.last ?? held.last,
-    automation: held.automation,
-    runBy: held.runBy,
-    runs: held.runs,
-  };
-  list.value = {
-    ...list0,
-    rows: ordered([
-      ...list0.rows.filter((row) => row.session.id !== ev.session.id),
-      next,
-    ]),
-  };
+  if (loading) changes.push({ ev });
+  const held = list.value;
+  if (held === null) return;
+  const rows = reconcile(held.rows, held.next, shown(), ev);
+  if (rows === "reload") flight.ask();
+  else if (rows !== held.rows) list.value = { ...held, rows };
 }
