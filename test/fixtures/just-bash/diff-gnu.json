@@ -2919,6 +2919,212 @@
       ],
       "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
       "exit": 1
+    },
+    {
+      "name": "brief ignoring space",
+      "args": [
+        "-q",
+        "-w",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "report identical ignoring space",
+      "args": [
+        "-s",
+        "-w",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "Files ws3 and ws4 are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "brief ignoring blank lines",
+      "args": [
+        "-q",
+        "-B",
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "report identical ignoring blank lines",
+      "args": [
+        "-s",
+        "-B",
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "Files blank1 and blank2 are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "brief ignoring case on binary",
+      "args": [
+        "-q",
+        "-i",
+        "nul1",
+        "nul1b"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "stdin against a directory",
+      "args": [
+        "-",
+        "emptydir"
+      ],
+      "stdin": "a\n",
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "conflicting styles",
+      "args": [
+        "--normal",
+        "-c",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "same style twice",
+      "args": [
+        "-c",
+        "-C",
+        "1",
+        "a",
+        "b"
+      ],
+      "stdout": "*** a\t2026-09-29 12:52:48.311000000 +0000\n--- b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n! a\n  b\n  c\n! d\n  e\n  f\n  g\n--- 1,8 ----\n! A\n  b\n  c\n! D\n  e\n  f\n  g\n+ h\n",
+      "exit": 1
+    },
+    {
+      "name": "context length then style",
+      "args": [
+        "-C",
+        "1",
+        "-c",
+        "a",
+        "b"
+      ],
+      "stdout": "*** a\t2026-09-29 12:52:48.311000000 +0000\n--- b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n! a\n  b\n  c\n! d\n  e\n  f\n  g\n--- 1,8 ----\n! A\n  b\n  c\n! D\n  e\n  f\n  g\n+ h\n",
+      "exit": 1
+    },
+    {
+      "name": "unified then a length",
+      "args": [
+        "-u",
+        "-U",
+        "1",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "a length then unified",
+      "args": [
+        "-U",
+        "1",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "two lengths shrinking",
+      "args": [
+        "-U",
+        "5",
+        "-U",
+        "1",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "two lengths growing",
+      "args": [
+        "-U",
+        "1",
+        "-U",
+        "2",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "unified then digits",
+      "args": [
+        "-u",
+        "-1",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,5 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n@@ -7 +7,2 @@\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "digits then a length",
+      "args": [
+        "-5",
+        "-U",
+        "1",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "digits alone",
+      "args": [
+        "-1",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "text on text",
+      "args": [
+        "-a",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "dash dash then a dash",
+      "args": [
+        "--",
+        "-",
+        "a"
+      ],
+      "stdin": "a\n",
+      "stdout": "1a2,7\n> b\n> c\n> d\n> e\n> f\n> g\n",
+      "exit": 1
     }
   ]
 }
