@@ -7,7 +7,10 @@ import type {
   ToolResultResponse,
   ToolVisualResponse,
 } from "../../shared/api/sessions.ts";
-import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type {
+  LiveRetry,
+  SessionDetail,
+} from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
 import { baseName } from "../lib/tree.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
@@ -29,6 +32,9 @@ export type StoredFile =
 export const toolResults = signal<ReadonlyMap<string, ToolResult>>(new Map());
 export const toolVisuals = signal<ReadonlyMap<string, StoredVisual>>(new Map());
 export const openedFiles = signal<ReadonlyMap<string, StoredFile>>(new Map());
+// the running round waiting to ask its provider again, from the snapshot
+// and the retry frames; never stored
+export const retrying = signal<LiveRetry | null>(null);
 let detail: SessionDetail | null = null;
 const requests = new Map<string, AbortController>();
 
@@ -39,6 +45,7 @@ export function resetValues(): void {
   toolResults.value = new Map();
   toolVisuals.value = new Map();
   openedFiles.value = new Map();
+  retrying.value = null;
 }
 
 export function syncValues(next: SessionDetail): void {

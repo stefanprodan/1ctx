@@ -4,6 +4,7 @@
 // The ephemeral reply stream and crash checkpoint. Durable placement and
 // round transitions stay in writer.ts.
 
+import type { LiveRetry } from "../../shared/contracts/session.ts";
 import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent } from "../providers/index.ts";
@@ -48,6 +49,26 @@ export function streamVisual(
     messageId: round.messageId,
     seq: ++send.seq,
     ...piece,
+  });
+}
+
+// held on the round alone, never stored: a watcher joining mid-wait
+// reads it from the snapshot
+export function streamRetry(
+  deps: StreamDeps,
+  send: ActiveSend,
+  retry: LiveRetry | null,
+): void {
+  const round = send.round;
+  if (round === null) return;
+  if (round.retry === null && retry === null) return;
+  round.retry = retry === null ? null : { ...retry };
+  deps.stream(send.sessionId, {
+    type: "retry",
+    sessionId: send.sessionId,
+    sendId: send.id,
+    seq: ++send.seq,
+    retry: round.retry,
   });
 }
 

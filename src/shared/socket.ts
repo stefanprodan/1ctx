@@ -11,6 +11,7 @@ import type { AutomationSummary } from "./contracts/automation.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
   LastLine,
+  LiveRetry,
   LiveSend,
   Message,
   SendSummary,
@@ -20,7 +21,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 14;
+export const PROTOCOL = 15;
 
 export type VisualFrame = {
   type: "visual";
@@ -117,6 +118,14 @@ export type SocketEvent =
       html: string;
       // how much content the html renders
       htmlAt: number;
+    }
+  // a round started or ended a wait to ask its provider again
+  | {
+      type: "retry";
+      sessionId: string;
+      sendId: string;
+      seq: number;
+      retry: LiveRetry | null;
     };
 
 export function isSocketCommand(value: unknown): value is SocketCommand {

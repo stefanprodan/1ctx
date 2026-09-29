@@ -32,6 +32,7 @@ import {
   projectAgents,
   regenerateSession,
   renameSession,
+  retrying,
   sending,
   sendMessage,
   session,
@@ -995,6 +996,55 @@ describe("the sessions entity", () => {
     });
 
     expect(live.value.get("m1")?.content).toBe("AB");
+  });
+
+  test("a watch joining mid-wait holds the retry, and frames move it", async () => {
+    const base = liveDetail();
+    answer = () => Response.json(base);
+    await loadSession("s1");
+    expect(retrying.value).toBeNull();
+    // a frame before the answer is kept and applied after the snapshot
+    onSocket({
+      type: "retry",
+      sessionId: "s1",
+      sendId: "send1",
+      seq: 3,
+      retry: { attempt: 2, max: 3 },
+    });
+    onSocket({
+      type: "watched",
+      sessionId: "s1",
+      live: {
+        phase: "reply",
+        sendId: "send1",
+        messageId: "m1",
+        seq: 2,
+        content: "",
+        reasoning: "",
+        html: "",
+        htmlAt: 0,
+        retry: { attempt: 1, max: 3 },
+      },
+    });
+    expect(retrying.value).toEqual({ attempt: 2, max: 3 });
+    onSocket({
+      type: "retry",
+      sessionId: "s1",
+      sendId: "send1",
+      seq: 4,
+      retry: null,
+    });
+    expect(retrying.value).toBeNull();
+  });
+
+  test("a detail that carries a retry shows it until the chat is left", async () => {
+    const base = liveDetail();
+    if (base.live !== null) base.live.retry = { attempt: 1, max: 3 };
+    answer = () => Response.json(base);
+    await loadSession("s1");
+    expect(retrying.value).toEqual({ attempt: 1, max: 3 });
+    leaveSession();
+    expect(retrying.value).toBeNull();
   });
 
   test("a work-slot envelope keeps the reply's live buffer", async () => {

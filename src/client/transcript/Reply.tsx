@@ -11,7 +11,7 @@
 
 import type { ComponentChildren } from "preact";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import type { Message } from "../../shared/contracts/session.ts";
+import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { finishWords } from "../../shared/finish.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { shortModel } from "../agents/meta.ts";
@@ -93,11 +93,14 @@ export function Reply({
   onRegenerate,
   fork,
   visuals,
+  retry = null,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
   agent: Agent | null;
   visuals?: ComponentChildren;
+  // the running round waiting to ask its provider again
+  retry?: LiveRetry | null;
   // set on the last turn alone: regenerate drops it and sends its
   // user message again
   onRegenerate?: () => void;
@@ -166,6 +169,7 @@ export function Reply({
             reply={m}
             live={live}
             running={running && node.send?.memoryRound == null}
+            retry={retry}
           />
         )}
         {visuals}
@@ -190,6 +194,7 @@ export function Reply({
             live={live}
             running={running}
             memory
+            retry={retry}
           />
         )}
         {!running && failure !== null && (

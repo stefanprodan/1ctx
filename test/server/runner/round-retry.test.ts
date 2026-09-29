@@ -13,8 +13,19 @@ import {
   STREAM_IDLE_MS,
 } from "../../../src/server/runner/round.ts";
 import type { ActiveSend } from "../../../src/server/runner/send.ts";
+import type {
+  LiveRetry,
+  SessionDetail,
+} from "../../../src/shared/contracts/session.ts";
 import { collectLogs } from "../../helpers/app.ts";
-import { type ChatApp, chatApp, tick, waitScript } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  startChat,
+  tick,
+  waitScript,
+} from "../../helpers/chat.ts";
+import { frames, watch, watcher } from "../../helpers/socket.ts";
 
 const BUSY = '{"error":{"message":"busy"}}';
 
@@ -232,6 +243,74 @@ describe("provider retries through a turn", () => {
   });
 });
 
+describe("the working line while a round waits", () => {
+  test("a retry frame sets it and the next attempt's first event clears it", async () => {
+    const chat = await chatApp();
+    const { script, sessionId, detail } = await startChat(chat, "use time");
+    const conn = await watcher(chat);
+    watch(chat, conn, sessionId);
+    chat.scripted.refuse(503, BUSY, { times: 1 });
+    script.toolRound([
+      { id: "time", name: "datetime", arguments: '{"timezone":"UTC"}' },
+    ]);
+    script.end();
+    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await tick();
+    expect(frames(conn, "retry")).toEqual([
+      {
+        type: "retry",
+        sessionId,
+        sendId: detail.send.id,
+        seq: expect.any(Number),
+        retry: { attempt: 1, max: 3 },
+      },
+    ]);
+    expect(chat.app.runner.live(sessionId)?.retry).toEqual({
+      attempt: 1,
+      max: 3,
+    });
+    await advance(chat);
+    const answer = await waitScript(chat.scripted, 2);
+    // asked again, and still nothing from the provider
+    expect(frames(conn, "retry")).toHaveLength(1);
+    answer.content("done");
+    await tick();
+    const [set, cleared] = frames(conn, "retry");
+    expect(cleared).toMatchObject({ retry: null, seq: set!.seq + 1 });
+    expect(frames(conn, "delta").at(-1)!.seq).toBe(cleared!.seq + 1);
+    expect(chat.app.runner.live(sessionId)).not.toHaveProperty("retry");
+    answer.finish();
+    answer.usage();
+    answer.end();
+    await tick();
+    await tick();
+    expect(chat.app.sessions.send(detail.send.id)!.status).toBe("done");
+    expect(frames(conn, "retry")).toHaveLength(2);
+  });
+
+  test("a watcher joining mid-wait sees it, and Stop clears it", async () => {
+    const chat = await chatApp();
+    chat.scripted.refuse(503, BUSY);
+    const { sessionId, sendId } = await post(chat);
+    await tick();
+    const joined = await watcher(chat);
+    watch(chat, joined, sessionId);
+    expect(frames(joined, "watched")[0]?.live).toMatchObject({
+      sendId,
+      retry: { attempt: 1, max: 3 },
+    });
+    const held: SessionDetail = await (
+      await chat.member.call("GET", `/api/sessions/${sessionId}`)
+    ).json();
+    expect(held.live?.retry).toEqual({ attempt: 1, max: 3 });
+    await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
+    await tick();
+    await tick();
+    expect(frames(joined, "retry").at(-1)).toMatchObject({ retry: null });
+    expect(chat.app.sessions.send(sendId)!.status).toBe("stopped");
+  });
+});
+
 // runRound alone, with a chat port that plays one stream per request
 function round(
   streams: ChatEvent[][],
@@ -250,6 +329,8 @@ function round(
     },
   });
   let asked = 0;
+  // what the working line was told, as the writer skips a clear of nothing
+  const shown: (LiveRetry | null)[] = [];
   const deps = {
     chat: () => {
       const events = streams[asked++] ?? [];
@@ -257,7 +338,14 @@ function round(
         yield* events;
       })();
     },
-    writer: { delta() {} },
+    writer: {
+      delta() {},
+      retrying(send: ActiveSend, retry: LiveRetry | null) {
+        if (send.round!.retry === null && retry === null) return;
+        send.round!.retry = retry;
+        shown.push(retry);
+      },
+    },
     lookups: {},
     clock,
     log: logs.logFactory("runner"),
@@ -277,13 +365,19 @@ function round(
       deadlineMs: null,
       offered: { tools: [] },
     },
-    round: { content: "", reasoning: "", finishReason: null, usage: null },
+    round: {
+      content: "",
+      reasoning: "",
+      finishReason: null,
+      usage: null,
+      retry: null,
+    },
   } as unknown as ActiveSend;
   const run = runRound(deps, send, [], {
     request: { model: "m", messages: [], thinking: false },
     ...(fields.deadline === undefined ? {} : { deadline: fields.deadline }),
   });
-  return { run, asked: () => asked, sleeps, logs, send };
+  return { run, asked: () => asked, sleeps, logs, send, shown };
 }
 
 const timedOut: ChatEvent = {
@@ -313,6 +407,12 @@ describe("runRound retries", () => {
     await expect(r.run).rejects.toThrow("HTTP 503");
     expect(r.asked()).toBe(4);
     expect(r.sleeps).toEqual([1000, 2000, 4000]);
+    expect(r.shown).toEqual([
+      { attempt: 1, max: 3 },
+      { attempt: 2, max: 3 },
+      { attempt: 3, max: 3 },
+      null,
+    ]);
   });
 
   test("a third retry answered finishes the round", async () => {
@@ -320,6 +420,13 @@ describe("runRound retries", () => {
     await r.run;
     expect(r.asked()).toBe(4);
     expect(r.send.round!.finishReason).toBe("stop");
+    expect(r.shown).toEqual([
+      { attempt: 1, max: 3 },
+      { attempt: 2, max: 3 },
+      { attempt: 3, max: 3 },
+      null,
+    ]);
+    expect(r.send.round!.retry).toBeNull();
   });
 
   test("a wait past the deadline is not started", async () => {
@@ -327,5 +434,6 @@ describe("runRound retries", () => {
     await expect(r.run).rejects.toThrow("HTTP 503");
     expect(r.asked()).toBe(1);
     expect(r.sleeps).toEqual([]);
+    expect(r.shown).toEqual([]);
   });
 });

@@ -8,7 +8,11 @@
 // caller of finalizeSend. The lock is held until both the provider
 // iteration and the round's tools have let go, which drained says.
 
-import type { LiveSend, VisualDraft } from "../../shared/contracts/session.ts";
+import type {
+  LiveRetry,
+  LiveSend,
+  VisualDraft,
+} from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
 import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
@@ -44,6 +48,8 @@ export type RoundState = {
   // ends normally; the loop reads them after the round
   calls: ToolCall[];
   drafts: Map<number, VisualDraft>;
+  // set while the round waits to ask its provider again
+  retry: LiveRetry | null;
   // set to "work" at the first tool call delta, in its own transaction;
   // the round remembers so markRoundWork runs once
   slotMarked: boolean;
@@ -159,6 +165,7 @@ export function newRound(messageId: string, now: number): RoundState {
     spent: 0,
     calls: [],
     drafts: new Map(),
+    retry: null,
     slotMarked: false,
   };
 }
@@ -256,6 +263,7 @@ export function live(send: ActiveSend): LiveSend {
     return { phase: "tools", sendId: send.id, seq: send.seq };
   }
   return {
+    ...(round.retry === null ? {} : { retry: { ...round.retry } }),
     phase: "reply",
     sendId: send.id,
     messageId: round.messageId,

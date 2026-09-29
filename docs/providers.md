@@ -53,7 +53,11 @@ fields.
   round's signal and one that would pass the turn's deadline (the
   memory phase's own window in that phase) is not started. Each retry
   is a `round retried` warning with the attempt, the status and the
-  wait; the last failure fails the round with its words. Other 4xx and
+  wait, and puts `retry` (the attempt of three) on the round, which the
+  live snapshot carries and a `retry` frame sets and clears, never
+  stored: the turn's working line (`transcript/Work.model.ts`) adds
+  `retrying 1/3` until the next attempt's first event or the round's
+  end; the last failure fails the round with its words. Other 4xx and
   anything after the stream started fail at once. Deciders, catalogs
   and MCP calls are never retried here.
 - **The round keeps who served it.** On the OpenRouter wire alone,

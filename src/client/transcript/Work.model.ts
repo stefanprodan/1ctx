@@ -5,11 +5,15 @@
 // finished so far as a sign of progress; once done, how long the work
 // took, the calls, the failures and whether a cap ended the loop.
 
-import type { Message } from "../../shared/contracts/session.ts";
+import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import type { WorkNode } from "./rows.ts";
 import { clock, secs } from "./stream.ts";
 
 const count = (value: number) => `${value} tool${value === 1 ? "" : "s"}`;
+
+// a round waiting to ask its provider again: which of its retries
+const retrying = (retry: LiveRetry | null) =>
+  retry === null ? "" : ` · retrying ${retry.attempt}/${retry.max}`;
 
 export type WorkSummary = {
   live: boolean;
@@ -45,6 +49,7 @@ export function workSummary(
   node: WorkNode,
   live: boolean,
   now = 0,
+  retry: LiveRetry | null = null,
 ): WorkSummary {
   const tools = node.rows.filter(isTool);
   const finished = tools.filter(
@@ -87,6 +92,7 @@ export function workSummary(
     // the clock runs so a long send is seen to move
     text = `Working ${clock(durationMs)}`;
     if (finished > 0) text += ` · ${count(finished)}`;
+    text += retrying(retry);
   } else {
     text = `Worked for ${secs(durationMs)}`;
     if (toolCalls > 0) text += ` · ${count(toolCalls)}`;
@@ -102,12 +108,13 @@ export function memorySummary(
   node: WorkNode,
   live: boolean,
   now = 0,
+  retry: LiveRetry | null = null,
 ): WorkSummary {
   const base = workSummary(node, live, now);
   const send = node.send;
   let text: string;
   if (live) {
-    text = `Updating memory ${clock(base.durationMs)}`;
+    text = `Updating memory ${clock(base.durationMs)}${retrying(retry)}`;
   } else if (send?.memoryError != null) {
     text = `Memory not updated. ${send.memoryError}`;
   } else {

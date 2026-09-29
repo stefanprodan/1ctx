@@ -28,7 +28,7 @@ import {
   summaryRequest,
   withExhausted,
 } from "./context.ts";
-import { type RetryState, retryWait } from "./retry.ts";
+import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
@@ -165,20 +165,37 @@ export function buildRequest(
   return req;
 }
 
+export type RoundOptions = {
+  request?: ChatRequest;
+  signal?: AbortSignal;
+  // when a retry's wait must be over: the turn's deadline unless a
+  // phase has its own, null for none
+  deadline?: number | null;
+};
+
 export async function runRound(
   deps: RoundDeps,
   send: ActiveSend,
   rows: Message[],
-  options: {
-    request?: ChatRequest;
-    signal?: AbortSignal;
-    // when a retry's wait must be over: the turn's deadline unless a
-    // phase has its own, null for none
-    deadline?: number | null;
-  } = {},
+  options: RoundOptions = {},
 ): Promise<void> {
   const round = send.round;
   if (round === null) return;
+  try {
+    await streamRound(deps, send, round, rows, options);
+  } finally {
+    // an answer, a failure or Stop ends a wait the line still shows
+    deps.writer.retrying(send, null);
+  }
+}
+
+async function streamRound(
+  deps: RoundDeps,
+  send: ActiveSend,
+  round: RoundState,
+  rows: Message[],
+  options: RoundOptions,
+): Promise<void> {
   const signal = options.signal ?? send.controller.signal;
   const deadline =
     options.deadline !== undefined
@@ -235,11 +252,17 @@ export async function runRound(
             ? errorFields(new Error(event.message), false)
             : {}),
         });
+        deps.writer.retrying(send, {
+          attempt: retry.retries,
+          max: MAX_RETRIES,
+        });
         if (!(await pause(deps.clock, wait, signal))) return;
         iterator = open();
         continue;
       }
     }
+    // the next attempt answered, so the line stops saying retrying
+    if (round.retry !== null) deps.writer.retrying(send, null);
     started = true;
     switch (event.kind) {
       case "reasoning":
