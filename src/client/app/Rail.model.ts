@@ -13,7 +13,7 @@ export function projectHere(
 ): string | null {
   const page = /^\/projects\/([^/]+)(\/|$)/.exec(pathname);
   if (page !== null) return decodeURIComponent(page[1]);
-  const open = /^\/chat\/([^/]+)$/.exec(pathname);
+  const open = /^\/(?:chat|run)\/([^/]+)$/.exec(pathname);
   if (open !== null && chat?.session.id === decodeURIComponent(open[1])) {
     return chat.session.projectId;
   }

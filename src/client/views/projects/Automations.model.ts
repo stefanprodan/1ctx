@@ -121,7 +121,7 @@ export function waitingSince(
 export const nextRunWords = (fire: number, now: number, tz: string) =>
   `Next run ${fireLabel(fire, now, tz, true)}, ${until(fire, now)}`;
 
-// the brief's foot: "Waiting for a free slot since 09:00", the day
+// the brief's foot: "Waiting since 09:00", the day
 // named when not today, or the next run and how far off it is
 export function nextLine(
   a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz">,
@@ -130,11 +130,11 @@ export function nextLine(
   if (a.nextAt === null) return "";
   if (waitingSince(a, now) === null) return nextRunWords(a.nextAt, now, a.tz);
   const at = fireLabel(a.nextAt, now, a.tz, true);
-  return `Waiting for a free slot since ${at.replace(/^today /, "")}`;
+  return `Waiting since ${at.replace(/^today /, "")}`;
 }
 
 // the row's meta: the last failure, red on its own, then running,
-// waiting for a slot, suspended or the next fire
+// waiting, suspended or the next fire
 export function rowState(
   a: AutomationSummary,
   now: number,
@@ -149,7 +149,7 @@ export function rowState(
     : a.suspendedAt !== null
       ? "suspended"
       : waitingSince(a, now) !== null
-        ? "waiting for a slot"
+        ? "waiting"
         : a.nextAt !== null
           ? `next ${until(a.nextAt, now)}`
           : null;

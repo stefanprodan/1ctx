@@ -69,7 +69,7 @@ export function NameFields({
         </div>
       </div>
       <label class="field">
-        <span class="label">System prompt</span>
+        <span class="label">Prompt</span>
         <textarea
           name="prompt"
           class="agent-page-prompt"

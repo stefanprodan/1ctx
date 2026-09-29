@@ -22,6 +22,7 @@ import {
   agentHref,
   automationHref,
   chatHref,
+  runHref,
   userHref,
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
@@ -80,7 +81,7 @@ function Writer({ memory, now }: { memory: Memory; now: number }) {
         </a>
       ) : (
         <>
-          <a class="note-head-link" href={chatHref(session.id)}>
+          <a class="note-head-link" href={runHref(session.id)}>
             a run
           </a>{" "}
           of{" "}

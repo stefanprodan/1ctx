@@ -69,7 +69,7 @@ export function McpPage({ params }: { params: Params }) {
       menu={
         server !== null ? (
           <PageSwitcher
-            label="MCP servers"
+            label="MCP Servers"
             current={server.id}
             name={server.name}
             items={byName(list ?? []).map((s) => ({
@@ -86,7 +86,7 @@ export function McpPage({ params }: { params: Params }) {
       loading={(list === null || agents.value === null) && error === null}
       empty={
         list !== null && server === null
-          ? "No MCP server by that name."
+          ? "No MCP Server by that name."
           : undefined
       }
       error={error}

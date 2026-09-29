@@ -10,7 +10,7 @@
 // since App needs it before any route.
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
-import { isRunFilter } from "../../shared/words.ts";
+import { isRunFilter, type SessionOrigin } from "../../shared/words.ts";
 import { refreshAccessBoard } from "../data/access-board.ts";
 import {
   loadAdminProject,
@@ -172,6 +172,26 @@ const userPage = async (params: Params) => {
 
 const webAccess = async () => {
   await Promise.all([loadTools(), loadWebUsage(), loadCredentials()]);
+};
+
+// the project and the agents follow the session, since only its row
+// says which project it is in; the other origin's page shows nothing
+const sessionPage = async (id: string, origin: SessionOrigin) => {
+  await loadSession(id);
+  const detail = session.value;
+  if (detail === null || detail.session.id !== id) return;
+  if (detail.session.origin !== origin) return;
+  const projectId = detail.session.projectId;
+  // a run names its automation under the title
+  await Promise.all([
+    project.value?.id === projectId ? undefined : loadProject(projectId),
+    loadProjectAgents(projectId),
+    // a run has no composer, so nothing is staged for it
+    origin === "chat" ? loadUploads(projectId) : undefined,
+    detail.session.automationId === null
+      ? undefined
+      : loadAutomations(projectId),
+  ]);
 };
 
 export const ALIASES: Record<string, string> = {
@@ -411,24 +431,14 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Chat)),
     title: () => "Chat",
     role: "authenticated",
-    // the project and the agents follow the session, since only its
-    // row says which project it is in
-    load: async (params) => {
-      await loadSession(params.id);
-      const detail = session.value;
-      if (detail === null || detail.session.id !== params.id) return;
-      const projectId = detail.session.projectId;
-      // a run names its automation under the title
-      await Promise.all([
-        project.value?.id === projectId ? undefined : loadProject(projectId),
-        loadProjectAgents(projectId),
-        // a run has no composer, so nothing is staged for it
-        detail.session.origin === "chat" ? loadUploads(projectId) : undefined,
-        detail.session.automationId === null
-          ? undefined
-          : loadAutomations(projectId),
-      ]);
-    },
+    load: (params) => sessionPage(params.id, "chat"),
+  },
+  {
+    path: "/run/:id",
+    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Run)),
+    title: () => "Run",
+    role: "authenticated",
+    load: (params) => sessionPage(params.id, "automation"),
   },
   {
     path: "/admin/monitor",

@@ -102,11 +102,11 @@ function Servers({
     <SettingForm save={save}>
       <Setting
         list
-        title="MCP servers"
+        title="MCP Servers"
         action={
           listable && (
             <Finder
-              label="MCP servers"
+              label="MCP Servers"
               add="Add server"
               disabled={save.busy}
               options={byName(
@@ -153,13 +153,13 @@ function Servers({
           <RowsNote>The servers did not load. Reload the page.</RowsNote>
         ) : all.length === 0 ? (
           <RowsNote>
-            No MCP servers yet. <a href={MCP_HREF}>Add one</a> and it shows
+            No MCP Servers yet. <a href={MCP_HREF}>Add one</a> and it shows
             here.
           </RowsNote>
         ) : !takesTools ? (
           <RowsNote>This model takes no tools.</RowsNote>
         ) : rows.length === 0 ? (
-          <RowsNote>No MCP servers.</RowsNote>
+          <RowsNote>No MCP Servers.</RowsNote>
         ) : (
           rows.map((server) => {
             const link = linkOf(server.id)!;

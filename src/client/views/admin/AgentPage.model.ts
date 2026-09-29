@@ -93,7 +93,7 @@ export function failing(
 export function failingLine(counts: { servers: number; skills: number }) {
   const parts = [
     counts.servers > 0
-      ? plural(counts.servers, "MCP server", "MCP servers")
+      ? plural(counts.servers, "MCP Server", "MCP Servers")
       : "",
     counts.skills > 0 ? plural(counts.skills, "skill") : "",
   ].filter((part) => part !== "");

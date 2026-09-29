@@ -489,7 +489,7 @@ describe("needs attention", () => {
       ),
     ).toMatchObject({
       line: "refresh failed 3h ago",
-      what: "MCP server",
+      what: "MCP Server",
       icon: "mcp",
       href: "/admin/config/mcp/flux",
     });
