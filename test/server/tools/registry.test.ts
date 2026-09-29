@@ -160,4 +160,20 @@ describe("the registry's result cleaning", () => {
     });
     expect(result.timedOut).toBeTrue();
   });
+
+  test("gives a tool its grace past the timeout to answer", async () => {
+    const tool: Tool = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      timeoutMs: 20,
+      graceMs: 1000,
+      run: async () => {
+        await Bun.sleep(60);
+        return "answered";
+      },
+    };
+    const result = await new Registry([tool]).run(call, context());
+    expect(result).toEqual({ content: "answered", error: false });
+  });
 });

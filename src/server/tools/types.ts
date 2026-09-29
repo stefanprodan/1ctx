@@ -78,6 +78,8 @@ export type Tool<T extends string | ToolResult = string> = {
   description: string;
   parameters: object;
   timeoutMs?: number;
+  /** time past the timeout to answer at its own deadline, before it is cut */
+  graceMs?: number;
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<T>;
 };
 

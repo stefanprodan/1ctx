@@ -43,10 +43,11 @@ changes to it, its recorders) in `vendor/README.md`.
   https only, and answers capped and redacted; curl giving up on a
   fetch ends that fetch alone.
 - **Deadline, cancel, shutdown.** The deadline starts before the
-  queues. The interpreter stops `INTERPRETER_MARGIN_MS` sooner, so its
-  own exit 124 and words usually win; at the deadline the worker is
-  ended. An abort posts a cancel; unanswered within `CANCEL_GRACE_MS`,
-  the worker is ended with a `command cancel unanswered` warning.
+  queues. The interpreter stops at the call timeout with its own exit
+  124, words and output; the worker is ended `BACKSTOP_MS` (1 s) later,
+  and the tool registry waits the same grace (`graceMs`). An abort
+  posts a cancel; unanswered within `CANCEL_GRACE_MS`, the worker is
+  ended with a `command cancel unanswered` warning.
   Shutdown ends every running worker. An ended job commits nothing, and
   a command that saves nothing puts `phase` and `cause` on the runner's
   `tool failed` line.

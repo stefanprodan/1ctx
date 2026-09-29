@@ -19,6 +19,7 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import {
   COMMAND_WORKER,
+  callCaps,
   phaseWatch,
   run,
   setup,
@@ -287,8 +288,6 @@ describe("the command worker", () => {
     },
   );
 
-  // the area gives the interpreter only INTERPRETER_MARGIN_MS before its
-  // own deadline, so the words are checked here, far from the outer one
   test("a loop that yields stops at the interpreter's deadline with its words", async () => {
     const workers = commandWorkers(COMMAND_WORKER, silent);
     const settled = await workers.run(
@@ -305,11 +304,16 @@ describe("the command worker", () => {
     expect(settled.ok && settled.answer.stderr).toContain("exceeded");
   });
 
-  test("an exit 124 is the interpreter's deadline and saves nothing", async () => {
+  test("the call timeout is the interpreter's deadline, before the backstop", async () => {
     const s = setup();
     try {
-      const result = await run(s, "echo x > /knowledge/late; exit 124");
+      const result = await run(
+        s,
+        "echo x > /knowledge/late; while :; do sleep 0.05; done",
+        { ...callCaps, callTimeoutMs: 1500 },
+      );
       expect(result.error).toBe(true);
+      expect(result.content).toContain("exceeded");
       expect(result.content).toEndWith(
         "nothing saved: command stopped at a deadline or limit\nexit 124",
       );

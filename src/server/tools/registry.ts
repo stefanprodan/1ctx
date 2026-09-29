@@ -42,7 +42,8 @@ export class Registry {
     try {
       const tool = this.byName.get(call.name);
       if (!tool) throw new Error(this.unknown(call.name));
-      timeoutMs = tool.timeoutMs ?? ctx.caps.callTimeoutMs;
+      timeoutMs =
+        (tool.timeoutMs ?? ctx.caps.callTimeoutMs) + (tool.graceMs ?? 0);
       let parsed: unknown;
       try {
         parsed = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
