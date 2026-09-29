@@ -23,11 +23,19 @@ import type {
 } from "../../types.js";
 import { showHelp } from "../help.js";
 import { compare } from "./engine.js";
+import { formatContext } from "./format-context.js";
+import { formatNormal } from "./format-normal.js";
 import { formatUnified } from "./format-unified.js";
-import { shellName } from "./header.js";
+import { headerName, headerTime, shellName } from "./header.js";
 import { changesOf, hunksOf } from "./hunks.js";
 import { intern, splitLines } from "./lines.js";
 import { type DiffOptions, DiffUsageError, parseDiffArgs } from "./options.js";
+import {
+  anyPattern,
+  headings,
+  type LineTest,
+  markIgnorable,
+} from "./patterns.js";
 
 const diffHelp = {
   name: "diff",
@@ -178,6 +186,16 @@ async function operandPair(
   return [first, second];
 }
 
+/** Patterns as a line test; one GNU or RE2 refuses is trouble. */
+function compile(patterns: string[]): LineTest {
+  try {
+    return anyPattern(patterns);
+  } catch (error) {
+    rethrowFatalExecutionError(error);
+    throw new Trouble(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function isBinary(bytes: string): boolean {
   const nul = bytes.indexOf("\0");
   return nul !== -1 && nul < BINARY_WINDOW;
@@ -194,9 +212,17 @@ function result(stdout: string, exitCode: number): ExecResult {
   };
 }
 
+interface Tests {
+  /** -I */
+  matching: LineTest | null;
+  /** -p and -F */
+  heading: LineTest | null;
+}
+
 function compareFiles(
   ctx: RuntimeCommandContext,
   o: DiffOptions,
+  tests: Tests,
   a: Operand,
   b: Operand,
 ): ExecResult {
@@ -213,33 +239,54 @@ function compareFiles(
   const la = splitLines(a.bytes, o.stripTrailingCr);
   const lb = splitLines(b.bytes, o.stripTrailingCr);
   const ids = intern(la, lb, o);
+  const style = o.style ?? (o.showCFunction ? "context" : "normal");
+  const context = style === "normal" ? 0 : (o.obsolete ?? o.context ?? 3);
   const comparison = compare(ids.a, ids.b, ids.count, {
     ...workBudget(ctx),
     minimal: o.minimal,
     speedLargeFiles: o.speedLargeFiles,
-    horizon: o.horizon,
+    // the context shown is never left out of the search, as GNU keeps it
+    horizon: Math.max(o.horizon, context),
   });
-  const context = o.obsolete ?? o.context ?? 3;
-  const hunks = hunksOf(
-    changesOf(comparison),
-    context,
-    la.lines.length,
-    lb.lines.length,
-  );
+  const changes = changesOf(comparison);
+  if (o.ignoreBlankLines || tests.matching) {
+    markIgnorable(
+      changes,
+      la,
+      lb,
+      o.ignoreBlankLines,
+      o.ignoreAllSpace || o.ignoreSpaceChange || o.ignoreTrailingSpace,
+      tests.matching,
+    );
+  }
+  const hunks = hunksOf(changes, context, la.lines.length, lb.lines.length);
   if (hunks.length === 0) return same();
   if (o.brief) return result(text(`Files ${names} differ\n`), 1);
-  const out = [text(`--- ${a.name}\n`), text(`+++ ${b.name}\n`)];
-  formatUnified(
-    la,
-    lb,
-    hunks,
-    {
-      initialTab: o.initialTab,
-      suppressBlankEmpty: o.suppressBlankEmpty,
-      expandTabs: o.expandTabs ? o.tabSize : 0,
-    },
-    out,
-  );
+
+  const lineStyle = {
+    initialTab: o.initialTab,
+    suppressBlankEmpty: o.suppressBlankEmpty,
+    expandTabs: o.expandTabs ? o.tabSize : 0,
+  };
+  const out: string[] = [];
+  if (style === "normal") {
+    formatNormal(la, lb, hunks, lineStyle, out);
+    return result(out.join(""), 1);
+  }
+  const heading = tests.heading ? headings(la, tests.heading) : undefined;
+  const header = (mark: string, file: Operand, label: string | undefined) =>
+    text(
+      label !== undefined
+        ? `${mark} ${label}\n`
+        : `${mark} ${headerName(file.name)}\t${headerTime(file.mtime, ctx.env.get("TZ"))}\n`,
+    );
+  if (style === "unified") {
+    out.push(header("---", a, o.labels[0]), header("+++", b, o.labels[1]));
+    formatUnified(la, lb, hunks, lineStyle, out, heading);
+  } else {
+    out.push(header("***", a, o.labels[0]), header("---", b, o.labels[1]));
+    formatContext(la, lb, hunks, lineStyle, out, heading);
+  }
   return result(out.join(""), 1);
 }
 
@@ -278,10 +325,18 @@ export const diffCommand: RuntimeCommand = {
       return usage(new DiffUsageError(`extra operand '${operands[2]}'`));
     }
     try {
+      const tests = {
+        matching: options.ignoreMatching.length
+          ? compile(options.ignoreMatching)
+          : null,
+        heading: options.functionPatterns.length
+          ? compile(options.functionPatterns)
+          : null,
+      };
       const [first, second] = await operandPair(ctx, operands);
       const a = await readOperand(ctx, first);
       const b = second === first && first === "-" ? a : await readOperand(ctx, second);
-      return compareFiles(ctx, options, a, b);
+      return compareFiles(ctx, options, tests, a, b);
     } catch (error) {
       if (error instanceof Trouble || error instanceof DiffWorkLimitError) {
         return { stdout: "", stderr: `diff: ${error.message}\n`, exitCode: 2 };

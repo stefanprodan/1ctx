@@ -27,7 +27,8 @@ describe("diff", () => {
       expect(result.exitCode).toBe(1);
     });
 
-    it("should show unified diff output by default", async () => {
+    // (1ctx) GNU diff: the normal format is the default, -u asks for unified
+    it("should show the normal format by default", async () => {
       const env = new Bash({
         files: {
           "/a.txt": "hello\n",
@@ -35,10 +36,7 @@ describe("diff", () => {
         },
       });
       const result = await env.exec("diff /a.txt /b.txt");
-      expect(result.stdout).toContain("---");
-      expect(result.stdout).toContain("+++");
-      expect(result.stdout).toContain("-hello");
-      expect(result.stdout).toContain("+world");
+      expect(result.stdout).toBe("1c1\n< hello\n---\n> world\n");
       expect(result.exitCode).toBe(1);
     });
 
@@ -49,7 +47,7 @@ describe("diff", () => {
           "/b.txt": "line1\nline2\n",
         },
       });
-      const result = await env.exec("diff /a.txt /b.txt");
+      const result = await env.exec("diff -u /a.txt /b.txt"); // (1ctx) -u
       expect(result.stdout).toContain("+line2");
       expect(result.exitCode).toBe(1);
     });
@@ -61,7 +59,7 @@ describe("diff", () => {
           "/b.txt": "line1\n",
         },
       });
-      const result = await env.exec("diff /a.txt /b.txt");
+      const result = await env.exec("diff -u /a.txt /b.txt"); // (1ctx) -u
       expect(result.stdout).toContain("-line2");
       expect(result.exitCode).toBe(1);
     });
@@ -165,7 +163,7 @@ describe("diff", () => {
           "/b.txt": "from file\n",
         },
       });
-      const result = await env.exec('echo "from stdin" | diff - /b.txt');
+      const result = await env.exec('echo "from stdin" | diff -u - /b.txt'); // (1ctx) -u
       expect(result.stdout).toContain("-from stdin");
       expect(result.stdout).toContain("+from file");
       expect(result.exitCode).toBe(1);
@@ -177,7 +175,7 @@ describe("diff", () => {
           "/a.txt": "from file\n",
         },
       });
-      const result = await env.exec('echo "from stdin" | diff /a.txt -');
+      const result = await env.exec('echo "from stdin" | diff -u /a.txt -'); // (1ctx) -u
       expect(result.stdout).toContain("-from file");
       expect(result.stdout).toContain("+from stdin");
       expect(result.exitCode).toBe(1);
@@ -249,7 +247,7 @@ describe("diff", () => {
           "/b.txt": "line1\nmodified\nline3\n",
         },
       });
-      const result = await env.exec("diff /a.txt /b.txt");
+      const result = await env.exec("diff -u /a.txt /b.txt"); // (1ctx) -u
       expect(result.stdout).toContain("-line2");
       expect(result.stdout).toContain("+modified");
       expect(result.exitCode).toBe(1);
@@ -262,7 +260,7 @@ describe("diff", () => {
           "/b.txt": "1\n2\nX\n4\n5\n",
         },
       });
-      const result = await env.exec("diff /a.txt /b.txt");
+      const result = await env.exec("diff -u /a.txt /b.txt"); // (1ctx) -u
       expect(result.stdout).toContain("@@");
       expect(result.exitCode).toBe(1);
     });
@@ -276,7 +274,7 @@ describe("diff", () => {
           "/content.txt": "has content\n",
         },
       });
-      const result = await env.exec("diff /empty.txt /content.txt");
+      const result = await env.exec("diff -u /empty.txt /content.txt"); // (1ctx) -u
       expect(result.stdout).toContain("+has content");
       expect(result.exitCode).toBe(1);
     });

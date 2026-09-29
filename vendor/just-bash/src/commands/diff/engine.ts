@@ -101,8 +101,9 @@ export function compare(
   for (let i = 0; i < sa.length; i++) if (search.deleted[i]) deleted[xs[i]] = 1;
   for (let j = 0; j < sb.length; j++) if (search.inserted[j]) inserted[ys[j]] = 1;
 
-  slide(a, deleted, inserted, options.charge);
-  slide(b, inserted, deleted, options.charge);
+  // groups never slide into the common head and tail the search left out
+  slide(a, deleted, inserted, x0, x1, options.charge);
+  slide(b, inserted, deleted, x0, y1, options.charge);
   return { deleted, inserted };
 }
 
@@ -223,7 +224,8 @@ class Search {
       const hi = fmax;
       const nlo = lo > kmin ? lo - 1 : lo + 1;
       const nhi = hi < kmax ? hi + 1 : hi - 1;
-      for (let k = nlo; k <= nhi; k += 2) {
+      // from the top diagonal down, which picks among equal answers as GNU
+      for (let k = nhi; k >= nlo; k -= 2) {
         let x = -1;
         if (k - 1 >= lo && k - 1 <= hi) {
           const from = fv[k - 1 + o];
@@ -264,7 +266,7 @@ class Search {
       const bhi = bmax;
       const nblo = blo > kmin ? blo - 1 : blo + 1;
       const nbhi = bhi < kmax ? bhi + 1 : bhi - 1;
-      for (let k = nblo; k <= nbhi; k += 2) {
+      for (let k = nbhi; k >= nblo; k -= 2) {
         let x = FAR;
         if (k + 1 >= blo && k + 1 <= bhi) {
           const from = bv[k + 1 + o];
@@ -356,15 +358,17 @@ class Search {
 }
 
 /**
- * Slides each group of changed lines in `changed` over equal lines: up
- * then down as far as it goes, merging with the groups it meets, and
- * settles where it lines up with a change in the other file, or else as
- * late as it can.
+ * Slides each group of changed lines in `changed` over equal lines within
+ * lo and hi: up then down as far as it goes, merging with the groups it
+ * meets, and settles where it lines up with a change in the other file,
+ * or else as late as it can.
  */
 function slide(
   lines: Int32Array,
   changed: Uint8Array,
   other: Uint8Array,
+  lo: number,
+  hi: number,
   charge: (steps: number) => void,
 ): void {
   const n = changed.length;
@@ -388,7 +392,7 @@ function slide(
     let aligned: number;
     do {
       length = end - start;
-      while (start > 0 && lines[start - 1] === lines[end - 1]) {
+      while (start > lo && lines[start - 1] === lines[end - 1]) {
         changed[--start] = 1;
         changed[--end] = 0;
         while (start > 0 && changed[start - 1]) start--;
@@ -397,7 +401,7 @@ function slide(
         steps++;
       }
       aligned = j > 0 && other[j - 1] ? end : -1;
-      while (end < n && lines[start] === lines[end]) {
+      while (end < hi && lines[start] === lines[end]) {
         changed[start++] = 0;
         changed[end++] = 1;
         while (end < n && changed[end]) end++;

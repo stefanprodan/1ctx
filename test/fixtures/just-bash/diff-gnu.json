@@ -104,6 +104,16 @@
     "exact2.md": "# exactly forty bytes of heading text 40\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
     "cut1.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nalt\n",
     "cut2.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
+    "hd1": "alpha()\nx1\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\ny\n",
+    "hd2": "beta()\nx1\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\nz\n",
+    "al1": "a\nc\na\na\na\n",
+    "al2": "c\na\n",
+    "al3": "b\nb\nc\na\na\n",
+    "al4": "c\nb\na\nb\n",
+    "al5": "a\na\nc\nc\n",
+    "al6": "c\nc\nc\nb\na\nc\n",
+    "ign5": "# one\nk1\nk2\nk3\nk4\nk5\ncode\nk6\nk7\nk8\nk9\nk10\nk11\nk12\n# x\nk13\n",
+    "ign6": "# two\nk1\nk2\nk3\nk4\nk5\nCODE\nk6\nk7\nk8\nk9\nk10\nk11\nk12\n# y\nk13\n",
     "wsnl": "a\nb\nc \n",
     "wsnonl": "a\nb\nc"
   },
@@ -2918,6 +2928,81 @@
         "b"
       ],
       "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "heading past a deleted line",
+      "args": [
+        "-U",
+        "1",
+        "-F",
+        "^[a-z]*()",
+        "hd1",
+        "hd2"
+      ],
+      "stdout": "--- hd1\t2026-09-29 12:52:48.311000000 +0000\n+++ hd2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n-alpha()\n+beta()\n x1\n@@ -10,2 +10,2 @@ alpha()\n x9\n-y\n+z\n",
+      "exit": 1
+    },
+    {
+      "name": "alignment near the common tail",
+      "args": [
+        "al1",
+        "al2"
+      ],
+      "stdout": "1d0\n< a\n3,4d1\n< a\n< a\n",
+      "exit": 1
+    },
+    {
+      "name": "alignment between equal answers",
+      "args": [
+        "al3",
+        "al4"
+      ],
+      "stdout": "1,2d0\n< b\n< b\n3a2\n> b\n5c4\n< a\n---\n> b\n",
+      "exit": 1
+    },
+    {
+      "name": "alignment joining insertions",
+      "args": [
+        "al5",
+        "al6"
+      ],
+      "stdout": "1,2d0\n< a\n< a\n3a2,5\n> c\n> c\n> b\n> a\n",
+      "exit": 1
+    },
+    {
+      "name": "alignment joining insertions unified",
+      "args": [
+        "-u",
+        "al5",
+        "al6"
+      ],
+      "stdout": "--- al5\t2026-09-29 12:52:48.311000000 +0000\n+++ al6\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,6 @@\n-a\n-a\n c\n c\n+c\n+b\n+a\n+c\n",
+      "exit": 1
+    },
+    {
+      "name": "ignorable change beside a real one",
+      "args": [
+        "-u",
+        "-I",
+        "^#",
+        "ign5",
+        "ign6"
+      ],
+      "stdout": "--- ign5\t2026-09-29 12:52:48.311000000 +0000\n+++ ign6\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,10 +1,10 @@\n-# one\n+# two\n k1\n k2\n k3\n k4\n k5\n-code\n+CODE\n k6\n k7\n k8\n",
+      "exit": 1
+    },
+    {
+      "name": "ignorable changes far from a real one",
+      "args": [
+        "-U",
+        "2",
+        "-I",
+        "^#",
+        "ign5",
+        "ign6"
+      ],
+      "stdout": "--- ign5\t2026-09-29 12:52:48.311000000 +0000\n+++ ign6\t2026-09-29 12:52:48.311000000 +0000\n@@ -5,5 +5,5 @@\n k4\n k5\n-code\n+CODE\n k6\n k7\n",
       "exit": 1
     },
     {
