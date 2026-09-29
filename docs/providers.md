@@ -55,8 +55,9 @@ fields.
   toward the three. The abandoned stream is closed at once, and every
   wait runs under the round's signal; one that would pass the turn's
   deadline (the memory phase's own window in that phase) is not
-  started. The next attempt restarts the round's first-token clock and
-  forgets who served the failed one. Each retry is a `round retried`
+  started. The round's first-token time keeps counting from its start,
+  so the waits show in the time to first token and the finished fold's
+  duration; the next attempt forgets who served the failed one. Each retry is a `round retried`
   warning with the attempt, the status and the wait, and puts `retry`
   (the attempt of three) on the round, which the live snapshot carries
   and a `retry` frame sets and clears, never stored: the turn's working

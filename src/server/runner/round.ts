@@ -260,9 +260,9 @@ async function streamRound(
           max: MAX_RETRIES,
         });
         if (!(await pause(deps.clock, wait, signal))) return;
-        // the next attempt is the one its first token is timed from, and
-        // it names who serves it
-        round.startedAt = deps.clock();
+        // the first token stays timed from the round's start, since the
+        // waits are what the reader sat through; the next attempt names
+        // who serves it
         round.upstream = null;
         round.servedModel = null;
         iterator = open();

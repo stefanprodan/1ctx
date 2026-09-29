@@ -6,6 +6,9 @@
 // the scripted fetch cannot make, a headers wait that ran out.
 
 import { describe, expect, test } from "bun:test";
+import type { WorkNode } from "../../../src/client/transcript/rows.ts";
+import { groupRows } from "../../../src/client/transcript/rows.ts";
+import { workSummary } from "../../../src/client/transcript/Work.model.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type {
   ChatEvent,
@@ -72,11 +75,27 @@ describe("provider retries through a turn", () => {
     await tick();
     expect(chat.scripted.chats()).toBe(2);
     expect(chat.app.sessions.send(sendId)!.status).toBe("done");
-    // the first token is timed from the attempt that answered
+    // the first token is timed from the round's start, the wait
+    // included, and the finished fold says how long the turn took
     const reply = chat.app.sessions
       .messages(sessionId)
       .find((row) => row.kind === "reply")!;
-    expect(reply.ttftMs).toBe(0);
+    expect(reply.ttftMs).toBe(5000);
+    const detail: SessionDetail = await (
+      await chat.member.call("GET", `/api/sessions/${sessionId}`)
+    ).json();
+    const turn = groupRows(detail.messages, detail.send).find(
+      (node) => node.kind === "reply",
+    )!;
+    if (turn.kind !== "reply") throw new Error("no reply node");
+    const work: WorkNode = turn.work ?? {
+      sendId: turn.sendId,
+      rows: [],
+      rounds: [],
+      answer: turn.message,
+      send: turn.send,
+    };
+    expect(workSummary(work, false).text).toBe("Worked for 5.0 s");
     const retried = logs.events.filter((e) => e.msg === "round retried");
     expect(retried).toHaveLength(1);
     expect(retried[0]).toMatchObject({ level: "warn", area: "runner" });
@@ -587,11 +606,11 @@ describe("runRound retries", () => {
     expect(r.send.round!.upstream).toBeNull();
   });
 
-  test("the first token is timed from the attempt that answered", async () => {
+  test("the first token is timed from the round's start, waits included", async () => {
     const r = round([[busy], answer]);
     await r.run;
     expect(r.sleeps).toEqual([1000]);
-    expect(r.send.round!.startedAt).toBe(1_000_000 + 1000);
+    expect(r.send.round!.startedAt).toBe(1_000_000);
   });
 
   test("two headers timeouts fail the round", async () => {
