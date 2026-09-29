@@ -7,7 +7,7 @@ One continuous context for agents. Domain: 1ctx.dev.
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead. The one exception is just-bash,
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
-  change: `docs/just-bash.md` says what we changed and how to sync it.
+  change: `vendor/README.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
   and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
   the vendored tar command uses modern-tar too. The modern-tar patch
@@ -97,17 +97,17 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, four of them over record-cases.ts
-                (docs/just-bash.md) and deciders-record.ts
+                (vendor/README.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
                 by the app. site/README.md is the brand book.
 vendor/         just-bash/, the vendored source (a git subtree, outside
-                Biome and the structure rules), and
-                just-bash-failures.txt, what `make vendor-test` expects.
-docs/           the rules of each area, one file per topic (see Docs), and
-                just-bash.md: the fork, our changes, the upstream sync.
+                Biome and the structure rules), README.md (the fork, our
+                changes, the upstream sync) and just-bash-failures.txt,
+                what `make vendor-test` expects.
+docs/           the rules of each area, one file per topic (see Docs).
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
@@ -125,9 +125,9 @@ builds it with its factory and fakes for its ports.
 
 ## Docs
 
-The files under `docs/` are rules with the same force as this file;
-each governs the code its first lines name. Read the one that covers a
-change before making it.
+The files under `docs/` and `vendor/README.md` are rules with the same
+force as this file; each governs the code its first lines name. Read
+the one that covers a change before making it.
 
 | Doc | Read it |
 |---|---|
@@ -143,7 +143,7 @@ change before making it.
 | `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
 | `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
 | `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
-| `docs/just-bash.md` | before changing `vendor/just-bash/` or syncing it with upstream |
+| `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
 
 AGENTS.md and `docs/` change in the same commit as the code that changes
 a rule.
