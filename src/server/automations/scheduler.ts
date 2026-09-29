@@ -161,7 +161,7 @@ export function scheduler(deps: Deps): Scheduler {
         ) {
           return { result: null };
         }
-        // a manual start takes a fire left waiting for a slot
+        // a manual start takes a fire left waiting for a place
         const waiting =
           row.suspendedAt === null && row.nextAt !== null && row.nextAt <= now;
         const nextAt =
@@ -204,10 +204,14 @@ export function scheduler(deps: Deps): Scheduler {
           holder.value?.abandon();
           holder.value = null;
           if (source === "manual" || !(err instanceof HttpError)) throw err;
-          // a full run pool writes nothing: the row stays due
+          // a full cap writes nothing: the row stays due
           if (err instanceof RunCapacity) {
             return {
-              result: { wait: err.pool, dueAt: dueAt!, ownerId: row.ownerId },
+              result: {
+                wait: err.cap,
+                dueAt: dueAt!,
+                projectId: row.projectId,
+              },
             };
           }
           const updated = deps.store.recordEvent(row.id, {
@@ -367,11 +371,11 @@ export function scheduler(deps: Deps): Scheduler {
       if (!keepGoing()) return;
       replaceMissed(deps, row.id, now);
     }
-    // oldest first, due and waiting alike; a full pool for one owner
-    // passes over that owner's rows, for the process it ends the fires
+    // oldest first, due and waiting alike; a full project passes over
+    // that project's rows, a full process ends the fires
     for (const row of deps.store.due(now)) {
       if (!keepGoing() || waits.processFull) break;
-      if (waits.ownerFull(row.ownerId)) continue;
+      if (waits.projectFull(row.projectId)) continue;
       await fire(row.id);
     }
     if (!keepGoing()) return;
@@ -388,7 +392,7 @@ export function scheduler(deps: Deps): Scheduler {
   const wait = async (seen: number): Promise<void> => {
     if (waits.generation !== seen) return;
     const now = deps.clock();
-    // while a pool is full the rows left due are waits, not wakes
+    // while a cap is full the rows left due are waits, not wakes
     const earliest = deps.store.earliest(waits.any ? passAt : null);
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;

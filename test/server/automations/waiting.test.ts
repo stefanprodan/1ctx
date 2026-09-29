@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A scheduled fire the run pool refuses stays due and starts once a
-// slot frees: over the real runner with a low run cap, and over a fake
+// A scheduled fire refused for a full cap stays due and starts once a
+// place frees: over the real runner with low caps, and over a fake
 // start that refuses on cue.
 
 import { describe, expect, test } from "bun:test";
@@ -34,27 +34,27 @@ const setDue = (chat: ChatApp, id: string, at: number) =>
 
 const row = (chat: ChatApp, id: string) => chat.app.automations.byId(id)!;
 
-// the runner's start wrapped: every call recorded, and a full pool
+// the runner's start wrapped: every call recorded, and a full cap
 // thrown while full() names one
 function fakeStart(
   chat: ChatApp,
-  full: (event: Event) => "user" | "process" | null,
+  full: (event: Event) => "project" | "process" | null,
 ) {
   const calls: string[] = [];
   const original = chat.app.runner.startRun;
   chat.app.runner.startRun = (event) => {
     calls.push(event.automation.id);
-    const pool = full(event);
-    if (pool === "user") {
+    const cap = full(event);
+    if (cap === "project") {
       throw new RunCapacity(
-        "user",
-        "1 of your tasks are running; wait for one",
+        "project",
+        "This project has 16 chats and runs going. Try again in a moment.",
       );
     }
-    if (pool === "process") {
+    if (cap === "process") {
       throw new RunCapacity(
         "process",
-        "too many tasks running; try again in a moment",
+        "Too many chats and runs are going. Try again in a moment.",
       );
     }
     return original(event);
@@ -81,12 +81,18 @@ async function adminAutomation(
   return (await response.json()).automation;
 }
 
-// a run of the member's that holds its only slot
+const LOW = { sendsPerUser: 4, sendsPerProject: 4, sendsRunning: 4 };
+
+// the admin's four chats fill the process; the first is returned, the
+// rest end with the app
 async function holdSlot(chat: ChatApp) {
-  await setLimits(chat, { runsPerUser: 1 });
-  const holder = await createAutomation(chat, { name: "holder" });
-  setDue(chat, holder.id, FAR);
-  return startRun(chat, holder.id);
+  await setLimits(chat, LOW);
+  const project = chat.app.projects.personal(chat.adminId)!.id;
+  const held = [];
+  for (const message of ["a", "b", "c", "d"]) {
+    held.push(await startChat(chat, message, chat.admin, project));
+  }
+  return { main: held[0]!.script, sessionId: held[0]!.sessionId, held };
 }
 
 async function stopped() {
@@ -102,8 +108,8 @@ const waits = (logs: ReturnType<typeof collectLogs>) =>
     .filter((event) => event.msg === "wait")
     .map((event) => event.fields);
 
-describe("a fire waiting for a run slot", () => {
-  test("a full pool leaves the row due with nothing written, logged once", async () => {
+describe("a fire waiting for a free place", () => {
+  test("a full cap leaves the row due with nothing written, logged once", async () => {
     const { chat, logs } = await stopped();
     const held = await holdSlot(chat);
     const waiting = await createAutomation(chat, { name: "waiting" });
@@ -113,8 +119,8 @@ describe("a fire waiting for a run slot", () => {
 
     await chat.app.automationScheduler.pass();
     expect(row(chat, waiting.id)).toEqual(before);
-    expect(chat.scripted.scripts).toHaveLength(1);
-    expect(waits(logs)).toEqual([{ automation: waiting.id, pool: "user" }]);
+    expect(chat.scripted.scripts).toHaveLength(4);
+    expect(waits(logs)).toEqual([{ automation: waiting.id, cap: "process" }]);
 
     chat.app.automationScheduler.wake();
     await chat.app.automationScheduler.pass();
@@ -127,7 +133,7 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
-  test("a freed slot starts it with its missed due time", async () => {
+  test("a chat ending starts it with its missed due time, without a pass interval", async () => {
     const { chat } = await stopped();
     const held = await holdSlot(chat);
     const waiting = await createAutomation(chat, { name: "waiting" });
@@ -137,12 +143,13 @@ describe("a fire waiting for a run slot", () => {
     chat.app.automationScheduler.start();
     await tick();
     await tick();
-    expect(chat.scripted.scripts).toHaveLength(1);
+    expect(chat.scripted.scripts).toHaveLength(4);
     expect(row(chat, waiting.id).nextAt).toBe(due);
 
     held.main.reply("done");
     await settleRun(chat, held.sessionId);
-    const script = await waitScript(chat.scripted, 2);
+    const script = await waitScript(chat.scripted, 5);
+    expect(chat.app.now.value).toBe(due);
     expect(row(chat, waiting.id)).toMatchObject({
       lastEventOutcome: "run",
       lastEventSource: "schedule",
@@ -160,7 +167,7 @@ describe("a fire waiting for a run slot", () => {
     const first = chat.app.now.value;
     setDue(chat, waiting.id, first);
     let full = true;
-    const start = fakeStart(chat, () => (full ? "user" : null));
+    const start = fakeStart(chat, () => (full ? "project" : null));
 
     await chat.app.automationScheduler.pass();
     expect(row(chat, waiting.id).nextAt).toBe(first);
@@ -185,8 +192,8 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.automationScheduler.pass();
     expect(start.calls).toEqual([waiting.id, waiting.id]);
     expect(waits(logs)).toEqual([
-      { automation: waiting.id, pool: "user" },
-      { automation: waiting.id, pool: "user" },
+      { automation: waiting.id, cap: "project" },
+      { automation: waiting.id, cap: "project" },
     ]);
 
     full = false;
@@ -205,7 +212,7 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
-  test("an owner's full pool passes over only that owner's rows", async () => {
+  test("a full project passes over only that project's rows", async () => {
     const { chat } = await stopped();
     const now = chat.app.now.value;
     const mine = await createAutomation(chat, { name: "mine-one" });
@@ -215,7 +222,7 @@ describe("a fire waiting for a run slot", () => {
     setDue(chat, mine2.id, now - 2);
     setDue(chat, theirs.id, now - 1);
     const start = fakeStart(chat, (event) =>
-      event.user.id === chat.memberId ? "user" : null,
+      event.project.id === chat.projectId ? "project" : null,
     );
     const pending = chat.scripted.next();
 
@@ -231,7 +238,7 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
-  test("a full process pool ends the pass's fires", async () => {
+  test("a full process ends the pass's fires", async () => {
     const { chat } = await stopped();
     const now = chat.app.now.value;
     const one = await createAutomation(chat, { name: "one" });
@@ -266,7 +273,7 @@ describe("a fire waiting for a run slot", () => {
     setDue(chat, late.id, 10 * HOUR + 5 * 60_000);
     setDue(chat, early.id, 10 * HOUR + 2 * 60_000);
     setDue(chat, missed.id, 8 * HOUR);
-    const start = fakeStart(chat, () => "user");
+    const start = fakeStart(chat, () => "project");
     await chat.app.automationScheduler.pass();
     expect(start.calls).toEqual([missed.id]);
     expect(row(chat, missed.id).nextAt).toBe(10 * HOUR);
@@ -297,7 +304,7 @@ describe("a fire waiting for a run slot", () => {
     setDue(chat, blocked.id, now);
     setDue(chat, later.id, now + 100);
     const start = fakeStart(chat, (event) =>
-      event.user.id === chat.memberId ? "user" : null,
+      event.project.id === chat.projectId ? "project" : null,
     );
     chat.app.automationScheduler.start();
     for (let i = 0; i < 5; i++) await tick();
@@ -325,7 +332,7 @@ describe("a fire waiting for a run slot", () => {
     const start = fakeStart(chat, () => {
       if (refusals === 0) return null;
       refusals--;
-      return "user";
+      return "project";
     });
     chat.app.automationScheduler.start();
     for (let i = 0; i < 5; i++) await tick();
@@ -353,7 +360,7 @@ describe("a fire waiting for a run slot", () => {
       refusals--;
       // the slot frees after the refusal, before the loop sleeps
       queueMicrotask(() => chat.app.automationScheduler.wake());
-      return "user";
+      return "project";
     });
     chat.app.automationScheduler.start();
     const script = await waitScript(chat.scripted, 1);
@@ -369,7 +376,7 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
-  test("raising the run cap starts a waiting fire", async () => {
+  test("raising a cap starts a waiting fire", async () => {
     const { chat } = await stopped();
     const held = await holdSlot(chat);
     const waiting = await createAutomation(chat, { name: "waiting" });
@@ -377,16 +384,119 @@ describe("a fire waiting for a run slot", () => {
     chat.app.automationScheduler.start();
     await tick();
     await tick();
-    expect(chat.scripted.scripts).toHaveLength(1);
+    expect(chat.scripted.scripts).toHaveLength(4);
 
-    await setLimits(chat, { runsPerUser: 2 });
-    const script = await waitScript(chat.scripted, 2);
+    await setLimits(chat, { ...LOW, sendsRunning: 8 });
+    const script = await waitScript(chat.scripted, 5);
     expect(row(chat, waiting.id).lastEventOutcome).toBe("run");
     chat.app.automationScheduler.stop();
     held.main.reply("done");
     script.reply("done");
     await settleRun(chat, held.sessionId);
     await settleRun(chat, row(chat, waiting.id).lastRunSessionId!);
+    await chat.app.shutdown();
+  });
+
+  test("a rollback and an abandon each start a waiting fire, without a pass interval", async () => {
+    const { chat } = await stopped();
+    const due = chat.app.now.value;
+    const waiting = await createAutomation(chat, { name: "waiting" });
+    const other = await createAutomation(chat, { name: "other" });
+    setDue(chat, waiting.id, due);
+    setDue(chat, other.id, FAR);
+    let full = true;
+    const start = fakeStart(chat, (event) =>
+      event.automation.id === waiting.id && full ? "process" : null,
+    );
+    chat.app.automationScheduler.start();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toEqual([waiting.id]);
+    // room without a wake is not seen before the pass interval
+    full = false;
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toEqual([waiting.id]);
+
+    // a chat whose rows fail to write frees its place
+    const sessions = chat.app.sessions;
+    const createSend = sessions.createSend;
+    // the wake starts the run before the call answers, so only once
+    sessions.createSend = () => {
+      sessions.createSend = createSend;
+      throw new Error("send write failed");
+    };
+    const pending = chat.scripted.next();
+    const failed = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    expect(failed.status).toBe(500);
+    const script = await pending;
+    expect(start.calls).toEqual([waiting.id, waiting.id]);
+    expect(row(chat, waiting.id).lastEventDueAt).toBe(due);
+    expect(chat.app.now.value).toBe(due);
+    script.reply("done");
+    await settleRun(chat, row(chat, waiting.id).lastRunSessionId!);
+
+    // a fire prepared and then abandoned frees its place
+    full = true;
+    setDue(chat, waiting.id, due);
+    chat.app.automationScheduler.wake();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toHaveLength(3);
+    full = false;
+    setDue(chat, other.id, due);
+    const store = chat.app.automations;
+    const record = store.recordEvent;
+    let failures = 1;
+    store.recordEvent = (id, fields) => {
+      if (id === other.id && failures-- > 0) {
+        throw new Error("event write failed");
+      }
+      return record.call(store, id, fields);
+    };
+    const next = chat.scripted.next();
+    await chat.app.automationScheduler.fire(other.id);
+    const again = await next;
+    store.recordEvent = record;
+    expect(start.calls.filter((id) => id === waiting.id)).toHaveLength(4);
+    expect(row(chat, waiting.id).lastEventDueAt).toBe(due);
+    expect(chat.app.now.value).toBe(due);
+    start.restore();
+    chat.app.automationScheduler.stop();
+    again.reply("done");
+    await settleRun(chat, row(chat, waiting.id).lastRunSessionId!);
+    await chat.app.shutdown();
+  });
+
+  test("two frees and a cap raise together start each waiting fire once", async () => {
+    const { chat } = await stopped();
+    const held = await holdSlot(chat);
+    const due = chat.app.now.value;
+    const one = await createAutomation(chat, { name: "one" });
+    const two = await createAutomation(chat, { name: "two" });
+    setDue(chat, one.id, due);
+    setDue(chat, two.id, due);
+    chat.app.automationScheduler.start();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(chat.scripted.scripts).toHaveLength(4);
+
+    const [a, b] = held.held;
+    a!.script.reply("done");
+    b!.script.reply("done");
+    await setLimits(chat, { ...LOW, sendsRunning: 8 });
+    await waitScript(chat.scripted, 6);
+    for (let i = 0; i < 20; i++) await tick();
+    expect(chat.scripted.scripts).toHaveLength(6);
+    for (const id of [one.id, two.id]) {
+      expect(row(chat, id)).toMatchObject({
+        lastEventOutcome: "run",
+        lastEventDueAt: due,
+      });
+      const runs = chat.app.db
+        .query("select id from sessions where automation_id = ?")
+        .all(id);
+      expect(runs).toHaveLength(1);
+    }
+    chat.app.automationScheduler.stop();
     await chat.app.shutdown();
   });
 
@@ -397,7 +507,7 @@ describe("a fire waiting for a run slot", () => {
       const due = chat.app.now.value;
       const waiting = await createAutomation(chat, { name: "waiting" });
       setDue(chat, waiting.id, due);
-      const start = fakeStart(chat, () => "user");
+      const start = fakeStart(chat, () => "project");
       await chat.app.automationScheduler.pass();
       start.restore();
       expect(row(chat, waiting.id).lastEventAt).toBeNull();
@@ -439,7 +549,7 @@ describe("a fire waiting for a run slot", () => {
     const due = chat.app.now.value;
     const waiting = await createAutomation(chat, { name: "waiting" });
     setDue(chat, waiting.id, due);
-    const start = fakeStart(chat, () => "user");
+    const start = fakeStart(chat, () => "project");
     await chat.app.automationScheduler.pass();
     const patch = (body: Record<string, unknown>) =>
       chat.member.call("PATCH", `/api/automations/${waiting.id}`, { body });
@@ -476,7 +586,7 @@ describe("a fire waiting for a run slot", () => {
     await chat.app.shutdown();
   });
 
-  test("Run now at a full pool is the 429 and the wait stays", async () => {
+  test("Run now at a full cap is the 429 and the wait stays", async () => {
     const { chat } = await stopped();
     const held = await holdSlot(chat);
     const waiting = await createAutomation(chat, { name: "waiting" });
@@ -490,7 +600,7 @@ describe("a fire waiting for a run slot", () => {
     );
     expect(refused.status).toBe(429);
     expect(await refused.json()).toEqual({
-      error: "1 of your tasks are running; wait for one",
+      error: "Too many chats and runs are going. Try again in a moment.",
     });
     expect(row(chat, waiting.id).nextAt).toBe(due);
     held.main.reply("done");
@@ -503,7 +613,7 @@ describe("a fire waiting for a run slot", () => {
     const waiting = await createAutomation(chat, { name: "waiting" });
     const due = chat.app.now.value;
     setDue(chat, waiting.id, due);
-    const start = fakeStart(chat, () => "user");
+    const start = fakeStart(chat, () => "project");
     await chat.app.automationScheduler.pass();
     start.restore();
 
@@ -540,8 +650,8 @@ describe("a fire waiting for a run slot", () => {
       db: chat.app.db,
       fetcher: chat.scripted.fetcher,
     });
-    expect(restarted.repaired).toBe(1);
-    expect(restarted.reconciled).toBe(1);
+    expect(restarted.repaired).toBe(4);
+    expect(restarted.reconciled).toBe(0);
     const script = await pending;
     expect(restarted.automations.byId(waiting.id)).toMatchObject({
       lastEventOutcome: "run",
@@ -567,7 +677,7 @@ describe("a fire waiting for a run slot", () => {
 
     await chat.app.shutdown();
     for (let i = 0; i < 5; i++) await tick();
-    expect(chat.scripted.scripts).toHaveLength(1);
+    expect(chat.scripted.scripts).toHaveLength(4);
     expect(chat.app.sessions.byId(held.sessionId)?.status).not.toBe("running");
     expect(row(chat, waiting.id)).toEqual(before);
     expect(logs.events.some((event) => event.msg === "skip")).toBe(false);

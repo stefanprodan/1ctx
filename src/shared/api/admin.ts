@@ -259,18 +259,22 @@ export const LOAD_SAMPLE_MS = 5_000;
 export const LOAD_SAMPLES = 180;
 
 // GET /api/admin/load: the process now, read from memory at each
-// request. chats and runs are the sends running in each pool against
-// their process caps; online the users with an open socket; waiting
-// the automations whose fire is past due by WAIT_GRACE_MS. cpu is the
+// request. chats and runs are the sends running, together against cap,
+// the process's; scheduled the runs no user started, against
+// scheduledCap, the share of cap they may hold; projectsFull the
+// projects at their own cap; online the users with an open socket;
+// waiting the automations whose fire is past due by WAIT_GRACE_MS. cpu is the
 // process's share of the cores it may use, 0 to 1; rss its resident
 // bytes against memoryLimit, a container's limit when contained, else
 // the host's memory. The samples are oldest first, the last the newest
 export type LoadResponse = {
   at: number;
   chats: number;
-  chatsCap: number;
   runs: number;
-  runsCap: number;
+  cap: number;
+  scheduled: number;
+  scheduledCap: number;
+  projectsFull: number;
   online: number;
   automations: number;
   waiting: number;

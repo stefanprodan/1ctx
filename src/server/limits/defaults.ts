@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The one table of the limits: the loop caps of a send, the caps a
-// single tool call runs under and the caps on running runs, each with
-// its default, the floor and the ceiling the parser holds an admin to,
-// its unit and its scope.
+// single tool call runs under and the caps on the chats and runs going
+// at once, each with its default, the floor and the ceiling the parser
+// holds an admin to, its unit and its scope.
 // The code owns the defaults; a row in the limits table is an override
 // alone, so a default that changes in code changes for every server
 // that never overrode it. runner/limits.ts and tools/limits.ts re-export
@@ -58,11 +58,19 @@ export type KnowledgeCaps = {
   mcpKeptFiles: number;
 };
 
-// the runs the process holds at once, read at each admission
-export type RunCaps = {
-  runsPerUser: number;
-  runsRunning: number;
+// the chats and runs going at once, read at each admission: per user
+// who started one, per project, and in the process
+export type SendCaps = {
+  sendsPerUser: number;
+  sendsPerProject: number;
+  sendsRunning: number;
 };
+
+// the places scheduled runs may hold under a project's or the process's
+// cap; the rest is kept for sends a user started, at least 1 at the
+// floor of 4
+export const scheduledShare = (cap: number): number =>
+  Math.floor((cap * 3) / 4);
 
 // the days the hourly sweep archives an idle chat after, and deletes
 // an archived chat after; neither has an off value
@@ -74,7 +82,7 @@ export type ChatCaps = {
 export type Limits = LoopLimits &
   ToolCaps &
   KnowledgeCaps &
-  RunCaps &
+  SendCaps &
   ChatCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
@@ -339,8 +347,21 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     unit: "count",
     scope: "knowledge",
   },
-  runsPerUser: { default: 4, min: 1, max: 32, unit: "count", scope: "runs" },
-  runsRunning: { default: 32, min: 1, max: 64, unit: "count", scope: "runs" },
+  sendsPerUser: { default: 4, min: 1, max: 16, unit: "count", scope: "sends" },
+  sendsPerProject: {
+    default: 16,
+    min: 4,
+    max: 64,
+    unit: "count",
+    scope: "sends",
+  },
+  sendsRunning: {
+    default: 64,
+    min: 4,
+    max: 256,
+    unit: "count",
+    scope: "sends",
+  },
   archiveIdleDays: {
     default: 30,
     min: 1,

@@ -37,6 +37,7 @@ import {
 import { type ChatApp, chatApp, FLASH, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 
+const IDLE = { chats: 0, runs: 0, scheduled: 0, projectsFull: 0 };
 const NOW = Date.parse("2026-06-15T12:00:00Z");
 const DAY = 86_400_000;
 const LONG_AGO = Date.parse("2020-01-01T00:00:00Z");
@@ -861,7 +862,7 @@ describe("the overview cache", () => {
       limits: { current: () => DEFAULT_LIMITS },
       version: "v0",
       startedAt: 0,
-      pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
+      running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
       attention: NO_ATTENTION,
@@ -997,15 +998,36 @@ describe("the load sampler", () => {
 describe("the load", () => {
   test("is read at each request", async () => {
     const app = await testApp();
-    const state = { chats: 1, runs: 2, online: 3, total: 4, waiting: 1 };
+    const state = {
+      chats: 1,
+      runs: 2,
+      online: 3,
+      total: 4,
+      waiting: 1,
+      perProject: 0,
+    };
     const built = overviewArea({
       db: app.db,
       clock: () => app.now.value,
       log: collectLogs().logFactory("overview"),
-      limits: { current: () => ({ ...DEFAULT_LIMITS, runsRunning: 12 }) },
+      limits: {
+        current: () => ({
+          ...DEFAULT_LIMITS,
+          sendsPerProject: 8,
+          sendsRunning: 12,
+        }),
+      },
       version: "v9.9.9",
       startedAt: 1234,
-      pools: () => ({ chats: state.chats, chatsCap: 32, runs: state.runs }),
+      running: (perProject) => {
+        state.perProject = perProject;
+        return {
+          chats: state.chats,
+          runs: state.runs,
+          scheduled: 1,
+          projectsFull: 1,
+        };
+      },
       online: () => state.online,
       automations: () => ({ total: state.total, waiting: state.waiting }),
       attention: NO_ATTENTION,
@@ -1021,9 +1043,11 @@ describe("the load", () => {
     expect(built.load()).toEqual({
       at: app.now.value,
       chats: 1,
-      chatsCap: 32,
       runs: 2,
-      runsCap: 12,
+      cap: 12,
+      scheduled: 1,
+      scheduledCap: 9,
+      projectsFull: 1,
       online: 3,
       automations: 4,
       waiting: 1,
@@ -1032,6 +1056,7 @@ describe("the load", () => {
       contained: true,
       samples: { at: [], cpu: [], rss: [] },
     });
+    expect(state.perProject).toBe(8);
     state.chats = 0;
     state.waiting = 0;
     expect(built.load()).toMatchObject({ chats: 0, waiting: 0 });
@@ -1051,7 +1076,7 @@ describe("the load", () => {
       limits: { current: () => DEFAULT_LIMITS },
       version: "v0",
       startedAt: 0,
-      pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
+      running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
       attention: NO_ATTENTION,
@@ -1106,9 +1131,11 @@ describe("the load", () => {
       online: 0,
       automations: 3,
       waiting: 1,
-      runsCap: DEFAULT_LIMITS.runsRunning,
+      cap: DEFAULT_LIMITS.sendsRunning,
+      scheduled: 0,
+      scheduledCap: 48,
+      projectsFull: 0,
     });
-    expect(body.chatsCap).toBeGreaterThan(0);
     expect(body.cores).toBeGreaterThan(0);
     expect(body.memoryLimit).toBeGreaterThan(0);
     // the baseline alone until the timer takes the first sample

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { type Event, Registry } from "../../../src/server/runner/index.ts";
+import type { Event } from "../../../src/server/runner/index.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import { automationBody, createAutomation } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { chatApp, setLimits, startChat, tick } from "../../helpers/chat.ts";
 
 async function settle(
   chat: Awaited<ReturnType<typeof chatApp>>,
@@ -342,10 +342,9 @@ describe("automation scheduler", () => {
     await chat.app.shutdown();
   });
 
-  test("a user's chats at their cap leave the run pool free", async () => {
-    const chat = await chatApp({
-      registry: new Registry({ running: 4, perUser: 1 }),
-    });
+  test("a user at their cap does not hold up their automation's scheduled run", async () => {
+    const chat = await chatApp();
+    await setLimits(chat, { sendsPerUser: 1 });
     chat.app.automationScheduler.stop();
     const active = await startChat(chat, "hold the user cap");
     const automation = await createAutomation(chat);

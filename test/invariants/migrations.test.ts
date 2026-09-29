@@ -45,6 +45,7 @@ const EXPECTED_IDS = [
   "0031-deciders",
   "0032-admin-activity",
   "0033-feed-arms",
+  "0034-send-limits",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1004,7 +1005,7 @@ describe("the schema", () => {
     try {
       const before = rows();
       const existing = indexes();
-      expect(migrate(db)).toEqual(["0033-feed-arms"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 33))).toEqual(["0033-feed-arms"]);
       expect(rows()).toEqual(before);
       const kept = (index: { name: string }) =>
         !FEED.includes(index.name) &&
@@ -1054,10 +1055,86 @@ describe("the schema", () => {
         "where origin = 'automation' and automation_id is null",
       );
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 33))).toEqual([]);
     } finally {
       db.close();
     }
+  });
+
+  describe("0034 turns the run caps into caps on every chat and run", () => {
+    const converted = (
+      overrides: [string, number, number][],
+    ): { name: string; value: number; updated_at: number }[] => {
+      const db = seed(MIGRATIONS.slice(0, 33));
+      try {
+        const insert = db.query(
+          "insert into limits (name, value, updated_at) values (?, ?, ?)",
+        );
+        for (const row of overrides) insert.run(...row);
+        expect(migrate(db)).toEqual(["0034-send-limits"]);
+        expect(migrate(db)).toEqual([]);
+        return db
+          .query<{ name: string; value: number; updated_at: number }, []>(
+            "select name, value, updated_at from limits order by name",
+          )
+          .all();
+      } finally {
+        db.close();
+      }
+    };
+
+    test("the lowest old overrides gain the chat caps", () => {
+      expect(
+        converted([
+          ["runsPerUser", 1, 10],
+          ["runsRunning", 1, 20],
+          ["rounds", 50, 30],
+        ]),
+      ).toEqual([
+        { name: "rounds", value: 50, updated_at: 30 },
+        { name: "sendsPerUser", value: 5, updated_at: 10 },
+        { name: "sendsRunning", value: 33, updated_at: 20 },
+      ]);
+    });
+
+    test("the highest old overrides are held to the new ceilings", () => {
+      expect(
+        converted([
+          ["runsPerUser", 32, 10],
+          ["runsRunning", 64, 20],
+        ]),
+      ).toEqual([
+        { name: "sendsPerUser", value: 16, updated_at: 10 },
+        { name: "sendsRunning", value: 96, updated_at: 20 },
+      ]);
+    });
+
+    test("the order holds against a project cap already set", () => {
+      expect(
+        converted([
+          ["runsPerUser", 32, 10],
+          ["runsRunning", 1, 20],
+          ["sendsPerProject", 48, 5],
+        ]),
+      ).toEqual([
+        { name: "sendsPerProject", value: 48, updated_at: 5 },
+        { name: "sendsPerUser", value: 16, updated_at: 10 },
+        { name: "sendsRunning", value: 48, updated_at: 20 },
+      ]);
+      expect(
+        converted([
+          ["runsPerUser", 12, 10],
+          ["sendsPerProject", 8, 5],
+        ]),
+      ).toEqual([
+        { name: "sendsPerProject", value: 8, updated_at: 5 },
+        { name: "sendsPerUser", value: 8, updated_at: 10 },
+      ]);
+    });
+
+    test("no override leaves no row", () => {
+      expect(converted([])).toEqual([]);
+    });
   });
 
   describe("0030 archived chats migration", () => {

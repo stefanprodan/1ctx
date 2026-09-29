@@ -3,9 +3,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { UPLOAD_LEASE_MS } from "../../../src/server/knowledge/limits.ts";
-import { Registry } from "../../../src/server/runner/index.ts";
 import { MAX_UPLOAD_RECORD_BYTES } from "../../../src/shared/uploads.ts";
-import { chatApp, NO_TOOLS } from "../../helpers/chat.ts";
+import { chatApp, NO_TOOLS, setLimits } from "../../helpers/chat.ts";
 import {
   close,
   files,
@@ -185,13 +184,11 @@ describe("uploads claimed by a send", () => {
   );
 
   test.each([
-    { name: "session lock", running: 4, perUser: 4, status: 409 },
-    { name: "process cap", running: 1, perUser: 4, status: 429 },
-    { name: "user cap", running: 4, perUser: 1, status: 429 },
+    { name: "session lock", perUser: 4, status: 409 },
+    { name: "user cap", perUser: 1, status: 429 },
   ])("$name preserves staging and the session tree", async (caps) => {
-    const chat = await chatApp({
-      registry: new Registry(caps),
-    });
+    const chat = await chatApp();
+    await setLimits(chat, { sendsPerUser: caps.perUser });
     try {
       const started = await start(chat);
       const item = await stage(chat, "readme.md");

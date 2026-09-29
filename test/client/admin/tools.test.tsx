@@ -139,14 +139,14 @@ const reserve = row({
   unit: "tokens",
   scope: "send",
 });
-const runsPerUser = row({
-  name: "runsPerUser",
+const sendsPerUser = row({
+  name: "sendsPerUser",
   value: 4,
   default: 4,
   min: 1,
-  max: 32,
+  max: 16,
   unit: "count",
-  scope: "runs",
+  scope: "sends",
 });
 const maxVisuals = row({
   name: "maxVisuals",
@@ -181,7 +181,7 @@ const rows = [
   searchBody,
   cut,
   reserve,
-  runsPerUser,
+  sendsPerUser,
   maxVisuals,
   toolWorkTokens,
   maxBashCalls,
@@ -313,7 +313,7 @@ describe("the limit words and units", () => {
         searchBodyBytes: 512 * 1024,
         resultCut: 50_000,
         contextReserve: 20_000,
-        runsPerUser: 4,
+        sendsPerUser: 4,
         maxVisuals: 2,
         toolWorkTokens: 750_000,
         maxBashCalls: 200,
@@ -482,7 +482,11 @@ describe("the Config board", () => {
       ...VISUAL_LIMITS,
     ];
     expect([...placed].sort()).toEqual([...LIMIT_NAMES].sort());
-    expect(LIMITS_CARDS.map((c) => c.title)).toEqual(["Turns", "Automations"]);
+    expect(LIMITS_CARDS.map((c) => c.title)).toEqual([
+      "Turns",
+      "Running",
+      "Automations",
+    ]);
     expect(STORAGE_CARDS.map((c) => c.title)).toEqual([
       "Knowledge",
       "Scratch",
@@ -621,8 +625,10 @@ describe("the Config board", () => {
     expect(html).toContain(">Turns<");
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
-    expect(html.match(/<form/g)).toHaveLength(6);
-    expect(html).toContain("Runs per user");
+    expect(html.match(/<form/g)).toHaveLength(7);
+    expect(html).toContain(">Running<");
+    expect(html).toContain("Per user");
+    expect(html).toContain("Scheduled runs are not counted.");
     expect(html).toContain("Call timeout");
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");

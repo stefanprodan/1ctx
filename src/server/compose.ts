@@ -45,7 +45,6 @@ import {
 } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import {
-  type Registry,
   type Runner,
   runnerArea,
   type ShutdownResult,
@@ -84,8 +83,6 @@ export type ComposeOptions = {
   trustProxy: boolean;
   // a test seam for the runner's tool state machine
   tools?: Tools;
-  // a test's registry with its own caps
-  registry?: Registry;
   // a test's command worker entry; the real one by default
   commandWorker?: URL;
   // Provisioning validates before bootstrap and never repairs or schedules.
@@ -153,7 +150,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // is made with its personal project, project routes ask sessions
   // and access, an agent's delete reaches what runs on it, the
   // session detail asks the runner for the reply in flight, and a freed
-  // run slot or a moved run cap wakes the scheduler.
+  // place or a moved send cap wakes the scheduler.
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
@@ -168,11 +165,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // the instance's start, as the overview reports it
   const startedAt = clock();
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
-  const limits = limitsArea({
-    db,
-    clock,
-    runCapsChanged: () => automations.scheduler.wake(),
-  });
+  const wake = () => automations.scheduler.wake();
+  const limits = limitsArea({ db, clock, wake });
   const usage = usageArea({
     db,
     clock,
@@ -398,8 +392,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     render: renderMarkdown,
     stream: (sessionId, frame) => socket.stream(sessionId, frame),
-    registry: options.registry,
-    slotFreed: () => automations.scheduler.wake(),
+    wake,
     attention: {
       decide: (...args) => deciders.decide(...args),
       decision: () => deciders.decision("run-attention"),
@@ -429,10 +422,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     limits,
     version: options.version,
     startedAt,
-    pools: () => ({
-      ...runner.registry.running(),
-      chatsCap: runner.registry.chatsCap,
-    }),
+    running: (perProject) => runner.registry.running(perProject),
     online: () => socket.online(),
     automations: () => automations.store.tally(clock() - WAIT_GRACE_MS),
     attention: () => {

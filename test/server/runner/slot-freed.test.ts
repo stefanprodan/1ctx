@@ -1,17 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// slotFreed wakes the scheduler once a run's send is released for good,
-// and only then.
+// Every send let go wakes the scheduler, whatever its kind and however
+// it ended, except at shutdown; a finalize that fails keeps the lock
+// and the places until the next start's repair.
 
 import { describe, expect, test } from "bun:test";
 import { FINALIZE_RETRY_MS } from "../../../src/server/runner/index.ts";
+import { testApp } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
   startRun,
 } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { chatApp, setLimits, startChat, tick } from "../../helpers/chat.ts";
 
 // the wakes since the last reset; the routes wake the scheduler too
 async function counted() {
@@ -31,7 +33,7 @@ async function counted() {
   };
 }
 
-describe("slotFreed", () => {
+describe("the wake", () => {
   test("once for a finished run and once for a stopped one", async () => {
     const { chat, wakes, reset } = await counted();
     const automation = await createAutomation(chat);
@@ -50,11 +52,13 @@ describe("slotFreed", () => {
     await chat.app.shutdown();
   });
 
-  test("never for a chat or a compact", async () => {
+  test("once for a chat and once for a compact", async () => {
     const { chat, wakes } = await counted();
     const started = await startChat(chat, "question");
     started.script.reply("answer");
     await settleRun(chat, started.sessionId);
+    await tick();
+    expect(wakes()).toBe(1);
     const pending = chat.scripted.next();
     const response = await chat.member.call(
       "POST",
@@ -66,7 +70,7 @@ describe("slotFreed", () => {
     await settleRun(chat, started.sessionId);
     await tick();
     expect(chat.app.runner.registry.size).toBe(0);
-    expect(wakes()).toBe(0);
+    expect(wakes()).toBe(2);
     await chat.app.shutdown();
   });
 
@@ -81,7 +85,7 @@ describe("slotFreed", () => {
     expect(wakes()).toBe(0);
   });
 
-  test("never for an abandoned preparation", async () => {
+  test("once for an abandoned preparation", async () => {
     const { chat, wakes, reset } = await counted();
     const automation = await createAutomation(chat);
     reset();
@@ -102,7 +106,24 @@ describe("slotFreed", () => {
     expect(store.byId(automation.id)?.lastEventReason).toBe(
       "event write failed",
     );
-    expect(wakes()).toBe(0);
+    expect(wakes()).toBe(1);
+    await chat.app.shutdown();
+  });
+
+  test("once for a chat whose rows fail to write", async () => {
+    const { chat, wakes } = await counted();
+    const sessions = chat.app.sessions;
+    const createSend = sessions.createSend;
+    sessions.createSend = () => {
+      throw new Error("send write failed");
+    };
+    const response = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    sessions.createSend = createSend;
+    expect(response.status).toBe(500);
+    expect(chat.app.runner.registry.size).toBe(0);
+    expect(wakes()).toBe(1);
     await chat.app.shutdown();
   });
 
@@ -126,5 +147,52 @@ describe("slotFreed", () => {
     store.finishSend = original;
     expect(chat.app.runner.registry.get(run.sessionId)).not.toBeNull();
     expect(wakes()).toBe(0);
+  });
+
+  test("a failed finalize keeps its places until the next start's repair", async () => {
+    const { chat } = await counted();
+    await setLimits(chat, { sendsPerUser: 1 });
+    const started = await startChat(chat, "question");
+    const store = chat.app.sessions;
+    const original = store.finishSend.bind(store);
+    store.finishSend = () => {
+      throw new Error("finalize failed");
+    };
+    await chat.member.call("POST", `/api/sessions/${started.sessionId}/stop`);
+    await tick();
+    chat.app.now.value += FINALIZE_RETRY_MS;
+    await tick();
+    chat.app.now.value += FINALIZE_RETRY_MS;
+    await tick();
+    await tick();
+    store.finishSend = original;
+    expect(chat.app.runner.registry.running(16)).toMatchObject({ chats: 1 });
+    const refused = await chat.member.call("POST", "/api/sessions", {
+      body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
+    });
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({
+      error: "You have 1 chats and runs going. Wait for one to end.",
+    });
+
+    // the next process repairs the row and holds no place for it
+    chat.app.automationScheduler.dispose();
+    const restarted = await testApp({
+      db: chat.app.db,
+      fetcher: chat.scripted.fetcher,
+    });
+    expect(restarted.repaired).toBe(1);
+    expect(restarted.runner.registry.size).toBe(0);
+    const member = restarted.client();
+    await member.login("casey", "pw");
+    const again = await startChat(
+      { ...chat, app: restarted, member },
+      "again",
+      member,
+    );
+    expect(again.detail.session.status).toBe("running");
+    again.script.reply("done");
+    await settleRun({ ...chat, app: restarted }, again.sessionId);
+    await restarted.shutdown();
   });
 });

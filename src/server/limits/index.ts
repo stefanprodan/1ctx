@@ -4,7 +4,7 @@
 // The limits area: the defaults with an admin's overrides on top.
 // current() is read once when a send starts and copied onto its policy,
 // so a change on an admin page reaches the next send and never one in
-// flight; the run caps are read at each admission. A value saved equal
+// flight; the send caps are read at each admission. A value saved equal
 // to its default drops the override rather than store it, so the rows
 // are exactly what an admin changed.
 
@@ -13,8 +13,14 @@ import type { LimitRow } from "../../shared/contracts/limit.ts";
 import { LIMIT_NAMES, type LimitName } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import { DEFAULT_LIMITS, LIMIT_DEFINITIONS, type Limits } from "./defaults.ts";
+import {
+  DEFAULT_LIMITS,
+  LIMIT_DEFINITIONS,
+  type Limits,
+  type SendCaps,
+} from "./defaults.ts";
 import { routes } from "./routes.ts";
 import { LimitStore } from "./store.ts";
 
@@ -26,6 +32,8 @@ export {
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
+  type SendCaps,
+  scheduledShare,
   TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
@@ -34,8 +42,8 @@ export { LimitStore } from "./store.ts";
 export type LimitsDeps = {
   db: Db;
   clock: Clock;
-  // a write moved a run cap, so a fire waiting for a slot may start
-  runCapsChanged?: () => void;
+  // a write moved a send cap, so a run waiting for a place may start
+  wake?: () => void;
 };
 
 export type LimitsArea = {
@@ -46,6 +54,17 @@ export type LimitsArea = {
   set(values: Partial<Limits>, now: number): void;
   reset(): void;
 };
+
+// a user's cap never reads larger than the project's, nor the
+// project's than the process's
+function ordered(caps: SendCaps): void {
+  if (caps.sendsPerUser > caps.sendsPerProject) {
+    throw new BadRequest("sendsPerUser must not exceed sendsPerProject");
+  }
+  if (caps.sendsPerProject > caps.sendsRunning) {
+    throw new BadRequest("sendsPerProject must not exceed sendsRunning");
+  }
+}
 
 function effectiveValue(name: LimitName, override?: number): number {
   const entry = LIMIT_DEFINITIONS[name];
@@ -78,19 +97,20 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
       };
     });
   };
-  const runCaps = () => {
-    const { runsPerUser, runsRunning } = current();
-    return `${runsPerUser}/${runsRunning}`;
+  const sendCaps = () => {
+    const { sendsPerUser, sendsPerProject, sendsRunning } = current();
+    return `${sendsPerUser}/${sendsPerProject}/${sendsRunning}`;
   };
-  // after the commit, and only when a run cap moved
+  // after the commit, and only when a send cap moved
   const noticing = (write: () => void): void => {
-    const before = runCaps();
+    const before = sendCaps();
     write();
-    if (runCaps() !== before) deps.runCapsChanged?.();
+    if (sendCaps() !== before) deps.wake?.();
   };
   const set = (values: Partial<Limits>, now: number): void =>
     noticing(() => {
       transact(deps.db, () => {
+        ordered({ ...current(), ...values });
         for (const name of LIMIT_NAMES) {
           const value = values[name];
           if (value === undefined) continue;

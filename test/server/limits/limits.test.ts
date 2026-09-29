@@ -42,20 +42,20 @@ const budgetLimits = [
     scope: "call",
   },
   {
-    name: "runsPerUser",
+    name: "sendsPerUser",
     default: 4,
     min: 1,
-    max: 32,
+    max: 16,
     unit: "count",
-    scope: "runs",
+    scope: "sends",
   },
   {
-    name: "runsRunning",
-    default: 32,
-    min: 1,
+    name: "sendsPerProject",
+    default: 16,
+    min: 4,
     max: 64,
     unit: "count",
-    scope: "runs",
+    scope: "sends",
   },
   {
     name: "contextReserve",
@@ -182,12 +182,12 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(41);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(41);
+      expect(rows).toHaveLength(42);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(42);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
-      expect(rows.filter((row) => row.scope === "runs")).toHaveLength(2);
+      expect(rows.filter((row) => row.scope === "sends")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
       expect(LOOP_LIMITS).toMatchObject({
@@ -200,33 +200,106 @@ describe("limits area", () => {
     }
   });
 
-  test("a write that moves a run cap calls the port once, any other none", () => {
+  test("sendsRunning holds 4 to 256, 64 by default, never below the project's cap", () => {
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100 });
+      expect(LIMIT_DEFINITIONS.sendsRunning).toEqual({
+        default: 64,
+        min: 4,
+        max: 256,
+        unit: "count",
+        scope: "sends",
+      });
+      const low = { sendsPerUser: 1, sendsPerProject: 4, sendsRunning: 4 };
+      area.set({ ...DEFAULT_LIMITS, ...low }, 100);
+      expect(area.current()).toMatchObject(low);
+      area.set({ ...DEFAULT_LIMITS, sendsRunning: 256 }, 110);
+      expect(area.current().sendsRunning).toBe(256);
+    } finally {
+      db.close();
+    }
+  });
+
+  test.each([
+    [
+      { sendsPerUser: 16, sendsPerProject: 8 },
+      "sendsPerUser must not exceed sendsPerProject",
+    ],
+    [
+      { sendsPerProject: 32, sendsRunning: 16 },
+      "sendsPerProject must not exceed sendsRunning",
+    ],
+  ])(
+    "a write that breaks the order is refused and writes nothing",
+    (values, error) => {
+      const db = memoryDb();
+      try {
+        const area = limitsArea({ db, clock: () => 100 });
+        expect(() => area.set({ ...DEFAULT_LIMITS, ...values }, 100)).toThrow(
+          new BadRequest(error),
+        );
+        expect(area.store.rows()).toEqual([]);
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  test("a write of one cap is ordered against the others' overrides", () => {
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100 });
+      area.set({ sendsPerProject: 8, sendsPerUser: 8 }, 100);
+      expect(() => area.set({ sendsPerProject: 6 }, 110)).toThrow(BadRequest);
+      expect(() => area.set({ sendsPerUser: 9 }, 110)).toThrow(BadRequest);
+      area.set({ sendsPerUser: 2, sendsPerProject: 6 }, 120);
+      expect(area.current()).toMatchObject({
+        sendsPerUser: 2,
+        sendsPerProject: 6,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("a write that moves a send cap calls the port once, any other none", () => {
     const db = memoryDb();
     try {
       let calls = 0;
       const area = limitsArea({
         db,
         clock: () => 100,
-        runCapsChanged: () => calls++,
+        wake: () => calls++,
       });
       area.set({ ...DEFAULT_LIMITS, rounds: 20 }, 100);
       expect(calls).toBe(0);
-      area.set({ ...DEFAULT_LIMITS, rounds: 20, runsPerUser: 6 }, 110);
+      area.set({ ...DEFAULT_LIMITS, rounds: 20, sendsPerUser: 6 }, 110);
       expect(calls).toBe(1);
-      area.set({ ...DEFAULT_LIMITS, rounds: 30, runsPerUser: 6 }, 120);
+      area.set({ ...DEFAULT_LIMITS, rounds: 30, sendsPerUser: 6 }, 120);
       expect(calls).toBe(1);
-      area.set({ ...DEFAULT_LIMITS, runsRunning: 40, runsPerUser: 6 }, 130);
+      area.set({ ...DEFAULT_LIMITS, sendsRunning: 40, sendsPerUser: 6 }, 130);
       expect(calls).toBe(2);
-      area.reset();
+      area.set(
+        {
+          ...DEFAULT_LIMITS,
+          sendsRunning: 40,
+          sendsPerUser: 6,
+          sendsPerProject: 20,
+        },
+        140,
+      );
       expect(calls).toBe(3);
       area.reset();
-      expect(calls).toBe(3);
+      expect(calls).toBe(4);
+      area.reset();
+      expect(calls).toBe(4);
     } finally {
       db.close();
     }
   });
 
-  test("saves the run, tool-work and bash limits through the full-set PUT", async () => {
+  test("saves the send, tool-work and bash limits through the full-set PUT", async () => {
     const app = await testApp();
     try {
       const admin = app.client();
@@ -238,14 +311,15 @@ describe("limits area", () => {
             rounds: 250,
             toolWorkTokens: 750_000,
             maxBashCalls: 200,
-            runsPerUser: 2,
-            runsRunning: 8,
+            sendsPerUser: 2,
+            sendsPerProject: 8,
+            sendsRunning: 8,
           },
         },
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(41);
+      expect(body.limits).toHaveLength(42);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),
@@ -261,24 +335,33 @@ describe("limits area", () => {
           }),
         ]),
       );
-      expect(body.limits.filter((row) => row.scope === "runs")).toEqual([
-        expect.objectContaining({ name: "runsPerUser", value: 2 }),
-        expect.objectContaining({ name: "runsRunning", value: 8 }),
+      expect(body.limits.filter((row) => row.scope === "sends")).toEqual([
+        expect.objectContaining({ name: "sendsPerUser", value: 2 }),
+        expect.objectContaining({ name: "sendsPerProject", value: 8 }),
+        expect.objectContaining({ name: "sendsRunning", value: 8 }),
       ]);
       const loaded = await admin.call("GET", "/api/limits");
       expect(loaded.status).toBe(200);
       expect(await loaded.json()).toEqual(body);
       const one = await admin.call("PUT", "/api/limits", {
-        body: { values: { runsPerUser: 3 } },
+        body: { values: { sendsPerUser: 3 } },
       });
       expect(one.status).toBe(200);
-      const runs = ((await one.json()) as typeof body).limits.filter(
-        (row) => row.scope === "runs",
+      const sends = ((await one.json()) as typeof body).limits.filter(
+        (row) => row.scope === "sends",
       );
-      expect(runs).toEqual([
-        expect.objectContaining({ name: "runsPerUser", value: 3 }),
-        expect.objectContaining({ name: "runsRunning", value: 8 }),
+      expect(sends).toEqual([
+        expect.objectContaining({ name: "sendsPerUser", value: 3 }),
+        expect.objectContaining({ name: "sendsPerProject", value: 8 }),
+        expect.objectContaining({ name: "sendsRunning", value: 8 }),
       ]);
+      const unordered = await admin.call("PUT", "/api/limits", {
+        body: { values: { sendsPerUser: 9 } },
+      });
+      expect(unordered.status).toBe(400);
+      expect(await unordered.json()).toEqual({
+        error: "sendsPerUser must not exceed sendsPerProject",
+      });
       const refused = await admin.call("PUT", "/api/limits", {
         body: { values: {} },
       });
@@ -287,11 +370,11 @@ describe("limits area", () => {
         error: "values must name a limit",
       });
       const over = await admin.call("PUT", "/api/limits", {
-        body: { values: { ...DEFAULT_LIMITS, runsRunning: 65 } },
+        body: { values: { ...DEFAULT_LIMITS, sendsRunning: 257 } },
       });
       expect(over.status).toBe(400);
       expect(await over.json()).toEqual({
-        error: "runsRunning must be between 1 and 64",
+        error: "sendsRunning must be between 4 and 256",
       });
     } finally {
       await app.shutdown();

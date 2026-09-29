@@ -60,28 +60,33 @@ describe("newestPast", () => {
 });
 
 describe("Waits", () => {
-  test("a wake during the attempt leaves the pool open", () => {
+  test("a wake during the attempt leaves the cap open", () => {
     const w = waits();
     const seen = w.generation;
     w.wake();
-    w.block("a1", { wait: "user", dueAt: 1, ownerId: "u1" }, seen, 0);
-    w.block("a2", { wait: "process", dueAt: 1, ownerId: "u2" }, seen, 0);
-    expect(w.ownerFull("u1")).toBe(false);
+    w.block("a1", { wait: "project", dueAt: 1, projectId: "p1" }, seen, 0);
+    w.block("a2", { wait: "process", dueAt: 1, projectId: "p2" }, seen, 0);
+    expect(w.projectFull("p1")).toBe(false);
     expect(w.processFull).toBe(false);
     expect(w.any).toBe(false);
   });
 
   test("a block holds until a wake or a pass interval", () => {
     const w = waits();
-    w.block("a1", { wait: "user", dueAt: 1, ownerId: "u1" }, w.generation, 0);
-    expect(w.ownerFull("u1")).toBe(true);
+    w.block(
+      "a1",
+      { wait: "project", dueAt: 1, projectId: "p1" },
+      w.generation,
+      0,
+    );
+    expect(w.projectFull("p1")).toBe(true);
     w.expire(59_999, 60_000);
-    expect(w.ownerFull("u1")).toBe(true);
+    expect(w.projectFull("p1")).toBe(true);
     w.expire(60_000, 60_000);
     expect(w.any).toBe(false);
     w.block(
       "a1",
-      { wait: "process", dueAt: 1, ownerId: "u1" },
+      { wait: "process", dueAt: 1, projectId: "p1" },
       w.generation,
       0,
     );
@@ -92,16 +97,21 @@ describe("Waits", () => {
 
   test("a wake starts the interval again for the next block", () => {
     const w = waits();
-    w.block("a1", { wait: "user", dueAt: 1, ownerId: "u1" }, w.generation, 0);
+    w.block(
+      "a1",
+      { wait: "project", dueAt: 1, projectId: "p1" },
+      w.generation,
+      0,
+    );
     w.wake();
     w.block(
       "a1",
-      { wait: "user", dueAt: 1, ownerId: "u1" },
+      { wait: "project", dueAt: 1, projectId: "p1" },
       w.generation,
       50_000,
     );
     w.expire(60_000, 60_000);
-    expect(w.ownerFull("u1")).toBe(true);
+    expect(w.projectFull("p1")).toBe(true);
     w.expire(110_000, 60_000);
     expect(w.any).toBe(false);
   });
@@ -109,7 +119,7 @@ describe("Waits", () => {
   test("a wait is logged once per occurrence, and forgotten once not due", () => {
     const logs = collectLogs();
     const w = new Waits(logs.logFactory("automations"));
-    const wait = { wait: "user" as const, dueAt: 1, ownerId: "u1" };
+    const wait = { wait: "project" as const, dueAt: 1, projectId: "p1" };
     w.block("a1", wait, w.generation, 0);
     w.block("a1", wait, w.generation, 0);
     w.prune(new Set());

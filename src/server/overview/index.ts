@@ -14,6 +14,8 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { type SendCaps, scheduledShare } from "../limits/index.ts";
+import type { Running } from "../runner/index.ts";
 import { monthWindow } from "../usage/index.ts";
 import { type AttentionInput, attention } from "./attention.ts";
 import { BOARD_KEEP_MS, scanCache } from "./cache.ts";
@@ -55,15 +57,15 @@ export type OverviewDeps = {
   db: Db;
   clock: Clock;
   log: Log;
-  limits: { current(): StorageLimits & { runsRunning: number } };
+  limits: { current(): StorageLimits & SendCaps };
   // the build /api/health answers and when the process composed
   version: string;
   startedAt: number;
-  // the sends running now by pool, and the chat pool's process cap
-  pools(): { chats: number; chatsCap: number; runs: number };
+  // the sends running now, and the projects at the cap it is given
+  running(perProject: number): Running;
   // the users with an open socket; web/ is built later, so a closure
   online(): number;
-  // every automation, and those whose fire waits for a run slot
+  // every automation, and those whose fire waits for a free place
   automations(): { total: number; waiting: number };
   // the secrets are read through compose's ports
   attention(): AttentionInput;
@@ -182,14 +184,17 @@ export function overviewArea(deps: OverviewDeps): Overview {
     });
   let stop: (() => void) | null = null;
   const load = (): LoadResponse => {
-    const pools = deps.pools();
+    const caps = deps.limits.current();
+    const running = deps.running(caps.sendsPerProject);
     const automations = deps.automations();
     return {
       at: deps.clock(),
-      chats: pools.chats,
-      chatsCap: pools.chatsCap,
-      runs: pools.runs,
-      runsCap: deps.limits.current().runsRunning,
+      chats: running.chats,
+      runs: running.runs,
+      cap: caps.sendsRunning,
+      scheduled: running.scheduled,
+      scheduledCap: scheduledShare(caps.sendsRunning),
+      projectsFull: running.projectsFull,
       online: deps.online(),
       automations: automations.total,
       waiting: automations.waiting,

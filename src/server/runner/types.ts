@@ -63,9 +63,8 @@ export type RunnerDeps = {
   usage: WriterDeps["usage"];
   render: WriterDeps["render"];
   stream: WriterDeps["stream"];
-  registry?: Registry;
-  // a run's slot let go for good, so a waiting fire may start
-  slotFreed(): void;
+  // a send's place let go, so a run waiting for one may start
+  wake(): void;
   attention: AttentionPort;
 };
 

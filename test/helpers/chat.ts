@@ -12,7 +12,6 @@ import type { Db } from "../../src/server/db/index.ts";
 import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
-import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import type { Wire } from "../../src/shared/words.ts";
 import {
@@ -338,7 +337,6 @@ export async function setLimits(chat: ChatApp, values: Partial<Limits>) {
 
 export async function chatApp(
   options: {
-    registry?: Registry;
     // the secrets beside user-admin.key: a search provider key makes
     // websearch offered (search-exa.key or search-firecrawl.key), decision 3
     secrets?: Record<string, string>;
@@ -361,7 +359,6 @@ export async function chatApp(
   const app = await testApp({
     fetcher: scripted.fetcher,
     logFactory: options.logFactory,
-    registry: options.registry,
     secrets,
     tools: options.tools,
     db: options.db,

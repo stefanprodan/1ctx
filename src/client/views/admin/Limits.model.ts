@@ -154,13 +154,17 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Files",
     text: "Results and resources one chat keeps.",
   },
-  runsPerUser: {
-    label: "Runs per user",
-    text: "Runs one user may have going at once.",
+  sendsPerUser: {
+    label: "Per user",
+    text: "Chats and runs one user has going at once. Scheduled runs are not counted.",
   },
-  runsRunning: {
-    label: "Runs at once",
-    text: "Runs going at once, every user counted.",
+  sendsPerProject: {
+    label: "Per project",
+    text: "Chats and runs going at once in one project.",
+  },
+  sendsRunning: {
+    label: "At once",
+    text: "Chats and runs going at once, every project counted.",
   },
   archiveIdleDays: {
     label: "Archive idle chats",

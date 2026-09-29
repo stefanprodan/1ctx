@@ -97,8 +97,11 @@ in `docs/views.md` and `docs/ui.md`.
   total is 0 with no rows and null when rows came and none was priced.
 - **Load is read from memory.**
   `GET /api/admin/load` (`admin`, no parameter) is read from memory at
-  every request, never kept: the pools from `runner.registry.running()`
-  and `chatsCap`, `runsCap` the current `runsRunning`, `online` the users
+  every request, never kept: the running chats and runs from
+  `runner.registry.running()` in one pass, against `cap`, the current
+  `sendsRunning`; the scheduled runs against `scheduledCap`, their
+  share of it; `projectsFull`, the projects at `sendsPerProject`;
+  `online` the users
   with a socket through a port to `web/`, the automations and those due
   past `WAIT_GRACE_MS` through a port to their store, and `load.ts`'s
   ring of `LOAD_SAMPLES` samples taken every `LOAD_SAMPLE_MS` from start,
