@@ -64,7 +64,9 @@ src/server/     the binary. main.ts parses the flags, opens the db and the
                 (http.ts: Principal, Policy, RouteDescriptor; body.ts:
                 readBody, jsonBody, fields; errors, log, clock, ids, bus),
                 db/ (open, transact, migrations/), then one directory per
-                area.
+                area. A *.worker.ts (overview/scan, knowledge/command) is
+                an entry of `bun build --compile` in package.json's build
+                script, its URL built in compose.ts.
 src/client/     the Preact app, bundled by Bun from client/index.html.
                 app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
                 (api, the entity cache), lib/, ui/ (the primitives, each

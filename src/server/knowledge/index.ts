@@ -20,10 +20,12 @@ import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
+import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
 
 export type { OpenedRecord } from "./open.ts";
+export type { CommandEnd } from "./protocol.ts";
 
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { startKept } from "./kept.ts";
@@ -42,6 +44,7 @@ import {
   UploadStore,
   type UploadTree,
 } from "./uploads.ts";
+import { commandWorkers } from "./worker.ts";
 
 export type LimitsPort = { current(): KnowledgeCaps };
 export type KnowledgeDeps = {
@@ -49,6 +52,9 @@ export type KnowledgeDeps = {
   clock: Clock;
   limits: LimitsPort;
   access: AccessPort;
+  log: Log;
+  // the command worker entry, built where the binary resolves it
+  worker: URL;
 };
 export type KnowledgeCapability = KnowledgePort & {
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
@@ -99,12 +105,15 @@ export type KnowledgeArea = KnowledgeCapability & {
   scratch: ScratchStore;
   uploads: UploadStore;
   routes: RouteDescriptor[];
+  // shutdown: running commands cancelled, their workers ended
+  close(): void;
 };
 
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
   const scratch = new ScratchStore(deps.db);
   const uploads = new UploadStore(deps.db);
+  const workers = commandWorkers(deps.worker, deps.log);
   const searching = new Set<string>();
   const views = new RenderCache();
   const required = (projectId: string, fileId: string) => {
@@ -200,6 +209,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           scratch,
           uploads,
           clock: deps.clock,
+          workers,
           current: () => deps.limits.current(),
         },
         projectId,
@@ -393,6 +403,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     uploads,
     ...capability,
     routes: routes({ access: deps.access, knowledge: capability }),
+    close: () => workers.close(),
   };
 }
 

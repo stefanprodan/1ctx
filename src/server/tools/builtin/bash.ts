@@ -208,7 +208,9 @@ export function makeBashTool(
             },
         ctx.signal,
       );
-      return scrubbed(result, signing);
+      const out = scrubbed(result, signing);
+      // where a command that saved nothing ended, for the log
+      return result.ended === undefined ? out : { ...out, ended: result.ended };
     },
   };
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { collectLogs } from "../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -169,6 +170,39 @@ describe("bash in the tool loop", () => {
       });
       answer.reply("done");
       await settleRun(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+});
+
+describe("a bash command that saves nothing", () => {
+  test("logs the phase it ended in and why, and nothing of the command", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
+    try {
+      const { script } = await startChat(chat);
+      const bash = (id: string, command: string) => ({
+        id,
+        name: "bash",
+        arguments: JSON.stringify({ command }),
+      });
+      script.toolRound([
+        bash("limit", "echo secret-words > kept.md; while :; do :; done"),
+        bash("exit", "exit 3"),
+      ]);
+      script.end();
+      const answer = await waitScript(chat.scripted, 2);
+      const failed = logs.events.filter((event) => event.msg === "tool failed");
+      expect(failed).toHaveLength(2);
+      // a nonzero exit commits, so only the limit names a phase
+      expect(
+        failed.filter((event) => event.fields.phase !== undefined),
+      ).toMatchObject([{ fields: { phase: "run", cause: "limit" } }]);
+      expect(JSON.stringify(logs.events)).not.toContain("secret-words");
+      expect(chat.app.knowledge.counts(chat.projectId).files).toBe(0);
+      answer.reply("done");
     } finally {
       await chat.app.shutdown();
       chat.app.db.close();

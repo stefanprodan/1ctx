@@ -1,0 +1,216 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The command worker over real workers: a command that never yields is
+// ended at the deadline or after a cancel's grace while this thread
+// keeps serving, a cancel stops an awaiting command, shutdown ends every
+// job, a kept file is read only when a command reads it, and the server
+// drops what a worker posts outside the protocol.
+
+import { describe, expect, test } from "bun:test";
+import type { Job } from "../../../src/server/knowledge/protocol.ts";
+import {
+  type CommandHooks,
+  commandWorkers,
+} from "../../../src/server/knowledge/worker.ts";
+import { silent } from "../../../src/server/lib/log.ts";
+import { collectLogs } from "../../helpers/app.ts";
+import { COMMAND_WORKER, run, setup } from "./helpers.ts";
+
+const MiB = 1024 * 1024;
+// limits high enough that a runaway never stops itself
+const job = (command: string, fields: Partial<Job> = {}): Job => ({
+  command,
+  endsAt: Date.now() + 60_000,
+  docs: true,
+  visuals: true,
+  network: false,
+  cwd: "/knowledge",
+  knowledgeFileBytes: MiB,
+  mountBytes: 64 * MiB,
+  ioBytes: MiB,
+  iterations: 1e12,
+  knowledge: [],
+  scratch: [],
+  uploads: [],
+  kept: [],
+  ...fields,
+});
+const hooks: CommandHooks = { kept: () => null, fetch: null };
+const stops = (
+  deadline = new AbortController().signal,
+  signal = new AbortController().signal,
+) => ({ signal, deadline, chat: "chat" });
+const BUSY = "while :; do :; done";
+
+describe("the command worker", () => {
+  test.serial(
+    "a busy loop ends at the deadline while this thread keeps serving",
+    async () => {
+      const workers = commandWorkers(COMMAND_WORKER, silent);
+      let last = performance.now();
+      let worst = 0;
+      const tick = setInterval(() => {
+        const now = performance.now();
+        worst = Math.max(worst, now - last);
+        last = now;
+      }, 5);
+      const started = performance.now();
+      try {
+        const settled = await workers.run(
+          job(BUSY),
+          hooks,
+          stops(AbortSignal.timeout(400)),
+        );
+        expect(settled).toMatchObject({
+          ok: false,
+          phase: "run",
+          cause: "deadline",
+        });
+        expect(performance.now() - started).toBeLessThan(3000);
+        expect(worst).toBeLessThan(200);
+      } finally {
+        clearInterval(tick);
+      }
+    },
+  );
+
+  test("a cancel stops an awaiting command within the grace", async () => {
+    const logs = collectLogs();
+    const workers = commandWorkers(COMMAND_WORKER, logs.logFactory("k"), 5000);
+    const abort = new AbortController();
+    const pending = workers.run(
+      job("sleep 30"),
+      hooks,
+      stops(undefined, abort.signal),
+    );
+    await Bun.sleep(300);
+    const started = performance.now();
+    abort.abort(new Error("send stopped"));
+    expect(await pending).toMatchObject({ ok: false, cause: "abort" });
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(logs.events).toEqual([]);
+  });
+
+  test("a busy loop past its grace is ended, logged, and the next command runs", async () => {
+    const logs = collectLogs();
+    const workers = commandWorkers(COMMAND_WORKER, logs.logFactory("k"), 100);
+    const abort = new AbortController();
+    const pending = workers.run(
+      job(BUSY),
+      hooks,
+      stops(undefined, abort.signal),
+    );
+    await Bun.sleep(300);
+    abort.abort(new Error("send stopped"));
+    expect(await pending).toMatchObject({
+      ok: false,
+      phase: "run",
+      cause: "abort",
+    });
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "k",
+        msg: "command cancel unanswered",
+        fields: { chat: "chat", phase: "run", duration: 100 },
+      },
+    ]);
+    const next = await workers.run(job("echo again"), hooks, stops());
+    expect(next).toMatchObject({ ok: true, answer: { stdout: "again\n" } });
+  });
+
+  test("shutdown ends every running job and refuses the next", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const busy = workers.run(job(BUSY), hooks, stops());
+    const waiting = workers.run(job("sleep 30"), hooks, stops());
+    await Bun.sleep(300);
+    workers.close();
+    for (const settled of await Promise.all([busy, waiting])) {
+      expect(settled).toMatchObject({ ok: false, cause: "abort" });
+      expect(!settled.ok && settled.error?.message).toBe(
+        "the server is shutting down",
+      );
+    }
+    const late = await workers.run(job("true"), hooks, stops());
+    expect(!late.ok && late.error?.message).toBe("the server is shutting down");
+  });
+
+  test("a kept file is asked for only when a command reads it", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const asked: number[] = [];
+    const kept: CommandHooks = {
+      kept: (index) => {
+        asked.push(index);
+        return index === 0 ? "first\n" : new TextEncoder().encode("second\n");
+      },
+      fetch: null,
+    };
+    const paths = ["/mcp/0001-a/result.txt", "/mcp/0002-b/result.txt"];
+    const listed = await workers.run(
+      job("ls -R /mcp", { kept: paths }),
+      kept,
+      stops(),
+    );
+    expect(listed).toMatchObject({ ok: true });
+    expect(asked).toEqual([]);
+    const read = await workers.run(
+      job(`cat ${paths[1]} ${paths[1]}`, { kept: paths }),
+      kept,
+      stops(),
+    );
+    expect(read).toMatchObject({
+      ok: true,
+      answer: { stdout: "second\nsecond\n" },
+    });
+    expect(asked).toEqual([1]);
+  });
+
+  test("messages outside the protocol are dropped and a job settles once", async () => {
+    const workers = commandWorkers(
+      new URL("../../fixtures/knowledge/forged.worker.ts", import.meta.url),
+      silent,
+    );
+    let asked = 0;
+    const settled = await workers.run(
+      job("true", { kept: ["/mcp/0001-a/result.txt"] }),
+      {
+        kept: () => {
+          asked++;
+          return "kept";
+        },
+        fetch: null,
+      },
+      stops(),
+    );
+    expect(settled).toEqual({
+      ok: true,
+      answer: {
+        stdout: "1",
+        stderr: "",
+        exitCode: 0,
+        notice: "",
+        opened: [],
+        changes: null,
+      },
+    });
+    expect(asked).toBe(1);
+  });
+
+  test("closing the area ends a running command with nothing saved", async () => {
+    const s = setup();
+    try {
+      const pending = run(s, "echo x > /knowledge/late; sleep 30");
+      await Bun.sleep(300);
+      s.area.close();
+      const result = await pending;
+      expect(result).toEqual({
+        error: true,
+        content: "nothing saved: the server is shutting down",
+      });
+      expect(s.area.list(s.projectId).files).toEqual([]);
+    } finally {
+      s.db.close();
+    }
+  });
+});

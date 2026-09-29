@@ -156,9 +156,9 @@ describe("command admission", () => {
     "a thrown mount releases both queues, including all four process slots",
     async () => {
       const s = setup();
-      const read = s.area.store.read.bind(s.area.store);
+      const read = s.area.store.mounted.bind(s.area.store);
       const slots: (() => void)[] = [];
-      s.area.store.read = () => {
+      s.area.store.mounted = () => {
         throw new Error("mount failed");
       };
       try {
@@ -170,7 +170,7 @@ describe("command admission", () => {
         for (let i = 0; i < 4; i++)
           slots.push(await acquire(AbortSignal.timeout(1000)));
         for (const release of slots) release();
-        s.area.store.read = read;
+        s.area.store.mounted = read;
         expect((await run(s, "true")).error).toBe(false);
         expect(scratchState(s).revision).toBe(1);
       } finally {

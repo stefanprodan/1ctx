@@ -10,8 +10,8 @@ import {
   VISUAL_FRAME_BYTES,
 } from "../../shared/words.ts";
 import { bytesWords } from "../lib/bytes.ts";
+import { MAX_OPENS_PER_COMMAND } from "./commands.ts";
 import { languageOf } from "./languages.ts";
-import { MAX_OPENS_PER_COMMAND } from "./limits.ts";
 import { lineCount, textFromBytes } from "./text.ts";
 
 export type OpenedRecord = OpenedFile & { text: string };

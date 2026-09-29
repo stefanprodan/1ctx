@@ -122,7 +122,8 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   and `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`
   under the runner's lock, so no command loses a file while it reads; a
   regenerate's files, on the rows it is about to delete, count for
-  nothing. The mount adds each as a lazy file (`writeFileLazy`), sized
+  nothing. The mount adds each as a lazy file (`writeFileLazy`), which
+  the command worker asks the server to read on first read, sized
   into `mountBytes` and `ioBytes` (four reads of the largest); `/mcp` is
   never committed, an added or removed name under it gives a discard
   notice found from `getAllPaths()` alone (a `stat` would load every

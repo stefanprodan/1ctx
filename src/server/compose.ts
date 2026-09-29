@@ -306,7 +306,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
-  const knowledge = knowledgeArea({ db, clock, limits, access });
+  const knowledge = knowledgeArea({
+    db,
+    clock,
+    limits,
+    access,
+    log: log("knowledge"),
+    // built here, at the compile root, so the binary finds its entry
+    worker: new URL("./knowledge/command.worker.ts", import.meta.url),
+  });
   sessions = sessionsArea({
     db,
     clock,
@@ -559,11 +567,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     mcpStart: () => mcp.start(),
     // the runner first, whose ending calls may still ask for a refresh
-    // that the MCP close then refuses; nothing touches the db after
+    // that the MCP close then refuses, then any command it left running;
+    // nothing touches the db after
     async shutdown() {
       skills.close();
       automations.stop();
       const result = await runner.shutdown();
+      knowledge.close();
       await mcp.close();
       automations.dispose();
       overview.close();

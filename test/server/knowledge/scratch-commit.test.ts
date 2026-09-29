@@ -138,8 +138,8 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("a knowledge revision conflict preserves the prior scratch", async () => {
     const s = prepared();
-    const read = s.area.store.read.bind(s.area.store);
-    s.area.store.read = (id) => {
+    const read = s.area.store.mounted.bind(s.area.store);
+    s.area.store.mounted = (id) => {
       const rows = read(id);
       s.area.replace(s.projectId, s.author, s.file.id, "other writer", 1);
       return rows;
@@ -292,8 +292,8 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("scratch-only writes ignore lowered knowledge totals and unrelated racing edits", async () => {
     const s = prepared();
-    const read = s.area.store.read.bind(s.area.store);
-    s.area.store.read = (id) => {
+    const read = s.area.store.mounted.bind(s.area.store);
+    s.area.store.mounted = (id) => {
       const rows = read(id);
       s.area.store.replace(s.file, s.author, "other writer", 150);
       return rows;

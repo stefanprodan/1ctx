@@ -19,6 +19,12 @@ import { usersArea } from "../../../src/server/users/index.ts";
 import type { KnowledgeAuthor } from "../../../src/shared/contracts/knowledge.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
+// the real entry, as compose.ts builds it: commands run in a worker here
+export const COMMAND_WORKER = new URL(
+  "../../../src/server/knowledge/command.worker.ts",
+  import.meta.url,
+);
+
 export function setup(overrides: Partial<KnowledgeCaps> = {}) {
   const db = memoryDb();
   const now = { value: 100 };
@@ -118,6 +124,8 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     db,
     clock: () => now.value,
     limits: { current: () => ({ ...caps }) },
+    log: silent,
+    worker: COMMAND_WORKER,
     access: {
       project(_principal, id) {
         const project = projects.byId(id);
@@ -191,9 +199,9 @@ export function scratchState(s: Setup) {
 // concurrent writer makes, without waiting on real time.
 export function afterMountRead(s: Setup, write: () => void) {
   const store = s.area.store;
-  const read = store.read;
-  store.read = (projectId) => {
-    store.read = read;
+  const read = store.mounted;
+  store.mounted = (projectId) => {
+    store.mounted = read;
     const rows = read.call(store, projectId);
     write();
     return rows;
