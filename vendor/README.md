@@ -109,6 +109,7 @@ without a file of their own.
 | `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
 | `src/commands/rg/rg-search.ts`, `src/commands/search-engine/regex.ts`, `matcher.ts` | rg looks for the literal a pattern needs before the regex runs, as grep does, except under `--passthru`, and `-l`, `--files-without-match` and `-q` stop at a file's first match, except under `--json`, `--stats` and `--passthru`; under `-i` a needle outside ASCII gives no shortcut and `ſ` is folded to `s`, and a letter escape other than `\n`, `\t`, `\r`, `\f`, `\v` gives none | `rg -il` over 150 docs took 170 ms against grep's 15, and grep's shortcut missed `ſ` for `-i s`, `ς` and `ΟΣ` for `-i σ`, and BEL for `-P '\a'` |
 | `src/commands/ls/ls.ts`, `find/find.exec.test.ts` | `-t` sorts by modification time, newest first and a tie by name, as GNU ls does, `-r` reversing it; of `-S` and `-t` the last given wins; a tie of either goes by name; `-t` and `-S` read a link's own time and size (lstat); operands are ordered as GNU ls orders them: what cannot be listed first, then the file operands as one block in the active sort, then the directories in it, and under `-d` every operand is in the one block (upstream's `find -exec ls {} +` test now expects the one block) | `-t` was accepted and ignored, and `ls -t *.md` listed each file alone in the order given, so a model looking for the newest doc got the names in order and concluded nothing had changed |
+| `src/commands/xargs/xargs.ts`, `xargs-options.ts`, `xargs-input.ts`, `xargs-plan.ts`, `xargs-quote.ts` (the last four new), upstream's xargs tests and `resource-limits.security.test.ts` | xargs as GNU xargs 4.11: getopt's syntax (a value attached or apart, a cluster ending in a value option, long options with `=` or apart and by unique prefix, `--`) and every option, with GNU's words for a bad number, delimiter or option and its warnings for conflicting ones; blanks and newlines separate items, quotes and a backslash protect them, a NUL cuts an argument with GNU's warning, and an unclosed quote is GNU's error after the items before it ran; `-I` reads whole lines without their leading blanks and leaves the command name alone, `-L` counts lines and carries one ending in a blank on, `-E` stops at its item, `-a` reads a file and leaves stdin to the first command, `-0` and `-d` (a character or an escape) keep empty items and the final newline, the last of them winning; items fill a command line up to `-s` bytes, 128 KiB by default, `-n` and `-L` cap it, `-x` and `-L` make an overflow an error, and with no item the command runs once unless `-r`; `-P` runs up to 16 commands at once through `ctx.exec`, output in input order, `--process-slot-var` exported to each; a failure from 1 to 254 exits 123, 255 stops with 124, a name the shell cannot find or run stops with 127 or 126, each in GNU's words; `-t` quotes as GNU prints; `--show-limits` gives the sandbox's numbers; `-p` and `-o` fail as without a terminal; the upstream tests that pinned the old answers now pin GNU's | a model's `xargs -P 12 -I{} sh -c '...'` was refused as `invalid option -- 'I'` and ran nothing, `-n1`, `-L`, `-a` and every long option were refused too, quoted names split, `-d` dropped the final newline, a failure came back as the command's own code, and every item went on one command line |
 
 ### The jq and yq dialects
 
@@ -275,6 +276,29 @@ holds our rg to it; a case with `accept` pins ours. Where they part:
 - The `accessed` and `created` sort keys order by mtime, the one time a
   stat gives. `--json` reports `elapsed` as zero, `--debug` prints
   nothing, and `--version` names no SIMD features.
+
+### Where our xargs still differs from GNU xargs
+
+`test/fixtures/just-bash/xargs-gnu.json` holds what GNU findutils
+4.11.0's xargs answered, recorded by `scripts/xargs-record.ts`, and
+`test/vendor/just-bash/xargs-gnu.test.ts` holds ours to it; a case with
+`accept` pins ours. `test/vendor/just-bash/xargs.test.ts` pins the words
+and `-t` lines the fixture does not compare. Where they part:
+
+- Under `-P` above 1 the output comes in input order; GNU's follows
+  which command ends first. The fixture compares it sorted.
+- `-P` runs at most 16 commands at once, `-P 0` included.
+- The sandbox has no signals, so no command is killed and 125 never
+  comes; a limit ends the whole call with its own error instead.
+- Input bytes that are not UTF-8 reach the command as U+FFFD, since
+  arguments are text in the shell.
+- `--show-limits` and the bound on `-s` count an exec limit of 2 MiB
+  and the shell's exported variables, not the host's.
+- `-p` and `-o` fail as GNU does without a terminal, `failed to open
+  /dev/tty for reading`, exit 1.
+- `--version` answers GNU's first line with `(just-bash, compatible)`.
+- A shell function or builtin runs as a command would; GNU executes
+  only programs.
 
 ### Where our yq still differs from mikefarah's
 
