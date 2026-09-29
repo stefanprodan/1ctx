@@ -86,6 +86,8 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's registry with its own caps
   registry?: Registry;
+  // a test's command worker entry; the real one by default
+  commandWorker?: URL;
   // Provisioning validates before bootstrap and never repairs or schedules.
   activate?: boolean;
   // argon2id's cost; a test passes the least
@@ -315,8 +317,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     limits,
     log: log("bash"),
     // built here, at the compile root, so the binary finds its entry
-    worker: new URL("./bash/command.worker.ts", import.meta.url),
-    knowledge,
+    worker:
+      options.commandWorker ??
+      new URL("./bash/command.worker.ts", import.meta.url),
+    knowledge: {
+      mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
+      mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
+      commitDocs: (projectId, author, changes, caps, now) =>
+        knowledge.commitDocs(projectId, author, changes, caps, now),
+    },
   });
   sessions = sessionsArea({
     db,

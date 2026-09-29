@@ -68,14 +68,14 @@ export type CommandResult = {
 };
 // what a command reads and writes of the docs and uploads, bound to
 // knowledge's stores
-export type KnowledgePort = {
+export type DocsPort = {
   mountedDocs(projectId: string): MountedDoc[];
   mountedUploads(sessionId: string): MountedUploads;
   commitDocs: CommitDocs;
 };
 type MountDeps = {
   db: Db;
-  knowledge: KnowledgePort;
+  knowledge: DocsPort;
   scratch: ScratchStore;
   clock: Clock;
   workers: CommandWorkers;

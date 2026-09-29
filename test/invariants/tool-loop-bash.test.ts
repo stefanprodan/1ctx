@@ -180,18 +180,8 @@ describe("bash in the tool loop", () => {
 describe("a bash command that saves nothing", () => {
   test("logs the phase it ended in and why, and nothing of the command", async () => {
     const logs = collectLogs();
-    const areas = new Set<string>();
-    const chat = await chatApp({
-      logFactory: (area) => {
-        areas.add(area);
-        return logs.logFactory(area);
-      },
-    });
+    const chat = await chatApp({ logFactory: logs.logFactory });
     try {
-      // the command worker's lines go to the bash area's logger, and the
-      // knowledge area has none
-      expect(areas.has("bash")).toBe(true);
-      expect(areas.has("knowledge")).toBe(false);
       const { script } = await startChat(chat);
       const bash = (id: string, command: string) => ({
         id,
@@ -212,6 +202,43 @@ describe("a bash command that saves nothing", () => {
       ).toMatchObject([{ fields: { phase: "run", cause: "limit" } }]);
       expect(JSON.stringify(logs.events)).not.toContain("secret-words");
       expect(chat.app.knowledge.counts(chat.projectId).files).toBe(0);
+      answer.reply("done");
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+
+  test("the command worker's own lines are the bash area's", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({
+      logFactory: logs.logFactory,
+      commandWorker: new URL(
+        "../fixtures/bash/forged.worker.ts",
+        import.meta.url,
+      ),
+    });
+    try {
+      const { sessionId, script } = await startChat(chat);
+      script.toolRound([
+        {
+          id: "forged",
+          name: "bash",
+          arguments: JSON.stringify({ command: "malformed" }),
+        },
+      ]);
+      script.end();
+      const answer = await waitScript(chat.scripted, 2);
+      expect(
+        logs.events.filter((event) => event.msg === "command answer malformed"),
+      ).toEqual([
+        {
+          level: "warn",
+          area: "bash",
+          msg: "command answer malformed",
+          fields: { chat: sessionId, phase: "run" },
+        },
+      ]);
       answer.reply("done");
     } finally {
       await chat.app.shutdown();

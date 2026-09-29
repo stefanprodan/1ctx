@@ -15,7 +15,7 @@ import { startKept } from "./kept.ts";
 import {
   type CommandCaps,
   type CommandResult,
-  type KnowledgePort,
+  type DocsPort,
   run,
 } from "./mount.ts";
 import { heldSessions } from "./queue.ts";
@@ -31,7 +31,7 @@ export type BashDeps = {
   worker: URL;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
-  knowledge: KnowledgePort;
+  knowledge: DocsPort;
 };
 export type BashCapability = {
   run(

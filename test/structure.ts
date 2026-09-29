@@ -48,7 +48,7 @@ export const MAX_LINES = 500;
 // index.ts, with the reason
 export const WORKER_EXEMPTIONS: Record<string, string> = {
   "server/overview/scan.worker.ts":
-    "opens its own database for the storage scan and reads usage's decision slots; it runs on the overview's timer, not per request",
+    "loads usage/index.ts for decisionSlots, a query and not a pure rule, and opens its own database; it runs on the overview's timer, not per command",
 };
 
 // production files allowed past MAX_LINES, with the reason

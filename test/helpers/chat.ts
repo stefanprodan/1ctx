@@ -332,6 +332,8 @@ export async function chatApp(
     tools?: Tools;
     fetcher?: typeof fetch;
     logFactory?: LogFactory;
+    // a command worker other than the real one
+    commandWorker?: URL;
     window?: number;
     // a file the test reopens, for a restart over the same rows
     db?: Db;
@@ -346,6 +348,7 @@ export async function chatApp(
     secrets,
     tools: options.tools,
     db: options.db,
+    ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
   });
   const admin = app.client();
   await admin.login("admin", "hunter2-test");
