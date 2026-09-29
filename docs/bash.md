@@ -35,7 +35,9 @@ changes to it, its recorders) in `vendor/README.md`.
   knowledge name rule, scratch paths by the scratch rule on the answer,
   over the stored rows at commit and at mount, deletes only of mounted
   files, scratch totals from the rows it wrote, no doc change with the
-  docs off, nothing saved on exit 124 or 126, and an opened record only
+  docs off, nothing saved on exit 124 or 126 or a `refused` answer
+  (its reason is shown, never trusted to allow a save), and an opened
+  record only
   as `open` would make it (`checkOpened()`).
 - **The worker holds no database and no key.** A kept file is a read
   request the server answers with `readKept`; a failed read is a read
@@ -52,6 +54,16 @@ changes to it, its recorders) in `vendor/README.md`.
   `command cancel unanswered` warning. Shutdown ends every running
   worker. An ended job commits nothing, and a command that saves
   nothing puts `phase` and `cause` on the runner's `tool failed` line.
+- **A result is the output, then its tail.** stdout then stderr, cut to
+  `resultCut` with a mark, then the tail the cuts keep whole: `exit N`
+  and the receipts when the command saved, `nothing saved: <reason>`
+  and `exit N` when it ran but saved nothing (exit 124 or 126, a
+  refused diff, a cap, a conflict, an answer out of protocol), so the
+  agent sees what the command printed and the refusal stays last. The
+  reason takes at most half the room past the mark. A worker's diff
+  that throws answers `refused` with the output instead of failing the
+  job. A command that never answered is `nothing saved: <reason>`
+  alone.
 - **Mounted files keep their times.** A doc mounts with its
   `updated_at`, an upload with its `created_at`, a scratch file with the
   session's `used_at`, a folder with its newest file's time, so `ls -t`

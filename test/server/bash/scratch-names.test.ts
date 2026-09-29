@@ -282,7 +282,7 @@ describe("scratch names", () => {
         "for i in $(seq 11); do touch /tmp/f$i; done",
       );
       expect(result.content).toBe(
-        "nothing saved: the scratch would have 11 files, the limit is 10",
+        "nothing saved: the scratch would have 11 files, the limit is 10\nexit 0",
       );
       expect(scratchState(s).files).toBe(0);
     } finally {

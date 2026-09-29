@@ -18,7 +18,8 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
 
 const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
-const OUT = "nothing saved: the command worker answered out of protocol";
+const OUT =
+  "nothing saved: the command worker answered out of protocol\nexit 0";
 const all: CommandCaps = {
   ...callCaps,
   web: { mode: "all", domains: [] },

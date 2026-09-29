@@ -20,6 +20,7 @@ const answer = (stdout: string) => ({
   notice: "",
   opened: [],
   changes: null,
+  refused: null,
 });
 
 self.onmessage = (event: MessageEvent) => {

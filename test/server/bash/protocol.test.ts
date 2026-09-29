@@ -25,6 +25,7 @@ const done = (patch: Record<string, unknown> = {}) => ({
     notice: "",
     opened: [],
     changes: { ...changes, ...patch },
+    refused: null,
   },
 });
 

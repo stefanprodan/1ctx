@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { output } from "../../../src/server/bash/output.ts";
+import { output, refused } from "../../../src/server/bash/output.ts";
 
 describe("command output tails", () => {
   test.each([
@@ -58,5 +58,14 @@ describe("command output tails", () => {
     expect(() => output("x".repeat(1000), "", 0, ["deleted old"], 30)).toThrow(
       "change receipts exceed 30 characters, split the command",
     );
+  });
+
+  test("a refusal cuts its reason, never the exit, to fit the cut", () => {
+    const result = refused("x".repeat(1000), "", 2, "why ".repeat(100), 200);
+    expect(result.content.length).toBeLessThanOrEqual(200);
+    expect(result.content).toStartWith("xxx");
+    expect(result.content).toContain("output cut at 200 characters");
+    expect(result.content.slice(-result.tail)).toStartWith("nothing saved: ");
+    expect(result.content).toEndWith("\nexit 2");
   });
 });
