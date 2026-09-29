@@ -1037,6 +1037,31 @@ describe("the sessions entity", () => {
     expect(retrying.value).toBeNull();
   });
 
+  test("an envelope that ends the send clears a retry", async () => {
+    const base = liveDetail();
+    if (base.live !== null) base.live.retry = { attempt: 2, max: 3 };
+    answer = () => Response.json(base);
+    await loadSession("s1");
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: summary({ revision: 2, status: "running" }),
+      messages: [],
+      send: sent,
+    });
+    expect(retrying.value).toEqual({ attempt: 2, max: 3 });
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: summary({ revision: 3, status: "failed" }),
+      messages: [],
+      send: { ...sent, status: "failed" },
+    });
+    expect(retrying.value).toBeNull();
+  });
+
   test("a detail that carries a retry shows it until the chat is left", async () => {
     const base = liveDetail();
     if (base.live !== null) base.live.retry = { attempt: 1, max: 3 };

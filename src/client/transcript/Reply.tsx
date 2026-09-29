@@ -185,7 +185,7 @@ export function Reply({
           <div class="transcript-tail">{tail(current)}</div>
         )}
         {node.summary !== null && (
-          <Summary message={node.summary} live={live} />
+          <Summary message={node.summary} live={live} retry={retry} />
         )}
         {node.memory !== null && (
           <Work

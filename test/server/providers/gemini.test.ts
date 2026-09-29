@@ -646,6 +646,7 @@ describe("Gemini errors", () => {
         kind: "error",
         message: `Gemini 400: ${message.replace("default_api:datetime", "[key]")}`,
         status: 400,
+        remote: true,
       },
     ]);
     expect(JSON.stringify(events)).not.toContain(KEY);
@@ -667,6 +668,7 @@ describe("Gemini errors", () => {
         kind: "error",
         message: "Gemini 503: The service is currently unavailable.",
         status: 503,
+        remote: true,
       },
     ]);
   });

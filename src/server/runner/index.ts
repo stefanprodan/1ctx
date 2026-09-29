@@ -149,7 +149,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         void terminate(send, end.cause, end.error);
       } catch (error) {
         if (send.cause === null && error instanceof ProviderRefusal) {
-          send.errorStatus = error.status;
+          send.refusal = { status: error.status };
         }
         void terminate(
           send,

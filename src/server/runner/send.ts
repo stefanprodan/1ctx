@@ -127,9 +127,9 @@ export type ActiveSend = {
   ending: AbortController;
   cause: SendCause | null;
   error: string | null;
-  // the provider's status when its refusal is the error, which a log
-  // names in place of the words
-  errorStatus: number | null;
+  // set when the error is the provider's words, which a log replaces
+  // with its status, when it gave one
+  refusal: { status: number | null } | null;
   memoryRound: number | null;
   memoryError: string | null;
   memorySkipped: number | null;
@@ -232,7 +232,7 @@ export function newSend(fields: {
     ending: new AbortController(),
     cause: null,
     error: null,
-    errorStatus: null,
+    refusal: null,
     memoryRound: null,
     memoryError: null,
     memorySkipped: null,

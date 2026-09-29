@@ -103,7 +103,7 @@ describe("provider retries through a turn", () => {
       chat: sessionId,
       round: 1,
       attempt: 1,
-      status: 503,
+      provider_status: 503,
       wait: expect.any(Number),
     });
     const wait = retried[0]!.fields.wait as number;
@@ -160,7 +160,7 @@ describe("provider retries through a turn", () => {
     expect(chat.scripted.chats()).toBe(2);
     expect(chat.app.sessions.send(sendId)!.status).toBe("done");
     const fields = logs.events.find((e) => e.msg === "round retried")!.fields;
-    expect(fields).toMatchObject({ status: 429 });
+    expect(fields).toMatchObject({ provider_status: 429 });
     expect(fields.wait as number).toBeGreaterThanOrEqual(2000);
     expect(fields.wait as number).toBeLessThanOrEqual(2500);
   });
@@ -213,11 +213,11 @@ describe("provider retries through a turn", () => {
     expect(logs.events.find((e) => e.msg === "round failed")!.fields).toEqual({
       chat: sessionId,
       round: 1,
-      status: 400,
+      provider_status: 400,
       error: REFUSED,
     });
     expect(logs.events.find((e) => e.msg === "send end")!.fields).toMatchObject(
-      { status: 400, error: REFUSED },
+      { status: "failed", provider_status: 400, error: REFUSED },
     );
     expect(JSON.stringify(logs.events)).not.toContain("bad request");
   });
@@ -289,6 +289,49 @@ describe("provider retries through a turn", () => {
       cause: "failure",
       error: "local failed: the connection was reset",
     });
+  });
+});
+
+describe("a provider's words never reach a log", () => {
+  test.each([
+    { error: { code: "context_length_exceeded", message: "secret words" } },
+    { error: { status: "INVALID_ARGUMENT", message: "secret words" } },
+    { error: "secret words" },
+  ])("an error frame with no code: %j", async (body) => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
+    const { sendId, sessionId } = await post(chat);
+    const script = await waitScript(chat.scripted, 1);
+    script.sse(`data: ${JSON.stringify(body)}\n\n`);
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(1);
+    // the chat row keeps the words exactly
+    expect(chat.app.sessions.send(sendId)!).toMatchObject({
+      status: "failed",
+      error: "secret words",
+    });
+    expect(logs.events.find((e) => e.msg === "round failed")!.fields).toEqual({
+      chat: sessionId,
+      round: 1,
+      error: REFUSED,
+    });
+    expect(logs.events.find((e) => e.msg === "send end")!.fields).toMatchObject(
+      { status: "failed", error: REFUSED },
+    );
+    expect(JSON.stringify(logs.events)).not.toContain("secret words");
+  });
+
+  test("our own words stay in the log", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
+    await post(chat);
+    (await waitScript(chat.scripted, 1)).end();
+    await tick();
+    await tick();
+    expect(
+      logs.events.find((e) => e.msg === "round failed")!.fields,
+    ).toMatchObject({ error: "stream ended early" });
   });
 });
 
@@ -455,6 +498,10 @@ function round(
   fields: {
     deadline?: number | null;
     chat?: (req: ChatRequest, signal: AbortSignal) => AsyncIterable<ChatEvent>;
+    // the quiet timer fires at once
+    quiet?: boolean;
+    // Stop lands during the first retry's wait
+    stopInWait?: boolean;
   } = {},
 ) {
   const logs = collectLogs();
@@ -463,7 +510,13 @@ function round(
   const clock = Object.assign(() => now, {
     // a retry's wait passes at once; the quiet timer never fires
     sleep: (ms: number) => {
-      if (ms >= STREAM_IDLE_MS) return new Promise<void>(() => {});
+      if (ms >= STREAM_IDLE_MS) {
+        return fields.quiet ? Promise.resolve() : new Promise<void>(() => {});
+      }
+      if (fields.stopInWait) {
+        send.controller.abort();
+        return new Promise<void>(() => {});
+      }
       sleeps.push(ms);
       now += ms;
       return Promise.resolve();
@@ -538,6 +591,27 @@ const answer: ChatEvent[] = [
 ];
 
 describe("runRound retries", () => {
+  test("a Stop during the wait leaves no one named as serving", async () => {
+    const served: ChatEvent = { kind: "served", upstream: "Busy", model: "x" };
+    const r = round([[served, busy], answer], { stopInWait: true });
+    await r.run;
+    expect(r.asked()).toBe(1);
+    expect(r.send.round!.upstream).toBeNull();
+    expect(r.send.round!.servedModel).toBeNull();
+  });
+
+  test("a stream quiet after naming who serves it goes quiet", async () => {
+    const r = round([], {
+      quiet: true,
+      chat: () =>
+        (async function* (): AsyncGenerator<ChatEvent> {
+          yield { kind: "served", upstream: "Busy", model: "m" };
+          await new Promise(() => {});
+        })(),
+    });
+    await expect(r.run).rejects.toThrow("the provider went quiet");
+  });
+
   test("a stream left open by its error frame is closed on a retry", async () => {
     const closed: number[] = [];
     let opened = 0;

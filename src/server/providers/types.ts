@@ -111,6 +111,9 @@ export type ChatEvent =
       timedOut?: boolean;
       // the HTTP status, or the code an error frame names
       status?: number;
+      // the words are the provider's, from its body or an error frame,
+      // so a log never carries them
+      remote?: boolean;
       // the response's Retry-After in milliseconds, when it had one
       retryAfterMs?: number;
     };

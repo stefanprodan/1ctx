@@ -42,32 +42,37 @@ fields.
 - **A busy provider is asked again, three times at most.** An error
   event carries `status` (the HTTP status, or the code or Google status
   word an error frame names, `errorStatus()` in `providers/frames.ts`),
-  `retryAfterMs` (a `Retry-After` in whole seconds or an IMF-fixdate;
-  anything else is ignored), `unanswered` when no response came and
-  `timedOut` when that was the headers wait. `retryWait()` in
+  `remote` when its words are the provider's (an HTTP error body or an
+  error frame), `retryAfterMs` (a `Retry-After` in whole seconds or an
+  IMF-fixdate; anything else is ignored), `unanswered` when no response
+  came and `timedOut` when that was the headers wait. `retryWait()` in
   `runner/retry.ts` decides: a round's error before any event that
-  reaches the writer or the page (a `served` event does not count),
-  with status 429, 500, 502, 503 or 504 or no response at all, is asked
-  again after about 1, 2 and 4 s, lengthened to the `Retry-After` when
-  it asks more, with up to 25% jitter on top, so sends refused together
-  come back apart; a `Retry-After` past 30 s fails the round. Four
-  requests in all; a headers timeout is asked again once and counts
-  toward the three. The abandoned stream is closed at once, and every
-  wait runs under the round's signal; one that would pass the turn's
-  deadline (the memory phase's own window in that phase) is not
-  started. The round's first-token time keeps counting from its start,
-  so the waits show in the time to first token and the finished fold's
-  duration; the next attempt forgets who served the failed one. Each retry is a `round retried`
-  warning with the attempt, the status and the wait, and puts `retry`
-  (the attempt of three) on the round, which the live snapshot carries
-  and a `retry` frame sets and clears, never stored: the turn's working
-  line (`transcript/Work.model.ts`) adds `retrying 1/3` until the next
-  attempt's first event or the round's end; the last failure fails the
-  round with its words. Other 4xx and anything after the stream
-  started fail at once. A failure with a status is a
-  `ProviderRefusal`: the chat row keeps its words, and `round failed`
-  and `send end` log the status and a fixed phrase, never the body.
-  Deciders, catalogs and MCP calls are never retried here.
+  reaches the writer or the page (a `served` event does not count,
+  though any event starts the two-minute quiet timer), with status 429,
+  500, 502, 503 or 504 or no response at all, is asked again after
+  about 1, 2 and 4 s, lengthened to the `Retry-After` when it asks
+  more, with up to 25% jitter on top, so sends refused together come
+  back apart; a `Retry-After` past 30 s fails the round. Four requests
+  in all; a headers timeout is asked again once and counts toward the
+  three. The abandoned stream is closed and who served it forgotten
+  before the wait, and every wait runs under the round's signal; one
+  that would pass the turn's deadline (the memory phase's own window in
+  that phase) is not started. The round's first-token time keeps
+  counting from its start, so the waits show in the time to first token
+  and the finished fold's duration. Each retry is a `round retried`
+  warning with the attempt, `provider_status` and the wait, and puts
+  `retry` (the attempt of three) on the round, which the live snapshot
+  carries and a `retry` frame sets and clears, never stored; an
+  envelope that ends the session clears it too. The turn's working line
+  (`transcript/Work.model.ts`) and a compaction's summary line add
+  `retrying 1/3` until the next attempt's first event or the round's
+  end; the last failure fails the round with its words. Other 4xx and
+  anything after the stream started fail at once. A `remote` failure
+  is a `ProviderRefusal`: the chat row keeps its words exactly, and
+  `round failed` and `send end` log a fixed phrase and
+  `provider_status` when there is one, never the words; our own
+  failures ("stream ended early") keep theirs. Deciders, catalogs and
+  MCP calls are never retried here.
 - **The round keeps who served it.** On the OpenRouter wire alone,
   `openRouterEvents` adds a
   `served` event (the upstream and the model that answered) on the

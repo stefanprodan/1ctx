@@ -320,6 +320,8 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
           },
   };
   syncValues(session.value);
+  // a lost clear frame never outlives the send
+  if (ev.session.status !== "running") retrying.value = null;
   live.value = map;
   // who archived it and until when are the detail's alone
   if (!held.session.archived && ev.session.archived) refetch();

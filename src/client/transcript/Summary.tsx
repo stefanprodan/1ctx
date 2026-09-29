@@ -8,7 +8,7 @@
 // with the streaming tail after it. Whether it is open is kept per row
 // for the life of the page.
 
-import type { Message } from "../../shared/contracts/session.ts";
+import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { folds, useTick } from "./fold.ts";
 import { summaryLabel, summaryRunning } from "./Summary.model.ts";
@@ -20,14 +20,17 @@ const { useFoldOpen } = folds();
 export function Summary({
   message,
   live,
+  retry = null,
 }: {
   message: Message;
   live: ReadonlyMap<string, Live>;
+  // the running round waiting to ask its provider again
+  retry?: LiveRetry | null;
 }) {
   const running = summaryRunning(message, live);
   const current = running ? (live.get(message.id) ?? null) : null;
   useTick(running);
-  const label = summaryLabel(message, running, Date.now());
+  const label = summaryLabel(message, running, Date.now(), retry);
   const { open, onToggle } = useFoldOpen(message.id);
   const html = current?.html ?? message.html;
   return (

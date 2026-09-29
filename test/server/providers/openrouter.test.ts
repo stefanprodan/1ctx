@@ -347,7 +347,12 @@ describe("OpenRouter stream", () => {
   test("a body that echoes the key has it scrubbed", async () => {
     const { events } = await stream(`{"error":{"message":"bad ${KEY}"}}`, 401);
     expect(events).toEqual([
-      { kind: "error", message: "OpenRouter 401: bad [key]", status: 401 },
+      {
+        kind: "error",
+        message: "OpenRouter 401: bad [key]",
+        status: 401,
+        remote: true,
+      },
     ]);
   });
 

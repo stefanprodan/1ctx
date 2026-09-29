@@ -7,7 +7,7 @@
 // summary round's prompt; failed or stopped, it says so, and the
 // summary is skipped by the next request.
 
-import type { Message } from "../../shared/contracts/session.ts";
+import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { k } from "../lib/format.ts";
 import { clock } from "./stream.ts";
 
@@ -28,10 +28,13 @@ export function summaryLabel(
   message: Message,
   running: boolean,
   now = 0,
+  retry: LiveRetry | null = null,
 ): SummaryLabel {
   if (running) {
     const ms = Math.max(0, now - message.createdAt);
-    return { live: true, text: `Summarizing ${clock(ms)}`, err: false };
+    const wait =
+      retry === null ? "" : ` · retrying ${retry.attempt}/${retry.max}`;
+    return { live: true, text: `Summarizing ${clock(ms)}${wait}`, err: false };
   }
   if (message.status === "done") {
     const tokens =

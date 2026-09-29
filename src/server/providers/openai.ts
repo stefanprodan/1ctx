@@ -364,6 +364,7 @@ export async function* streamChat(
       kind: "error",
       message: `HTTP ${response.status}${text ? `: ${text}` : ""}`,
       status: response.status,
+      remote: true,
       ...(wait === null ? {} : { retryAfterMs: wait }),
     };
     return;

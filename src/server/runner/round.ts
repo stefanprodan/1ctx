@@ -82,12 +82,13 @@ async function pause(
 ): Promise<boolean> {
   if (signal.aborted) return false;
   if (ms <= 0) return true;
-  const timer = sleep(clock, ms);
   let stop = () => {};
   const aborted = new Promise<void>((resolve) => {
     stop = resolve;
     signal.addEventListener("abort", stop, { once: true });
   });
+  // listening first, so an abort however early ends the wait
+  const timer = sleep(clock, ms);
   try {
     await Promise.race([timer.promise, aborted]);
   } finally {
@@ -218,13 +219,16 @@ async function streamRound(
       ? new RoundVisuals(send, round, deps.writer, signal)
       : null;
   let replyBytes = bytes(round.content) + bytes(round.reasoning);
+  // heard: any event came, so the quiet timer runs; started: one reached
+  // the writer or the page, so asking again is no longer safe
+  let heard = false;
   let started = false;
   while (true) {
     const next = await nextEvent(
       iterator,
       deps.clock,
       visuals,
-      started ? STREAM_IDLE_MS : null,
+      heard ? STREAM_IDLE_MS : null,
     );
     if (next.kind === "idle") throw new Error("the provider went quiet");
     if (next.result.done) break;
@@ -245,7 +249,9 @@ async function streamRound(
           chat: send.sessionId,
           round: send.roundNo,
           attempt: retry.retries,
-          ...(event.status === undefined ? {} : { status: event.status }),
+          ...(event.status === undefined
+            ? {}
+            : { provider_status: event.status }),
           wait,
           // a failed connection has no status; its words carry no body
           ...(event.unanswered
@@ -254,21 +260,23 @@ async function streamRound(
         });
         // an error frame leaves its stream open; closing it lets go of
         // the connection, and Stop during the wait finds nothing held
-        void iterator.return?.();
+        void iterator.return?.()?.catch(() => {});
+        // the failed attempt served nothing, so a round stopped during
+        // the wait names no one; the first token stays timed from the
+        // round's start, since the waits are what the reader sat through
+        round.upstream = null;
+        round.servedModel = null;
         deps.writer.retrying(send, {
           attempt: retry.retries,
           max: MAX_RETRIES,
         });
         if (!(await pause(deps.clock, wait, signal))) return;
-        // the first token stays timed from the round's start, since the
-        // waits are what the reader sat through; the next attempt names
-        // who serves it
-        round.upstream = null;
-        round.servedModel = null;
+        heard = false;
         iterator = open();
         continue;
       }
     }
+    heard = true;
     // who serves the round reaches neither the writer nor the page, so
     // a failure right after it is still asked again
     if (event.kind !== "served") {
@@ -364,24 +372,33 @@ async function streamRound(
 export class ProviderRefusal extends Error {
   constructor(
     message: string,
-    readonly status: number,
+    readonly status: number | null,
   ) {
     super(message);
   }
 }
 
 function roundError(event: Extract<ChatEvent, { kind: "error" }>): Error {
-  return event.status === undefined
-    ? new Error(event.message)
-    : new ProviderRefusal(event.message, event.status);
+  return event.remote
+    ? new ProviderRefusal(event.message, event.status ?? null)
+    : new Error(event.message);
 }
 
 export const REFUSED = "the provider answered with an error";
 
+// what a log says of a refusal: the fixed phrase and the status, beside
+// a status field that already names something else
+export function refusalFields(status: number | null): LogFields {
+  return {
+    error: REFUSED,
+    ...(status === null ? {} : { provider_status: status }),
+  };
+}
+
 // the fields a failed round logs
 export function failureFields(error: unknown): LogFields {
   return error instanceof ProviderRefusal
-    ? { status: error.status, error: REFUSED }
+    ? refusalFields(error.status)
     : errorFields(error, false);
 }
 

@@ -65,7 +65,14 @@ export function frameEvents(body: any): ChatEvent[] {
           ? body.error
           : "the provider failed";
     const status = errorStatus(body.error);
-    return [{ kind: "error", message, ...(status === null ? {} : { status }) }];
+    return [
+      {
+        kind: "error",
+        message,
+        remote: true,
+        ...(status === null ? {} : { status }),
+      },
+    ];
   }
   const events: ChatEvent[] = [];
   const choice = Array.isArray(body?.choices) ? body.choices[0] : undefined;
