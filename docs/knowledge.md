@@ -13,7 +13,7 @@ our changes to just-bash and the upstream sync are in
   UTF-8 files under prefix-free names; `knowledge_versions` keeps every
   post-image and an empty delete version with the last live summary.
   History outlives files and both tables cascade with the project.
-  People call the base the project docs or the project files; the prompt
+  Users call the base the project docs or the project files; the prompt
   block names both and the Knowledge tab, only when bash is offered and
   the send's set does not hold `knowledge`.
   The bash description separates shared, versioned UTF-8 `/knowledge`
