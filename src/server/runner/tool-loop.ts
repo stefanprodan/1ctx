@@ -20,7 +20,7 @@ import { ASK_TOKENS } from "./context.ts";
 import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
 import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
-import { runRound } from "./round.ts";
+import { failureFields, runRound } from "./round.ts";
 import { type ActiveSend, type CapReason, newRound } from "./send.ts";
 import { dropTextCalls } from "./text-calls.ts";
 import { NOT_RUN_REPEAT, notRun, type Writer } from "./writer.ts";
@@ -90,7 +90,7 @@ export async function toolLoop(
         deps.log.warn("round failed", {
           chat: send.sessionId,
           round: send.roundNo,
-          ...errorFields(error, false),
+          ...failureFields(error),
         });
       }
       throw error;

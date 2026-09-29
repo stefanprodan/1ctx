@@ -6,8 +6,14 @@
 // the scripted fetch cannot make, a headers wait that ran out.
 
 import { describe, expect, test } from "bun:test";
-import type { ChatEvent } from "../../../src/server/providers/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import type {
+  ChatEvent,
+  ChatRequest,
+} from "../../../src/server/providers/index.ts";
+import { providerFor } from "../../../src/server/providers/provider.ts";
 import {
+  REFUSED,
   type RoundDeps,
   runRound,
   STREAM_IDLE_MS,
@@ -19,8 +25,14 @@ import type {
 } from "../../../src/shared/contracts/session.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import {
+  createAutomation,
+  settleRun,
+  startRun,
+} from "../../helpers/automations.ts";
+import {
   type ChatApp,
   chatApp,
+  setLimits,
   startChat,
   tick,
   waitScript,
@@ -60,6 +72,11 @@ describe("provider retries through a turn", () => {
     await tick();
     expect(chat.scripted.chats()).toBe(2);
     expect(chat.app.sessions.send(sendId)!.status).toBe("done");
+    // the first token is timed from the attempt that answered
+    const reply = chat.app.sessions
+      .messages(sessionId)
+      .find((row) => row.kind === "reply")!;
+    expect(reply.ttftMs).toBe(0);
     const retried = logs.events.filter((e) => e.msg === "round retried");
     expect(retried).toHaveLength(1);
     expect(retried[0]).toMatchObject({ level: "warn", area: "runner" });
@@ -104,7 +121,7 @@ describe("provider retries through a turn", () => {
     },
   );
 
-  test("a 429 with Retry-After waits that long on the clock", async () => {
+  test("a 429 with Retry-After waits at least that long on the clock", async () => {
     const logs = collectLogs();
     const chat = await chatApp({ logFactory: logs.logFactory });
     chat.scripted.refuse(429, BUSY, {
@@ -116,15 +133,17 @@ describe("provider retries through a turn", () => {
     chat.app.now.value += 1999;
     await tick();
     expect(chat.scripted.chats()).toBe(1);
-    chat.app.now.value += 1;
+    // the jitter rides on top of the asked wait
+    chat.app.now.value += 501;
     (await waitScript(chat.scripted, 1)).reply("hello");
     await tick();
     await tick();
     expect(chat.scripted.chats()).toBe(2);
     expect(chat.app.sessions.send(sendId)!.status).toBe("done");
-    expect(
-      logs.events.find((e) => e.msg === "round retried")!.fields,
-    ).toMatchObject({ status: 429, wait: 2000 });
+    const fields = logs.events.find((e) => e.msg === "round retried")!.fields;
+    expect(fields).toMatchObject({ status: 429 });
+    expect(fields.wait as number).toBeGreaterThanOrEqual(2000);
+    expect(fields.wait as number).toBeLessThanOrEqual(2500);
   });
 
   test("a Retry-After past 30 s fails the turn at once", async () => {
@@ -163,7 +182,7 @@ describe("provider retries through a turn", () => {
     const logs = collectLogs();
     const chat = await chatApp({ logFactory: logs.logFactory });
     chat.scripted.refuse(400, '{"error":{"message":"bad request"}}');
-    const { sendId } = await post(chat);
+    const { sendId, sessionId } = await post(chat);
     await tick();
     expect(chat.scripted.chats()).toBe(1);
     expect(chat.app.sessions.send(sendId)!).toMatchObject({
@@ -171,6 +190,17 @@ describe("provider retries through a turn", () => {
       error: 'HTTP 400: {"error":{"message":"bad request"}}',
     });
     expect(logs.events.some((e) => e.msg === "round retried")).toBe(false);
+    // the words stay on the chat row; a log names the status alone
+    expect(logs.events.find((e) => e.msg === "round failed")!.fields).toEqual({
+      chat: sessionId,
+      round: 1,
+      status: 400,
+      error: REFUSED,
+    });
+    expect(logs.events.find((e) => e.msg === "send end")!.fields).toMatchObject(
+      { status: 400, error: REFUSED },
+    );
+    expect(JSON.stringify(logs.events)).not.toContain("bad request");
   });
 
   test("an error after the first content fails the turn at once", async () => {
@@ -239,6 +269,95 @@ describe("provider retries through a turn", () => {
       status: "failed",
       cause: "failure",
       error: "local failed: the connection was reset",
+    });
+  });
+});
+
+describe("every round kind retries", () => {
+  test("a memory phase round is asked again", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    chat.scripted.refuse(503, BUSY, { times: 1 });
+    run.main.reply("Done.");
+    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await advance(chat);
+    (await waitScript(chat.scripted, 2)).reply("No change.");
+    await settleRun(chat, run.sessionId);
+    expect(chat.scripted.chats()).toBe(3);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      status: "done",
+      memoryError: null,
+    });
+    await chat.app.shutdown();
+  });
+
+  test("a wait past the memory phase's window is not started", async () => {
+    const chat = await chatApp();
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    const active = chat.app.runner.registry.get(run.sessionId)!;
+    active.policy.limits.memoryPhaseMs = 900;
+    chat.scripted.refuse(503, BUSY, { times: 1 });
+    run.main.reply("Done.");
+    await settleRun(chat, run.sessionId);
+    expect(chat.scripted.chats()).toBe(2);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      status: "done",
+      memoryError: `HTTP 503: ${BUSY}`,
+    });
+    await chat.app.shutdown();
+  });
+
+  test("a wait past the turn's deadline is not started", async () => {
+    const chat = await chatApp();
+    await setLimits(chat, { sendDeadlineMs: 60_000 });
+    expect(DEFAULT_LIMITS.sendDeadlineMs).toBeGreaterThan(60_000);
+    const { script, sessionId, detail } = await startChat(chat, "use time");
+    script.reasoning("thinking");
+    await tick();
+    chat.app.now.value += 59_500;
+    chat.scripted.refuse(503, BUSY, { times: 1 });
+    script.toolRound([
+      { id: "time", name: "datetime", arguments: '{"timezone":"UTC"}' },
+    ]);
+    script.end();
+    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(2);
+    expect(chat.app.sessions.send(detail.send.id)!).toMatchObject({
+      status: "failed",
+      error: `HTTP 503: ${BUSY}`,
+    });
+    expect(chat.app.sessions.byId(sessionId)!.status).toBe("failed");
+  });
+
+  test("a compaction round is asked again", async () => {
+    const chat = await chatApp();
+    const { script, sessionId } = await startChat(chat, "question");
+    script.reply("answer");
+    for (let i = 0; i < 200; i++) {
+      if (chat.app.sessions.byId(sessionId)?.status !== "running") break;
+      await tick();
+    }
+    chat.scripted.refuse(503, BUSY, { times: 1 });
+    const compacted = await chat.member.call(
+      "POST",
+      `/api/sessions/${sessionId}/compact`,
+    );
+    expect(compacted.status).toBe(200);
+    const { send } = await compacted.json();
+    await tick();
+    expect(chat.scripted.chats()).toBe(2);
+    await advance(chat);
+    (await waitScript(chat.scripted, 2)).reply("the summary");
+    await tick();
+    await tick();
+    expect(chat.scripted.chats()).toBe(3);
+    expect(chat.app.sessions.send(send.id)!).toMatchObject({
+      kind: "compact",
+      status: "done",
     });
   });
 });
@@ -314,7 +433,10 @@ describe("the working line while a round waits", () => {
 // runRound alone, with a chat port that plays one stream per request
 function round(
   streams: ChatEvent[][],
-  fields: { deadline?: number | null } = {},
+  fields: {
+    deadline?: number | null;
+    chat?: (req: ChatRequest, signal: AbortSignal) => AsyncIterable<ChatEvent>;
+  } = {},
 ) {
   const logs = collectLogs();
   let now = 1_000_000;
@@ -332,7 +454,8 @@ function round(
   // what the working line was told, as the writer skips a clear of nothing
   const shown: (LiveRetry | null)[] = [];
   const deps = {
-    chat: () => {
+    chat: (_id: string, req: ChatRequest, signal: AbortSignal) => {
+      if (fields.chat !== undefined) return fields.chat(req, signal);
       const events = streams[asked++] ?? [];
       return (async function* () {
         yield* events;
@@ -371,6 +494,9 @@ function round(
       finishReason: null,
       usage: null,
       retry: null,
+      upstream: null,
+      servedModel: null,
+      startedAt: now,
     },
   } as unknown as ActiveSend;
   const run = runRound(deps, send, [], {
@@ -393,6 +519,81 @@ const answer: ChatEvent[] = [
 ];
 
 describe("runRound retries", () => {
+  test("a stream left open by its error frame is closed on a retry", async () => {
+    const closed: number[] = [];
+    let opened = 0;
+    const encoder = new TextEncoder();
+    const frame = (body: object) =>
+      encoder.encode(`data: ${JSON.stringify(body)}\n\n`);
+    const fetcher = (async () => {
+      const at = opened++;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          if (at === 0) {
+            // held open, as a proxy that keeps the connection does
+            controller.enqueue(
+              frame({ error: { code: 503, message: "busy" } }),
+            );
+            return;
+          }
+          controller.enqueue(
+            frame({
+              choices: [{ delta: { content: "hi" }, finish_reason: "stop" }],
+            }),
+          );
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+        cancel() {
+          closed.push(at);
+        },
+      });
+      return new Response(body, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }) as unknown as typeof fetch;
+    const provider = providerFor(
+      {
+        id: "p",
+        name: "local",
+        wire: "openai-compatible",
+        baseUrl: "http://models.test/v1",
+        keyName: null,
+        createdAt: 0,
+      },
+      { fetcher, secret: () => null },
+    );
+    const r = round([], {
+      chat: (req, signal) => provider.chat(req, signal),
+    });
+    await r.run;
+    await tick();
+    expect(opened).toBe(2);
+    expect(closed).toContain(0);
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  test("who serves the round does not start it", async () => {
+    const served: ChatEvent = { kind: "served", upstream: "Busy", model: "m" };
+    const upstream: ChatEvent = {
+      kind: "error",
+      message: "upstream failed",
+      status: 502,
+    };
+    const r = round([[served, upstream], answer]);
+    await r.run;
+    expect(r.asked()).toBe(2);
+    // the attempt that answered named no one
+    expect(r.send.round!.upstream).toBeNull();
+  });
+
+  test("the first token is timed from the attempt that answered", async () => {
+    const r = round([[busy], answer]);
+    await r.run;
+    expect(r.sleeps).toEqual([1000]);
+    expect(r.send.round!.startedAt).toBe(1_000_000 + 1000);
+  });
+
   test("two headers timeouts fail the round", async () => {
     const r = round([[timedOut], [timedOut], answer]);
     await expect(r.run).rejects.toThrow(

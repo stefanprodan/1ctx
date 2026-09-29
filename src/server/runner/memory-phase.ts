@@ -16,7 +16,7 @@ import { type ContextLookups, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";
-import { runRound } from "./round.ts";
+import { failureFields, runRound } from "./round.ts";
 import { type ActiveSend, newRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { CUT_SHORT, NOT_RUN, statusOf } from "./writer.ts";
@@ -352,7 +352,7 @@ export async function memoryPhase(
         deps.log.warn("round failed", {
           chat: send.sessionId,
           round: send.roundNo,
-          ...errorFields(error, false),
+          ...failureFields(error),
         });
         throw error;
       }

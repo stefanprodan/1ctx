@@ -42,24 +42,31 @@ fields.
 - **A busy provider is asked again, three times at most.** An error
   event carries `status` (the HTTP status, or the code or Google status
   word an error frame names, `errorStatus()` in `providers/frames.ts`),
-  `retryAfterMs` (a `Retry-After` in seconds or an HTTP date),
-  `unanswered` when no response came and `timedOut` when that was the
-  headers wait. `retryWait()` in `runner/retry.ts` decides: a round's
-  error before any other event of its stream, with status 429, 500,
-  502, 503 or 504 or no response at all, is asked again after about
-  1, 2 and 4 s with up to 25% jitter, or the `Retry-After`, which past
-  30 s fails the round. Four requests in all; a headers timeout is asked
-  again once and counts toward the three. Every wait runs under the
-  round's signal and one that would pass the turn's deadline (the
-  memory phase's own window in that phase) is not started. Each retry
-  is a `round retried` warning with the attempt, the status and the
-  wait, and puts `retry` (the attempt of three) on the round, which the
-  live snapshot carries and a `retry` frame sets and clears, never
-  stored: the turn's working line (`transcript/Work.model.ts`) adds
-  `retrying 1/3` until the next attempt's first event or the round's
-  end; the last failure fails the round with its words. Other 4xx and
-  anything after the stream started fail at once. Deciders, catalogs
-  and MCP calls are never retried here.
+  `retryAfterMs` (a `Retry-After` in whole seconds or an IMF-fixdate;
+  anything else is ignored), `unanswered` when no response came and
+  `timedOut` when that was the headers wait. `retryWait()` in
+  `runner/retry.ts` decides: a round's error before any event that
+  reaches the writer or the page (a `served` event does not count),
+  with status 429, 500, 502, 503 or 504 or no response at all, is asked
+  again after about 1, 2 and 4 s, lengthened to the `Retry-After` when
+  it asks more, with up to 25% jitter on top, so sends refused together
+  come back apart; a `Retry-After` past 30 s fails the round. Four
+  requests in all; a headers timeout is asked again once and counts
+  toward the three. The abandoned stream is closed at once, and every
+  wait runs under the round's signal; one that would pass the turn's
+  deadline (the memory phase's own window in that phase) is not
+  started. The next attempt restarts the round's first-token clock and
+  forgets who served the failed one. Each retry is a `round retried`
+  warning with the attempt, the status and the wait, and puts `retry`
+  (the attempt of three) on the round, which the live snapshot carries
+  and a `retry` frame sets and clears, never stored: the turn's working
+  line (`transcript/Work.model.ts`) adds `retrying 1/3` until the next
+  attempt's first event or the round's end; the last failure fails the
+  round with its words. Other 4xx and anything after the stream
+  started fail at once. A failure with a status is a
+  `ProviderRefusal`: the chat row keeps its words, and `round failed`
+  and `send end` log the status and a fixed phrase, never the body.
+  Deciders, catalogs and MCP calls are never retried here.
 - **The round keeps who served it.** On the OpenRouter wire alone,
   `openRouterEvents` adds a
   `served` event (the upstream and the model that answered) on the

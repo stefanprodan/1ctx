@@ -81,12 +81,25 @@ describe("how long a retry waits", () => {
     }
   });
 
-  test("a Retry-After replaces the backoff, up to 30 s", () => {
+  test("a Retry-After only lengthens the backoff, up to 30 s", () => {
     const after = (ms: number) => refused(429, { retryAfterMs: ms });
-    expect(retryWait(after(2000), fresh, null, 0.9)).toBe(2000);
-    expect(retryWait(after(0), fresh, null, 0.9)).toBe(0);
+    expect(retryWait(after(2000), fresh, null, 0)).toBe(2000);
+    expect(retryWait(after(2000), fresh, null, 0.5)).toBe(2250);
+    // no wait asked, or a past date, still backs off with its jitter
+    expect(retryWait(after(0), fresh, null, 0)).toBe(1000);
+    expect(retryWait(after(0), fresh, null, 0.5)).toBe(1125);
+    expect(retryWait(after(1500), { retries: 2, timeouts: 0 }, null, 0)).toBe(
+      4000,
+    );
     expect(retryWait(after(MAX_RETRY_AFTER_MS), fresh, null, 0)).toBe(30_000);
     expect(retryWait(after(MAX_RETRY_AFTER_MS + 1), fresh, null, 0)).toBeNull();
+  });
+
+  test("sends refused together come back apart", () => {
+    const waits = [0, 0.3, 0.7].map((random) =>
+      retryWait(refused(429, { retryAfterMs: 0 }), fresh, null, random),
+    );
+    expect(new Set(waits).size).toBe(3);
   });
 
   test("a wait that would pass the deadline is not started", () => {
@@ -113,7 +126,19 @@ describe("Retry-After", () => {
   });
 
   test("anything else is no Retry-After", () => {
-    for (const header of [null, "", "-1", "1.5", "soon", "2 s"]) {
+    for (const header of [
+      null,
+      "",
+      "-1",
+      "1.5",
+      "soon",
+      "2 s",
+      "May 1",
+      "x 5",
+      "2026-09-29T10:00:05Z",
+      "Tuesday, 29-Sep-26 10:00:05 GMT",
+      "Tue, 29 Sep 2026 10:00:05 PST",
+    ]) {
       expect(retryAfterMs(header, now)).toBeNull();
     }
   });

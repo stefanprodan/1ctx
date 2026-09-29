@@ -302,13 +302,17 @@ export class Unanswered extends Error {
   }
 }
 
-// Retry-After as seconds or an HTTP date, in milliseconds from now; a
-// date already past is no wait, anything else is not a Retry-After
+// an HTTP date as RFC 9110 requires a sender to write it
+const IMF_FIXDATE =
+  /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
+// Retry-After as whole seconds or an IMF-fixdate, in milliseconds from
+// now; a date already past is no wait, anything else is not a Retry-After
 export function retryAfterMs(header: string | null, now: number) {
   if (header === null) return null;
   const value = header.trim();
   if (/^\d+$/.test(value)) return Number(value) * 1000;
-  if (!/[a-z]/i.test(value)) return null;
+  if (!IMF_FIXDATE.test(value)) return null;
   const at = Date.parse(value);
   return Number.isFinite(at) ? Math.max(0, at - now) : null;
 }
@@ -316,6 +320,8 @@ export function retryAfterMs(header: string | null, now: number) {
 export type StreamOptions = {
   mapEvents?: (json: string) => ChatEvent[];
   headers?: Record<string, string>;
+  // shorter in a test, so a timed out wait is seen without two minutes
+  headersTimeoutMs?: number;
 };
 
 export async function* streamChat(
@@ -333,7 +339,7 @@ export async function* streamChat(
   const headersTimer = setTimeout(() => {
     timedOut = true;
     controller.abort(new Error("the response headers timed out"));
-  }, CHAT_HEADERS_TIMEOUT_MS);
+  }, options.headersTimeoutMs ?? CHAT_HEADERS_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetcher(url, {

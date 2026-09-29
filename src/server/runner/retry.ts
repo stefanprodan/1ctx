@@ -38,15 +38,13 @@ export function retryWait(
   ) {
     return null;
   }
-  let wait: number;
-  if (event.retryAfterMs !== undefined) {
-    if (event.retryAfterMs > MAX_RETRY_AFTER_MS) return null;
-    wait = Math.max(0, Math.ceil(event.retryAfterMs));
-  } else {
-    const base = RETRY_BASE_MS * 2 ** state.retries;
-    const jitter = Math.min(Math.max(random, 0), 1) * RETRY_JITTER;
-    wait = Math.round(base * (1 + jitter));
-  }
+  const after = event.retryAfterMs ?? 0;
+  if (after > MAX_RETRY_AFTER_MS) return null;
+  // a Retry-After only ever lengthens the backoff, and the jitter stays,
+  // so sends refused together never come back at the same instant
+  const base = Math.max(RETRY_BASE_MS * 2 ** state.retries, after);
+  const jitter = Math.min(Math.max(random, 0), 1) * RETRY_JITTER;
+  const wait = Math.round(base * (1 + jitter));
   if (leftMs !== null && wait >= leftMs) return null;
   return wait;
 }

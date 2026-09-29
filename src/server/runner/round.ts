@@ -13,7 +13,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Clock } from "../lib/clock.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
   type ChatEvent,
   type ChatRequest,
@@ -252,18 +252,30 @@ async function streamRound(
             ? errorFields(new Error(event.message), false)
             : {}),
         });
+        // an error frame leaves its stream open; closing it lets go of
+        // the connection, and Stop during the wait finds nothing held
+        void iterator.return?.();
         deps.writer.retrying(send, {
           attempt: retry.retries,
           max: MAX_RETRIES,
         });
         if (!(await pause(deps.clock, wait, signal))) return;
+        // the next attempt is the one its first token is timed from, and
+        // it names who serves it
+        round.startedAt = deps.clock();
+        round.upstream = null;
+        round.servedModel = null;
         iterator = open();
         continue;
       }
     }
-    // the next attempt answered, so the line stops saying retrying
-    if (round.retry !== null) deps.writer.retrying(send, null);
-    started = true;
+    // who serves the round reaches neither the writer nor the page, so
+    // a failure right after it is still asked again
+    if (event.kind !== "served") {
+      // the next attempt answered, so the line stops saying retrying
+      if (round.retry !== null) deps.writer.retrying(send, null);
+      started = true;
+    }
     switch (event.kind) {
       case "reasoning":
         if (send.summarizing) break;
@@ -329,7 +341,7 @@ async function streamRound(
         break;
       }
       case "error":
-        throw new Error(event.message);
+        throw roundError(event);
       default:
         break;
     }
@@ -345,6 +357,32 @@ async function streamRound(
     round.tokens = round.usage.promptTokens + round.usage.completionTokens;
     round.spent = spentTokens(round.usage);
   }
+}
+
+// A provider's refusal keeps its words for the chat row; a log names
+// only its status, since the words are the response's body
+export class ProviderRefusal extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+function roundError(event: Extract<ChatEvent, { kind: "error" }>): Error {
+  return event.status === undefined
+    ? new Error(event.message)
+    : new ProviderRefusal(event.message, event.status);
+}
+
+export const REFUSED = "the provider answered with an error";
+
+// the fields a failed round logs
+export function failureFields(error: unknown): LogFields {
+  return error instanceof ProviderRefusal
+    ? { status: error.status, error: REFUSED }
+    : errorFields(error, false);
 }
 
 export function spentTokens(
