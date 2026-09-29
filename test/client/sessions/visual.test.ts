@@ -49,6 +49,7 @@ async function open(detail = visualDetail()) {
 function envelope(detail: SessionDetail) {
   onSocket({
     type: "session",
+    row: null,
     projectId: detail.session.projectId,
     session: detail.session,
     messages: detail.messages,
@@ -194,6 +195,7 @@ test.serial(
     });
     onSocket({
       type: "session",
+      row: null,
       projectId: detail.session.projectId,
       session: { ...detail.session, revision: 3 },
       messages: [],
@@ -249,6 +251,7 @@ test.serial(
     expect(fetched).toBe(1);
     onSocket({
       type: "session",
+      row: null,
       projectId: detail.session.projectId,
       session: { ...detail.session, revision: 2 },
       messages: [],

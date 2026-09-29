@@ -111,7 +111,13 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   from `access.visibleProjectIds()` (memberships, plus every team
   project for an admin), and at most one watched session. A durable
   event (`session`, `deleted`) goes to the connections holding its
-  project, and so do `automation` and `automationDeleted`, from the bus's
+  project. A `session` frame carries `row`, the stream row's fields
+  that read the same for every viewer (not `session`, which the frame
+  has, nor `runs`, which hangs on the list's filter), read through the
+  sessions port once per event when the first connection in its
+  audience is met, so an event nobody sees costs no read; `deleted`
+  has no row. `automation` and `automationDeleted` go to the same
+  audience, from the bus's
   `automation.changed` and `automation.deleted`, by the row's revision,
   and `memory`, from `memory.changed`, by the note's revision;
   `knowledge.changed` reaches the same project audience as a `knowledge`

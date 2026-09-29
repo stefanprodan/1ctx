@@ -353,6 +353,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: next,
       messages: [
@@ -373,6 +374,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Ignored" }),
       messages: [message({ id: "m4", seq: 4 })],
@@ -388,6 +390,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Changed" }),
       messages: [],
@@ -432,6 +435,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [],
@@ -443,6 +447,7 @@ describe("the sessions entity", () => {
     const done = { ...sent, status: "done" as const, cause: "finish" as const };
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [],
@@ -455,6 +460,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, title: "Old" }),
       messages: [],
@@ -476,6 +482,7 @@ describe("the sessions entity", () => {
       await loadList({ project: null, q: "" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p2",
         session: summary({ id: "s2", projectId: "p2" }),
         messages: [],
@@ -487,6 +494,7 @@ describe("the sessions entity", () => {
       await loadList({ project: null, q: "pods" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ id: "s3", title: "restart pods" }),
         messages: [],
@@ -495,6 +503,7 @@ describe("the sessions entity", () => {
       await loadList({ project: "p1", q: "" });
       onSocket({
         type: "session",
+        row: null,
         projectId: "p2",
         session: summary({ id: "s4", projectId: "p2" }),
         messages: [],
@@ -518,6 +527,7 @@ describe("the sessions entity", () => {
     // nothing is held yet, so the envelope has nothing to update
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3, title: "Newer" }),
       messages: [],
@@ -531,6 +541,7 @@ describe("the sessions entity", () => {
     const again = loadList({ project: null, q: "" });
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3, title: "Newer" }),
       messages: [],
@@ -557,6 +568,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [streaming],
@@ -566,6 +578,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [message({ id: streaming.id })],
@@ -586,6 +599,7 @@ describe("the sessions entity", () => {
     });
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [streaming],
@@ -594,6 +608,7 @@ describe("the sessions entity", () => {
     expect(live.value.has("sum1")).toBe(true);
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 3 }),
       messages: [message({ ...streaming, status: "done", promptTokens: 40 })],
@@ -662,6 +677,7 @@ describe("the sessions entity", () => {
       };
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ revision: 2, archived }),
         messages: [],
@@ -675,6 +691,7 @@ describe("the sessions entity", () => {
       // a later envelope of an archived chat reads nothing more
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ revision: 4, archived }),
         messages: [],
@@ -991,6 +1008,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2, status: "running" }),
       messages: [
@@ -1174,6 +1192,7 @@ describe("the sessions entity", () => {
 
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ revision: 2 }),
       messages: [message({ id: "m2", seq: 4, kind: "user" })],
@@ -1578,6 +1597,7 @@ describe("answers held for the way back", () => {
       await loadSession("s2");
       onSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: summary({ id: "s1", revision: 2 }),
         messages: [],
@@ -1654,6 +1674,7 @@ describe("the stream's pages", () => {
   const arrived = (id: string, title = "Chat") =>
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: summary({ id, lastActivityAt: 60, title }),
       messages: [],
@@ -2033,6 +2054,7 @@ describe("runs grouped in All", () => {
   const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
     onSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: line(id, at, 0, changes).session,
       messages: [],

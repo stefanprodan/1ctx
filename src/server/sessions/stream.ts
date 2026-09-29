@@ -7,7 +7,7 @@
 // it is. The line is cut in SQL before it reaches the process, so a
 // reply of a megabyte weighs nothing here.
 
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { EnvelopeRow, StreamRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { lineFrom } from "./parse.ts";
@@ -163,4 +163,103 @@ export function streamRows(
           : (counts?.get(raw.automation_id) ?? null),
     };
   });
+}
+
+const SEND_COLUMNS = [
+  "id",
+  "session_id",
+  "kind",
+  "user_id",
+  "agent_id",
+  "provider_id",
+  "model",
+  "status",
+  "cause",
+  "error",
+  "first_message_id",
+  "rounds",
+  "tool_calls",
+  "memory_round",
+  "memory_error",
+  "memory_skipped",
+  "started_at",
+  "finished_at",
+] as const;
+
+type RawEnvelopeRow = {
+  agent: string;
+  retired: number;
+  automation_id: string | null;
+  automation_name: string | null;
+  owner_id: string;
+  run_by: string | null;
+  line_seq: number | null;
+  line_author: string;
+  line_content: string | null;
+  tokens: number;
+} & { [K in `send_${(typeof SEND_COLUMNS)[number]}`]: unknown };
+
+// The same last send and last line streamRows() reads, for one session,
+// as one statement of point lookups: an event fires many times a turn,
+// and the list's not-exists scans walk a long chat's every message.
+// The line's kind and slot come first so a tool row, whose status sits
+// past a content that may span overflow pages, is passed without it.
+export const ENVELOPE_ROW = `select agents.name as agent,
+    agents.deleted_at is not null as retired,
+    automations.id as automation_id, automations.name as automation_name,
+    sessions.owner_id, runner.username as run_by,
+    line.seq as line_seq, substr(line.content, 1, 600) as line_content,
+    coalesce(author.username, speaker.name) as line_author,
+    ${SEND_COLUMNS.map((column) => `last.${column} as send_${column}`).join(", ")},
+    ${sendTokens("last")}
+  from sessions
+  join agents on agents.id = sessions.agent_id
+  left join automations on automations.id = sessions.automation_id
+  left join users runner
+    on sessions.run_source = 'manual' and runner.id = sessions.owner_id
+  left join messages line on line.session_id = sessions.id and line.seq = (
+    select newest.seq from messages newest
+    where newest.session_id = sessions.id
+      and (newest.kind = 'user'
+        or (newest.kind = 'reply' and newest.slot = 'answer'))
+      and newest.status != 'streaming'
+      and newest.content != ''
+    order by newest.seq desc limit 1)
+  left join users author on author.id = line.user_id
+  left join agents speaker on speaker.id = line.agent_id
+  left join sends last on last.id = (
+    select newest.id from sends newest
+    where newest.session_id = sessions.id
+    order by newest.started_at desc, newest.rowid desc limit 1)
+  where sessions.id = ?`;
+
+/** What a session envelope carries of its stream row, or null when gone. */
+export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
+  const raw = db.query<RawEnvelopeRow, [string]>(ENVELOPE_ROW).get(sessionId);
+  if (raw === null) return null;
+  const text = raw.line_content === null ? "" : lineFrom(raw.line_content);
+  const sent =
+    raw.send_id === null
+      ? null
+      : send({
+          ...(Object.fromEntries(
+            SEND_COLUMNS.map((column) => [column, raw[`send_${column}`]]),
+          ) as Omit<RawSend, "tokens">),
+          tokens: raw.tokens,
+        });
+  return {
+    agent: raw.agent,
+    agentRetired: raw.retired === 1,
+    send: sent,
+    last:
+      text === "" || raw.line_seq === null
+        ? null
+        : { seq: raw.line_seq, author: raw.line_author, text },
+    automation:
+      raw.automation_id === null || raw.automation_name === null
+        ? null
+        : { id: raw.automation_id, name: raw.automation_name },
+    runBy:
+      raw.run_by === null ? null : { id: raw.owner_id, username: raw.run_by },
+  };
 }

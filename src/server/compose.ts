@@ -344,6 +344,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     refresh: (principal) => access.refresh(principal),
     visibleProjectIds: (userId) => access.visibleProjectIds(userId),
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
+    envelopeRow: (sessionId) => sessions.envelopeRow(sessionId),
     live: (sessionId) => runner.live(sessionId),
   });
   const runner = runnerArea({

@@ -6,16 +6,21 @@
 
 import { describe, expect, test } from "bun:test";
 import { transact } from "../../src/server/db/index.ts";
+import { publish } from "../../src/server/lib/bus.ts";
+import { silent } from "../../src/server/lib/log.ts";
 import {
   CLOSE_BAD_COMMAND,
   CLOSE_DROPPED,
   CLOSE_REVOKED,
   type Conn,
   type ConnData,
+  socketArea,
 } from "../../src/server/web/socket.ts";
+import type { StreamRow } from "../../src/shared/api/sessions.ts";
 import { PROTOCOL, type SocketEvent } from "../../src/shared/socket.ts";
 import {
   collectLogs,
+  hashPassword,
   ORIGIN,
   type TestClient,
   VERSION,
@@ -150,6 +155,93 @@ describe("the socket", () => {
     expect(frames(member, "session")).toHaveLength(2);
     expect(frames(admin, "session")).toEqual([]);
     close(chat, member, admin);
+  });
+
+  test("a session envelope carries the row the list shows", async () => {
+    const chat = await chatApp();
+    const conn = await connection(chat, chat.member);
+    chat.app.socket.open(conn);
+    const { script, sessionId } = await startChat(chat, "## first line");
+    await finish(script);
+    const listed = await chat.member.call(
+      "GET",
+      `/api/sessions?project=${chat.projectId}`,
+    );
+    const { rows } = (await listed.json()) as { rows: StreamRow[] };
+    const { runs: _runs, ...row } = rows.find(
+      (row) => row.session.id === sessionId,
+    )!;
+    const sent = frames(conn, "session").filter(
+      (frame) => frame.session.id === sessionId,
+    );
+    expect(sent.length).toBeGreaterThan(1);
+    const last = sent.at(-1)!;
+    expect({ session: last.session, ...last.row }).toEqual(row);
+    expect(sent[0].row?.last?.text).toBe("first line");
+    close(chat, conn);
+  });
+
+  test("the row reaches the same audience as the envelope", async () => {
+    const chat = await chatApp();
+    addTeam(chat, "row-team");
+    chat.app.createUser({
+      username: "drew",
+      fullName: "Drew Doe",
+      email: "drew@example.com",
+      role: "member",
+      passwordHash: await hashPassword("pw"),
+      mustChangePassword: false,
+      now: chat.app.now.value,
+    });
+    const locked = chat.app.createUser({
+      username: "erin",
+      fullName: "Erin Doe",
+      email: "erin@example.com",
+      role: "member",
+      passwordHash: await hashPassword("pw"),
+      mustChangePassword: true,
+      now: chat.app.now.value,
+    });
+    chat.app.db
+      .query(
+        "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
+      )
+      .run("row-team", locked.id, chat.app.now.value);
+    const drew = chat.app.client();
+    await drew.login("drew", "pw");
+    const erin = chat.app.client();
+    await erin.login("erin", "pw");
+    const conns = {
+      member: await connection(chat, chat.member),
+      admin: await connection(chat, chat.admin),
+      outsider: await connection(chat, drew),
+      locked: await connection(chat, erin),
+    };
+    for (const conn of Object.values(conns)) chat.app.socket.open(conn);
+    expect(conns.locked.data.projects.has("row-team")).toBe(true);
+    const team = await startChat(chat, "team chat", chat.member, "row-team");
+    await finish(team.script);
+    const personal = await startChat(chat, "own chat");
+    await finish(personal.script);
+
+    const seen = (conn: FakeConn) =>
+      frames(conn, "session").map((frame) => [
+        frame.session.id,
+        frame.row?.agent,
+      ]);
+    // an admin sees every team project, never a member's personal one
+    expect(new Set(seen(conns.admin).map(([id]) => id))).toEqual(
+      new Set([team.sessionId]),
+    );
+    expect(seen(conns.admin).every(([, agent]) => agent === "coder")).toBe(
+      true,
+    );
+    expect(new Set(seen(conns.member).map(([id]) => id))).toEqual(
+      new Set([team.sessionId, personal.sessionId]),
+    );
+    expect(seen(conns.outsider)).toEqual([]);
+    expect(seen(conns.locked)).toEqual([]);
+    close(chat, ...Object.values(conns));
   });
 
   test("a memory frame reaches only connections holding its project", async () => {
@@ -740,5 +832,94 @@ describe("automation socket events", () => {
     expect(frames(conn, "deleted")).toEqual([]);
     close(chat, conn);
     await chat.app.shutdown();
+  });
+});
+
+describe("the envelope row read", () => {
+  const fake = (userId: string, projects: string[]): FakeConn => {
+    const conn: FakeConn = {
+      data: {
+        principal: {
+          userId,
+          username: userId,
+          fullName: userId,
+          role: "member",
+          mustChangePassword: false,
+          loginId: `login-${userId}`,
+        },
+        projects: new Set(projects),
+        watching: null,
+      },
+      frames: [],
+      closed: [],
+      sendResult: null,
+      send(text) {
+        conn.frames.push(JSON.parse(text));
+        return text.length;
+      },
+      close(code, reason) {
+        conn.closed.push({ code, reason });
+      },
+    };
+    return conn;
+  };
+  const changed = (projectId: string) =>
+    publish({
+      type: "session.changed",
+      data: {
+        projectId,
+        session: { id: `s-${projectId}`, projectId } as never,
+        messages: [],
+        send: null,
+      },
+    });
+
+  test.serial("happens once per event, and never for no audience", () => {
+    const reads: string[] = [];
+    const socket = socketArea({
+      version: "test",
+      log: silent,
+      refresh: (principal) => principal,
+      visibleProjectIds: () => [],
+      sessionProject: () => null,
+      live: () => null,
+      envelopeRow(sessionId) {
+        reads.push(sessionId);
+        return null;
+      },
+    });
+    const conns = [fake("a", ["p"]), fake("b", ["p"]), fake("c", ["q"])];
+    for (const conn of conns) socket.open(conn);
+    changed("p");
+    changed("elsewhere");
+    expect(reads).toEqual(["s-p"]);
+    expect(conns.map((conn) => frames(conn, "session").length)).toEqual([
+      1, 1, 0,
+    ]);
+    socket.dispose();
+  });
+
+  test.serial("a failed read still sends the envelope, without a row", () => {
+    const logs = collectLogs();
+    const socket = socketArea({
+      version: "test",
+      log: logs.logFactory("socket"),
+      refresh: (principal) => principal,
+      visibleProjectIds: () => [],
+      sessionProject: () => null,
+      live: () => null,
+      envelopeRow() {
+        throw new Error("disk I/O error");
+      },
+    });
+    const conn = fake("a", ["p"]);
+    socket.open(conn);
+    changed("p");
+    expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);
+    expect(logs.events.map((event) => [event.msg, event.fields.chat])).toEqual([
+      ["socket open", undefined],
+      ["envelope row failed", "s-p"],
+    ]);
+    socket.dispose();
   });
 });

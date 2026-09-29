@@ -969,6 +969,7 @@ describe("the entity over the socket", () => {
     };
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ revision: 1 }),
       messages: [],
@@ -981,6 +982,7 @@ describe("the entity over the socket", () => {
     // the same run under the same status moves in place, unasked
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ revision: 2 }),
       messages: [],
@@ -996,6 +998,7 @@ describe("the entity over the socket", () => {
       })) as unknown as typeof fetch;
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ id: "s3", revision: 1 }),
       messages: [],
@@ -1003,6 +1006,7 @@ describe("the entity over the socket", () => {
     });
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ id: "s3", revision: 2, title: "moved" }),
       messages: [],
@@ -1027,6 +1031,7 @@ describe("the entity over the socket", () => {
     // a chat's envelope does not join
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ id: "c1", origin: "chat", automationId: null }),
       messages: [],
@@ -1055,6 +1060,7 @@ describe("the entity over the socket", () => {
     };
     const failedRun = {
       type: "session" as const,
+      row: null,
       projectId: "p1",
       session: session({ id: "s2", revision: 3, status: "failed" }),
       messages: [],
@@ -1083,6 +1089,7 @@ describe("the entity over the socket", () => {
     const staleRuns = loadRuns("au1");
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({ revision: 5, title: "newer run" }),
       messages: [],
@@ -1171,6 +1178,7 @@ describe("the runs' pages", () => {
     await firstPage();
     onAutomationsSocket({
       type: "session",
+      row: null,
       projectId: "p1",
       session: session({
         id: "r3",
@@ -1286,6 +1294,7 @@ describe("the runs' pages", () => {
         });
       onAutomationsSocket({
         type: "session",
+        row: null,
         projectId: "p1",
         session: session({ id: "r5", lastActivityAt: now }),
         messages: [],

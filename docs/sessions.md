@@ -27,6 +27,15 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   the session's revision once and publishes one `session.changed`
   envelope after commit. Create and send accept up to ten distinct
   staged `uploads` ids.
+- **An envelope's row is one statement, read after the commit.**
+  `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
+  does for one session, by key lookups and two newest-first index walks
+  that stop at their first match, since `session.changed` fires many
+  times a turn and the list's not-exists form walks a long chat's every
+  message. The socket reads it at publish, so envelopes of one
+  transaction for one session all carry the final row.
+  `test/server/sessions/envelope-row.test.ts` holds it to the list's
+  answer and pins its plan.
 - **A session's disabled capabilities are one sorted set.**
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`

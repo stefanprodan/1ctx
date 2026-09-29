@@ -42,6 +42,11 @@ export type StreamRow = {
   runs: number | null;
 };
 
+// what a session envelope carries of the stream row beside its
+// session: the fields that read the same for every viewer. runs hangs
+// on the list's filter and search, so only a list read answers it
+export type EnvelopeRow = Omit<StreamRow, "session" | "runs">;
+
 // GET /api/sessions/:id, and the answer of POST /api/sessions
 export type SessionResponse = SessionDetail;
 

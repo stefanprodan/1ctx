@@ -9,6 +9,7 @@
 // at once. The connection type is the few methods Bun's socket has, so
 // a test drives the module with fakes.
 
+import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { LiveSend } from "../../shared/contracts/session.ts";
 import {
   isSocketCommand,
@@ -17,7 +18,7 @@ import {
 } from "../../shared/socket.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -62,6 +63,8 @@ export type SocketDeps = {
   sessionProject(principal: Principal, sessionId: string): string | null;
   // the runner's snapshot of the send in flight
   live(sessionId: string): LiveSend | null;
+  // the stream row a session envelope carries, null for a session gone
+  envelopeRow(sessionId: string): EnvelopeRow | null;
 };
 
 export type Socket = {
@@ -171,18 +174,39 @@ export function socketArea(deps: SocketDeps): Socket {
     rewatch(conn);
   };
 
+  // a failed read still sends the envelope, without its row, since an
+  // open chat needs the messages
+  const row = (
+    event: Extract<BusEvent, { type: "session.changed" }>,
+  ): EnvelopeRow | null => {
+    try {
+      return deps.envelopeRow(event.data.session.id);
+    } catch (err) {
+      deps.log.error("envelope row failed", {
+        chat: event.data.session.id,
+        ...errorFields(err),
+      });
+      return null;
+    }
+  };
+
   const onBus = (event: BusEvent): void => {
     switch (event.type) {
-      case "session.changed":
+      case "session.changed": {
+        // read on the first connection it reaches, so an event nobody
+        // may see costs no read, and never once per connection
+        let frame: SocketEvent | undefined;
         each((conn) => {
           if (
             !conn.data.principal.mustChangePassword &&
             conn.data.projects.has(event.data.projectId)
           ) {
-            deliver(conn, { type: "session", ...event.data });
+            frame ??= { type: "session", ...event.data, row: row(event) };
+            deliver(conn, frame);
           }
         });
         break;
+      }
       case "session.deleted":
         each((conn) => {
           if (
