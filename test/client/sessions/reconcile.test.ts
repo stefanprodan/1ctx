@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   cursorPlace,
   type RowEnvelope,
-  reconcile,
+  reconcile as reconciled,
   replay,
   type Shown,
   searched,
@@ -104,6 +104,17 @@ function env(
 const ALL: Shown = { origin: null, q: "" };
 const CHATS: Shown = { origin: "chat", q: "" };
 const TASKS: Shown = { origin: "automation", q: "" };
+
+// the rows an envelope leaves, or "reload" when it asks one and leaves
+// the rows as they were
+function reconcile(
+  ...args: Parameters<typeof reconciled>
+): StreamRow[] | "reload" {
+  const out = reconciled(...args);
+  if (!out.reload) return out.rows;
+  if (out.rows !== args[0]) throw new Error("rows changed on a reload");
+  return "reload";
+}
 
 const ids = (rows: StreamRow[] | "reload") =>
   rows === "reload" ? rows : rows.map((r) => r.session.id);
@@ -338,6 +349,87 @@ describe("a run in All with its line held", () => {
       ),
     ).toBe(rows);
   });
+
+  test("its own run renamed off the search drops the line and asks", () => {
+    const rows = [rowOf(chat("c", 40)), line()];
+    const out = reconciled(
+      rows,
+      null,
+      { origin: null, q: "digest" },
+      env(run("r1", 9, { revision: 2, title: "renamed", status: "running" })),
+    );
+    // another run may hold the query, and only the server knows which
+    expect(ids(out.rows)).toEqual(["c"]);
+    expect(out.reload).toBe(true);
+  });
+});
+
+describe("a held row renamed off the search", () => {
+  const pods: Shown = { origin: null, q: "pods" };
+
+  test("goes, as the server no longer lists it, and asks nothing", () => {
+    const rows = [
+      rowOf(chat("b", 50, { title: "pods" })),
+      rowOf(chat("c", 40, { title: "more pods" })),
+    ];
+    const out = reconciled(
+      rows,
+      null,
+      pods,
+      env(chat("c", 60, { revision: 2, title: "disk" })),
+    );
+    expect(ids(out.rows)).toEqual(["b"]);
+    expect(out.reload).toBe(false);
+  });
+
+  test("an older envelope or no search keeps it", () => {
+    const rows = [rowOf(chat("c", 40, { revision: 3, title: "pods" }))];
+    expect(
+      reconcile(rows, null, pods, env(chat("c", 60, { title: "disk" }))),
+    ).toBe(rows);
+    expect(
+      ids(
+        reconcile(
+          rows,
+          null,
+          ALL,
+          env(chat("c", 60, { revision: 4, title: "disk" })),
+        ),
+      ),
+    ).toEqual(["c"]);
+  });
+});
+
+describe("the first page's cursor", () => {
+  // a warm load kept a tail: the first page ends at c, the paging at e
+  const rows = () => [
+    rowOf(chat("b", 50)),
+    rowOf(chat("c", 40)),
+    rowOf(chat("e", 20)),
+  ];
+
+  test("past it, nothing a reload could place is asked", () => {
+    const out = reconciled(rows(), "0.20.e", ALL, env(run("r", 35)), "0.40.c");
+    expect(out.reload).toBe(false);
+    const none = reconciled(
+      rows(),
+      "0.20.e",
+      ALL,
+      env(chat("n", 35), null),
+      "0.40.c",
+    );
+    expect(none.reload).toBe(false);
+  });
+
+  test("above it, a reload is asked", () => {
+    const out = reconciled(rows(), "0.20.e", ALL, env(run("r", 45)), "0.40.c");
+    expect(out.reload).toBe(true);
+  });
+
+  test("a row with its envelope row is still inserted above the paging one", () => {
+    const out = reconciled(rows(), "0.20.e", ALL, env(chat("n", 35)), "0.40.c");
+    expect(ids(out.rows)).toEqual(["b", "c", "n", "e"]);
+  });
 });
 
 describe("the place a cursor names", () => {
@@ -376,6 +468,14 @@ describe("a replay over an answer", () => {
     expect(out.reload).toBe(false);
     expect(ids(out.rows)).toEqual(["n", "c"]);
     expect(out.rows[0]!.session.revision).toBe(2);
+  });
+
+  test("a row inserted then deleted stays gone", () => {
+    const out = replay([rowOf(chat("b", 50))], null, ALL, [
+      { ev: env(chat("n", 45)) },
+      { drop: (row) => row.session.id === "n" },
+    ]);
+    expect(ids(out.rows)).toEqual(["b"]);
   });
 
   test("an envelope older than the answer's copy changes nothing", () => {

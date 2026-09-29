@@ -433,10 +433,15 @@ export function applyEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
 ): void {
   if (!covers(ev.projectId, ev.session.origin)) return;
+  // no frame tells of every row an agent retired: any row that says so
+  // retires the agent on the rows held
+  if (ev.row?.agentRetired && ev.session.agentId !== null) {
+    if (!retired.has(ev.session.agentId)) retire(ev.session.agentId);
+  }
   if (loading) changes.push({ ev });
   const held = list.value;
   if (held === null) return;
-  const rows = reconcile(held.rows, held.next, shown(), ev);
-  if (rows === "reload") flight.ask();
-  else if (rows !== held.rows) list.value = { ...held, rows };
+  const out = reconcile(held.rows, held.next, shown(), ev, head.next);
+  if (out.rows !== held.rows) list.value = { ...held, rows: out.rows };
+  if (out.reload) flight.ask();
 }

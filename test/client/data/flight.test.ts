@@ -125,6 +125,18 @@ describe("one load at a time", () => {
     expect(started()).toBe(3);
   });
 
+  test("a superseded load landing leaves the newer one in flight", async () => {
+    const { timer } = fakeTimer();
+    const { load, land, started } = gated();
+    const flight = new Flight(load, timer, 300);
+    void flight.run(load);
+    void flight.run(load);
+    await land(0);
+    // the second load is still out, so the ask trails it
+    flight.ask();
+    expect(started()).toBe(2);
+  });
+
   test("after a cold load with nothing trailing, an ask loads at once", async () => {
     const { timer, pending } = fakeTimer();
     const { load, land, started } = gated();

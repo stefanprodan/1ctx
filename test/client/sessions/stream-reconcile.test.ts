@@ -439,3 +439,125 @@ describe("labels no envelope carries", () => {
     expect(urls).toEqual(["/api/sessions", "/api/sessions", "/api/sessions"]);
   });
 });
+
+describe("reloads that cannot help are not asked", () => {
+  test.serial(
+    "a row between the first page and a kept tail does not loop",
+    async () => {
+      jest.useFakeTimers();
+      try {
+        await loaded(HOME, base(), "0.40.c");
+        const more = loadMore();
+        await settle();
+        await release([rowOf(chat("d", 30)), rowOf(chat("e", 20))], "0.20.e");
+        await more;
+        // a run with no line held above the first page's cursor: a reload
+        applyEnvelope(envelope(run("r", 45)));
+        await settle();
+        expect(urls).toHaveLength(3);
+        // the server's first page does not hold it by then; the warm
+        // load keeps the tail and its cursor
+        await release(base(), "0.40.c");
+        expect(ids()).toEqual(["b", "c", "d", "e"]);
+        expect(list.value?.next).toBe("0.20.e");
+        jest.advanceTimersByTime(TRAIL_MS);
+        await settle();
+        // the run moved past the first page: no first page places it
+        for (let i = 2; i < 6; i++) {
+          applyEnvelope(envelope(run("r", 35, { revision: i })));
+          applyEnvelope(envelope(chat("n", 35, { revision: i }), false));
+          jest.advanceTimersByTime(TRAIL_MS);
+          await settle();
+        }
+        expect(urls).toHaveLength(3);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  test.serial(
+    "an answer that needs the server asks once it lands",
+    async () => {
+      jest.useFakeTimers();
+      try {
+        const first = loadList(HOME);
+        await settle();
+        // nothing is held, so only the replay over the answer can ask
+        applyEnvelope(envelope(run("r", 60)));
+        await settle();
+        expect(urls).toHaveLength(1);
+        await release(base());
+        await first;
+        jest.advanceTimersByTime(TRAIL_MS);
+        await settle();
+        expect(urls).toHaveLength(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+});
+
+describe("a list that goes stops its loads", () => {
+  // a warm load out for Feed of p1, and one more asked behind it
+  async function trailing() {
+    await loaded({ project: "p1", q: "" }, base());
+    applyEnvelope(envelope(run("r", 60)));
+    applyEnvelope(envelope(run("r2", 70, { automationId: "a2" })));
+    await settle();
+    expect(urls).toHaveLength(2);
+  }
+
+  test.serial("on a revocation of its project", async () => {
+    jest.useFakeTimers();
+    try {
+      await trailing();
+      revokeRows("p1");
+      expect(list.value).toBeNull();
+      await release(base());
+      jest.advanceTimersByTime(TRAIL_MS * 4);
+      await settle();
+      expect(urls).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test.serial("on a change of user", async () => {
+    jest.useFakeTimers();
+    try {
+      await trailing();
+      me.value = {
+        id: `rec${user}-next`,
+        username: "ana",
+        fullName: "Ana",
+        role: "member",
+        mustChangePassword: false,
+      };
+      await release(base());
+      jest.advanceTimersByTime(TRAIL_MS * 4);
+      await settle();
+      expect(urls).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("a row that says its agent retired", () => {
+  test.serial("retires the agent on every row held", async () => {
+    await loaded(HOME, [
+      rowOf(chat("b", 50, { agentId: "a9" })),
+      rowOf(chat("c", 40)),
+    ]);
+    const ev = envelope(chat("n", 60, { agentId: "a9" }));
+    applyEnvelope({ ...ev, row: { ...ev.row!, agentRetired: true } });
+    expect(ids()).toEqual(["n", "b", "c"]);
+    expect(list.value?.rows.map((r) => r.agentRetired)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+});

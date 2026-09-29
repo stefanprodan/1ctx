@@ -51,12 +51,17 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   server would list it (the origin filter, the search, above the
   cursor; past the cursor a later page brings it); in All a run with
   its automation's line held goes through `swapRun()`. Only a row not
-  held above the cursor that the client cannot place asks for the
-  first page: a run in All with no line held, or an envelope whose
-  `row` is null. The search test is `searched()`, the route's: the
-  query trimmed, ASCII letters folded, every other character as is, as
+  held that the client cannot place asks for the first page: a run in
+  All with no line held, or an envelope whose `row` is null, and only
+  above the last first page's cursor, since a warm load that kept a
+  tail pages from a lower one and no first page holds a row between
+  them. The search test is `searched()`, the route's: the query
+  trimmed, ASCII letters folded, every other character as is, as
   SQLite's `LIKE` with `%` and `_` escaped; a row it misses is never
-  inserted and asks nothing. A first page loads cold on a navigation,
+  inserted and asks nothing, and a held row renamed off it goes, a
+  line asking for the first page too, since another run may hold the
+  query. An envelope whose `row` says its agent is retired retires the
+  agent on every row held. A first page loads cold on a navigation,
   the socket's open, a user change, `granted` and `revoked`, dropping
   every row past it; warm when reconcile asks and when a deleted
   automation's line stops counting, keeping the held rows past its
@@ -70,13 +75,15 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   answer (`replay()`), so the answer never drops an insert or a newer
   revision and never brings back a deleted row; a delete and a deleted
   automation's runs leave the rows at once and ask nothing, and a lost
-  grant leaves them at once before its cold load. `loadMore()` merges a later page by id and revision, is
-  dropped by a cold load and not by a warm one, and a failure keeps
-  the rows and sets `more.error`. `mergeNextPage()` and
-  `refreshHead()` take the order (`streamOrder` or the runs'
-  `runOrder`) and keep one line per automation (`oneLine()`). An
-  automation frame relabels its rows, over answers asked before it
-  too, and one whose agent is retired marks that agent's rows.
+  grant leaves them at once before its cold load. A list that goes (its
+  project revoked, a user change) stops the load out and the one
+  trailing. `loadMore()` merges a later page by id and revision, is
+  dropped by a cold load and not by a warm one, and a failure keeps the
+  rows and sets `more.error`. `mergeNextPage()` and `refreshHead()`
+  take the order (`streamOrder` or the runs' `runOrder`) and keep one
+  line per automation (`oneLine()`). An automation frame relabels its
+  rows, over answers asked before it too, and one whose agent is
+  retired marks that agent's rows.
 
 ## The chat page
 

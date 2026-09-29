@@ -200,20 +200,39 @@ export type RowEnvelope = {
 // the filter the rows were read under, past the project
 export type Shown = { origin: SessionOrigin | null; q: string };
 
-// an envelope over the stream's rows, next the cursor they page on: the
-// rows it leaves (the same array when it says nothing new to them), or
-// "reload" when only the server can say. A row not held is inserted
-// only where the server would list it: under the filter, holding the
-// search, and above the cursor, since a later page brings one past it
+// what an envelope leaves of the rows (the same array when it says
+// nothing new to them), and whether only the server can say the rest
+export type Reconciled = { rows: StreamRow[]; reload: boolean };
+
+// an envelope over the stream's rows. next is the cursor they page on,
+// first the cursor of the last first page, which is all a reload can
+// place. A row not held is inserted only where the server would list
+// it: under the filter, holding the search, and above the cursor, since
+// a later page brings one past it
 export function reconcile(
   rows: StreamRow[],
   next: string | null,
   shown: Shown,
   ev: RowEnvelope,
-): StreamRow[] | "reload" {
+  first: string | null = next,
+): Reconciled {
+  const same = (out: StreamRow[]) => ({ rows: out, reload: false });
   const { session } = ev;
-  if (shown.origin !== null && shown.origin !== session.origin) return rows;
+  if (shown.origin !== null && shown.origin !== session.origin) {
+    return same(rows);
+  }
   const listed = shown.q === "" || searched(session.title, shown.q);
+  const held = rows.find((row) => row.session.id === session.id);
+  const newer = held !== undefined && held.session.revision < session.revision;
+  // renamed off the search: the server no longer lists it. A line
+  // stands for its automation's newest matching run, which may be
+  // another, so the server says which
+  if (newer && !listed) {
+    return {
+      rows: rows.filter((row) => row !== held),
+      reload: held.runs !== null,
+    };
+  }
   // in All an automation's runs are one line, its newest matching run,
   // and only the server knows which that is when no line is held
   const grouped =
@@ -223,12 +242,11 @@ export function reconcile(
   if (grouped) {
     const swapped = swapRun(rows, ev);
     if (swapped !== undefined) {
-      return swapped !== null && listed ? swapped : rows;
+      return same(swapped !== null && listed ? swapped : rows);
     }
   }
-  const held = rows.find((row) => row.session.id === session.id);
   if (held !== undefined) {
-    if (held.session.revision >= session.revision) return rows;
+    if (!newer) return same(rows);
     const moved: StreamRow =
       ev.row !== null
         ? { ...ev.row, session, runs: held.runs }
@@ -239,18 +257,24 @@ export function reconcile(
             send: ev.send ?? held.send,
             last: ev.last ?? held.last,
           };
-    return ordered([...rows.filter((row) => row !== held), moved]);
+    return same(ordered([...rows.filter((row) => row !== held), moved]));
   }
-  if (!listed) return rows;
-  // past the cursor a first page would not hold it either: a later page
-  // brings it, as it is then
-  if (next !== null) {
-    const edge = cursorPlace(next);
-    if (edge === null) return "reload";
-    if (streamOrder(session, edge) > 0) return rows;
+  if (!listed) return same(rows);
+  // past a cursor a page would bring it as it is then; a first page
+  // holds nothing past its own cursor, which may sit above the paging
+  // one when a warm load kept a tail
+  const past = (cursor: string | null) => {
+    if (cursor === null) return false;
+    const edge = cursorPlace(cursor);
+    return edge !== null && streamOrder(session, edge) > 0;
+  };
+  const unread = (cursor: string | null) =>
+    cursor !== null && cursorPlace(cursor) === null;
+  if (past(next)) return same(rows);
+  if (ev.row === null || grouped || unread(next)) {
+    return past(first) ? same(rows) : { rows, reload: true };
   }
-  if (ev.row === null || grouped) return "reload";
-  return ordered([...rows, { ...ev.row, session, runs: null }]);
+  return same(ordered([...rows, { ...ev.row, session, runs: null }]));
 }
 
 // what changed the list while a first page was out: an envelope, or
@@ -276,8 +300,8 @@ export function replay(
       continue;
     }
     const out = reconcile(rows, next, shown, change.ev);
-    if (out === "reload") reload = true;
-    else rows = out;
+    reload ||= out.reload;
+    rows = out.rows;
   }
   return { rows, reload };
 }
