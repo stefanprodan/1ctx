@@ -53,6 +53,13 @@ const AWK_VERSION =
   "GNU Awk 5.4.1 (just-bash, compatible)\n" +
   "A sandboxed awk that answers as gawk 5.4.1 does; see awk --help.\n";
 
+// (1ctx) a snapshot of ENVIRON for a child's environment
+function environ(values: Record<string, unknown>): Record<string, string> {
+  const env: Record<string, string> = Object.create(null);
+  for (const [name, value] of Object.entries(values)) env[name] = String(value);
+  return env;
+}
+
 export const awkCommand2: RuntimeCommand = {
   name: "awk",
 
@@ -197,7 +204,16 @@ export const awkCommand2: RuntimeCommand = {
       exec: execFn
         ? (cmd: string, stdin?: string) =>
             withDefenseContext("command pipe exec", () =>
-              execFn(cmd, { cwd: ctx.cwd, signal: ctx.signal, stdin }),
+              execFn(cmd, {
+                cwd: ctx.cwd,
+                signal: ctx.signal,
+                stdin,
+                // (1ctx) a child gets ENVIRON as it stands, as gawk
+                // passes its environment: exported variables, never the
+                // shell's own, and what the program assigned there
+                env: environ(runtimeCtx.ENVIRON),
+                replaceEnv: true,
+              }),
             )
         : undefined,
       coverage: ctx.coverage,

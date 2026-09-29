@@ -7,6 +7,7 @@ import type {
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../../types.js";
+import { processEnv } from "../../helpers/env.js";
 import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
 import { formatStrftime } from "../printf/strftime.js";
 
@@ -178,7 +179,8 @@ export const dateCommand: RuntimeCommand = {
     // parseTz keeps its raw value (undefined when unset) so timezone-naive -d
     // strings without $TZ fall through to JS `new Date(s)` — do NOT propagate
     // the UTC display default into parsing.
-    let parseTz = ctx.env.get("TZ");
+    // (1ctx) TZ from the environment: an unexported one changes nothing
+    let parseTz = processEnv(ctx).get("TZ");
     if (parseTz && !isValidTimezone(parseTz)) parseTz = undefined;
     const displayTz = utc ? "UTC" : (parseTz ?? "UTC");
 

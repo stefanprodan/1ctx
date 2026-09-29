@@ -277,6 +277,41 @@ describe("scratch names", () => {
     25_000,
   );
 
+  test("a name of exactly 4,095 bytes saves and reads back, one more is refused", async () => {
+    const s = setup();
+    // 16 segments of 255 bytes, and 17 of 240: 4,095 and 4,096 bytes
+    const longest = Array(16).fill("x".repeat(255)).join("/");
+    const over = Array(17).fill("y".repeat(240)).join("/");
+    expect(Buffer.byteLength(longest)).toBe(4095);
+    expect(Buffer.byteLength(over)).toBe(4096);
+    const folder = (name: string) => name.slice(0, name.lastIndexOf("/"));
+    try {
+      const saved = await run(
+        s,
+        `mkdir -p /tmp/${folder(longest)}; echo kept > /tmp/${longest}`,
+      );
+      expect(saved).toMatchObject({ content: "exit 0", error: false });
+      expect(scratchState(s).entries.map((file) => file.path)).toEqual([
+        longest,
+      ]);
+      // a later command mounts it again and reads it
+      expect((await run(s, `cat /tmp/${longest}`)).content).toBe(
+        "kept\n\nexit 0",
+      );
+      const refused = await run(
+        s,
+        `mkdir -p /tmp/${folder(over)}; echo lost > /tmp/${over}`,
+      );
+      expect(refused.error).toBe(true);
+      expect(refused.content).toContain("4095 bytes in all");
+      expect(scratchState(s).entries.map((file) => file.path)).toEqual([
+        longest,
+      ]);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("an answer writing more files than the cap is refused before the commit", async () => {
     const s = setup({ scratchFiles: 10 });
     try {

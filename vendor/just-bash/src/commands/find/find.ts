@@ -2,6 +2,7 @@ import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
 import type { DirentEntry } from "../../fs/interface.js";
+import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { FileTraversalBudget } from "../../fs/traversal.js";
 import { shellJoinArgs } from "../../helpers/shell-quote.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -98,6 +99,21 @@ import type {
   Expression,
   FindAction,
 } from "./types.js";
+
+// (1ctx) a missing target: -L then reads the link itself, as GNU does
+function isMissing(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("ENOENT") || message.includes("no such file");
+}
+
+// (1ctx) GNU's words for a link -L cannot read through
+function statWords(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("ELOOP")) return "Too many levels of symbolic links";
+  if (message.includes("ENOTDIR")) return "Not a directory";
+  if (message.includes("EACCES")) return "Permission denied";
+  return sanitizeErrorMessage(message);
+}
 
 const findHelp = {
   name: "find",
@@ -398,7 +414,15 @@ export const findCommand: RuntimeCommand = {
         pruned: boolean;
       }
 
-      const loops: string[] = [];
+      // (1ctx) GNU's words for what -L met: a loop, or a link that
+      // cannot be read through; each is left out, and exit 1
+      const problems: string[] = [];
+      const relativeOf = (currentPath: string) =>
+        currentPath === basePath
+          ? searchPath
+          : searchPath === "."
+            ? `./${currentPath.slice(basePath === "/" ? basePath.length : basePath.length + 1)}`
+            : searchPath + currentPath.slice(basePath.length);
 
       // Tracing counters
       const traceCounters = createTraceCounters();
@@ -437,13 +461,20 @@ export const findCommand: RuntimeCommand = {
             // follow them while deciding whether to descend.
             // (1ctx) -L and -H read through a link; a broken one is itself
             stat = followed
-              ? await ctx.fs
-                  .stat(currentPath)
-                  .catch(() => ctx.fs.lstat(currentPath))
+              ? await ctx.fs.stat(currentPath).catch((error: unknown) => {
+                  if (isMissing(error)) return ctx.fs.lstat(currentPath);
+                  throw error;
+                })
               : await ctx.fs.lstat(currentPath);
             traceCounters.statCalls++;
             traceCounters.statTime += Date.now() - statStart;
-          } catch {
+          } catch (error) {
+            // (1ctx) a link that loops is GNU's error, not a missing file
+            if (followed && !isMissing(error)) {
+              problems.push(
+                `find: '${relativeOf(currentPath)}': ${statWords(error)}\n`,
+              );
+            }
             return null;
           }
           if (!stat) return null;
@@ -459,12 +490,7 @@ export const findCommand: RuntimeCommand = {
           name = currentPath.split("/").pop() || "";
         }
 
-        const relativePath =
-          currentPath === basePath
-            ? searchPath
-            : searchPath === "."
-              ? `./${currentPath.slice(basePath === "/" ? basePath.length : basePath.length + 1)}`
-              : searchPath + currentPath.slice(basePath.length);
+        const relativePath = relativeOf(currentPath);
 
         // (1ctx) under -L, a directory reached again through a link is
         // GNU's file system loop: reported, left out, and exit 1
@@ -473,7 +499,9 @@ export const findCommand: RuntimeCommand = {
           const parent = item.ancestors ?? [];
           const real = await ctx.fs.realpath(currentPath);
           if (parent.includes(real)) {
-            loops.push(relativePath);
+            problems.push(
+              `find: File system loop detected; the following directory is part of the cycle: '${relativePath}'\n`,
+            );
             return null;
           }
           ancestors = [...parent, real];
@@ -885,10 +913,8 @@ export const findCommand: RuntimeCommand = {
 
       const searchResult = await findIterative();
       for (const effect of searchResult.effects) effects.push(effect);
-      for (const loop of loops) {
-        appendStderr(
-          `find: File system loop detected; the following directory is part of the cycle: '${loop}'\n`,
-        );
+      for (const problem of problems) {
+        appendStderr(problem);
         exitCode = 1;
       }
 

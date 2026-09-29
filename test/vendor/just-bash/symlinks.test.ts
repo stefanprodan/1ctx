@@ -90,3 +90,65 @@ describe("symbolic links", () => {
     });
   }
 });
+
+// /real/dir/file, /alias -> /real, /outer -> /alias/dir: a link whose
+// target runs through another link resolves one component at a time
+async function nested(script: string) {
+  const bash = new Bash({ cwd: "/" });
+  await bash.exec(
+    "mkdir -p /real/dir; echo x > /real/dir/file; ln -s /real /alias; ln -s /alias/dir /outer; ln -s ../alias/dir /real/up",
+  );
+  return bash.exec(script);
+}
+
+const nestedCases: Case[] = [
+  ["ls /outer", "file\n", "", 0],
+  ["cat /outer/file", "x\n", "", 0],
+  ["cat /real/up/file", "x\n", "", 0],
+  ["find -L /outer", "/outer\n/outer/file\n", "", 0],
+  ["find -H /outer -type f", "/outer/file\n", "", 0],
+  ["rm /outer/file; ls /real/dir", "", "", 0],
+  [
+    "rm -r /outer/; ls -A /real/dir; ls /outer",
+    "",
+    "rm: cannot remove '/outer/': Not a directory\n",
+    0,
+  ],
+];
+
+// /d/a -> b, /d/b -> a, /d/f: a loop of links, as GNU find 4.11 answers
+async function looped(script: string) {
+  const bash = new Bash({ cwd: "/" });
+  await bash.exec("mkdir /d; touch /d/f; ln -s b /d/a; ln -s a /d/b");
+  return bash.exec(script);
+}
+
+const eloop = (path: string) =>
+  `find: '${path}': Too many levels of symbolic links\n`;
+
+const loopCases: Case[] = [
+  ["find /d", "/d\n/d/a\n/d/b\n/d/f\n", "", 0],
+  ["find -L /d", "/d\n/d/f\n", eloop("/d/a") + eloop("/d/b"), 1],
+  ["find -L /d -type f", "/d/f\n", eloop("/d/a") + eloop("/d/b"), 1],
+  ["find -L /d/a", "", eloop("/d/a"), 1],
+  ["rm /d/a; ls /d", "b\nf\n", "", 0],
+];
+
+describe("links through links", () => {
+  for (const [script, stdout, stderr, exitCode] of nestedCases) {
+    test(script, async () => {
+      const result = await nested(script);
+      expect(result.stderr).toBe(stderr);
+      expect(result.stdout).toBe(stdout);
+      expect(result.exitCode).toBe(exitCode);
+    });
+  }
+  for (const [script, stdout, stderr, exitCode] of loopCases) {
+    test(script, async () => {
+      const result = await looped(script);
+      expect(result.stderr).toBe(stderr);
+      expect(result.stdout).toBe(stdout);
+      expect(result.exitCode).toBe(exitCode);
+    });
+  }
+});
