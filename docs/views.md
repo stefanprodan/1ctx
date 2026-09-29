@@ -43,47 +43,28 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   count of its kept runs (null on every other row), which the row draws
   as the number and the bolt after the project; a run whose automation
   is gone is listed on its own. Chats and Tasks list every row.
-- **`data/stream.ts` reconciles, and loads cold or warm.**
-  `data/stream.ts` holds `{rows, next, more}` for one filter, the query
-  on the URL. An envelope goes through `reconcile()` in
-  `data/sessions-rows.ts`: a held row takes a newer revision with the
-  envelope's `row`; a row not held is inserted from its `row` where the
-  server would list it (the origin filter, the search, above the
-  cursor; past the cursor a later page brings it); in All a run with
-  its automation's line held goes through `swapRun()`. Only a row not
-  held that the client cannot place asks for the first page: a run in
-  All with no line held, or an envelope whose `row` is null, and only
-  above the last first page's cursor, since a warm load that kept a
-  tail pages from a lower one and no first page holds a row between
-  them. The search test is `searched()`, the route's: the query
-  trimmed, ASCII letters folded, every other character as is, as
-  SQLite's `LIKE` with `%` and `_` escaped; a row it misses is never
-  inserted and asks nothing, and a held row renamed off it goes, a
-  line asking for the first page too, since another run may hold the
-  query. An envelope whose `row` says its agent is retired retires the
-  agent on every row held. A first page loads cold on a navigation,
-  the socket's open, a user change, `granted` and `revoked`, dropping
-  every row past it; warm when reconcile asks and when a deleted
-  automation's line stops counting, keeping the held rows past its
-  last row and the held `next` while any are kept. A warm load asked
-  while a cold one is out is cold. `data/flight.ts` keeps one first
-  page out at a time: a warm ask while one is out, or within
-  `TRAIL_MS` after a warm one lands, becomes the one trailing load,
-  since at a hundred agents every tab would otherwise reload per
-  envelope; a cold load runs at once over both. The envelopes and
-  deletes that arrive while a first page is out are replayed over its
-  answer (`replay()`), so the answer never drops an insert or a newer
-  revision and never brings back a deleted row; a delete and a deleted
-  automation's runs leave the rows at once and ask nothing, and a lost
-  grant leaves them at once before its cold load. A list that goes (its
-  project revoked, a user change) stops the load out and the one
-  trailing. `loadMore()` merges a later page by id and revision, is
-  dropped by a cold load and not by a warm one, and a failure keeps the
-  rows and sets `more.error`. `mergeNextPage()` and `refreshHead()`
-  take the order (`streamOrder` or the runs' `runOrder`) and keep one
-  line per automation (`oneLine()`). An automation frame relabels its
-  rows, over answers asked before it too, and one whose agent is
-  retired marks that agent's rows.
+- **The feed reconciles envelopes instead of reloading.**
+  `data/stream.ts` holds `{rows, next, more}` for one filter. An
+  envelope's `row` updates a held row of a newer revision, or is
+  inserted where the server would list it: the origin filter, the
+  search (`searched()` matches the route's `LIKE` exactly, so a row it
+  misses is never inserted) and above the paging cursor. In All a run
+  whose line is held goes through `swapRun()`. Only a row the client
+  cannot place, a run in All with no line held or a null `row`, asks
+  for the first page, and only above that page's cursor, since no first
+  page can place a row below it. A held row renamed off the search
+  leaves the list.
+- **One first page is out at a time.** `data/flight.ts` folds warm asks
+  into one trailing load, run `TRAIL_MS` after the load out lands, since at a hundred
+  agents every tab would otherwise reload per envelope; a cold load
+  (navigation, the socket's open, a user change, `granted`, `revoked`)
+  runs at once over both, and a list that goes stops both. Envelopes
+  and deletes that arrive while a page is out are replayed over its
+  answer, so it never drops an insert or a newer revision and never
+  brings back a deleted row. A delete, and a deleted automation's runs,
+  leave at once and ask nothing. `loadMore()` merges a later page by id
+  and revision and is dropped by a cold load, not a warm one; the
+  reducers keep one line per automation (`oneLine()`).
 
 ## The chat page
 
