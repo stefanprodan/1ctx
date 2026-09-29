@@ -306,6 +306,10 @@ async function runCalls(
         ...(result.timedOut
           ? { cause: "timeout" }
           : errorFields(result.failure, false)),
+        // a bash command that saved nothing: where it ended and why
+        ...(result.ended === undefined
+          ? {}
+          : { phase: result.ended.phase, cause: result.ended.cause }),
       });
     }
     let stored = result;

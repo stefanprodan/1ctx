@@ -110,11 +110,63 @@ our changes to just-bash and the upstream sync are in
 
 ## The bash mount
 
-- **One module runs just-bash.** `knowledge/mount.ts` alone runs
-  just-bash (`credentials/check.ts` imports only its allow-list rules,
-  `knowledge/credentials.ts` its fetch, `knowledge/open.ts` its command
-  definition), with pinned commands, no host filesystem and
-  `defenseInDepth: true`. The send's web snapshot alone enables network
+- **One module runs just-bash, in a worker.** `knowledge/command.worker.ts`
+  alone runs just-bash (`credentials/check.ts` imports only its
+  allow-list rules, `knowledge/credentials.ts` its fetch,
+  `knowledge/open.ts` its command definition, `knowledge/tree.ts` the
+  fs reads), with the pinned commands of `knowledge/commands.ts`, no
+  host filesystem and `defenseInDepth: true`, so a command that never
+  yields holds no stream. `knowledge/mount.ts` admits the command, reads
+  the rows and commits on the server's thread; `knowledge/worker.ts`
+  starts a `Worker` per command and ends it when the job settles. The
+  worker is the third entry point of `bun build --compile`, its URL built
+  in `compose.ts` as the scan's is. Docs and uploads are read as blobs
+  (`cast(text as blob)`) and every file's bytes are transferred, never
+  cloned; the scratch commit reads only the revision, so the server
+  keeps no bytes. The worker answers once with stdout, stderr,
+  the exit, the notices, the opened records, the changes (docs as text,
+  scratch as transferred bytes with modes) and the next cwd; the
+  messages are in `knowledge/protocol.ts`, and the server drops any of
+  another id or type, after the job settled, or a request number seen
+  before, since the commands inside can post too. An answer of the job
+  in another shape fails it at once with a `command answer malformed`
+  warning; doc names and scratch paths must pass the knowledge name
+  rule, a delete must name a mounted doc and a removal a mounted scratch
+  file, and the commit counts the scratch totals and checks its names
+  from the rows it wrote, so no answer passes the caps. The server
+  re-derives every decision from what it holds: with the docs off any
+  doc change is out of protocol, an exit 124 or 126 discards whatever
+  came with it, and `checkOpened()` takes an opened record only as
+  `open` would make it from its path and text (a mounted path, once,
+  at most `MAX_OPENS_PER_COMMAND`, within the file cap, the kind, bytes,
+  lines and title derived under the Visuals row). The worker never
+  opens the database or holds a key: a kept MCP file is a read request
+  the server answers with `readKept`, the text read as a blob and
+  transferred; a failed read, or one past the job's list, is answered
+  as an error the command sees as a failed read. curl's fetch is a
+  request the server runs through `commandFetch()` with the command's
+  credentials, which refuses every scheme but http and https itself,
+  answering with the capped, redacted result; curl giving up on a fetch
+  (`timeout`) rejects it in the worker and posts an abort that ends
+  that fetch alone on the server. The deadline
+  starts before the queues; the interpreter's own `maxExecutionTimeMs`
+  stops `INTERPRETER_MARGIN_MS` sooner, so its exit 124 and words
+  usually win, and at the deadline the worker is ended at once. A caller's
+  abort posts a cancel that becomes the interpreter's signal, and a
+  cancel unanswered within `CANCEL_GRACE_MS` ends the worker with a
+  `command cancel unanswered` warning. An ended job commits nothing.
+  Shutdown, after the runner's, ends the worker of every running job.
+  A command that saves nothing puts `phase` (queue, mount, run, diff,
+  commit) and `cause` (deadline, abort, limit, error; exit 124 is a
+  deadline, 126 a limit) on the runner's `tool failed` line.
+- **Mounted files keep their times.** A doc mounts with its
+  `updated_at`, an upload with its `created_at` and a scratch file with
+  the session's `used_at`, the last command's time, since a scratch
+  file keeps none of its own; a folder, the roots included, takes its
+  newest file's time; a file a command writes has the mount's now. So
+  `ls -t` and `ls -l` tell the newest doc apart.
+- **The web snapshot opens the network.** The send's web snapshot alone
+  enables network
   and curl, through `commandFetch()` as the `fetch` option, never wget:
   all mode allows full internet access, listed mode uses `urlPrefixes()`
   and all seven HTTP methods. Both set `denyPrivateRanges: false`

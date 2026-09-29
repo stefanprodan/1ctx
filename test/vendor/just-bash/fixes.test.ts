@@ -5,10 +5,10 @@
 // server the test starts: curl never follows a redirect off http, since Bun's fetch reads
 // file: URLs from the host's disk, and a response refused for its length
 // lets go of its body. The suite reaches no network. A command we removed
-// is not found like any other.
+// is not found like any other, and ls -t sorts by time.
 
 import { describe, expect, test } from "bun:test";
-import { Bash } from "just-bash";
+import { Bash, InMemoryFs } from "just-bash";
 
 type Network = NonNullable<ConstructorParameters<typeof Bash>[0]>["network"];
 
@@ -90,6 +90,70 @@ describe("the vendored just-bash", () => {
     } finally {
       s.stop();
     }
+  });
+
+  test("ls -t lists the newest first, a tie by name, and -r reverses it", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/a", "", undefined, at(2));
+    fs.writeFileSync("/d/b", "", undefined, at(3));
+    fs.writeFileSync("/d/c", "", undefined, at(1));
+    fs.writeFileSync("/d/d", "", undefined, at(3));
+    const bash = new Bash({ fs });
+    expect((await bash.exec("ls -t /d")).stdout).toBe("b\nd\na\nc\n");
+    expect((await bash.exec("ls -tr /d")).stdout).toBe("c\na\nd\nb\n");
+    expect((await bash.exec("ls /d")).stdout).toBe("a\nb\nc\nd\n");
+  });
+
+  test("ls lists file operands as one sorted block before the directories", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/a.md", "", undefined, at(2));
+    fs.writeFileSync("/d/b.md", "", undefined, at(3));
+    fs.writeFileSync("/d/c.md", "", undefined, at(1));
+    fs.writeFileSync("/d/sub/x", "");
+    const bash = new Bash({ fs });
+    expect((await bash.exec("ls -t /d/*.md")).stdout).toBe(
+      "/d/b.md\n/d/a.md\n/d/c.md\n",
+    );
+    expect((await bash.exec("ls -tr /d/*.md")).stdout).toBe(
+      "/d/c.md\n/d/a.md\n/d/b.md\n",
+    );
+    expect((await bash.exec("cd /d && ls sub c.md a.md")).stdout).toBe(
+      "a.md\nc.md\n\nsub:\nx\n",
+    );
+  });
+
+  test("ls takes the last of -S and -t, ties by name, and -d as one block", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/ls-a", "aa", undefined, at(1));
+    fs.writeFileSync("/d/ls-b", "bb", undefined, at(3));
+    fs.writeFileSync("/d/ls-c", "cccc", undefined, at(2));
+    fs.mkdirSync("/d/sub");
+    await fs.utimes("/d/sub", new Date(0), new Date(Date.UTC(2026, 0, 4)));
+    const bash = new Bash({ fs, cwd: "/d" });
+    // what GNU ls 9 prints for the same files
+    const cases: [string, string][] = [
+      ["ls -St ls-a ls-b ls-c", "ls-b\nls-c\nls-a\n"],
+      ["ls -tS ls-a ls-b ls-c", "ls-c\nls-a\nls-b\n"],
+      ["ls -S ls-b ls-a", "ls-a\nls-b\n"],
+      ["ls -dt ls-a ls-b ls-c", "ls-b\nls-c\nls-a\n"],
+      ["ls -dt ls-a sub ls-b", "sub\nls-b\nls-a\n"],
+    ];
+    for (const [command, stdout] of cases)
+      expect((await bash.exec(command)).stdout, command).toBe(stdout);
+  });
+
+  test("ls -t sorts a link by its own time", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/new", "", undefined, at(3));
+    fs.writeFileSync("/d/old", "", undefined, at(1));
+    await fs.symlink("old", "/d/link");
+    const bash = new Bash({ fs });
+    // the link is made now, after both files
+    expect((await bash.exec("ls -t /d")).stdout).toBe("link\nnew\nold\n");
   });
 
   for (const name of ["python", "python3", "sqlite3", "node"]) {

@@ -40,7 +40,6 @@ export type ScratchCommit = {
   sessionId: string;
   before: Scratch;
   changes: ScratchChanges;
-  totals: { files: number; bytes: number };
 };
 
 export function commit(
@@ -71,12 +70,23 @@ export function commit(
       caps,
       now,
     );
-    checkScratchTotals(scratch.before, scratch.totals, caps);
     deps.scratch.write(
       scratch.sessionId,
       scratch.before.revision,
       scratch.changes,
       now,
+    );
+    // counted from the rows just written, so the caps hold whatever the
+    // command worker answered
+    const stored = deps.scratch.sizes(scratch.sessionId);
+    checkNames(stored.map((file) => file.path));
+    checkScratchTotals(
+      scratch.before,
+      {
+        files: stored.length,
+        bytes: stored.reduce((sum, file) => sum + file.bytes, 0),
+      },
+      caps,
     );
     const content = output(
       result.stdout,

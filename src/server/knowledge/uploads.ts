@@ -225,6 +225,35 @@ export class UploadStore {
     };
   }
 
+  // the session's files with their text as bytes, which a command's
+  // mount transfers to its worker as they come from SQLite
+  mounted(sessionId: string): {
+    bytes: number;
+    entries: {
+      name: string;
+      bytes: number;
+      createdAt: number;
+      data: Uint8Array;
+    }[];
+  } {
+    const row = this.db
+      .query<{ bytes: number }, [string]>(
+        "select bytes from session_uploads where session_id = ?",
+      )
+      .get(sessionId);
+    const entries = this.db
+      .query<
+        { name: string; bytes: number; createdAt: number; data: Uint8Array },
+        [string]
+      >(
+        `select name, bytes, created_at as createdAt,
+                cast(text as blob) as data
+         from session_upload_files where session_id = ? order by name`,
+      )
+      .all(sessionId);
+    return { bytes: row?.bytes ?? 0, entries };
+  }
+
   private readStored(sessionId: string): StoredUploadTree {
     const row = this.db
       .query<Omit<UploadTree, "entries">, [string]>(

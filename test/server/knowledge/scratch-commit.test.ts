@@ -4,7 +4,14 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
+import {
+  callCaps,
+  run,
+  scratchState,
+  seedScratch,
+  setup,
+  untilPhase,
+} from "./helpers.ts";
 
 const edits =
   "echo changed > /knowledge/existing; echo draft > /tmp/new; cd /tmp";
@@ -83,11 +90,12 @@ describe("atomic knowledge and scratch commits", () => {
     const controller = new AbortController();
     const pending = run(s, `${edits}; sleep 1`, callCaps, controller.signal);
     try {
-      await Bun.sleep(30);
+      await untilPhase(s);
       controller.abort(new Error("send stopped"));
       expect(await pending).toEqual({
         error: true,
         content: "nothing saved: send stopped",
+        ended: { phase: "run", cause: "abort" },
       });
       s.unchanged();
     } finally {
@@ -122,6 +130,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, edits)).toEqual({
         error: true,
         content: "nothing saved: write failed",
+        ended: { phase: "commit", cause: "error" },
       });
       s.unchanged();
       s.area.scratch.write = write;
@@ -138,8 +147,8 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("a knowledge revision conflict preserves the prior scratch", async () => {
     const s = prepared();
-    const read = s.area.store.read.bind(s.area.store);
-    s.area.store.read = (id) => {
+    const read = s.area.store.mounted.bind(s.area.store);
+    s.area.store.mounted = (id) => {
       const rows = read(id);
       s.area.replace(s.projectId, s.author, s.file.id, "other writer", 1);
       return rows;
@@ -292,8 +301,8 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("scratch-only writes ignore lowered knowledge totals and unrelated racing edits", async () => {
     const s = prepared();
-    const read = s.area.store.read.bind(s.area.store);
-    s.area.store.read = (id) => {
+    const read = s.area.store.mounted.bind(s.area.store);
+    s.area.store.mounted = (id) => {
       const rows = read(id);
       s.area.store.replace(s.file, s.author, "other writer", 150);
       return rows;

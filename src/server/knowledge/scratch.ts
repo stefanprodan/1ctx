@@ -50,6 +50,18 @@ export class ScratchStore {
     };
   }
 
+  // the last command's time, the mtime its files mount with, since a
+  // file keeps no time of its own
+  usedAt(sessionId: string): number | null {
+    return (
+      this.db
+        .query<{ used_at: number }, [string]>(
+          "select used_at from session_scratch where session_id = ?",
+        )
+        .get(sessionId)?.used_at ?? null
+    );
+  }
+
   // The caller owns the transaction so knowledge and scratch roll back together.
   write(
     sessionId: string,
@@ -100,6 +112,17 @@ export class ScratchStore {
          ) where session_id = ?`,
       )
       .run(sessionId, sessionId);
+  }
+
+  // the stored names and sizes, which a commit checks inside its
+  // transaction rather than trusting what the command worker counted
+  sizes(sessionId: string): { path: string; bytes: number }[] {
+    return this.db
+      .query<{ path: string; bytes: number }, [string]>(
+        `select path, length(data) as bytes from session_scratch_files
+         where session_id = ?`,
+      )
+      .all(sessionId);
   }
 
   // an archived chat never runs a command again; its files go with the row

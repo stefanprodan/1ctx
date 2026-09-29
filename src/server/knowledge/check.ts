@@ -30,7 +30,7 @@ export function checkFile(
   name: string,
   bytes: number,
   previous: number,
-  caps: KnowledgeCaps,
+  caps: Pick<KnowledgeCaps, "knowledgeFileBytes">,
 ): void {
   if (bytes > caps.knowledgeFileBytes && bytes >= previous) {
     throw new BadRequest(

@@ -271,6 +271,12 @@ export function commandFetch(
   };
   return async (url, options = {}) => {
     try {
+      // curl asks for http and https alone, but the request comes from
+      // the command worker, and Bun's fetch reads a file: URL from disk
+      const scheme = URL.parse(url)?.protocol;
+      if (scheme !== "http:" && scheme !== "https:") {
+        throw new NetworkAccessDeniedError(url, "only http and https");
+      }
       const credential = credentials.find((entry) =>
         matchesAllowListEntry(url, entry.prefix),
       );

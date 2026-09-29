@@ -449,8 +449,9 @@ describe("upload mount budgets and isolation", () => {
       seedUploads(s, files);
       const read = s.area.uploads.read.bind(s.area.uploads);
       const before = read(s.session.id);
-      s.area.uploads.read = (sessionId) => {
-        const snapshot = read(sessionId);
+      const mounted = s.area.uploads.mounted.bind(s.area.uploads);
+      s.area.uploads.mounted = (sessionId) => {
+        const snapshot = mounted(sessionId);
         transact(s.db, () => {
           s.db
             .query(

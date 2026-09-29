@@ -9,7 +9,7 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
 import type { CredentialRow } from "../credentials/index.ts";
-import type { KeptFile, OpenedRecord } from "../knowledge/index.ts";
+import type { CommandEnd, KeptFile, OpenedRecord } from "../knowledge/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type {
@@ -68,6 +68,9 @@ export type ToolResult = {
   // Kept in memory for the log and deliberately omitted from stored rows.
   failure?: unknown;
   timedOut?: boolean;
+  // where a bash command that saved nothing ended, for the log; finishTool
+  // stores fields by name, so it never reaches a row
+  ended?: CommandEnd;
 };
 
 export type Tool<T extends string | ToolResult = string> = {

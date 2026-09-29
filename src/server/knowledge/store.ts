@@ -57,6 +57,18 @@ export class KnowledgeStore extends KnowledgeVersions {
       }));
   }
 
+  // the live rows with their text as bytes, which a command's mount
+  // transfers to its worker as they come from SQLite
+  mounted(projectId: string): (KnowledgeFile & { data: Uint8Array })[] {
+    return this.filesDb
+      .query<FileRaw & { data: Uint8Array }, [string]>(
+        `select ${FILE_COLUMNS}, cast(text as blob) as data
+         from knowledge_files where project_id = ? order by name`,
+      )
+      .all(projectId)
+      .map((raw) => ({ ...fileOf(raw), data: raw.data }));
+  }
+
   // the rows past after, in name order, without their text
   after(projectId: string, after: string | null): Generator<KnowledgeFile> {
     return this.stream(
