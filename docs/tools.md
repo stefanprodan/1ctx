@@ -15,7 +15,10 @@ mount in `docs/bash.md`.
   override is a row in `limits`, `PUT /api/limits` writing only the
   limits it names, `limits.current()` merges them, and
   `runner/limits.ts` and `tools/limits.ts` re-export the types and
-  the defaults; `tools/` never imports `runner/`. The `chats` scope
+  the defaults; `tools/` never imports `runner/`. The `sends` scope
+  holds `sendsPerUser` (1 to 16, default 4), `sendsPerProject` (4 to
+  64, default 16) and `sendsRunning` (4 to 256, default 64), written
+  only in that order (`docs/sessions.md`). The `chats` scope
   holds `archiveIdleDays` (1 to 180, default 30) and
   `archivedDeleteDays` (30 to 1825, default 365), neither with an off
   value; the chats sweep reads them at each pass. `maxBashCalls` refuses
@@ -53,7 +56,7 @@ mount in `docs/bash.md`.
   `context_limit` or `tool_loop`; the answer keeps the provider's finish
   reason, except `tool_text`.
 - **The server places every row.** A change to a limit or a tool applies to
-  the next send, a run cap to the next admission; a send in flight
+  the next send, a send cap to the next admission; a send in flight
   keeps the caps and the set it started on. A round's calls run in
   parallel under the call timeout (plus a tool's `graceMs`, bash's 1.5 s
   to answer at its own deadline) and the send's signal. A tool row is

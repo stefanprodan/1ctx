@@ -514,7 +514,11 @@ compare the two before reporting.
 - **Limits.** A limit is a `NumberBox` text box, never a number input.
   A `LimitsSetting` card sends only its own limits, and Use defaults
   fills the draft without saving. A save that lowers the days archived
-  chats are kept asks first (`deleteAsk()` in `Limits.model.ts`).
+  chats are kept asks first (`deleteAsk()` in `Limits.model.ts`). The
+  Running card holds the three `sends` limits together, since the
+  server refuses a save that puts one above the next; `collect()`
+  refuses it first, on the field changed, in the labels' words, and
+  `limitRefusal()` turns the names in a server refusal into labels.
 - **Page rules that are not visible in one file.**
   - A provider is never edited, only made and deleted; Delete is off
     while an agent or a decider runs on it, since the server refuses.

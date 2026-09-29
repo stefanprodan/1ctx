@@ -80,6 +80,8 @@ export type ActiveSend = {
   id: string;
   sessionId: string;
   projectId: string;
+  // the user the send counts against, null for a scheduled run
+  startedBy: string | null;
   kind: SendKind;
   op: SendOp;
   startedAt: number;
@@ -177,6 +179,7 @@ export function newSend(fields: {
   id: string;
   sessionId: string;
   projectId: string;
+  startedBy: string | null;
   kind?: SendKind;
   op: SendOp;
   summarizing?: boolean;
@@ -198,6 +201,7 @@ export function newSend(fields: {
     id: fields.id,
     sessionId: fields.sessionId,
     projectId: fields.projectId,
+    startedBy: fields.startedBy,
     kind: fields.kind ?? "chat",
     op: fields.op,
     startedAt: fields.now,

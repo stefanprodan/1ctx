@@ -39,6 +39,7 @@ import {
   draftOf,
   LIMIT_WORDS,
   limitFieldOf,
+  limitRefusal,
   problem,
   read,
   seedOf,
@@ -139,14 +140,14 @@ const reserve = row({
   unit: "tokens",
   scope: "send",
 });
-const runsPerUser = row({
-  name: "runsPerUser",
+const sendsPerUser = row({
+  name: "sendsPerUser",
   value: 4,
   default: 4,
   min: 1,
-  max: 32,
+  max: 16,
   unit: "count",
-  scope: "runs",
+  scope: "sends",
 });
 const maxVisuals = row({
   name: "maxVisuals",
@@ -181,7 +182,7 @@ const rows = [
   searchBody,
   cut,
   reserve,
-  runsPerUser,
+  sendsPerUser,
   maxVisuals,
   toolWorkTokens,
   maxBashCalls,
@@ -299,6 +300,74 @@ describe("the limit words and units", () => {
     expect(limitFieldOf("maxBashCalls is out of range")).toBe("maxBashCalls");
   });
 
+  test("the send caps are held in order before a save, on the field changed", () => {
+    const sends = [
+      sendsPerUser,
+      row({
+        name: "sendsPerProject",
+        value: 16,
+        default: 16,
+        min: 4,
+        max: 64,
+        scope: "sends",
+      }),
+      row({
+        name: "sendsRunning",
+        value: 64,
+        default: 64,
+        min: 4,
+        max: 256,
+        scope: "sends",
+      }),
+    ];
+    const draft = draftOf(sends);
+    expect(collect(sends, { ...draft, sendsPerUser: "16" })).toMatchObject({
+      values: { sendsPerUser: 16 },
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerUser: "12", sendsPerProject: "8" }),
+    ).toEqual({
+      problem: "Per user must not be above Per project",
+      field: "sendsPerUser",
+    });
+    expect(collect(sends, { ...draft, sendsPerProject: "3" })).toEqual({
+      problem: "Per project must be from 4 to 64",
+      field: "sendsPerProject",
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerProject: "4", sendsPerUser: "4" }),
+    ).toMatchObject({
+      values: { sendsPerProject: 4 },
+    });
+    expect(collect(sends, { ...draft, sendsRunning: "8" })).toEqual({
+      problem: "Per project must not be above At once",
+      field: "sendsRunning",
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerProject: "32", sendsRunning: "16" }),
+    ).toEqual({
+      problem: "Per project must not be above At once",
+      field: "sendsPerProject",
+    });
+  });
+
+  test("a server refusal names each limit by its label and keeps the field", () => {
+    expect(
+      limitRefusal("sendsPerUser must not be above sendsPerProject"),
+    ).toEqual({
+      words: "Per user must not be above Per project",
+      field: "sendsPerUser",
+    });
+    expect(limitRefusal("rounds must be between 1 and 500")).toEqual({
+      words: "Rounds must be between 1 and 500",
+      field: "rounds",
+    });
+    expect(limitRefusal("values must name a limit")).toEqual({
+      words: "values must name a limit",
+      field: undefined,
+    });
+  });
+
   test.serial("the draft, what a Save collects and what is dirty", () => {
     const draft = draftOf(rows);
     expect(draft.toolMs).toBe("600");
@@ -313,7 +382,7 @@ describe("the limit words and units", () => {
         searchBodyBytes: 512 * 1024,
         resultCut: 50_000,
         contextReserve: 20_000,
-        runsPerUser: 4,
+        sendsPerUser: 4,
         maxVisuals: 2,
         toolWorkTokens: 750_000,
         maxBashCalls: 200,
@@ -482,7 +551,11 @@ describe("the Config board", () => {
       ...VISUAL_LIMITS,
     ];
     expect([...placed].sort()).toEqual([...LIMIT_NAMES].sort());
-    expect(LIMITS_CARDS.map((c) => c.title)).toEqual(["Turns", "Automations"]);
+    expect(LIMITS_CARDS.map((c) => c.title)).toEqual([
+      "Turns",
+      "Running",
+      "Automations",
+    ]);
     expect(STORAGE_CARDS.map((c) => c.title)).toEqual([
       "Knowledge",
       "Scratch",
@@ -621,8 +694,10 @@ describe("the Config board", () => {
     expect(html).toContain(">Turns<");
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
-    expect(html.match(/<form/g)).toHaveLength(6);
-    expect(html).toContain("Runs per user");
+    expect(html.match(/<form/g)).toHaveLength(7);
+    expect(html).toContain(">Running<");
+    expect(html).toContain("Per user");
+    expect(html).toContain("Scheduled runs are not counted.");
     expect(html).toContain("Call timeout");
     expect(html).toContain('value="1.5"');
     expect(html).toContain("default 20 s");

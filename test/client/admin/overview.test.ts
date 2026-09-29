@@ -11,13 +11,13 @@ import {
   attentionRow,
   automationsTile,
   buildLine,
-  chatTile,
   costOf,
   costTile,
   cpuTile,
   dayTokensHint,
   decisionsTile,
   memoryTile,
+  runningTile,
   runsTile,
   staleWords,
   tokensTile,
@@ -96,9 +96,11 @@ const day = (over: Partial<OverviewDay> = {}): OverviewDay => ({
 const load = (over: Partial<LoadResponse> = {}): LoadResponse => ({
   at: 0,
   chats: 3,
-  chatsCap: 32,
   runs: 1,
-  runsCap: 32,
+  cap: 64,
+  scheduled: 1,
+  scheduledCap: 48,
+  projectsFull: 0,
   online: 5,
   automations: 12,
   waiting: 0,
@@ -122,22 +124,37 @@ const row = (over: Partial<UsageRow>): UsageRow => ({
 });
 
 describe("the Now tiles", () => {
-  test("the pools against their slots, full at the cap", () => {
-    expect(chatTile(load())).toEqual({
-      figure: "3",
-      unit: "/ 32 slots",
-      sub: "5 users online",
-      share: 3 / 32,
+  test("chats and runs against the process's slots, full at the cap", () => {
+    expect(runningTile(load())).toEqual({
+      figure: "4",
+      unit: "/ 64 slots",
+      sub: "3 chats · 1 run · 5 users online",
+      share: 4 / 64,
       full: false,
     });
-    expect(chatTile(load({ chats: 32, online: 1 }))).toMatchObject({
-      sub: "1 user online",
+    expect(runningTile(load({ chats: 60, runs: 4, online: 1 }))).toMatchObject({
+      sub: "60 chats · 4 runs · 1 user online",
       full: true,
     });
-    expect(automationsTile(load()).sub).toBe("12 automations");
+  });
+
+  test("scheduled runs against their share, with waits and full projects", () => {
+    expect(automationsTile(load())).toEqual({
+      figure: "1",
+      unit: "/ 48 slots",
+      sub: "12 automations",
+      share: 1 / 48,
+      full: false,
+    });
     expect(automationsTile(load({ waiting: 4 })).sub).toBe(
       "12 automations · 4 waiting",
     );
+    expect(
+      automationsTile(load({ scheduled: 48, waiting: 4, projectsFull: 2 })),
+    ).toMatchObject({
+      sub: "12 automations · 4 waiting · 2 projects full",
+      full: true,
+    });
   });
 
   test("CPU and memory from the newest sample", () => {

@@ -22,7 +22,7 @@ import type {
   Wire,
 } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import type { Limits, LoopLimits } from "../limits/index.ts";
+import type { Limits, LoopLimits, SendCaps } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type {
@@ -115,6 +115,8 @@ export type SendPolicy = {
   // the caps the send started on, the limits area's word at that moment
   limits: LoopLimits;
   toolCaps: ToolCaps;
+  // what admission holds the send to, read in the same turn
+  sendCaps: SendCaps;
 };
 
 const NONE: Offered = {
@@ -270,6 +272,11 @@ export function buildPolicy(input: {
       visualBytes: input.limits.visualBytes,
       visualSendBytes: input.limits.visualSendBytes,
       maxVisuals: input.limits.maxVisuals,
+    },
+    sendCaps: {
+      sendsPerUser: input.limits.sendsPerUser,
+      sendsPerProject: input.limits.sendsPerProject,
+      sendsRunning: input.limits.sendsRunning,
     },
   };
 }

@@ -15,7 +15,6 @@ import {
   type LogLevel,
   silent,
 } from "../../src/server/lib/log.ts";
-import type { Registry } from "../../src/server/runner/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import {
   ADMIN_SECRET,
@@ -247,8 +246,6 @@ export async function testApp(
     secrets?: Record<string, string>;
     // a fake tools capability for runner state-machine tests
     tools?: Tools;
-    // a runner registry with its own caps
-    registry?: Registry;
     // a command worker other than the real one
     commandWorker?: URL;
     activate?: boolean;
@@ -312,7 +309,6 @@ export async function testApp(
     secureCookie: false,
     trustProxy,
     tools: options.tools,
-    registry: options.registry,
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
     activate: options.activate,
   });

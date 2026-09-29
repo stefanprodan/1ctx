@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A scheduled fire the run pool refused stays due, with nothing
+// A scheduled fire refused for a full cap stays due, with nothing
 // written. What the scheduler keeps in memory about those waits lives
-// here: the owners and the process whose pool was full, cleared by a
+// here: the projects and the process whose cap was full, cleared by a
 // wake, the wake's generation, and the wait last logged per automation.
 // An occurrence missed while waiting is replaced by the newest past one.
 
@@ -15,18 +15,18 @@ import type { AutomationStore } from "./store.ts";
 export const STILL_WAITING = "still waiting";
 
 export type Waiting = {
-  wait: "user" | "process";
+  wait: "project" | "process";
   dueAt: number;
-  ownerId: string;
+  projectId: string;
 };
 
 export class Waits {
   // a wake with no sleeper is kept: the sleep compares generations
   generation = 0;
-  private readonly owners = new Set<string>();
+  private readonly projects = new Set<string>();
   private process = false;
   private readonly logged = new Map<string, number>();
-  // when the first pool was marked full since the last wake or retry
+  // when the first cap was marked full since the last wake or retry
   private since: number | null = null;
 
   constructor(private readonly log: Log) {}
@@ -36,10 +36,10 @@ export class Waits {
     this.retry();
   }
 
-  // the pools are tried again without a wake once marked full for a
+  // the caps are tried again without a wake once marked full for a
   // pass interval, so a lost wake costs a minute, never a fire
   retry(): void {
-    this.owners.clear();
+    this.projects.clear();
     this.process = false;
     this.since = null;
   }
@@ -56,17 +56,17 @@ export class Waits {
     }
   }
 
-  // A wake since the attempt may have freed a slot, so the pool is not
+  // A wake since the attempt may have freed a place, so the cap is not
   // marked full. The wait is logged once per occurrence.
   block(id: string, wait: Waiting, seen: number, now: number): void {
     if (this.generation === seen) {
       if (wait.wait === "process") this.process = true;
-      else this.owners.add(wait.ownerId);
+      else this.projects.add(wait.projectId);
       this.since ??= now;
     }
     if (this.logged.get(id) === wait.dueAt) return;
     this.logged.set(id, wait.dueAt);
-    this.log.info("wait", { automation: id, pool: wait.wait });
+    this.log.info("wait", { automation: id, cap: wait.wait });
   }
 
   started(id: string): void {
@@ -77,12 +77,12 @@ export class Waits {
     return this.process;
   }
 
-  ownerFull(ownerId: string): boolean {
-    return this.owners.has(ownerId);
+  projectFull(projectId: string): boolean {
+    return this.projects.has(projectId);
   }
 
   get any(): boolean {
-    return this.process || this.owners.size > 0;
+    return this.process || this.projects.size > 0;
   }
 }
 

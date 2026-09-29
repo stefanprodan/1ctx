@@ -5,58 +5,49 @@
 // before startSend, with nothing written before it passes. A session
 // takes one send at a time; a terminated send holds the lock until its
 // stream has let go, so a second send cannot start on a reply that is
-// still being written. Chats and runs are two pools, each capped in the
-// process and per user: the chat caps are constants, the run caps are
-// limits the runner reads and passes at each admission.
+// still being written. Every send counts in one tally under three caps,
+// limits the caller reads in the admission's turn: per user who started
+// it, per project and in the process. A scheduled run has no one who
+// started it and may hold only a share of the project's and the
+// process's places, so the rest stays free for users.
 
 import { Conflict, TooManyRequests } from "../lib/errors.ts";
+import { type SendCaps, scheduledShare } from "../limits/index.ts";
 import type { ActiveSend } from "./send.ts";
 
-export const MAX_RUNNING = 32;
-export const MAX_RUNNING_PER_USER = 4;
+// who a send counts against: the user who started it, null for a
+// scheduled run, and the session's project
+export type Starter = { userId: string | null; projectId: string };
 
-export type Pool =
-  | { kind: "chat" }
-  | { kind: "run"; perUser: number; running: number };
+export type Running = {
+  chats: number;
+  runs: number;
+  scheduled: number;
+  // the projects whose every place is taken
+  projectsFull: number;
+};
 
-export const CHAT_POOL: Pool = { kind: "chat" };
-
-// the run caps as limits.current() answers them in the admission's turn
-export function runPool(limits: {
-  runsPerUser: number;
-  runsRunning: number;
-}): Pool {
-  return {
-    kind: "run",
-    perUser: limits.runsPerUser,
-    running: limits.runsRunning,
-  };
-}
-
-// a full run pool; the scheduler reads which one from the class, never
-// from the words
+// a full cap met by a scheduled run; the scheduler reads which one from
+// the class, never from the words
 export class RunCapacity extends TooManyRequests {
   constructor(
-    readonly pool: "user" | "process",
+    readonly cap: "project" | "process",
     message: string,
   ) {
     super(message);
   }
 }
 
-const poolOf = (send: ActiveSend) => (send.kind === "run" ? "run" : "chat");
+// the count, not the cap: a lowered cap leaves more going
+const going = (n: number): string =>
+  n === 1 ? "1 chat or run" : `${n} chats and runs`;
+
+const projectFull = (n: number): string =>
+  `This project has ${going(n)} going. Try again in a moment.`;
 
 export class Registry {
   private readonly sends = new Map<string, ActiveSend>();
   private closed = false;
-
-  // the chat pool's caps; a test passes its own
-  constructor(
-    private readonly caps: { running: number; perUser: number } = {
-      running: MAX_RUNNING,
-      perUser: MAX_RUNNING_PER_USER,
-    },
-  ) {}
 
   get(sessionId: string): ActiveSend | null {
     return this.sends.get(sessionId) ?? null;
@@ -70,66 +61,89 @@ export class Registry {
     return this.sends.size;
   }
 
-  // the chat pool's process cap, for the overview
-  get chatsCap(): number {
-    return this.caps.running;
-  }
-
-  // the sends holding a slot now, by pool; a terminated send holds its
-  // slot until its stream has let go
-  running(): { chats: number; runs: number } {
+  // the sends holding a place now; a terminated send holds its place
+  // until its stream has let go
+  running(perProject: number): Running {
     let chats = 0;
     let runs = 0;
+    let scheduled = 0;
+    const projects = new Map<string, number>();
     for (const send of this.sends.values()) {
-      if (poolOf(send) === "run") runs++;
+      if (send.kind === "run") runs++;
       else chats++;
+      if (send.startedBy === null) scheduled++;
+      projects.set(send.projectId, (projects.get(send.projectId) ?? 0) + 1);
     }
-    return { chats, runs };
+    let projectsFull = 0;
+    for (const count of projects.values()) {
+      if (count >= perProject) projectsFull++;
+    }
+    return { chats, runs, scheduled, projectsFull };
+  }
+
+  // the lock's refusals alone, for a caller that checks before it builds
+  // a send
+  locked(sessionId: string): void {
+    if (this.closed) throw new Conflict("the server is shutting down");
+    const own = this.sends.get(sessionId);
+    if (own === undefined) return;
+    if (own.terminal !== null) {
+      throw new Conflict(
+        "still stopping the last reply; try again in a moment",
+      );
+    }
+    throw new Conflict(`${own.policy.fullName} is sending`);
   }
 
   // throws the refusal, or returns; the caller reserves with set() in
   // the same turn, with no await between
-  admit(sessionId: string, userId: string, pool: Pool): void {
-    if (this.closed) throw new Conflict("the server is shutting down");
-    const own = this.sends.get(sessionId);
-    if (own) {
-      if (own.terminal !== null) {
-        throw new Conflict(
-          "still stopping the last reply; try again in a moment",
-        );
-      }
-      throw new Conflict(`${own.policy.fullName} is sending`);
-    }
+  admit(sessionId: string, who: Starter, caps: SendCaps): void {
+    this.locked(sessionId);
     let running = 0;
     let mine = 0;
+    let project = 0;
+    let scheduled = 0;
+    let scheduledHere = 0;
     for (const send of this.sends.values()) {
-      if (poolOf(send) !== pool.kind) continue;
       running++;
-      if (send.policy.userId === userId) mine++;
+      const here = send.projectId === who.projectId;
+      if (here) project++;
+      if (send.startedBy === null) {
+        scheduled++;
+        if (here) scheduledHere++;
+      } else if (send.startedBy === who.userId) {
+        mine++;
+      }
     }
-    if (pool.kind === "run") {
-      if (running >= pool.running) {
+    if (who.userId === null) {
+      if (
+        project >= caps.sendsPerProject ||
+        scheduledHere >= scheduledShare(caps.sendsPerProject)
+      ) {
+        throw new RunCapacity("project", projectFull(project));
+      }
+      if (
+        running >= caps.sendsRunning ||
+        scheduled >= scheduledShare(caps.sendsRunning)
+      ) {
         throw new RunCapacity(
           "process",
-          "too many tasks running; try again in a moment",
-        );
-      }
-      if (mine >= pool.perUser) {
-        throw new RunCapacity(
-          "user",
-          `${pool.perUser} of your tasks are running; wait for one`,
+          "Too many chats and runs are going. Try again in a moment.",
         );
       }
       return;
     }
-    if (running >= this.caps.running) {
+    if (mine >= caps.sendsPerUser) {
       throw new TooManyRequests(
-        "too many chats running; try again in a moment",
+        `You have ${going(mine)} going. Wait for one to end.`,
       );
     }
-    if (mine >= this.caps.perUser) {
+    if (project >= caps.sendsPerProject) {
+      throw new TooManyRequests(projectFull(project));
+    }
+    if (running >= caps.sendsRunning) {
       throw new TooManyRequests(
-        `${this.caps.perUser} of your chats are running; wait for one`,
+        "Too many chats and runs are going. Try again in a moment.",
       );
     }
   }

@@ -20,6 +20,7 @@ import type {
 import { collectLogs, testApp } from "../../helpers/app.ts";
 import { fileDb } from "../../helpers/db.ts";
 
+const IDLE = { chats: 0, runs: 0, scheduled: 0, projectsFull: 0 };
 const WORKER = new URL(
   "../../../src/server/overview/scan.worker.ts",
   import.meta.url,
@@ -91,7 +92,7 @@ describe("the scan worker", () => {
       limits: { current: () => DEFAULT_LIMITS },
       version: "v0.0.0-test",
       startedAt: 0,
-      pools: () => ({ chats: 0, chatsCap: 32, runs: 0 }),
+      running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
       attention: () => ({

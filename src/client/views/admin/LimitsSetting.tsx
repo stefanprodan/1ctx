@@ -5,6 +5,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { LimitName } from "../../../shared/words.ts";
+import { ApiError } from "../../data/api.ts";
 import { saveLimits } from "../../data/tools.ts";
 import { useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -20,7 +21,7 @@ import {
   draftOf,
   keepDays,
   LIMIT_WORDS,
-  limitFieldOf,
+  limitRefusal,
   dirty as limitsDirty,
   seedOf,
   show,
@@ -53,11 +54,23 @@ export function LimitsSetting({
     draft.value = draftOf(own);
     asking.value = null;
   }, [seed]);
-  const save = useSave(async () => {
-    const got = collect(mine(latest.current), draft.value);
-    if ("problem" in got) throw new Error(got.problem);
-    await saveLimits({ values: got.values });
-  }, limitFieldOf);
+  // the field of the last refusal, whose words no longer name it
+  const refused = useRef<LimitName | undefined>(undefined);
+  const save = useSave(
+    async () => {
+      const got = collect(mine(latest.current), draft.value);
+      if ("problem" in got) throw new Error(got.problem);
+      try {
+        await saveLimits({ values: got.values });
+      } catch (err) {
+        if (!(err instanceof ApiError)) throw err;
+        const { words, field } = limitRefusal(err.message);
+        refused.current = field;
+        throw new ApiError(err.status, words);
+      }
+    },
+    () => refused.current,
+  );
   useFocusField(save, form);
   const run = () => {
     const got = collect(own, draft.value);

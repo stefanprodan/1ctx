@@ -37,7 +37,7 @@ export const tokensOf = (t: {
   completionTokens: number;
 }): number => t.promptTokens + t.completionTokens;
 
-function pool(running: number, cap: number, sub: string) {
+function slots(running: number, cap: number, sub: string) {
   return {
     figure: String(running),
     unit: `/ ${cap} slots`,
@@ -47,20 +47,29 @@ function pool(running: number, cap: number, sub: string) {
   };
 }
 
-export const chatTile = (load: LoadResponse) =>
-  pool(
-    load.chats,
-    load.chatsCap,
-    pluralCommas(load.online, "user online", "users online"),
+// every chat and run against the process's cap
+export const runningTile = (load: LoadResponse) =>
+  slots(
+    load.chats + load.runs,
+    load.cap,
+    [
+      pluralCommas(load.chats, "chat", "chats"),
+      pluralCommas(load.runs, "run", "runs"),
+      pluralCommas(load.online, "user online", "users online"),
+    ].join(" · "),
   );
 
+// the scheduled runs against their share of the process
 export const automationsTile = (load: LoadResponse) =>
-  pool(
-    load.runs,
-    load.runsCap,
+  slots(
+    load.scheduled,
+    load.scheduledCap,
     [
       pluralCommas(load.automations, "automation", "automations"),
       ...(load.waiting > 0 ? [`${load.waiting} waiting`] : []),
+      ...(load.projectsFull > 0
+        ? [pluralCommas(load.projectsFull, "project full", "projects full")]
+        : []),
     ].join(" · "),
   );
 

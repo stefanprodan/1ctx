@@ -393,8 +393,9 @@ export const LIMIT_NAMES = [
   "uploadFiles",
   "mcpKeptBytes",
   "mcpKeptFiles",
-  "runsPerUser",
-  "runsRunning",
+  "sendsPerUser",
+  "sendsPerProject",
+  "sendsRunning",
   "archiveIdleDays",
   "archivedDeleteDays",
 ] as const;
@@ -413,14 +414,14 @@ export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
 // where a limit applies: over the whole send, to one tool call, to a
 // project's knowledge base, a storage cap read at each write, to the
-// runs the process holds at once, read at each admission, to the
+// chats and runs going at once, read at each admission, to the
 // visuals a send draws, or to chats, which the hourly sweep archives
 // and deletes by their days
 export const LIMIT_SCOPES = [
   "send",
   "call",
   "knowledge",
-  "runs",
+  "sends",
   "visuals",
   "chats",
 ] as const;

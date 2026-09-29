@@ -14,7 +14,7 @@ import {
   sessionDetail,
 } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
-import type { Pool, Registry } from "./registry.ts";
+import type { Registry } from "./registry.ts";
 import { live, newSend, type SendOp } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
@@ -26,7 +26,10 @@ export type PreparedRun = {
 
 export function prepareSend(fields: {
   registry: Registry;
-  pool: Pool;
+  // the user the send counts against, null for a scheduled run
+  startedBy: string | null;
+  // a freed place may let a waiting run start
+  wake(): void;
   writer: Writer;
   sessions: SessionStore;
   log: Log;
@@ -70,7 +73,11 @@ export function prepareSend(fields: {
       throw new BadRequest("this agent cannot read files");
     }
   }
-  fields.registry.admit(fields.sessionId, fields.policy.userId, fields.pool);
+  fields.registry.admit(
+    fields.sessionId,
+    { userId: fields.startedBy, projectId: fields.policy.projectId },
+    fields.policy.sendCaps,
+  );
   const sendId = newId();
   const userId = fields.existingUser?.id ?? newId();
   const replyId = newId();
@@ -78,6 +85,7 @@ export function prepareSend(fields: {
     id: sendId,
     sessionId: fields.sessionId,
     projectId: fields.policy.projectId,
+    startedBy: fields.startedBy,
     kind: fields.kind,
     op: fields.op,
     policy: fields.policy,
@@ -129,7 +137,7 @@ export function prepareSend(fields: {
       fields.policy.offered.mcpPrompt.digest,
     );
   } catch (err) {
-    fields.registry.free(send);
+    if (fields.registry.free(send)) fields.wake();
     throw err;
   }
   let settled = false;
@@ -153,7 +161,7 @@ export function prepareSend(fields: {
     abandon() {
       if (settled) return;
       settled = true;
-      fields.registry.free(send);
+      if (fields.registry.free(send)) fields.wake();
     },
   };
 }

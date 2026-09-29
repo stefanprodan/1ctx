@@ -34,7 +34,7 @@ import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { regenerateUser } from "./regenerate.ts";
-import { CHAT_POOL, Registry, runPool } from "./registry.ts";
+import { Registry } from "./registry.ts";
 import { ProviderRefusal, type RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
@@ -47,7 +47,7 @@ import { Writer } from "./writer.ts";
 export type { AttentionPort } from "./attention.ts";
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
-export { Registry, RunCapacity } from "./registry.ts";
+export { Registry, RunCapacity, type Running } from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
 export type { ShutdownResult } from "./shutdown.ts";
 export type { Runner, RunnerDeps } from "./types.ts";
@@ -64,7 +64,7 @@ export const SHUTDOWN_DRAIN_MS = 5000;
 export { FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS };
 
 export function runnerArea(deps: RunnerDeps): Runner {
-  const registry = deps.registry ?? new Registry();
+  const registry = new Registry();
   const asks = attention(deps.attention, deps.log);
   const writer = new Writer({
     db: deps.db,
@@ -165,9 +165,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       if (send.tools !== null) await send.tools.catch(() => {});
       send.letGo();
       const freed = finalized && registry.free(send);
-      if (freed && send.kind === "run" && send.terminal !== "shutdown") {
-        deps.slotFreed();
-      }
+      if (freed && send.terminal !== "shutdown") deps.wake();
     }
   };
 
@@ -226,7 +224,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
       event !== null ? "run" : existingUser !== null ? "regenerate" : "message";
     return prepareSend({
       registry,
-      pool: event === null ? CHAT_POOL : runPool(deps.limits.current()),
+      startedBy: event?.source === "schedule" ? null : user.id,
+      wake: deps.wake,
       writer,
       sessions: deps.sessions,
       log: deps.log,
@@ -338,9 +337,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         throw new Conflict("a run cannot regenerate");
       }
       refuseArchived(session);
-      if (registry.get(session.id) !== null) {
-        registry.admit(session.id, principal.userId, CHAT_POOL);
-      }
+      registry.locked(session.id);
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
@@ -367,9 +364,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         throw new Conflict("a run cannot compact");
       }
       refuseArchived(session);
-      if (registry.get(session.id) !== null) {
-        registry.admit(session.id, principal.userId, CHAT_POOL);
-      }
+      registry.locked(session.id);
       if (session.status === "running") {
         throw new Conflict("the chat is running");
       }
@@ -385,7 +380,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
         false,
         session.disabledCapabilities,
       );
-      return compactSend({ ...deps, registry, writer, run }, session, policy);
+      return compactSend(
+        { ...deps, registry, writer, run, wake: deps.wake },
+        session,
+        policy,
+      );
     },
     startRun(event) {
       return prepare(

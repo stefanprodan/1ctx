@@ -103,6 +103,7 @@ const policy: SendPolicy = {
   deadlineMs: null,
   limits: LOOP_LIMITS,
   toolCaps: TOOL_CAPS,
+  sendCaps: { sendsPerUser: 4, sendsPerProject: 16, sendsRunning: 64 },
 };
 
 const row = (

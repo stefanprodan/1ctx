@@ -15,10 +15,10 @@ import {
 } from "../../ui/Tiles.tsx";
 import {
   automationsTile,
-  chatTile,
   cpuTile,
   memoryTile,
   percent,
+  runningTile,
   sampleLine,
   zoomed,
 } from "./Overview.model.ts";
@@ -28,7 +28,7 @@ const NOW_SYNC = "overview-now";
 function NowTiles({ load }: { load: LoadResponse }) {
   const cpuAt = useSignal<number | null>(null);
   const rssAt = useSignal<number | null>(null);
-  const chats = chatTile(load);
+  const chats = runningTile(load);
   const runs = automationsTile(load);
   const cpu = cpuTile(load);
   const memory = memoryTile(load);
@@ -47,7 +47,7 @@ function NowTiles({ load }: { load: LoadResponse }) {
   return (
     <Tiles>
       <Tile
-        label="Chats"
+        label="Chats and runs"
         figure={chats.figure}
         unit={chats.unit}
         sub={chats.sub}

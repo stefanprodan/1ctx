@@ -1,7 +1,7 @@
 # Sessions and sends
 
 Governs `src/server/sessions/` and the runner's sends in
-`src/server/runner/`: the lock and the pools, the writer, the
+`src/server/runner/`: the lock and the caps, the writer, the
 capabilities set, uploads, regenerate, fork, rename, delete, the
 Markdown download and compaction. The tool loop is in `docs/tools.md`,
 memory in `docs/memory.md`, runs in `docs/automations.md`.
@@ -9,16 +9,29 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **A send is a row and ends once.** A chat is a session in a project
   with one agent for its life; a user message starts a send under the
   runner's lock, one per session, taken synchronously before anything
-  is written, with chats and runs in separate pools, each capped in the
-  process and per user (`runner/registry.ts`): a chat send (a message,
-  regenerate or compact) at the constant caps, a run at `runsPerUser`
-  and `runsRunning`, limits in the `runs` scope that the runner reads
-  and passes to `admit()` in the same turn. A full run pool throws
-  `RunCapacity`, a 429 carrying `pool` (`user` or `process`). A run's
-  final release (a finalized send freed) calls the `slotFreed` port,
-  never a rollback, an abandon or a failed finalize, and a limits write
-  that moves a run cap calls `runCapsChanged`; `compose.ts` binds both
-  to the scheduler's `wake()`.
+  is written (`runner/registry.ts`). Every send counts in one tally,
+  whatever its kind (a message, regenerate, compact, Run now or
+  scheduled run), under three limits in the `sends` scope that the
+  policy reads and `admit()` applies in the same turn: `sendsPerUser`
+  against the user who started it (who typed, regenerated, compacted
+  or pressed Run now, any member or admin in a team chat), in every
+  project; `sendsPerProject` against the session's project; and
+  `sendsRunning` in the process. A scheduled run has no one who started
+  it, is not counted per user, and may hold only
+  `scheduledShare()` (`floor(3 × cap / 4)`) of the project's and the
+  process's caps, so the rest stays free for users; a send a user
+  started is admitted whenever its own caps have room, however many
+  runs wait. A full cap refuses a started send with a 429 naming the
+  narrowest (the user's, the project's, the process's); a scheduled run
+  gets `RunCapacity`, a 429 carrying `cap` (`project` or `process`). A
+  limits write keeps `sendsPerUser` <= `sendsPerProject` <=
+  `sendsRunning` over the resulting values, else a 400. Every
+  `registry.free()` that freed a send (a finalize, a rollback of
+  `startSend` or `startCompact`, an abandoned run) calls the `wake`
+  port, except a shutdown's, and so does a limits write that moves a
+  send cap; `compose.ts` binds it to the scheduler's `wake()`. A
+  finalize that fails keeps the lock and the send's places until
+  `sessions.repair()` at the next start.
 - **The writer has three transactions.** The writer's three transactions:
   `startSend` (the session when new, the user message, the streaming
   reply, the send row, the running state), `finalizeRound` (the

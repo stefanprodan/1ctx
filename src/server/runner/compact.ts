@@ -12,7 +12,7 @@ import {
   sessionDetail,
 } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
-import { CHAT_POOL, type Registry } from "./registry.ts";
+import type { Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
@@ -24,6 +24,7 @@ export function compactSend(
     clock: Clock;
     log: Log;
     run(send: ActiveSend): Promise<void>;
+    wake(): void;
   },
   session: SessionRow,
   policy: SendPolicy,
@@ -49,13 +50,18 @@ export function compactSend(
   if (!hasAnswer || lastUser === null) {
     throw new BadRequest("nothing to compact");
   }
-  deps.registry.admit(session.id, policy.userId, CHAT_POOL);
+  deps.registry.admit(
+    session.id,
+    { userId: policy.userId, projectId: policy.projectId },
+    policy.sendCaps,
+  );
   const sendId = newId();
   const summaryId = newId();
   const send = newSend({
     id: sendId,
     sessionId: session.id,
     projectId: policy.projectId,
+    startedBy: policy.userId,
     kind: "compact",
     op: "compact",
     summarizing: true,
@@ -80,7 +86,7 @@ export function compactSend(
       policy,
     });
   } catch (err) {
-    deps.registry.free(send);
+    if (deps.registry.free(send)) deps.wake();
     throw err;
   }
   deps.log.info("send start", {

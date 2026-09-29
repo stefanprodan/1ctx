@@ -5,7 +5,6 @@ import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { newId } from "../../../src/server/lib/ids.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { Registry } from "../../../src/server/runner/index.ts";
 import { startSend } from "../../../src/server/runner/start.ts";
 import { MAX_REGENERATE_BODY } from "../../../src/server/sessions/index.ts";
 import { WEB_OFF_LINE } from "../../../src/shared/capabilities.ts";
@@ -16,6 +15,7 @@ import {
   type ChatApp,
   chatApp,
   NO_TOOLS,
+  setLimits,
   startChat,
   tick,
   waitScript,
@@ -272,9 +272,8 @@ describe("a send's disabled capabilities", () => {
   });
 
   test("400, 409 and admission limits write no capability changes", async () => {
-    const chat = await chatApp({
-      registry: new Registry({ running: 1, perUser: 1 }),
-    });
+    const chat = await chatApp();
+    await setLimits(chat, { sendsPerUser: 1 });
     try {
       const started = await startChat(chat);
       const before = chat.app.sessions.byId(started.sessionId);
