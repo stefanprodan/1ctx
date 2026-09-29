@@ -340,7 +340,8 @@ export class DiffRun {
         (!s0.stdin &&
           !s1.stdin &&
           fileType(st0) === fileType(st1) &&
-          sameStat(st0, st1)));
+          (sameStat(st0, st1) ||
+            this.path(s0.name) === this.path(s1.name))));
     if (sameFiles && noDiffMeansNoOutput(o)) return 0;
 
     const pair: Pair = {
