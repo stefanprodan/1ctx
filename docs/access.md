@@ -138,8 +138,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `watched` and the access frames are one connection's own. Every send
   keeps its own result: backpressure closes a slow connection; a
   dropped frame closes with 1013; the client reloads on every open.
-  Socket opens and closes are logged by user; a close carries Bun's code and only a cause the server recorded,
-  never the browser's reason text. The upgrade is `GET /api/socket` with
+  Socket opens and closes are logged by user; a close carries Bun's
+  code and only a cause the server recorded, never the browser's
+  reason text. The upgrade is `GET /api/socket` with
   `upgrade: true` on the descriptor: the router applies the same-origin
   check as for a write and hands the handler `ctx.upgrade()`; without
   an upgrade the route answers 426. The protocol is `shared/socket.ts`.

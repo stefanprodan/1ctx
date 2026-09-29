@@ -55,8 +55,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   page can place a row below it. A held row renamed off the search
   leaves the list.
 - **One first page is out at a time.** `data/flight.ts` folds warm asks
-  into one trailing load, run `TRAIL_MS` after the load out lands, since at a hundred
-  agents every tab would otherwise reload per envelope; a cold load
+  into one trailing load, run `TRAIL_MS` after the load out lands,
+  since at a hundred agents every tab would otherwise reload per
+  envelope; a cold load
   (navigation, the socket's open, a user change, `granted`, `revoked`)
   runs at once over both, and a list that goes stops both. Envelopes
   and deletes that arrive while a page is out are replayed over its
