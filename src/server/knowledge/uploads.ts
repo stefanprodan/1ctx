@@ -36,6 +36,17 @@ export type UploadTree = {
   entries: UploadFile[];
 };
 
+// a chat's uploads as a command mounts them
+export type MountedUploads = {
+  bytes: number;
+  entries: {
+    name: string;
+    bytes: number;
+    createdAt: number;
+    data: Uint8Array;
+  }[];
+};
+
 export type UploadCaps = Pick<
   KnowledgeCaps,
   "knowledgeFileBytes" | "uploadBytes" | "uploadFiles"
@@ -227,15 +238,7 @@ export class UploadStore {
 
   // the session's files with their text as bytes, which a command's
   // mount transfers to its worker as they come from SQLite
-  mounted(sessionId: string): {
-    bytes: number;
-    entries: {
-      name: string;
-      bytes: number;
-      createdAt: number;
-      data: Uint8Array;
-    }[];
-  } {
+  mounted(sessionId: string): MountedUploads {
     const row = this.db
       .query<{ bytes: number }, [string]>(
         "select bytes from session_uploads where session_id = ?",

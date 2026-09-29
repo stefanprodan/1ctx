@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { OpenedFileResponse } from "../../shared/api/sessions.ts";
-import type { OpenedRecord } from "../knowledge/index.ts";
+import type { OpenedRecord } from "../bash/index.ts";
 import { escapeHtml, highlight, renderMarkdown } from "../render/index.ts";
 
 export function openedFileResponse(file: OpenedRecord): OpenedFileResponse {

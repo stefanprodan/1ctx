@@ -29,6 +29,9 @@ import { KnowledgeVersions } from "./versions.ts";
 
 export { type KnowledgeRow, summary } from "./rows.ts";
 
+// a doc as a command mounts it, its text as bytes
+export type MountedDoc = KnowledgeFile & { data: Uint8Array };
+
 export class KnowledgeStore extends KnowledgeVersions {
   constructor(private readonly filesDb: Db) {
     super(filesDb);
@@ -59,7 +62,7 @@ export class KnowledgeStore extends KnowledgeVersions {
 
   // the live rows with their text as bytes, which a command's mount
   // transfers to its worker as they come from SQLite
-  mounted(projectId: string): (KnowledgeFile & { data: Uint8Array })[] {
+  mounted(projectId: string): MountedDoc[] {
     return this.filesDb
       .query<FileRaw & { data: Uint8Array }, [string]>(
         `select ${FILE_COLUMNS}, cast(text as blob) as data

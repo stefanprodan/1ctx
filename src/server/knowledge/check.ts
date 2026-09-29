@@ -53,14 +53,6 @@ export function checkTotals(
   );
 }
 
-export function checkScratchTotals(
-  before: { files: number; bytes: number },
-  after: { files: number; bytes: number },
-  caps: KnowledgeCaps,
-): void {
-  checkUsage(before, after, caps.scratchFiles, caps.scratchBytes, "scratch");
-}
-
 export function checkUploadTotals(
   before: { files: number; bytes: number },
   after: { files: number; bytes: number },
@@ -69,7 +61,7 @@ export function checkUploadTotals(
   checkUsage(before, after, caps.uploadFiles, caps.uploadBytes, "uploads");
 }
 
-function checkUsage(
+export function checkUsage(
   before: { files: number; bytes: number },
   after: { files: number; bytes: number },
   files: number,

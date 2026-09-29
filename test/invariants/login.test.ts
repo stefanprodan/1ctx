@@ -275,6 +275,7 @@ describe("sweep", () => {
         logins: 1,
         visits: 0,
         knowledge: 0,
+        bash: 0,
         digests: 0,
         removed: 1,
         chats_archived: 0,

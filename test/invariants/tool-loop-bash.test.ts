@@ -208,4 +208,41 @@ describe("a bash command that saves nothing", () => {
       chat.app.db.close();
     }
   });
+
+  test("the command worker's own lines are the bash area's", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({
+      logFactory: logs.logFactory,
+      commandWorker: new URL(
+        "../fixtures/bash/forged.worker.ts",
+        import.meta.url,
+      ),
+    });
+    try {
+      const { sessionId, script } = await startChat(chat);
+      script.toolRound([
+        {
+          id: "forged",
+          name: "bash",
+          arguments: JSON.stringify({ command: "malformed" }),
+        },
+      ]);
+      script.end();
+      const answer = await waitScript(chat.scripted, 2);
+      expect(
+        logs.events.filter((event) => event.msg === "command answer malformed"),
+      ).toEqual([
+        {
+          level: "warn",
+          area: "bash",
+          msg: "command answer malformed",
+          fields: { chat: sessionId, phase: "run" },
+        },
+      ]);
+      answer.reply("done");
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
 });

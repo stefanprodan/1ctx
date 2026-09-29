@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import type { CommandCaps } from "../../../src/server/knowledge/mount.ts";
+import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
@@ -22,7 +22,7 @@ function setup() {
     secret: () => null,
     skills: { forAgent: () => [], body: () => null, file: () => null },
     fetcher: (async (_input: unknown) => new Response("")) as typeof fetch,
-    knowledge: {
+    bash: {
       async run(_project, _session, _author, _command, caps) {
         seen.push(caps);
         return { content: "exit 0", error: false };

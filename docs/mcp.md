@@ -115,11 +115,11 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   `mcp_kept_files`, written by the writer's `finishTool` in the row's
   transaction, cascading with the message, copied by fork. An archived
   chat and an ended run keep them whole, unpacked, until the chat is
-  deleted, since Fork copies them (`copyKeptFiles`) so the `/mcp/`
-  paths its packed tool results name still resolve; each call's
+  deleted, since Fork copies them (bash's `copyKeptFiles`) so the
+  `/mcp/` paths its packed tool results name still resolve; each call's
   folder is `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`,
   never reused. `prepareSend` trims the oldest folders to `mcpKeptBytes`
-  and `mcpKeptFiles` (knowledge scope) through `knowledge.startKept()`
+  and `mcpKeptFiles` (knowledge scope) through `bash.startKept()`
   under the runner's lock, so no command loses a file while it reads; a
   regenerate's files, on the rows it is about to delete, count for
   nothing. The mount adds each as a lazy file (`writeFileLazy`), which

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { acquireSession } from "../../../src/server/knowledge/queue.ts";
+import { acquireSession } from "../../../src/server/bash/queue.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { Conflict } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
@@ -466,7 +466,7 @@ describe("the chats sweep", () => {
     const deps = {
       db: chat.app.db,
       store: chat.app.sessions,
-      scratch: chat.app.knowledge.scratch,
+      scratch: chat.app.bash.scratch,
       log: silent,
     };
     const caps = DEFAULT_LIMITS;

@@ -12,6 +12,7 @@ import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
+import { type BashArea, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
@@ -85,6 +86,8 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's registry with its own caps
   registry?: Registry;
+  // a test's command worker entry; the real one by default
+  commandWorker?: URL;
   // Provisioning validates before bootstrap and never repairs or schedules.
   activate?: boolean;
   // argon2id's cost; a test passes the least
@@ -101,6 +104,7 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  bash: BashArea;
   sessions: SessionStore;
   automations: Automations["store"];
   automationScheduler: Automations["scheduler"];
@@ -306,14 +310,22 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
-  const knowledge = knowledgeArea({
+  const knowledge = knowledgeArea({ db, clock, limits, access });
+  const bash = bashArea({
     db,
     clock,
     limits,
-    access,
-    log: log("knowledge"),
+    log: log("bash"),
     // built here, at the compile root, so the binary finds its entry
-    worker: new URL("./knowledge/command.worker.ts", import.meta.url),
+    worker:
+      options.commandWorker ??
+      new URL("./bash/command.worker.ts", import.meta.url),
+    knowledge: {
+      mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
+      mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
+      commitDocs: (projectId, author, changes, caps, now) =>
+        knowledge.commitDocs(projectId, author, changes, caps, now),
+    },
   });
   sessions = sessionsArea({
     db,
@@ -325,7 +337,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     limits,
     uploads: knowledge,
-    scratch: knowledge.scratch,
+    scratch: bash.scratch,
   });
   const configuredTools = toolsArea({
     db,
@@ -338,7 +350,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills,
     mcp,
     memory,
-    knowledge,
+    bash,
     credentials,
     usage: {
       visuals: (since, until) => sessions.visualCounts(since, until),
@@ -367,6 +379,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     tools,
     knowledge,
+    bash,
     uploads: {
       checkUploads: (userId, projectId, ids) =>
         knowledge.checkUploads(userId, projectId, ids),
@@ -527,6 +540,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    bash,
     sessions: sessions.store,
     automations: automations.store,
     automationScheduler: automations.scheduler,
@@ -545,15 +559,18 @@ export async function compose(options: ComposeOptions): Promise<App> {
       try {
         const logins = access.sweep();
         const visits = access.sweepVisits();
-        const knowledgeRows = knowledge.sweep(clock());
+        const now = clock();
+        const knowledgeRows = knowledge.sweep(now);
+        const scratchRows = bash.sweep(now);
         const digests = sessions.store.sweepDigests();
-        const chats = sessions.sweep(clock(), limits.current());
-        const removed = logins + visits + knowledgeRows + digests;
+        const chats = sessions.sweep(now, limits.current());
+        const removed = logins + visits + knowledgeRows + scratchRows + digests;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
             visits,
             knowledge: knowledgeRows,
+            bash: scratchRows,
             digests,
             removed,
             ...chats,
@@ -573,7 +590,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       skills.close();
       automations.stop();
       const result = await runner.shutdown();
-      knowledge.close();
+      bash.close();
       await mcp.close();
       automations.dispose();
       overview.close();

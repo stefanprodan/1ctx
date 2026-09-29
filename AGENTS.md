@@ -7,7 +7,7 @@ One continuous context for agents. Domain: 1ctx.dev.
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead. The one exception is just-bash,
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
-  change: `docs/just-bash.md` says what we changed and how to sync it.
+  change: `vendor/README.md` says what we changed and how to sync it.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
   and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
   the vendored tar command uses modern-tar too. The modern-tar patch
@@ -64,7 +64,7 @@ src/server/     the binary. main.ts parses the flags, opens the db and the
                 (http.ts: Principal, Policy, RouteDescriptor; body.ts:
                 readBody, jsonBody, fields; errors, log, clock, ids, bus),
                 db/ (open, transact, migrations/), then one directory per
-                area. A *.worker.ts (overview/scan, knowledge/command) is
+                area. A *.worker.ts (overview/scan, bash/command) is
                 an entry of `bun build --compile` in package.json's build
                 script, its URL built in compose.ts.
 src/client/     the Preact app, bundled by Bun from client/index.html.
@@ -97,17 +97,17 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, four of them over record-cases.ts
-                (docs/knowledge.md) and deciders-record.ts
+                (vendor/README.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
                 by the app. site/README.md is the brand book.
 vendor/         just-bash/, the vendored source (a git subtree, outside
-                Biome and the structure rules), and
-                just-bash-failures.txt, what `make vendor-test` expects.
-docs/           the rules of each area, one file per topic (see Docs), and
-                just-bash.md: the fork, our changes, the upstream sync.
+                Biome and the structure rules), README.md (the fork, our
+                changes, the upstream sync) and just-bash-failures.txt,
+                what `make vendor-test` expects.
+docs/           the rules of each area, one file per topic (see Docs).
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
@@ -125,9 +125,9 @@ builds it with its factory and fakes for its ports.
 
 ## Docs
 
-The files under `docs/` are rules with the same force as this file;
-each governs the code its first lines name. Read the one that covers a
-change before making it.
+The files under `docs/` and `vendor/README.md` are rules with the same
+force as this file; each governs the code its first lines name. Read
+the one that covers a change before making it.
 
 | Doc | Read it |
 |---|---|
@@ -140,9 +140,10 @@ change before making it.
 | `docs/automations.md` | before changing `src/server/automations/`, the scheduler or runs |
 | `docs/tools.md` | before changing `src/server/tools/`, `credentials/`, `skills/`, `limits/`, the tool loop in `runner/` or the visual frame |
 | `docs/mcp.md` | before changing `src/server/mcp/`, MCP tools in a send or the files under `/mcp` |
-| `docs/knowledge.md` | before changing `src/server/knowledge/`, the bash tool, `open`, uploads or `vendor/just-bash/` |
+| `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
+| `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
 | `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
-| `docs/just-bash.md` | before changing `vendor/just-bash/` or syncing it with upstream |
+| `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
 
 AGENTS.md and `docs/` change in the same commit as the code that changes
 a rule.
@@ -157,11 +158,15 @@ violation, and every rule has a rejected fixture under
   `shared/`, never `server/`. `server/` imports `client/` only in
   `main.ts`, for the page.
 - Server areas are in a layer order (the `LAYERS` list in the test); an
-  area imports only areas above it, through their `index.ts`. `web/`
-  imports only `access` and `lib`; no area imports `web/`, `main.ts` or
-  `compose.ts`. The server root holds `main.ts` and `compose.ts` and
-  nothing else; those two may import every area. Moving an area in the
-  order is a deliberate change to the test in the same commit.
+  area imports only areas above it, through their `index.ts` or
+  `rules.ts`. `web/` imports only `access` and `lib`; no area imports
+  `web/`, `main.ts` or `compose.ts`. The server root holds `main.ts` and
+  `compose.ts` and nothing else; those two may import every area. Moving
+  an area in the order is a deliberate change to the test in the same
+  commit.
+- An area's `rules.ts` is its pure rules, for workers: a `rules.ts` or
+  `*.worker.ts` never loads `db/` or an area's `index.ts`, so a worker
+  stays small (`WORKER_EXEMPTIONS` lists the exceptions).
 - No import cycles between files, type-only imports included, comments
   between the clause and `from` included. Dynamic imports are string
   literals, on one line or several; a template with `${}` is not.

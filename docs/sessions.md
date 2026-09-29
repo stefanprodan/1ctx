@@ -171,29 +171,33 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   context builder and the memory packet never meet a packed row, the
   download reads user messages and answers only, and search reads
   titles.
-- **The chats sweep archives, packs and deletes.**
-  `sessions.sweep(now, caps)` (`sessions/sweep.ts`) runs inside the
-  hourly sweep in `compose.ts`, which also runs at startup. It is an
-  ordered list of steps, each over at most `CHATS_PER_STEP` sessions
-  per pass, one `transact()` per session with its own catch that
-  rechecks the row. First every chat, not a run, not running and not
-  archived, whose `last_activity_at` is older than `archiveIdleDays`
-  (the `chats` scope) is archived with reason `idle`, over the partial
-  index `sessions_idle`, one envelope each; lowering the limit takes
-  more at the next pass. Then archived chats not running are packed,
-  and their scratch deleted, skipping the sessions a command holds,
-  since a chat archived while its send ran can write scratch until the
-  stop lands. Then every ended run is packed, its memory phase
-  included, which runs under the run's running status; never at the
-  run's end, so a finish adds no write. Last, an archived chat is
-  deleted `archivedDeleteDays` after `archived_at`, and a run whose
-  automation is gone `archivedDeleteDays` after its last activity, one
-  `session.deleted` each; a live automation's runs keep its retention.
-  The counts are the `sweep` event's `chats_archived`, `chats_packed`,
-  `scratch_freed`, `runs_packed`, `chats_deleted` and `runs_deleted`,
-  and any count above zero logs the event. No sweep vacuums: SQLite
-  reuses the pages a delete frees, and the file keeps its
-  `auto_vacuum` mode.
+- **The chats sweep archives, packs and deletes.** `sessions.sweep(now,
+  caps)` (`sessions/sweep.ts`) runs inside the hourly sweep in
+  `compose.ts`, which also runs at startup. It is an ordered list of
+  steps, each over at most `CHATS_PER_STEP` sessions per pass, one
+  `transact()` per session with its own catch that rechecks the row.
+  First every chat, not a run, not running and not archived, whose
+  `last_activity_at` is older than `archiveIdleDays` (the `chats` scope)
+  is archived with reason `idle`, over the partial index
+  `sessions_idle`, one envelope each; lowering the limit takes more at
+  the next pass. Then archived chats not running are packed, and their
+  scratch deleted, skipping the sessions a command holds, since a chat
+  archived while its send ran can write scratch until the stop lands.
+  Scratch is the bash area's (`docs/bash.md`): sessions deletes it and
+  reads the held set through its scratch port, answered by the bash
+  area's `ScratchStore`, and the step finds the archived chats with
+  scratch left by joining bash's `session_scratch` table directly,
+  bounded by the step's batch. Then every ended run is packed, its
+  memory phase included, which runs under the run's running status;
+  never at the run's end, so a finish adds no write. Last, an archived
+  chat is deleted `archivedDeleteDays` after `archived_at`, and a run
+  whose automation is gone `archivedDeleteDays` after its last activity,
+  one `session.deleted` each; a live automation's runs keep its
+  retention. The counts are the `sweep` event's `chats_archived`,
+  `chats_packed`, `scratch_freed`, `runs_packed`, `chats_deleted` and
+  `runs_deleted`, and any count above zero logs the event. No sweep
+  vacuums: SQLite reuses the pages a delete frees, and the file keeps
+  its `auto_vacuum` mode.
 - **The feed reads ordered project ranges.** `feedRead()`
   (`sessions/list.ts`) uses a fixed set of statement shapes: the
   visible projects are one JSON parameter, so neither the SQL nor its

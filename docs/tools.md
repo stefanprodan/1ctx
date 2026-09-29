@@ -4,7 +4,7 @@ Governs `src/server/tools/`, `limits/`, `credentials/`, `skills/`, the
 tool loop and the policy in `src/server/runner/`, and the visual frame
 (`GET /api/visual`, `tools/visual-theme.ts`, `tools/visual-scheme.ts`).
 The admin pages are in `docs/views.md`, MCP tools in `docs/mcp.md`, bash's
-mount in `docs/knowledge.md`.
+mount in `docs/bash.md`.
 
 ## The loop
 
@@ -95,7 +95,7 @@ mount in `docs/knowledge.md`.
   `VISUALIZE_OFF_LINE` after the web line by the same rule.
   `knowledge` (`KNOWLEDGE`) is the third: it keeps `bash` and sets
   `Offered.knowledge` false, which the bash tool's caps carry to the mount
-  (`docs/knowledge.md`); the prompt drops the knowledge block and adds
+  (`docs/bash.md`); the prompt drops the knowledge block and adds
   `KNOWLEDGE_OFF_LINE` after the visualize line exactly when the set
   holds it and the send offers `bash`.
   `memory` (`MEMORY`) is the fourth: the offer drops the chat's
@@ -187,7 +187,7 @@ mount in `docs/knowledge.md`.
   replaced file applies to the next command; the keys ride in the
   command caps as `CommandCredential`s and nowhere else, and the tool
   scrubs its result of them again, the tail kept apart.
-- **One fetch per URL, picked once.** `knowledge/credentials.ts` builds
+- **One fetch per URL, picked once.** `bash/credentials.ts` builds
   the `SecureFetch` the mount passes as just-bash's `fetch`:
   `commandFetch()` picks once, by `matchesAllowListEntry` on the URL
   curl asked for over every offered and off prefix, the web fetch

@@ -31,6 +31,7 @@ export const LAYERS = [
   "agents",
   "memory",
   "knowledge",
+  "bash",
   "sessions",
   "tools",
   "runner",
@@ -42,6 +43,13 @@ export const LAYERS = [
 ] as const;
 
 export const MAX_LINES = 500;
+
+// workers whose runtime graph may reach the database or an area's
+// index.ts, with the reason
+export const WORKER_EXEMPTIONS: Record<string, string> = {
+  "server/overview/scan.worker.ts":
+    "loads usage/index.ts for decisionSlots, a query and not a pure rule, and opens its own database; it runs on the overview's timer, not per command",
+};
 
 // production files allowed past MAX_LINES, with the reason
 export const LINE_EXEMPTIONS: Record<string, string> = {
@@ -168,6 +176,18 @@ function withoutComments(code: string): string {
     .replace(/^[ \t]*\/\/[^\n]*/gm, (c) => " ".repeat(c.length));
 }
 
+// a file inside a server area, and the two files at an area's root
+// another area may import; a nested file of the same name is private
+const isAreaFile = (rel: string) => {
+  const area = areaOf(rel);
+  return area.startsWith("server/") && area !== "server/main";
+};
+const isAreaRoot = (rel: string, name: string) =>
+  isAreaFile(rel) && rel.split(sep).length === 3 && basename(rel) === name;
+const isAreaIndex = (rel: string) => isAreaRoot(rel, "index.ts");
+const isAreaRules = (rel: string) => isAreaRoot(rel, "rules.ts");
+const isWorker = (rel: string) => rel.endsWith(".worker.ts");
+
 const isExternal = (s: string) =>
   !s.startsWith(".") && !s.startsWith("/") && !s.startsWith("@/");
 
@@ -176,6 +196,10 @@ export function check(root: string): Violation[] {
   const files = walk(root);
   const sources = files.filter(isSource);
   const edges = new Map<string, Set<string>>();
+  // the edges that survive transpiling: what a file loads when it runs
+  const runtime = new Map<string, Set<string>>();
+  // the packages and builtins each file loads when it runs
+  const externals = new Map<string, Set<string>>();
 
   for (const file of sources) {
     const rel = relative(root, file);
@@ -220,14 +244,24 @@ export function check(root: string): Violation[] {
       }
     }
     const targets = new Set<string>();
+    const loads = new Set<string>();
+    const outside = new Set<string>();
+    const isRules = isAreaRules(rel);
     for (const imp of imports) {
       const s = imp.specifier;
       if (isExternal(s)) {
         const builtin = s.startsWith("bun") || s.startsWith("node:");
+        if (imp.kind !== "scan") outside.add(s);
         if (area === "shared") {
           out.push({ file: rel, rule: "shared", detail: `imports ${s}` });
         } else if (area === "client" && builtin) {
           out.push({ file: rel, rule: "client", detail: `imports ${s}` });
+        } else if (isRules) {
+          out.push({
+            file: rel,
+            rule: "rules",
+            detail: `imports ${s}; a rules.ts imports no package or builtin`,
+          });
         }
         continue;
       }
@@ -283,7 +317,20 @@ export function check(root: string): Violation[] {
       }
       if (!isSource(target)) continue;
       targets.add(target);
+      if (imp.kind !== "scan") loads.add(target);
       const targetArea = areaOf(target);
+      if (
+        isRules &&
+        !(targetArea === area && !isAreaIndex(target)) &&
+        targetArea !== "server/lib" &&
+        targetArea !== "shared"
+      ) {
+        out.push({
+          file: rel,
+          rule: "rules",
+          detail: `imports ${target}; a rules.ts imports only its own area's files, lib and shared`,
+        });
+      }
       if (targetArea === area) continue;
       const detail = `${area} imports ${target}`;
       if (area === "shared") {
@@ -335,17 +382,48 @@ export function check(root: string): Violation[] {
         } else if (
           to !== "lib" &&
           to !== "db" &&
-          basename(target) !== "index.ts"
+          !isAreaIndex(target) &&
+          !isAreaRules(target)
         ) {
           out.push({
             file: rel,
             rule: "facade",
-            detail: `${detail}; use its index.ts`,
+            detail: `${detail}; use its index.ts or rules.ts`,
           });
         }
       }
     }
     edges.set(rel, targets);
+    runtime.set(rel, loads);
+    externals.set(rel, outside);
+  }
+
+  // a rules.ts and a worker load neither the database nor an area's
+  // index.ts, at any depth, so a worker starts light; bun:sqlite is the
+  // database too, even opened by a file of the worker's own area
+  for (const file of runtime.keys()) {
+    const rule = isAreaRules(file)
+      ? "rules"
+      : isAreaFile(file) && isWorker(file)
+        ? "worker"
+        : null;
+    if (rule === null || file in WORKER_EXEMPTIONS) continue;
+    const seen = new Set<string>([file]);
+    const queue = [file];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (externals.get(current)?.has("bun:sqlite")) {
+        out.push({ file, rule, detail: `loads bun:sqlite through ${current}` });
+      }
+      for (const next of runtime.get(current) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        queue.push(next);
+        if (areaOf(next) === "server/db" || isAreaIndex(next)) {
+          out.push({ file, rule, detail: `loads ${next}` });
+        }
+      }
+    }
   }
 
   // file cycles over the resolved graph, type-only edges included

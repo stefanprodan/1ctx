@@ -139,5 +139,5 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
   expect(
     chat.app.db.query("select count(*) as n from mcp_kept_files").get(),
   ).toEqual({ n: 0 });
-  expect(chat.app.knowledge.startKept(first.sessionId, null).next).toBe(2);
+  expect(chat.app.bash.startKept(first.sessionId, null).next).toBe(2);
 });

@@ -1,26 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A command's changes land together against the identities and revisions
-// it mounted. Caps and receipt space are checked inside the transaction
-// so a conflict or an unreportable change cannot leave a partial commit.
+// Changes to the docs land together against the identities and revisions
+// they were made from. Caps are checked inside the caller's transaction
+// so a conflict cannot leave a partial commit.
 
 import type {
   KnowledgeAuthor,
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
-import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { Conflict } from "../lib/errors.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
-import {
-  checkFile,
-  checkNames,
-  checkScratchTotals,
-  checkTotals,
-} from "./check.ts";
-import { output } from "./output.ts";
-import type { Scratch, ScratchChanges, ScratchStore } from "./scratch.ts";
+import { checkFile, checkNames, checkTotals } from "./check.ts";
 import type { KnowledgeStore } from "./store.ts";
 import { lineCount } from "./text.ts";
 
@@ -29,75 +21,6 @@ export type Change = {
   before: KnowledgeFile | null;
   text: string | null;
 };
-
-export type CommandOutput = {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-};
-
-export type ScratchCommit = {
-  sessionId: string;
-  before: Scratch;
-  changes: ScratchChanges;
-};
-
-export function commit(
-  deps: {
-    db: Db;
-    store: KnowledgeStore;
-    scratch: ScratchStore;
-    current(): KnowledgeCaps;
-  },
-  projectId: string,
-  author: KnowledgeAuthor,
-  changes: readonly Change[],
-  scratch: ScratchCommit,
-  result: CommandOutput,
-  extraReceipts: readonly string[],
-  resultCut: number,
-  signal: AbortSignal,
-  now: number,
-) {
-  return transact(deps.db, () => {
-    signal.throwIfAborted();
-    const caps = deps.current();
-    const { events, receipts } = commitKnowledge(
-      deps.store,
-      projectId,
-      author,
-      changes,
-      caps,
-      now,
-    );
-    deps.scratch.write(
-      scratch.sessionId,
-      scratch.before.revision,
-      scratch.changes,
-      now,
-    );
-    // counted from the rows just written, so the caps hold whatever the
-    // command worker answered
-    const stored = deps.scratch.sizes(scratch.sessionId);
-    checkNames(stored.map((file) => file.path));
-    checkScratchTotals(
-      scratch.before,
-      {
-        files: stored.length,
-        bytes: stored.reduce((sum, file) => sum + file.bytes, 0),
-      },
-      caps,
-    );
-    const content = output(
-      result.stdout,
-      result.stderr,
-      result.exitCode,
-      [...receipts, ...extraReceipts],
-      resultCut,
-    );
-    return { result: content, events };
-  });
-}
 
 // The caller owns the transaction, including any scratch writes or receipts.
 export function commitKnowledge(

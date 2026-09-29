@@ -249,6 +249,8 @@ export async function testApp(
     tools?: Tools;
     // a runner registry with its own caps
     registry?: Registry;
+    // a command worker other than the real one
+    commandWorker?: URL;
     activate?: boolean;
     // another app's database, for a restart over the same rows
     db?: Db;
@@ -311,6 +313,7 @@ export async function testApp(
     trustProxy,
     tools: options.tools,
     registry: options.registry,
+    ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
     activate: options.activate,
   });
   return {
