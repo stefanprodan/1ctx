@@ -576,7 +576,9 @@ describe("MCP tools in a send", () => {
     // the server's words are the model's; the log keeps a fixed phrase
     expect(
       logs.events.filter((event) => event.msg === "tool failed"),
-    ).toMatchObject([{ fields: { error: "MCP tool answered an error" } }]);
+    ).toMatchObject([
+      { fields: { tool: "mcp:flux", error: "MCP tool answered an error" } },
+    ]);
     expect(JSON.stringify(logs.events)).not.toContain("flux refused");
   });
 

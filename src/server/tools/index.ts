@@ -19,7 +19,12 @@ import {
 } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
-import type { McpMode, SearchProvider } from "../../shared/words.ts";
+import {
+  BUILTIN_TOOLS,
+  type McpMode,
+  type SearchProvider,
+  WEB_TOOLS,
+} from "../../shared/words.ts";
 import type { BashCapability } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -137,6 +142,7 @@ export type Tools = {
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
+  logName?(offered: Offered, call: ToolCall): string;
   normalize?(offered: Offered, calls: ToolCall[]): ToolCall[];
   routes?: RouteDescriptor[];
 };
@@ -152,6 +158,23 @@ export type ToolsArea = Tools & {
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
 // how long an MCP call's own timer runs past the registry's limit
 const MCP_BACKSTOP_MS = 1000;
+
+const LOGGED_TOOLS: ReadonlySet<string> = new Set([
+  ...BUILTIN_TOOLS,
+  ...WEB_TOOLS,
+]);
+
+// the name a log line may carry: a built-in's, or `mcp:` and the server's
+// configured name for an offered MCP tool, whose own name is server text;
+// never a name the model wrote
+export function toolLogName(offered: Offered, call: ToolCall): string {
+  const wire = mcpCallName(offered.mcp, call) ?? call.name;
+  const server = offered.mcp.find((item) =>
+    item.tools.some((tool) => tool.wireName === wire),
+  );
+  if (server !== undefined) return `mcp:${server.name}`;
+  return LOGGED_TOOLS.has(call.name) ? call.name : "unknown";
+}
 
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
@@ -376,6 +399,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     },
     toolName(offered, call) {
       return mcpCallName(offered.mcp, call) ?? call.name;
+    },
+    logName(offered, call) {
+      return toolLogName(offered, call);
     },
     async run(offered, call, ctx) {
       ctx = { ...ctx, web: offered.web };

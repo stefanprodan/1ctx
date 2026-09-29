@@ -84,7 +84,10 @@ mount in `docs/bash.md`.
   rethrows a `ToolError` as it is and wraps anything else in one, and
   websearch keeps the class when it scrubs the key. `skill refresh
   failed` logs `skill source refused` and the status for a refusal; the
-  row keeps the words.
+  row keeps the words. `tool failed` names the tool by `toolLogName()`
+  (`tools/index.ts`): a built-in's name, `mcp:` and the server's
+  configured name for an offered MCP tool, whose own name is server
+  text, else `unknown`, never the name the model wrote.
 
 ## The offered set
 
