@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import type { Db } from "../../../src/server/db/index.ts";
 import type { RawSession } from "../../../src/server/sessions/rows.ts";
 import {
   ENVELOPE_ROW,
   envelopeRow,
+  lastLinesSql,
   streamRows,
 } from "../../../src/server/sessions/stream.ts";
 import { memoryDb } from "../../helpers/db.ts";
@@ -102,24 +104,44 @@ function seeded() {
   return { db, session, sendRow, message };
 }
 
-// point lookups by key, and two newest-first walks of one session's
-// index range that stop at their first match: no scan, no sort
-const PLAN = [
-  "SEARCH sessions USING INDEX sqlite_autoindex_sessions_1 (id=?)",
-  "SEARCH agents USING INDEX sqlite_autoindex_agents_1 (id=?)",
-  "SEARCH automations USING INDEX sqlite_autoindex_automations_1 (id=?) LEFT-JOIN",
-  "SEARCH runner USING INDEX sqlite_autoindex_users_1 (id=?) LEFT-JOIN",
-  "SEARCH line USING INDEX sqlite_autoindex_messages_2 (session_id=? AND seq=?) LEFT-JOIN",
-  "CORRELATED SCALAR SUBQUERY 2",
-  "SEARCH newest USING INDEX sqlite_autoindex_messages_2 (session_id=?)",
-  "SEARCH author USING INDEX sqlite_autoindex_users_1 (id=?) LEFT-JOIN",
-  "SEARCH speaker USING INDEX sqlite_autoindex_agents_1 (id=?) LEFT-JOIN",
-  "SEARCH last USING INDEX sqlite_autoindex_sends_1 (id=?) LEFT-JOIN",
-  "CORRELATED SCALAR SUBQUERY 3",
-  "SEARCH newest USING INDEX sends_session (session_id=?)",
-  "CORRELATED SCALAR SUBQUERY 1",
-  "SEARCH usage USING INDEX usage_send_round (send_id=?)",
-];
+type Op = { addr: number; opcode: string; p1: number; p2: number };
+
+// Whether every read of a messages row in the statement tests kind
+// before it touches status or content: status sits past content in the
+// row, so reading either first follows a large tool row's overflow
+// pages. The order is SQLite's code generation, pinned from bytecode.
+function kindFirst(db: Db, sql: string, args: string[]): boolean {
+  const root = db
+    .query<{ rootpage: number }, []>(
+      "select rootpage from sqlite_master where name = 'messages'",
+    )
+    .get()!.rootpage;
+  const columns = db
+    .query<{ cid: number; name: string }, []>("pragma table_info(messages)")
+    .all();
+  const cid = (name: string) => columns.find((c) => c.name === name)!.cid;
+  const ops = db.query<Op, string[]>(`explain ${sql}`).all(...args);
+  const cursors = new Set(
+    ops
+      .filter((op) => op.opcode === "OpenRead" && op.p2 === root)
+      .map((op) => op.p1),
+  );
+  let tested = 0;
+  for (const cursor of cursors) {
+    const reads = ops.filter(
+      (op) => op.opcode === "Column" && op.p1 === cursor,
+    );
+    const first = (name: string) =>
+      reads.find((op) => op.p2 === cid(name))?.addr ?? Infinity;
+    // a cursor that never tests kind reads the chosen row itself
+    if (first("kind") === Infinity) continue;
+    tested++;
+    if (first("kind") > Math.min(first("status"), first("content"))) {
+      return false;
+    }
+  }
+  return tested > 0;
+}
 
 describe("the envelope row", () => {
   test("reads what the list reads, for every shape of session", () => {
@@ -209,27 +231,10 @@ describe("the envelope row", () => {
     expect(envelopeRow(db, "nothing")).toBeNull();
   });
 
-  test("is one statement of index lookups", () => {
+  test("seeks one session and walks only its own rows", () => {
     const { db } = seeded();
-    // stats over tables of a row or two would pick a scan
-    for (let i = 0; i < 100; i++) {
-      db.query(
-        `insert into users (id, username, full_name, email, role,
-           password_hash, created_at)
-         values (?, ?, 'U', ?, 'member', 'x', 0)`,
-      ).run(`user${i}`, `user${i}`, `u${i}@example.com`);
-      db.query(
-        `insert into agents (id, name, provider_id, model, model_name,
-           created_at)
-         values (?, ?, 'pr', 'm', 'M', 0)`,
-      ).run(`agent${i}`, `agent${i}`);
-      db.query(
-        `insert into automations (id, project_id, owner_id, agent_id, name,
-           instructions, schedule, tz, retention_days, next_at, created_at,
-           updated_at)
-         values (?, 'p', 'u', 'a', ?, 'go', '0 * * * *', 'UTC', 30, 1, 0, 0)`,
-      ).run(`auto${i}`, `auto${i}`);
-    }
+    // with stats over a table of an agent or two SQLite scans it, which
+    // costs nothing; what matters is that no history table is walked
     for (const analyzed of [false, true]) {
       if (analyzed) db.exec("analyze");
       const plan = db
@@ -238,7 +243,47 @@ describe("the envelope row", () => {
         )
         .all("x")
         .map((row) => row.detail);
-      expect(plan).toEqual(PLAN);
+      expect(plan[0]).toStartWith("SEARCH sessions USING INDEX");
+      expect(plan[0]).toEndWith("(id=?)");
+      expect(
+        plan.filter((line) =>
+          /^SCAN (sessions|line|newest|last|usage)\b/.test(line),
+        ),
+      ).toEqual([]);
+      expect(plan.filter((line) => line.includes("TEMP B-TREE"))).toEqual([]);
+      expect(plan).toContain(
+        "SEARCH newest USING INDEX sqlite_autoindex_messages_2 (session_id=?)",
+      );
+      expect(plan).toContain(
+        "SEARCH newest USING INDEX sends_session (session_id=?)",
+      );
     }
+  });
+});
+
+describe("a last line read", () => {
+  test("tests kind before it reads status or content", () => {
+    const { db, session, sendRow, message } = seeded();
+    session("chat");
+    sendRow("s1", "chat", 1);
+    message("chat", "s1", 1, "user", "hello");
+    for (let seq = 2; seq < 12; seq++) {
+      message("chat", "s1", seq, "tool", "x".repeat(50_000));
+    }
+    for (const analyzed of [false, true]) {
+      if (analyzed) db.exec("analyze");
+      expect(kindFirst(db, ENVELOPE_ROW, ["chat"])).toBe(true);
+      expect(kindFirst(db, lastLinesSql(1), ["chat"])).toBe(true);
+      expect(kindFirst(db, lastLinesSql(3), ["chat", "a", "b"])).toBe(true);
+    }
+  });
+
+  test("the check fails a statement that reads status first", () => {
+    const { db } = seeded();
+    const statusFirst = `select seq from messages
+      where session_id = ? and status != 'streaming' and content != ''
+        and (kind = 'user' or (kind = 'reply' and slot = 'answer'))
+      order by seq desc limit 1`;
+    expect(kindFirst(db, statusFirst, ["chat"])).toBe(false);
   });
 });

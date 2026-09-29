@@ -46,32 +46,33 @@ function lastSends(db: Db, sessionIds: string[]) {
 }
 
 // a user message or a finished answer reply, never a work reply, a
-// summary or a tool row: what the stream calls the last line
+// summary or a tool row: what the stream calls the last line. Kind and
+// slot are tested first: status sits past content in the row, so a
+// large tool row tested on status first has its overflow pages read
+const lineRow = (table: string) =>
+  `(${table}.kind = 'user'
+     or (${table}.kind = 'reply' and ${table}.slot = 'answer'))
+   and ${table}.status != 'streaming' and ${table}.content != ''`;
+
+export const lastLinesSql = (count: number) =>
+  `select current.session_id, current.seq,
+     substr(current.content, 1, 600) as content,
+     coalesce(users.username, agents.name) as author
+   from messages current
+   left join users on users.id = current.user_id
+   left join agents on agents.id = current.agent_id
+   where current.session_id in (${Array(count).fill("?").join(", ")})
+     and ${lineRow("current")}
+     and not exists (
+       select 1 from messages later
+       where later.session_id = current.session_id
+         and later.seq > current.seq
+         and ${lineRow("later")}
+     )`;
+
 function lastLines(db: Db, sessionIds: string[]) {
-  const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
-    .query<RawLastLine, string[]>(
-      `select current.session_id, current.seq,
-         substr(current.content, 1, 600) as content,
-         coalesce(users.username, agents.name) as author
-       from messages current
-       left join users on users.id = current.user_id
-       left join agents on agents.id = current.agent_id
-       where current.session_id in (${marks})
-         and current.status != 'streaming'
-         and current.content != ''
-         and (current.kind = 'user'
-           or (current.kind = 'reply' and current.slot = 'answer'))
-         and not exists (
-           select 1 from messages later
-           where later.session_id = current.session_id
-             and later.seq > current.seq
-             and later.status != 'streaming'
-             and later.content != ''
-             and (later.kind = 'user'
-               or (later.kind = 'reply' and later.slot = 'answer'))
-         )`,
-    )
+    .query<RawLastLine, string[]>(lastLinesSql(sessionIds.length))
     .all(...sessionIds);
   const out = new Map<string, LastLine>();
   for (const raw of rows) {
@@ -165,6 +166,8 @@ export function streamRows(
   });
 }
 
+// the send's columns but its computed tokens; the compiler holds the
+// list to RawSend both ways
 const SEND_COLUMNS = [
   "id",
   "session_id",
@@ -184,7 +187,12 @@ const SEND_COLUMNS = [
   "memory_skipped",
   "started_at",
   "finished_at",
-] as const;
+] as const satisfies readonly Exclude<keyof RawSend, "tokens">[];
+// Unlisted is never unless RawSend has a column the list lacks
+type Listed<_Unlisted extends never> = (typeof SEND_COLUMNS)[number];
+type SendColumn = Listed<
+  Exclude<keyof RawSend, "tokens" | (typeof SEND_COLUMNS)[number]>
+>;
 
 type RawEnvelopeRow = {
   agent: string;
@@ -197,13 +205,11 @@ type RawEnvelopeRow = {
   line_author: string;
   line_content: string | null;
   tokens: number;
-} & { [K in `send_${(typeof SEND_COLUMNS)[number]}`]: unknown };
+} & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
 
 // The same last send and last line streamRows() reads, for one session,
 // as one statement of point lookups: an event fires many times a turn,
 // and the list's not-exists scans walk a long chat's every message.
-// The line's kind and slot come first so a tool row, whose status sits
-// past a content that may span overflow pages, is passed without it.
 export const ENVELOPE_ROW = `select agents.name as agent,
     agents.deleted_at is not null as retired,
     automations.id as automation_id, automations.name as automation_name,
@@ -219,11 +225,7 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     on sessions.run_source = 'manual' and runner.id = sessions.owner_id
   left join messages line on line.session_id = sessions.id and line.seq = (
     select newest.seq from messages newest
-    where newest.session_id = sessions.id
-      and (newest.kind = 'user'
-        or (newest.kind = 'reply' and newest.slot = 'answer'))
-      and newest.status != 'streaming'
-      and newest.content != ''
+    where newest.session_id = sessions.id and ${lineRow("newest")}
     order by newest.seq desc limit 1)
   left join users author on author.id = line.user_id
   left join agents speaker on speaker.id = line.agent_id
@@ -242,9 +244,10 @@ export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
     raw.send_id === null
       ? null
       : send({
+          // a send row was found, so none of its not-null columns is null
           ...(Object.fromEntries(
             SEND_COLUMNS.map((column) => [column, raw[`send_${column}`]]),
-          ) as Omit<RawSend, "tokens">),
+          ) as Pick<RawSend, SendColumn>),
           tokens: raw.tokens,
         });
   return {

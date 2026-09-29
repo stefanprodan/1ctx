@@ -899,6 +899,31 @@ describe("the envelope row read", () => {
     socket.dispose();
   });
 
+  test.serial("no read when every viewer must change their password", () => {
+    const reads: string[] = [];
+    const socket = socketArea({
+      version: "test",
+      log: silent,
+      refresh: (principal) => principal,
+      visibleProjectIds: () => [],
+      sessionProject: () => null,
+      live: () => null,
+      envelopeRow(sessionId) {
+        reads.push(sessionId);
+        return null;
+      },
+    });
+    const conns = [fake("a", ["p"]), fake("b", ["p"])];
+    for (const conn of conns) {
+      conn.data.principal.mustChangePassword = true;
+      socket.open(conn);
+    }
+    changed("p");
+    expect(reads).toEqual([]);
+    expect(conns.map((conn) => frames(conn, "session"))).toEqual([[], []]);
+    socket.dispose();
+  });
+
   test.serial("a failed read still sends the envelope, without a row", () => {
     const logs = collectLogs();
     const socket = socketArea({

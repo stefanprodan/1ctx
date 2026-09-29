@@ -48,7 +48,8 @@ export type SocketEvent =
   // revision, the rows written, the ids removed, the send row, and
   // the stream's last line when the transaction wrote one. row is the
   // stream row as it stands after the commit, read once per event;
-  // null when the session was gone by then
+  // null when the session was gone by then or the read failed, which
+  // the list treats alike
   | {
       type: "session";
       projectId: string;

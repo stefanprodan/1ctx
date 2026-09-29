@@ -29,13 +29,17 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   staged `uploads` ids.
 - **An envelope's row is one statement, read after the commit.**
   `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
-  does for one session, by key lookups and two newest-first index walks
-  that stop at their first match, since `session.changed` fires many
-  times a turn and the list's not-exists form walks a long chat's every
-  message. The socket reads it at publish, so envelopes of one
-  transaction for one session all carry the final row.
-  `test/server/sessions/envelope-row.test.ts` holds it to the list's
-  answer and pins its plan.
+  does for one session: it seeks the session by id and walks only that
+  session's messages and sends newest first, stopping at the first
+  match, since `session.changed` fires many times a turn and the list's
+  not-exists form walks a long chat's every message. Both share
+  `lineRow()`, which tests kind and slot before status and content:
+  status sits past content in the row, so testing it first reads every
+  large tool row's overflow pages. The socket reads the row at publish,
+  so envelopes of one transaction for one session all carry the final
+  row. `test/server/sessions/envelope-row.test.ts` holds it to the
+  list's answer, pins that no history table is walked, and checks the
+  column order in the bytecode.
 - **A session's disabled capabilities are one sorted set.**
   A session stores a sorted `disabledCapabilities` set, empty by
   default. Create, send and regenerate accept an optional `capabilities`
