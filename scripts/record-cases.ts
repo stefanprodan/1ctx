@@ -3,12 +3,22 @@
 //
 // Records what a reference binary answers for each case of a fixture under
 // test/fixtures/just-bash/, for yq-record.ts, jq-record.ts, grep-record.ts,
-// rg-record.ts and xargs-record.ts. Run by hand;
+// rg-record.ts, xargs-record.ts and diff-record.ts. Run by hand;
 // the suite reads the fixture and never needs the binary.
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
+/** A file's text, or its bytes when they are not text. */
+export type FileValue = string | { base64: string };
 
 export interface RecordedCase {
   name: string;
@@ -16,8 +26,10 @@ export interface RecordedCase {
   stdin?: string;
   env?: Record<string, string>;
   /** files of this case alone, beside the fixture's shared ones */
-  files?: Record<string, string>;
+  files?: Record<string, FileValue>;
   stdout?: string;
+  /** stdout's bytes, in place of stdout, when they are not UTF-8 */
+  stdoutBase64?: string;
   exit?: number;
   /** the binary failed with words on stderr */
   error?: boolean;
@@ -25,14 +37,16 @@ export interface RecordedCase {
   warned?: boolean;
   /** stdout's lines in no fixed order, compared sorted */
   unordered?: boolean;
+  /** header times are masked on both sides, for stdin's current time */
+  maskTimes?: boolean;
   /** every file the run changed, as it was left */
-  written?: Record<string, string>;
+  written?: Record<string, FileValue>;
   /** ours where it differs on purpose, with the reason */
   accept?: {
     stdout: string;
     exit: number;
     reason: string;
-    written?: Record<string, string>;
+    written?: Record<string, FileValue>;
   };
 }
 
@@ -41,8 +55,37 @@ export interface Fixture {
   /** the environment of every case, under each case's own */
   env?: Record<string, string>;
   /** names may hold directories */
-  files: Record<string, string>;
+  files: Record<string, FileValue>;
+  /** directories made even when empty */
+  dirs?: string[];
+  /** the modification time of every file, as an ISO date */
+  mtime?: string;
   cases: RecordedCase[];
+}
+
+export function fileBytes(value: FileValue): Uint8Array {
+  return typeof value === "string"
+    ? new TextEncoder().encode(value)
+    : Uint8Array.from(atob(value.base64), (c) => c.charCodeAt(0));
+}
+
+/** Bytes as a FileValue: text when they are UTF-8. */
+export function fileValue(bytes: Uint8Array): FileValue {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return { base64: btoa(binary) };
+  }
+}
+
+const HEADER_TIME =
+  /^((?:\*\*\*|---|\+\+\+) .*\t)\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{9} [+-]\d{4}$/gm;
+
+/** A diff header's times replaced, since stdin's is the current time. */
+export function maskTimes(text: string): string {
+  return text.replace(HEADER_TIME, "$1TIME");
 }
 
 /** The lines of a text in code point order, for unordered answers. */
@@ -87,9 +130,18 @@ export async function record(
     const dir = await mkdtemp(join(tmpdir(), "record-"));
     try {
       const files = { ...fixture.files, ...c.files };
-      for (const [name, text] of Object.entries(files)) {
+      for (const name of fixture.dirs ?? []) {
+        await mkdir(join(dir, name), { recursive: true });
+      }
+      for (const [name, value] of Object.entries(files)) {
         await mkdir(dirname(join(dir, name)), { recursive: true });
-        await writeFile(join(dir, name), text);
+        await writeFile(join(dir, name), fileBytes(value));
+      }
+      if (fixture.mtime !== undefined) {
+        const time = new Date(fixture.mtime);
+        for (const name of Object.keys(files)) {
+          await utimes(join(dir, name), time, time);
+        }
       }
       const run = Bun.spawnSync([binary, ...c.args], {
         cwd: dir,
@@ -107,16 +159,21 @@ export async function record(
         stdout: "pipe",
         stderr: "pipe",
       });
-      const written: Record<string, string> = {};
-      for (const [name, text] of Object.entries(files)) {
-        const now = await readFile(join(dir, name), "utf8");
-        if (now !== text) written[name] = now;
+      const written: Record<string, FileValue> = {};
+      for (const [name, value] of Object.entries(files)) {
+        const now = new Uint8Array(await readFile(join(dir, name)));
+        if (!Bun.deepEquals(now, fileBytes(value))) {
+          written[name] = fileValue(now);
+        }
       }
       const said = run.stderr.toString().trim() !== "";
+      const out = fileValue(new Uint8Array(run.stdout));
+      let stdout = typeof out === "string" ? out : undefined;
+      if (stdout !== undefined && c.unordered) stdout = sortLines(stdout);
+      if (stdout !== undefined && c.maskTimes) stdout = maskTimes(stdout);
       const next = {
-        stdout: c.unordered
-          ? sortLines(run.stdout.toString())
-          : run.stdout.toString(),
+        stdout,
+        stdoutBase64: typeof out === "string" ? undefined : out.base64,
         exit: run.exitCode ?? -1,
         error: run.exitCode !== 0 && said,
         warned: run.exitCode === 0 && said,
@@ -124,12 +181,16 @@ export async function record(
       };
       const before = JSON.stringify([
         c.stdout,
+        c.stdoutBase64,
         c.exit,
         c.error,
         c.warned,
         c.written,
       ]);
-      c.stdout = next.stdout;
+      if (next.stdout !== undefined) c.stdout = next.stdout;
+      else delete c.stdout;
+      if (next.stdoutBase64 !== undefined) c.stdoutBase64 = next.stdoutBase64;
+      else delete c.stdoutBase64;
       c.exit = next.exit;
       if (next.error) c.error = true;
       else delete c.error;
@@ -139,6 +200,7 @@ export async function record(
       else delete c.written;
       const after = JSON.stringify([
         c.stdout,
+        c.stdoutBase64,
         c.exit,
         c.error,
         c.warned,

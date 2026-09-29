@@ -110,6 +110,9 @@ without a file of their own.
 | `src/commands/rg/rg-search.ts`, `src/commands/search-engine/regex.ts`, `matcher.ts` | rg looks for the literal a pattern needs before the regex runs, as grep does, except under `--passthru`, and `-l`, `--files-without-match` and `-q` stop at a file's first match, except under `--json`, `--stats` and `--passthru`; under `-i` a needle outside ASCII gives no shortcut and `ſ` is folded to `s`, and a letter escape other than `\n`, `\t`, `\r`, `\f`, `\v` gives none | `rg -il` over 150 docs took 170 ms against grep's 15, and grep's shortcut missed `ſ` for `-i s`, `ς` and `ΟΣ` for `-i σ`, and BEL for `-P '\a'` |
 | `src/commands/ls/ls.ts`, `find/find.exec.test.ts` | `-t` sorts by modification time, newest first and a tie by name, as GNU ls does, `-r` reversing it; of `-S` and `-t` the last given wins; a tie of either goes by name; `-t` and `-S` read a link's own time and size (lstat); operands are ordered as GNU ls orders them: what cannot be listed first, then the file operands as one block in the active sort, then the directories in it, and under `-d` every operand is in the one block (upstream's `find -exec ls {} +` test now expects the one block) | `-t` was accepted and ignored, and `ls -t *.md` listed each file alone in the order given, so a model looking for the newest doc got the names in order and concluded nothing had changed |
 | `src/commands/xargs/xargs.ts`, `xargs-options.ts`, `xargs-input.ts`, `xargs-plan.ts`, `xargs-quote.ts` (the last four new), upstream's xargs tests and `resource-limits.security.test.ts` | xargs as GNU xargs 4.11: getopt's syntax (a value attached or apart, a cluster ending in a value option, long options with `=` or apart and by unique prefix, `--`) and every option, with GNU's words for a bad number, delimiter or option and its warnings for conflicting ones; blanks and newlines separate items, any space character before one is skipped, quotes and a backslash protect them, a NUL cuts an argument with GNU's warning, and an unclosed quote is GNU's error after the items before it ran; `-I` reads whole lines without their leading blanks and leaves the command name alone, `-L` counts lines and carries one ending in a blank on, `-E` stops at its item, `-a` reads a file (`-` and `/dev/stdin` are stdin) and leaves stdin to the first command, `-0` and `-d` (a character or an escape) keep empty items and the final newline, the last of them winning; items fill a command line up to `-s` bytes, 128 KiB by default, `-n` and `-L` cap it, `-x` and `-L` make an overflow an error, and with no item the command runs once unless `-r`; `-P` runs up to 16 commands at once through `ctx.exec`, output in input order, `--process-slot-var` and the exported variables reaching each; a failure from 1 to 254 exits 123, 255 stops with 124, a name the shell cannot find or run stops with 127 or 126, each in GNU's words; `-t` quotes as GNU prints; `--show-limits` gives the sandbox's numbers; `-p` and `-o` fail as without a terminal; the upstream tests that pinned the old answers now pin GNU's | a model's `xargs -P 12 -I{} sh -c '...'` was refused as `invalid option -- 'I'` and ran nothing, `-n1`, `-L`, `-a` and every long option were refused too, quoted names split, `-d` dropped the final newline, a failure came back as the command's own code, and every item went on one command line |
+| `src/commands/diff/engine.ts`, `hunks.ts`, `lines.ts`, `output.ts`, `format-unified.ts` (all new), `diff.ts`, `src/limits.ts`, `grep/grep.ts`, `package.json` | diff compares with its own engine, written from Myers' 1986 paper and GNU's manual, never GNU's source: the common head and tail trimmed, lines found in one file only set aside, the middle-snake search in linear space, a search past a cost of the input's square root times its box, or a sixteenth of the budget left, settling for the point that reached furthest, and change groups slid as GNU slides them; every step is charged to the work limit grep's matcher takes (`commandWorkLimit()` in `limits.ts`, 64 steps a unit), a default compare takes the boxes left whole past a quarter of it, and `-d` past it fails with exit 2; jsdiff is gone from the command, from our `package.json` and from the vendored one | jsdiff's exhaustive search ran 41 s on two 20k-line files and 5.7 s on an RFC pair on the server's thread, and the deadline could not stop it |
+| `src/commands/diff/diff.ts`, `options.ts` (new), `header.ts` (new), `lines.ts`, upstream's diff tests | diff reads both operands and stdin as bytes, one character per byte, compares the bytes before any line is split and writes the lines' own bytes; a NUL in the first 4096 bytes of a file, or 65536 of stdin, is GNU's `Binary files A and B differ` (`-a` diffs them as lines); GNU's option parser (a value in the same argument or the next, options after operands, `--`, long-option prefixes, `-NUM` and GNU's rule for several context lengths, `-W` checked, conflicting styles refused), `-N` and `--unidirectional-new-file` reading an absent file as empty with GNU's epoch times, exactly two operands with GNU's `missing operand` and `extra operand`, a directory standing for the other file's namesake in it, every refusal and trouble exit 2 (upstream's two tests of an unknown option now expect 2), names in messages quoted for the shell as GNU quotes them; `-l` is refused, every form of `--color` and `--palette` is accepted and prints plain text, and what the second part of the diff work brings (`-y`, `-e`, `-n`, `-D`, the line formats, `--from-file`, `--to-file`, two directories) is refused by name, exit 2 | both reads decoded UTF-8 first, so Latin-1 files differing in one byte were the same with exit 0, a BOM vanished, and every refused option exited 1, which a model reads as "the files differ" |
+| `src/commands/diff/format-normal.ts`, `format-context.ts`, `patterns.ts` (all new), `format-unified.ts`, `output.ts`, `lines.ts`, `engine.ts`, `diff.ts`, upstream's diff tests | GNU's formats: the normal format is the default (upstream's tests that read unified output ask for `-u`), unified and context with GNU's headers (a name quoted C-style when it holds a space, a quote or a control character, the file's time in the sandbox's `TZ`, stdin's the current time, `--label` and `-L` in their place), ranges and `\ No newline at end of file`; `-p` and `-F` print the nearest earlier line of the first file that matches, 40 bytes of it; `-i` folds case one character at a time over UTF-8 where a line decodes and over ASCII where it does not, `-E`, `-Z`, `-b`, `-w` and `--strip-trailing-cr` fold as GNU's manual says, an incomplete line matching a complete one only under the white space options; `-B` and `-I` drop a hunk whose every change is blank or matches, an ignorable change joining the hunk before it only within fewer lines than the context, `-I` and `-F` read GNU's basic regex through grep's translation; `-t` (by display width), `-T`, `--tabsize` and `--suppress-blank-empty`; folding, splitting and matching are charged to the work limit; the common head and tail are trimmed on the bytes before any folding, the search goes from the top diagonal down, the context shown is kept in the search as a horizon, and groups slide only within what the search saw, which picks among equal answers as GNU does | the command printed jsdiff's unified patch whatever was asked, with a `====` line, no times and `@@ -1,1 +1,1 @@`, and `-i` lowercased the whole files, so every case-only line showed as changed |
 
 ### The jq and yq dialects
 
@@ -309,6 +312,51 @@ and `-t` lines the fixture does not compare. Where they part:
 - Under `-a` the first command gets all of xargs' stdin and the later
   ones none, as the first reader of GNU's shared stdin drains a pipe;
   a command that reads only part of it leaves nothing for the next.
+### Where our diff still differs from GNU diff
+
+`test/fixtures/just-bash/diff-gnu.json` holds what GNU diffutils 3.12
+answered, recorded by `scripts/diff-record.ts` with every file at one
+time and `TZ=UTC`, and `test/vendor/just-bash/diff-gnu.test.ts` holds
+our diff to it; a case with `accept` pins ours.
+`scripts/diff-patch-check.ts` checks by hand that GNU patch 2.8 applies
+our unified and context output of every pair of text files the fixture
+compares. The large inputs are in `diff-engine.test.ts`, which counts
+the work units each costs. Where they part:
+
+- Where GNU's cost heuristics settle for a larger answer, ours may be
+  smaller: on RFC 7231 against RFC 9110 ours changes 12360 lines to
+  GNU's 12866, and on small inputs full of one repeated line GNU
+  sometimes gives up matches the search would find. Where GNU finds the
+  smallest answer, ours is the same, line for line. A search box spends
+  at most a sixteenth of the budget left before giving up, so on a
+  blank-heavy 20k-line pair ours changes 12758 lines to GNU's 12738.
+- Under `-d` lines found in one file only stay out of the search, which
+  keeps `-d` on the RFC pair under the work limit; among answers of the
+  same size ours then lines up differently from GNU's on some small
+  pairs.
+- A default compare that passes a quarter of the work limit takes what
+  is left as whole changes, and `-d` past the limit fails with exit 2;
+  GNU never stops.
+- A NUL in the first 4096 bytes of a file or 65536 of stdin makes it
+  binary, GNU's first reads of a file and of a pipe where the fixture was
+  recorded; GNU's window is its buffer, which varies, and stdin redirected
+  from a file is a pipe here.
+- A header's time has zeros past the milliseconds a mount keeps.
+- `-t` and `-E` count display width from a table of the wide East Asian
+  ranges and the combining marks, where GNU asks the locale. `-i` folds
+  one character at a time with JavaScript's case tables.
+- `--color=always` and `--palette` print plain text where GNU colors:
+  escape codes say nothing to a model. `-l` is refused, and `--version`
+  names just-bash.
+- Linear passes are charged to the work limit too: a byte of splitting a
+  step, of folding or of a `-I` or `-F` match eight, so `-i` on a file of
+  some megabytes fails with the limit's error where GNU runs on.
+- Not yet: two directories, `--from-file`, `--to-file`, `-y`, `-e`,
+  `-f`, `-n`, `-D` and the line and group formats are refused by name,
+  exit 2. `-r`, `-x`, `-X`, `-S`, `-W`, `--left-column`,
+  `--suppress-common-lines`, `--no-dereference` and
+  `--ignore-file-name-case` are accepted and change nothing between two
+  files, as in GNU.
 
 ### Where our yq still differs from mikefarah's
 

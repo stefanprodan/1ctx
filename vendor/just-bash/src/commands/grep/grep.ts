@@ -1,6 +1,7 @@
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
+import { commandWorkLimit } from "../../limits.js";
 import type { UserRegex } from "../../regex/index.js";
 import type {
   ExecResult,
@@ -43,12 +44,6 @@ interface GrepTraversalBudget {
   results: number;
   maxOperations: number;
   maxResults: number;
-}
-
-function getMatcherWorkLimit(ctx: RuntimeCommandContext): number {
-  const loopLimit = ctx.limits.maxLoopIterations;
-  const arrayLimit = ctx.limits.maxArrayElements;
-  return Math.max(loopLimit, Math.min(arrayLimit, loopLimit * 10));
 }
 
 function useTraversalOperation(budget: GrepTraversalBudget): void {
@@ -986,7 +981,8 @@ export const grepCommand: RuntimeCommand = {
         conditions,
         selectOnly: binary || quietMode || filesWithMatches || filesWithoutMatch,
         preFilter,
-        maxWork: getMatcherWorkLimit(ctx),
+        // (1ctx) the limit diff shares, moved to limits.ts
+        maxWork: commandWorkLimit(ctx.limits),
         maxMatches: ctx.limits.maxArrayElements,
         signal: ctx.signal,
       });
