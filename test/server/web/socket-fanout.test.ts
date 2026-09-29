@@ -10,48 +10,28 @@ import { type BusEvent, publish } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   CLOSE_DROPPED,
-  type Conn,
   type Socket,
   socketArea,
 } from "../../../src/server/web/socket.ts";
 import type { SocketEvent } from "../../../src/shared/socket.ts";
+import { memberConn, type RecordingConn } from "../../helpers/socket.ts";
 
-type FakeConn = Conn & {
-  texts: string[];
-  closed: { code?: number; reason?: string }[];
-  sendResult: number | null;
-};
-
-const fake = (userId: string, projects: string[]): FakeConn => {
-  const conn: FakeConn = {
-    data: {
-      principal: {
-        userId,
-        username: userId,
-        fullName: userId,
-        role: "member",
-        mustChangePassword: false,
-        loginId: `login-${userId}`,
-      },
-      projects: new Set(projects),
-      watching: null,
-    },
-    texts: [],
-    closed: [],
-    sendResult: null,
-    send(text) {
-      conn.texts.push(text);
-      return conn.sendResult ?? text.length;
-    },
-    close(code, reason) {
-      conn.closed.push({ code, reason });
+// A value that counts how often it is encoded. Counting the socket's
+// own payload, not JSON.stringify, keeps other listeners on the
+// process-wide bus out of the count.
+type Mark = { encodes: number; toJSON(): string };
+const mark = (): Mark => {
+  const m: Mark = {
+    encodes: 0,
+    toJSON() {
+      m.encodes++;
+      return "mark";
     },
   };
-  return conn;
+  return m;
 };
 
-const types = (conn: FakeConn) =>
-  conn.texts.map((text) => (JSON.parse(text) as SocketEvent).type);
+const types = (conn: RecordingConn) => conn.frames.map((frame) => frame.type);
 
 const built: Socket[] = [];
 
@@ -76,80 +56,81 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
   return socket;
 };
 
-// every JSON.stringify the body makes, restored even on a throw
-function countStringify(body: () => void): number {
-  const original = JSON.stringify;
-  let calls = 0;
-  JSON.stringify = ((...args: Parameters<typeof original>) => {
-    calls++;
-    return original(...args);
-  }) as typeof original;
-  try {
-    body();
-  } finally {
-    JSON.stringify = original;
-  }
-  return calls;
+// each event with a mark where its frame carries a payload, and one
+// more as an extra field the frame spreads in
+function events(m: Mark): BusEvent[] {
+  const extra = { mark: m } as object;
+  return [
+    {
+      type: "session.changed",
+      data: {
+        projectId: "p",
+        session: m as never,
+        messages: [],
+        send: null,
+      },
+    },
+    {
+      type: "session.deleted",
+      data: { projectId: "p", sessionId: "gone", ...extra },
+    },
+    {
+      type: "automation.changed",
+      data: { projectId: "p", automation: m as never },
+    },
+    {
+      type: "automation.deleted",
+      data: { projectId: "p", automationId: "a", runs: true, ...extra },
+    },
+    {
+      type: "memory.changed",
+      data: { projectId: "p", automationId: null, revision: 2, ...extra },
+    },
+    {
+      type: "knowledge.changed",
+      data: { projectId: "p", file: m as never, deleted: false },
+    },
+    { type: "knowledge.emptied", data: { projectId: "p", ...extra } },
+  ];
 }
 
-const events: BusEvent[] = [
-  {
-    type: "session.changed",
-    data: {
-      projectId: "p",
-      session: { id: "s", projectId: "p" } as never,
-      messages: [],
-      send: null,
-    },
-  },
-  { type: "session.deleted", data: { projectId: "p", sessionId: "gone" } },
-  {
-    type: "automation.changed",
-    data: { projectId: "p", automation: { id: "a" } as never },
-  },
-  {
-    type: "automation.deleted",
-    data: { projectId: "p", automationId: "a", runs: true },
-  },
-  {
-    type: "memory.changed",
-    data: { projectId: "p", automationId: null, revision: 2 },
-  },
-  {
-    type: "knowledge.changed",
-    data: { projectId: "p", file: { path: "a.md" } as never, deleted: false },
-  },
-  { type: "knowledge.emptied", data: { projectId: "p" } },
-];
+const delta = (m: Mark): SocketEvent =>
+  ({
+    type: "delta",
+    sessionId: "s",
+    sendId: "send",
+    messageId: "m",
+    seq: 1,
+    content: "hi",
+    contentAt: 0,
+    reasoningAt: 0,
+    mark: m,
+  }) as SocketEvent;
 
-const delta: SocketEvent = {
-  type: "delta",
-  sessionId: "s",
-  sendId: "send",
-  messageId: "m",
-  seq: 1,
-  content: "hi",
-  contentAt: 0,
-  reasoningAt: 0,
-};
-
-function opened(socket: Socket, n: number): FakeConn[] {
-  const conns = Array.from({ length: n }, (_, i) => fake(`u${i}`, ["p"]));
+function opened(socket: Socket, n: number): RecordingConn[] {
+  const conns = Array.from({ length: n }, (_, i) => memberConn(`u${i}`, ["p"]));
   for (const conn of conns) socket.open(conn);
-  for (const conn of conns) conn.texts = [];
+  for (const conn of conns) {
+    conn.frames = [];
+    conn.texts = [];
+  }
   return conns;
 }
 
 describe("the socket fan-out", () => {
-  for (const event of events) {
-    test.serial(`${event.type} is encoded once for any audience`, () => {
+  for (const type of events(mark()).map((event) => event.type)) {
+    test.serial(`${type} is encoded once for any audience`, () => {
       for (const n of [1, 5, 25]) {
-        const socket = area();
+        const m = mark();
+        const row = mark();
+        const socket = area({ envelopeRow: () => row as never });
         const conns = opened(socket, n);
-        const outside = fake("outside", ["q"]);
+        const outside = memberConn("outside", ["q"]);
         socket.open(outside);
         outside.texts = [];
-        expect(countStringify(() => publish(event))).toBe(1);
+        publish(events(m).find((event) => event.type === type)!);
+        expect(m.encodes).toBe(1);
+        expect(row.encodes).toBe(type === "session.changed" ? 1 : 0);
         for (const conn of conns) {
           expect(conn.texts).toEqual([conns[0]!.texts[0]!]);
         }
@@ -160,14 +141,14 @@ describe("the socket fan-out", () => {
   }
 
   test.serial("an event nobody may see is never encoded", () => {
+    const m = mark();
     const socket = area();
     const conns = opened(socket, 3);
     conns[0]!.data.principal.mustChangePassword = true;
     conns[1]!.data.projects = new Set(["q"]);
     conns[2]!.data.projects = new Set();
-    for (const event of events) {
-      expect(countStringify(() => publish(event))).toBe(0);
-    }
+    for (const event of events(m)) publish(event);
+    expect(m.encodes).toBe(0);
     expect(conns.flatMap((conn) => conn.texts)).toEqual([]);
     socket.dispose();
   });
@@ -179,31 +160,34 @@ describe("the socket fan-out", () => {
       for (const conn of conns) {
         socket.message(conn, JSON.stringify({ type: "watch", sessionId: "s" }));
       }
-      const idle = fake("idle", ["p"]);
+      const idle = memberConn("idle", ["p"]);
       socket.open(idle);
       for (const conn of [...conns, idle]) conn.texts = [];
-      expect(countStringify(() => socket.stream("s", delta))).toBe(1);
-      for (const conn of conns)
+      const m = mark();
+      socket.stream("s", delta(m));
+      expect(m.encodes).toBe(1);
+      for (const conn of conns) {
         expect(conn.texts).toEqual([conns[0]!.texts[0]!]);
+      }
       expect(idle.texts).toEqual([]);
-      expect(countStringify(() => socket.stream("nobody", delta))).toBe(0);
+      const unseen = mark();
+      socket.stream("nobody", delta(unseen));
+      expect(unseen.encodes).toBe(0);
       socket.dispose();
     }
   });
 
   test.serial("hello and watched stay per connection", () => {
-    const lives: string[] = [];
+    const lives: Mark[] = [];
     const socket = area({
-      live(sessionId) {
-        lives.push(sessionId);
-        return null;
+      live() {
+        const m = mark();
+        lives.push(m);
+        return m as never;
       },
     });
-    const conns = [fake("a", ["p"]), fake("b", ["p"])];
-    const opens = countStringify(() => {
-      for (const conn of conns) socket.open(conn);
-    });
-    expect(opens).toBe(2);
+    const conns = [memberConn("a", ["p"]), memberConn("b", ["p"])];
+    for (const conn of conns) socket.open(conn);
     expect(conns.map(types)).toEqual([["hello"], ["hello"]]);
     socket.message(
       conns[0]!,
@@ -213,33 +197,33 @@ describe("the socket fan-out", () => {
       conns[1]!,
       JSON.stringify({ type: "watch", sessionId: "t" }),
     );
-    // each watch takes its own snapshot at its own time
-    expect(lives).toEqual(["s", "t"]);
+    // each watch takes its own snapshot and encodes it for itself
+    expect(lives.map((m) => m.encodes)).toEqual([1, 1]);
     expect(conns.map(types)).toEqual([
       ["hello", "watched"],
       ["hello", "watched"],
     ]);
-    expect(conns.map((conn) => JSON.parse(conn.texts[1]!).sessionId)).toEqual([
-      "s",
-      "t",
-    ]);
+    expect(
+      conns.map((conn) => (conn.frames[1] as { sessionId: string }).sessionId),
+    ).toEqual(["s", "t"]);
     socket.dispose();
   });
 
   test.serial("a failed send touches only its own connection", () => {
     const socket = area();
     const [dropped, slow, fine] = opened(socket, 3) as [
-      FakeConn,
-      FakeConn,
-      FakeConn,
+      RecordingConn,
+      RecordingConn,
+      RecordingConn,
     ];
     for (const conn of [dropped, slow, fine]) {
       socket.message(conn, JSON.stringify({ type: "watch", sessionId: "s" }));
+      conn.frames = [];
       conn.texts = [];
     }
     dropped.sendResult = 0;
     slow.sendResult = -1;
-    publish(events[0]!);
+    publish(events(mark())[0]!);
     expect(dropped.closed).toEqual([
       { code: CLOSE_DROPPED, reason: "dropped a frame" },
     ]);
@@ -249,10 +233,9 @@ describe("the socket fan-out", () => {
     expect(fine.closed).toEqual([]);
     expect(fine.data.closeCause).toBeUndefined();
     expect(fine.texts).toEqual(slow.texts);
-    // the drop's close lands later; until then it is still in the set,
-    // and the others keep hearing either way
+    // the drop's close lands later; the others keep hearing either way
     socket.close(dropped, CLOSE_DROPPED);
-    socket.stream("s", delta);
+    socket.stream("s", delta(mark()));
     expect(types(fine)).toEqual(["session", "delta"]);
     expect(types(slow)).toEqual(["session", "delta"]);
     socket.drain(slow);

@@ -12,7 +12,6 @@ import {
   CLOSE_BAD_COMMAND,
   CLOSE_DROPPED,
   CLOSE_REVOKED,
-  type Conn,
   type ConnData,
   socketArea,
 } from "../../src/server/web/socket.ts";
@@ -33,13 +32,13 @@ import {
   startChat,
   tick,
 } from "../helpers/chat.ts";
+import {
+  memberConn,
+  type RecordingConn,
+  recordingConn,
+} from "../helpers/socket.ts";
 
-type Closed = { code?: number; reason?: string };
-type FakeConn = Conn & {
-  frames: SocketEvent[];
-  closed: Closed[];
-  sendResult: number | null;
-};
+type FakeConn = RecordingConn;
 
 async function connection(
   chat: ChatApp,
@@ -60,20 +59,7 @@ async function connection(
   });
   expect(outcome).toBeUndefined();
   if (captured === null) throw new Error("the upgrade did not capture data");
-  const conn: FakeConn = {
-    data: captured,
-    frames: [],
-    closed: [],
-    sendResult: null,
-    send(text) {
-      conn.frames.push(JSON.parse(text));
-      return conn.sendResult ?? text.length;
-    },
-    close(code, reason) {
-      conn.closed.push({ code, reason });
-    },
-  };
-  return conn;
+  return recordingConn(captured);
 }
 
 function frames<T extends SocketEvent["type"]>(
@@ -836,33 +822,6 @@ describe("automation socket events", () => {
 });
 
 describe("the envelope row read", () => {
-  const fake = (userId: string, projects: string[]): FakeConn => {
-    const conn: FakeConn = {
-      data: {
-        principal: {
-          userId,
-          username: userId,
-          fullName: userId,
-          role: "member",
-          mustChangePassword: false,
-          loginId: `login-${userId}`,
-        },
-        projects: new Set(projects),
-        watching: null,
-      },
-      frames: [],
-      closed: [],
-      sendResult: null,
-      send(text) {
-        conn.frames.push(JSON.parse(text));
-        return text.length;
-      },
-      close(code, reason) {
-        conn.closed.push({ code, reason });
-      },
-    };
-    return conn;
-  };
   const changed = (projectId: string) =>
     publish({
       type: "session.changed",
@@ -888,7 +847,11 @@ describe("the envelope row read", () => {
         return null;
       },
     });
-    const conns = [fake("a", ["p"]), fake("b", ["p"]), fake("c", ["q"])];
+    const conns = [
+      memberConn("a", ["p"]),
+      memberConn("b", ["p"]),
+      memberConn("c", ["q"]),
+    ];
     for (const conn of conns) socket.open(conn);
     changed("p");
     changed("elsewhere");
@@ -913,7 +876,7 @@ describe("the envelope row read", () => {
         return null;
       },
     });
-    const conns = [fake("a", ["p"]), fake("b", ["p"])];
+    const conns = [memberConn("a", ["p"]), memberConn("b", ["p"])];
     for (const conn of conns) {
       conn.data.principal.mustChangePassword = true;
       socket.open(conn);
@@ -937,7 +900,7 @@ describe("the envelope row read", () => {
         throw new Error("disk I/O error");
       },
     });
-    const conn = fake("a", ["p"]);
+    const conn = memberConn("a", ["p"]);
     socket.open(conn);
     changed("p");
     expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);

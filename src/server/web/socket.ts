@@ -6,8 +6,7 @@
 // holding its project; a stream frame reaches the connections watching
 // its session; nothing is broadcast and no Bun topic is used, so a
 // slow connection is closed on its own and a revoked one stops hearing
-// at once. A frame for many is encoded once and the same text is sent
-// to each. The connection type is the few methods Bun's socket has, so
+// at once. The connection type is the few methods Bun's socket has, so
 // a test drives the module with fakes.
 
 import type { EnvelopeRow } from "../../shared/api/sessions.ts";
