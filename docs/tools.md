@@ -18,7 +18,9 @@ mount in `docs/bash.md`.
   the defaults; `tools/` never imports `runner/`. The `sends` scope
   holds `sendsPerUser` (1 to 16, default 4), `sendsPerProject` (4 to
   64, default 16) and `sendsRunning` (4 to 256, default 64), written
-  only in that order (`docs/sessions.md`). The `chats` scope
+  only in that order (`docs/sessions.md`), with the queue's
+  `queuedPerUser` (1 to 32, default 8) and `queuedMinutes` (10 to 240,
+  default 60, unit `minutes`). The `chats` scope
   holds `archiveIdleDays` (1 to 180, default 30) and
   `archivedDeleteDays` (30 to 1825, default 365), neither with an off
   value; the chats sweep reads them at each pass. `maxBashCalls` refuses

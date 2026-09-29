@@ -60,8 +60,14 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
   },
   {
     title: "Running",
-    line: "How many chats and runs go at once.",
-    names: ["sendsPerUser", "sendsPerProject", "sendsRunning"],
+    line: "How many chats and runs go at once, and what waits.",
+    names: [
+      "sendsPerUser",
+      "sendsPerProject",
+      "sendsRunning",
+      "queuedPerUser",
+      "queuedMinutes",
+    ],
   },
   {
     title: "Automations",

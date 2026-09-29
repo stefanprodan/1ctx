@@ -515,8 +515,9 @@ compare the two before reporting.
   A `LimitsSetting` card sends only its own limits, and Use defaults
   fills the draft without saving. A save that lowers the days archived
   chats are kept asks first (`deleteAsk()` in `Limits.model.ts`). The
-  Running card holds the three `sends` limits together, since the
-  server refuses a save that puts one above the next; `collect()`
+  Running card holds the `sends` limits together, the queue's two
+  after the three caps, since the server refuses a save that puts one
+  cap above the next; `collect()`
   refuses it first, on the field changed, in the labels' words, and
   `limitRefusal()` turns the names in a server refusal into labels.
 - **Page rules that are not visible in one file.**

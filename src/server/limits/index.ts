@@ -32,6 +32,7 @@ export {
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
+  type QueueCaps,
   type SendCaps,
   scheduledShare,
   TOOL_CAPS,
@@ -97,11 +98,13 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
       };
     });
   };
+  // the wait's minutes too, so the queue's expiry timer moves with them
   const sendCaps = () => {
-    const { sendsPerUser, sendsPerProject, sendsRunning } = current();
-    return `${sendsPerUser}/${sendsPerProject}/${sendsRunning}`;
+    const { sendsPerUser, sendsPerProject, sendsRunning, queuedMinutes } =
+      current();
+    return `${sendsPerUser}/${sendsPerProject}/${sendsRunning}/${queuedMinutes}`;
   };
-  // after the commit, and only when a send cap moved
+  // after the commit, and only when a send cap or the wait moved
   const noticing = (write: () => void): void => {
     const before = sendCaps();
     write();
