@@ -61,6 +61,42 @@ function formatHumanSize(bytes: number): string {
   return g < 10 ? `${g.toFixed(1)}G` : `${Math.round(g)}G`;
 }
 
+// (1ctx) -t was accepted and ignored, so a model looking for the newest
+// file got the names in order: it sorts newest first, a tie by name, as
+// GNU ls does
+type LsSort = "name" | "size" | "time";
+
+// -S largest first, -t newest first, otherwise alphabetically
+async function sortNames(
+  ctx: RuntimeCommandContext,
+  names: string[],
+  sort: LsSort,
+  pathOf: (name: string) => string,
+): Promise<string[]> {
+  if (sort === "name") return [...names].sort();
+  const keyed: { name: string; key: number }[] = [];
+  for (const name of names) {
+    try {
+      const stat = await ctx.fs.stat(pathOf(name));
+      keyed.push({
+        name,
+        key: sort === "size" ? (stat.size ?? 0) : (stat.mtime?.getTime() ?? 0),
+      });
+    } catch (error) {
+      if (
+        error instanceof ExecutionLimitError ||
+        error instanceof ExecutionAbortedError
+      ) {
+        throw error;
+      }
+      keyed.push({ name, key: 0 });
+    }
+  }
+  if (sort === "time") keyed.sort((a, b) => (a.name < b.name ? -1 : 1));
+  keyed.sort((a, b) => b.key - a.key);
+  return keyed.map((entry) => entry.name);
+}
+
 // Format date for ls -l output (e.g., "Jan  1 00:00" or "Jan  1  2024")
 function formatDate(date: Date): string {
   const months = [
@@ -158,10 +194,14 @@ export const lsCommand: RuntimeCommand = {
     const humanReadable = parsed.result.flags.humanReadable;
     const recursive = parsed.result.flags.recursive;
     const reverse = parsed.result.flags.reverse;
-    const sortBySize = parsed.result.flags.sortBySize;
     const classifyFiles = parsed.result.flags.classifyFiles;
     const directoryOnly = parsed.result.flags.directoryOnly;
-    const _sortByTime = parsed.result.flags.sortByTime;
+    // (1ctx) -t sorts too; -S wins when both are given
+    const sort: LsSort = parsed.result.flags.sortBySize
+      ? "size"
+      : parsed.result.flags.sortByTime
+        ? "time"
+        : "name";
     // Note: onePerLine is accepted but implicit in our output
     void parsed.result.flags.onePerLine;
 
@@ -239,7 +279,7 @@ export const lsCommand: RuntimeCommand = {
           longFormat,
           reverse,
           humanReadable,
-          sortBySize,
+          sort,
           classifyFiles,
           traversalBudget,
         );
@@ -257,7 +297,7 @@ export const lsCommand: RuntimeCommand = {
           paths.length > 1,
           reverse,
           humanReadable,
-          sortBySize,
+          sort,
           classifyFiles,
           false,
           traversalBudget,
@@ -282,7 +322,7 @@ async function listGlob(
   longFormat: boolean,
   reverse: boolean = false,
   humanReadable: boolean = false,
-  sortBySize: boolean = false,
+  sort: LsSort = "name",
   classifyFiles: boolean = false,
   traversalBudget?: FileTraversalBudget,
 ): Promise<ExecResult> {
@@ -317,24 +357,11 @@ async function listGlob(
     };
   }
 
-  // Sort by size if -S flag, otherwise alphabetically
-  if (sortBySize) {
-    const matchesWithSize: { path: string; size: number }[] = [];
-    for (const match of matches) {
-      const fullPath = ctx.fs.resolvePath(ctx.cwd, match);
-      try {
-        const stat = await ctx.fs.stat(fullPath);
-        matchesWithSize.push({ path: match, size: stat.size ?? 0 });
-      } catch {
-        matchesWithSize.push({ path: match, size: 0 });
-      }
-    }
-    matchesWithSize.sort((a, b) => b.size - a.size); // largest first
-    matches.length = 0;
-    matches.push(...matchesWithSize.map((m) => m.path));
-  } else {
-    matches.sort();
-  }
+  const sorted = await sortNames(ctx, matches, sort, (match) =>
+    ctx.fs.resolvePath(ctx.cwd, match),
+  );
+  matches.length = 0;
+  matches.push(...sorted);
   if (reverse) {
     matches.reverse();
   }
@@ -406,7 +433,7 @@ async function listPath(
   showHeader: boolean,
   reverse: boolean = false,
   humanReadable: boolean = false,
-  sortBySize: boolean = false,
+  sort: LsSort = "name",
   classifyFiles: boolean = false,
   _isSubdir: boolean = false,
   traversalBudget: FileTraversalBudget = new FileTraversalBudget({
@@ -470,25 +497,9 @@ async function listPath(
       entries = entries.filter((e) => !e.startsWith("."));
     }
 
-    // Sort by size if -S flag, otherwise alphabetically
-    if (sortBySize) {
-      const entriesWithSize: { name: string; size: number }[] = [];
-      for (const entry of entries) {
-        const entryPath =
-          fullPath === "/" ? `/${entry}` : `${fullPath}/${entry}`;
-        try {
-          const entryStat = await ctx.fs.stat(entryPath);
-          entriesWithSize.push({ name: entry, size: entryStat.size ?? 0 });
-        } catch {
-          entriesWithSize.push({ name: entry, size: 0 });
-        }
-      }
-      entriesWithSize.sort((a, b) => b.size - a.size); // largest first
-      entries = entriesWithSize.map((e) => e.name);
-    } else {
-      // Sort entries (already sorted by readdir, but ensure consistent order)
-      entries.sort();
-    }
+    entries = await sortNames(ctx, entries, sort, (entry) =>
+      fullPath === "/" ? `/${entry}` : `${fullPath}/${entry}`,
+    );
 
     // Add . and .. entries for -a flag (but not for -A)
     if (showAll) {
@@ -668,7 +679,7 @@ async function listPath(
               false,
               reverse,
               humanReadable,
-              sortBySize,
+              sort,
               classifyFiles,
               true,
               traversalBudget,

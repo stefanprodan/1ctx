@@ -5,10 +5,10 @@
 // server the test starts: curl never follows a redirect off http, since Bun's fetch reads
 // file: URLs from the host's disk, and a response refused for its length
 // lets go of its body. The suite reaches no network. A command we removed
-// is not found like any other.
+// is not found like any other, and ls -t sorts by time.
 
 import { describe, expect, test } from "bun:test";
-import { Bash } from "just-bash";
+import { Bash, InMemoryFs } from "just-bash";
 
 type Network = NonNullable<ConstructorParameters<typeof Bash>[0]>["network"];
 
@@ -90,6 +90,19 @@ describe("the vendored just-bash", () => {
     } finally {
       s.stop();
     }
+  });
+
+  test("ls -t lists the newest first, a tie by name, and -r reverses it", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/a", "", undefined, at(2));
+    fs.writeFileSync("/d/b", "", undefined, at(3));
+    fs.writeFileSync("/d/c", "", undefined, at(1));
+    fs.writeFileSync("/d/d", "", undefined, at(3));
+    const bash = new Bash({ fs });
+    expect((await bash.exec("ls -t /d")).stdout).toBe("b\nd\na\nc\n");
+    expect((await bash.exec("ls -tr /d")).stdout).toBe("c\na\nd\nb\n");
+    expect((await bash.exec("ls /d")).stdout).toBe("a\nb\nc\nd\n");
   });
 
   for (const name of ["python", "python3", "sqlite3", "node"]) {
