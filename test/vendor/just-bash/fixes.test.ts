@@ -5,8 +5,8 @@
 // server the test starts: curl never follows a redirect off http, since Bun's fetch reads
 // file: URLs from the host's disk, and a response refused for its length
 // lets go of its body. The suite reaches no network. A command we removed
-// is not found like any other, ls -t sorts by time, and curl, jq and yq
-// answer --version.
+// is not found like any other, ls -t sorts by time, and every command answers
+// --version as the tool it follows.
 
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
@@ -187,6 +187,46 @@ describe("the vendored just-bash", () => {
       expect(result.stdout).toStartWith(
         "curl 8.21.0 (just-bash, compatible)\n",
       );
+    });
+  }
+
+  for (const [command, line] of [
+    ["ls --version", "ls (GNU coreutils) 9.11"],
+    ["sort -r --version", "sort (GNU coreutils) 9.11"],
+    ["timeout 5 sort --version", "sort (GNU coreutils) 9.11"],
+    ["env --version", "env (GNU coreutils) 9.11"],
+    ["sed --version", "sed (GNU sed) 4.10"],
+    ["find -version", "find (GNU findutils) 4.11.0"],
+    ["tar --version", "tar (GNU tar) 1.35"],
+    ["gzip -V", "gzip 1.15"],
+    ["zcat --version", "zcat (gzip) 1.15"],
+    ["file -v", "file-5.48"],
+    ["column -V", "column from util-linux 2.42.4"],
+    ["strings -v", "GNU strings (GNU Binutils) 2.47"],
+    ["tree --version", "tree v2.3.2"],
+    ["which --version", "GNU which v2.25"],
+    ["hostname -V", "hostname (GNU inetutils) 2.8"],
+    ["xan --version", "xan 0.61.0"],
+    ["bash --version", "GNU bash, version 5.3.15(1)-release"],
+    ["sh --version", "GNU bash, version 5.3.15(1)-release"],
+  ]) {
+    test(`${command} answers as the tool it follows`, async () => {
+      const result = await new Bash().exec(command);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.split("\n")[0]).toBe(
+        `${line} (just-bash, compatible)`,
+      );
+    });
+  }
+
+  for (const [command, stdout] of [
+    ["echo --version", "--version\n"],
+    ["bash -c 'echo $1' _ --version", "--version\n"],
+    ["echo hi > ./--version; cat -- --version", "hi\n"],
+  ]) {
+    test(`${command} is not asking for a version`, async () => {
+      const result = await new Bash().exec(command);
+      expect(result.stdout).toBe(stdout);
     });
   }
 });
