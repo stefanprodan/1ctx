@@ -23,7 +23,7 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, HttpError } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
-import { LIMIT_DEFINITIONS, type Limits } from "../limits/index.ts";
+import type { Limits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
   type QueuedRow,
@@ -31,6 +31,7 @@ import {
   refuseArchived,
   type SessionRow,
   type SessionStore,
+  type WaitingCursor,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
@@ -45,7 +46,8 @@ const MINUTE_MS = 60_000;
 const PASSES_PER_WAKE = 4;
 // the chats one expiry read takes
 const EXPIRE_PAGE = 64;
-const SENDS_CEILING = LIMIT_DEFINITIONS.sendsRunning.max;
+// the queued rows one read of a pass takes
+export const WAITING_PAGE = 64;
 
 export type DispatcherDeps = {
   db: Db;
@@ -334,21 +336,31 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     return processFull(err) ? "process" : "waits";
   };
 
+  // every chat with queued rows, oldest wait first, in keyset pages: a
+  // chat whose authors or project are at their cap is passed over, a
+  // full process ends the pass, and each queued row is read once
   const pass = (): void => {
     const held = registry.values().map((send) => send.sessionId);
-    // the page is bounded by the ceiling; a chat whose authors or
-    // project are at their cap is passed over, a full process ends it
-    for (const sessionId of queue.waitingChats(held, SENDS_CEILING)) {
-      if (closed) return;
-      if (registry.get(sessionId) !== null) continue;
-      try {
-        if (startChat(sessionId) === "process") return;
-      } catch (err) {
-        deps.log.error("queue pass failed", {
-          chat: sessionId,
-          ...errorFields(err),
-        });
+    const seen = new Set<string>();
+    let after: WaitingCursor | null = null;
+    for (;;) {
+      const page = queue.waitingRows(held, after, WAITING_PAGE);
+      for (const row of page) {
+        if (closed) return;
+        if (seen.has(row.sessionId)) continue;
+        seen.add(row.sessionId);
+        if (registry.get(row.sessionId) !== null) continue;
+        try {
+          if (startChat(row.sessionId) === "process") return;
+        } catch (err) {
+          deps.log.error("queue pass failed", {
+            chat: row.sessionId,
+            ...errorFields(err),
+          });
+        }
       }
+      if (page.length < WAITING_PAGE) return;
+      after = page.at(-1)!;
     }
   };
 

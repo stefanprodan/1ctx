@@ -101,6 +101,8 @@ export function queueChanged(
     : archivedEvent(session, store.lastSend(session.id));
 }
 
+export type WaitingCursor = { sessionId: string; queuedAt: number };
+
 export type QueueLoad = {
   queued: number;
   notSent: number;
@@ -261,18 +263,33 @@ export class QueueStore {
     return dropped;
   }
 
-  // the chats with a queued row, oldest wait first, past those the
-  // runner holds; one indexed read when nothing waits
-  waitingChats(held: readonly string[], limit: number): string[] {
+  // a page of queued rows past the cursor, oldest first, in the chats
+  // the runner does not hold: a keyset walk of the partial index, one
+  // indexed read when nothing waits. A chat shows once per row, and its
+  // oldest row comes first
+  waitingRows(
+    held: readonly string[],
+    after: WaitingCursor | null,
+    limit: number,
+  ): WaitingCursor[] {
     return this.db
-      .query<{ session_id: string }, [string, number]>(
-        `select session_id from queued_messages indexed by queued_waiting
-         where state = 'queued'
+      .query<
+        { session_id: string; queued_at: number },
+        [number, string, string, number]
+      >(
+        `select session_id, queued_at from queued_messages
+         indexed by queued_waiting
+         where state = 'queued' and (queued_at, session_id) > (?, ?)
            and session_id not in (select value from json_each(?))
-         group by session_id order by min(queued_at) limit ?`,
+         order by queued_at, session_id limit ?`,
       )
-      .all(JSON.stringify(held), limit)
-      .map((r) => r.session_id);
+      .all(
+        after?.queuedAt ?? -1,
+        after?.sessionId ?? "",
+        JSON.stringify(held),
+        limit,
+      )
+      .map((r) => ({ sessionId: r.session_id, queuedAt: r.queued_at }));
   }
 
   // the chats with a row queued at or before the time

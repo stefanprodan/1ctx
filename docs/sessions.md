@@ -78,10 +78,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   what is left after four passes of one wake, is put off to a timer (a
   macrotask, never a microtask, so the process goes on), and a wake
   during a pass runs one more. A pass walks the chats with queued rows
-  whose lock is free, oldest first, a page bounded by the ceiling of
-  `sendsRunning` (one indexed read when none waits), passing over a
-  chat whose authors or project are at their cap and ending at a full
-  process. For each chat it sorts the rows: an author who no longer sees
+  whose lock is free, oldest first, in keyset pages of `WAITING_PAGE`
+  queued rows over `queued_waiting` (one indexed read when none waits,
+  each queued row read once), passing over a chat whose authors or
+  project are at their cap and ending only at a full process. For each chat it sorts the rows: an author who no longer sees
   the chat loses theirs (deleted); an archived chat (`archived`), a
   retired agent (`agent-deleted`), a row past `queuedMinutes` from
   `queued_at` (`expired`), a gone, disabled or must-change-password
@@ -100,11 +100,16 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   overflow together) finds its rows: each row is tried after those
   that passed, in a start rolled back with its transaction and not
   admitted, the ones that fail turn not sent (`failed`, logged with the
-  status alone) and the rest start. A failed start never asks for
+  status alone) and the rest start. A trial writes only SQLite rows,
+  which its rollback takes with their envelopes; its registry entry is
+  freed before it returns and launches nothing. When the real start
+  still fails after its trial passed, its rows turn not sent too, so a
+  chat never loops. A failed start never asks for
   another pass of its chat. One timer, on the clock port, is set to the
   oldest queued row's expiry and reset when the limit moves, so an idle
-  process expires rows too; a restart expires at start. An archive and
-  an agent's delete wake the dispatcher, so their chats' rows turn not
+  process expires rows too; a restart expires at start. An archive, the
+  hourly sweep when it archived a chat and an agent's delete wake the
+  dispatcher, so their chats' rows turn not
   sent at once. A queue's start builds no session detail; a POST's
   answer reads it.
   start. Removing a member drops their rows in its transaction. `PATCH`

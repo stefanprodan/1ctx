@@ -82,6 +82,7 @@ export {
   type QueueLoad,
   QueueStore,
   queueChanged,
+  type WaitingCursor,
 } from "./queued.ts";
 export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {

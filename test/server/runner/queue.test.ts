@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
+import { WAITING_PAGE } from "../../../src/server/runner/queue.ts";
 import type { QueuedMessage } from "../../../src/shared/contracts/session.ts";
 import { hashPassword, testApp } from "../../helpers/app.ts";
 import { createAutomation, settleRun } from "../../helpers/automations.ts";
@@ -895,4 +896,136 @@ describe("the queue behind a busy chat", () => {
       await chat.app.shutdown();
     }
   });
+
+  test("a free chat past the first page of waiting rows starts", async () => {
+    const chat = await chatApp();
+    try {
+      await setLimits(chat, { sendsPerUser: 1 });
+      const mine = await startChat(chat, "mine");
+      mine.script.reply("done");
+      await settleRun(chat, mine.sessionId);
+      // the admin's one place is taken, so every chat of theirs waits
+      const busy = await startChat(
+        chat,
+        "busy",
+        chat.admin,
+        adminProject(chat),
+      );
+      const at = chat.app.now.value;
+      const blocked: string[] = [];
+      for (let i = 0; i <= WAITING_PAGE; i++) {
+        const session = chat.app.sessions.create({
+          projectId: adminProject(chat),
+          ownerId: chat.adminId,
+          agentId: chat.agentId,
+          status: "done",
+          title: `old ${i}`,
+          now: at,
+        });
+        chat.app.sessions.queue.insert({
+          sessionId: session.id,
+          authorId: chat.adminId,
+          text: `old ${i}`,
+          now: at - 1000 + i,
+        });
+        blocked.push(session.id);
+      }
+      chat.app.sessions.queue.insert({
+        sessionId: mine.sessionId,
+        authorId: chat.memberId,
+        text: "newest",
+        now: at,
+      });
+      chat.app.runner.queue.wake();
+      const next = await waitScript(chat.scripted, 3);
+      expect(userMessages(next).at(-1)?.content).toBe("newest");
+      expect(blocked.every((id) => rows(chat, id)[0]?.state === "queued")).toBe(
+        true,
+      );
+      next.reply("done");
+      await settleRun(chat, mine.sessionId);
+      busy.script.reply("done");
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("the hourly sweep's archive of an idle chat turns its rows not sent", async () => {
+    const chat = await chatApp();
+    try {
+      await setLimits(chat, { sendsPerUser: 1 });
+      const { sessionId, script } = await teamChat(chat);
+      const busy = await startChat(
+        chat,
+        "busy",
+        chat.admin,
+        adminProject(chat),
+      );
+      await queue(chat, sessionId, "waits", chat.admin);
+      script.reply("done");
+      await settleRun(chat, sessionId);
+      expect(rows(chat, sessionId)[0]?.state).toBe("queued");
+      // in one turn, before the expiry timer hears the clock
+      chat.app.now.value += 31 * 86_400_000;
+      chat.app.sweep();
+      expect(chat.app.sessions.byId(sessionId)?.archived?.reason).toBe("idle");
+      expect(rows(chat, sessionId)).toEqual([
+        { content: "waits", state: "not-sent", reason: "archived" },
+      ]);
+      busy.script.reply("done");
+      await settleRun(chat, busy.sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test.serial(
+    "a trial that passes before a real start that fails leaves nothing behind",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const { sessionId, script } = await startChat(chat, "first");
+        await queue(chat, sessionId, "tried");
+        const store = chat.app.sessions;
+        const createSend = store.createSend.bind(store);
+        let calls = 0;
+        // the first start and the real start after the trial fail; the
+        // trial in between passes and is rolled back
+        store.createSend = (fields) => {
+          calls++;
+          if (calls !== 2) throw new Error("send write failed");
+          return createSend(fields);
+        };
+        const written: BusEvent[] = [];
+        const unsubscribe = subscribe((event) => {
+          if (
+            event.type === "session.changed" &&
+            event.data.messages.some((row) => row.content === "tried")
+          ) {
+            written.push(event);
+          }
+        }, silent);
+        try {
+          script.reply("done");
+          await settleRun(chat, sessionId);
+          await tick();
+        } finally {
+          unsubscribe();
+          store.createSend = createSend;
+        }
+        expect(calls).toBe(3);
+        expect(written).toEqual([]);
+        expect(rows(chat, sessionId)).toEqual([
+          { content: "tried", state: "not-sent", reason: "failed" },
+        ]);
+        expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+        expect(
+          chat.app.sessions.messages(sessionId).map((row) => row.content),
+        ).toEqual(["first", "done"]);
+        expect(chat.scripted.scripts).toHaveLength(1);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
 });
