@@ -238,6 +238,12 @@ function buildOutput(
   return output;
 }
 
+// (1ctx) curl's first line, so a script reading the version from it works
+const CURL_VERSION =
+  "curl 8.21.0 (just-bash, compatible)\n" +
+  "Protocols: http https\n" +
+  "A sandboxed curl over the host's fetch; see curl --help.\n";
+
 export const curlCommand: RuntimeCommand = {
   name: "curl",
 
@@ -256,6 +262,11 @@ export const curlCommand: RuntimeCommand = {
     }
 
     const options = parseResult;
+
+    // (1ctx) before the URL check, as curl answers -V alone
+    if (options.version) {
+      return { stdout: CURL_VERSION, stderr: "", exitCode: 0 };
+    }
 
     // Check for URL
     if (!options.url) {

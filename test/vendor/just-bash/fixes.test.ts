@@ -5,7 +5,8 @@
 // server the test starts: curl never follows a redirect off http, since Bun's fetch reads
 // file: URLs from the host's disk, and a response refused for its length
 // lets go of its body. The suite reaches no network. A command we removed
-// is not found like any other, and ls -t sorts by time.
+// is not found like any other, ls -t sorts by time, and curl, jq and yq
+// answer --version.
 
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
@@ -161,6 +162,31 @@ describe("the vendored just-bash", () => {
       const result = await new Bash().exec(`${name} -c 1`);
       expect(result.exitCode).toBe(127);
       expect(result.stderr).toBe(`bash: ${name}: command not found\n`);
+    });
+  }
+
+  for (const [command, line] of [
+    ["jq --version", "jq-1.8.2 (just-bash, compatible)"],
+    ["jq -V", "jq-1.8.2 (just-bash, compatible)"],
+    [
+      "yq --version",
+      "yq (https://github.com/mikefarah/yq/) version v4.53.3 (just-bash, compatible)",
+    ],
+  ]) {
+    test(`${command} names the version it answers as`, async () => {
+      const result = await new Bash().exec(command);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.split("\n")[0]).toBe(line);
+    });
+  }
+
+  for (const flag of ["--version", "-V", "-sV"]) {
+    test(`curl ${flag} answers without a URL`, async () => {
+      const result = await new Bash({ network: full }).exec(`curl ${flag}`);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toStartWith(
+        "curl 8.21.0 (just-bash, compatible)\n",
+      );
     });
   }
 });

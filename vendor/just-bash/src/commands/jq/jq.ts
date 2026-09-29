@@ -243,9 +243,14 @@ const jqHelp = {
     "    --slurpfile NAME FILE bind $NAME to the array of JSON values in FILE",
     "    --args        remaining arguments are string positional args ($ARGS.positional)",
     "    --jsonargs    remaining arguments are JSON positional args ($ARGS.positional)",
+    "-V, --version     show the version and exit",
     "    --help        display this help and exit",
   ],
 };
+
+const JQ_VERSION =
+  "jq-1.8.2 (just-bash, compatible)\n" +
+  "A sandboxed jq that answers as jq 1.8.2 does; see jq --help.\n";
 
 export const jqCommand: RuntimeCommand = {
   name: "jq",
@@ -362,6 +367,9 @@ export const jqCommand: RuntimeCommand = {
         // Remaining non-option tokens (after the filter) are JSON-parsed and
         // become positional args instead of input files.
         positionalMode = "jsonargs";
+      } else if (a === "--version" || a === "-V") {
+        // (1ctx) jq's own line first, so a script reading it works
+        return { stdout: JQ_VERSION, stderr: "", exitCode: 0 };
       } else if (a === "-") files.push("-");
       else if (a.startsWith("--")) return unknownOption("jq", a);
       else if (a.startsWith("-")) {
