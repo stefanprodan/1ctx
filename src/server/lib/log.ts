@@ -5,6 +5,8 @@
 // not the clock port's: a service manager's log file carries no time,
 // and a test passes `silent`.
 
+import { ToolError } from "./errors.ts";
+
 export type LogValue = string | number | boolean | undefined;
 
 export type LogFields = Record<string, LogValue> & {
@@ -43,6 +45,7 @@ const ERROR_NAMES = new Set([
   "Conflict",
   "BadGateway",
   "ServiceUnavailable",
+  "ToolError",
   "ProviderError",
   "CatalogError",
   "DecisionError",
@@ -280,6 +283,8 @@ export function errorFields(error: unknown, stack = true): LogFields {
         ? error
         : undefined;
   if (message) fields.error = firstLine(message);
+  // the message names input or a server's answer; the log keeps the phrase
+  if (error instanceof ToolError) fields.error = error.logged;
   if (typeof error === "object" && error !== null) {
     const value = error as Record<string, unknown>;
     if (typeof value.code === "string" && ERROR_CODE.test(value.code)) {

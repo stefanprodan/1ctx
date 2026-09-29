@@ -5,7 +5,8 @@
 // name: an optional IANA timezone, UTC when left out, so the answer
 // never depends on where the binary runs.
 
-import { type ToolContext, ToolError } from "../types.ts";
+import { ToolError } from "../../lib/errors.ts";
+import type { ToolContext } from "../types.ts";
 
 export type Datetime = {
   timezone: string;

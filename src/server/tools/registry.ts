@@ -5,13 +5,9 @@
 // throws become failed results so the runner only handles ToolResult.
 
 import { sanitize } from "../../shared/memory.ts";
+import { ToolError } from "../lib/errors.ts";
 import type { ToolCall } from "../providers/index.ts";
-import {
-  type Tool,
-  type ToolContext,
-  ToolError,
-  type ToolResult,
-} from "./types.ts";
+import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
 function clean(text: string, cut: number): string {
   return sanitize(text).slice(0, cut);
@@ -46,7 +42,7 @@ export class Registry {
     let started = 0;
     try {
       const tool = this.byName.get(call.name);
-      if (!tool) throw new Error(this.unknown(call.name));
+      if (!tool) throw new ToolError(this.unknown(call.name), "tool not found");
       timeoutMs =
         (tool.timeoutMs ?? ctx.caps.callTimeoutMs) + (tool.graceMs ?? 0);
       let parsed: unknown;
@@ -112,11 +108,7 @@ export class Registry {
         error: true,
       };
       Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
-        value: timedOut
-          ? true
-          : failure instanceof ToolError
-            ? new Error(failure.logged)
-            : failure,
+        value: timedOut ? true : failure,
       });
       return result;
     }

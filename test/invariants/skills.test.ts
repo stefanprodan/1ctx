@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { LogFactory } from "../../src/server/lib/log.ts";
 import { SKILLS_LEAD } from "../../src/server/runner/context.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import { makeSkillTools } from "../../src/server/tools/builtin/skill.ts";
@@ -32,8 +33,8 @@ function sources(entries: Record<string, Answer>): typeof fetch {
   }) as typeof fetch;
 }
 
-async function admin(fetcher: typeof fetch) {
-  const app = await testApp({ fetcher });
+async function admin(fetcher: typeof fetch, logFactory?: LogFactory) {
+  const app = await testApp({ fetcher, logFactory });
   const client = app.client();
   await client.login("admin", "hunter2-test");
   return { app, client };
@@ -327,8 +328,10 @@ describe("skill routes", () => {
       new Response(raw("ops", "one")),
       new Response(raw("new-name", "two")),
     ];
+    const logs = collectLogs();
     const { app, client } = await admin(
       sources({ [url]: () => answers.shift()! }),
+      logs.logFactory,
     );
     const created = await (
       await client.call("POST", "/api/skills", { body: { url } })
@@ -339,6 +342,13 @@ describe("skill routes", () => {
     );
     expect(res.status).toBe(409);
     expect(app.skills.byId(created.skill.id)?.name).toBe("ops");
+    // the source's words stay on the row, the log keeps a phrase
+    expect(
+      logs.events.filter((event) => event.msg === "skill refresh failed"),
+    ).toMatchObject([
+      { fields: { error: "skill source refused", status: 409 } },
+    ]);
+    expect(JSON.stringify(logs.events)).not.toContain("new-name");
   });
 
   test("blocks another refresh and delete while one fetch is running", async () => {

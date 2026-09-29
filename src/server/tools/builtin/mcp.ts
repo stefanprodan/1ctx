@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { ToolError } from "../../lib/errors.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../../mcp/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
-import { type Tool, ToolError } from "../types.ts";
+import type { Tool } from "../types.ts";
 
 function flat(servers: OfferedServer[]): OfferedMcpTool[] {
   return servers.flatMap((server) => server.tools);

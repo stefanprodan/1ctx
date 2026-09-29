@@ -9,7 +9,8 @@
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { bytesWords } from "../../lib/bytes.ts";
-import { type Tool, type ToolContext, ToolError } from "../types.ts";
+import { ToolError } from "../../lib/errors.ts";
+import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
   return `<error>Content truncated at ${bytesWords(maxBytes)}.</error>`;
@@ -114,7 +115,10 @@ function mediaType(header: string | null): MediaType {
   }
   const type = header.split(";", 1)[0].trim().toLowerCase();
   if (!/^[a-z0-9!#$%&'*+.^_`|~-]+\/[a-z0-9!#$%&'*+.^_`|~-]+$/u.test(type)) {
-    throw new Error(`media type "${type}" is not allowed`);
+    throw new ToolError(
+      `media type "${type}" is not allowed`,
+      "media type not allowed",
+    );
   }
   const allowed =
     type.startsWith("text/") ||
@@ -122,7 +126,12 @@ function mediaType(header: string | null): MediaType {
     type === "application/xml" ||
     type.endsWith("+json") ||
     type.endsWith("+xml");
-  if (!allowed) throw new Error(`media type "${type}" is not allowed`);
+  if (!allowed) {
+    throw new ToolError(
+      `media type "${type}" is not allowed`,
+      "media type not allowed",
+    );
+  }
   const match = header.match(
     /(?:^|;)\s*charset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^;\s]*))/iu,
   );

@@ -3,8 +3,9 @@
 
 import type { OfferedSkill } from "../../../shared/contracts/skill.ts";
 import { skillContent } from "../../../shared/skills.ts";
+import { ToolError } from "../../lib/errors.ts";
 import type { SkillBody } from "../../skills/index.ts";
-import { type Tool, ToolError } from "../types.ts";
+import type { Tool } from "../types.ts";
 
 export type SkillToolsPort = {
   body(id: string, name: string): SkillBody | null;

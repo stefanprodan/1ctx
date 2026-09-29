@@ -5,13 +5,14 @@
 // alike: controls, the C1 block and the bidi controls go, text stays.
 
 import { describe, expect, test } from "bun:test";
+import { ToolError } from "../../../src/server/lib/errors.ts";
+import { errorFields } from "../../../src/server/lib/log.ts";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
-import {
-  type Tool,
-  type ToolContext,
-  ToolError,
-  type ToolResult,
+import type {
+  Tool,
+  ToolContext,
+  ToolResult,
 } from "../../../src/server/tools/types.ts";
 
 // built from code points, so no invisible character sits in the source
@@ -142,7 +143,19 @@ describe("the registry's result cleaning", () => {
     };
     const result = await new Registry([tool]).run(call, context());
     expect(result.content).toBe("Error: no file a/b.md; available paths: c.md");
-    expect((result.failure as Error).message).toBe("gone");
+    expect(errorFields(result.failure, false)).toEqual({
+      error_type: "ToolError",
+      error: "gone",
+    });
+  });
+
+  test("logs an unknown tool's refusal without the name the model made", async () => {
+    const result = await echo("x").run(
+      { id: "c1", name: "made/up-name", arguments: "{}" },
+      context(),
+    );
+    expect(result.content).toBe('Error: tool "made/up-name" not found.');
+    expect(errorFields(result.failure, false).error).toBe("tool not found");
   });
 
   test("keeps a built-in error that mentions timeout", async () => {
