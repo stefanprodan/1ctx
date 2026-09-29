@@ -5,6 +5,7 @@
 // path: the knowledge name rule stays on /knowledge.
 
 import { describe, expect, test } from "bun:test";
+import { MAX_SCRATCH_SEGMENTS } from "../../../src/server/bash/names.ts";
 import { openedRecord } from "../../../src/server/bash/open.ts";
 import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
 
@@ -169,7 +170,7 @@ describe("scratch names", () => {
   test.each([
     ["a path climbing out", ["../escape", "ok"], ["ok"]],
     ["an empty segment", ["a//b", "ok"], ["ok"]],
-    ["seventeen segments", [`${"d/".repeat(16)}f`, "ok"], ["ok"]],
+    ["65 segments", [`${"d/".repeat(64)}f`, "ok"], ["ok"]],
     ["a file where a folder is", ["d", "d/f"], ["d"]],
   ])(
     "a stored row with %s is left out with a notice and dropped on save",
@@ -251,7 +252,7 @@ describe("scratch names", () => {
     async () => {
       const s = setup();
       try {
-        const deep = "d/".repeat(14);
+        const deep = "d/".repeat(MAX_SCRATCH_SEGMENTS - 2);
         seedScratch(s, {
           written: Array.from({ length: s.caps.scratchFiles }, (_, i) => ({
             path: `${i}/${deep}f`,
@@ -260,7 +261,9 @@ describe("scratch names", () => {
           })),
         });
         expect(scratchState(s).files).toBe(1000);
-        expect(scratchState(s).entries[0]!.path.split("/")).toHaveLength(16);
+        expect(scratchState(s).entries[0]!.path.split("/")).toHaveLength(
+          MAX_SCRATCH_SEGMENTS,
+        );
         const result = await run(s, "rm -rf /tmp/*; ls -A /tmp | wc -l", {
           ...callCaps,
           callTimeoutMs: 20_000,
