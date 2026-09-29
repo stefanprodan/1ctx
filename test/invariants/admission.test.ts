@@ -101,6 +101,54 @@ describe("admission", () => {
     await chat.app.shutdown();
   });
 
+  test("Run now counts against whoever pressed it, not the automation's owner", async () => {
+    const chat = await chatApp();
+    chat.app.automationScheduler.stop();
+    await setLimits(chat, { sendsPerUser: 1 });
+    const team = await createTeam(chat.admin, "ops", [chat.memberId]);
+    const made = async (name: string) => {
+      const response = await chat.member.call(
+        "POST",
+        `/api/projects/${team.id}/automations`,
+        { body: automationBody(chat, { name }) },
+      );
+      expect(response.status).toBe(201);
+      return (await response.json()).automation.id as string;
+    };
+    const first = await made("first");
+    const second = await made("second");
+    // the owner is at their cap
+    const mine = await startChat(chat, "mine");
+    const refused = await chat.member.call(
+      "POST",
+      `/api/automations/${first}/run`,
+    );
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({
+      error: "You have 1 chat or run going. Wait for one to end.",
+    });
+    // the admin's press counts against the admin
+    const pending = chat.scripted.next();
+    const pressed = await chat.admin.call(
+      "POST",
+      `/api/automations/${first}/run`,
+    );
+    expect(pressed.status).toBe(201);
+    const run = await pending;
+    const again = await chat.admin.call(
+      "POST",
+      `/api/automations/${second}/run`,
+    );
+    expect(again.status).toBe(429);
+    expect(await again.json()).toEqual({
+      error: "You have 1 chat or run going. Wait for one to end.",
+    });
+    mine.script.reply("done");
+    run.reply("done");
+    await tick();
+    await chat.app.shutdown();
+  });
+
   test("a full project refuses a member's turn and holds its scheduled runs, other projects go on", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

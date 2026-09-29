@@ -204,6 +204,20 @@ describe("admission", () => {
     expect(() => registry.admit("new", user("u1"), floor)).not.toThrow();
   });
 
+  test("the user's refusal counts what they have going, not the cap", () => {
+    const registry = new Registry();
+    fill(registry, 1, "u1", "p1");
+    expect(
+      refusal(() => registry.admit("new", user("u1"), caps(1, 16, 64)))
+        ?.message,
+    ).toBe("You have 1 chat or run going. Wait for one to end.");
+    fill(registry, 5, "u1", "p2");
+    expect(
+      refusal(() => registry.admit("new", user("u1"), caps(4, 16, 64)))
+        ?.message,
+    ).toBe("You have 6 chats and runs going. Wait for one to end.");
+  });
+
   test("the caps are read at each admission and a lowered one stops nothing", () => {
     const registry = new Registry();
     const held = fill(registry, 3, "u1", "p1");

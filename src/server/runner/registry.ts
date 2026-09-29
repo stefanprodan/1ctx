@@ -130,8 +130,10 @@ export class Registry {
       return;
     }
     if (mine >= caps.sendsPerUser) {
+      // the count, not the cap: a lowered cap leaves more going
+      const going = mine === 1 ? "1 chat or run" : `${mine} chats and runs`;
       throw new TooManyRequests(
-        `You have ${caps.sendsPerUser} chats and runs going. Wait for one to end.`,
+        `You have ${going} going. Wait for one to end.`,
       );
     }
     if (project >= caps.sendsPerProject) {

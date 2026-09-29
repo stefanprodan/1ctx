@@ -224,11 +224,11 @@ describe("limits area", () => {
   test.each([
     [
       { sendsPerUser: 16, sendsPerProject: 8 },
-      "sendsPerUser must not exceed sendsPerProject",
+      "sendsPerUser must not be above sendsPerProject",
     ],
     [
       { sendsPerProject: 32, sendsRunning: 16 },
-      "sendsPerProject must not exceed sendsRunning",
+      "sendsPerProject must not be above sendsRunning",
     ],
   ])(
     "a write that breaks the order is refused and writes nothing",
@@ -360,7 +360,7 @@ describe("limits area", () => {
       });
       expect(unordered.status).toBe(400);
       expect(await unordered.json()).toEqual({
-        error: "sendsPerUser must not exceed sendsPerProject",
+        error: "sendsPerUser must not be above sendsPerProject",
       });
       const refused = await admin.call("PUT", "/api/limits", {
         body: { values: {} },

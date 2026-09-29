@@ -39,6 +39,7 @@ import {
   draftOf,
   LIMIT_WORDS,
   limitFieldOf,
+  limitRefusal,
   problem,
   read,
   seedOf,
@@ -297,6 +298,74 @@ describe("the limit words and units", () => {
       "toolWorkTokens",
     );
     expect(limitFieldOf("maxBashCalls is out of range")).toBe("maxBashCalls");
+  });
+
+  test("the send caps are held in order before a save, on the field changed", () => {
+    const sends = [
+      sendsPerUser,
+      row({
+        name: "sendsPerProject",
+        value: 16,
+        default: 16,
+        min: 4,
+        max: 64,
+        scope: "sends",
+      }),
+      row({
+        name: "sendsRunning",
+        value: 64,
+        default: 64,
+        min: 4,
+        max: 256,
+        scope: "sends",
+      }),
+    ];
+    const draft = draftOf(sends);
+    expect(collect(sends, { ...draft, sendsPerUser: "16" })).toMatchObject({
+      values: { sendsPerUser: 16 },
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerUser: "12", sendsPerProject: "8" }),
+    ).toEqual({
+      problem: "Per user must not be above Per project",
+      field: "sendsPerUser",
+    });
+    expect(collect(sends, { ...draft, sendsPerProject: "3" })).toEqual({
+      problem: "Per project must be from 4 to 64",
+      field: "sendsPerProject",
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerProject: "4", sendsPerUser: "4" }),
+    ).toMatchObject({
+      values: { sendsPerProject: 4 },
+    });
+    expect(collect(sends, { ...draft, sendsRunning: "8" })).toEqual({
+      problem: "Per project must not be above At once",
+      field: "sendsRunning",
+    });
+    expect(
+      collect(sends, { ...draft, sendsPerProject: "32", sendsRunning: "16" }),
+    ).toEqual({
+      problem: "Per project must not be above At once",
+      field: "sendsPerProject",
+    });
+  });
+
+  test("a server refusal names each limit by its label and keeps the field", () => {
+    expect(
+      limitRefusal("sendsPerUser must not be above sendsPerProject"),
+    ).toEqual({
+      words: "Per user must not be above Per project",
+      field: "sendsPerUser",
+    });
+    expect(limitRefusal("rounds must be between 1 and 500")).toEqual({
+      words: "Rounds must be between 1 and 500",
+      field: "rounds",
+    });
+    expect(limitRefusal("values must name a limit")).toEqual({
+      words: "values must name a limit",
+      field: undefined,
+    });
   });
 
   test.serial("the draft, what a Save collects and what is dirty", () => {

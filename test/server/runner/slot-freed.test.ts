@@ -172,7 +172,7 @@ describe("the wake", () => {
     });
     expect(refused.status).toBe(429);
     expect(await refused.json()).toEqual({
-      error: "You have 1 chats and runs going. Wait for one to end.",
+      error: "You have 1 chat or run going. Wait for one to end.",
     });
 
     // the next process repairs the row and holds no place for it

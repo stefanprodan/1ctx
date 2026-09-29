@@ -467,6 +467,47 @@ describe("a fire waiting for a free place", () => {
     await chat.app.shutdown();
   });
 
+  test("a compact whose rows fail to write starts a waiting fire, without a pass interval", async () => {
+    const { chat } = await stopped();
+    const talk = await startChat(chat, "question");
+    talk.script.reply("answer");
+    await settleRun(chat, talk.sessionId);
+    const due = chat.app.now.value;
+    const waiting = await createAutomation(chat, { name: "waiting" });
+    setDue(chat, waiting.id, due);
+    let full = true;
+    const start = fakeStart(chat, () => (full ? "process" : null));
+    chat.app.automationScheduler.start();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toEqual([waiting.id]);
+    full = false;
+    for (let i = 0; i < 5; i++) await tick();
+    expect(start.calls).toEqual([waiting.id]);
+
+    const sessions = chat.app.sessions;
+    const createSend = sessions.createSend;
+    // the wake starts the run before the call answers, so only once
+    sessions.createSend = () => {
+      sessions.createSend = createSend;
+      throw new Error("send write failed");
+    };
+    const pending = chat.scripted.next();
+    const failed = await chat.member.call(
+      "POST",
+      `/api/sessions/${talk.sessionId}/compact`,
+    );
+    expect(failed.status).toBe(500);
+    const script = await pending;
+    expect(start.calls).toEqual([waiting.id, waiting.id]);
+    expect(row(chat, waiting.id).lastEventDueAt).toBe(due);
+    expect(chat.app.now.value).toBe(due);
+    start.restore();
+    chat.app.automationScheduler.stop();
+    script.reply("done");
+    await settleRun(chat, row(chat, waiting.id).lastRunSessionId!);
+    await chat.app.shutdown();
+  });
+
   test("two frees and a cap raise together start each waiting fire once", async () => {
     const { chat } = await stopped();
     const held = await holdSlot(chat);

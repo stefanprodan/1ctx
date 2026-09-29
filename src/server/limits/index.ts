@@ -59,10 +59,10 @@ export type LimitsArea = {
 // project's than the process's
 function ordered(caps: SendCaps): void {
   if (caps.sendsPerUser > caps.sendsPerProject) {
-    throw new BadRequest("sendsPerUser must not exceed sendsPerProject");
+    throw new BadRequest("sendsPerUser must not be above sendsPerProject");
   }
   if (caps.sendsPerProject > caps.sendsRunning) {
-    throw new BadRequest("sendsPerProject must not exceed sendsRunning");
+    throw new BadRequest("sendsPerProject must not be above sendsRunning");
   }
 }
 

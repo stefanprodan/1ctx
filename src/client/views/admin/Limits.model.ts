@@ -268,7 +268,32 @@ export function collect(
     if (why !== null) return { problem: why, field: row.name };
     values[row.name] = read(row, text) as number;
   }
-  return { values };
+  const out = unordered(rows, values);
+  return out ?? { values };
+}
+
+// each pair reads lower first; the server refuses a save that breaks one
+const ORDERED: readonly [LimitName, LimitName][] = [
+  ["sendsPerUser", "sendsPerProject"],
+  ["sendsPerProject", "sendsRunning"],
+];
+
+// the pair a draft breaks, put on the field that was changed
+function unordered(
+  rows: LimitRow[],
+  values: Record<LimitName, number>,
+): { problem: string; field: LimitName } | null {
+  for (const [low, high] of ORDERED) {
+    const lowRow = rows.find((row) => row.name === low);
+    const highRow = rows.find((row) => row.name === high);
+    if (lowRow === undefined || highRow === undefined) continue;
+    if (values[low] <= values[high]) continue;
+    return {
+      problem: `${LIMIT_WORDS[low].label} must not be above ${LIMIT_WORDS[high].label}`,
+      field: values[low] !== lowRow.value ? low : high,
+    };
+  }
+  return null;
 }
 
 export function seedOf(rows: LimitRow[]): string {
@@ -279,6 +304,20 @@ export function seedOf(rows: LimitRow[]): string {
 export function limitFieldOf(message: string): LimitName | undefined {
   const name = message.split(" ", 1)[0] as LimitName;
   return name in LIMIT_WORDS ? name : undefined;
+}
+
+// a server refusal in the page's words: each limit's name becomes its
+// label, the field kept from the name it opened with
+export function limitRefusal(message: string): {
+  words: string;
+  field: LimitName | undefined;
+} {
+  const words = message.replace(/\b[a-z][A-Za-z]+\b/g, (word) =>
+    Object.hasOwn(LIMIT_WORDS, word)
+      ? LIMIT_WORDS[word as LimitName].label
+      : word,
+  );
+  return { words, field: limitFieldOf(message) };
 }
 
 export function dirty(rows: LimitRow[], draft: Record<string, string>) {
