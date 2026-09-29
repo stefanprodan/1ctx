@@ -96,8 +96,7 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 (what `make smoke` runs), vendor-test.sh, brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
-                run by hand, *-record.ts, five of them over record-cases.ts
-                (vendor/README.md) and deciders-record.ts
+                run by hand, *-record.ts, six of them over record-cases.ts
                 (diff-record.ts among them, with diff-patch-check.ts
                 beside it; vendor/README.md) and deciders-record.ts
                 (docs/providers.md).
