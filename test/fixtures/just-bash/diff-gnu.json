@@ -5760,6 +5760,114 @@
       ],
       "stdout": "0a1,7\n> a\n> b\n> c\n> d\n> e\n> f\n> g\n",
       "exit": 1
+    },
+    {
+      "name": "exclude an upper case class",
+      "args": [
+        "-q",
+        "-x",
+        "[[:upper:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a negated class",
+      "args": [
+        "-q",
+        "-x",
+        "[![:lower:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a space class",
+      "args": [
+        "-q",
+        "-x",
+        "*[[:space:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude two classes",
+      "args": [
+        "-q",
+        "-x",
+        "[[:punct:][:upper:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an unknown class",
+      "args": [
+        "-q",
+        "-x",
+        "[[:foo:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an open bracket",
+      "args": [
+        "-q",
+        "-x",
+        "[[:alpha:]",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a bracket first",
+      "args": [
+        "-q",
+        "-x",
+        "[]a]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an escaped star",
+      "args": [
+        "-q",
+        "-x",
+        "\\*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude from a directory",
+      "args": [
+        "-X",
+        "d1",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
     }
   ],
   "links": {

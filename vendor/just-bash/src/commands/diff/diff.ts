@@ -24,7 +24,7 @@ import { DiffWorkLimitError, workBudget } from "./budget.js";
 import { excludePatterns } from "./names.js";
 import { DiffUsageError, parseDiffArgs } from "./options.js";
 import { anyPattern, type LineTest } from "./patterns.js";
-import { DiffRun, Fatal } from "./run.js";
+import { DiffRun, errorWords, Fatal } from "./run.js";
 
 export { STEPS_PER_UNIT } from "./budget.js";
 
@@ -139,7 +139,7 @@ async function excludeFiles(
       patterns.push(...excludePatterns(decodeBytesToUtf8(bytes)));
     } catch (error) {
       rethrowFatalExecutionError(error);
-      throw new Fatal(`${file}: No such file or directory`);
+      throw new Fatal(`${file}: ${errorWords(error)}`);
     }
   }
   return patterns;

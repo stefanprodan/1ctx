@@ -61,7 +61,7 @@ function errorCode(error: unknown): string {
   return /^(E[A-Z]+)\b/.exec(message)?.[1] ?? "EIO";
 }
 
-function errorWords(error: unknown): string {
+export function errorWords(error: unknown): string {
   switch (errorCode(error)) {
     case "ENOENT":
       return "No such file or directory";
@@ -163,6 +163,8 @@ export class DiffRun {
   }
 
   private message(words: string): void {
+    // a wide tree's Only in and type lines cost their bytes
+    this.budget.charge(words.length + 1);
     this.out.push(text(`${this.o.mergeAssist ? " " : ""}${words}`));
   }
 

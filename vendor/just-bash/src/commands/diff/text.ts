@@ -25,6 +25,8 @@ import {
 } from "./options.js";
 import { headings, type LineTest, markIgnorable } from "./patterns.js";
 
+/** Bytes of the identical check that make a step. */
+const SAME_BYTES = 8;
 /** Steps a byte of folding and of regex matching are charged. */
 const FOLD_STEPS = 8;
 const MATCH_STEPS = 8;
@@ -92,6 +94,8 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
     status: 1,
     began: false,
   });
+  // many identical pairs in a tree cost their bytes too
+  budget.charge(Math.ceil((a.bytes.length + b.bytes.length) / SAME_BYTES));
   if (
     a.bytes === b.bytes &&
     (o.brief ||

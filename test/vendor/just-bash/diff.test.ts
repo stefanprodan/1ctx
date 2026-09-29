@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
+import { formatSide } from "../../../vendor/just-bash/src/commands/diff/format-side.ts";
 
 function shell(files: Record<string, string | Uint8Array>) {
   const fs = new InMemoryFs({}, {});
@@ -192,6 +193,66 @@ describe("diff", () => {
     expect(result.stdout).toBe("");
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain("work limit exceeded");
+  });
+
+  test("charges a wide tree's messages and identical pairs", async () => {
+    const limits = { maxLoopIterations: 1000 };
+    const wide = new InMemoryFs({}, {});
+    wide.mkdirSync("/w/d2", { recursive: true });
+    for (let i = 0; i < 2000; i++) {
+      wide.writeFileSync(`/w/d1/${"n".repeat(600)}${i}`, "");
+    }
+    const only = await new Bash({
+      fs: wide,
+      cwd: "/w",
+      executionLimits: limits,
+    }).exec("diff d1 d2 > /dev/null");
+    expect(only.exitCode).toBe(2);
+    expect(only.stderr).toContain("work limit exceeded");
+
+    const same = new InMemoryFs({}, {});
+    const text = "x".repeat(300000);
+    for (let i = 0; i < 20; i++) {
+      same.writeFileSync(`/w/d1/f${i}`, text);
+      same.writeFileSync(`/w/d2/f${i}`, text);
+    }
+    const bash = new Bash({ fs: same, cwd: "/w", executionLimits: limits });
+    expect((await bash.exec("diff d1/f0 d2/f0")).exitCode).toBe(0);
+    const tree = await bash.exec("diff -r d1 d2");
+    expect(tree.exitCode).toBe(2);
+    expect(tree.stderr).toContain("work limit exceeded");
+  });
+
+  test("charges the spaces a backspace pads to side by side", () => {
+    let charged = 0;
+    const out: string[] = [];
+    formatSide(
+      { lines: ["\t\ba"], incomplete: false },
+      { lines: [""], incomplete: false },
+      [],
+      {
+        width: 3000000,
+        expandTabs: false,
+        tabSize: 1000000,
+        leftColumn: false,
+        suppressCommonLines: false,
+        mergeAssist: false,
+        charge: (steps) => {
+          charged += steps;
+        },
+      },
+      out,
+    );
+    const spaces = out.join("").split(" ").length - 1;
+    expect(spaces).toBe(999999);
+    expect(charged).toBeGreaterThanOrEqual(spaces);
+  });
+
+  test("says why an exclude file cannot be read", async () => {
+    const { bash } = shell({ a: "a\n", b: "b\n", "d/f": "x\n" });
+    const result = await bash.exec("diff -X d a b");
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toBe("diff: d: Is a directory\n");
   });
 
   test("names both files when neither exists under -N", async () => {

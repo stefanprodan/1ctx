@@ -123,7 +123,10 @@ class Printer {
         i++;
         if (inPos !== 0 && --inPos < bound) {
           if (outPos <= inPos) {
-            if (outPos < inPos) out.push(" ".repeat(inPos - outPos));
+            if (outPos < inPos) {
+              style.charge(inPos - outPos);
+              out.push(" ".repeat(inPos - outPos));
+            }
             outPos = inPos;
           } else {
             outPos = inPos;
