@@ -293,8 +293,41 @@ export const jqCommand: RuntimeCommand = {
       maxElements: ctx.limits.maxQueryElements,
     };
 
+    const operand = (a: string): ExecResult | undefined => {
+      if (!filterSet) {
+        // The first non-option token is always the filter, even when a
+        // positional mode has already been enabled by --args/--jsonargs.
+        filter = a;
+        filterSet = true;
+      } else if (positionalMode === "args") {
+        positionalArgs.push(a);
+      } else if (positionalMode === "jsonargs") {
+        let parsed: unknown[];
+        try {
+          parsed = parseJsonStream(a.trim(), jsonLimits);
+        } catch {
+          return jqArgError("invalid JSON text passed to --jsonargs");
+        }
+        if (parsed.length !== 1) {
+          return jqArgError("invalid JSON text passed to --jsonargs");
+        }
+        positionalArgs.push(parsed[0] as QueryValue);
+      } else {
+        files.push(a);
+      }
+      return undefined;
+    };
+
+    let optionsEnded = false;
     for (let i = 0; i < args.length; i++) {
       const a = args[i];
+      // (1ctx) `--` ends the options, as in jq 1.8
+      if (optionsEnded || a === "--") {
+        const error = optionsEnded ? operand(a) : undefined;
+        if (error) return error;
+        optionsEnded = true;
+        continue;
+      }
       if (a === "-R" || a === "--raw-input") rawInput = true;
       else if (a === "-r" || a === "--raw-output") raw = true;
       else if (a === "-c" || a === "--compact-output") compact = true;
@@ -390,26 +423,9 @@ export const jqCommand: RuntimeCommand = {
             /* ignored */
           } else return unknownOption("jq", `-${c}`);
         }
-      } else if (!filterSet) {
-        // The first non-option token is always the filter, even when a
-        // positional mode has already been enabled by --args/--jsonargs.
-        filter = a;
-        filterSet = true;
-      } else if (positionalMode === "args") {
-        positionalArgs.push(a);
-      } else if (positionalMode === "jsonargs") {
-        let parsed: unknown[];
-        try {
-          parsed = parseJsonStream(a.trim(), jsonLimits);
-        } catch {
-          return jqArgError("invalid JSON text passed to --jsonargs");
-        }
-        if (parsed.length !== 1) {
-          return jqArgError("invalid JSON text passed to --jsonargs");
-        }
-        positionalArgs.push(parsed[0] as QueryValue);
       } else {
-        files.push(a);
+        const error = operand(a);
+        if (error) return error;
       }
     }
 

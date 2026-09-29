@@ -19,6 +19,8 @@ export const exprCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
+    // (1ctx) a leading `--` is dropped, as GNU expr does
+    if (args[0] === "--") args = args.slice(1);
     if (args.length === 0) {
       return {
         stdout: "",

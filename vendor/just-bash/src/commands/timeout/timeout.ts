@@ -65,6 +65,10 @@ export const timeoutCommand: RuntimeCommand = {
         commandStart = i + 1;
       } else if (arg.startsWith("--signal=")) {
         commandStart = i + 1;
+      } else if (arg === "--") {
+        // (1ctx) `--` ends the options, as in GNU timeout
+        commandStart = i + 1;
+        break;
       } else if (arg.startsWith("--") && arg !== "--") {
         return unknownOption("timeout", arg);
       } else if (arg.startsWith("-") && arg.length > 1 && arg !== "--") {

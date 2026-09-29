@@ -17,6 +17,8 @@ async function tacExecute(
   args: string[],
   ctx: RuntimeCommandContext,
 ): Promise<ExecResult> {
+  // (1ctx) `--` ends the options, as in GNU tac
+  if (args[0] === "--") args = args.slice(1);
   if (args.length > 0 && args[0] !== "-") {
     // Try to read from file
     const filePath = ctx.fs.resolvePath(ctx.cwd, args[0]);

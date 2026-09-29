@@ -399,7 +399,12 @@ export const fileCommand: RuntimeCommand = {
     let dereference = false;
     const files: string[] = [];
 
-    for (const arg of args) {
+    for (const [i, arg] of args.entries()) {
+      // (1ctx) `--` ends the options, as in file 5
+      if (arg === "--") {
+        files.push(...args.slice(i + 1));
+        break;
+      }
       if (arg.startsWith("--")) {
         if (arg === "--brief") brief = true;
         else if (arg === "--mime" || arg === "--mime-type") mimeMode = true;

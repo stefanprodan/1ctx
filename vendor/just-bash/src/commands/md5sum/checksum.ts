@@ -157,7 +157,12 @@ export function createChecksumCommand(
       let check = false;
       const files: string[] = [];
 
-      for (const arg of args) {
+      for (const [i, arg] of args.entries()) {
+        // (1ctx) `--` ends the options, as in GNU coreutils
+        if (arg === "--") {
+          files.push(...args.slice(i + 1));
+          break;
+        }
         if (arg === "-c" || arg === "--check") check = true;
         else if (
           arg === "-b" ||

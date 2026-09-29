@@ -152,8 +152,10 @@ export const findCommand: RuntimeCommand = {
 
     // Starting points must precede the expression. Separating them first keeps
     // predicate operands and -exec command arguments from being mistaken for paths.
+    // (1ctx) a leading `--` ends the options, as in GNU find
+    const firstPath = args[0] === "--" ? 1 : 0;
     let expressionStart = args.length;
-    for (let i = 0; i < args.length; i++) {
+    for (let i = firstPath; i < args.length; i++) {
       const arg = args[i];
       if (
         arg.startsWith("-") ||
