@@ -12,7 +12,7 @@ import type {
   visualGround,
   visualSchemeQuery,
 } from "./visual-scheme.ts";
-import type { visualThemeValues } from "./visual-theme.ts";
+import type { VISUAL_BACKDROPS, visualThemeValues } from "./visual-theme.ts";
 
 export type VisualMessage =
   | { type: "paint" | "final"; html: string }
@@ -93,6 +93,7 @@ type PainterHelpers = {
   query: typeof visualSchemeQuery;
   contrast: typeof visualContrast;
   ground: typeof visualGround;
+  backdrops: typeof VISUAL_BACKDROPS;
 };
 type Morpher = {
   morph(
@@ -210,6 +211,7 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
               !!channels(body.backgroundColor),
           },
           helpers.contrast,
+          helpers.backdrops,
         ));
       }
       html.toggleAttribute("data-visual-bare", bare);

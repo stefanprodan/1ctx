@@ -64,13 +64,19 @@ export function refused(
 ): { content: string; error: true; tail: number } {
   const words = error instanceof Error ? error.message : String(error);
   const exit = `exit ${exitCode}`;
-  // at most half the room past the mark, so some output always shows
+  const whole = `nothing saved: ${words}`;
+  // at most half the room past the mark, so some output always shows,
+  // and never less than the refusal itself
   const line = cutText(
-    `nothing saved: ${words}`,
-    Math.floor((resultCut - mark(resultCut).length - exit.length - 3) / 2),
+    whole,
+    Math.max(
+      "nothing saved".length,
+      Math.floor((resultCut - mark(resultCut).length - exit.length - 3) / 2),
+    ),
   );
   const tail = `${line}\n${exit}`;
-  const short = cutText(tail, resultCut);
+  // with no room for output and exit, the refusal alone, as failed() says it
+  const short = cutText(whole, resultCut);
   const content = bounded(stdout, stderr, tail, resultCut) ?? {
     content: short,
     tail: short.length,

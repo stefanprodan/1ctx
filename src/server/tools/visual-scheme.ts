@@ -31,6 +31,8 @@ export function visualGround(
     color: boolean;
   },
   contrast: (a: number[], b: number[]) => number,
+  // the backdrops the frame paints, from visual-theme.ts
+  backdrops: { light: number[]; dark: number[] },
 ): { bare: boolean; backdrop: "light" | "dark" | null } {
   const { text, chat } = page;
   if (!text) return { bare: false, backdrop: null };
@@ -40,7 +42,7 @@ export function visualGround(
   return {
     bare: false,
     backdrop:
-      contrast(text, [255, 255, 255]) >= contrast(text, [0, 0, 0])
+      contrast(text, backdrops.light) >= contrast(text, backdrops.dark)
         ? "light"
         : "dark",
   };

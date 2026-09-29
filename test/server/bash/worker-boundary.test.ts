@@ -71,6 +71,21 @@ describe("a command worker's answer is untrusted", () => {
       await expect(fetch(url)).rejects.toThrow("only http and https");
   });
 
+  test("a refusal that carries changes saves nothing", async () => {
+    const s = setup({}, FORGED);
+    try {
+      const result = await run(s, "refused");
+      expect(result).toMatchObject({
+        error: true,
+        content: "printed\nnothing saved: why\nexit 0",
+      });
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
+      expect(s.bash.scratch.read(s.session.id).revision).toBe(0);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("a doc change with the docs off saves nothing", async () => {
     const s = setup({}, FORGED);
     try {

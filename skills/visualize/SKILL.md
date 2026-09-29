@@ -110,7 +110,9 @@ Do not fill the budget with embedded assets or repeated geometry.
 
 ## Use the supplied design system
 
-The outer background is transparent. Use flat surfaces, spacing and
+The outer background is transparent. A whole page whose text does not
+read on the chat, and that paints no background of its own, gets a plain
+light or dark backdrop instead. Use flat surfaces, spacing and
 alignment, not gradients, shadows, blur, glow, neon or emoji. Colour
 encodes meaning; use two or three categories rather than a rainbow.
 Pair colour with a label, shape or line pattern.

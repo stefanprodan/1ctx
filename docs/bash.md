@@ -58,12 +58,14 @@ changes to it, its recorders) in `vendor/README.md`.
   `resultCut` with a mark, then the tail the cuts keep whole: `exit N`
   and the receipts when the command saved, `nothing saved: <reason>`
   and `exit N` when it ran but saved nothing (exit 124 or 126, a
-  refused diff, a cap, a conflict, an answer out of protocol), so the
-  agent sees what the command printed and the refusal stays last. The
-  reason takes at most half the room past the mark. A worker's diff
-  that throws answers `refused` with the output instead of failing the
-  job. A command that never answered is `nothing saved: <reason>`
-  alone.
+  refused diff, a cap, a conflict, a well-formed answer the mount's
+  checks refuse), so the agent sees what the command printed and the
+  refusal stays last. The reason takes at most half the room past the
+  mark, never less than `nothing saved`; a cut too narrow for output
+  and exit returns the refusal alone. A worker's diff that throws
+  answers `refused` with the output instead of failing the job. A
+  command that never answered, or whose answer fails the shape check
+  (`command answer malformed`), is `nothing saved: <reason>` alone.
 - **Mounted files keep their times.** A doc mounts with its
   `updated_at`, an upload with its `created_at`, a scratch file with the
   session's `used_at`, a folder with its newest file's time, so `ls -t`

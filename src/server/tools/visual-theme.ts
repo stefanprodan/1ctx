@@ -74,6 +74,15 @@ ${root} svg .c-${name} text.ts { fill: ${border}; }`;
 ${classes.join("\n")}`;
 }
 
+// the plain backdrops a page gets when its text reads on neither the chat
+// nor a background of its own, as sRGB channels the frame compares
+export const VISUAL_BACKDROPS = {
+  light: [255, 255, 255],
+  dark: [26, 26, 24],
+};
+const backdrop = (scheme: keyof typeof VISUAL_BACKDROPS) =>
+  `:root[data-visual-backdrop="${scheme}"] { background: rgb(${VISUAL_BACKDROPS[scheme].join(" ")}); }`;
+
 // in a layer, so any rule the visual writes wins over these defaults
 // whatever its specificity
 export const VISUAL_THEME_CSS = `@layer frame {
@@ -129,8 +138,9 @@ html, body { background: transparent; }
 :root[data-visual-bare], :root[data-visual-bare] body {
   background: transparent !important; margin: 0 !important; padding: 0 !important;
 }
-:root[data-visual-backdrop="light"] { background: #ffffff; }
-:root[data-visual-backdrop="dark"] { background: #1a1a18; }
+${backdrop("light")}
+${backdrop("dark")}
+:root[data-visual-backdrop] body { padding: 8px; }
 body {
   font-family: var(--font-sans); font-size: 16px; line-height: 1.7;
   color: var(--color-text-primary); -webkit-font-smoothing: antialiased;

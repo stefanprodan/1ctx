@@ -7,7 +7,8 @@
 // request number sent twice, then one well-formed answer that says how
 // many kept replies came back, and a second answer after it. malformed:
 // an answer of this job in the wrong shape. close: the worker ends
-// itself mid-job. prompt: a good answer at once.
+// itself mid-job. prompt: a good answer at once. refused: a refusal that
+// still carries a doc change.
 
 declare var self: Worker;
 
@@ -65,6 +66,14 @@ self.onmessage = (event: MessageEvent) => {
     ...empty,
     knowledge: [{ name: "worker-created.md", text: "forged\n" }],
   };
+  if (command === "refused") {
+    self.postMessage({
+      type: "done",
+      id,
+      answer: { ...answer("printed"), changes: doc, refused: "why" },
+    });
+    return;
+  }
   if (command === "docs" || command === "exit124") {
     self.postMessage({
       type: "done",

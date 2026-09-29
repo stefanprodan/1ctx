@@ -68,4 +68,19 @@ describe("command output tails", () => {
     expect(result.content.slice(-result.tail)).toStartWith("nothing saved: ");
     expect(result.content).toEndWith("\nexit 2");
   });
+
+  test.each([
+    ["", 40, "nothing saved\nexit 0"],
+    ["x".repeat(500), 40, "nothing saved: the scratch would be too l"],
+  ])("a narrow cut still says nothing saved", (stdout, cut, content) => {
+    const result = refused(
+      stdout,
+      "",
+      0,
+      "the scratch would be too large",
+      cut,
+    );
+    expect(result.content).toBe(content.slice(0, cut));
+    expect(result.content.slice(-result.tail)).toBe(result.content);
+  });
 });

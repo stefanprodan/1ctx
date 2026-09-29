@@ -76,7 +76,7 @@ describe("a refused save keeps the command's output", () => {
       );
       const result = await run(
         s,
-        "echo edit > x.md; echo partial > second; grep -c . x.md; false",
+        "echo edit > x.md; echo partial > second; echo t > /tmp/t; grep -c . x.md; false",
       );
       expect(result.error).toBe(true);
       expect(result.content).toBe(
@@ -86,6 +86,7 @@ describe("a refused save keeps the command's output", () => {
       expect(s.knowledge.store.byName(s.projectId, "x.md")?.text).toBe(
         "racing",
       );
+      expect(scratchState(s)).toMatchObject({ files: 0, revision: 0 });
     } finally {
       s.db.close();
     }

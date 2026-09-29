@@ -24,7 +24,10 @@ import {
   visualScript,
   visualShell,
 } from "../../../src/server/tools/visual-shell.ts";
-import { visualThemeValues } from "../../../src/server/tools/visual-theme.ts";
+import {
+  VISUAL_BACKDROPS,
+  visualThemeValues,
+} from "../../../src/server/tools/visual-theme.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 import fixture from "../../fixtures/tools/visual-inert.json";
 
@@ -445,6 +448,7 @@ function painter(scripts: VisualScript[], look?: Look) {
       query: visualSchemeQuery,
       contrast: visualContrast,
       ground: visualGround,
+      backdrops: VISUAL_BACKDROPS,
     },
     { morph: () => morphs.push(final) },
   );
@@ -757,6 +761,7 @@ test("the ground rule decides bare, backdrop or neither", () => {
     visualGround(
       { ...page, text: null, chat: night, ...fields },
       visualContrast,
+      VISUAL_BACKDROPS,
     );
   expect(decide({ text: white })).toEqual({ bare: true, backdrop: null });
   expect(decide({ text: ink })).toEqual({ bare: false, backdrop: "light" });
@@ -769,4 +774,10 @@ test("the ground rule decides bare, backdrop or neither", () => {
     backdrop: null,
   });
   expect(decide({})).toEqual({ bare: false, backdrop: null });
+  // mid grey reads better on white than on the dark backdrop, though not
+  // than on pure black
+  expect(decide({ text: [119, 119, 119] })).toEqual({
+    bare: false,
+    backdrop: "light",
+  });
 });
