@@ -88,6 +88,12 @@ export const envCommand: RuntimeCommand = {
       setVars.set(args[i].slice(0, eqIdx), args[i].slice(eqIdx + 1));
     }
     const commandStart = i < args.length ? i : -1;
+    // (1ctx) glibc's unsetenv refuses an empty name or one with `=`
+    for (const name of unsetVars) {
+      if (name === "" || name.includes("=")) {
+        return envFailure(`env: cannot unset '${name}': Invalid argument\n`);
+      }
+    }
 
     // Build the new environment
     let newEnv: Map<string, string>;
@@ -168,6 +174,7 @@ export const printenvCommand: RuntimeCommand = {
     }
 
     const vars = args.filter((arg) => !arg.startsWith("-"));
+    // (1ctx) the exported variables, as GNU printenv sees them
     const env = new Map(Object.entries(exportedEnv(ctx)));
 
     if (vars.length === 0) {

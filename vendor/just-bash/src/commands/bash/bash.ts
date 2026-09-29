@@ -153,6 +153,8 @@ async function executeScript(
   scriptArgs.forEach((arg, i) => {
     positionalEnv[String(i + 1)] = arg;
   });
+  // (1ctx) a new shell never takes IFS from its environment, as bash does
+  if ("IFS" in positionalEnv) positionalEnv.IFS = " \t\n";
 
   // Skip shebang line if present
   let scriptToRun = script;
@@ -180,6 +182,7 @@ async function executeScript(
       })
     : await ctx.exec(scriptToRun, {
         env: positionalEnv,
+        // (1ctx) as above
         replaceEnv: true,
         cwd: ctx.cwd,
         stdin: latin1FromBytes(ctx.stdin),

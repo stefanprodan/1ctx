@@ -776,6 +776,7 @@ export class Bash {
         extraArgs: effectiveOptions.args,
       };
 
+      // (1ctx) a new shell sets these itself, whatever its environment
       if (effectiveOptions.replaceEnv) {
         execEnv.set("SHELLOPTS", buildShellopts(execState.options));
         execEnv.set("BASHOPTS", buildBashopts(execState.shoptOptions));

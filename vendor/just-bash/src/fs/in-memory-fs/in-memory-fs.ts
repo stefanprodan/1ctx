@@ -568,6 +568,7 @@ export class InMemoryFs implements IFileSystem {
   private resolveIntermediateSymlinks(path: string): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
+    // (1ctx) no symlink in the tree, nothing to resolve
     if (this.symlinks === 0) return normalized;
 
     const parts = normalized.slice(1).split("/");
@@ -616,6 +617,7 @@ export class InMemoryFs implements IFileSystem {
   private resolvePathWithSymlinks(path: string): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
+    // (1ctx) no symlink in the tree, nothing to resolve
     if (this.symlinks === 0) return normalized;
 
     const parts = normalized.slice(1).split("/");
@@ -728,6 +730,7 @@ export class InMemoryFs implements IFileSystem {
     }
 
     const entries: DirentEntry[] = [];
+    // (1ctx) the directory's own children, not a scan of every path
     for (const name of this.children.get(normalized) ?? []) {
       const fsEntry = this.data.get(joinPath(normalized, name));
       if (!fsEntry) continue;

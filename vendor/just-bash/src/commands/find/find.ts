@@ -887,6 +887,9 @@ export const findCommand: RuntimeCommand = {
             part === "{}" ? file : part,
           );
           const result = await ctx.exec(shellJoinArgs([cmdWithFile[0]]), {
+            // (1ctx) the command is a process: it sees the exported variables
+            env: { ...ctx.exportedEnv },
+            replaceEnv: true,
             cwd: ctx.cwd,
             signal: ctx.signal,
             args: cmdWithFile.slice(1),
@@ -910,6 +913,9 @@ export const findCommand: RuntimeCommand = {
         else cmdWithFiles.push(part);
       }
       const result = await ctx.exec(shellJoinArgs([cmdWithFiles[0]]), {
+        // (1ctx) as above
+        env: { ...ctx.exportedEnv },
+        replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
         args: cmdWithFiles.slice(1),

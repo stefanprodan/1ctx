@@ -149,6 +149,9 @@ export const timeoutCommand: RuntimeCommand = {
 
       const execPromise = ctx
         .exec(shellJoinArgs([commandArgs[0]]), {
+          // (1ctx) the command is a process: it sees the exported variables
+          env: { ...ctx.exportedEnv },
+          replaceEnv: true,
           cwd: ctx.cwd,
           signal: combinedAbort.signal,
           stdin: latin1FromBytes(ctx.stdin),

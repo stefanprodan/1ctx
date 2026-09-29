@@ -366,6 +366,8 @@ export const xargsCommand: RuntimeCommand = {
       // environment does
       const execOptions = {
         env: { ...ctx.exportedEnv },
+        // (1ctx) only them, not the first shell's variables
+        replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
         args: cmdArgs.slice(1),
