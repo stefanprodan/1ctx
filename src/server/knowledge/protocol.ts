@@ -75,7 +75,9 @@ export type ToWorker =
       type: "kept";
       id: string;
       request: number;
-      data: Uint8Array | null;
+      // the bytes, or why the read failed, which the command sees
+      data?: Uint8Array;
+      error?: string;
     }
   | {
       type: "fetched";
@@ -95,6 +97,8 @@ export type FromWorker =
       url: string;
       options: FetchRequest;
     }
+  // curl gave up on a fetch it asked for, as timeout does
+  | { type: "abort"; id: string; request: number }
   | { type: "done"; id: string; answer: Answer }
   | { type: "failed"; id: string; message: string };
 
@@ -244,6 +248,10 @@ export function fromWorker(
       return keys(value, ["type", "id", "request", "index"]) &&
         isCount(value.request) &&
         isCount(value.index)
+        ? (value as FromWorker)
+        : null;
+    case "abort":
+      return keys(value, ["type", "id", "request"]) && isCount(value.request)
         ? (value as FromWorker)
         : null;
     case "fetch":

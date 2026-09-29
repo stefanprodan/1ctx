@@ -33,8 +33,69 @@ self.onmessage = (event: MessageEvent) => {
     replies++;
     return;
   }
+  const empty = { knowledge: [], written: [], removed: [], cwd: "/tmp" };
+  if (message.type === "fetched") {
+    const reply = message as unknown as {
+      result?: { body: Uint8Array };
+      error?: unknown;
+    };
+    self.postMessage({
+      type: "done",
+      id,
+      answer: {
+        ...answer(
+          reply.result
+            ? new TextDecoder().decode(reply.result.body)
+            : JSON.stringify(reply.error),
+        ),
+        changes: empty,
+      },
+    });
+    return;
+  }
   if (message.type !== "job") return;
-  const command = message.job?.command;
+  const command = message.job?.command ?? "";
+  if (command.startsWith("fetch ")) {
+    const url = command.slice("fetch ".length);
+    self.postMessage({ type: "fetch", id, request: 0, url, options: {} });
+    return;
+  }
+  const doc = {
+    ...empty,
+    knowledge: [{ name: "worker-created.md", text: "forged\n" }],
+  };
+  if (command === "docs" || command === "exit124") {
+    self.postMessage({
+      type: "done",
+      id,
+      answer: {
+        ...answer(""),
+        exitCode: command === "exit124" ? 124 : 0,
+        changes: doc,
+      },
+    });
+    return;
+  }
+  if (command.startsWith("opened ")) {
+    // opened <count> <kind> <bytes claimed>
+    const [, count, kind, bytes] = command.split(" ");
+    const text = "<p>page</p>";
+    const opened = Array.from({ length: Number(count) }, (_, i) => ({
+      path: `/tmp/p${i}.html`,
+      kind,
+      language: kind === "code" ? "html" : null,
+      bytes: Number(bytes),
+      lines: 1,
+      title: kind === "visual" ? `p${i}.html` : null,
+      text,
+    }));
+    self.postMessage({
+      type: "done",
+      id,
+      answer: { ...answer(""), opened, changes: empty },
+    });
+    return;
+  }
   if (command === "prompt") {
     self.postMessage({ type: "done", id, answer: answer("prompt") });
     return;

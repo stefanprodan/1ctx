@@ -133,13 +133,22 @@ our changes to just-bash and the upstream sync are in
   warning; doc names and scratch paths must pass the knowledge name
   rule, a delete must name a mounted doc and a removal a mounted scratch
   file, and the commit counts the scratch totals and checks its names
-  from the rows it wrote, so no answer passes the caps. The
-  worker never opens the database or holds a key: a kept MCP file is a
-  read request the server answers with `readKept`, the text read as a
-  blob and transferred (a read past the job's list answers empty), and
-  curl's fetch a
+  from the rows it wrote, so no answer passes the caps. The server
+  re-derives every decision from what it holds: with the docs off any
+  doc change is out of protocol, an exit 124 or 126 discards whatever
+  came with it, and `checkOpened()` takes an opened record only as
+  `open` would make it from its path and text (a mounted path, once,
+  at most `MAX_OPENS_PER_COMMAND`, within the file cap, the kind, bytes,
+  lines and title derived under the Visuals row). The worker never
+  opens the database or holds a key: a kept MCP file is a read request
+  the server answers with `readKept`, the text read as a blob and
+  transferred; a failed read, or one past the job's list, is answered
+  as an error the command sees as a failed read. curl's fetch is a
   request the server runs through `commandFetch()` with the command's
-  credentials, answering with the capped, redacted result. The deadline
+  credentials, which refuses every scheme but http and https itself,
+  answering with the capped, redacted result; curl giving up on a fetch
+  (`timeout`) rejects it in the worker and posts an abort that ends
+  that fetch alone on the server. The deadline
   starts before the queues; the interpreter's own `maxExecutionTimeMs`
   stops `INTERPRETER_MARGIN_MS` sooner, so its exit 124 and words
   usually win, and at the deadline the worker is ended at once. A caller's

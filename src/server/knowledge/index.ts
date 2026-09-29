@@ -55,6 +55,8 @@ export type KnowledgeDeps = {
   log: Log;
   // the command worker entry, built where the binary resolves it
   worker: URL;
+  // each phase a command's worker reports, by chat; a test waits on it
+  onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
 };
 export type KnowledgeCapability = KnowledgePort & {
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
@@ -211,6 +213,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           clock: deps.clock,
           workers,
           current: () => deps.limits.current(),
+          ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
         },
         projectId,
         sessionId,

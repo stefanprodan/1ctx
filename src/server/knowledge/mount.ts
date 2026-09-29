@@ -18,7 +18,12 @@ import { COMMAND_ITERATIONS } from "./commands.ts";
 import { type Change, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
-import { type OpenedRecord, openedReceipt } from "./open.ts";
+import {
+  checkOpened,
+  mountPath,
+  type OpenedRecord,
+  openedReceipt,
+} from "./open.ts";
 import { failed, output } from "./output.ts";
 import type {
   Changes,
@@ -29,7 +34,6 @@ import type {
 import { acquire, acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import type { KnowledgeStore } from "./store.ts";
-import { mountPath } from "./tree.ts";
 import type { UploadStore } from "./uploads.ts";
 import type { CommandWorkers } from "./worker.ts";
 
@@ -66,16 +70,22 @@ type MountDeps = {
   clock: Clock;
   workers: CommandWorkers;
   current(): KnowledgeCaps;
+  // each phase a command's worker reports, by chat
+  onPhase?(sessionId: string, phase: "run" | "diff"): void;
 };
 
-// what the worker answered, held to the mounted trees: a delete names a
-// mounted doc, no name twice, and scratch removes only what it mounted,
-// since a command inside could post an answer of its own
+// what the worker answered, held to the mounted trees: no doc changes
+// with the docs off, a delete names a mounted doc, no name twice, and
+// scratch removes only what it mounted, since a command inside could
+// post an answer of its own
 function checked(
-  changes: Changes,
+  changes: Changes | null,
   docs: ReadonlyMap<string, KnowledgeFile>,
   scratch: Scratch,
+  knowledge: boolean,
 ): Changes {
+  if (changes === null || (!knowledge && changes.knowledge.length > 0))
+    throw new Error("the command worker answered out of protocol");
   const names = new Set(changes.knowledge.map((change) => change.name));
   const written = new Set(changes.written.map((file) => file.path));
   const mounted = new Set(scratch.entries.map((file) => file.path));
@@ -200,7 +210,12 @@ export async function run(
             })
           : null,
       },
-      { signal, deadline: deadline.signal, chat: sessionId },
+      {
+        signal,
+        deadline: deadline.signal,
+        chat: sessionId,
+        phase: (reached) => deps.onPhase?.(sessionId, reached),
+      },
     );
     if (!settled.ok) {
       phase = settled.phase;
@@ -212,7 +227,8 @@ export async function run(
     phase = "diff";
     notice = answer.notice;
     combined.throwIfAborted();
-    if (answer.changes === null) {
+    // the exit decides, whatever changes came with it
+    if (answer.exitCode === 124 || answer.exitCode === 126) {
       const printed = output(
         answer.stdout,
         `${answer.stderr}\nnothing saved: command stopped at a deadline or limit`,
@@ -232,7 +248,12 @@ export async function run(
       };
     }
     const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
-    const answered = checked(answer.changes, mounted, scratch);
+    const answered = checked(answer.changes, mounted, scratch, docs);
+    const opened = checkOpened(answer.opened, {
+      knowledgeFileBytes: storage.knowledgeFileBytes,
+      visuals: caps.visuals,
+      knowledge: docs,
+    });
     const changes: Change[] = answered.knowledge.map((change) => ({
       name: change.name,
       before: mounted.get(change.name) ?? null,
@@ -259,7 +280,7 @@ export async function run(
         stderr: answer.stderr,
         exitCode: answer.exitCode,
       },
-      answer.opened.map(openedReceipt),
+      opened.map(openedReceipt),
       caps.resultCut - notice.length,
       combined,
       deps.clock(),
@@ -268,7 +289,7 @@ export async function run(
       ...printed,
       content: notice + printed.content,
       error: answer.exitCode !== 0,
-      opened: answer.opened,
+      opened,
     };
   } catch (error) {
     const result = failed(error, caps.resultCut - notice.length);

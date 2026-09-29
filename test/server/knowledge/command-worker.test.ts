@@ -16,7 +16,14 @@ import {
 } from "../../../src/server/knowledge/worker.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
-import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
+import {
+  COMMAND_WORKER,
+  callCaps,
+  phaseWatch,
+  run,
+  setup,
+  untilPhase,
+} from "./helpers.ts";
 
 const MiB = 1024 * 1024;
 // limits high enough that a runaway never stops itself
@@ -41,7 +48,8 @@ const hooks: CommandHooks = { kept: () => null, fetch: null };
 const stops = (
   deadline = new AbortController().signal,
   signal = new AbortController().signal,
-) => ({ signal, deadline, chat: "chat" });
+  phase?: (phase: "run" | "diff") => void,
+) => ({ signal, deadline, chat: "chat", ...(phase ? { phase } : {}) });
 const BUSY = "while :; do :; done";
 const FORGED = new URL(
   "../../fixtures/knowledge/forged.worker.ts",
@@ -89,12 +97,13 @@ describe("the command worker", () => {
     const logs = collectLogs();
     const workers = commandWorkers(COMMAND_WORKER, logs.logFactory("k"), 5000);
     const abort = new AbortController();
+    const watch = phaseWatch();
     const pending = workers.run(
       job("sleep 30"),
       hooks,
-      stops(undefined, abort.signal),
+      stops(undefined, abort.signal, watch.phase),
     );
-    await Bun.sleep(300);
+    await watch.running;
     const started = performance.now();
     abort.abort(new Error("send stopped"));
     expect(await pending).toMatchObject({ ok: false, cause: "abort" });
@@ -106,12 +115,13 @@ describe("the command worker", () => {
     const logs = collectLogs();
     const workers = commandWorkers(COMMAND_WORKER, logs.logFactory("k"), 100);
     const abort = new AbortController();
+    const watch = phaseWatch();
     const pending = workers.run(
       job(BUSY),
       hooks,
-      stops(undefined, abort.signal),
+      stops(undefined, abort.signal, watch.phase),
     );
-    await Bun.sleep(300);
+    await watch.running;
     abort.abort(new Error("send stopped"));
     expect(await pending).toMatchObject({
       ok: false,
@@ -132,9 +142,19 @@ describe("the command worker", () => {
 
   test("shutdown ends every running job and refuses the next", async () => {
     const workers = commandWorkers(COMMAND_WORKER, silent);
-    const busy = workers.run(job(BUSY), hooks, stops());
-    const waiting = workers.run(job("sleep 30"), hooks, stops());
-    await Bun.sleep(300);
+    const first = phaseWatch();
+    const second = phaseWatch();
+    const busy = workers.run(
+      job(BUSY),
+      hooks,
+      stops(undefined, undefined, first.phase),
+    );
+    const waiting = workers.run(
+      job("sleep 30"),
+      hooks,
+      stops(undefined, undefined, second.phase),
+    );
+    await Promise.all([first.running, second.running]);
     workers.close();
     for (const settled of await Promise.all([busy, waiting])) {
       expect(settled).toMatchObject({ ok: false, cause: "abort" });
@@ -300,7 +320,7 @@ describe("the command worker", () => {
     const s = setup();
     try {
       const pending = run(s, "echo x > /knowledge/late; sleep 30");
-      await Bun.sleep(300);
+      await untilPhase(s);
       s.area.close();
       const result = await pending;
       expect(result).toEqual({

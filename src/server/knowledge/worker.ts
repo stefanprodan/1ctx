@@ -6,9 +6,10 @@
 // serves the streams. A job settles exactly once. A message of another
 // id, of an unknown shape or after the job settled is dropped, and so is
 // a second request under one number, since the commands inside can post
-// too; an answer of this job that does not check out fails it. A cancel lets the command stop on its own within a grace; past
-// it, or at the deadline, the worker is ended. The worker file is an
-// entry point of the compiled binary, where a URL resolves against the
+// too; an answer of this job that does not check out fails it. A
+// cancel lets the command stop on its own within a grace; past it, or
+// at the deadline, the worker is ended. The worker file is an entry
+// point of the compiled binary, where a URL resolves against the
 // compile root, so compose.ts builds it and passes it in.
 
 import type { SecureFetch } from "just-bash";
@@ -42,6 +43,8 @@ export type CommandStops = {
   deadline: AbortSignal;
   // the chat, for the log
   chat: string;
+  // each phase the worker reports, for a caller that waits on one
+  phase?: (phase: "run" | "diff") => void;
 };
 
 export type Settled =
@@ -62,6 +65,7 @@ export type CommandWorkers = {
 };
 
 const SHUTTING_DOWN = "the server is shutting down";
+const KEPT_FAILED = "the kept file could not be read";
 
 function fetchOptions(options: FetchRequest, signal: AbortSignal) {
   const { headers, ...rest } = options;
@@ -102,6 +106,7 @@ export function commandWorkers(
       // the server's fetches for this job
       const stop = new AbortController();
       const served = new Set<number>();
+      const fetches = new Map<number, AbortController>();
       let cancelling = false;
       let settled = false;
       let grace: ReturnType<typeof setTimeout> | undefined;
@@ -152,18 +157,18 @@ export function commandWorkers(
       const ended = (words: string) =>
         cancelling ? fail("abort") : fail("error", new Error(words));
       const serveKept = (request: number, index: number) => {
-        // a read past the job's list answers empty, never leaves it waiting
-        let data: Uint8Array | null = null;
+        // a failed read, or one past the job's list, which the worker never
+        // asks for, is answered as an error the command sees; a row gone
+        // since the mount reads empty, as it always has
+        let bytes: Uint8Array;
         try {
-          data = index < job.kept.length ? hooks.kept(index) : null;
+          if (index >= job.kept.length) throw new Error("not in the job");
+          bytes = owned(hooks.kept(index) ?? new Uint8Array());
         } catch {
-          data = null;
+          send({ type: "kept", id, request, error: KEPT_FAILED });
+          return;
         }
-        const bytes = data === null ? null : owned(data);
-        send(
-          { type: "kept", id, request, data: bytes },
-          bytes === null ? [] : transferOf([bytes]),
-        );
+        send({ type: "kept", id, request, data: bytes }, transferOf([bytes]));
       };
       const serveFetch = (
         request: number,
@@ -179,9 +184,14 @@ export function commandWorkers(
           });
           return;
         }
-        hooks.fetch(target, fetchOptions(options, stop.signal)).then(
+        // its own stop, so curl giving up on it (timeout) ends it alone
+        const own = new AbortController();
+        fetches.set(request, own);
+        const signal = AbortSignal.any([stop.signal, own.signal]);
+        hooks.fetch(target, fetchOptions(options, signal)).then(
           (result) => {
-            if (settled || cancelling) return;
+            fetches.delete(request);
+            if (settled || cancelling || own.signal.aborted) return;
             const body = owned(result.body);
             send(
               { type: "fetched", id, request, result: { ...result, body } },
@@ -189,7 +199,8 @@ export function commandWorkers(
             );
           },
           (error: unknown) => {
-            if (settled || cancelling) return;
+            fetches.delete(request);
+            if (settled || cancelling || own.signal.aborted) return;
             send({
               type: "fetched",
               id,
@@ -215,6 +226,7 @@ export function commandWorkers(
           case "phase":
             phase = message.phase;
             notice = message.notice;
+            stops.phase?.(message.phase);
             return;
           case "done":
             if (cancelling) fail("abort");
@@ -222,6 +234,10 @@ export function commandWorkers(
             return;
           case "failed":
             ended(message.message);
+            return;
+          case "abort":
+            fetches.get(message.request)?.abort();
+            fetches.delete(message.request);
             return;
           case "kept":
           case "fetch":

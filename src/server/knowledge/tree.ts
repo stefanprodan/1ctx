@@ -170,18 +170,6 @@ export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
 
 const home = (docs: boolean) => (docs ? "/knowledge" : "/tmp");
 
-// a cwd the server keeps: a normalized absolute path in one of the trees
-export function mountPath(path: string): boolean {
-  const parts = path.split("/").slice(1);
-  return (
-    path.startsWith("/") &&
-    Buffer.byteLength(path) <= 256 &&
-    !/\p{Cc}/u.test(path) &&
-    ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
-    parts.every((part) => part !== "" && part !== "." && part !== "..")
-  );
-}
-
 export async function savedCwd(
   fs: InMemoryFs,
   pwd: string | undefined,

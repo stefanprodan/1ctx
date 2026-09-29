@@ -62,6 +62,19 @@ function visualTitle(text: string, path: string): string {
 export const underKnowledge = (path: string) =>
   path === "/knowledge" || path.startsWith("/knowledge/");
 
+// a path the server takes from the command worker, a cwd or an opened
+// file: normalized, absolute, in one of the trees
+export function mountPath(path: string): boolean {
+  const parts = path.split("/").slice(1);
+  return (
+    path.startsWith("/") &&
+    Buffer.byteLength(path) <= 256 &&
+    !/\p{Cc}/u.test(path) &&
+    ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
+    parts.every((part) => part !== "" && part !== "." && part !== "..")
+  );
+}
+
 function mounted(path: string): boolean {
   return ["/knowledge", "/tmp", "/uploads", "/mcp"].some(
     (root) => path === root || path.startsWith(`${root}/`),
@@ -87,6 +100,63 @@ export function openedReceipt(file: OpenedRecord): string {
   }
   const kind = file.kind === "markdown" ? "Markdown" : "code";
   return `opened ${file.path} for the user as ${kind}, ${file.lines} lines. They see it now, so do not repeat its content.`;
+}
+
+// what open records of a file: the kind by extension and the Visuals row,
+// the rest read from the text
+export function openedRecord(
+  path: string,
+  text: string,
+  visuals: boolean,
+): OpenedRecord {
+  const extension = kindOf(path);
+  const visual = ["html", "htm", "svg"].includes(extension);
+  const bytes = Buffer.byteLength(text, "utf8");
+  const kind = ["md", "markdown"].includes(extension)
+    ? "markdown"
+    : visual && visuals && bytes <= VISUAL_FRAME_BYTES
+      ? "visual"
+      : "code";
+  return {
+    path,
+    kind,
+    language: kind === "code" ? languageOf(path) : null,
+    bytes,
+    lines: lineCount(text),
+    title: kind === "visual" ? visualTitle(text, path) : null,
+    text,
+  };
+}
+
+// the command worker's opened records, held to what open itself allows:
+// a mounted path, once, within the count and the file cap, and each
+// record exactly what open makes of its text; a command inside could
+// post an answer of its own
+export function checkOpened(
+  records: readonly OpenedRecord[],
+  caps: { knowledgeFileBytes: number; visuals: boolean; knowledge: boolean },
+): OpenedRecord[] {
+  const paths = new Set(records.map((record) => record.path));
+  const fits = (record: OpenedRecord) => {
+    const made = openedRecord(record.path, record.text, caps.visuals);
+    return (
+      mountPath(record.path) &&
+      (caps.knowledge || !underKnowledge(record.path)) &&
+      made.bytes <= caps.knowledgeFileBytes &&
+      made.kind === record.kind &&
+      made.language === record.language &&
+      made.bytes === record.bytes &&
+      made.lines === record.lines &&
+      made.title === record.title
+    );
+  };
+  if (
+    records.length > MAX_OPENS_PER_COMMAND ||
+    paths.size !== records.length ||
+    !records.every(fits)
+  )
+    throw new Error("the command worker answered out of protocol");
+  return [...records];
 }
 
 export function makeOpenCommand(
@@ -141,24 +211,7 @@ export function makeOpenCommand(
       } catch {
         return refusal(arg, "not text");
       }
-      const extension = kindOf(path);
-      const visual = ["html", "htm", "svg"].includes(extension);
-      const kind = ["md", "markdown"].includes(extension)
-        ? "markdown"
-        : visual &&
-            caps.visuals &&
-            Buffer.byteLength(text, "utf8") <= VISUAL_FRAME_BYTES
-          ? "visual"
-          : "code";
-      const record: OpenedRecord = {
-        path,
-        kind,
-        language: kind === "code" ? languageOf(path) : null,
-        bytes: Buffer.byteLength(text, "utf8"),
-        lines: lineCount(text),
-        title: kind === "visual" ? visualTitle(text, path) : null,
-        text,
-      };
+      const record = openedRecord(path, text, caps.visuals);
       if (existing < 0) collect.push(record);
       else collect[existing] = record;
       return { stdout: "", stderr: "", exitCode: 0 };

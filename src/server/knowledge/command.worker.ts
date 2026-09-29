@@ -46,22 +46,45 @@ function post(message: FromWorker, transfer: ArrayBuffer[] = []): void {
   self.postMessage(message, transfer);
 }
 
-// a request to the server, answered once; a job's cancel fails it
+function aborted(): Error {
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
+// a request to the server, answered once; a job's cancel fails it, and
+// the request's own signal (curl under timeout) fails it alone and tells
+// the server to stop that fetch
 function ask(
   id: string,
   running: Running,
   message:
     | { type: "kept"; index: number }
     | { type: "fetch"; url: string; options: FetchRequest },
+  own?: AbortSignal,
 ): Promise<unknown> {
   const request = running.next++;
   return new Promise((resolve, reject) => {
-    const signal = running.controller.signal;
-    if (signal.aborted) {
-      reject(new Error("The operation was aborted."));
+    if (running.controller.signal.aborted || own?.aborted) {
+      reject(aborted());
       return;
     }
-    running.waiting.set(request, { resolve, reject });
+    const stop = () => {
+      if (!running.waiting.delete(request)) return;
+      post({ type: "abort", id, request });
+      reject(aborted());
+    };
+    own?.addEventListener("abort", stop, { once: true });
+    running.waiting.set(request, {
+      resolve: (value) => {
+        own?.removeEventListener("abort", stop);
+        resolve(value);
+      },
+      reject: (error) => {
+        own?.removeEventListener("abort", stop);
+        reject(error);
+      },
+    });
     post({ ...message, id, request });
   });
 }
@@ -96,11 +119,12 @@ function workerFetch(id: string, running: Running): SecureFetch {
     if (options.timeoutMs !== undefined) request.timeoutMs = options.timeoutMs;
     if (options.maxRedirects !== undefined)
       request.maxRedirects = options.maxRedirects;
-    return (await ask(id, running, {
-      type: "fetch",
-      url,
-      options: request,
-    })) as FetchResult;
+    return (await ask(
+      id,
+      running,
+      { type: "fetch", url, options: request },
+      options.signal,
+    )) as FetchResult;
   };
 }
 
@@ -146,8 +170,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
   // MCP results past the cut, read from the server on first read
   job.kept.forEach((path, index) => {
     fs.writeFileLazy(path, async () => {
-      const data = await ask(id, running, { type: "kept", index });
-      return (data as string | Uint8Array | null) ?? "";
+      return (await ask(id, running, { type: "kept", index })) as Uint8Array;
     });
   });
   const cwd = await savedCwd(fs, job.cwd, job.docs);
@@ -232,8 +255,7 @@ function cancel(id: string): void {
   const running = jobs.get(id);
   if (running === undefined) return;
   running.controller.abort(new Error("cancelled"));
-  for (const waiting of running.waiting.values())
-    waiting.reject(new Error("The operation was aborted."));
+  for (const waiting of running.waiting.values()) waiting.reject(aborted());
   running.waiting.clear();
 }
 
@@ -247,7 +269,17 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
       cancel(message.id);
       return;
     case "kept":
-      answer(message.id, message.request, message.data);
+      if (message.data !== undefined) {
+        answer(message.id, message.request, message.data);
+      } else {
+        // the lazy file throws, so the command sees a failed read
+        answer(
+          message.id,
+          message.request,
+          undefined,
+          new Error(message.error ?? "read failed"),
+        );
+      }
       return;
     case "fetched":
       if (message.result !== undefined) {

@@ -74,6 +74,8 @@ async function orderOperands(
   paths: string[],
   sort: LsSort,
   reverse: boolean,
+  // -d: a directory is listed as itself, in the one block
+  directoryOnly: boolean,
 ): Promise<{ list: string[]; files: number; start: number }> {
   const other: string[] = [];
   const files: string[] = [];
@@ -85,7 +87,7 @@ async function orderOperands(
     }
     try {
       const stat = await ctx.fs.stat(ctx.fs.resolvePath(ctx.cwd, path));
-      (stat.isDirectory ? dirs : files).push(path);
+      (stat.isDirectory && !directoryOnly ? dirs : files).push(path);
     } catch (error) {
       if (
         error instanceof ExecutionLimitError ||
@@ -107,6 +109,20 @@ async function orderOperands(
     files: files.length,
     start: other.length,
   };
+}
+
+// the last of -S and -t in the arguments, before any --
+function lastSort(args: readonly string[]): LsSort {
+  let sort: LsSort = "name";
+  for (const arg of args) {
+    if (arg === "--") break;
+    if (!arg.startsWith("-") || arg.startsWith("--")) continue;
+    for (const flag of arg.slice(1)) {
+      if (flag === "S") sort = "size";
+      else if (flag === "t") sort = "time";
+    }
+  }
+  return sort;
 }
 
 // -S largest first, -t newest first, otherwise alphabetically
@@ -136,7 +152,8 @@ async function sortNames(
       keyed.push({ name, key: 0 });
     }
   }
-  if (sort === "time") keyed.sort((a, b) => (a.name < b.name ? -1 : 1));
+  // a tie goes by name
+  keyed.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   keyed.sort((a, b) => b.key - a.key);
   return keyed.map((entry) => entry.name);
 }
@@ -240,12 +257,8 @@ export const lsCommand: RuntimeCommand = {
     const reverse = parsed.result.flags.reverse;
     const classifyFiles = parsed.result.flags.classifyFiles;
     const directoryOnly = parsed.result.flags.directoryOnly;
-    // (1ctx) -t sorts too; -S wins when both are given
-    const sort: LsSort = parsed.result.flags.sortBySize
-      ? "size"
-      : parsed.result.flags.sortByTime
-        ? "time"
-        : "name";
+    // (1ctx) -t sorts too; of -S and -t the last given wins, as in GNU ls
+    const sort = lastSort(args);
     // Note: onePerLine is accepted but implicit in our output
     void parsed.result.flags.onePerLine;
 
@@ -265,9 +278,13 @@ export const lsCommand: RuntimeCommand = {
       site: "ls",
     });
 
-    const ordered = directoryOnly
-      ? { list: paths, files: 0, start: 0 }
-      : await orderOperands(ctx, paths, sort, reverse);
+    const ordered = await orderOperands(
+      ctx,
+      paths,
+      sort,
+      reverse,
+      directoryOnly,
+    );
 
     for (let i = 0; i < ordered.list.length; i++) {
       const path = ordered.list[i];

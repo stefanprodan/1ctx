@@ -124,6 +124,27 @@ describe("the vendored just-bash", () => {
     );
   });
 
+  test("ls takes the last of -S and -t, ties by name, and -d as one block", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/ls-a", "aa", undefined, at(1));
+    fs.writeFileSync("/d/ls-b", "bb", undefined, at(3));
+    fs.writeFileSync("/d/ls-c", "cccc", undefined, at(2));
+    fs.mkdirSync("/d/sub");
+    await fs.utimes("/d/sub", new Date(0), new Date(Date.UTC(2026, 0, 4)));
+    const bash = new Bash({ fs, cwd: "/d" });
+    // what GNU ls 9 prints for the same files
+    const cases: [string, string][] = [
+      ["ls -St ls-a ls-b ls-c", "ls-b\nls-c\nls-a\n"],
+      ["ls -tS ls-a ls-b ls-c", "ls-c\nls-a\nls-b\n"],
+      ["ls -S ls-b ls-a", "ls-a\nls-b\n"],
+      ["ls -dt ls-a ls-b ls-c", "ls-b\nls-c\nls-a\n"],
+      ["ls -dt ls-a sub ls-b", "sub\nls-b\nls-a\n"],
+    ];
+    for (const [command, stdout] of cases)
+      expect((await bash.exec(command)).stdout, command).toBe(stdout);
+  });
+
   test("ls -t sorts a link by its own time", async () => {
     const fs = new InMemoryFs();
     const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });

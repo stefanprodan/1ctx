@@ -4,7 +4,14 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
+import {
+  callCaps,
+  run,
+  scratchState,
+  seedScratch,
+  setup,
+  untilPhase,
+} from "./helpers.ts";
 
 const edits =
   "echo changed > /knowledge/existing; echo draft > /tmp/new; cd /tmp";
@@ -83,8 +90,7 @@ describe("atomic knowledge and scratch commits", () => {
     const controller = new AbortController();
     const pending = run(s, `${edits}; sleep 1`, callCaps, controller.signal);
     try {
-      // long enough for the worker to be running the command
-      await Bun.sleep(300);
+      await untilPhase(s);
       controller.abort(new Error("send stopped"));
       expect(await pending).toEqual({
         error: true,
