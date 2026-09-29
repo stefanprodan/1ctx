@@ -58,6 +58,7 @@ describe("command admission", () => {
         expect(await canceled).toEqual({
           error: true,
           content: "nothing saved: session wait stopped",
+          ended: { phase: "queue", cause: "abort" },
         });
         expect(scratchState(s).revision).toBe(0);
         expect(heldSessions().has(s.session.id)).toBe(true);
@@ -96,6 +97,7 @@ describe("command admission", () => {
         expect(await canceled).toEqual({
           error: true,
           content: "nothing saved: process wait stopped",
+          ended: { phase: "queue", cause: "abort" },
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
         expect(scratchState(s).revision).toBe(0);
@@ -165,6 +167,7 @@ describe("command admission", () => {
         expect(await run(s, "true")).toEqual({
           error: true,
           content: "nothing saved: mount failed",
+          ended: { phase: "mount", cause: "error" },
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
         for (let i = 0; i < 4; i++)

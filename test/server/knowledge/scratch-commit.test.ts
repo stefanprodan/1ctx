@@ -83,11 +83,13 @@ describe("atomic knowledge and scratch commits", () => {
     const controller = new AbortController();
     const pending = run(s, `${edits}; sleep 1`, callCaps, controller.signal);
     try {
-      await Bun.sleep(30);
+      // long enough for the worker to be running the command
+      await Bun.sleep(300);
       controller.abort(new Error("send stopped"));
       expect(await pending).toEqual({
         error: true,
         content: "nothing saved: send stopped",
+        ended: { phase: "run", cause: "abort" },
       });
       s.unchanged();
     } finally {
@@ -122,6 +124,7 @@ describe("atomic knowledge and scratch commits", () => {
       expect(await run(s, edits)).toEqual({
         error: true,
         content: "nothing saved: write failed",
+        ended: { phase: "commit", cause: "error" },
       });
       s.unchanged();
       s.area.scratch.write = write;

@@ -6,7 +6,10 @@
 // thread admits the command, reads the rows and commits; the shell runs
 // in a worker, so a command that never yields holds no stream.
 
-import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
+import type {
+  KnowledgeAuthor,
+  KnowledgeFile,
+} from "../../shared/contracts/knowledge.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -17,10 +20,16 @@ import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
 import { type OpenedRecord, openedReceipt } from "./open.ts";
 import { failed, output } from "./output.ts";
-import type { CommandCause, CommandEnd, CommandPhase } from "./protocol.ts";
+import type {
+  Changes,
+  CommandCause,
+  CommandEnd,
+  CommandPhase,
+} from "./protocol.ts";
 import { acquire, acquireSession } from "./queue.ts";
-import type { ScratchStore } from "./scratch.ts";
+import type { Scratch, ScratchStore } from "./scratch.ts";
 import type { KnowledgeStore } from "./store.ts";
+import { mountPath } from "./tree.ts";
 import type { UploadStore } from "./uploads.ts";
 import type { CommandWorkers } from "./worker.ts";
 
@@ -45,8 +54,8 @@ export type CommandResult = {
   error: boolean;
   tail?: number;
   opened?: OpenedRecord[];
-  // where a command that saved nothing ended, for the log; unlisted, so
-  // it never reaches a stored row
+  // where a command that saved nothing ended, for the log; finishTool
+  // stores a row's fields by name, so it never reaches one
   ended?: CommandEnd;
 };
 type MountDeps = {
@@ -59,9 +68,29 @@ type MountDeps = {
   current(): KnowledgeCaps;
 };
 
-function ended<T extends object>(result: T, end: CommandEnd): T {
-  Object.defineProperty(result, "ended", { value: end });
-  return result;
+// what the worker answered, held to the mounted trees: a delete names a
+// mounted doc, no name twice, and scratch removes only what it mounted,
+// since a command inside could post an answer of its own
+function checked(
+  changes: Changes,
+  docs: ReadonlyMap<string, KnowledgeFile>,
+  scratch: Scratch,
+): Changes {
+  const names = new Set(changes.knowledge.map((change) => change.name));
+  const written = new Set(changes.written.map((file) => file.path));
+  const mounted = new Set(scratch.entries.map((file) => file.path));
+  if (
+    names.size !== changes.knowledge.length ||
+    changes.knowledge.some(
+      (change) => change.text === null && !docs.has(change.name),
+    ) ||
+    written.size !== changes.written.length ||
+    new Set(changes.removed).size !== changes.removed.length ||
+    changes.removed.some((path) => !mounted.has(path) || written.has(path)) ||
+    !mountPath(changes.cwd)
+  )
+    throw new Error("the command worker answered out of protocol");
+  return changes;
 }
 
 export async function run(
@@ -84,9 +113,11 @@ export async function run(
   let releaseSession: (() => void) | undefined;
   let notice = "";
   let phase: CommandPhase = "queue";
+  // the worker's word when neither signal fired: a shutdown is an abort
+  let ended: CommandCause = "error";
   const cause = (): CommandCause => {
     if (deadline.signal.aborted) return "deadline";
-    if (!signal.aborted) return "error";
+    if (!signal.aborted) return ended;
     // the tool's own timer ends the call as the deadline does
     const reason = signal.reason;
     return reason instanceof DOMException && reason.name === "TimeoutError"
@@ -174,6 +205,7 @@ export async function run(
     if (!settled.ok) {
       phase = settled.phase;
       notice = settled.notice;
+      ended = settled.cause;
       throw combined.aborted ? combined.reason : settled.error;
     }
     const answer = settled.answer;
@@ -188,13 +220,20 @@ export async function run(
         [],
         caps.resultCut - notice.length,
       );
-      return ended(
-        { ...printed, content: notice + printed.content, error: true },
-        { phase: "run", cause: "limit" },
-      );
+      return {
+        ...printed,
+        content: notice + printed.content,
+        error: true,
+        // 124 is the interpreter's own deadline, 126 another of its limits
+        ended: {
+          phase: "run",
+          cause: answer.exitCode === 124 ? "deadline" : "limit",
+        },
+      };
     }
     const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
-    const changes: Change[] = answer.changes.knowledge.map((change) => ({
+    const answered = checked(answer.changes, mounted, scratch);
+    const changes: Change[] = answered.knowledge.map((change) => ({
       name: change.name,
       before: mounted.get(change.name) ?? null,
       text: change.text,
@@ -210,11 +249,10 @@ export async function run(
         sessionId,
         before: scratch,
         changes: {
-          written: answer.changes.written,
-          removed: answer.changes.removed,
-          cwd: answer.changes.cwd,
+          written: answered.written,
+          removed: answered.removed,
+          cwd: answered.cwd,
         },
-        totals: answer.changes.totals,
       },
       {
         stdout: answer.stdout,
@@ -234,10 +272,11 @@ export async function run(
     };
   } catch (error) {
     const result = failed(error, caps.resultCut - notice.length);
-    return ended(
-      { ...result, content: notice + result.content },
-      { phase, cause: cause() },
-    );
+    return {
+      ...result,
+      content: notice + result.content,
+      ended: { phase, cause: cause() },
+    };
   } finally {
     clearTimeout(timer);
     release?.();

@@ -66,6 +66,49 @@ function formatHumanSize(bytes: number): string {
 // GNU ls does
 type LsSort = "name" | "size" | "time";
 
+// (1ctx) GNU ls's operand order: what cannot be listed first, as given,
+// then the files as one block, then the directories, both in the
+// active sort; ls -t a b c listed each file alone in the order given
+async function orderOperands(
+  ctx: RuntimeCommandContext,
+  paths: string[],
+  sort: LsSort,
+  reverse: boolean,
+): Promise<{ list: string[]; files: number; start: number }> {
+  const other: string[] = [];
+  const files: string[] = [];
+  const dirs: string[] = [];
+  for (const path of paths) {
+    if (path.includes("*") || path.includes("?") || path.includes("[")) {
+      other.push(path);
+      continue;
+    }
+    try {
+      const stat = await ctx.fs.stat(ctx.fs.resolvePath(ctx.cwd, path));
+      (stat.isDirectory ? dirs : files).push(path);
+    } catch (error) {
+      if (
+        error instanceof ExecutionLimitError ||
+        error instanceof ExecutionAbortedError
+      ) {
+        throw error;
+      }
+      other.push(path);
+    }
+  }
+  const arrange = async (names: string[]) => {
+    const sorted = await sortNames(ctx, names, sort, (name) =>
+      ctx.fs.resolvePath(ctx.cwd, name),
+    );
+    return reverse ? sorted.reverse() : sorted;
+  };
+  return {
+    list: [...other, ...(await arrange(files)), ...(await arrange(dirs))],
+    files: files.length,
+    start: other.length,
+  };
+}
+
 // -S largest first, -t newest first, otherwise alphabetically
 async function sortNames(
   ctx: RuntimeCommandContext,
@@ -77,7 +120,8 @@ async function sortNames(
   const keyed: { name: string; key: number }[] = [];
   for (const name of names) {
     try {
-      const stat = await ctx.fs.stat(pathOf(name));
+      // a link sorts by its own time and size, as GNU ls does without -L
+      const stat = await ctx.fs.lstat(pathOf(name));
       keyed.push({
         name,
         key: sort === "size" ? (stat.size ?? 0) : (stat.mtime?.getTime() ?? 0),
@@ -221,11 +265,22 @@ export const lsCommand: RuntimeCommand = {
       site: "ls",
     });
 
-    for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
+    const ordered = directoryOnly
+      ? { list: paths, files: 0, start: 0 }
+      : await orderOperands(ctx, paths, sort, reverse);
+
+    for (let i = 0; i < ordered.list.length; i++) {
+      const path = ordered.list[i];
+      // (1ctx) the file operands are one block, as GNU ls prints them
+      const inFiles = i >= ordered.start && i < ordered.start + ordered.files;
 
       // Add blank line between directory listings
-      if (i > 0 && stdout && !stdout.endsWith("\n\n")) {
+      if (
+        i > 0 &&
+        !(inFiles && i > ordered.start) &&
+        stdout &&
+        !stdout.endsWith("\n\n")
+      ) {
         stdout = appendLsOutput(ctx, stdout, "\n");
       }
 

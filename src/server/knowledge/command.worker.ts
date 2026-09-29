@@ -125,6 +125,24 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     fs.writeFileSync(`/uploads/${file.name}`, file.data, undefined, {
       mtime: new Date(file.mtime),
     });
+  // a folder, the roots too, takes its newest file's time, so ls -t
+  // never puts every folder above every file
+  const folders = new Map<string, number>();
+  const trees = [
+    ["/knowledge", job.knowledge],
+    ["/tmp", job.scratch],
+    ["/uploads", job.uploads],
+  ] as const;
+  for (const [root, files] of trees)
+    for (const file of files) {
+      let path = `${root}/${file.name}`;
+      while (path !== root) {
+        path = path.slice(0, path.lastIndexOf("/"));
+        folders.set(path, Math.max(folders.get(path) ?? 0, file.mtime));
+      }
+    }
+  for (const [path, mtime] of folders)
+    await fs.utimes(path, new Date(mtime), new Date(mtime));
   // MCP results past the cut, read from the server on first read
   job.kept.forEach((path, index) => {
     fs.writeFileLazy(path, async () => {

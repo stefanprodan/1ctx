@@ -7,6 +7,7 @@
 
 import type { BashOptions, InMemoryFs } from "just-bash";
 import { checkFile, checkNames } from "./check.ts";
+import { INTERPRETER_MARGIN_MS } from "./commands.ts";
 import { underKnowledge } from "./open.ts";
 import { parseName } from "./parse.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
@@ -25,7 +26,6 @@ export async function diff(
   const scratchNames: string[] = [];
   const knowledge: Changes["knowledge"] = [];
   const written: ScratchEntry[] = [];
-  let scratchBytes = 0;
   const root = await fs.lstat("/tmp");
   if (!root.isDirectory || root.isSymbolicLink)
     throw new Error("/tmp is not a directory");
@@ -47,7 +47,6 @@ export async function diff(
       const name = parseName(path.slice("/tmp/".length));
       scratchNames.push(name);
       const data = await fs.readFileBuffer(path);
-      scratchBytes += data.byteLength;
       const before = temporary.get(name);
       temporary.delete(name);
       if (
@@ -83,7 +82,6 @@ export async function diff(
     knowledge,
     written,
     removed: [...temporary.keys()],
-    totals: { files: scratchNames.length, bytes: scratchBytes },
   };
 }
 
@@ -172,6 +170,18 @@ export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
 
 const home = (docs: boolean) => (docs ? "/knowledge" : "/tmp");
 
+// a cwd the server keeps: a normalized absolute path in one of the trees
+export function mountPath(path: string): boolean {
+  const parts = path.split("/").slice(1);
+  return (
+    path.startsWith("/") &&
+    Buffer.byteLength(path) <= 256 &&
+    !/\p{Cc}/u.test(path) &&
+    ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
+    parts.every((part) => part !== "" && part !== "." && part !== "..")
+  );
+}
+
 export async function savedCwd(
   fs: InMemoryFs,
   pwd: string | undefined,
@@ -204,7 +214,7 @@ export function executionLimits(
   remainingMs: number,
 ): NonNullable<BashOptions["executionLimits"]> {
   return {
-    maxExecutionTimeMs: Math.max(1, remainingMs),
+    maxExecutionTimeMs: Math.max(1, remainingMs - INTERPRETER_MARGIN_MS),
     maxOutputSize: job.ioBytes,
     maxHeredocSize: job.knowledgeFileBytes,
     maxStringLength: job.ioBytes,

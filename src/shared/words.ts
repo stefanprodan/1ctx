@@ -93,6 +93,11 @@ export function isAbout(value: unknown): value is string {
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD_BYTES = 1024;
 
+// how an opened file is drawn: HTML and SVG in the visual frame while
+// the admin's Visuals row is on, Markdown rendered, anything else as code
+export const OPENED_KINDS = ["visual", "markdown", "code"] as const;
+export type OpenedKind = (typeof OPENED_KINDS)[number];
+
 // a project is personal (one per user, made with the user) or team
 export const PROJECT_KINDS = ["personal", "team"] as const;
 export type ProjectKind = (typeof PROJECT_KINDS)[number];

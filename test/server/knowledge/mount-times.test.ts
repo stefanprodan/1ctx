@@ -35,6 +35,23 @@ describe("mounted times", () => {
     }
   });
 
+  test("a folder takes its newest file's time", async () => {
+    const s = setup();
+    try {
+      s.now.value = JAN_2;
+      s.area.create(s.projectId, s.author, "docs/old.md", "old\n");
+      s.now.value = JAN_3;
+      s.area.create(s.projectId, s.author, "a.md", "new\n");
+      const listed = await run(s, "ls -t /knowledge; stat /knowledge");
+      expect(listed.content).toStartWith("a.md\ndocs\n");
+      expect(listed.content).toContain(
+        `Modify: ${new Date(JAN_3).toISOString()}\n`,
+      );
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("scratch files mount with the time of the last command", async () => {
     const s = setup();
     try {

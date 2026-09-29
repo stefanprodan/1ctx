@@ -8,6 +8,7 @@
 // the server takes a message only after checking its whole shape.
 
 import type { FetchResult } from "just-bash";
+import { isKnowledgeName, OPENED_KINDS } from "../../shared/words.ts";
 import type { OpenedRecord } from "./open.ts";
 
 // where a failed command ended, and why, as the tool log counts them
@@ -44,7 +45,6 @@ export type Changes = {
   knowledge: { name: string; text: string | null }[];
   written: ScratchEntry[];
   removed: string[];
-  totals: { files: number; bytes: number };
   cwd: string;
 };
 
@@ -75,7 +75,7 @@ export type ToWorker =
       type: "kept";
       id: string;
       request: number;
-      data: string | Uint8Array | null;
+      data: Uint8Array | null;
     }
   | {
       type: "fetched";
@@ -133,7 +133,7 @@ function isOpened(value: unknown): value is OpenedRecord {
       "text",
     ]) &&
     isString(value.path) &&
-    ["visual", "markdown", "code"].includes(value.kind as string) &&
+    (OPENED_KINDS as readonly unknown[]).includes(value.kind) &&
     (value.language === null || isString(value.language)) &&
     isCount(value.bytes) &&
     isCount(value.lines) &&
@@ -148,7 +148,7 @@ function isKnowledgeChange(
   return (
     isObject(value) &&
     keys(value, ["name", "text"]) &&
-    isString(value.name) &&
+    isKnowledgeName(value.name) &&
     (value.text === null || isString(value.text))
   );
 }
@@ -157,7 +157,7 @@ function isScratchEntry(value: unknown): value is ScratchEntry {
   return (
     isObject(value) &&
     keys(value, ["path", "data", "mode"]) &&
-    isString(value.path) &&
+    isKnowledgeName(value.path) &&
     isBytes(value.data) &&
     isCount(value.mode)
   );
@@ -166,14 +166,10 @@ function isScratchEntry(value: unknown): value is ScratchEntry {
 function isChanges(value: unknown): value is Changes {
   return (
     isObject(value) &&
-    keys(value, ["knowledge", "written", "removed", "totals", "cwd"]) &&
+    keys(value, ["knowledge", "written", "removed", "cwd"]) &&
     isList(value.knowledge, isKnowledgeChange) &&
     isList(value.written, isScratchEntry) &&
-    isList(value.removed, isString) &&
-    isObject(value.totals) &&
-    keys(value.totals, ["files", "bytes"]) &&
-    isCount(value.totals.files) &&
-    isCount(value.totals.bytes) &&
+    isList(value.removed, isKnowledgeName) &&
     isString(value.cwd)
   );
 }
@@ -227,9 +223,15 @@ function isFetchRequest(value: unknown): value is FetchRequest {
   );
 }
 
-// the message for this job, or null for anything else: another id, an
-// unknown type, a field missing, extra or of the wrong kind
-export function fromWorker(value: unknown, id: string): FromWorker | null {
+export const MALFORMED = "malformed";
+
+// the message for this job, MALFORMED for an answer of this job that
+// does not check out, or null for anything else: another id, an unknown
+// type, a field missing, extra or of the wrong kind
+export function fromWorker(
+  value: unknown,
+  id: string,
+): FromWorker | typeof MALFORMED | null {
   if (!isObject(value) || value.id !== id) return null;
   switch (value.type) {
     case "phase":
@@ -251,14 +253,16 @@ export function fromWorker(value: unknown, id: string): FromWorker | null {
         isFetchRequest(value.options)
         ? (value as FromWorker)
         : null;
+    // an end of this job that does not check out ends it all the same,
+    // rather than leaving it to the deadline
     case "done":
       return keys(value, ["type", "id", "answer"]) && isAnswer(value.answer)
         ? (value as FromWorker)
-        : null;
+        : MALFORMED;
     case "failed":
       return keys(value, ["type", "id", "message"]) && isString(value.message)
         ? (value as FromWorker)
-        : null;
+        : MALFORMED;
     default:
       return null;
   }

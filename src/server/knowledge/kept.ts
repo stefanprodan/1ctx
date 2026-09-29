@@ -90,18 +90,20 @@ export function listKept(db: Db, sessionId: string): KeptEntry[] {
     }));
 }
 
+// the file's bytes, text read as a blob, so the command worker gets them
+// transferred rather than copied on the server's thread
 export function readKept(
   db: Db,
   messageId: string,
   position: number,
-): string | Uint8Array | null {
+): Uint8Array | null {
   const row = db
-    .query<{ text: string | null; data: Uint8Array | null }, [string, number]>(
-      "select text, data from mcp_kept_files where message_id = ? and position = ?",
+    .query<{ data: Uint8Array | null }, [string, number]>(
+      `select coalesce(cast(text as blob), data) as data from mcp_kept_files
+       where message_id = ? and position = ?`,
     )
     .get(messageId, position);
-  if (row === null) return null;
-  return row.text ?? new Uint8Array(row.data ?? []);
+  return row === null ? null : (row.data ?? new Uint8Array());
 }
 
 /**

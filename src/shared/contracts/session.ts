@@ -13,6 +13,7 @@ import type {
   EventSource,
   MessageKind,
   MessageStatus,
+  OpenedKind,
   SendCause,
   SendKind,
   SessionOrigin,
@@ -76,9 +77,7 @@ export type RoundUsage = {
   contextLength: number | null;
 };
 
-// how an opened file is drawn: HTML and SVG in the visual frame while
-// the admin's Visuals row is on, Markdown rendered, anything else as code
-export type OpenedKind = "visual" | "markdown" | "code";
+export type { OpenedKind };
 
 // a file a bash command put on the page with open, as the tool row
 // carries it: the stored copy's text stays behind and the file route

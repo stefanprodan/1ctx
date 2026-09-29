@@ -114,6 +114,17 @@ export class ScratchStore {
       .run(sessionId, sessionId);
   }
 
+  // the stored names and sizes, which a commit checks inside its
+  // transaction rather than trusting what the command worker counted
+  sizes(sessionId: string): { path: string; bytes: number }[] {
+    return this.db
+      .query<{ path: string; bytes: number }, [string]>(
+        `select path, length(data) as bytes from session_scratch_files
+         where session_id = ?`,
+      )
+      .all(sessionId);
+  }
+
   // an archived chat never runs a command again; its files go with the row
   drop(sessionId: string): void {
     this.db

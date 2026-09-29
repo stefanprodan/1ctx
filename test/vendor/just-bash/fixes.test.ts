@@ -105,6 +105,36 @@ describe("the vendored just-bash", () => {
     expect((await bash.exec("ls /d")).stdout).toBe("a\nb\nc\nd\n");
   });
 
+  test("ls lists file operands as one sorted block before the directories", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/a.md", "", undefined, at(2));
+    fs.writeFileSync("/d/b.md", "", undefined, at(3));
+    fs.writeFileSync("/d/c.md", "", undefined, at(1));
+    fs.writeFileSync("/d/sub/x", "");
+    const bash = new Bash({ fs });
+    expect((await bash.exec("ls -t /d/*.md")).stdout).toBe(
+      "/d/b.md\n/d/a.md\n/d/c.md\n",
+    );
+    expect((await bash.exec("ls -tr /d/*.md")).stdout).toBe(
+      "/d/c.md\n/d/a.md\n/d/b.md\n",
+    );
+    expect((await bash.exec("cd /d && ls sub c.md a.md")).stdout).toBe(
+      "a.md\nc.md\n\nsub:\nx\n",
+    );
+  });
+
+  test("ls -t sorts a link by its own time", async () => {
+    const fs = new InMemoryFs();
+    const at = (day: number) => ({ mtime: new Date(Date.UTC(2026, 0, day)) });
+    fs.writeFileSync("/d/new", "", undefined, at(3));
+    fs.writeFileSync("/d/old", "", undefined, at(1));
+    await fs.symlink("old", "/d/link");
+    const bash = new Bash({ fs });
+    // the link is made now, after both files
+    expect((await bash.exec("ls -t /d")).stdout).toBe("link\nnew\nold\n");
+  });
+
   for (const name of ["python", "python3", "sqlite3", "node"]) {
     test(`${name} is not found like any other command`, async () => {
       const result = await new Bash().exec(`${name} -c 1`);

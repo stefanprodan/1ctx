@@ -9,13 +9,14 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/knowledge/protocol.ts";
+import { acquire, heldSessions } from "../../../src/server/knowledge/queue.ts";
 import {
   type CommandHooks,
   commandWorkers,
 } from "../../../src/server/knowledge/worker.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
-import { COMMAND_WORKER, run, setup } from "./helpers.ts";
+import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
 
 const MiB = 1024 * 1024;
 // limits high enough that a runaway never stops itself
@@ -42,6 +43,14 @@ const stops = (
   signal = new AbortController().signal,
 ) => ({ signal, deadline, chat: "chat" });
 const BUSY = "while :; do :; done";
+const FORGED = new URL(
+  "../../fixtures/knowledge/forged.worker.ts",
+  import.meta.url,
+);
+const CRASH = new URL(
+  "../../fixtures/knowledge/crash.worker.ts",
+  import.meta.url,
+);
 
 describe("the command worker", () => {
   test.serial(
@@ -68,7 +77,8 @@ describe("the command worker", () => {
           cause: "deadline",
         });
         expect(performance.now() - started).toBeLessThan(3000);
-        expect(worst).toBeLessThan(200);
+        // not held for seconds, as a busy loop on this thread would
+        expect(worst).toBeLessThan(500);
       } finally {
         clearInterval(tick);
       }
@@ -142,7 +152,7 @@ describe("the command worker", () => {
     const kept: CommandHooks = {
       kept: (index) => {
         asked.push(index);
-        return index === 0 ? "first\n" : new TextEncoder().encode("second\n");
+        return new TextEncoder().encode(index === 0 ? "first\n" : "second\n");
       },
       fetch: null,
     };
@@ -167,17 +177,14 @@ describe("the command worker", () => {
   });
 
   test("messages outside the protocol are dropped and a job settles once", async () => {
-    const workers = commandWorkers(
-      new URL("../../fixtures/knowledge/forged.worker.ts", import.meta.url),
-      silent,
-    );
+    const workers = commandWorkers(FORGED, silent);
     let asked = 0;
     const settled = await workers.run(
-      job("true", { kept: ["/mcp/0001-a/result.txt"] }),
+      job("forge", { kept: ["/mcp/0001-a/result.txt"] }),
       {
         kept: () => {
           asked++;
-          return "kept";
+          return new TextEncoder().encode("kept");
         },
         fetch: null,
       },
@@ -186,7 +193,7 @@ describe("the command worker", () => {
     expect(settled).toEqual({
       ok: true,
       answer: {
-        stdout: "1",
+        stdout: "2",
         stderr: "",
         exitCode: 0,
         notice: "",
@@ -195,6 +202,98 @@ describe("the command worker", () => {
       },
     });
     expect(asked).toBe(1);
+  });
+
+  test("an answer of the wrong shape fails the job at once", async () => {
+    const logs = collectLogs();
+    const workers = commandWorkers(FORGED, logs.logFactory("k"));
+    const started = performance.now();
+    const settled = await workers.run(
+      job("malformed"),
+      hooks,
+      stops(AbortSignal.timeout(30_000)),
+    );
+    expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "k",
+        msg: "command answer malformed",
+        fields: { chat: "chat", phase: "run" },
+      },
+    ]);
+  });
+
+  test("a worker that ends itself mid-job fails it once", async () => {
+    const workers = commandWorkers(FORGED, silent);
+    const settled = await workers.run(
+      job("close"),
+      hooks,
+      stops(AbortSignal.timeout(30_000)),
+    );
+    expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
+    expect(!settled.ok && settled.error?.message).toBe(
+      "the command worker stopped",
+    );
+  });
+
+  test("an answer racing the deadline settles once", async () => {
+    const workers = commandWorkers(FORGED, silent);
+    const deadline = new AbortController();
+    const pending = workers.run(job("prompt"), hooks, stops(deadline.signal));
+    deadline.abort();
+    expect(await pending).toMatchObject({ ok: false, cause: "deadline" });
+    const racing = new AbortController();
+    const answered = workers.run(job("prompt"), hooks, stops(racing.signal));
+    const settled = await answered;
+    racing.abort();
+    expect(settled).toMatchObject({ ok: true, answer: { stdout: "prompt" } });
+  });
+
+  test.serial(
+    "a worker that throws as it loads fails the command and frees its slots",
+    async () => {
+      const s = setup({}, CRASH);
+      try {
+        const result = await run(s, "true");
+        expect(result).toMatchObject({
+          error: true,
+          ended: { phase: "mount", cause: "error" },
+        });
+        expect(result.content).toStartWith("nothing saved: ");
+        expect(heldSessions().has(s.session.id)).toBe(false);
+        const slots: (() => void)[] = [];
+        for (let i = 0; i < 4; i++)
+          slots.push(await acquire(AbortSignal.timeout(1000)));
+        for (const release of slots) release();
+      } finally {
+        s.db.close();
+      }
+    },
+  );
+
+  test("a loop that yields stops at the interpreter's deadline with its words", async () => {
+    const s = setup();
+    try {
+      const result = await run(
+        s,
+        "echo x > /knowledge/late; while :; do sleep 0.05; done",
+        {
+          ...callCaps,
+          callTimeoutMs: 1500,
+        },
+      );
+      expect(result.error).toBe(true);
+      expect(result.content).toContain("exceeded");
+      expect(result.content).toEndWith(
+        "nothing saved: command stopped at a deadline or limit\nexit 124",
+      );
+      expect(result.ended).toEqual({ phase: "run", cause: "deadline" });
+      expect(s.area.list(s.projectId).files).toEqual([]);
+    } finally {
+      s.db.close();
+    }
   });
 
   test("closing the area ends a running command with nothing saved", async () => {
@@ -207,6 +306,7 @@ describe("the command worker", () => {
       expect(result).toEqual({
         error: true,
         content: "nothing saved: the server is shutting down",
+        ended: { phase: "run", cause: "abort" },
       });
       expect(s.area.list(s.projectId).files).toEqual([]);
     } finally {

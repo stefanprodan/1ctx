@@ -82,7 +82,8 @@ describe("find -exec", () => {
       });
       const result = await env.exec("find /dir -type f -exec ls {} +");
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe("/dir/file1.txt\n\n/dir/file2.txt\n");
+      // (1ctx) file operands are one block, as GNU ls prints them
+      expect(result.stdout).toBe("/dir/file1.txt\n/dir/file2.txt\n");
       expect(result.stderr).toBe("");
     });
   });

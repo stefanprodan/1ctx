@@ -25,7 +25,10 @@ export const COMMAND_WORKER = new URL(
   import.meta.url,
 );
 
-export function setup(overrides: Partial<KnowledgeCaps> = {}) {
+export function setup(
+  overrides: Partial<KnowledgeCaps> = {},
+  worker = COMMAND_WORKER,
+) {
   const db = memoryDb();
   const now = { value: 100 };
   const projects = new ProjectStore(db);
@@ -125,7 +128,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     clock: () => now.value,
     limits: { current: () => ({ ...caps }) },
     log: silent,
-    worker: COMMAND_WORKER,
+    worker,
     access: {
       project(_principal, id) {
         const project = projects.byId(id);

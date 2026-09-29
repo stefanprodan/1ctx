@@ -105,7 +105,7 @@ export type KnowledgeArea = KnowledgeCapability & {
   scratch: ScratchStore;
   uploads: UploadStore;
   routes: RouteDescriptor[];
-  // shutdown: running commands cancelled, their workers ended
+  // shutdown: the workers of running commands ended
   close(): void;
 };
 

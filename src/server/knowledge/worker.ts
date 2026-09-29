@@ -6,7 +6,7 @@
 // serves the streams. A job settles exactly once. A message of another
 // id, of an unknown shape or after the job settled is dropped, and so is
 // a second request under one number, since the commands inside can post
-// too. A cancel lets the command stop on its own within a grace; past
+// too; an answer of this job that does not check out fails it. A cancel lets the command stop on its own within a grace; past
 // it, or at the deadline, the worker is ended. The worker file is an
 // entry point of the compiled binary, where a URL resolves against the
 // compile root, so compose.ts builds it and passes it in.
@@ -21,6 +21,7 @@ import {
   type FetchRequest,
   fromWorker,
   type Job,
+  MALFORMED,
   owned,
   type ToWorker,
   transferOf,
@@ -30,7 +31,7 @@ import {
 // in the job, and curl's fetch, with the command's keys, or null
 // without network
 export type CommandHooks = {
-  kept(index: number): string | Uint8Array | null;
+  kept(index: number): Uint8Array | null;
   fetch: SecureFetch | null;
 };
 
@@ -56,7 +57,7 @@ export type Settled =
 
 export type CommandWorkers = {
   run(job: Job, hooks: CommandHooks, stops: CommandStops): Promise<Settled>;
-  // shutdown: every running job cancelled, then its worker ended
+  // shutdown: every running job's worker ended
   close(): void;
 };
 
@@ -144,24 +145,24 @@ export function commandWorkers(
       function expire() {
         fail("deadline");
       }
+      // ending the worker is the shutdown; a cancel first would change nothing
       function shut() {
-        if (!settled) send({ type: "cancel", id });
         fail("abort", new Error(SHUTTING_DOWN));
       }
       const ended = (words: string) =>
         cancelling ? fail("abort") : fail("error", new Error(words));
       const serveKept = (request: number, index: number) => {
-        if (index >= job.kept.length) return;
-        let data: string | Uint8Array | null = null;
+        // a read past the job's list answers empty, never leaves it waiting
+        let data: Uint8Array | null = null;
         try {
-          data = hooks.kept(index);
+          data = index < job.kept.length ? hooks.kept(index) : null;
         } catch {
           data = null;
         }
-        const bytes = data instanceof Uint8Array ? owned(data) : data;
+        const bytes = data === null ? null : owned(data);
         send(
           { type: "kept", id, request, data: bytes },
-          bytes instanceof Uint8Array ? transferOf([bytes]) : [],
+          bytes === null ? [] : transferOf([bytes]),
         );
       };
       const serveFetch = (
@@ -205,6 +206,11 @@ export function commandWorkers(
         if (settled) return;
         const message = fromWorker(event.data, id);
         if (message === null) return;
+        if (message === MALFORMED) {
+          log.warn("command answer malformed", { chat: stops.chat, phase });
+          ended("the command worker answered out of protocol");
+          return;
+        }
         switch (message.type) {
           case "phase":
             phase = message.phase;

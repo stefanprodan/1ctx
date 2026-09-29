@@ -68,7 +68,8 @@ export type ToolResult = {
   // Kept in memory for the log and deliberately omitted from stored rows.
   failure?: unknown;
   timedOut?: boolean;
-  // where a bash command that saved nothing ended, for the log
+  // where a bash command that saved nothing ended, for the log; finishTool
+  // stores fields by name, so it never reaches a row
   ended?: CommandEnd;
 };
 
