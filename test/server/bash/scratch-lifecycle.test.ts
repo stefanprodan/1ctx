@@ -23,6 +23,11 @@ const entries = [
   { path: "work/data.bin", data: binary, mode: 0o700 },
   { path: "work/empty", data: new Uint8Array(), mode: 0o600 },
 ];
+// a stored file counts its name
+const storedBytes = entries.reduce(
+  (sum, file) => sum + file.data.byteLength + file.path.length,
+  0,
+);
 const writeScratch =
   `mkdir -p /tmp/work && printf '${encoded}' | base64 -d > /tmp/work/data.bin` +
   " && touch /tmp/work/empty && chmod 700 /tmp/work/data.bin" +
@@ -90,7 +95,7 @@ async function scratchChat(chat: ChatApp) {
   expect(state(chat.app.db, started.sessionId)).toEqual({
     cwd: "/tmp/work",
     revision: 1,
-    bytes: binary.byteLength,
+    bytes: storedBytes,
     files: 2,
     entries,
     usedAt: chat.app.now.value,
@@ -307,7 +312,7 @@ describe("scratch lifecycle", () => {
         expect(state(chat.app.db, fork.session.id)).toMatchObject({
           cwd: "/knowledge",
           revision: 1,
-          bytes: 4,
+          bytes: 7,
           files: 1,
           entries: [{ path: "new", data: new TextEncoder().encode("fork") }],
         });
@@ -365,7 +370,7 @@ describe("scratch lifecycle", () => {
           expect(state(chat.app.db, second.sessionId)).toMatchObject({
             cwd: "/knowledge",
             revision: 1,
-            bytes: 6,
+            bytes: 9,
             files: 1,
             entries: [
               { path: "new", data: new TextEncoder().encode("second") },
@@ -410,7 +415,7 @@ describe("scratch lifecycle", () => {
       expect(before).toEqual({
         cwd: "/tmp/work",
         revision: 2,
-        bytes: binary.byteLength,
+        bytes: storedBytes,
         files: 2,
         entries,
         usedAt: 200,

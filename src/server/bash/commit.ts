@@ -79,9 +79,9 @@ export function commit(
       now,
     );
     // counted from the rows just written, so the caps hold whatever the
-    // command worker answered
+    // command worker answered, and bound the rows before their names are
+    // walked
     const stored = deps.scratch.sizes(scratch.sessionId);
-    checkScratchNames(stored.map((file) => file.path));
     checkScratchTotals(
       scratch.before,
       {
@@ -90,6 +90,7 @@ export function commit(
       },
       caps,
     );
+    checkScratchNames(stored.map((file) => file.path));
     const content = output(
       result.stdout,
       result.stderr,

@@ -62,23 +62,24 @@ describe("the scratch name rule", () => {
     expect(isScratchName("é".repeat(128))).toBe(false);
   });
 
-  test("a name is at most 64 segments", () => {
+  test("a name is at most 16 segments", () => {
     const deep = (n: number) => Array(n).fill("d").join("/");
     expect(isScratchName(deep(MAX_SCRATCH_SEGMENTS))).toBe(true);
     expect(isScratchName(deep(MAX_SCRATCH_SEGMENTS + 1))).toBe(false);
   });
 
-  test("a name is at most 4096 bytes", () => {
-    // 16 segments of 250 and one of 80, with 16 slashes
-    const edge = `${Array(16).fill("x".repeat(250)).join("/")}/${"y".repeat(80)}`;
+  test("both caps together make a name of at most 4095 bytes", () => {
+    const edge = Array(16).fill("x".repeat(255)).join("/");
     expect(Buffer.byteLength(edge)).toBe(MAX_SCRATCH_NAME_BYTES);
+    expect(MAX_SCRATCH_NAME_BYTES).toBe(4095);
     expect(isScratchName(edge)).toBe(true);
     expect(isScratchName(`${edge}x`)).toBe(false);
+    expect(isScratchName(`${edge}/x`)).toBe(false);
   });
 
   test("the refusal names the rule", () => {
     expect(() => parseScratchName("a/../b")).toThrow(
-      "a /tmp path must be valid Unicode with no NUL and no empty, . or .. part, at most 64 parts of 255 bytes each and 4096 bytes in all",
+      "a /tmp path must be valid Unicode with no NUL and no empty, . or .. part, at most 16 parts of 255 bytes each",
     );
   });
 });
@@ -103,11 +104,19 @@ describe("a scratch tree's names", () => {
 });
 
 describe("a mount path", () => {
-  test("takes a /tmp path at the cap and nothing longer", () => {
-    const name = `${Array(16).fill("x".repeat(250)).join("/")}/${"y".repeat(80)}`;
+  test("takes a /tmp path by the scratch rule", () => {
+    const name = Array(16).fill("x".repeat(255)).join("/");
+    expect(mountPath("/tmp")).toBe(true);
     expect(mountPath("/tmp/my notes.md")).toBe(true);
     expect(mountPath(`/tmp/${name}`)).toBe(true);
     expect(mountPath(`/tmp/${name}y`)).toBe(false);
+    expect(mountPath(`/tmp/${name}/y`)).toBe(false);
+    expect(mountPath("/tmp/a\ud800b")).toBe(false);
+  });
+
+  test("refuses a control character or a line break anywhere", () => {
     expect(mountPath("/tmp/a\tb")).toBe(false);
+    expect(mountPath("/tmp/a\u2028b")).toBe(false);
+    expect(mountPath("/knowledge/a\u2029b")).toBe(false);
   });
 });

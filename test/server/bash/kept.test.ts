@@ -123,7 +123,7 @@ describe("kept MCP files in the mount", () => {
       // a copy past the scratch cap is the scratch's refusal, not a full disk
       const copied = await run(s, "cp /mcp/0001-get/result.txt /tmp/big.txt");
       expect(copied.content).toContain(
-        "nothing saved: the scratch would be 4600000 bytes",
+        "nothing saved: the scratch would be 4600007 bytes",
       );
     } finally {
       s.db.close();

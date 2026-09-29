@@ -12,7 +12,8 @@ import {
 import { languageOf, lineCount, textFromBytes } from "../knowledge/rules.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { MAX_OPENS_PER_COMMAND } from "./commands.ts";
-import { MAX_MOUNT_PATH_BYTES } from "./names.ts";
+import { isScratchName, MAX_MOUNT_PATH_BYTES } from "./names.ts";
+import { cutText } from "./output.ts";
 
 export type OpenedRecord = OpenedFile & { text: string };
 
@@ -56,22 +57,28 @@ function visualTitle(text: string, path: string): string {
       return title;
     }
   }
-  return baseName(path);
+  // a scratch name may be long or break a line, which a title may not
+  const base = baseName(path);
+  return hasLineBreak(base) ? "Visual" : cutText(base, MAX_TITLE);
 }
 
 export const underKnowledge = (path: string) =>
   path === "/knowledge" || path.startsWith("/knowledge/");
 
 // a path the server takes from the command worker, a cwd or an opened
-// file: normalized, absolute, in one of the trees
+// file: normalized, absolute, in one of the trees, on one line, and
+// under /tmp by the scratch rule
 export function mountPath(path: string): boolean {
   const parts = path.split("/").slice(1);
   return (
     path.startsWith("/") &&
+    path.isWellFormed() &&
     Buffer.byteLength(path) <= MAX_MOUNT_PATH_BYTES &&
     !/\p{Cc}/u.test(path) &&
+    !hasLineBreak(path) &&
     ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
-    parts.every((part) => part !== "" && part !== "." && part !== "..")
+    parts.every((part) => part !== "" && part !== "." && part !== "..") &&
+    (!path.startsWith("/tmp/") || isScratchName(path.slice("/tmp/".length)))
   );
 }
 
@@ -181,9 +188,11 @@ export function makeOpenCommand(
       if (!mountPath(path))
         return refusal(
           arg,
-          /\p{Cc}/u.test(path)
-            ? "name has a control character"
-            : "path too long",
+          hasLineBreak(path)
+            ? "name has a line break"
+            : /\p{Cc}/u.test(path)
+              ? "name has a control character"
+              : "not an allowed name",
         );
       // with the docs off a file made under /knowledge is discarded, so
       // it is missing here too

@@ -12,8 +12,8 @@ import {
   parseName,
   textFromBytes,
 } from "../knowledge/rules.ts";
-import { MAX_MOUNT_PATH_BYTES, parseScratchName } from "./names.ts";
-import { underKnowledge } from "./open.ts";
+import { checkScratchNames, parseScratchName } from "./names.ts";
+import { mountPath, underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
 
 const same = (a: Uint8Array, b: Uint8Array) =>
@@ -77,7 +77,7 @@ export async function diff(
     knowledge.push({ name, text });
   }
   checkNames(names);
-  checkNames(scratchNames);
+  checkScratchNames(scratchNames);
   for (const before of mounted.values()) {
     knowledge.push({ name: before.name, text: null });
   }
@@ -178,14 +178,10 @@ export async function savedCwd(
   pwd: string | undefined,
   docs: boolean,
 ): Promise<string> {
-  if (
-    pwd === undefined ||
-    !pwd.startsWith("/") ||
-    Buffer.byteLength(pwd) > MAX_MOUNT_PATH_BYTES ||
-    /\p{Cc}/u.test(pwd)
-  )
-    return home(docs);
+  if (pwd === undefined || !pwd.startsWith("/")) return home(docs);
   const path = fs.resolvePath("/", pwd);
+  // the cwd the server takes, as mountPath allows it
+  if (!mountPath(path)) return home(docs);
   if (
     !(docs && underKnowledge(path)) &&
     path !== "/tmp" &&

@@ -51,17 +51,12 @@ describe("atomic knowledge and scratch commits", () => {
     [
       "long segment",
       `touch /tmp/${"x".repeat(256)}`,
-      "at most 64 parts of 255 bytes",
+      "at most 16 parts of 255 bytes",
     ],
     [
-      "long name",
-      `p=/tmp; for i in $(seq 17); do p=$p/${"x".repeat(250)}; done; mkdir -p $p; touch $p/f`,
-      "4096 bytes in all",
-    ],
-    [
-      "depth 65",
-      "p=/tmp; for i in $(seq 64); do p=$p/d; done; mkdir -p $p; touch $p/f",
-      "at most 64 parts",
+      "depth 17",
+      "p=/tmp; for i in $(seq 16); do p=$p/d; done; mkdir -p $p; touch $p/f",
+      "at most 16 parts",
     ],
     [
       "doc name",
@@ -344,7 +339,7 @@ describe("atomic knowledge and scratch commits", () => {
 
 describe("scratch caps", () => {
   test.each([
-    ["bytes", { scratchBytes: 7 }, "8 bytes, the limit is 7"],
+    ["bytes", { scratchBytes: 19 }, "20 bytes, the limit is 19"],
     ["files", { scratchFiles: 1 }, "2 files, the limit is 1"],
   ])(
     "%s refusal includes the numbers and rolls back everything",
@@ -391,14 +386,14 @@ describe("scratch caps", () => {
         ],
       });
       expect((await run(s, "printf 123 > /tmp/large")).error).toBe(false);
-      expect(scratchState(s)).toMatchObject({ files: 2, bytes: 13 });
+      expect(scratchState(s)).toMatchObject({ files: 2, bytes: 23 });
       const before = scratchState(s);
       expect((await run(s, "printf 456 > /tmp/large")).content).toContain(
         "2 files, the limit is 1",
       );
       expect(scratchState(s)).toEqual(before);
       expect((await run(s, "rm /tmp/other")).error).toBe(false);
-      expect(scratchState(s)).toMatchObject({ files: 1, bytes: 3 });
+      expect(scratchState(s)).toMatchObject({ files: 1, bytes: 8 });
       expect((await run(s, "rm /tmp/large")).error).toBe(false);
       expect(scratchState(s)).toMatchObject({ files: 0, bytes: 0 });
     } finally {

@@ -24,7 +24,7 @@ describe("scratch across commands", () => {
       expect(scratchState(s)).toMatchObject({
         cwd: "/tmp",
         revision: 2,
-        bytes: 4,
+        bytes: 9,
         files: 1,
       });
       expect((await run(s, "rm draft")).error).toBe(false);

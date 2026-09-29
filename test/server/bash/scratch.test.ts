@@ -20,6 +20,9 @@ const empty: ScratchFile = {
   data: new Uint8Array(),
   mode: 0o755,
 };
+// a stored file counts its name with its bytes
+const stored = (...files: ScratchFile[]) =>
+  files.reduce((sum, file) => sum + file.data.byteLength + file.path.length, 0);
 const blank = {
   cwd: "/knowledge",
   revision: 0,
@@ -74,7 +77,7 @@ describe("scratch store", () => {
       expect(scratch).toEqual({
         cwd: "/tmp/work",
         revision: 1,
-        bytes: binary.data.byteLength,
+        bytes: stored(binary, empty),
         files: 2,
         entries: [empty, binary],
       });
@@ -102,7 +105,7 @@ describe("scratch store", () => {
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         cwd: "/tmp",
         revision: 2,
-        bytes: 2,
+        bytes: stored(changed, empty),
         files: 2,
         entries: [empty, changed],
       });
@@ -111,7 +114,7 @@ describe("scratch store", () => {
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         cwd: "/tmp",
         revision: 3,
-        bytes: 2,
+        bytes: stored(executable, empty),
         files: 2,
         entries: [empty, executable],
       });
@@ -190,6 +193,7 @@ describe("scratch store", () => {
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         ...blank,
         revision: 2,
+        bytes: stored(empty),
         files: 1,
         entries: [empty],
       });
@@ -201,7 +205,7 @@ describe("scratch store", () => {
       expect(ctx.bash.scratch.read(second.id)).toEqual({
         ...blank,
         revision: 1,
-        bytes: binary.data.byteLength,
+        bytes: stored(binary),
         files: 1,
         entries: [binary],
       });
