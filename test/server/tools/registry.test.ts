@@ -7,10 +7,11 @@
 import { describe, expect, test } from "bun:test";
 import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
-import type {
-  Tool,
-  ToolContext,
-  ToolResult,
+import {
+  type Tool,
+  type ToolContext,
+  ToolError,
+  type ToolResult,
 } from "../../../src/server/tools/types.ts";
 
 // built from code points, so no invisible character sits in the source
@@ -128,6 +129,20 @@ describe("the registry's result cleaning", () => {
       content: "Error: eviltxt.exe",
       error: true,
     });
+  });
+
+  test("gives the model a refusal's words and the log only its phrase", async () => {
+    const tool: Tool = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      run: async () => {
+        throw new ToolError("no file a/b.md; available paths: c.md", "gone");
+      },
+    };
+    const result = await new Registry([tool]).run(call, context());
+    expect(result.content).toBe("Error: no file a/b.md; available paths: c.md");
+    expect((result.failure as Error).message).toBe("gone");
   });
 
   test("keeps a built-in error that mentions timeout", async () => {

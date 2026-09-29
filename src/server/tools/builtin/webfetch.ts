@@ -9,7 +9,7 @@
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { bytesWords } from "../../lib/bytes.ts";
-import type { Tool, ToolContext } from "../types.ts";
+import { type Tool, type ToolContext, ToolError } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
   return `<error>Content truncated at ${bytesWords(maxBytes)}.</error>`;
@@ -85,16 +85,22 @@ export function parseFetchUrl(
   try {
     url = new URL(input);
   } catch {
-    throw new Error(`invalid URL "${input}"`);
+    throw new ToolError(`invalid URL "${input}"`, "invalid URL");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(`scheme "${url.protocol}" is not allowed`);
+    throw new ToolError(
+      `scheme "${url.protocol}" is not allowed`,
+      "scheme not allowed",
+    );
   }
   if (url.username !== "" || url.password !== "") {
     throw new Error("credentials in URLs are not allowed");
   }
   if (web?.mode === "listed" && !originAllowed(url, web.domains)) {
-    throw new Error(`not an allowed domain: ${url.host}`);
+    throw new ToolError(
+      `not an allowed domain: ${url.host}`,
+      "not an allowed domain",
+    );
   }
   const host = normalizedHost(url.hostname);
   if (host === "") throw new Error("URL has no host");
@@ -374,7 +380,10 @@ export async function fetchText(
           url = parseFetchUrl(new URL(location, url).href, ctx.web);
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
-          throw new Error(`redirect refused: ${reason}`);
+          throw new ToolError(
+            `redirect refused: ${reason}`,
+            "redirect refused",
+          );
         }
         redirects++;
         continue;

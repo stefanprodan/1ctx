@@ -6,7 +6,12 @@
 
 import { sanitize } from "../../shared/memory.ts";
 import type { ToolCall } from "../providers/index.ts";
-import type { Tool, ToolContext, ToolResult } from "./types.ts";
+import {
+  type Tool,
+  type ToolContext,
+  ToolError,
+  type ToolResult,
+} from "./types.ts";
 
 function clean(text: string, cut: number): string {
   return sanitize(text).slice(0, cut);
@@ -107,7 +112,11 @@ export class Registry {
         error: true,
       };
       Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
-        value: timedOut ? true : failure,
+        value: timedOut
+          ? true
+          : failure instanceof ToolError
+            ? new Error(failure.logged)
+            : failure,
       });
       return result;
     }

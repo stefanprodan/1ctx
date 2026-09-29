@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { SKILLS_LEAD } from "../../src/server/runner/context.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import { makeSkillTools } from "../../src/server/tools/builtin/skill.ts";
-import { testApp } from "../helpers/app.ts";
+import { collectLogs, testApp } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -528,7 +528,8 @@ describe("skills in a send", () => {
   });
 
   test("skill and skill_file calls write tool rows and return their text", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const [skill] = assign(chat, [
       loadedSkill("ops", [
         { path: "references/a.md", content: "reference", bytes: 9 },
@@ -562,6 +563,14 @@ describe("skills in a send", () => {
     ).toContain("available paths: references/a.md");
     answer.reply("done");
     await settle(chat);
+    // the model reads the paths, the log only a fixed phrase
+    const failed = logs.events.filter((event) => event.msg === "tool failed");
+    expect(failed).toMatchObject([
+      { fields: { tool: "skill_file", error: "skill file not found" } },
+    ]);
+    const logged = JSON.stringify(logs.events);
+    expect(logged).not.toContain("missing.md");
+    expect(logged).not.toContain("references/a.md");
     const rows = chat.app.sessions
       .messages(started.sessionId)
       .filter((row) => row.kind === "tool");

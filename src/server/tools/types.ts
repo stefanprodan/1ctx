@@ -138,3 +138,15 @@ export type Offered = {
   credentials: OfferedCredential[];
   credentialsOff: { id: string; name: string; prefix: string }[];
 };
+
+// A refusal whose words name the call's input (a path, a URL, a name).
+// The model gets the message; the log gets only `logged`, a fixed
+// phrase, since a log line never holds tool input or file names.
+export class ToolError extends Error {
+  constructor(
+    message: string,
+    readonly logged: string,
+  ) {
+    super(message);
+  }
+}

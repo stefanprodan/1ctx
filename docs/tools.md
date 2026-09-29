@@ -70,6 +70,10 @@ mount in `docs/bash.md`.
   travels without its result; detail and envelopes carry `resultBytes`,
   and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
   at the display cap. The runner reads the full row from the store.
+- **A refusal that names its input is a `ToolError`.** Its message is
+  the model's result; the registry keeps only its fixed phrase as the
+  failure `tool failed` logs, so a path, URL, name or file list the
+  call carried never reaches a log line.
 
 ## The offered set
 

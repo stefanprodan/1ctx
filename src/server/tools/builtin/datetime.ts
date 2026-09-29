@@ -5,7 +5,7 @@
 // name: an optional IANA timezone, UTC when left out, so the answer
 // never depends on where the binary runs.
 
-import type { ToolContext } from "../types.ts";
+import { type ToolContext, ToolError } from "../types.ts";
 
 export type Datetime = {
   timezone: string;
@@ -38,7 +38,7 @@ export function formatDatetime(epochMs: number, timezone: string): Datetime {
       timeZoneName: "longOffset",
     }).formatToParts(new Date(epochMs));
   } catch {
-    throw new Error(`unknown timezone "${timezone}"`);
+    throw new ToolError(`unknown timezone "${timezone}"`, "unknown timezone");
   }
   const offsetName = part(parts, "timeZoneName");
   const offset = offsetName === "GMT" ? "+00:00" : offsetName.slice(3);
