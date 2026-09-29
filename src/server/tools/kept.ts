@@ -7,7 +7,7 @@
 // as a file otherwise, never both.
 // The path lines are the result's tail, so every later cut keeps them.
 
-import { type KeptFile, keptPath } from "../knowledge/index.ts";
+import { type KeptFile, keptPath } from "../bash/index.ts";
 import type { McpCallOutput, McpContent } from "../mcp/index.ts";
 import type { KeepPort, ToolResult } from "./types.ts";
 

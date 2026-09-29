@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { run, setup } from "../knowledge/helpers.ts";
+import { run, setup } from "./helpers.ts";
 
 describe("knowledge command output", () => {
   test("stdout then stderr is cut while Unicode, status and receipts stay intact", async () => {
     const s = setup();
     try {
-      s.area.create(
+      s.knowledge.create(
         s.projectId,
         s.author,
         "text",
@@ -36,13 +36,13 @@ describe("knowledge command output", () => {
     const s = setup({ scratchBytes: 4000, knowledgeFileBytes: 4000 });
     try {
       expect((await run(s, "echo saved > x; seq 1 10000")).error).toBe(true);
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
       const result = await run(s, "for i in {1..100}; do touch file$i; done");
       expect(result.error).toBe(true);
       expect(result.content).toContain(
         "change receipts exceed 1000 characters",
       );
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }

@@ -24,7 +24,7 @@ import {
   run,
   setup,
   untilPhase,
-} from "../knowledge/helpers.ts";
+} from "./helpers.ts";
 
 const MiB = 1024 * 1024;
 // limits high enough that a runaway never stops itself
@@ -305,7 +305,7 @@ describe("the command worker", () => {
         "nothing saved: command stopped at a deadline or limit\nexit 124",
       );
       expect(result.ended).toEqual({ phase: "run", cause: "deadline" });
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }
@@ -316,14 +316,14 @@ describe("the command worker", () => {
     try {
       const pending = run(s, "echo x > /knowledge/late; sleep 30");
       await untilPhase(s);
-      s.area.close();
+      s.bash.close();
       const result = await pending;
       expect(result).toEqual({
         error: true,
         content: "nothing saved: the server is shutting down",
         ended: { phase: "run", cause: "abort" },
       });
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }

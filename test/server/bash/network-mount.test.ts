@@ -3,7 +3,7 @@
 
 import { expect, test } from "bun:test";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
-import { callCaps, run, setup } from "../knowledge/helpers.ts";
+import { callCaps, run, setup } from "./helpers.ts";
 
 function serve(handler: (req: Request) => Response | Promise<Response>) {
   const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler });
@@ -131,9 +131,10 @@ test("listed access reaches its exact origin with all seven methods", async () =
     expect(refused.content).toContain("PROPFIND");
     expect(refused.content).toContain("wrote method.txt");
     expect(
-      s.area.read(s.projectId, s.area.list(s.projectId).files[0]!.id).text,
+      s.knowledge.read(s.projectId, s.knowledge.list(s.projectId).files[0]!.id)
+        .text,
     ).toBe("kept\n");
-    expect(s.area.scratch.read(s.session.id).entries[0]!.path).toBe("method");
+    expect(s.bash.scratch.read(s.session.id).entries[0]!.path).toBe("method");
     expect(methods).toHaveLength(7);
   } finally {
     server.stop();
@@ -169,12 +170,11 @@ test("a listed origin refuses other origins and redirects without discarding wri
       expect(result.content).toContain("allow-list");
       expect(result.content).toContain(`wrote ${name}.txt`);
     }
-    expect(s.area.list(s.projectId).files.map((file) => file.name)).toEqual([
-      "direct.txt",
-      "redirect.txt",
-    ]);
     expect(
-      s.area.scratch.read(s.session.id).entries.map((file) => file.path),
+      s.knowledge.list(s.projectId).files.map((file) => file.name),
+    ).toEqual(["direct.txt", "redirect.txt"]);
+    expect(
+      s.bash.scratch.read(s.session.id).entries.map((file) => file.path),
     ).toEqual(["direct", "redirect"]);
     expect(refusedHits).toBe(0);
   } finally {
@@ -195,16 +195,16 @@ test("network downloads keep bytes in scratch and reject non-text knowledge atom
       all,
     );
     expect(scratch.error, scratch.content).toBe(false);
-    expect(s.area.scratch.read(s.session.id).entries[0]!.data).toEqual(bytes);
-    const revision = s.area.scratch.read(s.session.id).revision;
+    expect(s.bash.scratch.read(s.session.id).entries[0]!.data).toEqual(bytes);
+    const revision = s.bash.scratch.read(s.session.id).revision;
     const bad = await run(
       s,
       `echo unsaved > /tmp/new; curl -sS -o /knowledge/download ${server.url}/`,
       all,
     );
     expect(bad.error).toBe(true);
-    expect(s.area.list(s.projectId).files).toEqual([]);
-    expect(s.area.scratch.read(s.session.id).revision).toBe(revision);
+    expect(s.knowledge.list(s.projectId).files).toEqual([]);
+    expect(s.bash.scratch.read(s.session.id).revision).toBe(revision);
   } finally {
     server.stop();
     s.db.close();

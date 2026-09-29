@@ -18,10 +18,7 @@ const NO_USAGE = {
   servers: () => ({ calls: 0, failed: 0, servers: [] }),
 };
 
-function setup(
-  large = false,
-  knowledge?: Parameters<typeof toolsArea>[0]["knowledge"],
-) {
+function setup(large = false, bash?: Parameters<typeof toolsArea>[0]["bash"]) {
   const db = memoryDb();
   const fetched = fakeFetch();
   const mcp = mcpArea({
@@ -50,7 +47,7 @@ function setup(
     render: (text) => text,
     skills: { forAgent: () => [], body: () => null, file: () => null },
     mcp,
-    knowledge,
+    bash,
     memory: {
       work: (projectId, automationId) => ({
         target: { projectId, automationId },

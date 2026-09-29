@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { MAX_OPENS_PER_COMMAND } from "../../../src/server/bash/commands.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
-import { afterMountRead, callCaps, run, setup } from "../knowledge/helpers.ts";
+import { afterMountRead, callCaps, run, setup } from "./helpers.ts";
 
 const receipt = (path: string, kind: string, lines?: number) =>
   `opened ${path} for the user as ${kind}${lines === undefined ? "" : `, ${lines} lines`}. They see it now, so do not repeat its content.`;
@@ -119,7 +119,7 @@ describe("open command", () => {
         ["/tmp/a", "last"],
         ["/tmp/b", "other"],
       ]);
-      expect(s.area.scratch.read(s.session.id).entries).toContainEqual(
+      expect(s.bash.scratch.read(s.session.id).entries).toContainEqual(
         expect.objectContaining({ path: "a", data: Buffer.from("after") }),
       );
     } finally {
@@ -170,7 +170,7 @@ describe("open command", () => {
   ])("chooses a valid HTML title from %j", async (html, title) => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "page.html", html);
+      s.knowledge.create(s.projectId, s.author, "page.html", html);
       expect((await run(s, "open page.html")).opened?.[0]?.title).toBe(title);
     } finally {
       s.db.close();
@@ -180,7 +180,7 @@ describe("open command", () => {
   test("reads the root SVG title", async () => {
     const s = setup();
     try {
-      s.area.create(
+      s.knowledge.create(
         s.projectId,
         s.author,
         "shape.svg",
@@ -198,8 +198,8 @@ describe("open command", () => {
   test("opens HTML as code when visuals are off or the frame cap is exceeded", async () => {
     const s = setup({ knowledgeFileBytes: 1024 * 1024 });
     try {
-      s.area.create(s.projectId, s.author, "small.html", "<p>small</p>");
-      s.area.create(
+      s.knowledge.create(s.projectId, s.author, "small.html", "<p>small</p>");
+      s.knowledge.create(
         s.projectId,
         s.author,
         "large.html",
@@ -283,9 +283,9 @@ describe("open command", () => {
   test("discards opens on a knowledge conflict", async () => {
     const s = setup();
     try {
-      const file = s.area.create(s.projectId, s.author, "x.md", "before");
+      const file = s.knowledge.create(s.projectId, s.author, "x.md", "before");
       afterMountRead(s, () =>
-        s.area.store.replace(file, s.author, "racing", 101),
+        s.knowledge.store.replace(file, s.author, "racing", 101),
       );
       const result = await run(s, "open x.md; echo after > x.md");
       expect(result.error).toBe(true);

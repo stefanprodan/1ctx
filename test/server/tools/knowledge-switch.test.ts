@@ -22,7 +22,7 @@ function setup() {
     secret: () => null,
     skills: { forAgent: () => [], body: () => null, file: () => null },
     fetcher: (async (_input: unknown) => new Response("")) as typeof fetch,
-    knowledge: {
+    bash: {
       async run(_project, _session, _author, _command, caps) {
         seen.push(caps);
         return { content: "exit 0", error: false };

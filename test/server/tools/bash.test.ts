@@ -23,7 +23,7 @@ import { Registry } from "../../../src/server/tools/registry.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import { settleRun } from "../../helpers/automations.ts";
 import { chatApp, startChat, waitScript } from "../../helpers/chat.ts";
-import { freshSignal, type Setup, setup } from "../knowledge/helpers.ts";
+import { freshSignal, type Setup, setup } from "../bash/helpers.ts";
 
 const context = (): ToolContext => ({
   web: null,
@@ -144,7 +144,7 @@ describe("bash", () => {
       const ctx = mountedContext(s);
       ctx.caps = { ...ctx.caps, maxBashCalls: 1, callTimeoutMs: 100 };
       ctx.budget.bashCalls = 1;
-      const registry = new Registry([makeBashTool(s.area)]);
+      const registry = new Registry([makeBashTool(s.bash)]);
       const slots = await Promise.all(
         Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
       );
@@ -165,8 +165,8 @@ describe("bash", () => {
         });
         releaseSession();
         expect(heldSessions().has(s.session.id)).toBe(false);
-        expect(s.area.scratch.read(s.session.id).revision).toBe(0);
-        expect(s.area.list(s.projectId).files).toEqual([]);
+        expect(s.bash.scratch.read(s.session.id).revision).toBe(0);
+        expect(s.knowledge.list(s.projectId).files).toEqual([]);
         expect(ctx.budget.bashCalls).toBe(1);
       } finally {
         releaseSession?.();
@@ -182,7 +182,7 @@ describe("bash", () => {
       const s = setup();
       const ctx = mountedContext(s);
       ctx.caps = { ...ctx.caps, maxBashCalls: 2 };
-      const registry = new Registry([makeBashTool(s.area)]);
+      const registry = new Registry([makeBashTool(s.bash)]);
       const release = await acquireSession(s.session.id, freshSignal());
       const pending = ["first", "second", "third", "fourth"].map((name) =>
         registry.run(call({ command: `echo ${name} > ${name}` }), ctx),
@@ -193,17 +193,17 @@ describe("bash", () => {
           { content: "the bash budget for this reply is spent", error: true },
           { content: "the bash budget for this reply is spent", error: true },
         ]);
-        expect(s.area.list(s.projectId).files).toEqual([]);
+        expect(s.knowledge.list(s.projectId).files).toEqual([]);
         release();
         const results = await Promise.all(pending.slice(0, 2));
         expect(results.map((result) => result.error)).toEqual([false, false]);
         expect(
-          s.area
+          s.knowledge
             .list(s.projectId)
             .files.map((file) => file.name)
             .sort(),
         ).toEqual(["first", "second"]);
-        expect(s.area.scratch.read(s.session.id).revision).toBe(2);
+        expect(s.bash.scratch.read(s.session.id).revision).toBe(2);
       } finally {
         release();
         await Promise.all(pending);
@@ -271,10 +271,10 @@ describe("bash", () => {
     const s = setup();
     const ctx = mountedContext(s);
     ctx.caps = { ...ctx.caps, resultCut: 1000 };
-    s.area.create(s.projectId, s.author, "old", "old");
-    s.area.create(s.projectId, s.author, "source", "x".repeat(2000));
+    s.knowledge.create(s.projectId, s.author, "old", "old");
+    s.knowledge.create(s.projectId, s.author, "source", "x".repeat(2000));
     try {
-      const result = await new Registry([makeBashTool(s.area)]).run(
+      const result = await new Registry([makeBashTool(s.bash)]).run(
         call({
           command:
             "cat source; printf one > first; printf two > second; rm old; false",

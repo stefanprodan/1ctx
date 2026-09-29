@@ -11,7 +11,7 @@ import {
   scratchState,
   seedScratch,
   setup,
-} from "../knowledge/helpers.ts";
+} from "./helpers.ts";
 
 const discarded =
   "changes under /uploads were discarded: copy a file to /tmp to change it";
@@ -25,7 +25,7 @@ function seedUploads(
 ) {
   transact(s.db, () => {
     const rows = Object.entries(entries);
-    const before = s.area.uploads.read(sessionId);
+    const before = s.knowledge.uploads.read(sessionId);
     s.db
       .query("delete from session_uploads where session_id = ?")
       .run(sessionId);
@@ -64,14 +64,14 @@ describe("uploaded files in command mounts", () => {
   test("an empty uploads directory exists without creating stored rows", async () => {
     const s = setup();
     try {
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       expect(await run(s, "test -d /uploads; ls /uploads")).toEqual({
         content: "exit 0",
         error: false,
         opened: [],
         tail: 6,
       });
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
       expect(before).toEqual({ revision: 0, bytes: 0, files: 0, entries: [] });
     } finally {
       s.db.close();
@@ -82,7 +82,7 @@ describe("uploaded files in command mounts", () => {
     const s = setup();
     try {
       seedUploads(s, files);
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       const result = await run(
         s,
         "cat /uploads/docs/readme.md; grep -rn needle /uploads",
@@ -91,7 +91,7 @@ describe("uploaded files in command mounts", () => {
       expect(result.content).toStartWith(files["docs/readme.md"]);
       expect(result.content).toContain("/uploads/docs/readme.md:2:needle café");
       expect(result.content).not.toContain(discarded);
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
     } finally {
       s.db.close();
     }
@@ -113,7 +113,7 @@ describe("uploaded files in command mounts", () => {
       expect((await run(s, "cat /tmp/copy")).content).toStartWith(
         files["docs/readme.md"],
       );
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }
@@ -153,7 +153,7 @@ describe("uploaded files in command mounts", () => {
       const s = setup();
       try {
         seedUploads(s, files);
-        const before = s.area.uploads.read(s.session.id);
+        const before = s.knowledge.uploads.read(s.session.id);
         const result = await run(
           s,
           `printf shared > /knowledge/kept; printf scratch > /tmp/kept; ${command}`,
@@ -161,7 +161,9 @@ describe("uploaded files in command mounts", () => {
         expect(result.error).toBe(false);
         expect(result.content).toStartWith(`${discarded}\n`);
         expect(result.content).toContain("wrote kept (rev 1, 1 lines)");
-        expect(s.area.store.byName(s.projectId, "kept")?.text).toBe("shared");
+        expect(s.knowledge.store.byName(s.projectId, "kept")?.text).toBe(
+          "shared",
+        );
         const kept = scratchState(s).entries.find(
           (file) => file.path === "kept",
         );
@@ -174,7 +176,7 @@ describe("uploaded files in command mounts", () => {
             files["docs/readme.md"],
           );
         }
-        expect(s.area.uploads.read(s.session.id)).toEqual(before);
+        expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
         const next = await run(s, "cat /uploads/docs/readme.md");
         expect(next.error).toBe(false);
         expect(next.content).toStartWith(files["docs/readme.md"]);
@@ -195,16 +197,18 @@ describe("uploaded files in command mounts", () => {
         const s = setup();
         try {
           if (populated) seedUploads(s, files);
-          const before = s.area.uploads.read(s.session.id);
+          const before = s.knowledge.uploads.read(s.session.id);
           const result = await run(
             s,
             `printf shared > /knowledge/kept; printf scratch > /tmp/kept; ${command}`,
           );
           expect(result.error).toBe(false);
           expect(result.content).toStartWith(`${discarded}\n`);
-          expect(s.area.store.byName(s.projectId, "kept")?.text).toBe("shared");
+          expect(s.knowledge.store.byName(s.projectId, "kept")?.text).toBe(
+            "shared",
+          );
           expect(scratchState(s).files).toBe(1);
-          expect(s.area.uploads.read(s.session.id)).toEqual(before);
+          expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
           expect((await run(s, "test -d /uploads")).error).toBe(false);
         } finally {
           s.db.close();
@@ -217,7 +221,7 @@ describe("uploaded files in command mounts", () => {
     const s = setup();
     try {
       seedUploads(s, files);
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       const mode = await run(s, "stat -c %a /uploads/docs/readme.md");
       const result = await run(
         s,
@@ -230,7 +234,7 @@ describe("uploaded files in command mounts", () => {
         tail: 6,
       });
       expect(await run(s, "stat -c %a /uploads/docs/readme.md")).toEqual(mode);
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
     } finally {
       s.db.close();
     }
@@ -255,7 +259,7 @@ describe("uploaded files in command mounts", () => {
     const s = setup();
     try {
       seedUploads(s, files);
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       const result = await run(
         s,
         "printf shared > /knowledge/kept; printf scratch > /tmp/kept; rm -r /uploads; false",
@@ -263,9 +267,11 @@ describe("uploaded files in command mounts", () => {
       expect(result.error).toBe(true);
       expect(result.content).toStartWith(`${discarded}\n`);
       expect(result.content).toContain("exit 1");
-      expect(s.area.store.byName(s.projectId, "kept")?.text).toBe("shared");
+      expect(s.knowledge.store.byName(s.projectId, "kept")?.text).toBe(
+        "shared",
+      );
       expect(scratchState(s).files).toBe(1);
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
     } finally {
       s.db.close();
     }
@@ -348,7 +354,7 @@ describe("upload mount budgets and isolation", () => {
       });
       s.caps.knowledgeFileBytes = megabyte;
       s.caps.scratchBytes = megabyte;
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       expect(
         await run(s, "cat /uploads/payload > /tmp/copy; rm /tmp/remove"),
       ).toEqual({
@@ -360,7 +366,7 @@ describe("upload mount budgets and isolation", () => {
       expect(Buffer.from(scratchState(s).entries[0]!.data).toString()).toBe(
         text,
       );
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
     } finally {
       s.db.close();
     }
@@ -385,12 +391,12 @@ describe("upload mount budgets and isolation", () => {
       );
       s.caps.uploadBytes = megabyte;
       s.caps.uploadFiles = 10;
-      const before = s.area.uploads.read(s.session.id);
+      const before = s.knowledge.uploads.read(s.session.id);
       const result = await run(s, "cat /uploads/payload-11 | wc -c");
       expect(result.error).toBe(false);
       expect(result.content).toContain(String(megabyte / 2));
       expect(result.content).not.toContain(discarded);
-      expect(s.area.uploads.read(s.session.id)).toEqual(before);
+      expect(s.knowledge.uploads.read(s.session.id)).toEqual(before);
     } finally {
       s.db.close();
     }
@@ -447,10 +453,10 @@ describe("upload mount budgets and isolation", () => {
     const s = setup();
     try {
       seedUploads(s, files);
-      const read = s.area.uploads.read.bind(s.area.uploads);
+      const read = s.knowledge.uploads.read.bind(s.knowledge.uploads);
       const before = read(s.session.id);
-      const mounted = s.area.uploads.mounted.bind(s.area.uploads);
-      s.area.uploads.mounted = (sessionId) => {
+      const mounted = s.knowledge.uploads.mounted.bind(s.knowledge.uploads);
+      s.knowledge.uploads.mounted = (sessionId) => {
         const snapshot = mounted(sessionId);
         transact(s.db, () => {
           s.db
@@ -472,7 +478,9 @@ describe("upload mount budgets and isolation", () => {
         ...before,
         revision: before.revision + 1,
       });
-      expect(s.area.store.byName(s.projectId, "kept")?.text).toBe("shared");
+      expect(s.knowledge.store.byName(s.projectId, "kept")?.text).toBe(
+        "shared",
+      );
       expect(scratchState(s).files).toBe(1);
     } finally {
       s.db.close();

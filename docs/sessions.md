@@ -183,7 +183,11 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   more at the next pass. Then archived chats not running are packed,
   and their scratch deleted, skipping the sessions a command holds,
   since a chat archived while its send ran can write scratch until the
-  stop lands. Then every ended run is packed, its memory phase
+  stop lands. Scratch is the bash area's (`docs/bash.md`): sessions
+  deletes it and reads the held set through its scratch port, answered
+  by the bash area's `ScratchStore`, and the step finds the archived
+  chats with scratch left by joining bash's `session_scratch` table
+  directly, bounded by the step's batch. Then every ended run is packed, its memory phase
   included, which runs under the run's running status; never at the
   run's end, so a finish adds no write. Last, an archived chat is
   deleted `archivedDeleteDays` after `archived_at`, and a run whose

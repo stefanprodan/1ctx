@@ -12,7 +12,7 @@ import {
 } from "../../../src/server/bash/credentials.ts";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { WebSnapshot } from "../../../src/shared/web.ts";
-import { callCaps, run, setup } from "../knowledge/helpers.ts";
+import { callCaps, run, setup } from "./helpers.ts";
 
 const KEY = "quotes-key-0123456789";
 const OTHER_KEY = "prices-key-9876543210";

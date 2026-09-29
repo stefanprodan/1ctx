@@ -5,13 +5,13 @@
 // execution takes its identity only from the runner's call context.
 
 import type { WebSnapshot } from "../../../shared/web.ts";
-import { headerValue, type KeyRead } from "../../credentials/index.ts";
 import {
+  type BashCapability,
   type CommandCredential,
-  type KnowledgeCapability,
   type Refusal,
   scrubKeys,
-} from "../../knowledge/index.ts";
+} from "../../bash/index.ts";
+import { headerValue, type KeyRead } from "../../credentials/index.ts";
 import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
 import { domainWords } from "../web.ts";
 
@@ -134,7 +134,7 @@ function scrubbed(
 }
 
 export function makeBashTool(
-  knowledge?: Pick<KnowledgeCapability, "run">,
+  bash?: Pick<BashCapability, "run">,
   web: WebSnapshot | null = null,
   visuals = true,
   credentials: BashCredentials = NONE,
@@ -166,7 +166,7 @@ export function makeBashTool(
       if (typeof args.command !== "string") {
         throw new Error("command must be a string");
       }
-      if (knowledge === undefined) {
+      if (bash === undefined) {
         throw new Error("knowledge is not configured");
       }
       if (ctx.budget.bashCalls >= ctx.caps.maxBashCalls) {
@@ -186,7 +186,7 @@ export function makeBashTool(
         ctx.web === null
           ? []
           : commandCredentials(credentials, keys, actor.projectId);
-      const result = await knowledge.run(
+      const result = await bash.run(
         actor.projectId,
         actor.sessionId,
         {

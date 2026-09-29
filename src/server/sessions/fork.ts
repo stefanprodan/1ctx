@@ -6,8 +6,8 @@ import type {
   SendSummary,
   SessionDetail,
 } from "../../shared/contracts/session.ts";
+import { copyKeptFiles } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
-import { copyKeptFiles } from "../knowledge/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import { packedText } from "./pack.ts";

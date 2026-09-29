@@ -10,8 +10,8 @@ import type {
   MessageStatus,
   SessionStatus,
 } from "../../shared/words.ts";
+import type { OpenedRecord } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
-import type { OpenedRecord } from "../knowledge/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import { archiveRow } from "./archive.ts";
@@ -76,7 +76,7 @@ import {
   type SendEnd,
 } from "./sends.ts";
 
-// the knowledge area's scratch of a chat, dropped when it is archived,
+// the bash area's scratch of a chat, dropped when it is archived,
 // and the sessions a command holds now
 export type ScratchPort = {
   drop(sessionId: string): void;

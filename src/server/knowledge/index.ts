@@ -1,9 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The knowledge capability shared by routes, tools and send policies.
-// Page writes bind the file, its history and its event in one transaction;
-// command writes use the same store so both paths share revisions and caps.
+// The knowledge capability shared by routes, send policies and the bash
+// area: the project docs and a chat's uploads. Page writes bind the file,
+// its history and its event in one transaction; a command's docs commit
+// runs in the command's, on the same store, so both paths share
+// revisions and caps.
 
 import type {
   KnowledgeAuthor,
@@ -20,28 +22,19 @@ import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
-
-export type { OpenedRecord } from "../bash/open.ts";
-export type { CommandEnd } from "../bash/protocol.ts";
-
-import { startKept } from "../bash/kept.ts";
-import { type CommandCaps, type CommandResult, run } from "../bash/mount.ts";
-import { heldSessions } from "../bash/queue.ts";
-import { ScratchStore } from "../bash/scratch.ts";
-import { commandWorkers } from "../bash/worker.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
-import { commitKnowledge } from "./commit.ts";
+import { type Change, commitKnowledge } from "./commit.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { parseName, parseText } from "./parse.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { oneAtATime, search } from "./search.ts";
 import { stage } from "./stage.ts";
-import { KnowledgeStore, summary } from "./store.ts";
+import { KnowledgeStore, type MountedDoc, summary } from "./store.ts";
 import {
+  type MountedUploads,
   type RestageUploads,
   UploadStore,
   type UploadTree,
@@ -53,11 +46,6 @@ export type KnowledgeDeps = {
   clock: Clock;
   limits: LimitsPort;
   access: AccessPort;
-  log: Log;
-  // the command worker entry, built where the binary resolves it
-  worker: URL;
-  // each phase a command's worker reports, by chat; a test waits on it
-  onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
 };
 export type KnowledgeCapability = KnowledgePort & {
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
@@ -80,43 +68,29 @@ export type KnowledgeCapability = KnowledgePort & {
   // the files changed last, newest first
   latest(projectId: string, limit: number): KnowledgeFile[];
   emptyBin(projectId: string): number;
-  run(
-    projectId: string,
-    sessionId: string,
-    author: KnowledgeAuthor,
-    command: string,
-    caps: CommandCaps,
-    signal: AbortSignal,
-  ): Promise<CommandResult>;
   sweep(now: number): number;
-  // a send's start: the session's kept MCP files trimmed to the budget,
-  // and the number the next kept folder takes; files of rows past
-  // afterSeq, which a regenerate deletes, are not counted
-  startKept(
-    sessionId: string,
-    afterSeq: number | null,
-  ): {
-    next: number;
-    used: number;
-    files: number;
-    maxBytes: number;
-    maxFiles: number;
-  };
+  // what a command mounts: the project's docs and the chat's uploads,
+  // their text as bytes
+  mountedDocs(projectId: string): MountedDoc[];
+  mountedUploads(sessionId: string): MountedUploads;
+  // a command's docs changes, inside the caller's transaction
+  commitDocs(
+    projectId: string,
+    author: KnowledgeAuthor,
+    changes: readonly Change[],
+    caps: KnowledgeCaps,
+    now: number,
+  ): { receipts: string[]; events: BusEvent[] };
 };
 export type KnowledgeArea = KnowledgeCapability & {
   store: KnowledgeStore;
-  scratch: ScratchStore;
   uploads: UploadStore;
   routes: RouteDescriptor[];
-  // shutdown: the workers of running commands ended
-  close(): void;
 };
 
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
-  const scratch = new ScratchStore(deps.db);
   const uploads = new UploadStore(deps.db);
-  const workers = commandWorkers(deps.worker, deps.log);
   const searching = new Set<string>();
   const views = new RenderCache();
   const required = (projectId: string, fileId: string) => {
@@ -203,29 +177,6 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         projectId,
         author,
         req,
-      ),
-    run: (projectId, sessionId, author, command, caps, signal) =>
-      run(
-        {
-          db: deps.db,
-          knowledge: {
-            mountedDocs: (projectId) => store.mounted(projectId),
-            mountedUploads: (sessionId) => uploads.mounted(sessionId),
-            commitDocs: (projectId, author, changes, caps, now) =>
-              commitKnowledge(store, projectId, author, changes, caps, now),
-          },
-          scratch,
-          clock: deps.clock,
-          workers,
-          current: () => deps.limits.current(),
-          ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
-        },
-        projectId,
-        sessionId,
-        author,
-        command,
-        caps,
-        signal,
       ),
     list(projectId) {
       const caps = deps.limits.current();
@@ -384,54 +335,23 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       files: store.counts(projectId).files,
       recent: store.recent(projectId),
     }),
-    startKept: (sessionId, afterSeq) =>
-      transact(deps.db, () => {
-        const caps = deps.limits.current();
-        return {
-          result: {
-            ...startKept(deps.db, sessionId, caps, afterSeq),
-            maxBytes: caps.mcpKeptBytes,
-            maxFiles: caps.mcpKeptFiles,
-          },
-          events: [],
-        };
-      }),
     sweep(now) {
       const caps = deps.limits.current();
-      return (
-        store.sweep(now, caps.knowledgeHistoryDays) +
-        scratch.sweep(now, caps.scratchIdleDays, heldSessions()) +
-        uploads.sweep(now)
-      );
+      return store.sweep(now, caps.knowledgeHistoryDays) + uploads.sweep(now);
     },
+    mountedDocs: (projectId) => store.mounted(projectId),
+    mountedUploads: (sessionId) => uploads.mounted(sessionId),
+    commitDocs: (projectId, author, changes, caps, now) =>
+      commitKnowledge(store, projectId, author, changes, caps, now),
   };
   return {
     store,
-    scratch,
     uploads,
     ...capability,
     routes: routes({ access: deps.access, knowledge: capability }),
-    close: () => workers.close(),
   };
 }
 
-export {
-  type CommandCredential,
-  type Refusal,
-  scrubKeys,
-} from "../bash/credentials.ts";
-export {
-  copyKeptFiles,
-  type KeptFile,
-  keptPath,
-  writeKeptFiles,
-} from "../bash/kept.ts";
-export {
-  type Scratch,
-  type ScratchChanges,
-  type ScratchFile,
-  ScratchStore,
-} from "../bash/scratch.ts";
 export {
   checkFile,
   checkNames,

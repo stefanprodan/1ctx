@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { OpenedRecord } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
-import type { OpenedRecord } from "../knowledge/index.ts";
 
 export function readOpenedFile(
   db: Db,

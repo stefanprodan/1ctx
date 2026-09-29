@@ -249,7 +249,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       uploads,
       capabilities,
       checkUploads: deps.uploads.checkUploads,
-      startKept: (id, afterSeq) => deps.knowledge.startKept(id, afterSeq),
+      startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),
       now: deps.clock(),
     });
   };

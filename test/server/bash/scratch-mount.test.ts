@@ -2,13 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import {
-  callCaps,
-  run,
-  scratchState,
-  seedScratch,
-  setup,
-} from "../knowledge/helpers.ts";
+import { callCaps, run, scratchState, seedScratch, setup } from "./helpers.ts";
 
 describe("scratch across commands", () => {
   test("the first command can enter /tmp and the next reads its files", async () => {
@@ -26,7 +20,7 @@ describe("scratch across commands", () => {
         opened: [],
         tail: 6,
       });
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
       expect(scratchState(s)).toMatchObject({
         cwd: "/tmp",
         revision: 2,
@@ -215,11 +209,16 @@ describe("the saved directory", () => {
     async (change) => {
       const s = setup();
       try {
-        const file = s.area.create(s.projectId, s.author, "work/kept", "kept");
+        const file = s.knowledge.create(
+          s.projectId,
+          s.author,
+          "work/kept",
+          "kept",
+        );
         expect((await run(s, "cd work")).error).toBe(false);
-        s.area.remove(s.projectId, s.author, file.id);
+        s.knowledge.remove(s.projectId, s.author, file.id);
         if (change === "file")
-          s.area.create(s.projectId, s.author, "work", "file");
+          s.knowledge.create(s.projectId, s.author, "work", "file");
         expect((await run(s, "pwd")).content).toStartWith(
           "started in /knowledge: /knowledge/work no longer exists\n/knowledge\n",
         );

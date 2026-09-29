@@ -22,7 +22,7 @@ export const CHATS_PER_STEP = 500;
 const DAY_MS = 86_400_000;
 
 // the scratch the sweep frees, and the sessions a command holds now,
-// which it leaves be as the knowledge sweep does
+// which it leaves be as the bash sweep does
 export type SweepScratch = {
   drop(sessionId: string): void;
   held(): ReadonlySet<string>;
@@ -124,7 +124,7 @@ function steps(deps: SweepDeps): Step[] {
     },
     {
       // a chat archived while its send ran could write scratch until
-      // the stop landed
+      // the stop landed; the join reads the bash area's table
       field: "scratch_freed",
       candidates: (_now, _caps, limit) => {
         const held = deps.scratch.held();

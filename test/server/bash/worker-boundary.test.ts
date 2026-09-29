@@ -15,7 +15,7 @@ import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { Job } from "../../../src/server/bash/protocol.ts";
 import { commandWorkers } from "../../../src/server/bash/worker.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { COMMAND_WORKER, callCaps, run, setup } from "../knowledge/helpers.ts";
+import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
 
 const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
 const OUT = "nothing saved: the command worker answered out of protocol";
@@ -75,7 +75,7 @@ describe("a command worker's answer is untrusted", () => {
     try {
       const result = await run(s, "docs", { ...callCaps, knowledge: false });
       expect(result).toMatchObject({ error: true, content: OUT });
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }
@@ -89,7 +89,7 @@ describe("a command worker's answer is untrusted", () => {
       expect(result.content).toContain(
         "nothing saved: command stopped at a deadline or limit",
       );
-      expect(s.area.list(s.projectId).files).toEqual([]);
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
     } finally {
       s.db.close();
     }

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { transact } from "../../../src/server/db/index.ts";
 import type {
   ScratchChanges,
   ScratchFile,
-} from "../../../src/server/knowledge/index.ts";
+} from "../../../src/server/bash/scratch.ts";
+import { transact } from "../../../src/server/db/index.ts";
 import { Conflict } from "../../../src/server/lib/errors.ts";
-import { setup } from "../knowledge/helpers.ts";
+import { setup } from "./helpers.ts";
 
 const binary: ScratchFile = {
   path: "work/data.bin",
@@ -35,7 +35,7 @@ function write(
   sessionId = ctx.session.id,
 ) {
   transact(ctx.db, () => ({
-    result: ctx.area.scratch.write(
+    result: ctx.bash.scratch.write(
       sessionId,
       revision,
       { written: [], removed: [], cwd: "/knowledge", ...changes },
@@ -56,7 +56,7 @@ describe("scratch store", () => {
   test("an absent scratch reads empty without creating a row", () => {
     const ctx = setup();
     try {
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual(blank);
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(ctx.db.query("select * from session_scratch").all()).toEqual([]);
       expect(ctx.db.query("select * from session_scratch_files").all()).toEqual(
         [],
@@ -70,7 +70,7 @@ describe("scratch store", () => {
     const ctx = setup();
     try {
       write(ctx, 0, { written: [binary, empty], cwd: "/tmp/work" });
-      const scratch = ctx.area.scratch.read(ctx.session.id);
+      const scratch = ctx.bash.scratch.read(ctx.session.id);
       expect(scratch).toEqual({
         cwd: "/tmp/work",
         revision: 1,
@@ -99,7 +99,7 @@ describe("scratch store", () => {
       const changed = { ...binary, data: new Uint8Array([255, 0]) };
       ctx.now.value = 200;
       write(ctx, 1, { written: [changed], cwd: "/tmp" });
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         cwd: "/tmp",
         revision: 2,
         bytes: 2,
@@ -108,7 +108,7 @@ describe("scratch store", () => {
       });
       const executable = { ...changed, mode: 0o700 };
       write(ctx, 2, { written: [executable], cwd: "/tmp" });
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         cwd: "/tmp",
         revision: 3,
         bytes: 2,
@@ -125,7 +125,7 @@ describe("scratch store", () => {
     const ctx = setup();
     try {
       write(ctx, 0);
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         ...blank,
         revision: 1,
       });
@@ -133,7 +133,7 @@ describe("scratch store", () => {
       write(ctx, 1, { cwd: "/tmp" });
       ctx.now.value = 300;
       write(ctx, 2, { cwd: "/tmp" });
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         ...blank,
         cwd: "/tmp",
         revision: 3,
@@ -150,7 +150,7 @@ describe("scratch store", () => {
       const ctx = setup();
       try {
         write(ctx, 0, { written: [binary], cwd: "/tmp/work" });
-        const before = ctx.area.scratch.read(ctx.session.id);
+        const before = ctx.bash.scratch.read(ctx.session.id);
         ctx.now.value = 200;
         const fail = () =>
           write(ctx, revision, {
@@ -160,7 +160,7 @@ describe("scratch store", () => {
           });
         expect(fail).toThrow(Conflict);
         expect(fail).toThrow("the scratch changed while the command ran");
-        expect(ctx.area.scratch.read(ctx.session.id)).toEqual(before);
+        expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
         expect(usedAt(ctx)).toEqual({ used_at: 100 });
       } finally {
         ctx.db.close();
@@ -172,7 +172,7 @@ describe("scratch store", () => {
     const ctx = setup();
     try {
       expect(() => write(ctx, 1, { written: [binary] })).toThrow(Conflict);
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual(blank);
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();
     } finally {
       ctx.db.close();
@@ -184,21 +184,21 @@ describe("scratch store", () => {
     try {
       const second = ctx.makeSession();
       write(ctx, 0, { written: [binary, empty] });
-      expect(ctx.area.scratch.read(second.id)).toEqual(blank);
+      expect(ctx.bash.scratch.read(second.id)).toEqual(blank);
       write(ctx, 0, { written: [binary] }, second.id);
       write(ctx, 1, { removed: [binary.path] });
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         ...blank,
         revision: 2,
         files: 1,
         entries: [empty],
       });
       write(ctx, 2, { removed: [empty.path] });
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual({
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual({
         ...blank,
         revision: 3,
       });
-      expect(ctx.area.scratch.read(second.id)).toEqual({
+      expect(ctx.bash.scratch.read(second.id)).toEqual({
         ...blank,
         revision: 1,
         bytes: binary.data.byteLength,
@@ -216,11 +216,11 @@ describe("scratch store", () => {
       const ctx = setup();
       try {
         if (existing) write(ctx, 0, { written: [binary], cwd: "/tmp/work" });
-        const before = ctx.area.scratch.read(ctx.session.id);
+        const before = ctx.bash.scratch.read(ctx.session.id);
         const lastUse = usedAt(ctx);
         expect(() =>
           transact(ctx.db, () => {
-            ctx.area.scratch.write(
+            ctx.bash.scratch.write(
               ctx.session.id,
               before.revision,
               { written: [empty], removed: [binary.path], cwd: "/tmp" },
@@ -229,7 +229,7 @@ describe("scratch store", () => {
             throw new Error("rollback");
           }),
         ).toThrow("rollback");
-        expect(ctx.area.scratch.read(ctx.session.id)).toEqual(before);
+        expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
         expect(usedAt(ctx)).toEqual(lastUse);
       } finally {
         ctx.db.close();
@@ -265,15 +265,15 @@ describe("scratch store", () => {
       ctx.now.value = 200;
       write(ctx, 0, { written: [empty] }, recent.id);
       const held = new Set<string>();
-      expect(ctx.area.scratch.sweep(101 + 86_400_000, 1, held)).toBe(1);
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual(blank);
+      expect(ctx.bash.scratch.sweep(101 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();
-      expect(ctx.area.scratch.read(boundary.id).entries).toEqual([binary]);
-      expect(ctx.area.scratch.read(recent.id).entries).toEqual([empty]);
+      expect(ctx.bash.scratch.read(boundary.id).entries).toEqual([binary]);
+      expect(ctx.bash.scratch.read(recent.id).entries).toEqual([empty]);
       expect(ctx.sessions.byId(ctx.session.id)).not.toBeNull();
-      expect(ctx.area.scratch.sweep(102 + 86_400_000, 1, held)).toBe(1);
-      expect(ctx.area.scratch.read(boundary.id)).toEqual(blank);
-      expect(ctx.area.scratch.sweep(201 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.sweep(102 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.read(boundary.id)).toEqual(blank);
+      expect(ctx.bash.scratch.sweep(201 + 86_400_000, 1, held)).toBe(1);
       expect(ctx.db.query("select * from session_scratch").all()).toEqual([]);
       expect(ctx.db.query("select * from session_scratch_files").all()).toEqual(
         [],
@@ -289,15 +289,15 @@ describe("scratch store", () => {
       const second = ctx.makeSession();
       write(ctx, 0, { written: [binary], cwd: "/tmp/work" });
       write(ctx, 0, { written: [empty] }, second.id);
-      const before = ctx.area.scratch.read(ctx.session.id);
+      const before = ctx.bash.scratch.read(ctx.session.id);
       const held = new Set([ctx.session.id]);
-      expect(ctx.area.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual(before);
+      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
       expect(usedAt(ctx)).toEqual({ used_at: 100 });
-      expect(ctx.area.scratch.read(second.id)).toEqual(blank);
+      expect(ctx.bash.scratch.read(second.id)).toEqual(blank);
       held.clear();
-      expect(ctx.area.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
-      expect(ctx.area.scratch.read(ctx.session.id)).toEqual(blank);
+      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
+      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();
     } finally {
       ctx.db.close();

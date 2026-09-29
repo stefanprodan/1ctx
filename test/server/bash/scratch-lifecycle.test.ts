@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { ScratchStore } from "../../../src/server/bash/scratch.ts";
 import { type Db, open, transact } from "../../../src/server/db/index.ts";
-import { ScratchStore } from "../../../src/server/knowledge/index.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
 import {
@@ -15,7 +15,7 @@ import {
   startChat,
   waitScript,
 } from "../../helpers/chat.ts";
-import { setup } from "../knowledge/helpers.ts";
+import { setup } from "./helpers.ts";
 
 const binary = new Uint8Array([0, 255, 128, 192, 10, 13, 1, 254]);
 const encoded = Buffer.from(binary).toString("base64");

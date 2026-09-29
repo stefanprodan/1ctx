@@ -20,8 +20,8 @@ import {
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";
+import type { BashCapability } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
@@ -110,7 +110,7 @@ export type ToolsDeps = {
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
-  knowledge?: Pick<KnowledgeCapability, "run">;
+  bash?: Pick<BashCapability, "run">;
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
@@ -218,7 +218,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         ]),
     makeVisualizeTool(hosts),
     makeBashTool(
-      deps.knowledge,
+      deps.bash,
       web,
       visuals,
       credentials,

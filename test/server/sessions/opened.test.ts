@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import type { OpenedRecord } from "../../../src/server/knowledge/index.ts";
+import type { OpenedRecord } from "../../../src/server/bash/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { openedFileResponse } from "../../../src/server/sessions/opened.ts";

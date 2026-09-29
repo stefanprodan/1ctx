@@ -15,8 +15,8 @@ import type {
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
+import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
-import { writeKeptFiles } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";

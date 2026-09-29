@@ -466,7 +466,7 @@ describe("the chats sweep", () => {
     const deps = {
       db: chat.app.db,
       store: chat.app.sessions,
-      scratch: chat.app.knowledge.scratch,
+      scratch: chat.app.bash.scratch,
       log: silent,
     };
     const caps = DEFAULT_LIMITS;

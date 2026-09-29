@@ -9,7 +9,7 @@ import {
   scratchState,
   seedScratch,
   setup,
-} from "../knowledge/helpers.ts";
+} from "./helpers.ts";
 
 const off = { ...callCaps, knowledge: false };
 const discarded =
@@ -24,7 +24,7 @@ describe("a command with the project docs off", () => {
   test("mounts no /knowledge and starts in /tmp without a notice", async () => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "docs/x.md", "secret\n");
+      s.knowledge.create(s.projectId, s.author, "docs/x.md", "secret\n");
       const result = await run(s, "pwd; ls /; cat /knowledge/docs/x.md", off);
       expect(result.content).toStartWith("/tmp\n");
       expect(result.content.split("\n")).not.toContain("knowledge");
@@ -43,7 +43,12 @@ describe("a command with the project docs off", () => {
   test("discards a write under /knowledge with the notice first and writes no version", async () => {
     const s = setup();
     try {
-      const file = s.area.create(s.projectId, s.author, "docs/x.md", "old\n");
+      const file = s.knowledge.create(
+        s.projectId,
+        s.author,
+        "docs/x.md",
+        "old\n",
+      );
       const before = versions(s);
       const result = await run(
         s,
@@ -56,10 +61,10 @@ describe("a command with the project docs off", () => {
       expect(result.content).not.toContain("wrote");
       expect(result.error).toBe(false);
       expect(versions(s)).toBe(before);
-      expect(s.area.list(s.projectId).files.map((f) => f.name)).toEqual([
+      expect(s.knowledge.list(s.projectId).files.map((f) => f.name)).toEqual([
         "docs/x.md",
       ]);
-      expect(s.area.read(s.projectId, file.id)).toMatchObject({
+      expect(s.knowledge.read(s.projectId, file.id)).toMatchObject({
         text: "old\n",
         revision: 1,
       });
@@ -77,13 +82,13 @@ describe("a command with the project docs off", () => {
   test("a read-only command writes no version and says nothing", async () => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "a.md", "a\n");
-      s.area.create(s.projectId, s.author, "b.md", "b\n");
+      s.knowledge.create(s.projectId, s.author, "a.md", "a\n");
+      s.knowledge.create(s.projectId, s.author, "b.md", "b\n");
       const before = versions(s);
       const result = await run(s, "echo hi", off);
       expect(result.content).toBe("hi\n\nexit 0");
       expect(versions(s)).toBe(before);
-      expect(s.area.list(s.projectId).files).toHaveLength(2);
+      expect(s.knowledge.list(s.projectId).files).toHaveLength(2);
     } finally {
       s.db.close();
     }
@@ -92,7 +97,7 @@ describe("a command with the project docs off", () => {
   test("a saved cwd under /knowledge starts in /tmp and is kept for when the docs are on", async () => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "docs/x.md", "x\n");
+      s.knowledge.create(s.projectId, s.author, "docs/x.md", "x\n");
       expect((await run(s, "cd docs")).error).toBe(false);
       expect(scratchState(s).cwd).toBe("/knowledge/docs");
       expect((await run(s, "pwd", off)).content).toBe("/tmp\n\nexit 0");
@@ -113,7 +118,7 @@ describe("a command with the project docs off", () => {
   test("a command that moves elsewhere while the docs are off keeps its cwd", async () => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "docs/x.md", "x\n");
+      s.knowledge.create(s.projectId, s.author, "docs/x.md", "x\n");
       await run(s, "cd docs");
       await run(
         s,
@@ -152,7 +157,7 @@ describe("a command with the project docs off", () => {
   test("open finds nothing under /knowledge, even a file the command made", async () => {
     const s = setup();
     try {
-      s.area.create(s.projectId, s.author, "x.md", "x\n");
+      s.knowledge.create(s.projectId, s.author, "x.md", "x\n");
       const result = await run(
         s,
         "open /knowledge/x.md; mkdir /knowledge; echo y > /knowledge/y.md; open /knowledge/y.md",

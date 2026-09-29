@@ -11,6 +11,7 @@ import type {
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { Wire } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
+import type { BashCapability } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import type { KnowledgeCapability } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -49,7 +50,8 @@ export type RunnerDeps = {
     MemoryCapability,
     "read" | "commit" | "view" | "startView" | "endView" | "resetSeen"
   >;
-  knowledge: Pick<KnowledgeCapability, "snapshot" | "startKept">;
+  knowledge: Pick<KnowledgeCapability, "snapshot">;
+  bash: Pick<BashCapability, "startKept">;
   uploads: WriterDeps["uploads"] & {
     checkUploads(
       userId: string,

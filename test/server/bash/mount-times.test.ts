@@ -5,7 +5,7 @@
 // tell the newest apart; a file a command writes keeps the mount's now.
 
 import { describe, expect, test } from "bun:test";
-import { run, seedScratch, setup } from "../knowledge/helpers.ts";
+import { run, seedScratch, setup } from "./helpers.ts";
 
 const JAN_2 = Date.UTC(2026, 0, 2, 3, 4, 5);
 const JAN_3 = Date.UTC(2026, 0, 3, 3, 4, 5);
@@ -15,12 +15,12 @@ describe("mounted times", () => {
     const s = setup();
     try {
       s.now.value = JAN_3;
-      s.area.create(s.projectId, s.author, "a.md", "old\n");
+      s.knowledge.create(s.projectId, s.author, "a.md", "old\n");
       s.now.value = JAN_2;
-      s.area.create(s.projectId, s.author, "b.md", "older\n");
+      s.knowledge.create(s.projectId, s.author, "b.md", "older\n");
       s.now.value = JAN_3 + 60_000;
-      const replaced = s.area.list(s.projectId).files[1]!;
-      s.area.replace(s.projectId, s.author, replaced.id, "newest\n", 1);
+      const replaced = s.knowledge.list(s.projectId).files[1]!;
+      s.knowledge.replace(s.projectId, s.author, replaced.id, "newest\n", 1);
       const listed = await run(s, "ls -t /knowledge; stat /knowledge/a.md");
       expect(listed.content).toStartWith(
         `b.md\na.md\n  File: /knowledge/a.md\n`,
@@ -39,9 +39,9 @@ describe("mounted times", () => {
     const s = setup();
     try {
       s.now.value = JAN_2;
-      s.area.create(s.projectId, s.author, "docs/old.md", "old\n");
+      s.knowledge.create(s.projectId, s.author, "docs/old.md", "old\n");
       s.now.value = JAN_3;
-      s.area.create(s.projectId, s.author, "a.md", "new\n");
+      s.knowledge.create(s.projectId, s.author, "a.md", "new\n");
       const listed = await run(s, "ls -t /knowledge; stat /knowledge");
       expect(listed.content).toStartWith("a.md\ndocs\n");
       expect(listed.content).toContain(

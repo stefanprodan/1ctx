@@ -14,7 +14,7 @@ import type {
   SendKind,
   SessionStatus,
 } from "../../shared/words.ts";
-import type { OpenedRecord } from "../knowledge/index.ts";
+import type { OpenedRecord } from "../bash/index.ts";
 import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 

@@ -361,7 +361,7 @@ for one of the reasons below. Where they part:
 ### How the mount gives curl its network
 
 The mount passes `fetch`, never `network`: `commandFetch()` in
-`src/server/knowledge/credentials.ts` wraps one `createSecureFetch` for
+`src/server/bash/credentials.ts` wraps one `createSecureFetch` for
 the web snapshot and one per project credential, and picks between them
 once, from the URL curl asked for. A credential's own fetch has its
 prefix as the only allow-list entry, carrying the header as a
@@ -465,6 +465,6 @@ tests of what we removed.
    For every line `make vendor-test` reports, decide whether it is Bun,
    the trim or a real regression; fix a regression, then `--update`.
    A new command upstream added is off until `KNOWLEDGE_COMMANDS` in
-   `src/server/knowledge/limits.ts` names it.
+   `src/server/bash/commands.ts` names it.
 7. Update the tag in this file, and each row of "What we changed" that
    moved.

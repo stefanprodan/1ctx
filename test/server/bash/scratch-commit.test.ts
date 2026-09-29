@@ -11,14 +11,19 @@ import {
   seedScratch,
   setup,
   untilPhase,
-} from "../knowledge/helpers.ts";
+} from "./helpers.ts";
 
 const edits =
   "echo changed > /knowledge/existing; echo draft > /tmp/new; cd /tmp";
 
 function prepared() {
   const s = setup();
-  const file = s.area.create(s.projectId, s.author, "existing", "original");
+  const file = s.knowledge.create(
+    s.projectId,
+    s.author,
+    "existing",
+    "original",
+  );
   seedScratch(s, {
     cwd: "/tmp/work",
     written: [
@@ -26,14 +31,14 @@ function prepared() {
     ],
   });
   const before = scratchState(s);
-  const knowledge = s.area.list(s.projectId);
-  const versions = s.area.versions(s.projectId, file.id);
+  const knowledge = s.knowledge.list(s.projectId);
+  const versions = s.knowledge.versions(s.projectId, file.id);
   s.now.value = 200;
   const unchanged = () => {
     expect(scratchState(s)).toEqual(before);
-    expect(s.area.list(s.projectId)).toEqual(knowledge);
-    expect(s.area.versions(s.projectId, file.id)).toEqual(versions);
-    expect(s.area.read(s.projectId, file.id).text).toBe("original");
+    expect(s.knowledge.list(s.projectId)).toEqual(knowledge);
+    expect(s.knowledge.versions(s.projectId, file.id)).toEqual(versions);
+    expect(s.knowledge.read(s.projectId, file.id).text).toBe("original");
   };
   return { ...s, file, before, unchanged };
 }
@@ -121,8 +126,8 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("a throw after scratch writes rolls back both trees and releases the session", async () => {
     const s = prepared();
-    const write = s.area.scratch.write.bind(s.area.scratch);
-    s.area.scratch.write = (...args) => {
+    const write = s.bash.scratch.write.bind(s.bash.scratch);
+    s.bash.scratch.write = (...args) => {
       write(...args);
       throw new Error("write failed");
     };
@@ -133,7 +138,7 @@ describe("atomic knowledge and scratch commits", () => {
         ended: { phase: "commit", cause: "error" },
       });
       s.unchanged();
-      s.area.scratch.write = write;
+      s.bash.scratch.write = write;
       expect((await run(s, edits)).error).toBe(false);
       expect(scratchState(s)).toMatchObject({
         revision: 2,
@@ -147,10 +152,10 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("a knowledge revision conflict preserves the prior scratch", async () => {
     const s = prepared();
-    const read = s.area.store.mounted.bind(s.area.store);
-    s.area.store.mounted = (id) => {
+    const read = s.knowledge.store.mounted.bind(s.knowledge.store);
+    s.knowledge.store.mounted = (id) => {
       const rows = read(id);
-      s.area.replace(s.projectId, s.author, s.file.id, "other writer", 1);
+      s.knowledge.replace(s.projectId, s.author, s.file.id, "other writer", 1);
       return rows;
     };
     try {
@@ -158,8 +163,10 @@ describe("atomic knowledge and scratch commits", () => {
         "existing changed while the command ran",
       );
       expect(scratchState(s)).toEqual(s.before);
-      expect(s.area.read(s.projectId, s.file.id).text).toBe("other writer");
-      expect(s.area.versions(s.projectId, s.file.id)).toHaveLength(2);
+      expect(s.knowledge.read(s.projectId, s.file.id).text).toBe(
+        "other writer",
+      );
+      expect(s.knowledge.versions(s.projectId, s.file.id)).toHaveLength(2);
     } finally {
       s.db.close();
     }
@@ -167,9 +174,9 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("a scratch revision conflict rolls back knowledge and preserves the racing scratch", async () => {
     const s = prepared();
-    const read = s.area.scratch.read.bind(s.area.scratch);
+    const read = s.bash.scratch.read.bind(s.bash.scratch);
     let raced = false;
-    s.area.scratch.read = (id) => {
+    s.bash.scratch.read = (id) => {
       const before = read(id);
       if (!raced) {
         raced = true;
@@ -187,8 +194,8 @@ describe("atomic knowledge and scratch commits", () => {
         revision: 2,
         usedAt: 200,
       });
-      expect(s.area.read(s.projectId, s.file.id).text).toBe("original");
-      expect(s.area.versions(s.projectId, s.file.id)).toHaveLength(1);
+      expect(s.knowledge.read(s.projectId, s.file.id).text).toBe("original");
+      expect(s.knowledge.versions(s.projectId, s.file.id)).toHaveLength(1);
     } finally {
       s.db.close();
     }
@@ -209,7 +216,7 @@ describe("atomic knowledge and scratch commits", () => {
         usedAt: 200,
         files: 2,
       });
-      expect(s.area.read(s.projectId, s.file.id).text).toBe("changed\n");
+      expect(s.knowledge.read(s.projectId, s.file.id).text).toBe("changed\n");
     } finally {
       s.db.close();
     }
@@ -242,7 +249,7 @@ describe("atomic knowledge and scratch commits", () => {
           });
         }
         expect(events).toEqual([]);
-        expect(s.area.list(s.projectId).files).toEqual([]);
+        expect(s.knowledge.list(s.projectId).files).toEqual([]);
       } finally {
         off();
         s.db.close();
@@ -301,10 +308,10 @@ describe("atomic knowledge and scratch commits", () => {
 
   test("scratch-only writes ignore lowered knowledge totals and unrelated racing edits", async () => {
     const s = prepared();
-    const read = s.area.store.mounted.bind(s.area.store);
-    s.area.store.mounted = (id) => {
+    const read = s.knowledge.store.mounted.bind(s.knowledge.store);
+    s.knowledge.store.mounted = (id) => {
       const rows = read(id);
-      s.area.store.replace(s.file, s.author, "other writer", 150);
+      s.knowledge.store.replace(s.file, s.author, "other writer", 150);
       return rows;
     };
     try {
@@ -320,7 +327,9 @@ describe("atomic knowledge and scratch commits", () => {
       expect(
         scratchState(s).entries.find((file) => file.path === "copied")?.data,
       ).toEqual(new TextEncoder().encode("original"));
-      expect(s.area.read(s.projectId, s.file.id).text).toBe("other writer");
+      expect(s.knowledge.read(s.projectId, s.file.id).text).toBe(
+        "other writer",
+      );
     } finally {
       s.db.close();
     }
@@ -347,8 +356,8 @@ describe("scratch caps", () => {
 
   test("current scratch caps are read again at commit", async () => {
     const s = prepared();
-    const read = s.area.scratch.read.bind(s.area.scratch);
-    s.area.scratch.read = (id) => {
+    const read = s.bash.scratch.read.bind(s.bash.scratch);
+    s.bash.scratch.read = (id) => {
       s.caps.scratchFiles = 1;
       return read(id);
     };

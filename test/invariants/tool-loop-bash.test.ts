@@ -180,8 +180,18 @@ describe("bash in the tool loop", () => {
 describe("a bash command that saves nothing", () => {
   test("logs the phase it ended in and why, and nothing of the command", async () => {
     const logs = collectLogs();
-    const chat = await chatApp({ logFactory: logs.logFactory });
+    const areas = new Set<string>();
+    const chat = await chatApp({
+      logFactory: (area) => {
+        areas.add(area);
+        return logs.logFactory(area);
+      },
+    });
     try {
+      // the command worker's lines go to the bash area's logger, and the
+      // knowledge area has none
+      expect(areas.has("bash")).toBe(true);
+      expect(areas.has("knowledge")).toBe(false);
       const { script } = await startChat(chat);
       const bash = (id: string, command: string) => ({
         id,
