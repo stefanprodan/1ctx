@@ -327,8 +327,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
-      // the agents the composer offers in a project: every agent, until
-      // agents are members of projects
+      // the agents the composer offers in a project: every agent, since
+      // agents are shared by every project
       method: "GET",
       path: "/api/projects/:id/agents",
       policy: "authenticated",

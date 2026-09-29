@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The glossary's enums as const arrays and their guards. Environment
+// The domain's enums as const arrays and their guards. Environment
 // neutral: no Bun, no DOM, no packages.
 
 export const ROLES = ["admin", "member"] as const;

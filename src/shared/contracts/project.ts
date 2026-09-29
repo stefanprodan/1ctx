@@ -13,7 +13,7 @@ export type ProjectSummary = {
   kind: ProjectKind;
   name: string;
   createdAt: number;
-  // the membership rows, so a list row counts people without the detail
+  // the membership rows, so a list row counts members without the detail
   memberCount: number;
 };
 
