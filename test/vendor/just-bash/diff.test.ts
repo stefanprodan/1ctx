@@ -125,6 +125,17 @@ describe("diff", () => {
     expect(tree.stderr).toContain("work limit exceeded");
   });
 
+  test("charges side by side padding and formats to the work limit", async () => {
+    const { bash } = shell({ a: "a\n", b: "b\n", c: "a\n".repeat(5000) });
+    const wide = await bash.exec("diff -y -W 1000000000 a b");
+    expect(wide.exitCode).toBe(2);
+    expect(wide.stderr).toContain("work limit exceeded");
+    const format = "%L".repeat(20000);
+    const long = await bash.exec(`diff --line-format='${format}' a c`);
+    expect(long.exitCode).toBe(2);
+    expect(long.stderr).toContain("work limit exceeded");
+  });
+
   test("walks directories within the traversal budget", async () => {
     const fs = new InMemoryFs({}, {});
     for (let i = 0; i < 20; i++) {

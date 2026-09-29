@@ -22,6 +22,8 @@ export interface SideStyle {
   suppressCommonLines: boolean;
   /** --sdiff-merge-assist: sdiff's commands before each run of lines */
   mergeAssist: boolean;
+  /** takes the columns padded, which -W makes as many as asked */
+  charge: (steps: number) => void;
 }
 
 /** The half width and the right column's offset, as GNU computes them. */
@@ -68,6 +70,7 @@ class Printer {
   }
 
   private tabFromTo(from: number, to: number): number {
+    if (to > from) this.style.charge(to - from);
     let at = from;
     if (!this.style.expandTabs) {
       const size = this.style.tabSize;
@@ -95,6 +98,7 @@ class Printer {
         if (inPos === outPos) {
           if (style.expandTabs) {
             if (bound < stop) stop = bound;
+            if (stop > outPos) style.charge(stop - outPos);
             for (; outPos < stop; outPos++) out.push(" ");
           } else if (stop < bound) {
             outPos = stop;

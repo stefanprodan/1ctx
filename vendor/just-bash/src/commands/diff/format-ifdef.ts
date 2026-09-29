@@ -25,6 +25,8 @@ interface Ifdef {
   lines: string[];
   /** -t: tabs expanded at this size, 0 to keep them */
   tabSize: number;
+  /** takes a step a byte of each format run, which a long one makes many */
+  charge: (steps: number) => void;
 }
 
 const isDigit = (c: string) => c >= "0" && c <= "9";
@@ -165,6 +167,7 @@ function printLines(
 ): void {
   if (out === null) return;
   for (let i = group.from; i < group.upto; i++) {
+    run.charge(format.length + 1);
     let p = 0;
     while (p < format.length) {
       const c = format[p++];
@@ -204,6 +207,7 @@ function formatGroup(
   groups: [Group, Group],
   out: string[] | null,
 ): number {
+  run.charge(format.length - at + 1);
   let f = at;
   while (f < format.length && format[f] !== end) {
     const c = format[f++];

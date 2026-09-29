@@ -159,6 +159,7 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
         leftColumn: o.leftColumn,
         suppressCommonLines: o.suppressCommonLines,
         mergeAssist: o.mergeAssist,
+        charge: budget.charge,
       },
       out,
     );
@@ -176,7 +177,7 @@ export function diffTexts(run: TextRun, a: TextFile, b: TextFile): TextResult {
       lb,
       real,
       groups.map(text),
-      { lines: lines.map(text), tabSize },
+      { lines: lines.map(text), tabSize, charge: budget.charge },
       out,
     );
   } else {
