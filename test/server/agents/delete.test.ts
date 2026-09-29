@@ -24,6 +24,7 @@ import {
   startChat,
   tick,
 } from "../../helpers/chat.ts";
+import { frames, watcher } from "../../helpers/socket.ts";
 
 const skill = (name: string) => ({
   name,
@@ -157,6 +158,9 @@ describe("deleting an agent", () => {
       run.main.reply("healthy");
       await settle(chat, run.sessionId);
       const paused = await createAutomation(chat, { name: "paused" });
+      const pausedRun = await startRun(chat, paused.id);
+      pausedRun.main.reply("healthy");
+      await settle(chat, pausedRun.sessionId);
       expect(
         (
           await chat.member.call(
@@ -172,6 +176,9 @@ describe("deleting an agent", () => {
         running: 0,
       });
 
+      const pausedRevision = app.automations.byId(paused.id)!.revision;
+      const conn = await watcher(chat);
+      const outside = await watcher(chat, chat.admin);
       const events: BusEvent[] = [];
       const unsubscribe = subscribe((event) => events.push(event), silent);
       const deleted = await chat.admin.call(
@@ -240,7 +247,8 @@ describe("deleting an agent", () => {
         id: chat.memberId,
       });
 
-      // one envelope per chat and per paused automation
+      // one envelope per chat and per automation, the one already
+      // paused included, so its held runs learn the agent is retired
       const changed = events.flatMap((event) =>
         event.type === "session.changed" ? [event.data.session.id] : [],
       );
@@ -248,10 +256,36 @@ describe("deleting an agent", () => {
         [first.sessionId, second.sessionId].sort(),
       );
       expect(
-        events.flatMap((event) =>
-          event.type === "automation.changed" ? [event.data.automation.id] : [],
-        ),
-      ).toEqual([active.id]);
+        events
+          .flatMap((event) =>
+            event.type === "automation.changed"
+              ? [event.data.automation.id]
+              : [],
+          )
+          .sort(),
+      ).toEqual([active.id, paused.id].sort());
+      expect(
+        frames(conn, "automation")
+          .map((frame) => ({
+            projectId: frame.projectId,
+            id: frame.automation.id,
+            agentRetired: frame.automation.agentRetired,
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      ).toEqual(
+        [active.id, paused.id].sort().map((id) => ({
+          projectId: chat.projectId,
+          id,
+          agentRetired: true,
+        })),
+      );
+      // the frames go to the automations' project alone: the admin who
+      // deleted the agent is outside the member's personal project
+      expect(frames(outside, "automation")).toEqual([]);
+      // a client keeps only a newer revision
+      expect(app.automations.byId(paused.id)!.revision).toBe(
+        pausedRevision + 1,
+      );
 
       // the default and the member's start move on
       const offered: ProjectAgentsResponse = await (

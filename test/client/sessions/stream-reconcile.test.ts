@@ -5,6 +5,11 @@
 // time: the races between the socket and a first page out.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
+import {
+  automations,
+  loadAutomations,
+  onAutomationsSocket,
+} from "../../../src/client/data/automations.ts";
 import { TRAIL_MS } from "../../../src/client/data/flight.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
@@ -427,6 +432,57 @@ describe("labels no envelope carries", () => {
       await release([rowOf(chat("b", 50, { agentId: "a9" }))]);
       await again;
       expect(list.value?.rows[0]?.agentRetired).toBe(true);
+    },
+  );
+
+  test.serial(
+    "an agent's delete retires the runs of its paused automations too",
+    async () => {
+      const task = (id: string, revision: number, suspendedAt: number | null) =>
+        ({
+          id,
+          projectId: "p1",
+          agentId: "a9",
+          agentRetired: false,
+          name: "digest",
+          suspendedAt,
+          revision,
+        }) as AutomationSummary;
+      await loaded(HOME, [
+        rowOf(run("r1", 50, { agentId: "a9", automationId: "au" })),
+        rowOf(run("r2", 40, { agentId: "a9", automationId: "av" })),
+        rowOf(chat("c", 30)),
+      ]);
+      // the automations page of the project is open too, and keeps only
+      // a frame of a newer revision
+      const gatedFetch = globalThis.fetch;
+      globalThis.fetch = (async () =>
+        Response.json({
+          automations: [task("au", 1, null), task("av", 2, 5)],
+          runDeadlineMs: 60_000,
+        })) as unknown as typeof fetch;
+      await loadAutomations("p1");
+      globalThis.fetch = gatedFetch;
+      // the delete sends a frame for the one already paused and for the
+      // one it suspends; either alone retires the agent on every row,
+      // which is all a project holding only paused ones would get
+      const frame = (automation: AutomationSummary) =>
+        onAutomationsSocket({
+          type: "automation",
+          projectId: "p1",
+          automation: { ...automation, agentRetired: true },
+        });
+      frame(task("av", 3, 5));
+      expect(list.value?.rows.map((r) => r.agentRetired)).toEqual([
+        true,
+        true,
+        false,
+      ]);
+      frame(task("au", 2, 70));
+      expect(automations.value?.map((a) => a.agentRetired)).toEqual([
+        true,
+        true,
+      ]);
     },
   );
 

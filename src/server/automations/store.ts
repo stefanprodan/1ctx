@@ -436,4 +436,27 @@ export class AutomationStore {
       .all(agentId)
       .map((row) => row.id);
   }
+
+  // an agent's delete suspends its active automations as the admin and
+  // moves every one's revision, since each summary now says the agent is
+  // retired and a client keeps only a newer revision
+  retireAgent(agentId: string, by: string, now: number): AutomationSummary[] {
+    this.db
+      .query(
+        `update automations set
+           suspended_by = iif(suspended_at is null, ?, suspended_by),
+           updated_at = iif(suspended_at is null, ?, updated_at),
+           suspended_at = coalesce(suspended_at, ?),
+           next_at = null, revision = revision + 1
+         where agent_id = ?`,
+      )
+      .run(by, now, now, agentId);
+    return this.db
+      .query<Raw, [string]>(
+        `${SELECT} where automations.agent_id = ?
+         order by automations.created_at, automations.id`,
+      )
+      .all(agentId)
+      .map(row);
+  }
 }

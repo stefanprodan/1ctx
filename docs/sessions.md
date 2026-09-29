@@ -126,7 +126,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   and server rows and users' picks of it, archives each of its chats
   (reason `agent`, a revision and an envelope each, its scratch
   deleted, never a run) through `SessionStore.archive()`, and suspends
-  its active automations as the admin. After the commit the scheduler
+  its active automations as the admin, with an `automation.changed` for
+  every automation of the agent, a paused one included. After the commit the scheduler
   is woken and the runner stops every send whose policy names the
   agent, so a chat archived while running ends as a stop does. `GET
   /api/agents/:id/impact` counts what it would archive, pause and
