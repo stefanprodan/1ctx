@@ -6,7 +6,9 @@
   },
   "mtime": "2026-09-29T12:52:48.311Z",
   "dirs": [
-    "emptydir"
+    "emptydir",
+    "d1/emptysub",
+    "d2/emptysub"
   ],
   "files": {
     "lao": "The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n",
@@ -126,7 +128,54 @@
     "ign5": "# one\nk1\nk2\nk3\nk4\nk5\ncode\nk6\nk7\nk8\nk9\nk10\nk11\nk12\n# x\nk13\n",
     "ign6": "# two\nk1\nk2\nk3\nk4\nk5\nCODE\nk6\nk7\nk8\nk9\nk10\nk11\nk12\n# y\nk13\n",
     "wsnl": "a\nb\nc \n",
-    "wsnonl": "a\nb\nc"
+    "wsnonl": "a\nb\nc",
+    "d1/same.txt": "same\n",
+    "d1/changed.txt": "one\ntwo\nthree\n",
+    "d1/only1.txt": "only in d1\n",
+    "d1/fd": "a file\n",
+    "d1/sub/inner.txt": "a\nb\n",
+    "d1/sub/same.txt": "same\n",
+    "d1/sub/deep/leaf": "x\n",
+    "d1/onlydir1/f": "f\n",
+    "d1/nul.bin": {
+      "base64": "YQBiCg=="
+    },
+    "d1/Upper.txt": "U\n",
+    "d1/lower.txt": "l\n",
+    "d1/.hidden": "h\n",
+    "d1/sp ace.txt": "x\n",
+    "d1/emptyfile": "",
+    "d1/B.txt": "B\n",
+    "d1/a.txt": "a\n",
+    "d2/same.txt": "same\n",
+    "d2/changed.txt": "one\n2\nthree\n",
+    "d2/only2.txt": "only in d2\n",
+    "d2/fd/in": "in\n",
+    "d2/sub/inner.txt": "a\nB\n",
+    "d2/sub/same.txt": "same\n",
+    "d2/sub/deep/leaf": "y\n",
+    "d2/onlydir2/g": "g\n",
+    "d2/nul.bin": {
+      "base64": "YQBjCg=="
+    },
+    "d2/upper.txt": "u\n",
+    "d2/lower.txt": "l\n",
+    "d2/.hidden": "H\n",
+    "d2/sp ace.txt": "y\n",
+    "d2/B.txt": "b\n",
+    "d2/a.txt": "A\n",
+    "e1/x": "x\n",
+    "e1/y": "y\n",
+    "e2/x": "X\n",
+    "e2/dangling": "a file\n",
+    "e2/y": "y\n",
+    "d2/lfile": "same\n",
+    "excl": "*.bin\nsub  \n\n.hidden\n",
+    "dot1": "a\nb\n",
+    "dot2": "a\n.\nb\n",
+    "dot3": ".\n..\nx\n.\n",
+    "a=b": "a\n",
+    "br]": "a\n"
   },
   "cases": [
     {
@@ -3555,6 +3604,2278 @@
       "stdin": "a\n",
       "stdout": "1a2,7\n> b\n> c\n> d\n> e\n> f\n> g\n",
       "exit": 1
+    },
+    {
+      "name": "two directories",
+      "args": [
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories recursive",
+      "args": [
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories recursive unified",
+      "args": [
+        "-ru",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -ru d1/.hidden d2/.hidden\n--- d1/.hidden\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/.hidden\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-h\n+H\ndiff -ru d1/a.txt d2/a.txt\n--- d1/a.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/a.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-a\n+A\ndiff -ru d1/B.txt d2/B.txt\n--- d1/B.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/B.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-B\n+b\ndiff -ru d1/changed.txt d2/changed.txt\n--- d1/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n one\n-two\n+2\n three\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -ru d1/ln d2/ln\n--- d1/ln\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/ln\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,3 @@\n-same\n+one\n+2\n+three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -ru \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n--- \"d1/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n+++ \"d2/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -ru d1/sub/deep/leaf d2/sub/deep/leaf\n--- d1/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -ru d1/sub/inner.txt d2/sub/inner.txt\n--- d1/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n a\n-b\n+B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories unified then recursive",
+      "args": [
+        "-u",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -u -r d1/.hidden d2/.hidden\n--- d1/.hidden\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/.hidden\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-h\n+H\ndiff -u -r d1/a.txt d2/a.txt\n--- d1/a.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/a.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-a\n+A\ndiff -u -r d1/B.txt d2/B.txt\n--- d1/B.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/B.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-B\n+b\ndiff -u -r d1/changed.txt d2/changed.txt\n--- d1/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n one\n-two\n+2\n three\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -u -r d1/ln d2/ln\n--- d1/ln\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/ln\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,3 @@\n-same\n+one\n+2\n+three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -u -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n--- \"d1/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n+++ \"d2/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -u -r d1/sub/deep/leaf d2/sub/deep/leaf\n--- d1/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -u -r d1/sub/inner.txt d2/sub/inner.txt\n--- d1/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n a\n-b\n+B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories context recursive",
+      "args": [
+        "-c",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -c -r d1/.hidden d2/.hidden\n*** d1/.hidden\t2026-09-29 12:52:48.311000000 +0000\n--- d2/.hidden\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! h\n--- 1 ----\n! H\ndiff -c -r d1/a.txt d2/a.txt\n*** d1/a.txt\t2026-09-29 12:52:48.311000000 +0000\n--- d2/a.txt\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! a\n--- 1 ----\n! A\ndiff -c -r d1/B.txt d2/B.txt\n*** d1/B.txt\t2026-09-29 12:52:48.311000000 +0000\n--- d2/B.txt\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! B\n--- 1 ----\n! b\ndiff -c -r d1/changed.txt d2/changed.txt\n*** d1/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n--- d2/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n  one\n! two\n  three\n--- 1,3 ----\n  one\n! 2\n  three\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -c -r d1/ln d2/ln\n*** d1/ln\t2026-09-29 12:52:48.311000000 +0000\n--- d2/ln\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! same\n--- 1,3 ----\n! one\n! 2\n! three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -c -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n*** \"d1/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n--- \"d2/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! x\n--- 1 ----\n! y\ndiff -c -r d1/sub/deep/leaf d2/sub/deep/leaf\n*** d1/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n--- d2/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! x\n--- 1 ----\n! y\ndiff -c -r d1/sub/inner.txt d2/sub/inner.txt\n*** d1/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n--- d2/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,2 ****\n  a\n! b\n--- 1,2 ----\n  a\n! B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories unified",
+      "args": [
+        "-u",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -u d1/.hidden d2/.hidden\n--- d1/.hidden\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/.hidden\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-h\n+H\ndiff -u d1/a.txt d2/a.txt\n--- d1/a.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/a.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-a\n+A\ndiff -u d1/B.txt d2/B.txt\n--- d1/B.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/B.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-B\n+b\ndiff -u d1/changed.txt d2/changed.txt\n--- d1/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n one\n-two\n+2\n three\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -u d1/ln d2/ln\n--- d1/ln\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/ln\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,3 @@\n-same\n+one\n+2\n+three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -u \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n--- \"d1/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n+++ \"d2/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories brief",
+      "args": [
+        "-q",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories brief recursive",
+      "args": [
+        "-qr",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nFiles d1/sub/deep/leaf and d2/sub/deep/leaf differ\nFiles d1/sub/inner.txt and d2/sub/inner.txt differ\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories recursive new file",
+      "args": [
+        "-rN",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -rN d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -rN d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -rN d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -rN d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -rN d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\ndiff -rN d1/only1.txt d2/only1.txt\n1d0\n< only in d1\ndiff -rN d1/only2.txt d2/only2.txt\n0a1\n> only in d2\ndiff -rN d1/onlydir1/f d2/onlydir1/f\n1d0\n< f\ndiff -rN d1/onlydir2/g d2/onlydir2/g\n0a1\n> g\ndiff -rN \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -rN d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -rN d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\ndiff -rN d1/upper.txt d2/upper.txt\n0a1\n> u\ndiff -rN d1/Upper.txt d2/Upper.txt\n1d0\n< U\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories recursive unified new file",
+      "args": [
+        "-ruN",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -ruN d1/.hidden d2/.hidden\n--- d1/.hidden\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/.hidden\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-h\n+H\ndiff -ruN d1/a.txt d2/a.txt\n--- d1/a.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/a.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-a\n+A\ndiff -ruN d1/B.txt d2/B.txt\n--- d1/B.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/B.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-B\n+b\ndiff -ruN d1/changed.txt d2/changed.txt\n--- d1/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/changed.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n one\n-two\n+2\n three\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -ruN d1/ln d2/ln\n--- d1/ln\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/ln\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,3 @@\n-same\n+one\n+2\n+three\nBinary files d1/nul.bin and d2/nul.bin differ\ndiff -ruN d1/only1.txt d2/only1.txt\n--- d1/only1.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/only1.txt\t1970-01-01 00:00:00.000000000 +0000\n@@ -1 +0,0 @@\n-only in d1\ndiff -ruN d1/only2.txt d2/only2.txt\n--- d1/only2.txt\t1970-01-01 00:00:00.000000000 +0000\n+++ d2/only2.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -0,0 +1 @@\n+only in d2\ndiff -ruN d1/onlydir1/f d2/onlydir1/f\n--- d1/onlydir1/f\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/onlydir1/f\t1970-01-01 00:00:00.000000000 +0000\n@@ -1 +0,0 @@\n-f\ndiff -ruN d1/onlydir2/g d2/onlydir2/g\n--- d1/onlydir2/g\t1970-01-01 00:00:00.000000000 +0000\n+++ d2/onlydir2/g\t2026-09-29 12:52:48.311000000 +0000\n@@ -0,0 +1 @@\n+g\ndiff -ruN \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n--- \"d1/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n+++ \"d2/sp ace.txt\"\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -ruN d1/sub/deep/leaf d2/sub/deep/leaf\n--- d1/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -ruN d1/sub/inner.txt d2/sub/inner.txt\n--- d1/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n a\n-b\n+B\ndiff -ruN d1/upper.txt d2/upper.txt\n--- d1/upper.txt\t1970-01-01 00:00:00.000000000 +0000\n+++ d2/upper.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -0,0 +1 @@\n+u\ndiff -ruN d1/Upper.txt d2/Upper.txt\n--- d1/Upper.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/Upper.txt\t1970-01-01 00:00:00.000000000 +0000\n@@ -1 +0,0 @@\n-U\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories new file",
+      "args": [
+        "-N",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -N d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -N d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -N d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -N d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -N d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\ndiff -N d1/only1.txt d2/only1.txt\n1d0\n< only in d1\ndiff -N d1/only2.txt d2/only2.txt\n0a1\n> only in d2\nCommon subdirectories: d1/onlydir1 and d2/onlydir1\nCommon subdirectories: d1/onlydir2 and d2/onlydir2\ndiff -N \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\ndiff -N d1/upper.txt d2/upper.txt\n0a1\n> u\ndiff -N d1/Upper.txt d2/Upper.txt\n1d0\n< U\n",
+      "exit": 1
+    },
+    {
+      "name": "unidirectional new file in directories",
+      "args": [
+        "--unidirectional-new-file",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --unidirectional-new-file -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --unidirectional-new-file -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --unidirectional-new-file -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --unidirectional-new-file -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff --unidirectional-new-file -r d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\ndiff --unidirectional-new-file -r d1/only2.txt d2/only2.txt\n0a1\n> only in d2\nOnly in d1: onlydir1\ndiff --unidirectional-new-file -r d1/onlydir2/g d2/onlydir2/g\n0a1\n> g\ndiff --unidirectional-new-file -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff --unidirectional-new-file -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff --unidirectional-new-file -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\ndiff --unidirectional-new-file -r d1/upper.txt d2/upper.txt\n0a1\n> u\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "unidirectional new file reversed",
+      "args": [
+        "-r",
+        "--unidirectional-new-file",
+        "d2",
+        "d1"
+      ],
+      "stdout": "diff -r --unidirectional-new-file d2/.hidden d1/.hidden\n1c1\n< H\n---\n> h\ndiff -r --unidirectional-new-file d2/a.txt d1/a.txt\n1c1\n< A\n---\n> a\ndiff -r --unidirectional-new-file d2/B.txt d1/B.txt\n1c1\n< b\n---\n> B\ndiff -r --unidirectional-new-file d2/changed.txt d1/changed.txt\n2c2\n< 2\n---\n> two\nFile d2/fd is a directory while file d1/fd is a regular file\ndiff -r --unidirectional-new-file d2/ln d1/ln\n1,3c1\n< one\n< 2\n< three\n---\n> same\nBinary files d2/nul.bin and d1/nul.bin differ\ndiff -r --unidirectional-new-file d2/only1.txt d1/only1.txt\n0a1\n> only in d1\nOnly in d2: only2.txt\ndiff -r --unidirectional-new-file d2/onlydir1/f d1/onlydir1/f\n0a1\n> f\nOnly in d2: onlydir2\ndiff -r --unidirectional-new-file \"d2/sp ace.txt\" \"d1/sp ace.txt\"\n1c1\n< y\n---\n> x\ndiff -r --unidirectional-new-file d2/sub/deep/leaf d1/sub/deep/leaf\n1c1\n< y\n---\n> x\ndiff -r --unidirectional-new-file d2/sub/inner.txt d1/sub/inner.txt\n2c2\n< B\n---\n> b\nOnly in d2: upper.txt\ndiff -r --unidirectional-new-file d2/Upper.txt d1/Upper.txt\n0a1\n> U\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories report identical",
+      "args": [
+        "-rs",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -rs d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -rs d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -rs d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -rs d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/lfile and d2/lfile are identical\ndiff -rs d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nFiles d1/lower.txt and d2/lower.txt are identical\nFiles d1/lsame and d2/lsame are identical\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles d1/same.txt and d2/same.txt are identical\ndiff -rs \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -rs d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -rs d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nFiles d1/sub/same.txt and d2/sub/same.txt are identical\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude a pattern",
+      "args": [
+        "-r",
+        "-x",
+        "*.bin",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -x '*.bin' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r -x '*.bin' d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r -x '*.bin' d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r -x '*.bin' d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -x '*.bin' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -x '*.bin' \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r -x '*.bin' d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r -x '*.bin' d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude a directory",
+      "args": [
+        "-r",
+        "-x",
+        "sub",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -x sub d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r -x sub d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r -x sub d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r -x sub d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -x sub d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -x sub \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude long",
+      "args": [
+        "--exclude=sub",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff '--exclude=sub' -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff '--exclude=sub' -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff '--exclude=sub' -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff '--exclude=sub' -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff '--exclude=sub' -r d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff '--exclude=sub' -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude a class",
+      "args": [
+        "-r",
+        "-x",
+        "[cs]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -x '[cs]*' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r -x '[cs]*' d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r -x '[cs]*' d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -x '[cs]*' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude twice",
+      "args": [
+        "-r",
+        "-x",
+        "*.txt",
+        "-x",
+        "only*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -x '*.txt' -x 'only*' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -x '*.txt' -x 'only*' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\ndiff -r -x '*.txt' -x 'only*' d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude with a question mark",
+      "args": [
+        "-x",
+        "?.txt",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -x '?.txt' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -x '?.txt' d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -x '?.txt' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -x '?.txt' \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude from a file",
+      "args": [
+        "-r",
+        "-X",
+        "excl",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -X excl d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r -X excl d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r -X excl d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -X excl d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -X excl \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude from a missing file",
+      "args": [
+        "-X",
+        "nothere",
+        "d1",
+        "d2"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "two directories starting file",
+      "args": [
+        "-r",
+        "-S",
+        "m",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Binary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -S m \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r -S m d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r -S m d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories starting file long",
+      "args": [
+        "--starting-file=sub",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff '--starting-file=sub' -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff '--starting-file=sub' -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories starting past every name",
+      "args": [
+        "-S",
+        "zzz",
+        "d1",
+        "d2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "two directories ignoring name case",
+      "args": [
+        "--ignore-file-name-case",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --ignore-file-name-case d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --ignore-file-name-case d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --ignore-file-name-case d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --ignore-file-name-case d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff --ignore-file-name-case d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff --ignore-file-name-case \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\ndiff --ignore-file-name-case d1/Upper.txt d2/upper.txt\n1c1\n< U\n---\n> u\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories ignoring name case recursive",
+      "args": [
+        "-r",
+        "--ignore-file-name-case",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r --ignore-file-name-case d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r --ignore-file-name-case d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r --ignore-file-name-case d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r --ignore-file-name-case d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r --ignore-file-name-case d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r --ignore-file-name-case \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r --ignore-file-name-case d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r --ignore-file-name-case d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\ndiff -r --ignore-file-name-case d1/Upper.txt d2/upper.txt\n1c1\n< U\n---\n> u\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories no longer ignoring name case",
+      "args": [
+        "--ignore-file-name-case",
+        "--no-ignore-file-name-case",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --ignore-file-name-case --no-ignore-file-name-case d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --ignore-file-name-case --no-ignore-file-name-case d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --ignore-file-name-case --no-ignore-file-name-case d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --ignore-file-name-case --no-ignore-file-name-case d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff --ignore-file-name-case --no-ignore-file-name-case d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff --ignore-file-name-case --no-ignore-file-name-case \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories exclude ignoring name case",
+      "args": [
+        "--ignore-file-name-case",
+        "-x",
+        "UPPER.TXT",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --ignore-file-name-case -x UPPER.TXT d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --ignore-file-name-case -x UPPER.TXT d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --ignore-file-name-case -x UPPER.TXT d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --ignore-file-name-case -x UPPER.TXT d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff --ignore-file-name-case -x UPPER.TXT d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff --ignore-file-name-case -x UPPER.TXT \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories no dereference",
+      "args": [
+        "--no-dereference",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --no-dereference -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --no-dereference -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --no-dereference -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --no-dereference -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\nFile d1/lfile is a symbolic link while file d2/lfile is a regular file\nSymbolic links ‘d1/ln’ -> ‘same.txt’ and ‘d2/ln’ -> ‘changed.txt’ differ\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff --no-dereference -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff --no-dereference -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff --no-dereference -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories options after operands",
+      "args": [
+        "d1",
+        "d2",
+        "-r"
+      ],
+      "stdout": "diff -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories dash dash",
+      "args": [
+        "-r",
+        "--",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -- d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r -- d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r -- d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r -- d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -- d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -- \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r -- d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r -- d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories trailing slashes",
+      "args": [
+        "-r",
+        "d1/",
+        "d2/"
+      ],
+      "stdout": "diff -r d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1/: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1/: only1.txt\nOnly in d2/: only2.txt\nOnly in d1/: onlydir1\nOnly in d2/: onlydir2\ndiff -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2/: upper.txt\nOnly in d1/: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "two directories dot slash",
+      "args": [
+        "-r",
+        "./d1",
+        "d2"
+      ],
+      "stdout": "diff -r ./d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r ./d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r ./d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r ./d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in ./d1: emptyfile\nFile ./d1/fd is a regular file while file d2/fd is a directory\ndiff -r ./d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files ./d1/nul.bin and d2/nul.bin differ\nOnly in ./d1: only1.txt\nOnly in d2: only2.txt\nOnly in ./d1: onlydir1\nOnly in d2: onlydir2\ndiff -r \"./d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r ./d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r ./d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in ./d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "a file against a directory",
+      "args": [
+        "d1/changed.txt",
+        "d2"
+      ],
+      "stdout": "2c2\n< two\n---\n> 2\n",
+      "exit": 1
+    },
+    {
+      "name": "a directory against a file",
+      "args": [
+        "d1",
+        "d2/changed.txt"
+      ],
+      "stdout": "2c2\n< two\n---\n> 2\n",
+      "exit": 1
+    },
+    {
+      "name": "a directory against an empty one",
+      "args": [
+        "-r",
+        "d1",
+        "emptydir"
+      ],
+      "stdout": "Only in d1: .hidden\nOnly in d1: a.txt\nOnly in d1: B.txt\nOnly in d1: changed.txt\nOnly in d1: emptyfile\nOnly in d1: emptysub\nOnly in d1: fd\nOnly in d1: lfile\nOnly in d1: ln\nOnly in d1: lower.txt\nOnly in d1: lsame\nOnly in d1: nul.bin\nOnly in d1: only1.txt\nOnly in d1: onlydir1\nOnly in d1: same.txt\nOnly in d1: 'sp ace.txt'\nOnly in d1: sub\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "an empty directory against a tree, new file",
+      "args": [
+        "-rN",
+        "emptydir",
+        "d2"
+      ],
+      "stdout": "diff -rN emptydir/.hidden d2/.hidden\n0a1\n> H\ndiff -rN emptydir/a.txt d2/a.txt\n0a1\n> A\ndiff -rN emptydir/B.txt d2/B.txt\n0a1\n> b\ndiff -rN emptydir/changed.txt d2/changed.txt\n0a1,3\n> one\n> 2\n> three\ndiff -rN emptydir/fd/in d2/fd/in\n0a1\n> in\ndiff -rN emptydir/lfile d2/lfile\n0a1\n> same\ndiff -rN emptydir/ln d2/ln\n0a1,3\n> one\n> 2\n> three\ndiff -rN emptydir/lower.txt d2/lower.txt\n0a1\n> l\ndiff -rN emptydir/lsame d2/lsame\n0a1\n> same\nBinary files emptydir/nul.bin and d2/nul.bin differ\ndiff -rN emptydir/only2.txt d2/only2.txt\n0a1\n> only in d2\ndiff -rN emptydir/onlydir2/g d2/onlydir2/g\n0a1\n> g\ndiff -rN emptydir/same.txt d2/same.txt\n0a1\n> same\ndiff -rN \"emptydir/sp ace.txt\" \"d2/sp ace.txt\"\n0a1\n> y\ndiff -rN emptydir/sub/deep/leaf d2/sub/deep/leaf\n0a1\n> y\ndiff -rN emptydir/sub/inner.txt d2/sub/inner.txt\n0a1,2\n> a\n> B\ndiff -rN emptydir/sub/same.txt d2/sub/same.txt\n0a1\n> same\ndiff -rN emptydir/upper.txt d2/upper.txt\n0a1\n> u\n",
+      "exit": 1
+    },
+    {
+      "name": "a directory against itself",
+      "args": [
+        "-r",
+        "d1",
+        "d1"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "a directory against a missing one",
+      "args": [
+        "-r",
+        "d1",
+        "nothere"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "a directory against a missing one, new file",
+      "args": [
+        "-rN",
+        "d1",
+        "nothere"
+      ],
+      "stdout": "diff -rN d1/.hidden nothere/.hidden\n1d0\n< h\ndiff -rN d1/a.txt nothere/a.txt\n1d0\n< a\ndiff -rN d1/B.txt nothere/B.txt\n1d0\n< B\ndiff -rN d1/changed.txt nothere/changed.txt\n1,3d0\n< one\n< two\n< three\ndiff -rN d1/fd nothere/fd\n1d0\n< a file\ndiff -rN d1/lfile nothere/lfile\n1d0\n< same\ndiff -rN d1/ln nothere/ln\n1d0\n< same\ndiff -rN d1/lower.txt nothere/lower.txt\n1d0\n< l\ndiff -rN d1/lsame nothere/lsame\n1d0\n< same\nBinary files d1/nul.bin and nothere/nul.bin differ\ndiff -rN d1/only1.txt nothere/only1.txt\n1d0\n< only in d1\ndiff -rN d1/onlydir1/f nothere/onlydir1/f\n1d0\n< f\ndiff -rN d1/same.txt nothere/same.txt\n1d0\n< same\ndiff -rN \"d1/sp ace.txt\" \"nothere/sp ace.txt\"\n1d0\n< x\ndiff -rN d1/sub/deep/leaf nothere/sub/deep/leaf\n1d0\n< x\ndiff -rN d1/sub/inner.txt nothere/sub/inner.txt\n1,2d0\n< a\n< b\ndiff -rN d1/sub/same.txt nothere/sub/same.txt\n1d0\n< same\ndiff -rN d1/Upper.txt nothere/Upper.txt\n1d0\n< U\n",
+      "exit": 1
+    },
+    {
+      "name": "a missing directory against one, unidirectional",
+      "args": [
+        "-r",
+        "--unidirectional-new-file",
+        "nothere",
+        "d2"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "side by side directories",
+      "args": [
+        "-y",
+        "-r",
+        "d1/sub",
+        "d2/sub"
+      ],
+      "stdout": "diff -y -r d1/sub/deep/leaf d2/sub/deep/leaf\nx\t\t\t\t\t\t\t      |\ty\ndiff -y -r d1/sub/inner.txt d2/sub/inner.txt\na\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t      |\tB\ndiff -y -r d1/sub/same.txt d2/sub/same.txt\nsame\t\t\t\t\t\t\t\tsame\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef on directories",
+      "args": [
+        "-D",
+        "X",
+        "d1",
+        "d2"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ed on directories",
+      "args": [
+        "-e",
+        "-r",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -e -r d1/.hidden d2/.hidden\n1c\nH\n.\ndiff -e -r d1/a.txt d2/a.txt\n1c\nA\n.\ndiff -e -r d1/B.txt d2/B.txt\n1c\nb\n.\ndiff -e -r d1/changed.txt d2/changed.txt\n2c\n2\n.\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -e -r d1/ln d2/ln\n1c\none\n2\nthree\n.\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -e -r \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c\ny\n.\ndiff -e -r d1/sub/deep/leaf d2/sub/deep/leaf\n1c\ny\n.\ndiff -e -r d1/sub/inner.txt d2/sub/inner.txt\n2c\nB\n.\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "directories ignoring case",
+      "args": [
+        "-r",
+        "-i",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff -r -i d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r -i d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r -i \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r -i d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "directories with labels",
+      "args": [
+        "-r",
+        "--label",
+        "L",
+        "d1/sub",
+        "d2/sub"
+      ],
+      "stdout": "diff -r --label L L d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r --label L L d2/sub/inner.txt\n2c2\n< b\n---\n> B\n",
+      "exit": 1
+    },
+    {
+      "name": "trouble and a difference in one tree",
+      "args": [
+        "-r",
+        "e1",
+        "e2"
+      ],
+      "stdout": "diff -r e1/x e2/x\n1c1\n< x\n---\n> X\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "trouble and a difference brief",
+      "args": [
+        "-rq",
+        "e1",
+        "e2"
+      ],
+      "stdout": "Files e1/x and e2/x differ\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "trouble and a difference, no dereference",
+      "args": [
+        "-r",
+        "--no-dereference",
+        "e1",
+        "e2"
+      ],
+      "stdout": "File e1/dangling is a symbolic link while file e2/dangling is a regular file\ndiff -r --no-dereference e1/x e2/x\n1c1\n< x\n---\n> X\n",
+      "exit": 1
+    },
+    {
+      "name": "directories with a long option switch",
+      "args": [
+        "--recursive",
+        "--ignore-all-space",
+        "d1",
+        "d2"
+      ],
+      "stdout": "diff --recursive --ignore-all-space d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff --recursive --ignore-all-space d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff --recursive --ignore-all-space d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff --recursive --ignore-all-space d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff --recursive --ignore-all-space d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff --recursive --ignore-all-space \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff --recursive --ignore-all-space d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff --recursive --ignore-all-space d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "directories with a quoted switch",
+      "args": [
+        "-r",
+        "-I",
+        "^#",
+        "d1/sub",
+        "d2/sub"
+      ],
+      "stdout": "diff -r -I '^#' d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r -I '^#' d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\n",
+      "exit": 1
+    },
+    {
+      "name": "directories with minimal",
+      "args": [
+        "-rd",
+        "-U",
+        "1",
+        "d1/sub",
+        "d2/sub"
+      ],
+      "stdout": "diff -rd -U 1 d1/sub/deep/leaf d2/sub/deep/leaf\n--- d1/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/deep/leaf\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-x\n+y\ndiff -rd -U 1 d1/sub/inner.txt d2/sub/inner.txt\n--- d1/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n+++ d2/sub/inner.txt\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n a\n-b\n+B\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with an equals sign",
+      "args": [
+        "-q",
+        "a=b",
+        "a"
+      ],
+      "stdout": "Files 'a=b' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a bracket",
+      "args": [
+        "-q",
+        "br]",
+        "a"
+      ],
+      "stdout": "Files br] and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "from file",
+      "args": [
+        "--from-file=a",
+        "b",
+        "same"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "from file separate",
+      "args": [
+        "--from-file",
+        "a",
+        "b",
+        "same",
+        "one"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n1,7c1\n< a\n< b\n< c\n< d\n< e\n< f\n< g\n---\n> one\n",
+      "exit": 1
+    },
+    {
+      "name": "to file",
+      "args": [
+        "--to-file=a",
+        "b",
+        "same"
+      ],
+      "stdout": "1c1\n< A\n---\n> a\n4c4\n< D\n---\n> d\n8d7\n< h\n",
+      "exit": 1
+    },
+    {
+      "name": "from file unified",
+      "args": [
+        "-u",
+        "--from-file=a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "from file with no operands",
+      "args": [
+        "--from-file=a"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "from file and to file",
+      "args": [
+        "--from-file=a",
+        "--to-file=b",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "from file twice the same",
+      "args": [
+        "--from-file=a",
+        "--from-file=a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "from file twice differing",
+      "args": [
+        "--from-file=a",
+        "--from-file=b",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "from file with a missing operand",
+      "args": [
+        "--from-file=a",
+        "nothere",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "from file a directory",
+      "args": [
+        "--from-file=d1",
+        "d2",
+        "d1/changed.txt"
+      ],
+      "stdout": "diff '--from-file=d1' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff '--from-file=d1' d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff '--from-file=d1' d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff '--from-file=d1' d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff '--from-file=d1' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff '--from-file=d1' \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "to file a directory",
+      "args": [
+        "-r",
+        "--to-file=d2",
+        "d1"
+      ],
+      "stdout": "diff -r '--to-file=d2' d1/.hidden d2/.hidden\n1c1\n< h\n---\n> H\ndiff -r '--to-file=d2' d1/a.txt d2/a.txt\n1c1\n< a\n---\n> A\ndiff -r '--to-file=d2' d1/B.txt d2/B.txt\n1c1\n< B\n---\n> b\ndiff -r '--to-file=d2' d1/changed.txt d2/changed.txt\n2c2\n< two\n---\n> 2\nOnly in d1: emptyfile\nFile d1/fd is a regular file while file d2/fd is a directory\ndiff -r '--to-file=d2' d1/ln d2/ln\n1c1,3\n< same\n---\n> one\n> 2\n> three\nBinary files d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\ndiff -r '--to-file=d2' \"d1/sp ace.txt\" \"d2/sp ace.txt\"\n1c1\n< x\n---\n> y\ndiff -r '--to-file=d2' d1/sub/deep/leaf d2/sub/deep/leaf\n1c1\n< x\n---\n> y\ndiff -r '--to-file=d2' d1/sub/inner.txt d2/sub/inner.txt\n2c2\n< b\n---\n> B\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "from file brief",
+      "args": [
+        "-q",
+        "--from-file=a",
+        "b",
+        "same",
+        "one"
+      ],
+      "stdout": "Files a and b differ\nFiles a and one differ\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side",
+      "args": [
+        "-y",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of is not the eternal Way;\t      <\nThe name that can be named is not the eternal name.\t      <\nThe Nameless is the origin of Heaven and Earth;\t\t\tThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\t\t\t      |\tThe named is the mother of all things.\n\t\t\t\t\t\t\t      >\nTherefore let there always be non-being,\t\t\tTherefore let there always be non-being,\n  so we may see their subtlety,\t\t\t\t\t  so we may see their subtlety,\nAnd let there always be being,\t\t\t\t\tAnd let there always be being,\n  so we may see their outcome.\t\t\t\t\t  so we may see their outcome.\nThe two are the same,\t\t\t\t\t\tThe two are the same,\nBut after they are produced,\t\t\t\t\tBut after they are produced,\n  they have different names.\t\t\t\t\t  they have different names.\n\t\t\t\t\t\t\t      >\tThey both may be called deep and profound.\n\t\t\t\t\t\t\t      >\tDeeper and more profound,\n\t\t\t\t\t\t\t      >\tThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side a b",
+      "args": [
+        "-y",
+        "a",
+        "b"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t      |\tA\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t      |\tD\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\n\t\t\t\t\t\t\t      >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side long",
+      "args": [
+        "--side-by-side",
+        "a",
+        "b"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t      |\tA\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t      |\tD\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\n\t\t\t\t\t\t\t      >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 60",
+      "args": [
+        "-y",
+        "-W",
+        "60",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of  <\nThe name that can be named i <\nThe Nameless is the origin o\tThe Nameless is the origin o\nThe Named is the mother of a |\tThe named is the mother of a\n\t\t\t     >\nTherefore let there always b\tTherefore let there always b\n  so we may see their subtle\t  so we may see their subtle\nAnd let there always be bein\tAnd let there always be bein\n  so we may see their outcom\t  so we may see their outcom\nThe two are the same,\t\tThe two are the same,\nBut after they are produced,\tBut after they are produced,\n  they have different names.\t  they have different names.\n\t\t\t     >\tThey both may be called deep\n\t\t\t     >\tDeeper and more profound,\n\t\t\t     >\tThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 40 first",
+      "args": [
+        "-W",
+        "40",
+        "-y",
+        "a",
+        "b"
+      ],
+      "stdout": "a\t\t   |\tA\nb\t\t\tb\nc\t\t\tc\nd\t\t   |\tD\ne\t\t\te\nf\t\t\tf\ng\t\t\tg\n\t\t   >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 131",
+      "args": [
+        "-y",
+        "--width=131",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of is not the eternal Way;\t      <\nThe name that can be named is not the eternal name.\t      <\nThe Nameless is the origin of Heaven and Earth;\t\t\tThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\t\t\t      |\tThe named is the mother of all things.\n\t\t\t\t\t\t\t      >\nTherefore let there always be non-being,\t\t\tTherefore let there always be non-being,\n  so we may see their subtlety,\t\t\t\t\t  so we may see their subtlety,\nAnd let there always be being,\t\t\t\t\tAnd let there always be being,\n  so we may see their outcome.\t\t\t\t\t  so we may see their outcome.\nThe two are the same,\t\t\t\t\t\tThe two are the same,\nBut after they are produced,\t\t\t\t\tBut after they are produced,\n  they have different names.\t\t\t\t\t  they have different names.\n\t\t\t\t\t\t\t      >\tThey both may be called deep and profound.\n\t\t\t\t\t\t\t      >\tDeeper and more profound,\n\t\t\t\t\t\t\t      >\tThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 1",
+      "args": [
+        "-y",
+        "-W",
+        "1",
+        "a",
+        "b"
+      ],
+      "stdout": "|\n \n \n|\n \n \n \n>\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 7",
+      "args": [
+        "-y",
+        "-W",
+        "7",
+        "a",
+        "b"
+      ],
+      "stdout": "   |   \n       \n       \n   |   \n       \n       \n       \n   >   \n",
+      "exit": 1
+    },
+    {
+      "name": "side by side width 12",
+      "args": [
+        "-y",
+        "-W",
+        "12",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "int  |\tint \n     |\t    \ntrai |\ttrai\nno s |\tnosp\nsame\tsame\nend  |\tend \n",
+      "exit": 1
+    },
+    {
+      "name": "side by side left column",
+      "args": [
+        "-y",
+        "--left-column",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of is not the eternal Way;\t      <\nThe name that can be named is not the eternal name.\t      <\nThe Nameless is the origin of Heaven and Earth;\t\t      (\nThe Named is the mother of all things.\t\t\t      |\tThe named is the mother of all things.\n\t\t\t\t\t\t\t      >\nTherefore let there always be non-being,\t\t      (\n  so we may see their subtlety,\t\t\t\t      (\nAnd let there always be being,\t\t\t\t      (\n  so we may see their outcome.\t\t\t\t      (\nThe two are the same,\t\t\t\t\t      (\nBut after they are produced,\t\t\t\t      (\n  they have different names.\t\t\t\t      (\n\t\t\t\t\t\t\t      >\tThey both may be called deep and profound.\n\t\t\t\t\t\t\t      >\tDeeper and more profound,\n\t\t\t\t\t\t\t      >\tThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side suppress common lines",
+      "args": [
+        "-y",
+        "--suppress-common-lines",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of is not the eternal Way;\t      <\nThe name that can be named is not the eternal name.\t      <\nThe Named is the mother of all things.\t\t\t      |\tThe named is the mother of all things.\n\t\t\t\t\t\t\t      >\n\t\t\t\t\t\t\t      >\tThey both may be called deep and profound.\n\t\t\t\t\t\t\t      >\tDeeper and more profound,\n\t\t\t\t\t\t\t      >\tThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side suppress common lines s30",
+      "args": [
+        "-y",
+        "--suppress-common-lines",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "line 5\t\t\t\t\t\t\t      |\tchanged 5\nline 10\t\t\t\t\t\t\t      |\tchanged 10\nline 20\t\t\t\t\t\t\t      |\tchanged 20\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side left column insertions",
+      "args": [
+        "--left-column",
+        "-y",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "line 1\t\t\t\t\t\t\t      (\nline 2\t\t\t\t\t\t\t      (\nline 3\t\t\t\t\t\t\t      (\nline 4\t\t\t\t\t\t\t      (\nline 5\t\t\t\t\t\t\t      (\nline 6\t\t\t\t\t\t\t      (\nline 7\t\t\t\t\t\t\t      (\nline 8\t\t\t\t\t\t\t      (\nline 9\t\t\t\t\t\t\t      (\nline 10\t\t\t\t\t\t\t      (\nline 11\t\t\t\t\t\t\t      (\nline 12\t\t\t\t\t\t\t      (\nline 13\t\t\t\t\t\t\t      (\nline 14\t\t\t\t\t\t\t      (\nline 15\t\t\t\t\t\t\t      (\n\t\t\t\t\t\t\t      >\tnew a\n\t\t\t\t\t\t\t      >\tnew b\nline 16\t\t\t\t\t\t\t      (\nline 17\t\t\t\t\t\t\t      (\nline 18\t\t\t\t\t\t\t      (\nline 19\t\t\t\t\t\t\t      (\nline 20\t\t\t\t\t\t\t      (\nline 21\t\t\t\t\t\t\t      (\nline 22\t\t\t\t\t\t\t      (\nline 23\t\t\t\t\t\t\t      (\nline 24\t\t\t\t\t\t\t      (\nline 25\t\t\t\t\t\t\t      (\nline 26\t\t\t\t\t\t\t      (\nline 27\t\t\t\t\t\t\t      (\nline 28\t\t\t\t\t\t\t      (\nline 29\t\t\t\t\t\t\t      (\nline 30\t\t\t\t\t\t\t      (\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side same",
+      "args": [
+        "-y",
+        "a",
+        "same"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t\td\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\n",
+      "exit": 0
+    },
+    {
+      "name": "side by side same suppressed",
+      "args": [
+        "-y",
+        "--suppress-common-lines",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "side by side same reported",
+      "args": [
+        "-ys",
+        "a",
+        "same"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t\td\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\nFiles a and same are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "side by side same file",
+      "args": [
+        "-y",
+        "a",
+        "a"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t\td\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\n",
+      "exit": 0
+    },
+    {
+      "name": "side by side brief",
+      "args": [
+        "-yq",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side nl nonl",
+      "args": [
+        "-y",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t      /\tc\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side nonl nl",
+      "args": [
+        "-y",
+        "nonl",
+        "nl"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t      \\\tc\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side nonl nonl2",
+      "args": [
+        "-y",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t      |\td",
+      "exit": 1
+    },
+    {
+      "name": "side by side empty a",
+      "args": [
+        "-y",
+        "empty",
+        "a"
+      ],
+      "stdout": "\t\t\t\t\t\t\t      >\ta\n\t\t\t\t\t\t\t      >\tb\n\t\t\t\t\t\t\t      >\tc\n\t\t\t\t\t\t\t      >\td\n\t\t\t\t\t\t\t      >\te\n\t\t\t\t\t\t\t      >\tf\n\t\t\t\t\t\t\t      >\tg\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side a empty",
+      "args": [
+        "-y",
+        "a",
+        "empty"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t      <\nb\t\t\t\t\t\t\t      <\nc\t\t\t\t\t\t\t      <\nd\t\t\t\t\t\t\t      <\ne\t\t\t\t\t\t\t      <\nf\t\t\t\t\t\t\t      <\ng\t\t\t\t\t\t\t      <\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side tabs",
+      "args": [
+        "-y",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "a\tb\t\t\t\t\t\t      |\ta       b\n\tc\t\t\t\t\t\t      |\t        c\nd  e\t\t\t\t\t\t\t      |\td e\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side expand tabs",
+      "args": [
+        "-y",
+        "-t",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "a       b                                                       |  a       b\n        c                                                       |          c\nd  e                                                            |  d e\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side tab size",
+      "args": [
+        "-y",
+        "--tabsize=4",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "a\tb\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t|\ta       b\n\tc\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t|\t        c\nd  e\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t|\td e\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side tab size expanded",
+      "args": [
+        "-y",
+        "-t",
+        "--tabsize=3",
+        "-W",
+        "40",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "a  b               |  a       b\n   c               |          c\nd  e               |  d e\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side initial tab",
+      "args": [
+        "-y",
+        "-T",
+        "a",
+        "b"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t      |\tA\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t      |\tD\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\n\t\t\t\t\t\t\t      >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side wide characters",
+      "args": [
+        "-y",
+        "-W",
+        "20",
+        "tab1",
+        "tab2"
+      ],
+      "stdout": "é     |\té\n€€    |\t€€\n日本  |\t日本\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side utf-8",
+      "args": [
+        "-y",
+        "-W",
+        "50",
+        "utf1.md",
+        "utf2.md"
+      ],
+      "stdout": "# Überschrift mit Uml\t# Überschrift mit Uml\n  a1;\t\t\t  a1;\n  a2;\t\t\t  a2;\n  a3;\t\t\t  a3;\n  a4;\t\t\t  a4;\n  a5;\t\t\t  a5;\n  a6;\t\t\t  a6;\nalt\t\t      |\tneu\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side latin-1",
+      "args": [
+        "-y",
+        "lat3",
+        "lat4"
+      ],
+      "stdoutBase64": "Y2Fm6QkJCQkJCQkJY2Fm6QpzYW1lCQkJCQkJCQlzYW1lCm9sZCBlbmQJCQkJCQkJICAgICAgfAluZXcgZW5kCg==",
+      "exit": 1
+    },
+    {
+      "name": "side by side ignore case",
+      "args": [
+        "-y",
+        "-i",
+        "case1",
+        "case2"
+      ],
+      "stdout": "Hello World\t\t\t\t\t\t\thello world\nsame line\t\t\t\t\t\t      |\tsame line changed\nBar baz\t\t\t\t\t\t\t\tBAR BAZ\nkeep\t\t\t\t\t\t\t\tkeep\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side ignore blank lines",
+      "args": [
+        "-y",
+        "-B",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\nc\n\t\t\t\t\t\t\t      )\tc\nd\t\t\t\t\t\t\t      |\tX\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side blank lines",
+      "args": [
+        "-y",
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\n\t\t\t\t\t\t\t      >\nb\t\t\t\t\t\t\t\tb\n\t\t\t\t\t\t\t      >\n\t\t\t\t\t\t\t      >\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t\td\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side suppress blank empty",
+      "args": [
+        "-y",
+        "--suppress-blank-empty",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\n\t\t\t\t\t\t\t      >\nc\t\t\t\t\t\t\t\tc\nd\t\t\t\t\t\t\t      |\tX\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side carriage returns",
+      "args": [
+        "-y",
+        "crlf",
+        "crlf2"
+      ],
+      "stdout": "a\r\t\t\t\t\t\t\t\ta\r\t\t\t\t\t\t\t\t\nb\r\t\t\t\t\t\t\t      |\tB\r\t\t\t\t\t\t\t\t\nc\r\t\t\t\t\t\t\t\tc\r\t\t\t\t\t\t\t\t\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side long lines",
+      "args": [
+        "-y",
+        "-W",
+        "30",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "#include <std\t#include <std\n\nstatic int co\tstatic int co\n\nint add(int a\tint add(int a\n{\t\t{\n  int sum = a |\t  int sum = b\n  counter++;\t  counter++;\n  return sum;\t  return sum;\n}\t\t}\n\nint sub(int a\tint sub(int a\n{\t\t{\n  int diff = \t  int diff = \n  counter++;\t  counter++;\n  return diff\t  return diff\n}\t\t}\n\nint main(void\tint main(void\n{\t\t{\n  printf(\"%d\\\t  printf(\"%d\\\n  printf(\"%d\\ |\t  printf(\"%d\\\n  return 0;\t  return 0;\n}\t\t}\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side repeated lines",
+      "args": [
+        "-y",
+        "rep1",
+        "rep2"
+      ],
+      "stdout": "a\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\na\t\t\t\t\t\t\t\ta\nb\t\t\t\t\t\t\t\tb\na\t\t\t\t\t\t\t      <\nb\t\t\t\t\t\t\t      <\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side binary",
+      "args": [
+        "-y",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Binary files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side same binary",
+      "args": [
+        "-y",
+        "nul1",
+        "nul1b"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "side by side conflicting widths",
+      "args": [
+        "-y",
+        "-W",
+        "60",
+        "-W",
+        "70",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "side by side same width twice",
+      "args": [
+        "-y",
+        "-W",
+        "60",
+        "-W",
+        "60",
+        "a",
+        "b"
+      ],
+      "stdout": "a\t\t\t     |\tA\nb\t\t\t\tb\nc\t\t\t\tc\nd\t\t\t     |\tD\ne\t\t\t\te\nf\t\t\t\tf\ng\t\t\t\tg\n\t\t\t     >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "side by side and unified",
+      "args": [
+        "-y",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "sdiff merge assist",
+      "args": [
+        "--sdiff-merge-assist",
+        "a",
+        "b"
+      ],
+      "stdout": "c1,1\na\t\t\t\t\t\t\t      |\tA\ni2,2\nb\t\t\t\t\t\t\t\tb\nc\t\t\t\t\t\t\t\tc\nc1,1\nd\t\t\t\t\t\t\t      |\tD\ni3,3\ne\t\t\t\t\t\t\t\te\nf\t\t\t\t\t\t\t\tf\ng\t\t\t\t\t\t\t\tg\nc0,1\n\t\t\t\t\t\t\t      >\th\n",
+      "exit": 1
+    },
+    {
+      "name": "conflicting tab sizes",
+      "args": [
+        "--tabsize=4",
+        "--tabsize=2",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bad tab size",
+      "args": [
+        "--tabsize=0",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ed",
+      "args": [
+        "-e",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "11a\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n.\n4c\nThe named is the mother of all things.\n\n.\n1,2d\n",
+      "exit": 1
+    },
+    {
+      "name": "ed a b",
+      "args": [
+        "-e",
+        "a",
+        "b"
+      ],
+      "stdout": "7a\nh\n.\n4c\nD\n.\n1c\nA\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed long",
+      "args": [
+        "--ed",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "20c\nchanged 20\n.\n10c\nchanged 10\n.\n5c\nchanged 5\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed deletions",
+      "args": [
+        "-e",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "30d\n1d\n",
+      "exit": 1
+    },
+    {
+      "name": "ed insertions",
+      "args": [
+        "-e",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "15a\nnew a\nnew b\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed empty a",
+      "args": [
+        "-e",
+        "empty",
+        "a"
+      ],
+      "stdout": "0a\na\nb\nc\nd\ne\nf\ng\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed a empty",
+      "args": [
+        "-e",
+        "a",
+        "empty"
+      ],
+      "stdout": "1,7d\n",
+      "exit": 1
+    },
+    {
+      "name": "ed same",
+      "args": [
+        "-e",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ed nl nonl",
+      "args": [
+        "-e",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ed nonl nonl2",
+      "args": [
+        "-e",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "3c\nd\n.\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ed nonl same file",
+      "args": [
+        "-e",
+        "nonl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ed a dot line",
+      "args": [
+        "-e",
+        "dot1",
+        "dot2"
+      ],
+      "stdout": "1a\n..\n.\ns/.//\n",
+      "exit": 1
+    },
+    {
+      "name": "ed dots",
+      "args": [
+        "-e",
+        "dot1",
+        "dot3"
+      ],
+      "stdout": "1,2c\n..\n.\ns/.//\na\n..\nx\n..\n.\ns/.//\n",
+      "exit": 1
+    },
+    {
+      "name": "ed ignore blank lines",
+      "args": [
+        "-e",
+        "-B",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "4c\nX\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed ignore case",
+      "args": [
+        "-e",
+        "-i",
+        "case1",
+        "case2"
+      ],
+      "stdout": "2c\nsame line changed\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "ed brief",
+      "args": [
+        "-eq",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "ed initial tab",
+      "args": [
+        "-e",
+        "-T",
+        "a",
+        "b"
+      ],
+      "stdout": "7a\nh\n.\n4c\nD\n.\n1c\nA\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "forward ed",
+      "args": [
+        "-f",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "d1 2\nc4\nThe named is the mother of all things.\n\n.\na11\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "forward ed long",
+      "args": [
+        "--forward-ed",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "c5\nchanged 5\n.\nc10\nchanged 10\n.\nc20\nchanged 20\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "forward ed a dot line",
+      "args": [
+        "-f",
+        "dot1",
+        "dot2"
+      ],
+      "stdout": "a1\n.\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "forward ed nl nonl",
+      "args": [
+        "-f",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "forward ed deletions",
+      "args": [
+        "-f",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "d1\nd30\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs",
+      "args": [
+        "-n",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "d1 2\nd4 1\na4 2\nThe named is the mother of all things.\n\na11 3\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs long",
+      "args": [
+        "--rcs",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "d5 1\na5 1\nchanged 5\nd10 1\na10 1\nchanged 10\nd20 1\na20 1\nchanged 20\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs a b",
+      "args": [
+        "-n",
+        "a",
+        "b"
+      ],
+      "stdout": "d1 1\na1 1\nA\nd4 1\na4 1\nD\na7 1\nh\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs empty a",
+      "args": [
+        "-n",
+        "empty",
+        "a"
+      ],
+      "stdout": "a0 7\na\nb\nc\nd\ne\nf\ng\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs a empty",
+      "args": [
+        "-n",
+        "a",
+        "empty"
+      ],
+      "stdout": "d1 7\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs nl nonl",
+      "args": [
+        "-n",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "d3 1\na3 1\nc",
+      "exit": 1
+    },
+    {
+      "name": "rcs nonl nl",
+      "args": [
+        "-n",
+        "nonl",
+        "nl"
+      ],
+      "stdout": "d3 1\na3 1\nc\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs nonl nonl2",
+      "args": [
+        "-n",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "d3 1\na3 1\nd",
+      "exit": 1
+    },
+    {
+      "name": "rcs a dot line",
+      "args": [
+        "-n",
+        "dot1",
+        "dot2"
+      ],
+      "stdout": "a1 1\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs insertions",
+      "args": [
+        "-n",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "a15 2\nnew a\nnew b\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs deletions",
+      "args": [
+        "-n",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "d1 1\nd30 1\n",
+      "exit": 1
+    },
+    {
+      "name": "rcs expand tabs",
+      "args": [
+        "-n",
+        "-t",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "d1 3\na3 3\na       b\n        c\nd e\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef",
+      "args": [
+        "-D",
+        "X",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "#ifndef X\nThe Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\n#endif /* ! X */\nThe Nameless is the origin of Heaven and Earth;\n#ifndef X\nThe Named is the mother of all things.\n#else /* X */\nThe named is the mother of all things.\n\n#endif /* X */\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n#ifdef X\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef long",
+      "args": [
+        "--ifdef=HAVE_X",
+        "a",
+        "b"
+      ],
+      "stdout": "#ifndef HAVE_X\na\n#else /* HAVE_X */\nA\n#endif /* HAVE_X */\nb\nc\n#ifndef HAVE_X\nd\n#else /* HAVE_X */\nD\n#endif /* HAVE_X */\ne\nf\ng\n#ifdef HAVE_X\nh\n#endif /* HAVE_X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef joined",
+      "args": [
+        "-DX",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "line 1\nline 2\nline 3\nline 4\n#ifndef X\nline 5\n#else /* X */\nchanged 5\n#endif /* X */\nline 6\nline 7\nline 8\nline 9\n#ifndef X\nline 10\n#else /* X */\nchanged 10\n#endif /* X */\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\n#ifndef X\nline 20\n#else /* X */\nchanged 20\n#endif /* X */\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef same",
+      "args": [
+        "-D",
+        "X",
+        "a",
+        "same"
+      ],
+      "stdout": "a\nb\nc\nd\ne\nf\ng\n",
+      "exit": 0
+    },
+    {
+      "name": "ifdef nl nonl",
+      "args": [
+        "-D",
+        "X",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "a\nb\n#ifndef X\nc\n#else /* X */\nc\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef nonl nl",
+      "args": [
+        "-D",
+        "X",
+        "nonl",
+        "nl"
+      ],
+      "stdout": "a\nb\n#ifndef X\nc\n#else /* X */\nc\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef nonl nonl2",
+      "args": [
+        "-D",
+        "X",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "a\nb\n#ifndef X\nc\n#else /* X */\nd\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef empty a",
+      "args": [
+        "-D",
+        "X",
+        "empty",
+        "a"
+      ],
+      "stdout": "#ifdef X\na\nb\nc\nd\ne\nf\ng\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef a empty",
+      "args": [
+        "-D",
+        "X",
+        "a",
+        "empty"
+      ],
+      "stdout": "#ifndef X\na\nb\nc\nd\ne\nf\ng\n#endif /* ! X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef expand tabs",
+      "args": [
+        "-D",
+        "X",
+        "-t",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "#ifndef X\na       b\n        c\nd  e\n#else /* X */\na       b\n        c\nd e\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef ignore blank lines",
+      "args": [
+        "-D",
+        "X",
+        "-B",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "a\nb\nc\n#ifndef X\nd\n#else /* X */\nX\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef twice differing",
+      "args": [
+        "-D",
+        "X",
+        "-D",
+        "Y",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ifdef twice the same",
+      "args": [
+        "-D",
+        "X",
+        "-D",
+        "X",
+        "a",
+        "b"
+      ],
+      "stdout": "#ifndef X\na\n#else /* X */\nA\n#endif /* X */\nb\nc\n#ifndef X\nd\n#else /* X */\nD\n#endif /* X */\ne\nf\ng\n#ifdef X\nh\n#endif /* X */\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef and unified",
+      "args": [
+        "-D",
+        "X",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ifdef brief",
+      "args": [
+        "-q",
+        "-D",
+        "X",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "ifdef binary",
+      "args": [
+        "-D",
+        "X",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Binary files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "line format",
+      "args": [
+        "--line-format=%L",
+        "a",
+        "b"
+      ],
+      "stdout": "a\nA\nb\nc\nd\nD\ne\nf\ng\nh\n",
+      "exit": 1
+    },
+    {
+      "name": "line format with numbers",
+      "args": [
+        "--line-format=%dn:%l\n",
+        "a",
+        "b"
+      ],
+      "stdout": "1:a\n1:A\n2:b\n3:c\n4:d\n4:D\n5:e\n6:f\n7:g\n8:h\n",
+      "exit": 1
+    },
+    {
+      "name": "old new unchanged line formats",
+      "args": [
+        "--old-line-format=< %l\n",
+        "--new-line-format=> %l\n",
+        "--unchanged-line-format=  %l\n",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "< The Way that can be told of is not the eternal Way;\n< The name that can be named is not the eternal name.\n  The Nameless is the origin of Heaven and Earth;\n< The Named is the mother of all things.\n> The named is the mother of all things.\n> \n  Therefore let there always be non-being,\n    so we may see their subtlety,\n  And let there always be being,\n    so we may see their outcome.\n  The two are the same,\n  But after they are produced,\n    they have different names.\n> They both may be called deep and profound.\n> Deeper and more profound,\n> The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "line formats only changes",
+      "args": [
+        "--unchanged-line-format=",
+        "--old-line-format=-%dn: %L",
+        "--new-line-format=+%dn: %L",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "-5: line 5\n+5: changed 5\n-10: line 10\n+10: changed 10\n-20: line 20\n+20: changed 20\n",
+      "exit": 1
+    },
+    {
+      "name": "changed group format",
+      "args": [
+        "--changed-group-format=%<%>",
+        "--unchanged-group-format=",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Named is the mother of all things.\nThe named is the mother of all things.\n\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "group formats with numbers",
+      "args": [
+        "--old-group-format=del %df,%dl\n",
+        "--new-group-format=add %dF,%dL\n",
+        "--changed-group-format=chg %de %dm %dn %dE %dM %dN\n",
+        "--unchanged-group-format=",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "chg 4 6 1 4 6 1\nchg 9 11 1 9 11 1\nchg 19 21 1 19 21 1\n",
+      "exit": 1
+    },
+    {
+      "name": "group format conditional",
+      "args": [
+        "--changed-group-format=%(f=l?one:many) %(N=1?single:%dN lines)\n",
+        "--unchanged-group-format=",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "many 0 lines\none 2 lines\nmany 3 lines\n",
+      "exit": 1
+    },
+    {
+      "name": "group format conditional numbers",
+      "args": [
+        "--old-group-format=%(2=2?yes:no)%(n=0?none:some)\n",
+        "--new-group-format=",
+        "--changed-group-format=",
+        "--unchanged-group-format=",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "yessome\nyessome\n",
+      "exit": 1
+    },
+    {
+      "name": "line format printf widths",
+      "args": [
+        "--line-format=[%5dn][%-5dn][%05xn][%on][%Xn] %l\n",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "[    1][1    ][00001][1][1] line 1\n[    2][2    ][00002][2][2] line 2\n[    3][3    ][00003][3][3] line 3\n[    4][4    ][00004][4][4] line 4\n[    5][5    ][00005][5][5] line 5\n[    5][5    ][00005][5][5] changed 5\n[    6][6    ][00006][6][6] line 6\n[    7][7    ][00007][7][7] line 7\n[    8][8    ][00008][10][8] line 8\n[    9][9    ][00009][11][9] line 9\n[   10][10   ][0000a][12][A] line 10\n[   10][10   ][0000a][12][A] changed 10\n[   11][11   ][0000b][13][B] line 11\n[   12][12   ][0000c][14][C] line 12\n[   13][13   ][0000d][15][D] line 13\n[   14][14   ][0000e][16][E] line 14\n[   15][15   ][0000f][17][F] line 15\n[   16][16   ][00010][20][10] line 16\n[   17][17   ][00011][21][11] line 17\n[   18][18   ][00012][22][12] line 18\n[   19][19   ][00013][23][13] line 19\n[   20][20   ][00014][24][14] line 20\n[   20][20   ][00014][24][14] changed 20\n[   21][21   ][00015][25][15] line 21\n[   22][22   ][00016][26][16] line 22\n[   23][23   ][00017][27][17] line 23\n[   24][24   ][00018][30][18] line 24\n[   25][25   ][00019][31][19] line 25\n[   26][26   ][0001a][32][1A] line 26\n[   27][27   ][0001b][33][1B] line 27\n[   28][28   ][0001c][34][1C] line 28\n[   29][29   ][0001d][35][1D] line 29\n[   30][30   ][0001e][36][1E] line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "group format printf widths",
+      "args": [
+        "--unchanged-group-format=",
+        "--changed-group-format=%3df|%-3dl|%xN|%oM|%.3dn\n",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "  5|5  |1|6|001\n 10|10 |1|13|001\n 20|20 |1|25|001\n",
+      "exit": 1
+    },
+    {
+      "name": "line format characters",
+      "args": [
+        "--line-format=%c'x'%c'\\101'%%%l\n",
+        "a",
+        "b"
+      ],
+      "stdout": "xA%a\nxA%A\nxA%b\nxA%c\nxA%d\nxA%D\nxA%e\nxA%f\nxA%g\nxA%h\n",
+      "exit": 1
+    },
+    {
+      "name": "line format bad directives",
+      "args": [
+        "--line-format=%q%n%c'ab'%c'\\9'%l\n",
+        "a",
+        "b"
+      ],
+      "stdout": "%q%n%c'ab'%c'\\9'a\n%q%n%c'ab'%c'\\9'A\n%q%n%c'ab'%c'\\9'b\n%q%n%c'ab'%c'\\9'c\n%q%n%c'ab'%c'\\9'd\n%q%n%c'ab'%c'\\9'D\n%q%n%c'ab'%c'\\9'e\n%q%n%c'ab'%c'\\9'f\n%q%n%c'ab'%c'\\9'g\n%q%n%c'ab'%c'\\9'h\n",
+      "exit": 1
+    },
+    {
+      "name": "group format bad directives",
+      "args": [
+        "--changed-group-format=%(f=?x)%z%<",
+        "--unchanged-group-format=",
+        "a",
+        "b"
+      ],
+      "stdout": "%(f=?x)%za\n%(f=?x)%zd\n%(f=?x)%z",
+      "exit": 1
+    },
+    {
+      "name": "group format unterminated conditional",
+      "args": [
+        "--changed-group-format=%(f=1?yes",
+        "--unchanged-group-format=",
+        "a",
+        "b"
+      ],
+      "stdout": "yes",
+      "exit": 1
+    },
+    {
+      "name": "unchanged formats on same files",
+      "args": [
+        "--unchanged-group-format=%=",
+        "--line-format=%L",
+        "a",
+        "same"
+      ],
+      "stdout": "a\nb\nc\nd\ne\nf\ng\n",
+      "exit": 0
+    },
+    {
+      "name": "empty unchanged group on same files",
+      "args": [
+        "--unchanged-group-format=",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "merge formats",
+      "args": [
+        "--new-group-format=%>",
+        "--old-group-format=",
+        "--changed-group-format=%>",
+        "--unchanged-group-format=%=",
+        "a",
+        "b"
+      ],
+      "stdout": "A\nb\nc\nD\ne\nf\ng\nh\n",
+      "exit": 1
+    },
+    {
+      "name": "line format bracketed incomplete",
+      "args": [
+        "--line-format=[%l]\n",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "[a]\n[b]\n[c]\n[c]\n",
+      "exit": 1
+    },
+    {
+      "name": "line format whole incomplete",
+      "args": [
+        "--line-format=%L",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "a\nb\ncd",
+      "exit": 1
+    },
+    {
+      "name": "line format expand tabs",
+      "args": [
+        "-t",
+        "--line-format=%l\n",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "a       b\n        c\nd  e\na       b\n        c\nd e\n",
+      "exit": 1
+    },
+    {
+      "name": "line format and unified",
+      "args": [
+        "--line-format=%L",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "line format twice differing",
+      "args": [
+        "--line-format=x",
+        "--line-format=y",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unchanged line format with numbers",
+      "args": [
+        "--unchanged-line-format=%dn %l\n",
+        "--old-line-format=",
+        "--new-line-format=",
+        "a",
+        "b"
+      ],
+      "stdout": "2 b\n3 c\n5 e\n6 f\n7 g\n",
+      "exit": 1
+    },
+    {
+      "name": "old group format only",
+      "args": [
+        "--old-group-format=OLD\n%<",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "OLD\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nOLD\nline 30\n",
+      "exit": 1
+    },
+    {
+      "name": "new group format only",
+      "args": [
+        "--new-group-format=NEW %dF\n",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nNEW 16\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+      "exit": 1
+    },
+    {
+      "name": "group format with a newline literal",
+      "args": [
+        "--changed-group-format=%c'\n'%<%>",
+        "--unchanged-group-format=",
+        "a",
+        "b"
+      ],
+      "stdout": "\na\nA\n\nd\nD\n\nh\n",
+      "exit": 1
+    },
+    {
+      "name": "line format ignore case",
+      "args": [
+        "-i",
+        "--old-line-format=-%l\n",
+        "--new-line-format=+%l\n",
+        "--unchanged-line-format= %l\n",
+        "case1",
+        "case2"
+      ],
+      "stdout": " Hello World\n-same line\n+same line changed\n Bar baz\n keep\n",
+      "exit": 1
+    },
+    {
+      "name": "line format brief",
+      "args": [
+        "-q",
+        "--line-format=%L",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "group format with ifdef",
+      "args": [
+        "-D",
+        "X",
+        "--changed-group-format=CHANGED\n",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "initial tab rcs",
+      "args": [
+        "-T",
+        "-n",
+        "a",
+        "b"
+      ],
+      "stdout": "d1 1\na1 1\nA\nd4 1\na4 1\nD\na7 1\nh\n",
+      "exit": 1
+    },
+    {
+      "name": "suppress blank empty ed",
+      "args": [
+        "--suppress-blank-empty",
+        "-e",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "4c\nX\n.\n2a\n\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "expand tabs ed",
+      "args": [
+        "-t",
+        "-e",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "1,3c\na       b\n        c\nd e\n.\n",
+      "exit": 1
+    },
+    {
+      "name": "inhibit hunk merge",
+      "args": [
+        "--inhibit-hunk-merge",
+        "-u",
+        "s20",
+        "s20g5"
+      ],
+      "stdout": "--- s20\t2026-09-29 12:52:48.311000000 +0000\n+++ s20g5\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,13 +2,13 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n line 10\n-line 11\n+changed 11\n line 12\n line 13\n line 14\n",
+      "exit": 1
+    },
+    {
+      "name": "h option",
+      "args": [
+        "-h",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "H option",
+      "args": [
+        "-H",
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "P option",
+      "args": [
+        "-P",
+        "nothere",
+        "a"
+      ],
+      "stdout": "0a1,7\n> a\n> b\n> c\n> d\n> e\n> f\n> g\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an upper case class",
+      "args": [
+        "-q",
+        "-x",
+        "[[:upper:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a negated class",
+      "args": [
+        "-q",
+        "-x",
+        "[![:lower:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a space class",
+      "args": [
+        "-q",
+        "-x",
+        "*[[:space:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude two classes",
+      "args": [
+        "-q",
+        "-x",
+        "[[:punct:][:upper:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/a.txt and d2/a.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an unknown class",
+      "args": [
+        "-q",
+        "-x",
+        "[[:foo:]]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an open bracket",
+      "args": [
+        "-q",
+        "-x",
+        "[[:alpha:]",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude a bracket first",
+      "args": [
+        "-q",
+        "-x",
+        "[]a]*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude an escaped star",
+      "args": [
+        "-q",
+        "-x",
+        "\\*",
+        "d1",
+        "d2"
+      ],
+      "stdout": "Files d1/.hidden and d2/.hidden differ\nFiles d1/a.txt and d2/a.txt differ\nFiles d1/B.txt and d2/B.txt differ\nFiles d1/changed.txt and d2/changed.txt differ\nOnly in d1: emptyfile\nCommon subdirectories: d1/emptysub and d2/emptysub\nFile d1/fd is a regular file while file d2/fd is a directory\nFiles d1/ln and d2/ln differ\nFiles d1/nul.bin and d2/nul.bin differ\nOnly in d1: only1.txt\nOnly in d2: only2.txt\nOnly in d1: onlydir1\nOnly in d2: onlydir2\nFiles 'd1/sp ace.txt' and 'd2/sp ace.txt' differ\nCommon subdirectories: d1/sub and d2/sub\nOnly in d2: upper.txt\nOnly in d1: Upper.txt\n",
+      "exit": 1
+    },
+    {
+      "name": "exclude from a directory",
+      "args": [
+        "-X",
+        "d1",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
     }
-  ]
+  ],
+  "links": {
+    "d1/ln": "same.txt",
+    "d2/ln": "changed.txt",
+    "d1/lsame": "same.txt",
+    "d2/lsame": "same.txt",
+    "d1/lfile": "same.txt",
+    "e1/dangling": "nowhere"
+  }
 }

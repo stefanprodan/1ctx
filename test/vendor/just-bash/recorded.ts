@@ -36,6 +36,9 @@ export async function runCase(
   for (const [name, value] of Object.entries(files)) {
     fs.writeFileSync(`/work/${name}`, fileBytes(value), undefined, { mtime });
   }
+  for (const [name, target] of Object.entries(fixture.links ?? {})) {
+    await fs.symlink(target, `/work/${name}`);
+  }
   const bash = new Bash({
     fs,
     cwd: "/work",
