@@ -284,7 +284,8 @@ test("oversized round results are stored cut with bash tails and the answer and 
       completion: 2000,
     });
     script.end();
-    const answer = await waitScript(chat.scripted, 2);
+    // ten commands one after another, each in its own worker
+    const answer = await waitScript(chat.scripted, 2, 1_600);
     expect(asksAnswer(answer.body)).toBe(true);
     const stored = chat.app.sessions.messages(sessionId);
     expect(stored[1]).toMatchObject({

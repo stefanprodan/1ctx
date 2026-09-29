@@ -273,11 +273,12 @@ export const tick = () => new Promise((r) => setTimeout(r, 5));
 // wait until the scripted provider has received at least `count`
 // requests and return the last one; a round the runner starts arrives
 // as a new script, so a test that drives several rounds waits for each
-// by count rather than racing next()
+// by count rather than racing next(). Up to 4 s, under a test's 5 s:
+// each bash command starts a worker, slower on a CI runner
 export async function waitScript(
   scripted: Scripted,
   count: number,
-  tries = 200,
+  tries = 800,
 ): Promise<Script> {
   for (let i = 0; i < tries; i++) {
     if (scripted.scripts.length >= count) return scripted.scripts[count - 1]!;
