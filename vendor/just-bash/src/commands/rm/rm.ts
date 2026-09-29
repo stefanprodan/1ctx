@@ -48,10 +48,40 @@ export const rmCommand: RuntimeCommand = {
     for (const path of paths) {
       try {
         const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
-        const stat = await ctx.fs.stat(fullPath);
+        // (1ctx) rm removes a link, never what it points to, as GNU rm's
+        // lstat does; a trailing slash resolves the link, as in any path
+        const slashed = path.length > 1 && path.endsWith("/");
+        const stat = slashed
+          ? await ctx.fs.stat(fullPath)
+          : await ctx.fs.lstat(fullPath);
+        if (slashed && !stat.isDirectory) {
+          // GNU's ENOTDIR, which -f takes for a missing file
+          if (!force) {
+            stderr += `rm: cannot remove '${path}': Not a directory\n`;
+            exitCode = 1;
+          }
+          continue;
+        }
         if (stat.isDirectory && !recursive) {
           stderr += `rm: cannot remove '${path}': Is a directory\n`;
           exitCode = 1;
+          continue;
+        }
+        if (slashed && (await ctx.fs.lstat(fullPath)).isSymbolicLink) {
+          // (1ctx) GNU's `rm -r link/` empties the folder the link names,
+          // then fails to remove the link as a folder: ENOTDIR, which -f
+          // takes for a missing file
+          const target = await ctx.fs.realpath(fullPath);
+          for (const child of await ctx.fs.readdir(target)) {
+            await ctx.fs.rm(`${target === "/" ? "" : target}/${child}`, {
+              recursive,
+              force,
+            });
+          }
+          if (!force) {
+            stderr += `rm: cannot remove '${path}': Not a directory\n`;
+            exitCode = 1;
+          }
           continue;
         }
         await ctx.fs.rm(fullPath, { recursive, force });

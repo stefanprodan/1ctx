@@ -6,6 +6,7 @@
 
 import { decodeBytesToUtf8 } from "../../encoding.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
+import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import {
   assertDefenseContext,
@@ -508,7 +509,8 @@ export const jqCommand: RuntimeCommand = {
               maxDepth: ctx.limits.maxQueryDepth,
             }
           : undefined,
-        env: ctx.env,
+        // (1ctx) $ENV and env hold the exported variables only
+        env: processEnv(ctx),
         namedArgs,
         positionalArgs,
         coverage: ctx.coverage,

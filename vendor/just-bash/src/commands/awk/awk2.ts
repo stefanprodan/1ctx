@@ -6,7 +6,7 @@
 
 import { decodeBytesToUtf8 } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
-import { mapToRecord } from "../../helpers/env.js";
+import { mapToRecord, processEnv } from "../../helpers/env.js";
 import {
   ExecutionAbortedError,
   ExecutionLimitError,
@@ -211,7 +211,8 @@ export const awkCommand2: RuntimeCommand = {
     for (let i = 0; i < options.operands.length; i++) {
       runtimeCtx.ARGV[String(i + 1)] = options.operands[i];
     }
-    Object.assign(runtimeCtx.ENVIRON, mapToRecord(ctx.env));
+    // (1ctx) the exported variables only, as gawk sees its environment
+    Object.assign(runtimeCtx.ENVIRON, mapToRecord(processEnv(ctx)));
     runtimeCtx.arrayElementCount +=
       options.operands.length + 1 + Object.keys(runtimeCtx.ENVIRON).length;
 

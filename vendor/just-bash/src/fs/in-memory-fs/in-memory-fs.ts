@@ -702,7 +702,8 @@ export class InMemoryFs implements IFileSystem {
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     validatePath(path, "scandir");
-    let normalized = normalizePath(path);
+    // (1ctx) a folder under a linked folder is read through the link
+    let normalized = this.resolveIntermediateSymlinks(path);
     let entry = this.data.get(normalized);
 
     if (!entry) {
@@ -750,7 +751,8 @@ export class InMemoryFs implements IFileSystem {
 
   async rm(path: string, options?: RmOptions): Promise<void> {
     validatePath(path, "rm");
-    const normalized = normalizePath(path);
+    // (1ctx) through linked folders above, never the last name, as unlink
+    const normalized = this.resolveIntermediateSymlinks(path);
     const entry = this.data.get(normalized);
 
     if (!entry) {

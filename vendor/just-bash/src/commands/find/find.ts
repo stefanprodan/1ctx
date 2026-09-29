@@ -102,8 +102,11 @@ import type {
 const findHelp = {
   name: "find",
   summary: "search for files in a directory hierarchy",
-  usage: "find [path...] [expression]",
+  usage: "find [-H] [-L] [-P] [path...] [expression]",
   options: [
+    "-P               never follow symbolic links (the default)",
+    "-L               follow symbolic links",
+    "-H               follow symbolic links only in the starting points",
     "-name PATTERN    file name matches shell pattern PATTERN",
     "-iname PATTERN   like -name but case insensitive",
     "-path PATTERN    file path matches shell pattern PATTERN",
@@ -152,8 +155,20 @@ export const findCommand: RuntimeCommand = {
 
     // Starting points must precede the expression. Separating them first keeps
     // predicate operands and -exec command arguments from being mistaken for paths.
-    // (1ctx) a leading `--` ends the options, as in GNU find
-    const firstPath = args[0] === "--" ? 1 : 0;
+    // (1ctx) GNU's leading options: -H, -L and -P, the last one winning,
+    // then an optional `--` ending them
+    let follow: "H" | "L" | "P" = "P";
+    let firstPath = 0;
+    while (firstPath < args.length) {
+      const arg = args[firstPath];
+      if (arg === "-H" || arg === "-L" || arg === "-P") {
+        follow = arg[1] as "H" | "L" | "P";
+        firstPath++;
+        continue;
+      }
+      if (arg === "--") firstPath++;
+      break;
+    }
     let expressionStart = args.length;
     for (let i = firstPath; i < args.length; i++) {
       const arg = args[i];
@@ -330,15 +345,24 @@ export const findCommand: RuntimeCommand = {
 
     // Process each search path
     for (let searchPath of searchPaths) {
+      // (1ctx) a trailing slash resolves a symbolic link, as in any path
+      const slashed = searchPath.length > 1 && searchPath.endsWith("/");
       // Normalize trailing slashes (except for root "/")
-      if (searchPath.length > 1 && searchPath.endsWith("/")) {
+      if (slashed) {
         searchPath = searchPath.slice(0, -1);
       }
       const basePath = ctx.fs.resolvePath(ctx.cwd, searchPath);
+      // (1ctx) whether a starting point, or anything under it, is read
+      // through its symbolic link: -L everywhere, -H at the start only
+      const followsAt = (depth: number) =>
+        follow === "L" || (depth === 0 && (follow === "H" || slashed));
 
       // Check if path exists
+      // (1ctx) a starting point that is a link exists when the link does,
+      // unless it is followed through a trailing slash
       try {
-        await ctx.fs.stat(basePath);
+        if (slashed) await ctx.fs.stat(basePath);
+        else await ctx.fs.lstat(basePath);
       } catch {
         appendStderr(`find: ${searchPath}: No such file or directory\n`);
         exitCode = 1;
@@ -349,7 +373,14 @@ export const findCommand: RuntimeCommand = {
       interface WorkItem {
         path: string;
         depth: number;
-        typeInfo?: { isFile: boolean; isDirectory: boolean };
+        typeInfo?: {
+          isFile: boolean;
+          isDirectory: boolean;
+          isSymbolicLink?: boolean;
+        };
+        // (1ctx) under -L, the real paths of the directories above, to
+        // find a link back into one of them
+        ancestors?: string[];
         // For ordered results: index where this item's results go
         resultIndex: number;
       }
@@ -367,6 +398,8 @@ export const findCommand: RuntimeCommand = {
         pruned: boolean;
       }
 
+      const loops: string[] = [];
+
       // Tracing counters
       const traceCounters = createTraceCounters();
       const traceStartTime = Date.now();
@@ -376,6 +409,7 @@ export const findCommand: RuntimeCommand = {
         item: WorkItem,
       ): Promise<ProcessedNode | null> {
         const { path: currentPath, depth, typeInfo } = item;
+        const followed = followsAt(depth);
         traversalBudget.visit(depth);
         traceCounters.nodeCount++;
 
@@ -389,7 +423,11 @@ export const findCommand: RuntimeCommand = {
         let isDirectory: boolean;
         let stat: Awaited<ReturnType<typeof ctx.fs.stat>> | undefined;
 
-        if (typeInfo && !needsStatMetadata) {
+        if (
+          typeInfo &&
+          !needsStatMetadata &&
+          !(followed && typeInfo.isSymbolicLink)
+        ) {
           isFile = typeInfo.isFile;
           isDirectory = typeInfo.isDirectory;
         } else {
@@ -397,7 +435,12 @@ export const findCommand: RuntimeCommand = {
             const statStart = Date.now();
             // find defaults to the POSIX -P policy: inspect symlinks, never
             // follow them while deciding whether to descend.
-            stat = await ctx.fs.lstat(currentPath);
+            // (1ctx) -L and -H read through a link; a broken one is itself
+            stat = followed
+              ? await ctx.fs
+                  .stat(currentPath)
+                  .catch(() => ctx.fs.lstat(currentPath))
+              : await ctx.fs.lstat(currentPath);
             traceCounters.statCalls++;
             traceCounters.statTime += Date.now() - statStart;
           } catch {
@@ -422,6 +465,19 @@ export const findCommand: RuntimeCommand = {
             : searchPath === "."
               ? `./${currentPath.slice(basePath === "/" ? basePath.length : basePath.length + 1)}`
               : searchPath + currentPath.slice(basePath.length);
+
+        // (1ctx) under -L, a directory reached again through a link is
+        // GNU's file system loop: reported, left out, and exit 1
+        let ancestors: string[] | undefined;
+        if (follow === "L" && isDirectory) {
+          const parent = item.ancestors ?? [];
+          const real = await ctx.fs.realpath(currentPath);
+          if (parent.includes(real)) {
+            loops.push(relativePath);
+            return null;
+          }
+          ancestors = [...parent, real];
+        }
 
         // Get children for directories
         const children: WorkItem[] = [];
@@ -476,7 +532,9 @@ export const findCommand: RuntimeCommand = {
                   typeInfo: {
                     isFile: entry.isFile,
                     isDirectory: entry.isDirectory,
+                    isSymbolicLink: entry.isSymbolicLink,
                   },
+                  ancestors,
                   resultIndex: idx,
                 });
               }
@@ -497,6 +555,7 @@ export const findCommand: RuntimeCommand = {
                       ? `/${entry}`
                       : `${currentPath}/${entry}`,
                   depth: depth + 1,
+                  ancestors,
                   resultIndex: idx,
                 });
               }
@@ -826,6 +885,12 @@ export const findCommand: RuntimeCommand = {
 
       const searchResult = await findIterative();
       for (const effect of searchResult.effects) effects.push(effect);
+      for (const loop of loops) {
+        appendStderr(
+          `find: File system loop detected; the following directory is part of the cycle: '${loop}'\n`,
+        );
+        exitCode = 1;
+      }
 
       // Emit trace summary for this search path
       if (ctx.trace) {
