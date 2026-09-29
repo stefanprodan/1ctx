@@ -3,12 +3,15 @@
 //
 // The card the user writes in: the text that grows with it, the files
 // added to it, the plus, the project chip on Home, the agent chip, the
-// context readout, and Send, which is Stop while the reply runs. Enter
-// sends, Shift+Enter breaks a line. Two modes: a chat, where the message
-// goes into it, and a project, where it starts one. Files come from the
-// plus, a drop on the card or a paste, are staged as they are picked,
-// and go with the send. The draft, text and staged files, survives a
-// navigation; a refusal shows under the box until the next keystroke.
+// context readout, and Send, with Stop before it while the reply runs: a
+// message sent then waits for the reply to end. Enter sends, Shift+Enter
+// breaks a line. A waiting message's Edit puts its text here, and Send
+// is Save until the edit is saved or let go. Two modes: a chat, where
+// the message goes into it, and a project, where it starts one. Files
+// come from the plus, a drop on the card or a paste, are staged as they
+// are picked, and go with the send. The draft, text and staged files,
+// survives a navigation; a refusal shows under the box until the next
+// keystroke.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
@@ -23,7 +26,10 @@ import {
 } from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
-import type { RoundUsage } from "../../shared/contracts/session.ts";
+import type {
+  QueuedMessage,
+  RoundUsage,
+} from "../../shared/contracts/session.ts";
 import {
   credentials,
   dropFlips,
@@ -77,7 +83,15 @@ import {
   writeDraftText,
   writeDraftUploads,
 } from "./draft.ts";
+import {
+  EditLine,
+  editOf,
+  SendButtons,
+  saveEdit,
+  useHandoff,
+} from "./Edit.tsx";
 import { Files } from "./Files.tsx";
+import type { Editing } from "./handoff.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import "./composer.css";
 import { says } from "../lib/format.ts";
@@ -100,6 +114,8 @@ export function Composer({
   onCompact,
   onRename,
   onFork,
+  queued,
+  onEdit,
   project,
   off = NONE_OFF,
   placeholder: idle = "Send a message",
@@ -111,7 +127,7 @@ export function Composer({
   agents: AgentSummary[] | null;
   // the session's agent; null for a chat not started yet
   agentId: string | null;
-  // a reply is streaming: Send is Stop
+  // a reply is streaming: Stop shows before Send
   running: boolean;
   // a send is on its way to the server
   busy: boolean;
@@ -131,6 +147,9 @@ export function Composer({
   onRename?: (title: string) => Promise<void>;
   // /fork <name>: the chat so far as a new chat under the name
   onFork?: (title: string) => Promise<void>;
+  // the chat's waiting messages, and the save of an edit over one
+  queued?: readonly QueuedMessage[];
+  onEdit?: (row: Editing, text: string) => Promise<void>;
   // Home's pick of the project a new chat starts in; the draft stays
   // the scope's while the project changes under it
   project?: {
@@ -197,9 +216,12 @@ export function Composer({
   }, [key, text, failure]);
   useEffect(grow, [text.value]);
 
-  const ready = agent !== null && !busy && !running;
+  // a message sent while the reply runs waits for it to end
+  const ready = agent !== null && !busy;
   const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
   const chat = "sessionId" in scope ? scope.sessionId : null;
+  const edit = editOf(chat);
+  const saving = useHandoff(chat, key, text, failure, input, queued);
   // a flip never sent does not wait for the next visit to the chat
   useEffect(() => () => dropFlips(chat), [chat]);
   const offKey = (key: string) => isOff(chat, off, key);
@@ -264,13 +286,17 @@ export function Composer({
   const started = onCompact !== undefined && onFork !== undefined;
   const block = (command: Command) =>
     commandBlock({ started, running }, command);
-  const matches = shut.value
-    ? []
-    : commandMatches(text.value, !started || onRename !== undefined);
+  const matches =
+    shut.value || edit !== null
+      ? []
+      : commandMatches(text.value, !started || onRename !== undefined);
   // the highlight follows the list as it shrinks
   const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
   const submit = async () => {
     const content = text.value.trim();
+    if (edit !== null && onEdit !== undefined) {
+      return saveEdit(edit, content, onEdit, { key, text, failure, saving });
+    }
     if (content === "" || agent === null || busy) return;
     const named = commandOf(content);
     if (named === null && (!ready || !placed || files.busy)) return;
@@ -337,6 +363,7 @@ export function Composer({
         attach(dropped);
       }}
     >
+      {edit !== null && <EditLine open={edit} draftKey={key} text={text} />}
       <textarea
         ref={input}
         class="composer-text"
@@ -456,25 +483,16 @@ export function Composer({
             </span>
           </span>
         )}
-        <button
-          type="button"
-          class={`composer-send${running ? " composer-stop" : ""}`}
-          aria-label={running ? "Stop" : "Send"}
-          disabled={
-            running
-              ? false
-              : !ready || !placed || files.busy || text.value.trim() === ""
+        <SendButtons
+          save={edit !== null}
+          onStop={running ? onStop : undefined}
+          failure={failure}
+          off={
+            text.value.trim() === "" ||
+            (edit !== null ? saving.value : !ready || !placed || files.busy)
           }
-          onClick={() => {
-            if (running) {
-              onStop().catch((err) => {
-                failure.value = says(err);
-              });
-            } else void submit();
-          }}
-        >
-          <Icon name={running ? "stop" : "send"} size={16} />
-        </button>
+          onSend={() => void submit()}
+        />
       </div>
     </div>
   );

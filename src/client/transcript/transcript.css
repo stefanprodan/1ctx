@@ -1,8 +1,8 @@
 /* The transcript: the rows, a user row (author line and card), the
    agent's turn (its line, the work fold, the reasoning fold, the
-   rendered body, the streaming tail, the line under it), and the
-   foot stuck to the bottom of the shell's scroll box with the composer
-   and Jump to latest. */
+   rendered body, the streaming tail, the line under it), the messages
+   that wait, and the foot stuck to the bottom of the shell's scroll box
+   with the composer and Jump to latest. */
 
 @layer tokens, base, owners;
 
@@ -76,6 +76,40 @@
     gap: 6px;
     margin-top: var(--space-2);
     white-space: normal;
+  }
+
+  /* a message that waits: a user message whose card is not yet part of
+     the transcript, its state and the author's actions under it */
+  .transcript-queued-card {
+    border-style: dashed;
+  }
+  .transcript-queued-files {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    white-space: normal;
+  }
+  .transcript-queued-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--text-small);
+  }
+  .transcript-queued-line {
+    color: var(--faint);
+  }
+  .transcript-queued-bad {
+    color: var(--failed);
+  }
+  .transcript-queued-acts {
+    display: flex;
+    gap: var(--space-3);
+    margin-left: auto;
   }
 
   .transcript-body {

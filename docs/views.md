@@ -97,9 +97,42 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **A deleted agent keeps its name.** The transcript names a reply's
   agent from `SessionDetail.agents`; a retired one is plain text with
   a `deleted` tag, and a memory note names it without a link.
+- **The messages that wait.** `SessionDetail.queued` is drawn under the
+  last turn by `transcript/Queued.tsx`, oldest first, each as a user
+  message with a dashed card: the author (their username when the page
+  knows no name), the text, its file count, then the line from
+  `Queued.words.ts`, "Queued. Starts when the reply ends." while the
+  chat runs, "Queued. Waiting for a free place." while it is idle, or
+  "Not sent." and why. Only the author gets actions, `btn-text` words
+  that ask nothing: Edit and Remove while it waits, Send again and
+  Discard once not sent (no Send again in an archived chat, which has
+  no composer). Edit and Send again hand the text to the chat's
+  composer through `composer/handoff.ts`, the text before the draft;
+  Send again then deletes the row. A refused action is the row's
+  failure line. Each write names the row's revision (`data/queued.ts`)
+  and lands on the chat at once.
+- **The detail is read again for the queue.** The queue's rows ride on
+  no envelope. `queueMoved()` in `data/queued-rows.ts` reads the detail
+  again for an envelope above the held revision that carries no rows
+  and changes nothing else in the summary (a queue change, whatever its
+  keys' order), and for one that brings a new user message while rows
+  wait (the queue started). A rename, a status or an archive carries
+  its change and reads nothing more.
 
 ## The composer
 
+- **Send beside Stop.** While the chat's turn runs the composer shows
+  Stop, then Send (`SendButtons` in `composer/Edit.tsx`): a message
+  sent then is answered 202 and waits, its row shown under the turn at
+  once, and the composer empties as after any send; a 429 keeps the
+  draft and shows the words under the box. An Edit handed over opens
+  an edit: "Editing a queued message" and Cancel over the box (Cancel
+  gives the draft back as it was), no slash commands, and Send becomes
+  Save, which sends the text with the revision read and empties the
+  composer. A 409, or the row leaving the queue, ends the edit and
+  keeps the text as the draft, with words that say so. Leaving the chat
+  lets the edit go; its text stays the draft. The queued row's files
+  stay with it and are not handed back.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under

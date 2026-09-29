@@ -8,6 +8,7 @@
 
 import { effect, signal } from "@preact/signals";
 import type {
+  QueuedResponse,
   RegenerateRequest,
   RenameSessionRequest,
   SendMessageRequest,
@@ -34,6 +35,8 @@ import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
+import { noteWaits } from "./not-sent.ts";
+import { queuedOnto, queueMoved } from "./queued-rows.ts";
 import { sending } from "./session-start.ts";
 import { resetValues, retrying, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
@@ -102,6 +105,7 @@ effect(() => {
 });
 
 function show(detail: SessionDetail): void {
+  noteWaits(detail.session.id, detail.queued);
   visualPreviews.value = snapshotVisuals(
     reconcileVisuals(visualPreviews.value, detail),
     detail,
@@ -200,15 +204,20 @@ function take(detail: SessionDetail): void {
   show(detail);
 }
 
-// a send of any kind answers the detail; the flips the person made ride
-// on the two kinds that take them and are forgotten once taken
+// a send answers the detail, or the row that waits in a busy chat; the
+// flips ride on the two kinds that take them and are forgotten once taken
 async function post(id: string, path: string, body?: object): Promise<void> {
   sending.value = true;
   try {
     const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
-    take(
-      await carry(id, body ?? {}, () => api<SessionResponse>(at, "POST", body)),
+    const answer = await carry(id, body ?? {}, () =>
+      api<SessionResponse | QueuedResponse>(at, "POST", body),
     );
+    if ("session" in answer) return take(answer);
+    noteWaits(id, [answer.queued]);
+    const held = session.value;
+    if (held?.session.id === id)
+      session.value = queuedOnto(held, answer.queued);
   } finally {
     sending.value = false;
   }
@@ -285,6 +294,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     return;
   }
   if (ev.session.revision <= held.session.revision) return;
+  const reread = queueMoved(held, ev);
   const removed = new Set(ev.removedMessageIds ?? []);
   const messages = upsert(
     held.messages.filter((message) => !removed.has(message.id)),
@@ -323,8 +333,9 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   // a lost clear frame never outlives the send
   if (ev.session.status !== "running") retrying.value = null;
   live.value = map;
-  // who archived it and until when are the detail's alone
-  if (!held.session.archived && ev.session.archived) refetch();
+  // who archived it and until when are the detail's alone, and so is
+  // the queue
+  if (reread || (!held.session.archived && ev.session.archived)) refetch();
 }
 
 // one detail answers a gap, an overflow, a frame ahead of the buffer

@@ -39,11 +39,13 @@ client change. What each page draws is in `docs/views.md`.
   so a reconnect goes through the path a navigation does. It knows no
   entity: `data/sessions.ts` registers for the frames, applies a
   durable envelope only when its revision is above the one held, and
-  applies stream frames through `transcript/stream.ts`, in sequence; a
-  gap, a frame ahead of the buffer, or too many frames before
-  `watched` refetch the detail. The reducers are pure and tested on
-  fixtures; the transcript, the composer and the chat view render
-  what the entity holds. The server's side is in `docs/access.md`.
+  reads the detail again for one that carries nothing new (a queue
+  change, `queueMoved()` in `docs/views.md`), and applies stream frames
+  through `transcript/stream.ts`, in sequence; a gap, a frame ahead of
+  the buffer, or too many frames before `watched` refetch the detail.
+  The reducers are pure and tested on fixtures; the transcript, the
+  composer and the chat view render what the entity holds. The
+  server's side is in `docs/access.md`.
 - **Rendered HTML carries `md-` classes on every element** and
   highlight.js tokens keep `hljs-`, so a stylesheet owns those prefixes
   and styles nothing by element. Render is server-side in `render/`.

@@ -690,12 +690,13 @@ describe("the sessions entity", () => {
       await settle();
       expect(hits).toEqual(["/api/sessions/s1"]);
       expect(session.value?.archive?.by?.username).toBe("ana");
-      // a later envelope of an archived chat reads nothing more
+      // a later envelope of an archived chat that carries its change
+      // reads nothing more
       onSocket({
         type: "session",
         row: null,
         projectId: "p1",
-        session: summary({ revision: 4, archived }),
+        session: summary({ revision: 4, archived, title: "Renamed" }),
         messages: [],
         send: null,
       });
