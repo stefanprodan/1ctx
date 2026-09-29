@@ -145,3 +145,73 @@ describe("xargs --show-limits", () => {
     );
   });
 });
+
+describe("xargs's words", () => {
+  const cases: [string, string, number][] = [
+    [
+      "printf 'x\\ny\\n' | xargs -n1 sh -c 'exit 255'",
+      "xargs: sh: exited with status 255; aborting\n",
+      124,
+    ],
+    [
+      "printf 'x\\ny\\n' | xargs -n1 nosuchcmd",
+      "xargs: failed to run command ‘nosuchcmd’: No such file or directory\n",
+      127,
+    ],
+    [
+      "printf 'x\\n' | xargs ./plain.txt",
+      "xargs: failed to run command ‘./plain.txt’: Permission denied\n",
+      126,
+    ],
+    [
+      'printf "a \'b\\n" | xargs echo',
+      "a\nxargs: unmatched single quote; by default quotes are special to xargs unless you use the -0 option\n",
+      1,
+    ],
+    [
+      "printf 'x\\n' | xargs -n nope echo",
+      "xargs: invalid number \"nope\" for -n option\nTry 'xargs --help' for more information.\n",
+      1,
+    ],
+    [
+      "printf 'a bbbbbb\\n' | xargs -s 8 echo",
+      "a\nxargs: argument line too long\n",
+      1,
+    ],
+    [
+      "printf 'a\\0b c\\n' | xargs -n1 echo 2>&1 >/dev/null",
+      "xargs: WARNING: a NUL character occurred in the input.  It cannot be passed through in the argument list.  Did you mean to use the --null option?\n",
+      0,
+    ],
+    [
+      "printf '1 2\\n' | xargs -n1 -I{} echo {} 2>&1 >/dev/null",
+      "xargs: warning: options --max-args and --replace/-I/-i are mutually exclusive, ignoring previous --max-args value\n",
+      0,
+    ],
+    [
+      "printf 'a b\\n' | xargs -p echo",
+      "echo a b\nxargs: failed to open /dev/tty for reading: No such device or address\n",
+      1,
+    ],
+    [
+      "printf 'a b\\n' | xargs -o echo",
+      "xargs: failed to open /dev/tty for reading: No such device or address\n",
+      1,
+    ],
+  ];
+  for (const [command, said, exitCode] of cases) {
+    test(command, async () => {
+      // the shell merges a command's stdout before its stderr, so a case
+      // whose order matters keeps only stderr
+      const merged = command.includes("2>&1") ? command : `${command} 2>&1`;
+      const result = await run(merged, { "/work/plain.txt": "x" });
+      expect(result.stdout).toBe(said);
+      expect(result.exitCode).toBe(exitCode);
+    });
+  }
+
+  test("-p and -o need no terminal when nothing runs", async () => {
+    const result = await run("xargs -r -p -o echo < /dev/null");
+    expect(result).toMatchObject({ stdout: "", stderr: "", exitCode: 0 });
+  });
+});

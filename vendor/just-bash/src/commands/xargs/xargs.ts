@@ -82,6 +82,50 @@ function cString(arg: string): string {
   return nul === -1 ? arg : arg.slice(0, nul);
 }
 
+type Outcome =
+  | { kind: "ok" | "failed" }
+  | { kind: "stop"; code: number; stderr: string };
+
+/**
+ * (1ctx) What a command's end means to xargs, as GNU reads its child: a
+ * name the shell could not find or run is 127 or 126 in GNU's words, 255
+ * stops xargs with 124, any other failure makes the end 123. Only the
+ * dispatcher's own words, whole, mark a command that never ran.
+ */
+function commandOutcome(name: string, result: ExecResult): Outcome {
+  const q = `\u2018${name}\u2019`;
+  if (
+    result.exitCode === 127 &&
+    (result.stderr === `bash: ${name}: command not found\n` ||
+      result.stderr === `bash: ${name}: No such file or directory\n`)
+  ) {
+    return {
+      kind: "stop",
+      code: 127,
+      stderr: `xargs: failed to run command ${q}: No such file or directory\n`,
+    };
+  }
+  if (
+    result.exitCode === 126 &&
+    result.stderr.startsWith(`bash: ${name}: `) &&
+    result.stderr.indexOf("\n") === result.stderr.length - 1
+  ) {
+    return {
+      kind: "stop",
+      code: 126,
+      stderr: `xargs: failed to run command ${q}: Permission denied\n`,
+    };
+  }
+  if (result.exitCode === 255) {
+    return {
+      kind: "stop",
+      code: 124,
+      stderr: `${result.stderr}xargs: ${name}: exited with status 255; aborting\n`,
+    };
+  }
+  return { kind: result.exitCode === 0 ? "ok" : "failed" };
+}
+
 /** (1ctx) The bytes the environment takes, as GNU counts it for -s. */
 function environmentSize(ctx: RuntimeCommandContext): number {
   let size = 0;
@@ -205,7 +249,6 @@ export const xargsCommand: RuntimeCommand = {
 
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
-    let exitCode = 0;
     let outputBytes = 0;
     const output = ctx.executionScope
       ? new ExecutionOutputAccumulator(
@@ -303,26 +346,57 @@ export const xargsCommand: RuntimeCommand = {
       };
     };
 
+    // (1ctx) no terminal: -p and -o fail as GNU does without one
+    if ((options.interactive || options.openTty) && commands.length > 0) {
+      if (options.interactive) {
+        appendStderr(`${commands[0].map(cString).map(quoteForTrace).join(" ")}\n`);
+      }
+      appendStderr(
+        "xargs: failed to open /dev/tty for reading: No such device or address\n",
+      );
+      return (
+        output?.build(1) ?? {
+          stdout: stdoutChunks.join(""),
+          stderr: stderrChunks.join(""),
+          exitCode: 1,
+        }
+      );
+    }
+
     // (1ctx) up to -P commands at once, a slot taking the next command as
-    // soon as its own ends; output is kept in input order
+    // soon as its own ends; output is kept in input order, and a command
+    // that stops xargs lets the running ones finish and starts no more
     const results: (ExecResult | undefined)[] = [];
     let emitted = 0;
     let next = 0;
     let failure: unknown;
+    let stopping = false;
+    let failed = false;
+    let stopCode: number | null = null;
     const emitReady = () => {
       while (emitted < commands.length && results[emitted] !== undefined) {
         const result = results[emitted] as ExecResult;
+        const name = cString(commands[emitted][0]);
         results[emitted] = undefined;
         emitted++;
-        appendOutput(result);
-        if (result.exitCode !== 0) exitCode = result.exitCode;
+        const outcome = commandOutcome(name, result);
+        if (outcome.kind === "failed") failed = true;
+        if (outcome.kind === "stop") {
+          appendOutput({ ...result, stderr: outcome.stderr });
+          stopCode ??= outcome.code;
+        } else {
+          appendOutput(result);
+        }
       }
     };
     const slot = async (id: number) => {
-      while (failure === undefined && next < commands.length) {
+      while (!stopping && failure === undefined && next < commands.length) {
         const index = next++;
         try {
-          results[index] = await executeCommand(commands[index], id);
+          const result = await executeCommand(commands[index], id);
+          results[index] = result;
+          const name = cString(commands[index][0]);
+          if (commandOutcome(name, result).kind === "stop") stopping = true;
           emitReady();
         } catch (error) {
           failure ??= error;
@@ -335,11 +409,13 @@ export const xargsCommand: RuntimeCommand = {
       ),
     );
     if (failure !== undefined) throw failure;
+    emitReady();
 
+    let exitCode = stopCode ?? (failed ? 123 : 0);
     // (1ctx) an unbuilt command line or an unclosed quote ends xargs after
     // what could run
     const error = plan.error ?? input.error;
-    if (error !== null) {
+    if (error !== null && stopCode === null) {
       appendStderr(`xargs: ${error}\n`);
       exitCode = 1;
     }

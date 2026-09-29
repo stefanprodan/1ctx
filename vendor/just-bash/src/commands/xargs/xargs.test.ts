@@ -174,6 +174,7 @@ describe("xargs command", () => {
       // (1ctx) the last name keeps echo's newline, so cat misses it
       expect(result.stdout).toBe("content1content2");
       expect(result.stderr).toContain("No such file");
+      expect(result.exitCode).toBe(123);
     });
 
     it("should work with find output (newline separated)", async () => {
@@ -339,7 +340,8 @@ describe("xargs command", () => {
     it("should propagate command failure exit code", async () => {
       const env = new Bash();
       const result = await env.exec('echo "missing.txt" | xargs cat');
-      expect(result.exitCode).toBe(1);
+      // (1ctx) GNU xargs answers any failure from 1 to 254 with 123
+      expect(result.exitCode).toBe(123);
       expect(result.stderr).toContain("No such file");
     });
   });
