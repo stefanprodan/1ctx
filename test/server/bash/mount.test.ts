@@ -412,7 +412,7 @@ describe("bash command mounts", () => {
       const pending = controllers.map((controller, i) =>
         run(
           first,
-          `echo x > file${i}; sleep 1`,
+          `echo x > file${i}; sleep 5`,
           callCaps,
           controller.signal,
           first.makeSession().id,
@@ -433,6 +433,7 @@ describe("bash command mounts", () => {
           second.makeSession().id,
         );
         expect(expired.error).toBe(true);
+        expect(expired.ended).toEqual({ phase: "queue", cause: "deadline" });
         expect(finished).toBe(false);
         expect(second.knowledge.list(second.projectId).files).toEqual([]);
         controllers[0]!.abort("free the slot");

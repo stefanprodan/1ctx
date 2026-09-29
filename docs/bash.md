@@ -45,12 +45,12 @@ changes to it, its recorders) in `vendor/README.md`.
 - **Deadline, cancel, shutdown.** The deadline starts before the
   queues. The interpreter stops at the call timeout with its own exit
   124, words and output; the worker is ended `BACKSTOP_MS` (1 s) later,
-  and the tool registry waits the same grace (`graceMs`). An abort
-  posts a cancel; unanswered within `CANCEL_GRACE_MS`, the worker is
-  ended with a `command cancel unanswered` warning.
-  Shutdown ends every running worker. An ended job commits nothing, and
-  a command that saves nothing puts `phase` and `cause` on the runner's
-  `tool failed` line.
+  and the tool registry waits half a second more (`graceMs`), so the
+  mount's own words end a stuck command. An abort posts a cancel;
+  unanswered within `CANCEL_GRACE_MS`, the worker is ended with a
+  `command cancel unanswered` warning. Shutdown ends every running
+  worker. An ended job commits nothing, and a command that saves
+  nothing puts `phase` and `cause` on the runner's `tool failed` line.
 - **Mounted files keep their times.** A doc mounts with its
   `updated_at`, an upload with its `created_at`, a scratch file with the
   session's `used_at`, a folder with its newest file's time, so `ls -t`
