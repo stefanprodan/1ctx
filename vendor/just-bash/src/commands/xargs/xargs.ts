@@ -1,6 +1,11 @@
-import { decodeBytesToUtf8 } from "../../encoding.js";
+import {
+  decodeBytesToUtf8,
+  latin1FromBytes,
+  readBytesFrom,
+} from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
+import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { shellJoinArgs } from "../../helpers/shell-quote.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type {
@@ -8,71 +13,147 @@ import type {
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../../types.js";
-import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
+import { accountFileInput } from "../../utils/file-reader.js";
+import { showHelp } from "../help.js";
 import { utf8ByteLength } from "../printf/escapes.js";
+import { readXargsInput } from "./xargs-input.js";
+import { parseXargsArgs } from "./xargs-options.js";
+import { planCommands } from "./xargs-plan.js";
+import { quoteForTrace } from "./xargs-quote.js";
 
+// (1ctx) every option GNU xargs 4.11 has, in its words
 const xargsHelp = {
   name: "xargs",
   summary: "build and execute command lines from standard input",
-  usage: "xargs [OPTION]... [COMMAND [INITIAL-ARGS]]",
+  usage: "xargs [OPTION]... [COMMAND [INITIAL-ARGS]...]",
+  description: [
+    "Run COMMAND with arguments INITIAL-ARGS and more arguments read from",
+    "input, as GNU xargs 4.11 does. Items are separated by blanks and",
+    "newlines, and quotes and backslashes protect them.",
+  ],
   options: [
-    "-I REPLACE   replace occurrences of REPLACE with input",
-    "-d DELIM     use DELIM as input delimiter (e.g., -d '\\n' for newline)",
-    "-n NUM       use at most NUM arguments per command line",
-    "-P NUM       run at most NUM processes at a time",
-    "-0, --null   items are separated by null, not whitespace",
-    "-t, --verbose  print commands before executing",
-    "-r, --no-run-if-empty  do not run command if input is empty",
-    "    --help   display this help and exit",
+    "-0, --null               items are separated by a null, not whitespace",
+    "-a, --arg-file=FILE      read arguments from FILE, not standard input",
+    "-d, --delimiter=CHAR     items are separated by CHAR, not by whitespace",
+    "-E END                   stop at an input item END (not with -0 or -d)",
+    "-e, --eof[=END]          -E END, or no end string without END",
+    "-I R                     same as --replace=R",
+    "-i, --replace[=R]        replace R in INITIAL-ARGS with each input line",
+    "                           ({} without R)",
+    "-L, --max-lines=MAX      at most MAX non-blank input lines per command",
+    "-l[MAX]                  -L, one line without MAX",
+    "-n, --max-args=MAX       at most MAX arguments per command",
+    "-o, --open-tty           needs a terminal, which the sandbox has none of",
+    "-P, --max-procs=MAX      run at most MAX commands at a time (at most 16)",
+    "-p, --interactive        needs a terminal, which the sandbox has none of",
+    "    --process-slot-var=VAR  set VAR to the command's slot",
+    "-r, --no-run-if-empty    run nothing when there is no item",
+    "-s, --max-chars=MAX      at most MAX bytes per command line",
+    "    --show-limits        show the command-line limits",
+    "-t, --verbose            print each command on stderr before it runs",
+    "-x, --exit               exit when a command line exceeds -s",
+    "    --help               display this help and exit",
+    "    --version            output version information and exit",
+  ],
+  notes: [
+    "Exit status: 0, 123 when a command exits 1 to 254, 124 when one exits",
+    "255, 126 when it cannot run, 127 when it is not found, 1 for an error.",
   ],
 };
 
-function splitExactBounded(
-  input: string,
-  delimiter: string,
-  maxItems: number,
-): string[] {
-  if (delimiter.length === 0) {
-    throw new Error("xargs: delimiter must not be empty");
-  }
-  const items: string[] = [];
-  let start = 0;
-  while (start <= input.length) {
-    const end = input.indexOf(delimiter, start);
-    const item = input.slice(start, end === -1 ? input.length : end);
-    if (item.length > 0) {
-      if (items.length >= maxItems) {
-        throw new ExecutionLimitError(
-          `xargs: array element limit exceeded (${maxItems})`,
-          "array_elements",
-        );
-      }
-      items.push(item);
-    }
-    if (end === -1) break;
-    start = end + delimiter.length;
-  }
-  return items;
+/** (1ctx) The most commands -P runs at once in the sandbox. */
+const MAX_PARALLEL = 16;
+
+/** (1ctx) GNU's default command-line buffer, 128 KiB. */
+const DEFAULT_MAX_CHARS = 131072;
+
+/** (1ctx) The exec limit the sandbox answers as, Linux's 2 MiB. */
+const ARG_MAX = 2097152;
+
+const XARGS_VERSION =
+  "xargs (GNU findutils) 4.11.0 (just-bash, compatible)\n" +
+  "A sandboxed xargs that answers as GNU xargs 4.11.0 does; see xargs --help.\n";
+
+/** (1ctx) An argument is a C string: it ends at a NUL, as GNU passes it. */
+function cString(arg: string): string {
+  const nul = arg.indexOf("\0");
+  return nul === -1 ? arg : arg.slice(0, nul);
 }
 
-function splitWhitespaceBounded(input: string, maxItems: number): string[] {
-  const items: string[] = [];
-  let start = -1;
-  for (let i = 0; i <= input.length; i++) {
-    const isWhitespace = i === input.length || /\s/.test(input[i]);
-    if (!isWhitespace && start === -1) start = i;
-    if (isWhitespace && start !== -1) {
-      if (items.length >= maxItems) {
-        throw new ExecutionLimitError(
-          `xargs: array element limit exceeded (${maxItems})`,
-          "array_elements",
-        );
-      }
-      items.push(input.slice(start, i));
-      start = -1;
-    }
+type Outcome =
+  | { kind: "ok" | "failed" }
+  | { kind: "stop"; code: number; stderr: string; own: string };
+
+/**
+ * (1ctx) What a command's end means to xargs, as GNU reads its child: a
+ * name the shell could not find or run is 127 or 126 in GNU's words, 255
+ * stops xargs with 124, any other failure makes the end 123. Only the
+ * dispatcher's own words, whole, mark a command that never ran.
+ */
+function commandOutcome(name: string, result: ExecResult): Outcome {
+  const q = `\u2018${name}\u2019`;
+  if (
+    result.exitCode === 127 &&
+    (result.stderr === `bash: ${name}: command not found\n` ||
+      result.stderr === `bash: ${name}: No such file or directory\n`)
+  ) {
+    return {
+      kind: "stop",
+      code: 127,
+      stderr: `xargs: failed to run command ${q}: No such file or directory\n`,
+      own: "",
+    };
   }
-  return items;
+  if (
+    result.exitCode === 126 &&
+    result.stderr === `bash: ${name}: Permission denied\n`
+  ) {
+    return {
+      kind: "stop",
+      code: 126,
+      stderr: `xargs: failed to run command ${q}: Permission denied\n`,
+      own: "",
+    };
+  }
+  if (result.exitCode === 255) {
+    return {
+      kind: "stop",
+      code: 124,
+      stderr: `${result.stderr}xargs: ${name}: exited with status 255; aborting\n`,
+      own: result.stderr,
+    };
+  }
+  return { kind: result.exitCode === 0 ? "ok" : "failed" };
+}
+
+/**
+ * (1ctx) A result with its stderr rewritten. The bytes the child charged
+ * stay charged; only as many as the new text holds are carried as already
+ * counted, so the budget is never refunded nor charged twice.
+ */
+function withStderr(result: ExecResult, stderr: string): ExecResult {
+  const counted = result.internalOutputAccounting;
+  return {
+    ...result,
+    stderr,
+    ...(counted
+      ? {
+          internalOutputAccounting: {
+            stdout: counted.stdout,
+            stderr: Math.min(counted.stderr, utf8ByteLength(stderr)),
+          },
+        }
+      : {}),
+  };
+}
+
+/** (1ctx) The bytes the environment takes, as GNU counts it for -s. */
+function environmentSize(ctx: RuntimeCommandContext): number {
+  let size = 0;
+  for (const [key, value] of Object.entries(ctx.exportedEnv ?? {})) {
+    size += utf8ByteLength(key) + utf8ByteLength(value) + 2;
+  }
+  return size;
 }
 
 export const xargsCommand: RuntimeCommand = {
@@ -82,103 +163,21 @@ export const xargsCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
-      return showHelp(xargsHelp);
+    const parsed = parseXargsArgs(args);
+    if (parsed.kind === "error") return parsed.result;
+    if (parsed.kind === "help") return showHelp(xargsHelp);
+    if (parsed.kind === "version") {
+      return { stdout: XARGS_VERSION, stderr: "", exitCode: 0 };
     }
+    const options = parsed.options;
+    // (1ctx) at most 16 at once, -P 0 included, each through ctx.exec
+    const maxProcs = Math.min(
+      options.maxProcs === 0 ? MAX_PARALLEL : options.maxProcs,
+      MAX_PARALLEL,
+    );
+    const command =
+      options.command.length > 0 ? [...options.command] : ["echo"];
 
-    let replaceStr: string | null = null;
-    let delimiter: string | null = null;
-    let maxArgs: number | null = null;
-    let maxProcs: number | null = null;
-    let nullSeparator = false;
-    let verbose = false;
-    let noRunIfEmpty = false;
-    let commandStart = 0;
-
-    // Parse xargs options
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === "-I" && i + 1 < args.length) {
-        replaceStr = args[++i];
-        commandStart = i + 1;
-      } else if (arg === "-d" && i + 1 < args.length) {
-        // Parse delimiter - handle escape sequences like \n, \t
-        const delimArg = args[++i];
-        delimiter = delimArg
-          .replace(/\\n/g, "\n")
-          .replace(/\\t/g, "\t")
-          .replace(/\\r/g, "\r")
-          .replace(/\\0/g, "\0")
-          .replace(/\\\\/g, "\\");
-        commandStart = i + 1;
-      } else if (arg === "-n" && i + 1 < args.length) {
-        const value = args[++i];
-        const parsedNumber = Number(value);
-        if (
-          !/^\d+$/.test(value) ||
-          !Number.isSafeInteger(parsedNumber) ||
-          parsedNumber < 1
-        ) {
-          return {
-            stdout: "",
-            stderr: `xargs: invalid number for -n: '${value}'\n`,
-            exitCode: 1,
-          };
-        }
-        maxArgs = parsedNumber;
-        commandStart = i + 1;
-      } else if (arg === "-P" && i + 1 < args.length) {
-        const value = args[++i];
-        const parsedNumber = Number(value);
-        if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsedNumber)) {
-          return {
-            stdout: "",
-            stderr: `xargs: invalid number for -P: '${value}'\n`,
-            exitCode: 1,
-          };
-        }
-        maxProcs = parsedNumber;
-        commandStart = i + 1;
-      } else if (arg === "-0" || arg === "--null") {
-        nullSeparator = true;
-        commandStart = i + 1;
-      } else if (arg === "-t" || arg === "--verbose") {
-        verbose = true;
-        commandStart = i + 1;
-      } else if (arg === "-r" || arg === "--no-run-if-empty") {
-        noRunIfEmpty = true;
-        commandStart = i + 1;
-      } else if (arg.startsWith("--")) {
-        return unknownOption("xargs", arg);
-      } else if (arg.startsWith("-") && arg.length > 1) {
-        // Check for unknown short options (only boolean flags allowed in combined form)
-        for (const c of arg.slice(1)) {
-          if (!"0tr".includes(c)) {
-            return unknownOption("xargs", `-${c}`);
-          }
-        }
-        // Handle combined short options
-        if (arg.includes("0")) nullSeparator = true;
-        if (arg.includes("t")) verbose = true;
-        if (arg.includes("r")) noRunIfEmpty = true;
-        commandStart = i + 1;
-      } else if (!arg.startsWith("-")) {
-        commandStart = i;
-        break;
-      }
-    }
-
-    // Get command and initial args
-    const command = args.slice(commandStart);
-    if (command.length === 0) {
-      command.push("echo");
-    }
-
-    // Parse input. Priority: -0 (null) > -d (custom delimiter) > default
-    // (whitespace). xargs' delimiters (`\0`, ASCII whitespace, user-provided
-    // single-byte delim) all live in the ASCII range, but the args produced
-    // are passed onward as text — decode so multibyte filenames survive.
-    const stdinText = decodeBytesToUtf8(ctx.stdin);
     const maxStringLength = Math.min(
       ctx.limits.maxInputBytes,
       ctx.limits.maxStringLength,
@@ -186,55 +185,105 @@ export const xargsCommand: RuntimeCommand = {
     const maxArrayElements = ctx.limits.maxArrayElements;
     const maxIterations = ctx.limits.maxLoopIterations;
     const maxOutputSize = ctx.limits.maxOutputSize;
-    if (utf8ByteLength(stdinText) > maxStringLength) {
+
+    // (1ctx) -s is bounded by the sandbox's exec limit, less the
+    // environment, as GNU bounds it by the host's
+    const envSize = environmentSize(ctx);
+    const posixLimit = ARG_MAX - 2048 - envSize;
+    const warnings = [...options.warnings];
+    let maxChars = options.maxChars ?? Math.min(DEFAULT_MAX_CHARS, posixLimit);
+    if (maxChars > posixLimit) {
+      warnings.push(
+        `value ${maxChars} for -s option should be <= ${posixLimit}`,
+      );
+      maxChars = posixLimit;
+    }
+
+    // (1ctx) -a reads the items from a file and leaves stdin to the
+    // command; - and /dev/stdin are stdin itself
+    const fromFile =
+      options.argFile !== null &&
+      options.argFile !== "-" &&
+      options.argFile !== "/dev/stdin";
+    let inputText: string;
+    if (fromFile) {
+      const argFile = options.argFile as string;
+      const path = ctx.fs.resolvePath(ctx.cwd, argFile);
+      try {
+        const bytes = await readBytesFrom(ctx.fs, path);
+        const size = latin1FromBytes(bytes).length;
+        if (size > maxStringLength) {
+          throw new ExecutionLimitError(
+            `xargs: input size limit exceeded (${maxStringLength} bytes)`,
+            "string_length",
+          );
+        }
+        accountFileInput(ctx, size, "xargs");
+        inputText = decodeBytesToUtf8(bytes);
+      } catch (error) {
+        rethrowFatalExecutionError(error);
+        const isDirectory = await ctx.fs
+          .stat(path)
+          .then((st) => st.isDirectory)
+          .catch(() => false);
+        const reason = isDirectory
+          ? "Is a directory"
+          : "No such file or directory";
+        return {
+          stdout: "",
+          stderr: `xargs: Cannot open input file \u2018${argFile}\u2019: ${reason}\n`,
+          exitCode: 1,
+        };
+      }
+    } else {
+      // The delimiters are ASCII, but the items go on as text, so decode
+      // for multibyte names to survive.
+      inputText = decodeBytesToUtf8(ctx.stdin);
+      if (utf8ByteLength(inputText) > maxStringLength) {
+        throw new ExecutionLimitError(
+          `xargs: input size limit exceeded (${maxStringLength} bytes)`,
+          "string_length",
+        );
+      }
+    }
+    const input = readXargsInput(inputText, {
+      mode: options.mode,
+      delimiter: options.delimiter,
+      eof: options.eof,
+      wholeLines: options.replace !== null,
+      maxItems: maxArrayElements,
+    });
+    warnings.push(...input.warnings);
+    const plan = planCommands(input.lines, {
+      command,
+      replace: options.replace,
+      maxLines: options.maxLines,
+      maxArgs: options.maxArgs,
+      maxChars,
+      exit: options.exit,
+      noRunIfEmpty: options.noRunIfEmpty,
+      inputFailed: input.error !== null,
+      maxStringLength,
+    });
+    const commands = plan.commands;
+    if (commands.length > maxIterations) {
       throw new ExecutionLimitError(
-        `xargs: input size limit exceeded (${maxStringLength} bytes)`,
-        "string_length",
+        `xargs: iteration limit exceeded (${maxIterations})`,
+        "iterations",
       );
     }
-    if (maxProcs !== null && maxProcs > maxArrayElements) {
+    let elements = 0;
+    for (const line of commands) elements += line.length;
+    if (elements > maxArrayElements) {
       throw new ExecutionLimitError(
         `xargs: array element limit exceeded (${maxArrayElements})`,
         "array_elements",
       );
     }
-    let items: string[];
-    if (nullSeparator) {
-      items = splitExactBounded(stdinText, "\0", maxArrayElements);
-    } else if (delimiter !== null) {
-      // Custom delimiter - split on exact string
-      // Strip trailing newline from input before splitting (echo adds trailing newlines)
-      const input = stdinText.replace(/\n$/, "");
-      try {
-        items = splitExactBounded(input, delimiter, maxArrayElements);
-      } catch (error) {
-        if (error instanceof ExecutionLimitError) throw error;
-        return {
-          stdout: "",
-          stderr: "xargs: delimiter must not be empty\n",
-          exitCode: 1,
-        };
-      }
-    } else {
-      // Default: split on whitespace and trim
-      items = splitWhitespaceBounded(stdinText, maxArrayElements);
-    }
 
-    if (items.length === 0) {
-      if (noRunIfEmpty) {
-        return { stdout: "", stderr: "", exitCode: 0 };
-      }
-      // With no -r flag, still run the command with no args
-      // (echo with no args just outputs newline)
-      return { stdout: "", stderr: "", exitCode: 0 };
-    }
-
-    // Execute commands
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
-    let exitCode = 0;
     let outputBytes = 0;
-    let commandIterations = 0;
     const output = ctx.executionScope
       ? new ExecutionOutputAccumulator(
           ctx.executionScope as ExecutionScope,
@@ -273,33 +322,29 @@ export const xargsCommand: RuntimeCommand = {
       if (value) stderrChunks.push(value);
       outputBytes += addedBytes;
     };
+    for (const w of warnings) {
+      appendStderr(`xargs: ${w}\n`);
+    }
+    if (options.showLimits) {
+      appendStderr(
+        `Your environment variables take up ${envSize} bytes\n` +
+          `POSIX upper limit on argument length (this system): ${posixLimit}\n` +
+          "POSIX smallest allowable upper limit on argument length (all systems): 4096\n" +
+          `Maximum length of command we could actually use: ${posixLimit - envSize}\n` +
+          `Size of command buffer we are actually using: ${maxChars}\n` +
+          `Maximum parallelism (--max-procs must be no greater): ${MAX_PARALLEL}\n`,
+      );
+    }
 
-    // Helper to quote an argument if it contains special characters
-    const quoteArg = (arg: string): string => {
-      // If arg contains spaces, quotes, or shell metacharacters, quote it
-      // Note: \s includes spaces, tabs, and newlines
-      if (/[\s"'\\$`!*?[\]{}();&|<>#]/.test(arg)) {
-        // Use double quotes and escape characters that are special inside double quotes:
-        // backslash, double quote, dollar sign, and backtick
-        return `"${arg.replace(/([\\"`$])/g, "\\$1")}"`;
-      }
-      return arg;
-    };
+    // (1ctx) under -a the first command gets xargs' stdin, as it would
+    // drain the inherited descriptor
+    let stdinLeft = fromFile;
 
-    // Helper to execute a single command via the shell
-    const executeCommand = async (cmdArgs: string[]): Promise<ExecResult> => {
-      if (++commandIterations > maxIterations) {
-        throw new ExecutionLimitError(
-          `xargs: iteration limit exceeded (${maxIterations})`,
-          "iterations",
-        );
-      }
-      if (cmdArgs.length > maxArrayElements) {
-        throw new ExecutionLimitError(
-          `xargs: array element limit exceeded (${maxArrayElements})`,
-          "array_elements",
-        );
-      }
+    const executeCommand = async (
+      rawArgs: string[],
+      slot: number,
+    ): Promise<ExecResult> => {
+      const cmdArgs = rawArgs.map(cString);
       for (const value of cmdArgs) {
         if (utf8ByteLength(value) > maxStringLength) {
           throw new ExecutionLimitError(
@@ -308,125 +353,112 @@ export const xargsCommand: RuntimeCommand = {
           );
         }
       }
-      if (verbose) {
-        const cmdLine = cmdArgs.map(quoteArg).join(" ");
-        appendStderr(`${cmdLine}\n`);
+      if (options.verbose) {
+        appendStderr(`${cmdArgs.map(quoteForTrace).join(" ")}\n`);
       }
-      // Use ctx.exec to run the command, passing current working directory
-      if (ctx.exec) {
-        return ctx.exec(shellJoinArgs([cmdArgs[0]]), {
-          cwd: ctx.cwd,
-          signal: ctx.signal,
-          args: cmdArgs.slice(1),
-        });
-      }
-      // Fallback: just output what would be run
-      const cmdLine = cmdArgs.map(quoteArg).join(" ");
-      return { stdout: `${cmdLine}\n`, stderr: "", exitCode: 0 };
-    };
-
-    // Helper to run commands with optional parallelism
-    const runCommands = async (cmdArgsList: string[][]): Promise<void> => {
-      if (maxProcs !== null && maxProcs > 1) {
-        // Run in parallel batches
-        for (let i = 0; i < cmdArgsList.length; i += maxProcs) {
-          const batch = cmdArgsList.slice(i, i + maxProcs);
-          const results = await Promise.all(batch.map(executeCommand));
-          for (const result of results) {
-            appendOutput(result);
-            if (result.exitCode !== 0) {
-              exitCode = result.exitCode;
-            }
-          }
-        }
-      } else {
-        // Sequential execution
-        for (const cmdArgs of cmdArgsList) {
-          const result = await executeCommand(cmdArgs);
-          appendOutput(result);
-          if (result.exitCode !== 0) {
-            exitCode = result.exitCode;
-          }
-        }
-      }
-    };
-
-    if (replaceStr !== null) {
-      // -I mode: run command once per item, replacing replaceStr in each argument
-      if (items.length > maxIterations) {
-        throw new ExecutionLimitError(
-          `xargs: iteration limit exceeded (${maxIterations})`,
-          "iterations",
-        );
-      }
-      if (replaceStr.length === 0) {
-        return {
-          stdout: "",
-          stderr: "xargs: replacement string must not be empty\n",
-          exitCode: 1,
-        };
-      }
-      if (
-        command.length > 0 &&
-        items.length > Math.floor(maxArrayElements / command.length)
-      ) {
-        throw new ExecutionLimitError(
-          `xargs: array element limit exceeded (${maxArrayElements})`,
-          "array_elements",
-        );
-      }
-      const replaceBounded = (template: string, item: string): string => {
-        let occurrences = 0;
-        let position = 0;
-        while (true) {
-          position = template.indexOf(replaceStr, position);
-          if (position === -1) break;
-          occurrences++;
-          position += replaceStr.length;
-        }
-        const prospectiveBytes =
-          utf8ByteLength(template) +
-          occurrences * (utf8ByteLength(item) - utf8ByteLength(replaceStr));
-        if (prospectiveBytes > maxStringLength) {
-          throw new ExecutionLimitError(
-            `xargs: string length limit exceeded (${maxStringLength} bytes)`,
-            "string_length",
-          );
-        }
-        return template.replaceAll(replaceStr, item);
+      // an assignment before the name exports the slot to the command
+      const slotPrefix =
+        options.slotVar !== null
+          ? `${options.slotVar}=${slot} `
+          : "";
+      const script = `${slotPrefix}${shellJoinArgs([cmdArgs[0]])}`;
+      // the exported variables reach the command, as a child's
+      // environment does
+      const execOptions = {
+        env: { ...ctx.exportedEnv },
+        cwd: ctx.cwd,
+        signal: ctx.signal,
+        args: cmdArgs.slice(1),
       };
-      const cmdArgsList = items.map((item) =>
-        command.map((c) => replaceBounded(c, item)),
+      if (stdinLeft && ctx.execWithInheritedStdin) {
+        stdinLeft = false;
+        return ctx.execWithInheritedStdin(script, execOptions);
+      }
+      if (ctx.exec) return ctx.exec(script, execOptions);
+      // Fallback: just output what would be run
+      return {
+        stdout: `${cmdArgs.map(quoteForTrace).join(" ")}\n`,
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    // (1ctx) no terminal: -p and -o fail as GNU does without one
+    if ((options.interactive || options.openTty) && commands.length > 0) {
+      if (options.interactive) {
+        appendStderr(`${commands[0].map(cString).map(quoteForTrace).join(" ")}\n`);
+      }
+      appendStderr(
+        "xargs: failed to open /dev/tty for reading: No such device or address\n",
       );
-      await runCommands(cmdArgsList);
-    } else if (maxArgs !== null) {
-      // -n mode: batch items
-      const cmdArgsList: string[][] = [];
-      const batchCount = Math.ceil(items.length / maxArgs);
-      if (batchCount > Math.min(maxArrayElements, maxIterations)) {
-        throw new ExecutionLimitError(
-          `xargs: iteration limit exceeded (${maxIterations})`,
-          "iterations",
-        );
+      return (
+        output?.build(1) ?? {
+          stdout: stdoutChunks.join(""),
+          stderr: stderrChunks.join(""),
+          exitCode: 1,
+        }
+      );
+    }
+
+    // (1ctx) up to -P commands at once, a slot taking the next command as
+    // soon as its own ends; output is kept in input order, and a command
+    // that stops xargs lets the running ones finish and starts no more
+    const results: (ExecResult | undefined)[] = [];
+    const outcomes: Outcome[] = [];
+    let emitted = 0;
+    let next = 0;
+    let failure: unknown;
+    let stopping = false;
+    let failed = false;
+    let stopCode: number | null = null;
+    const emitReady = () => {
+      while (emitted < commands.length && results[emitted] !== undefined) {
+        const result = results[emitted] as ExecResult;
+        results[emitted] = undefined;
+        emitted++;
+        const outcome = outcomes[emitted - 1] as Outcome;
+        if (outcome.kind === "failed") failed = true;
+        // only the first stop speaks, as GNU stops at it
+        if (outcome.kind === "stop" && stopCode === null) {
+          appendOutput(withStderr(result, outcome.stderr));
+          stopCode = outcome.code;
+        } else if (outcome.kind === "stop") {
+          appendOutput(withStderr(result, outcome.own));
+        } else {
+          appendOutput(result);
+        }
       }
-      const prospectiveElements = items.length + batchCount * command.length;
-      if (prospectiveElements > maxArrayElements) {
-        throw new ExecutionLimitError(
-          `xargs: array element limit exceeded (${maxArrayElements})`,
-          "array_elements",
-        );
+    };
+    const slot = async (id: number) => {
+      while (!stopping && failure === undefined && next < commands.length) {
+        const index = next++;
+        try {
+          const result = await executeCommand(commands[index], id);
+          const outcome = commandOutcome(cString(commands[index][0]), result);
+          outcomes[index] = outcome;
+          results[index] = result;
+          if (outcome.kind === "stop") stopping = true;
+          emitReady();
+        } catch (error) {
+          failure ??= error;
+        }
       }
-      for (let i = 0; i < items.length; i += maxArgs) {
-        const batch = items.slice(i, i + maxArgs);
-        cmdArgsList.push([...command, ...batch]);
-      }
-      await runCommands(cmdArgsList);
-    } else {
-      // Default: all items on one line
-      const cmdArgs = [...command, ...items];
-      const result = await executeCommand(cmdArgs);
-      appendOutput(result);
-      exitCode = result.exitCode;
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(maxProcs, commands.length) }, (_, id) =>
+        slot(id),
+      ),
+    );
+    if (failure !== undefined) throw failure;
+    emitReady();
+
+    let exitCode = stopCode ?? (failed ? 123 : 0);
+    // (1ctx) an unbuilt command line or an unclosed quote ends xargs after
+    // what could run
+    const error = plan.error ?? input.error;
+    if (error !== null && stopCode === null) {
+      appendStderr(`xargs: ${error}\n`);
+      exitCode = 1;
     }
 
     return (
