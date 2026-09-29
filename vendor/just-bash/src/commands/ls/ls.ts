@@ -16,22 +16,26 @@ import { parseArgs } from "../../utils/args.js";
 import { DEFAULT_BATCH_SIZE } from "../../utils/constants.js";
 import { hasHelpFlag, showHelp } from "../help.js";
 
-function appendLsOutput(
-  ctx: RuntimeCommandContext,
-  current: string,
-  next: string,
-): string {
-  if (
-    utf8ByteLength(next) >
-    ctx.limits.maxOutputSize - utf8ByteLength(current)
-  ) {
-    throw new ExecutionLimitError(
-      `ls: output size limit exceeded (${ctx.limits.maxOutputSize} bytes)`,
-      "output_size",
-    );
+// (1ctx) output that keeps its byte count, so an append never rescans what
+// came before; ls -R appends every subtree's output again at each level
+class LsText {
+  text = "";
+  bytes = 0;
+  constructor(private readonly max: number) {}
+
+  add(next: string, nextBytes = utf8ByteLength(next)): void {
+    if (nextBytes > this.max - this.bytes) {
+      throw new ExecutionLimitError(
+        `ls: output size limit exceeded (${this.max} bytes)`,
+        "output_size",
+      );
+    }
+    this.text += next;
+    this.bytes += nextBytes;
   }
-  return current + next;
 }
+
+type LsResult = ExecResult & { stdoutBytes?: number; stderrBytes?: number };
 
 function joinLsLines(
   ctx: RuntimeCommandContext,
@@ -268,8 +272,8 @@ export const lsCommand: RuntimeCommand = {
       paths.push(".");
     }
 
-    let stdout = "";
-    let stderr = "";
+    const stdout = new LsText(ctx.limits.maxOutputSize);
+    const stderr = new LsText(ctx.limits.maxOutputSize);
     let exitCode = 0;
     const traversalBudget = new FileTraversalBudget({
       limits: ctx.limits,
@@ -295,10 +299,10 @@ export const lsCommand: RuntimeCommand = {
       if (
         i > 0 &&
         !(inFiles && i > ordered.start) &&
-        stdout &&
-        !stdout.endsWith("\n\n")
+        stdout.text &&
+        !stdout.text.endsWith("\n\n")
       ) {
-        stdout = appendLsOutput(ctx, stdout, "\n");
+        stdout.add("\n");
       }
 
       // With -d flag, just list the directories/files themselves, not their contents
@@ -319,21 +323,17 @@ export const lsCommand: RuntimeCommand = {
               : String(size).padStart(5);
             const mtime = stat.mtime ?? new Date(0);
             const dateStr = formatDate(mtime);
-            stdout = appendLsOutput(
-              ctx,
-              stdout,
+            stdout.add(
               `${mode} 1 user user ${sizeStr} ${dateStr} ${path}${suffix}\n`,
             );
           } else {
             const suffix = classifyFiles
               ? classifySuffix(await ctx.fs.lstat(fullPath))
               : "";
-            stdout = appendLsOutput(ctx, stdout, `${path}${suffix}\n`);
+            stdout.add(`${path}${suffix}\n`);
           }
         } catch {
-          stderr = appendLsOutput(
-            ctx,
-            stderr,
+          stderr.add(
             `ls: cannot access '${path}': No such file or directory\n`,
           );
           exitCode = 2;
@@ -355,8 +355,8 @@ export const lsCommand: RuntimeCommand = {
           classifyFiles,
           traversalBudget,
         );
-        stdout = appendLsOutput(ctx, stdout, result.stdout);
-        stderr = appendLsOutput(ctx, stderr, result.stderr);
+        stdout.add(result.stdout);
+        stderr.add(result.stderr);
         if (result.exitCode !== 0) exitCode = result.exitCode;
       } else {
         const result = await listPath(
@@ -376,13 +376,13 @@ export const lsCommand: RuntimeCommand = {
           0,
           new Set(),
         );
-        stdout = appendLsOutput(ctx, stdout, result.stdout);
-        stderr = appendLsOutput(ctx, stderr, result.stderr);
+        stdout.add(result.stdout, result.stdoutBytes);
+        stderr.add(result.stderr, result.stderrBytes);
         if (result.exitCode !== 0) exitCode = result.exitCode;
       }
     }
 
-    return { stdout, stderr, exitCode };
+    return { stdout: stdout.text, stderr: stderr.text, exitCode };
   },
 };
 
@@ -516,7 +516,7 @@ async function listPath(
   }),
   traversalDepth = 0,
   ancestorIdentities: Set<string> = new Set(),
-): Promise<ExecResult> {
+): Promise<LsResult> {
   const showHidden = showAll || showAlmostAll;
   const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
 
@@ -582,8 +582,8 @@ async function listPath(
       entries.reverse();
     }
 
-    let stdout = "";
-    let stderr = "";
+    const stdout = new LsText(ctx.limits.maxOutputSize);
+    const stderr = new LsText(ctx.limits.maxOutputSize);
     let exitCode = 0;
 
     // For recursive listing:
@@ -592,11 +592,11 @@ async function listPath(
     // - Subdirectories use './subdir:' format when starting from '.'
     // - When starting from other path, subdirs use '{path}/subdir:' format
     if (recursive || showHeader) {
-      stdout = appendLsOutput(ctx, stdout, `${path}:\n`);
+      stdout.add(`${path}:\n`);
     }
 
     if (longFormat) {
-      stdout = appendLsOutput(ctx, stdout, `total ${entries.length}\n`);
+      stdout.add(`total ${entries.length}\n`);
 
       // Separate special entries (. and ..) from regular entries
       const specialEntries = entries.filter((e) => e === "." || e === "..");
@@ -604,11 +604,7 @@ async function listPath(
 
       // Add special entries first
       for (const entry of specialEntries) {
-        stdout = appendLsOutput(
-          ctx,
-          stdout,
-          `drwxr-xr-x 1 user user     0 Jan  1 00:00 ${entry}\n`,
-        );
+        stdout.add(`drwxr-xr-x 1 user user     0 Jan  1 00:00 ${entry}\n`);
       }
 
       // Parallelize stat calls for regular entries
@@ -659,7 +655,7 @@ async function listPath(
       );
 
       for (const { line } of entryStats) {
-        stdout = appendLsOutput(ctx, stdout, line);
+        stdout.add(line);
       }
     } else if (classifyFiles) {
       // Classify each entry with type suffix
@@ -688,9 +684,9 @@ async function listPath(
         classified.push(...batchResults);
       }
 
-      stdout = appendLsOutput(ctx, stdout, joinLsLines(ctx, classified));
+      stdout.add(joinLsLines(ctx, classified));
     } else {
-      stdout = appendLsOutput(ctx, stdout, joinLsLines(ctx, entries));
+      stdout.add(joinLsLines(ctx, entries));
     }
 
     // Handle recursive - parallel processing for better performance
@@ -703,8 +699,10 @@ async function listPath(
 
       if (ctx.fs.readdirWithFileTypes) {
         const entriesWithTypes = await ctx.fs.readdirWithFileTypes(fullPath);
+        // (1ctx) a set, so a wide folder is not scanned once per entry
+        const listed = new Set(filteredEntries);
         dirEntries = entriesWithTypes
-          .filter((e) => e.isDirectory && filteredEntries.includes(e.name))
+          .filter((e) => e.isDirectory && listed.has(e.name))
           .map((e) => ({ name: e.name, isDirectory: true }));
       } else {
         // Fall back to stat calls - parallelize them
@@ -733,7 +731,7 @@ async function listPath(
       }
 
       // Process subdirectories in parallel batches
-      const subResults: { name: string; result: ExecResult }[] = [];
+      const subResults: { name: string; result: LsResult }[] = [];
 
       for (let i = 0; i < dirEntries.length; i += DEFAULT_BATCH_SIZE) {
         const batch = dirEntries.slice(i, i + DEFAULT_BATCH_SIZE);
@@ -772,14 +770,20 @@ async function listPath(
 
       // Append results
       for (const { result } of subResults) {
-        stdout = appendLsOutput(ctx, stdout, "\n");
-        stdout = appendLsOutput(ctx, stdout, result.stdout);
-        stderr = appendLsOutput(ctx, stderr, result.stderr);
+        stdout.add("\n");
+        stdout.add(result.stdout, result.stdoutBytes);
+        stderr.add(result.stderr, result.stderrBytes);
         if (result.exitCode !== 0) exitCode = result.exitCode;
       }
     }
 
-    return { stdout, stderr, exitCode };
+    return {
+      stdout: stdout.text,
+      stderr: stderr.text,
+      exitCode,
+      stdoutBytes: stdout.bytes,
+      stderrBytes: stderr.bytes,
+    };
   } catch (error) {
     if (
       error instanceof ExecutionLimitError ||

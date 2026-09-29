@@ -85,6 +85,43 @@ export class InMemoryFs implements IFileSystem {
   private retainedBytes = 0;
   /** Number of directory entries retaining each hard-link-compatible buffer. */
   private contentReferences = new WeakMap<Uint8Array, number>();
+  // (1ctx) each directory's child names, so a readdir reads its own
+  // children instead of scanning every path in the tree
+  private children = new Map<string, Set<string>>();
+  // (1ctx) with none, a path resolves to itself without a walk
+  private symlinks = 0;
+
+  /** The one writer of `data`, keeping `children` and `symlinks` in step. */
+  private store(path: string, entry: FsEntry): void {
+    const previous = this.data.get(path);
+    if (previous === undefined && path !== "/") {
+      const slash = path.lastIndexOf("/");
+      const parent = slash === 0 ? "/" : path.slice(0, slash);
+      let names = this.children.get(parent);
+      if (!names) {
+        names = new Set();
+        this.children.set(parent, names);
+      }
+      names.add(path.slice(slash + 1));
+    }
+    if (previous?.type === "symlink") this.symlinks--;
+    if (entry.type === "symlink") this.symlinks++;
+    this.data.set(path, entry);
+  }
+
+  private unstore(path: string): boolean {
+    const previous = this.data.get(path);
+    if (previous === undefined) return false;
+    if (path !== "/") {
+      const slash = path.lastIndexOf("/");
+      const parent = slash === 0 ? "/" : path.slice(0, slash);
+      const names = this.children.get(parent);
+      names?.delete(path.slice(slash + 1));
+      if (names?.size === 0) this.children.delete(parent);
+    }
+    if (previous.type === "symlink") this.symlinks--;
+    return this.data.delete(path);
+  }
 
   private materializedContent(entry: FsEntry | undefined): FileContent | null {
     return entry?.type === "file" && "content" in entry ? entry.content : null;
@@ -128,7 +165,7 @@ export class InMemoryFs implements IFileSystem {
     const nextContent = this.materializedContent(entry);
 
     if (previousContent === nextContent) {
-      this.data.set(path, entry);
+      this.store(path, entry);
       return;
     }
 
@@ -157,7 +194,7 @@ export class InMemoryFs implements IFileSystem {
       );
     }
     this.retainedBytes += addedBytes - releasedBytes;
-    this.data.set(path, entry);
+    this.store(path, entry);
   }
 
   private deleteEntry(path: string): boolean {
@@ -171,7 +208,7 @@ export class InMemoryFs implements IFileSystem {
       else this.contentReferences.set(content, references - 1);
     }
     this.retainedBytes -= releasedBytes;
-    return this.data.delete(path);
+    return this.unstore(path);
   }
 
   private contentByteLength(
@@ -207,7 +244,7 @@ export class InMemoryFs implements IFileSystem {
       throw new Error("InMemoryFs: invalid maxTotalBytes");
     }
     // Create root directory
-    this.data.set("/", {
+    this.store("/", {
       type: "directory",
       mode: DEFAULT_DIR_MODE,
       mtime: new Date(),
@@ -238,7 +275,7 @@ export class InMemoryFs implements IFileSystem {
 
     if (!this.data.has(dir)) {
       this.ensureParentDirs(dir);
-      this.data.set(dir, {
+      this.store(dir, {
         type: "directory",
         mode: DEFAULT_DIR_MODE,
         mtime: new Date(),
@@ -531,6 +568,7 @@ export class InMemoryFs implements IFileSystem {
   private resolveIntermediateSymlinks(path: string): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
+    if (this.symlinks === 0) return normalized;
 
     const parts = normalized.slice(1).split("/");
     if (parts.length <= 1) return normalized; // No intermediate components
@@ -578,6 +616,7 @@ export class InMemoryFs implements IFileSystem {
   private resolvePathWithSymlinks(path: string): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
+    if (this.symlinks === 0) return normalized;
 
     const parts = normalized.slice(1).split("/");
     let resolvedPath = "";
@@ -647,7 +686,7 @@ export class InMemoryFs implements IFileSystem {
       }
     }
 
-    this.data.set(normalized, {
+    this.store(normalized, {
       type: "directory",
       mode: DEFAULT_DIR_MODE,
       mtime: new Date(),
@@ -688,28 +727,20 @@ export class InMemoryFs implements IFileSystem {
       throw new Error(`ENOTDIR: not a directory, scandir '${path}'`);
     }
 
-    const prefix = normalized === "/" ? "/" : `${normalized}/`;
-    const entriesMap = new Map<string, DirentEntry>();
-
-    for (const [p, fsEntry] of this.data.entries()) {
-      if (p === normalized) continue;
-      if (p.startsWith(prefix)) {
-        const rest = p.slice(prefix.length);
-        const name = rest.split("/")[0];
-        // Only add direct children (no nested paths)
-        if (name && !rest.includes("/", name.length) && !entriesMap.has(name)) {
-          entriesMap.set(name, {
-            name,
-            isFile: fsEntry.type === "file",
-            isDirectory: fsEntry.type === "directory",
-            isSymbolicLink: fsEntry.type === "symlink",
-          });
-        }
-      }
+    const entries: DirentEntry[] = [];
+    for (const name of this.children.get(normalized) ?? []) {
+      const fsEntry = this.data.get(joinPath(normalized, name));
+      if (!fsEntry) continue;
+      entries.push({
+        name,
+        isFile: fsEntry.type === "file",
+        isDirectory: fsEntry.type === "directory",
+        isSymbolicLink: fsEntry.type === "symlink",
+      });
     }
 
     // Sort using default string comparison (case-sensitive) to match readdir behavior
-    return Array.from(entriesMap.values()).sort((a, b) =>
+    return entries.sort((a, b) =>
       a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
     );
   }
@@ -772,7 +803,7 @@ export class InMemoryFs implements IFileSystem {
     } else if (srcEntry.type === "symlink") {
       // Copy the symlink itself (not its target)
       this.ensureParentDirs(destNorm);
-      this.data.set(destNorm, { ...srcEntry });
+      this.store(destNorm, { ...srcEntry });
     } else if (srcEntry.type === "directory") {
       if (!options?.recursive) {
         throw new Error(`EISDIR: is a directory, cp '${src}'`);
@@ -858,7 +889,7 @@ export class InMemoryFs implements IFileSystem {
     }
 
     this.ensureParentDirs(normalized);
-    this.data.set(normalized, {
+    this.store(normalized, {
       type: "symlink",
       target,
       mode: SYMLINK_MODE,
