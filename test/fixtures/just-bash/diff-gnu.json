@@ -1,0 +1,2924 @@
+{
+  "recordedWith": "diff (GNU diffutils) 3.12\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Paul Eggert, Mike Haertel, David Hayes,\nRichard Stallman, and Len Tower.",
+  "env": {
+    "TZ": "UTC",
+    "LC_ALL": "en_US.UTF-8"
+  },
+  "mtime": "2026-09-29T12:52:48.311Z",
+  "dirs": [
+    "emptydir"
+  ],
+  "files": {
+    "lao": "The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n",
+    "tzu": "The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n",
+    "a": "a\nb\nc\nd\ne\nf\ng\n",
+    "b": "A\nb\nc\nD\ne\nf\ng\nh\n",
+    "same": "a\nb\nc\nd\ne\nf\ng\n",
+    "one": "one\n",
+    "two": "two\n",
+    "s20": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n",
+    "s20g5": "line 1\nline 2\nline 3\nline 4\nchanged 5\nline 6\nline 7\nline 8\nline 9\nline 10\nchanged 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n",
+    "s20g6": "line 1\nline 2\nline 3\nline 4\nchanged 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nchanged 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n",
+    "s20g7": "line 1\nline 2\nline 3\nline 4\nchanged 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nchanged 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n",
+    "s30": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "s30b": "line 1\nline 2\nline 3\nline 4\nchanged 5\nline 6\nline 7\nline 8\nline 9\nchanged 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nchanged 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "s30ins": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nnew a\nnew b\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\n",
+    "s30del": "line 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\n",
+    "nl": "a\nb\nc\n",
+    "nonl": "a\nb\nc",
+    "nonl2": "a\nb\nd",
+    "f": "f",
+    "g": "g",
+    "crlf": "a\r\nb\r\nc\r\n",
+    "crlf2": "a\r\nB\r\nc\r\n",
+    "case1": "Hello World\nsame line\nBar baz\nkeep\n",
+    "case2": "hello world\nsame line changed\nBAR BAZ\nkeep\n",
+    "utfcase1": "ÉCOLE\nΔέλτα\nstraße\n",
+    "utfcase2": "école\nδέλτα\nSTRASSE\n",
+    "ws1": "int  x = 1;\n\tindented\ntrailing\nno space\nsame\nend\n",
+    "ws2": "int x = 1;\n        indented\ntrailing   \nnospace\nsame\nend \n",
+    "ws3": "a\tb\n\tc\nd  e\n",
+    "ws4": "a       b\n        c\nd e\n",
+    "blank1": "a\nb\nc\nd\n",
+    "blank2": "a\n\nb\n\n\nc\nd\n",
+    "blank3": "a\n  \nb\nc\nd\n",
+    "blank4": "a\nb\n\nc\nX\n",
+    "lat1": {
+      "base64": "Y2Fm6QpzYW1lCg=="
+    },
+    "lat2": {
+      "base64": "Y2Fm6ApzYW1lCg=="
+    },
+    "lat3": {
+      "base64": "Y2Fm6QpzYW1lCm9sZCBlbmQK"
+    },
+    "lat4": {
+      "base64": "Y2Fm6QpzYW1lCm5ldyBlbmQK"
+    },
+    "bom": "﻿a\nb\n",
+    "nobom": "a\nb\n",
+    "nul1": "a\u0000b\nc\n",
+    "nul2": "a\u0000c\nc\n",
+    "nul1b": "a\u0000b\nc\n",
+    "near1": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000\n",
+    "near2": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000y\n",
+    "far1": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000\n",
+    "far2": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000y\n",
+    "empty": "",
+    "c1.c": "#include <stdio.h>\n\nstatic int counter = 0;\n\nint add(int a, int b)\n{\n  int sum = a + b;\n  counter++;\n  return sum;\n}\n\nint sub(int a, int b)\n{\n  int diff = a - b;\n  counter++;\n  return diff;\n}\n\nint main(void)\n{\n  printf(\"%d\\n\", add(1, 2));\n  printf(\"%d\\n\", sub(3, 1));\n  return 0;\n}\n",
+    "c2.c": "#include <stdio.h>\n\nstatic int counter = 0;\n\nint add(int a, int b)\n{\n  int sum = b + a;\n  counter++;\n  return sum;\n}\n\nint sub(int a, int b)\n{\n  int diff = a - b;\n  counter++;\n  return diff;\n}\n\nint main(void)\n{\n  printf(\"%d\\n\", add(1, 2));\n  printf(\"%d\\n\", sub(5, 1));\n  return 0;\n}\n",
+    "m1.md": "# Title\n\nIntro line one.\nIntro line two.\n\n## Install\n\nRun the installer.\nThen restart.\nCheck the log.\n\n## Usage\n\nCall the tool.\nRead the output.\nRepeat as needed.\nDone.\n",
+    "m2.md": "# Title\n\nIntro line one.\nIntro line two.\n\n## Install\n\nRun the installer.\nThen reboot.\nCheck the log.\n\n## Usage\n\nCall the tool.\nRead the output.\nRepeat twice.\nDone.\n",
+    "rep1": "a\nb\na\nb\na\nb\n",
+    "rep2": "a\nb\na\nb\n",
+    "br1": "f() {\n  x;\n}\n\ng() {\n  y;\n}\n",
+    "br2": "f() {\n  x;\n}\n\nh() {\n  z;\n}\n\ng() {\n  y;\n}\n",
+    "abc": "a\nb\nc\n",
+    "cba": "c\nb\na\n",
+    "ign1": "# version 1\nkeep\ncode one\nkeep\n# date 1\n",
+    "ign2": "# version 2\nkeep\ncode two\nkeep\n# date 2\n",
+    "ign3": "# version 1\nkeep\ncode one\n",
+    "ign4": "# version 2\nkeep\ncode one\n",
+    "sp ace": "space\n",
+    "q\"t": "quote\n",
+    "-dash": "dash\n",
+    "tab\tn": "tab\n",
+    "bs\\x": "backslash\n",
+    "dir/a": "a\nb\nc\nd\ne\nf\ng\n",
+    "b s\\x": "both\n",
+    "$x": "dollar\n",
+    "ap'os": "apostrophe\n",
+    "nl\nname": "newline\n",
+    "ctl\u0001x": "control\n",
+    "st*r": "star\n",
+    "hash#": "hash\n",
+    "é": "accent\n",
+    "sp nul": "a\u0000b\n",
+    "long1.c": "int a_function_with_a_rather_long_name(int first, int second)\n{\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\n  return 1;\n}\n",
+    "long2.c": "int a_function_with_a_rather_long_name(int first, int second)\n{\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\n  return 2;\n}\n",
+    "utf1.md": "# Überschrift mit Umlauten äöü und noch mehr Text dazu\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nalt\n",
+    "utf2.md": "# Überschrift mit Umlauten äöü und noch mehr Text dazu\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
+    "trail1.c": "int f(void)   \n{\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\n  return 1;\n}\n",
+    "trail2.c": "int f(void)   \n{\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\n  return 2;\n}\n",
+    "exact1.md": "# exactly forty bytes of heading text 40\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nalt\n",
+    "exact2.md": "# exactly forty bytes of heading text 40\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
+    "cut1.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nalt\n",
+    "cut2.md": "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxéé\n  a1;\n  a2;\n  a3;\n  a4;\n  a5;\n  a6;\nneu\n",
+    "wsnl": "a\nb\nc \n",
+    "wsnonl": "a\nb\nc"
+  },
+  "cases": [
+    {
+      "name": "normal format by default",
+      "args": [
+        "lao",
+        "tzu"
+      ],
+      "stdout": "1,2d0\n< The Way that can be told of is not the eternal Way;\n< The name that can be named is not the eternal name.\n4c2,3\n< The Named is the mother of all things.\n---\n> The named is the mother of all things.\n> \n11a11,13\n> They both may be called deep and profound.\n> Deeper and more profound,\n> The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "--normal",
+      "args": [
+        "--normal",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "1,2d0\n< The Way that can be told of is not the eternal Way;\n< The name that can be named is not the eternal name.\n4c2,3\n< The Named is the mother of all things.\n---\n> The named is the mother of all things.\n> \n11a11,13\n> They both may be called deep and profound.\n> Deeper and more profound,\n> The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified",
+      "args": [
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "context",
+      "args": [
+        "-c",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "*** lao\t2026-09-29 12:52:48.311000000 +0000\n--- tzu\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n- The Way that can be told of is not the eternal Way;\n- The name that can be named is not the eternal name.\n  The Nameless is the origin of Heaven and Earth;\n! The Named is the mother of all things.\n  Therefore let there always be non-being,\n    so we may see their subtlety,\n  And let there always be being,\n--- 1,6 ----\n  The Nameless is the origin of Heaven and Earth;\n! The named is the mother of all things.\n! \n  Therefore let there always be non-being,\n    so we may see their subtlety,\n  And let there always be being,\n***************\n*** 9,11 ****\n--- 8,13 ----\n  The two are the same,\n  But after they are produced,\n    they have different names.\n+ They both may be called deep and profound.\n+ Deeper and more profound,\n+ The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "context with one line",
+      "args": [
+        "-C",
+        "1",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "*** lao\t2026-09-29 12:52:48.311000000 +0000\n--- tzu\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,5 ****\n- The Way that can be told of is not the eternal Way;\n- The name that can be named is not the eternal name.\n  The Nameless is the origin of Heaven and Earth;\n! The Named is the mother of all things.\n  Therefore let there always be non-being,\n--- 1,4 ----\n  The Nameless is the origin of Heaven and Earth;\n! The named is the mother of all things.\n! \n  Therefore let there always be non-being,\n***************\n*** 11 ****\n--- 10,13 ----\n    they have different names.\n+ They both may be called deep and profound.\n+ Deeper and more profound,\n+ The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "context=1",
+      "args": [
+        "--context=1",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "*** lao\t2026-09-29 12:52:48.311000000 +0000\n--- tzu\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,5 ****\n- The Way that can be told of is not the eternal Way;\n- The name that can be named is not the eternal name.\n  The Nameless is the origin of Heaven and Earth;\n! The Named is the mother of all things.\n  Therefore let there always be non-being,\n--- 1,4 ----\n  The Nameless is the origin of Heaven and Earth;\n! The named is the mother of all things.\n! \n  Therefore let there always be non-being,\n***************\n*** 11 ****\n--- 10,13 ----\n    they have different names.\n+ They both may be called deep and profound.\n+ Deeper and more profound,\n+ The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified with one line",
+      "args": [
+        "-U",
+        "1",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,4 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n@@ -11 +10,4 @@\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified joined value",
+      "args": [
+        "-U1",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,4 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n@@ -11 +10,4 @@\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified=1",
+      "args": [
+        "--unified=1",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,4 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n@@ -11 +10,4 @@\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified with no context",
+      "args": [
+        "-U0",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +0,0 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n@@ -4 +2,2 @@\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n@@ -11,0 +11,3 @@\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified with no context apart",
+      "args": [
+        "-U",
+        "0",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +0,0 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n@@ -4 +2,2 @@\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n@@ -11,0 +11,3 @@\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "u0 as digits",
+      "args": [
+        "-u0",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +0,0 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n@@ -4 +2,2 @@\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n@@ -11,0 +11,3 @@\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "digits then u",
+      "args": [
+        "-1",
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,4 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n@@ -11 +10,4 @@\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified long prefix",
+      "args": [
+        "--unif",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "context with no context",
+      "args": [
+        "-C0",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "*** lao\t2026-09-29 12:52:48.311000000 +0000\n--- tzu\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,2 ****\n- The Way that can be told of is not the eternal Way;\n- The name that can be named is not the eternal name.\n--- 0 ----\n***************\n*** 4 ****\n! The Named is the mother of all things.\n--- 2,3 ----\n! The named is the mother of all things.\n! \n***************\n*** 11 ****\n--- 11,13 ----\n+ They both may be called deep and profound.\n+ Deeper and more profound,\n+ The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "reversed normal",
+      "args": [
+        "tzu",
+        "lao"
+      ],
+      "stdout": "0a1,2\n> The Way that can be told of is not the eternal Way;\n> The name that can be named is not the eternal name.\n2,3c4\n< The named is the mother of all things.\n< \n---\n> The Named is the mother of all things.\n11,13d11\n< They both may be called deep and profound.\n< Deeper and more profound,\n< The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "reversed unified",
+      "args": [
+        "-u",
+        "tzu",
+        "lao"
+      ],
+      "stdout": "--- tzu\t2026-09-29 12:52:48.311000000 +0000\n+++ lao\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,6 +1,7 @@\n+The Way that can be told of is not the eternal Way;\n+The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The named is the mother of all things.\n-\n+The Named is the mother of all things.\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -8,6 +9,3 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n-They both may be called deep and profound.\n-Deeper and more profound,\n-The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "reversed context",
+      "args": [
+        "-c",
+        "tzu",
+        "lao"
+      ],
+      "stdout": "*** tzu\t2026-09-29 12:52:48.311000000 +0000\n--- lao\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,6 ****\n  The Nameless is the origin of Heaven and Earth;\n! The named is the mother of all things.\n! \n  Therefore let there always be non-being,\n    so we may see their subtlety,\n  And let there always be being,\n--- 1,7 ----\n+ The Way that can be told of is not the eternal Way;\n+ The name that can be named is not the eternal name.\n  The Nameless is the origin of Heaven and Earth;\n! The Named is the mother of all things.\n  Therefore let there always be non-being,\n    so we may see their subtlety,\n  And let there always be being,\n***************\n*** 8,13 ****\n  The two are the same,\n  But after they are produced,\n    they have different names.\n- They both may be called deep and profound.\n- Deeper and more profound,\n- The door of all subtleties!\n--- 9,11 ----\n",
+      "exit": 1
+    },
+    {
+      "name": "last format wins",
+      "args": [
+        "-c",
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "options after operands",
+      "args": [
+        "lao",
+        "tzu",
+        "-u"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "unified over a large context",
+      "args": [
+        "-U",
+        "100",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,11 +1,13 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n   so we may see their outcome.\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "normal a b",
+      "args": [
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "unified a b",
+      "args": [
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "context a b",
+      "args": [
+        "-c",
+        "a",
+        "b"
+      ],
+      "stdout": "*** a\t2026-09-29 12:52:48.311000000 +0000\n--- b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n! a\n  b\n  c\n! d\n  e\n  f\n  g\n--- 1,8 ----\n! A\n  b\n  c\n! D\n  e\n  f\n  g\n+ h\n",
+      "exit": 1
+    },
+    {
+      "name": "normal b a",
+      "args": [
+        "b",
+        "a"
+      ],
+      "stdout": "1c1\n< A\n---\n> a\n4c4\n< D\n---\n> d\n8d7\n< h\n",
+      "exit": 1
+    },
+    {
+      "name": "unified b a",
+      "args": [
+        "-u",
+        "b",
+        "a"
+      ],
+      "stdout": "--- b\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,8 +1,7 @@\n-A\n+a\n b\n c\n-D\n+d\n e\n f\n g\n-h\n",
+      "exit": 1
+    },
+    {
+      "name": "context b a",
+      "args": [
+        "-c",
+        "b",
+        "a"
+      ],
+      "stdout": "*** b\t2026-09-29 12:52:48.311000000 +0000\n--- a\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,8 ****\n! A\n  b\n  c\n! D\n  e\n  f\n  g\n- h\n--- 1,7 ----\n! a\n  b\n  c\n! d\n  e\n  f\n  g\n",
+      "exit": 1
+    },
+    {
+      "name": "normal a same",
+      "args": [
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "unified a same",
+      "args": [
+        "-u",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "context a same",
+      "args": [
+        "-c",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "normal one two",
+      "args": [
+        "one",
+        "two"
+      ],
+      "stdout": "1c1\n< one\n---\n> two\n",
+      "exit": 1
+    },
+    {
+      "name": "unified one two",
+      "args": [
+        "-u",
+        "one",
+        "two"
+      ],
+      "stdout": "--- one\t2026-09-29 12:52:48.311000000 +0000\n+++ two\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-one\n+two\n",
+      "exit": 1
+    },
+    {
+      "name": "context one two",
+      "args": [
+        "-c",
+        "one",
+        "two"
+      ],
+      "stdout": "*** one\t2026-09-29 12:52:48.311000000 +0000\n--- two\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! one\n--- 1 ----\n! two\n",
+      "exit": 1
+    },
+    {
+      "name": "normal empty a",
+      "args": [
+        "empty",
+        "a"
+      ],
+      "stdout": "0a1,7\n> a\n> b\n> c\n> d\n> e\n> f\n> g\n",
+      "exit": 1
+    },
+    {
+      "name": "unified empty a",
+      "args": [
+        "-u",
+        "empty",
+        "a"
+      ],
+      "stdout": "--- empty\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -0,0 +1,7 @@\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "context empty a",
+      "args": [
+        "-c",
+        "empty",
+        "a"
+      ],
+      "stdout": "*** empty\t2026-09-29 12:52:48.311000000 +0000\n--- a\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 0 ****\n--- 1,7 ----\n+ a\n+ b\n+ c\n+ d\n+ e\n+ f\n+ g\n",
+      "exit": 1
+    },
+    {
+      "name": "normal a empty",
+      "args": [
+        "a",
+        "empty"
+      ],
+      "stdout": "1,7d0\n< a\n< b\n< c\n< d\n< e\n< f\n< g\n",
+      "exit": 1
+    },
+    {
+      "name": "unified a empty",
+      "args": [
+        "-u",
+        "a",
+        "empty"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ empty\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +0,0 @@\n-a\n-b\n-c\n-d\n-e\n-f\n-g\n",
+      "exit": 1
+    },
+    {
+      "name": "context a empty",
+      "args": [
+        "-c",
+        "a",
+        "empty"
+      ],
+      "stdout": "*** a\t2026-09-29 12:52:48.311000000 +0000\n--- empty\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n- a\n- b\n- c\n- d\n- e\n- f\n- g\n--- 0 ----\n",
+      "exit": 1
+    },
+    {
+      "name": "normal empty empty",
+      "args": [
+        "empty",
+        "empty"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "unified empty empty",
+      "args": [
+        "-u",
+        "empty",
+        "empty"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "context empty empty",
+      "args": [
+        "-c",
+        "empty",
+        "empty"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "normal s30 s30ins",
+      "args": [
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "15a16,17\n> new a\n> new b\n",
+      "exit": 1
+    },
+    {
+      "name": "unified s30 s30ins",
+      "args": [
+        "-u",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30ins\t2026-09-29 12:52:48.311000000 +0000\n@@ -13,6 +13,8 @@\n line 13\n line 14\n line 15\n+new a\n+new b\n line 16\n line 17\n line 18\n",
+      "exit": 1
+    },
+    {
+      "name": "context s30 s30ins",
+      "args": [
+        "-c",
+        "s30",
+        "s30ins"
+      ],
+      "stdout": "*** s30\t2026-09-29 12:52:48.311000000 +0000\n--- s30ins\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 13,18 ****\n--- 13,20 ----\n  line 13\n  line 14\n  line 15\n+ new a\n+ new b\n  line 16\n  line 17\n  line 18\n",
+      "exit": 1
+    },
+    {
+      "name": "normal s30 s30del",
+      "args": [
+        "s30",
+        "s30del"
+      ],
+      "stdout": "1d0\n< line 1\n30d28\n< line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "unified s30 s30del",
+      "args": [
+        "-u",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30del\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,3 @@\n-line 1\n line 2\n line 3\n line 4\n@@ -27,4 +26,3 @@\n line 27\n line 28\n line 29\n-line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "context s30 s30del",
+      "args": [
+        "-c",
+        "s30",
+        "s30del"
+      ],
+      "stdout": "*** s30\t2026-09-29 12:52:48.311000000 +0000\n--- s30del\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,4 ****\n- line 1\n  line 2\n  line 3\n  line 4\n--- 1,3 ----\n***************\n*** 27,30 ****\n  line 27\n  line 28\n  line 29\n- line 30\n--- 26,28 ----\n",
+      "exit": 1
+    },
+    {
+      "name": "normal s30del s30",
+      "args": [
+        "s30del",
+        "s30"
+      ],
+      "stdout": "0a1\n> line 1\n28a30\n> line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "unified s30del s30",
+      "args": [
+        "-u",
+        "s30del",
+        "s30"
+      ],
+      "stdout": "--- s30del\t2026-09-29 12:52:48.311000000 +0000\n+++ s30\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,4 @@\n+line 1\n line 2\n line 3\n line 4\n@@ -26,3 +27,4 @@\n line 27\n line 28\n line 29\n+line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "context s30del s30",
+      "args": [
+        "-c",
+        "s30del",
+        "s30"
+      ],
+      "stdout": "*** s30del\t2026-09-29 12:52:48.311000000 +0000\n--- s30\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n--- 1,4 ----\n+ line 1\n  line 2\n  line 3\n  line 4\n***************\n*** 26,28 ****\n--- 27,30 ----\n  line 27\n  line 28\n  line 29\n+ line 30\n",
+      "exit": 1
+    },
+    {
+      "name": "normal abc cba",
+      "args": [
+        "abc",
+        "cba"
+      ],
+      "stdout": "1,2d0\n< a\n< b\n3a2,3\n> b\n> a\n",
+      "exit": 1
+    },
+    {
+      "name": "unified abc cba",
+      "args": [
+        "-u",
+        "abc",
+        "cba"
+      ],
+      "stdout": "--- abc\t2026-09-29 12:52:48.311000000 +0000\n+++ cba\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n-a\n-b\n c\n+b\n+a\n",
+      "exit": 1
+    },
+    {
+      "name": "context abc cba",
+      "args": [
+        "-c",
+        "abc",
+        "cba"
+      ],
+      "stdout": "*** abc\t2026-09-29 12:52:48.311000000 +0000\n--- cba\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n- a\n- b\n  c\n--- 1,3 ----\n  c\n+ b\n+ a\n",
+      "exit": 1
+    },
+    {
+      "name": "normal rep1 rep2",
+      "args": [
+        "rep1",
+        "rep2"
+      ],
+      "stdout": "5,6d4\n< a\n< b\n",
+      "exit": 1
+    },
+    {
+      "name": "unified rep1 rep2",
+      "args": [
+        "-u",
+        "rep1",
+        "rep2"
+      ],
+      "stdout": "--- rep1\t2026-09-29 12:52:48.311000000 +0000\n+++ rep2\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,5 +2,3 @@\n b\n a\n b\n-a\n-b\n",
+      "exit": 1
+    },
+    {
+      "name": "context rep1 rep2",
+      "args": [
+        "-c",
+        "rep1",
+        "rep2"
+      ],
+      "stdout": "*** rep1\t2026-09-29 12:52:48.311000000 +0000\n--- rep2\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,6 ****\n  b\n  a\n  b\n- a\n- b\n--- 2,4 ----\n",
+      "exit": 1
+    },
+    {
+      "name": "normal rep2 rep1",
+      "args": [
+        "rep2",
+        "rep1"
+      ],
+      "stdout": "4a5,6\n> a\n> b\n",
+      "exit": 1
+    },
+    {
+      "name": "unified rep2 rep1",
+      "args": [
+        "-u",
+        "rep2",
+        "rep1"
+      ],
+      "stdout": "--- rep2\t2026-09-29 12:52:48.311000000 +0000\n+++ rep1\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,3 +2,5 @@\n b\n a\n b\n+a\n+b\n",
+      "exit": 1
+    },
+    {
+      "name": "context rep2 rep1",
+      "args": [
+        "-c",
+        "rep2",
+        "rep1"
+      ],
+      "stdout": "*** rep2\t2026-09-29 12:52:48.311000000 +0000\n--- rep1\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,4 ****\n--- 2,6 ----\n  b\n  a\n  b\n+ a\n+ b\n",
+      "exit": 1
+    },
+    {
+      "name": "normal br1 br2",
+      "args": [
+        "br1",
+        "br2"
+      ],
+      "stdout": "4a5,8\n> h() {\n>   z;\n> }\n> \n",
+      "exit": 1
+    },
+    {
+      "name": "unified br1 br2",
+      "args": [
+        "-u",
+        "br1",
+        "br2"
+      ],
+      "stdout": "--- br1\t2026-09-29 12:52:48.311000000 +0000\n+++ br2\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,6 +2,10 @@\n   x;\n }\n \n+h() {\n+  z;\n+}\n+\n g() {\n   y;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "context br1 br2",
+      "args": [
+        "-c",
+        "br1",
+        "br2"
+      ],
+      "stdout": "*** br1\t2026-09-29 12:52:48.311000000 +0000\n--- br2\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,7 ****\n--- 2,11 ----\n    x;\n  }\n  \n+ h() {\n+   z;\n+ }\n+ \n  g() {\n    y;\n  }\n",
+      "exit": 1
+    },
+    {
+      "name": "normal br2 br1",
+      "args": [
+        "br2",
+        "br1"
+      ],
+      "stdout": "5,8d4\n< h() {\n<   z;\n< }\n< \n",
+      "exit": 1
+    },
+    {
+      "name": "unified br2 br1",
+      "args": [
+        "-u",
+        "br2",
+        "br1"
+      ],
+      "stdout": "--- br2\t2026-09-29 12:52:48.311000000 +0000\n+++ br1\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,10 +2,6 @@\n   x;\n }\n \n-h() {\n-  z;\n-}\n-\n g() {\n   y;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "context br2 br1",
+      "args": [
+        "-c",
+        "br2",
+        "br1"
+      ],
+      "stdout": "*** br2\t2026-09-29 12:52:48.311000000 +0000\n--- br1\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,11 ****\n    x;\n  }\n  \n- h() {\n-   z;\n- }\n- \n  g() {\n    y;\n  }\n--- 2,7 ----\n",
+      "exit": 1
+    },
+    {
+      "name": "hunks 5 apart",
+      "args": [
+        "-u",
+        "s20",
+        "s20g5"
+      ],
+      "stdout": "--- s20\t2026-09-29 12:52:48.311000000 +0000\n+++ s20g5\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,13 +2,13 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n line 10\n-line 11\n+changed 11\n line 12\n line 13\n line 14\n",
+      "exit": 1
+    },
+    {
+      "name": "hunks 6 apart",
+      "args": [
+        "-u",
+        "s20",
+        "s20g6"
+      ],
+      "stdout": "--- s20\t2026-09-29 12:52:48.311000000 +0000\n+++ s20g6\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,14 +2,14 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n line 10\n line 11\n-line 12\n+changed 12\n line 13\n line 14\n line 15\n",
+      "exit": 1
+    },
+    {
+      "name": "hunks 7 apart",
+      "args": [
+        "-u",
+        "s20",
+        "s20g7"
+      ],
+      "stdout": "--- s20\t2026-09-29 12:52:48.311000000 +0000\n+++ s20g7\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,7 +2,7 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n@@ -10,7 +10,7 @@\n line 10\n line 11\n line 12\n-line 13\n+changed 13\n line 14\n line 15\n line 16\n",
+      "exit": 1
+    },
+    {
+      "name": "context hunks 6 apart",
+      "args": [
+        "-c",
+        "s20",
+        "s20g6"
+      ],
+      "stdout": "*** s20\t2026-09-29 12:52:48.311000000 +0000\n--- s20g6\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,15 ****\n  line 2\n  line 3\n  line 4\n! line 5\n  line 6\n  line 7\n  line 8\n  line 9\n  line 10\n  line 11\n! line 12\n  line 13\n  line 14\n  line 15\n--- 2,15 ----\n  line 2\n  line 3\n  line 4\n! changed 5\n  line 6\n  line 7\n  line 8\n  line 9\n  line 10\n  line 11\n! changed 12\n  line 13\n  line 14\n  line 15\n",
+      "exit": 1
+    },
+    {
+      "name": "context hunks 7 apart",
+      "args": [
+        "-c",
+        "s20",
+        "s20g7"
+      ],
+      "stdout": "*** s20\t2026-09-29 12:52:48.311000000 +0000\n--- s20g7\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 2,8 ****\n  line 2\n  line 3\n  line 4\n! line 5\n  line 6\n  line 7\n  line 8\n--- 2,8 ----\n  line 2\n  line 3\n  line 4\n! changed 5\n  line 6\n  line 7\n  line 8\n***************\n*** 10,16 ****\n  line 10\n  line 11\n  line 12\n! line 13\n  line 14\n  line 15\n  line 16\n--- 10,16 ----\n  line 10\n  line 11\n  line 12\n! changed 13\n  line 14\n  line 15\n  line 16\n",
+      "exit": 1
+    },
+    {
+      "name": "normal hunks 5 apart",
+      "args": [
+        "s20",
+        "s20g5"
+      ],
+      "stdout": "5c5\n< line 5\n---\n> changed 5\n11c11\n< line 11\n---\n> changed 11\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes, one line",
+      "args": [
+        "-U",
+        "1",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -4,3 +4,3 @@\n line 4\n-line 5\n+changed 5\n line 6\n@@ -9,3 +9,3 @@\n line 9\n-line 10\n+changed 10\n line 11\n@@ -19,3 +19,3 @@\n line 19\n-line 20\n+changed 20\n line 21\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes, no context",
+      "args": [
+        "-U0",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -5 +5 @@\n-line 5\n+changed 5\n@@ -10 +10 @@\n-line 10\n+changed 10\n@@ -20 +20 @@\n-line 20\n+changed 20\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes, context 1",
+      "args": [
+        "-C1",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "*** s30\t2026-09-29 12:52:48.311000000 +0000\n--- s30b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 4,6 ****\n  line 4\n! line 5\n  line 6\n--- 4,6 ----\n  line 4\n! changed 5\n  line 6\n***************\n*** 9,11 ****\n  line 9\n! line 10\n  line 11\n--- 9,11 ----\n  line 9\n! changed 10\n  line 11\n***************\n*** 19,21 ****\n  line 19\n! line 20\n  line 21\n--- 19,21 ----\n  line 19\n! changed 20\n  line 21\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes, context 0",
+      "args": [
+        "-C",
+        "0",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "*** s30\t2026-09-29 12:52:48.311000000 +0000\n--- s30b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 5 ****\n! line 5\n--- 5 ----\n! changed 5\n***************\n*** 10 ****\n! line 10\n--- 10 ----\n! changed 10\n***************\n*** 20 ****\n! line 20\n--- 20 ----\n! changed 20\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes",
+      "args": [
+        "-u",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,12 +2,12 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n-line 10\n+changed 10\n line 11\n line 12\n line 13\n@@ -17,7 +17,7 @@\n line 17\n line 18\n line 19\n-line 20\n+changed 20\n line 21\n line 22\n line 23\n",
+      "exit": 1
+    },
+    {
+      "name": "three changes normal",
+      "args": [
+        "s30",
+        "s30b"
+      ],
+      "stdout": "5c5\n< line 5\n---\n> changed 5\n10c10\n< line 10\n---\n> changed 10\n20c20\n< line 20\n---\n> changed 20\n",
+      "exit": 1
+    },
+    {
+      "name": "minimal",
+      "args": [
+        "-d",
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "minimal long",
+      "args": [
+        "--minimal",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "5c5\n< line 5\n---\n> changed 5\n10c10\n< line 10\n---\n> changed 10\n20c20\n< line 20\n---\n> changed 20\n",
+      "exit": 1
+    },
+    {
+      "name": "speed large files",
+      "args": [
+        "--speed-large-files",
+        "-u",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "horizon lines",
+      "args": [
+        "--horizon-lines=2",
+        "-u",
+        "s30",
+        "s30b"
+      ],
+      "stdout": "--- s30\t2026-09-29 12:52:48.311000000 +0000\n+++ s30b\t2026-09-29 12:52:48.311000000 +0000\n@@ -2,12 +2,12 @@\n line 2\n line 3\n line 4\n-line 5\n+changed 5\n line 6\n line 7\n line 8\n line 9\n-line 10\n+changed 10\n line 11\n line 12\n line 13\n@@ -17,7 +17,7 @@\n line 17\n line 18\n line 19\n-line 20\n+changed 20\n line 21\n line 22\n line 23\n",
+      "exit": 1
+    },
+    {
+      "name": "normal nl nonl",
+      "args": [
+        "nl",
+        "nonl"
+      ],
+      "stdout": "3c3\n< c\n---\n> c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "unified nl nonl",
+      "args": [
+        "-u",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "--- nl\t2026-09-29 12:52:48.311000000 +0000\n+++ nonl\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n b\n-c\n+c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "context nl nonl",
+      "args": [
+        "-c",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "*** nl\t2026-09-29 12:52:48.311000000 +0000\n--- nonl\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n  a\n  b\n! c\n--- 1,3 ----\n  a\n  b\n! c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "normal nonl nl",
+      "args": [
+        "nonl",
+        "nl"
+      ],
+      "stdout": "3c3\n< c\n\\ No newline at end of file\n---\n> c\n",
+      "exit": 1
+    },
+    {
+      "name": "unified nonl nl",
+      "args": [
+        "-u",
+        "nonl",
+        "nl"
+      ],
+      "stdout": "--- nonl\t2026-09-29 12:52:48.311000000 +0000\n+++ nl\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n b\n-c\n\\ No newline at end of file\n+c\n",
+      "exit": 1
+    },
+    {
+      "name": "context nonl nl",
+      "args": [
+        "-c",
+        "nonl",
+        "nl"
+      ],
+      "stdout": "*** nonl\t2026-09-29 12:52:48.311000000 +0000\n--- nl\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n  a\n  b\n! c\n\\ No newline at end of file\n--- 1,3 ----\n  a\n  b\n! c\n",
+      "exit": 1
+    },
+    {
+      "name": "normal nonl nonl2",
+      "args": [
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "3c3\n< c\n\\ No newline at end of file\n---\n> d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "unified nonl nonl2",
+      "args": [
+        "-u",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "--- nonl\t2026-09-29 12:52:48.311000000 +0000\n+++ nonl2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n b\n-c\n\\ No newline at end of file\n+d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "context nonl nonl2",
+      "args": [
+        "-c",
+        "nonl",
+        "nonl2"
+      ],
+      "stdout": "*** nonl\t2026-09-29 12:52:48.311000000 +0000\n--- nonl2\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n  a\n  b\n! c\n\\ No newline at end of file\n--- 1,3 ----\n  a\n  b\n! d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "normal nl nonl2",
+      "args": [
+        "nl",
+        "nonl2"
+      ],
+      "stdout": "3c3\n< c\n---\n> d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "unified nl nonl2",
+      "args": [
+        "-u",
+        "nl",
+        "nonl2"
+      ],
+      "stdout": "--- nl\t2026-09-29 12:52:48.311000000 +0000\n+++ nonl2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n b\n-c\n+d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "context nl nonl2",
+      "args": [
+        "-c",
+        "nl",
+        "nonl2"
+      ],
+      "stdout": "*** nl\t2026-09-29 12:52:48.311000000 +0000\n--- nonl2\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,3 ****\n  a\n  b\n! c\n--- 1,3 ----\n  a\n  b\n! d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "normal f g",
+      "args": [
+        "f",
+        "g"
+      ],
+      "stdout": "1c1\n< f\n\\ No newline at end of file\n---\n> g\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "unified f g",
+      "args": [
+        "-u",
+        "f",
+        "g"
+      ],
+      "stdout": "--- f\t2026-09-29 12:52:48.311000000 +0000\n+++ g\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1 @@\n-f\n\\ No newline at end of file\n+g\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "context f g",
+      "args": [
+        "-c",
+        "f",
+        "g"
+      ],
+      "stdout": "*** f\t2026-09-29 12:52:48.311000000 +0000\n--- g\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! f\n\\ No newline at end of file\n--- 1 ----\n! g\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "normal empty f",
+      "args": [
+        "empty",
+        "f"
+      ],
+      "stdout": "0a1\n> f\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "unified empty f",
+      "args": [
+        "-u",
+        "empty",
+        "f"
+      ],
+      "stdout": "--- empty\t2026-09-29 12:52:48.311000000 +0000\n+++ f\t2026-09-29 12:52:48.311000000 +0000\n@@ -0,0 +1 @@\n+f\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "context empty f",
+      "args": [
+        "-c",
+        "empty",
+        "f"
+      ],
+      "stdout": "*** empty\t2026-09-29 12:52:48.311000000 +0000\n--- f\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 0 ****\n--- 1 ----\n+ f\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "crlf against lf",
+      "args": [
+        "crlf",
+        "nl"
+      ],
+      "stdout": "1,3c1,3\n< a\r\n< b\r\n< c\r\n---\n> a\n> b\n> c\n",
+      "exit": 1
+    },
+    {
+      "name": "crlf against lf unified",
+      "args": [
+        "-u",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "--- crlf\t2026-09-29 12:52:48.311000000 +0000\n+++ nl\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n-a\r\n-b\r\n-c\r\n+a\n+b\n+c\n",
+      "exit": 1
+    },
+    {
+      "name": "strip trailing cr",
+      "args": [
+        "--strip-trailing-cr",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "strip trailing cr unified",
+      "args": [
+        "--strip-trailing-cr",
+        "-u",
+        "crlf",
+        "crlf2"
+      ],
+      "stdout": "--- crlf\t2026-09-29 12:52:48.311000000 +0000\n+++ crlf2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n",
+      "exit": 1
+    },
+    {
+      "name": "crlf changed",
+      "args": [
+        "crlf",
+        "crlf2"
+      ],
+      "stdout": "2c2\n< b\r\n---\n> B\r\n",
+      "exit": 1
+    },
+    {
+      "name": "case differs",
+      "args": [
+        "case1",
+        "case2"
+      ],
+      "stdout": "1,3c1,3\n< Hello World\n< same line\n< Bar baz\n---\n> hello world\n> same line changed\n> BAR BAZ\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case",
+      "args": [
+        "-i",
+        "case1",
+        "case2"
+      ],
+      "stdout": "2c2\n< same line\n---\n> same line changed\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case unified",
+      "args": [
+        "-i",
+        "-u",
+        "case1",
+        "case2"
+      ],
+      "stdout": "--- case1\t2026-09-29 12:52:48.311000000 +0000\n+++ case2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,4 @@\n Hello World\n-same line\n+same line changed\n Bar baz\n keep\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case long",
+      "args": [
+        "--ignore-case",
+        "case1",
+        "case2"
+      ],
+      "stdout": "2c2\n< same line\n---\n> same line changed\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore case utf-8",
+      "args": [
+        "-i",
+        "utfcase1",
+        "utfcase2"
+      ],
+      "stdout": "3c3\n< straße\n---\n> STRASSE\n",
+      "exit": 1
+    },
+    {
+      "name": "white space differs",
+      "args": [
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "1,4c1,4\n< int  x = 1;\n< \tindented\n< trailing\n< no space\n---\n> int x = 1;\n>         indented\n> trailing   \n> nospace\n6c6\n< end\n---\n> end \n",
+      "exit": 1
+    },
+    {
+      "name": "ignore all space",
+      "args": [
+        "-w",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore all space unified",
+      "args": [
+        "-u",
+        "-w",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore space change",
+      "args": [
+        "-b",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "4c4\n< no space\n---\n> nospace\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore space change unified",
+      "args": [
+        "-ub",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "--- ws1\t2026-09-29 12:52:48.311000000 +0000\n+++ ws2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,6 +1,6 @@\n int  x = 1;\n \tindented\n trailing\n-no space\n+nospace\n same\n end\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore trailing space",
+      "args": [
+        "-Z",
+        "ws1",
+        "ws2"
+      ],
+      "stdout": "1,2c1,2\n< int  x = 1;\n< \tindented\n---\n> int x = 1;\n>         indented\n4c4\n< no space\n---\n> nospace\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore tab expansion",
+      "args": [
+        "-E",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "3c3\n< d  e\n---\n> d e\n",
+      "exit": 1
+    },
+    {
+      "name": "tabs against spaces",
+      "args": [
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "1,3c1,3\n< a\tb\n< \tc\n< d  e\n---\n> a       b\n>         c\n> d e\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore space change on tabs",
+      "args": [
+        "-b",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore all space on tabs",
+      "args": [
+        "-w",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore all space long",
+      "args": [
+        "--ignore-all-space",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore case and space",
+      "args": [
+        "-iw",
+        "case1",
+        "case2"
+      ],
+      "stdout": "2c2\n< same line\n---\n> same line changed\n",
+      "exit": 1
+    },
+    {
+      "name": "blank lines added",
+      "args": [
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "1a2\n> \n2a4,5\n> \n> \n",
+      "exit": 1
+    },
+    {
+      "name": "ignore blank lines",
+      "args": [
+        "-B",
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore blank lines unified",
+      "args": [
+        "-B",
+        "-u",
+        "blank1",
+        "blank2"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore blank lines with a change",
+      "args": [
+        "-B",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "4c5\n< d\n---\n> X\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore blank lines unified with a change",
+      "args": [
+        "-u",
+        "-B",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "--- blank1\t2026-09-29 12:52:48.311000000 +0000\n+++ blank4\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,5 @@\n a\n b\n+\n c\n-d\n+X\n",
+      "exit": 1
+    },
+    {
+      "name": "blank of spaces",
+      "args": [
+        "-B",
+        "blank1",
+        "blank3"
+      ],
+      "stdout": "1a2\n>   \n",
+      "exit": 1
+    },
+    {
+      "name": "blank of spaces with -b",
+      "args": [
+        "-bB",
+        "blank1",
+        "blank3"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "blank of spaces with -w",
+      "args": [
+        "-w",
+        "-B",
+        "blank1",
+        "blank3"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore matching lines",
+      "args": [
+        "-I",
+        "^#",
+        "ign1",
+        "ign2"
+      ],
+      "stdout": "3c3\n< code one\n---\n> code two\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore matching lines unified",
+      "args": [
+        "-u",
+        "-I",
+        "^#",
+        "ign1",
+        "ign2"
+      ],
+      "stdout": "--- ign1\t2026-09-29 12:52:48.311000000 +0000\n+++ ign2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,5 @@\n-# version 1\n+# version 2\n keep\n-code one\n+code two\n keep\n-# date 1\n+# date 2\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore matching lines all ignored",
+      "args": [
+        "-I",
+        "^#",
+        "ign3",
+        "ign4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore matching lines joined",
+      "args": [
+        "-I^#",
+        "ign3",
+        "ign4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore matching lines long",
+      "args": [
+        "--ignore-matching-lines=^# ",
+        "ign3",
+        "ign4"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "ignore matching lines two patterns",
+      "args": [
+        "-I",
+        "version",
+        "-I",
+        "date",
+        "-u",
+        "ign1",
+        "ign2"
+      ],
+      "stdout": "--- ign1\t2026-09-29 12:52:48.311000000 +0000\n+++ ign2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,5 +1,5 @@\n-# version 1\n+# version 2\n keep\n-code one\n+code two\n keep\n-# date 1\n+# date 2\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore matching lines bre",
+      "args": [
+        "-I",
+        "^# [a-z]\\+ [0-9]$",
+        "ign1",
+        "ign2"
+      ],
+      "stdout": "3c3\n< code one\n---\n> code two\n",
+      "exit": 1
+    },
+    {
+      "name": "ignore matching lines no match",
+      "args": [
+        "-I",
+        "zzz",
+        "ign3",
+        "ign4"
+      ],
+      "stdout": "1c1\n< # version 1\n---\n> # version 2\n",
+      "exit": 1
+    },
+    {
+      "name": "latin-1 differs",
+      "args": [
+        "lat1",
+        "lat2"
+      ],
+      "stdoutBase64": "MWMxCjwgY2Fm6QotLS0KPiBjYWboCg==",
+      "exit": 1
+    },
+    {
+      "name": "latin-1 differs brief",
+      "args": [
+        "-q",
+        "lat1",
+        "lat2"
+      ],
+      "stdout": "Files lat1 and lat2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "latin-1 unified",
+      "args": [
+        "-u",
+        "lat3",
+        "lat4"
+      ],
+      "stdoutBase64": "LS0tIGxhdDMJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKKysrIGxhdDQJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKQEAgLTEsMyArMSwzIEBACiBjYWbpCiBzYW1lCi1vbGQgZW5kCituZXcgZW5kCg==",
+      "exit": 1
+    },
+    {
+      "name": "latin-1 context",
+      "args": [
+        "-c",
+        "lat3",
+        "lat4"
+      ],
+      "stdoutBase64": "KioqIGxhdDMJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKLS0tIGxhdDQJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKKioqKioqKioqKioqKioqCioqKiAxLDMgKioqKgogIGNhZukKICBzYW1lCiEgb2xkIGVuZAotLS0gMSwzIC0tLS0KICBjYWbpCiAgc2FtZQohIG5ldyBlbmQK",
+      "exit": 1
+    },
+    {
+      "name": "latin-1 same",
+      "args": [
+        "lat1",
+        "lat1"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "latin-1 ignore case",
+      "args": [
+        "-i",
+        "lat1",
+        "lat2"
+      ],
+      "stdoutBase64": "MWMxCjwgY2Fm6QotLS0KPiBjYWboCg==",
+      "exit": 1
+    },
+    {
+      "name": "bom differs",
+      "args": [
+        "bom",
+        "nobom"
+      ],
+      "stdout": "1c1\n< ﻿a\n---\n> a\n",
+      "exit": 1
+    },
+    {
+      "name": "bom differs brief",
+      "args": [
+        "-q",
+        "bom",
+        "nobom"
+      ],
+      "stdout": "Files bom and nobom differ\n",
+      "exit": 1
+    },
+    {
+      "name": "bom unified",
+      "args": [
+        "-u",
+        "bom",
+        "nobom"
+      ],
+      "stdout": "--- bom\t2026-09-29 12:52:48.311000000 +0000\n+++ nobom\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n-﻿a\n+a\n b\n",
+      "exit": 1
+    },
+    {
+      "name": "nul differs",
+      "args": [
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Binary files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "nul differs unified",
+      "args": [
+        "-u",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Binary files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "nul same",
+      "args": [
+        "nul1",
+        "nul1b"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "nul same reported",
+      "args": [
+        "-s",
+        "nul1",
+        "nul1b"
+      ],
+      "stdout": "Files nul1 and nul1b are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "nul brief",
+      "args": [
+        "-q",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "nul as text",
+      "args": [
+        "-a",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "1c1\n< a\u0000b\n---\n> a\u0000c\n",
+      "exit": 1
+    },
+    {
+      "name": "nul as text unified",
+      "args": [
+        "--text",
+        "-u",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "--- nul1\t2026-09-29 12:52:48.311000000 +0000\n+++ nul2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,2 +1,2 @@\n-a\u0000b\n+a\u0000c\n c\n",
+      "exit": 1
+    },
+    {
+      "name": "nul against text",
+      "args": [
+        "nul1",
+        "a"
+      ],
+      "stdout": "Binary files nul1 and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "nul at the window's end",
+      "args": [
+        "near1",
+        "near2"
+      ],
+      "stdout": "Binary files near1 and near2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "nul past the window",
+      "args": [
+        "far1",
+        "far2"
+      ],
+      "stdout": "1c1\n< xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000\n---\n> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u0000y\n",
+      "exit": 1
+    },
+    {
+      "name": "binary ignoring case",
+      "args": [
+        "-i",
+        "nul1",
+        "nul2"
+      ],
+      "stdout": "Binary files nul1 and nul2 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief",
+      "args": [
+        "-q",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief long",
+      "args": [
+        "--brief",
+        "a",
+        "b"
+      ],
+      "stdout": "Files a and b differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief same",
+      "args": [
+        "-q",
+        "a",
+        "same"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "report identical",
+      "args": [
+        "-s",
+        "a",
+        "same"
+      ],
+      "stdout": "Files a and same are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "report identical long",
+      "args": [
+        "--report-identical-files",
+        "a",
+        "same"
+      ],
+      "stdout": "Files a and same are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "report identical differs",
+      "args": [
+        "-s",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "brief and report identical",
+      "args": [
+        "-qs",
+        "a",
+        "same"
+      ],
+      "stdout": "Files a and same are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "same file twice",
+      "args": [
+        "a",
+        "a"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "same file reported",
+      "args": [
+        "-s",
+        "a",
+        "a"
+      ],
+      "stdout": "Files a and a are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case makes same",
+      "args": [
+        "-i",
+        "-s",
+        "one",
+        "one"
+      ],
+      "stdout": "Files one and one are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "white space makes same",
+      "args": [
+        "-w",
+        "-s",
+        "ws3",
+        "ws3"
+      ],
+      "stdout": "Files ws3 and ws3 are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "ignore case makes same reported",
+      "args": [
+        "-si",
+        "a",
+        "b"
+      ],
+      "stdout": "7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a name with a space",
+      "args": [
+        "-q",
+        "sp ace",
+        "a"
+      ],
+      "stdout": "Files 'sp ace' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a quote",
+      "args": [
+        "-q",
+        "q\"t",
+        "a"
+      ],
+      "stdout": "Files 'q\"t' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "report identical with a space",
+      "args": [
+        "-s",
+        "sp ace",
+        "sp ace"
+      ],
+      "stdout": "Files 'sp ace' and 'sp ace' are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "label twice",
+      "args": [
+        "--label",
+        "old",
+        "--label",
+        "new",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- old\n+++ new\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "label once",
+      "args": [
+        "--label=old",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- old\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "label context",
+      "args": [
+        "--label",
+        "x",
+        "--label",
+        "y",
+        "-c",
+        "a",
+        "b"
+      ],
+      "stdout": "*** x\n--- y\n***************\n*** 1,7 ****\n! a\n  b\n  c\n! d\n  e\n  f\n  g\n--- 1,8 ----\n! A\n  b\n  c\n! D\n  e\n  f\n  g\n+ h\n",
+      "exit": 1
+    },
+    {
+      "name": "label normal",
+      "args": [
+        "--label",
+        "x",
+        "--label",
+        "y",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "label with a space",
+      "args": [
+        "--label",
+        "a b",
+        "--label",
+        "c",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a b\n+++ c\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "label three times",
+      "args": [
+        "--label",
+        "x",
+        "--label",
+        "y",
+        "--label",
+        "z",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "label short",
+      "args": [
+        "-L",
+        "x",
+        "-L",
+        "y",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- x\n+++ y\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a space",
+      "args": [
+        "-u",
+        "sp ace",
+        "a"
+      ],
+      "stdout": "--- \"sp ace\"\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-space\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a quote",
+      "args": [
+        "-u",
+        "q\"t",
+        "a"
+      ],
+      "stdout": "--- \"q\\\"t\"\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-quote\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a tab",
+      "args": [
+        "-c",
+        "tab\tn",
+        "a"
+      ],
+      "stdout": "*** \"tab\\tn\"\t2026-09-29 12:52:48.311000000 +0000\n--- a\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1 ****\n! tab\n--- 1,7 ----\n! a\n! b\n! c\n! d\n! e\n! f\n! g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a backslash",
+      "args": [
+        "-u",
+        "bs\\x",
+        "a"
+      ],
+      "stdout": "--- bs\\x\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-backslash\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a dash",
+      "args": [
+        "-u",
+        "--",
+        "-dash",
+        "a"
+      ],
+      "stdout": "--- -dash\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-dash\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name in a directory",
+      "args": [
+        "-u",
+        "dir/a",
+        "b"
+      ],
+      "stdout": "--- dir/a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "stdin first",
+      "args": [
+        "-u",
+        "-",
+        "a"
+      ],
+      "stdin": "a\nx\nc\n",
+      "maskTimes": true,
+      "stdout": "--- -\tTIME\n+++ a\tTIME\n@@ -1,3 +1,7 @@\n a\n-x\n+b\n c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "stdin second",
+      "args": [
+        "-",
+        "a"
+      ],
+      "stdin": "a\nx\nc\n",
+      "stdout": "2c2\n< x\n---\n> b\n3a4,7\n> d\n> e\n> f\n> g\n",
+      "exit": 1
+    },
+    {
+      "name": "stdin with labels",
+      "args": [
+        "--label",
+        "in",
+        "--label",
+        "a",
+        "-u",
+        "-",
+        "a"
+      ],
+      "stdin": "a\nb\n",
+      "stdout": "--- in\n+++ a\n@@ -1,2 +1,7 @@\n a\n b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "stdin same",
+      "args": [
+        "-s",
+        "-",
+        "a"
+      ],
+      "stdin": "a\nb\nc\nd\ne\nf\ng\n",
+      "stdout": "Files - and a are identical\n",
+      "exit": 0
+    },
+    {
+      "name": "stdin twice",
+      "args": [
+        "-",
+        "-"
+      ],
+      "stdin": "a\n",
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "stdin brief",
+      "args": [
+        "-q",
+        "a",
+        "-"
+      ],
+      "stdin": "z\n",
+      "stdout": "Files a and - differ\n",
+      "exit": 1
+    },
+    {
+      "name": "show c function",
+      "args": [
+        "-p",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "*** c1.c\t2026-09-29 12:52:48.311000000 +0000\n--- c2.c\t2026-09-29 12:52:48.311000000 +0000\n*************** static int counter = 0;\n*** 4,10 ****\n  \n  int add(int a, int b)\n  {\n!   int sum = a + b;\n    counter++;\n    return sum;\n  }\n--- 4,10 ----\n  \n  int add(int a, int b)\n  {\n!   int sum = b + a;\n    counter++;\n    return sum;\n  }\n*************** int sub(int a, int b)\n*** 19,24 ****\n  int main(void)\n  {\n    printf(\"%d\\n\", add(1, 2));\n!   printf(\"%d\\n\", sub(3, 1));\n    return 0;\n  }\n--- 19,24 ----\n  int main(void)\n  {\n    printf(\"%d\\n\", add(1, 2));\n!   printf(\"%d\\n\", sub(5, 1));\n    return 0;\n  }\n",
+      "exit": 1
+    },
+    {
+      "name": "show c function unified",
+      "args": [
+        "-u",
+        "-p",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "--- c1.c\t2026-09-29 12:52:48.311000000 +0000\n+++ c2.c\t2026-09-29 12:52:48.311000000 +0000\n@@ -4,7 +4,7 @@ static int counter = 0;\n \n int add(int a, int b)\n {\n-  int sum = a + b;\n+  int sum = b + a;\n   counter++;\n   return sum;\n }\n@@ -19,6 +19,6 @@ int sub(int a, int b)\n int main(void)\n {\n   printf(\"%d\\n\", add(1, 2));\n-  printf(\"%d\\n\", sub(3, 1));\n+  printf(\"%d\\n\", sub(5, 1));\n   return 0;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "show c function long",
+      "args": [
+        "--show-c-function",
+        "-U",
+        "1",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "--- c1.c\t2026-09-29 12:52:48.311000000 +0000\n+++ c2.c\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,3 +6,3 @@ int add(int a, int b)\n {\n-  int sum = a + b;\n+  int sum = b + a;\n   counter++;\n@@ -21,3 +21,3 @@ int main(void)\n   printf(\"%d\\n\", add(1, 2));\n-  printf(\"%d\\n\", sub(3, 1));\n+  printf(\"%d\\n\", sub(5, 1));\n   return 0;\n",
+      "exit": 1
+    },
+    {
+      "name": "show c function then unified",
+      "args": [
+        "-p",
+        "-U",
+        "2",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "--- c1.c\t2026-09-29 12:52:48.311000000 +0000\n+++ c2.c\t2026-09-29 12:52:48.311000000 +0000\n@@ -5,5 +5,5 @@ static int counter = 0;\n int add(int a, int b)\n {\n-  int sum = a + b;\n+  int sum = b + a;\n   counter++;\n   return sum;\n@@ -20,5 +20,5 @@ int main(void)\n {\n   printf(\"%d\\n\", add(1, 2));\n-  printf(\"%d\\n\", sub(3, 1));\n+  printf(\"%d\\n\", sub(5, 1));\n   return 0;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "show c function then context",
+      "args": [
+        "-p",
+        "-C",
+        "1",
+        "c1.c",
+        "c2.c"
+      ],
+      "stdout": "*** c1.c\t2026-09-29 12:52:48.311000000 +0000\n--- c2.c\t2026-09-29 12:52:48.311000000 +0000\n*************** int add(int a, int b)\n*** 6,8 ****\n  {\n!   int sum = a + b;\n    counter++;\n--- 6,8 ----\n  {\n!   int sum = b + a;\n    counter++;\n*************** int main(void)\n*** 21,23 ****\n    printf(\"%d\\n\", add(1, 2));\n!   printf(\"%d\\n\", sub(3, 1));\n    return 0;\n--- 21,23 ----\n    printf(\"%d\\n\", add(1, 2));\n!   printf(\"%d\\n\", sub(5, 1));\n    return 0;\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line",
+      "args": [
+        "-u",
+        "-F",
+        "^#",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "--- m1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ m2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,12 +6,12 @@ # Title\n ## Install\n \n Run the installer.\n-Then restart.\n+Then reboot.\n Check the log.\n \n ## Usage\n \n Call the tool.\n Read the output.\n-Repeat as needed.\n+Repeat twice.\n Done.\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line context",
+      "args": [
+        "-c",
+        "-F",
+        "^#",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "*** m1.md\t2026-09-29 12:52:48.311000000 +0000\n--- m2.md\t2026-09-29 12:52:48.311000000 +0000\n*************** # Title\n*** 6,17 ****\n  ## Install\n  \n  Run the installer.\n! Then restart.\n  Check the log.\n  \n  ## Usage\n  \n  Call the tool.\n  Read the output.\n! Repeat as needed.\n  Done.\n--- 6,17 ----\n  ## Install\n  \n  Run the installer.\n! Then reboot.\n  Check the log.\n  \n  ## Usage\n  \n  Call the tool.\n  Read the output.\n! Repeat twice.\n  Done.\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line long",
+      "args": [
+        "-U",
+        "1",
+        "--show-function-line=^## ",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "--- m1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ m2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -8,3 +8,3 @@ ## Install\n Run the installer.\n-Then restart.\n+Then reboot.\n Check the log.\n@@ -15,3 +15,3 @@ ## Usage\n Read the output.\n-Repeat as needed.\n+Repeat twice.\n Done.\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line normal",
+      "args": [
+        "-F",
+        "^#",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "9c9\n< Then restart.\n---\n> Then reboot.\n16c16\n< Repeat as needed.\n---\n> Repeat twice.\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line long heading",
+      "args": [
+        "-u",
+        "-F",
+        "^T",
+        "lao",
+        "tzu"
+      ],
+      "stdout": "--- lao\t2026-09-29 12:52:48.311000000 +0000\n+++ tzu\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,6 @@\n-The Way that can be told of is not the eternal Way;\n-The name that can be named is not the eternal name.\n The Nameless is the origin of Heaven and Earth;\n-The Named is the mother of all things.\n+The named is the mother of all things.\n+\n Therefore let there always be non-being,\n   so we may see their subtlety,\n And let there always be being,\n@@ -9,3 +8,6 @@ Therefore let there always be non-being,\n The two are the same,\n But after they are produced,\n   they have different names.\n+They both may be called deep and profound.\n+Deeper and more profound,\n+The door of all subtleties!\n",
+      "exit": 1
+    },
+    {
+      "name": "show function line ere",
+      "args": [
+        "-u",
+        "-F",
+        "^(#|Intro)",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "--- m1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ m2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,12 +6,12 @@\n ## Install\n \n Run the installer.\n-Then restart.\n+Then reboot.\n Check the log.\n \n ## Usage\n \n Call the tool.\n Read the output.\n-Repeat as needed.\n+Repeat twice.\n Done.\n",
+      "exit": 1
+    },
+    {
+      "name": "show function and c function",
+      "args": [
+        "-u",
+        "-p",
+        "-F",
+        "^#",
+        "m1.md",
+        "m2.md"
+      ],
+      "stdout": "--- m1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ m2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,12 +6,12 @@ Intro line two.\n ## Install\n \n Run the installer.\n-Then restart.\n+Then reboot.\n Check the log.\n \n ## Usage\n \n Call the tool.\n Read the output.\n-Repeat as needed.\n+Repeat twice.\n Done.\n",
+      "exit": 1
+    },
+    {
+      "name": "initial tab",
+      "args": [
+        "-T",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n<\ta\n---\n>\tA\n4c4\n<\td\n---\n>\tD\n7a8\n>\th\n",
+      "exit": 1
+    },
+    {
+      "name": "initial tab context",
+      "args": [
+        "-T",
+        "-c",
+        "a",
+        "b"
+      ],
+      "stdout": "*** a\t2026-09-29 12:52:48.311000000 +0000\n--- b\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,7 ****\n!\ta\n \tb\n \tc\n!\td\n \te\n \tf\n \tg\n--- 1,8 ----\n!\tA\n \tb\n \tc\n!\tD\n \te\n \tf\n \tg\n+\th\n",
+      "exit": 1
+    },
+    {
+      "name": "initial tab unified",
+      "args": [
+        "-T",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-\ta\n+\tA\n\tb\n\tc\n-\td\n+\tD\n\te\n\tf\n\tg\n+\th\n",
+      "exit": 1
+    },
+    {
+      "name": "suppress blank empty",
+      "args": [
+        "--suppress-blank-empty",
+        "-u",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "--- blank1\t2026-09-29 12:52:48.311000000 +0000\n+++ blank4\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,4 +1,5 @@\n a\n b\n+\n c\n-d\n+X\n",
+      "exit": 1
+    },
+    {
+      "name": "suppress blank empty context",
+      "args": [
+        "--suppress-blank-empty",
+        "-c",
+        "blank1",
+        "blank4"
+      ],
+      "stdout": "*** blank1\t2026-09-29 12:52:48.311000000 +0000\n--- blank4\t2026-09-29 12:52:48.311000000 +0000\n***************\n*** 1,4 ****\n  a\n  b\n  c\n! d\n--- 1,5 ----\n  a\n  b\n+\n  c\n! X\n",
+      "exit": 1
+    },
+    {
+      "name": "expand tabs",
+      "args": [
+        "-t",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "1,3c1,3\n< a       b\n<         c\n< d  e\n---\n> a       b\n>         c\n> d e\n",
+      "exit": 1
+    },
+    {
+      "name": "expand tabs unified",
+      "args": [
+        "-t",
+        "-u",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "--- ws3\t2026-09-29 12:52:48.311000000 +0000\n+++ ws4\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n-a       b\n-        c\n-d  e\n+a       b\n+        c\n+d e\n",
+      "exit": 1
+    },
+    {
+      "name": "tab size",
+      "args": [
+        "-t",
+        "--tabsize=4",
+        "ws3",
+        "ws4"
+      ],
+      "stdout": "1,3c1,3\n< a   b\n<     c\n< d  e\n---\n> a       b\n>         c\n> d e\n",
+      "exit": 1
+    },
+    {
+      "name": "missing operand",
+      "args": [
+        "a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "no operands",
+      "args": [],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "extra operand",
+      "args": [
+        "a",
+        "b",
+        "c"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing file",
+      "args": [
+        "a",
+        "nothere"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing first file",
+      "args": [
+        "nothere",
+        "a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing file unified",
+      "args": [
+        "-u",
+        "nothere",
+        "a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing file brief",
+      "args": [
+        "-q",
+        "a",
+        "nothere"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown option",
+      "args": [
+        "--bogus",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unknown short option",
+      "args": [
+        "-j",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "ambiguous option",
+      "args": [
+        "--ignore",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "missing option value",
+      "args": [
+        "a",
+        "b",
+        "-U"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bad context value",
+      "args": [
+        "-U",
+        "x",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "negative context value",
+      "args": [
+        "--unified=-1",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "color refused",
+      "args": [
+        "--color=always",
+        "a",
+        "b"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "escape codes spend a model's tokens and say nothing"
+      },
+      "stdout": "\u001b[36m1c1\u001b[0m\n\u001b[31m< a\u001b[0m\n---\n\u001b[32m> A\u001b[0m\n\u001b[36m4c4\u001b[0m\n\u001b[31m< d\u001b[0m\n---\n\u001b[32m> D\u001b[0m\n\u001b[36m7a8\u001b[0m\n\u001b[32m> h\u001b[0m\n",
+      "exit": 1
+    },
+    {
+      "name": "palette refused",
+      "args": [
+        "--palette=ad=32",
+        "a",
+        "b"
+      ],
+      "accept": {
+        "stdout": "",
+        "exit": 2,
+        "reason": "a palette only serves --color=always, which is refused"
+      },
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    },
+    {
+      "name": "option with an unwanted value",
+      "args": [
+        "--brief=1",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "bad regex",
+      "args": [
+        "-I",
+        "a\\{1",
+        "a",
+        "b"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "directory against a file",
+      "args": [
+        "emptydir",
+        "a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "unified dash dash",
+      "args": [
+        "-u",
+        "--",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "dash dash then option-like name",
+      "args": [
+        "--",
+        "-u",
+        "a"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "version",
+      "args": [
+        "--version"
+      ],
+      "accept": {
+        "stdout": "diff (GNU diffutils) 3.12 (just-bash, compatible)\nA sandboxed diff that answers as GNU diff 3.12 does; see diff --help.\n",
+        "exit": 0,
+        "reason": "names what answers, as awk --version names gawk"
+      },
+      "stdout": "diff (GNU diffutils) 3.12\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Paul Eggert, Mike Haertel, David Hayes,\nRichard Stallman, and Len Tower.\n",
+      "exit": 0
+    },
+    {
+      "name": "version short",
+      "args": [
+        "-v"
+      ],
+      "accept": {
+        "stdout": "diff (GNU diffutils) 3.12 (just-bash, compatible)\nA sandboxed diff that answers as GNU diff 3.12 does; see diff --help.\n",
+        "exit": 0,
+        "reason": "names what answers, as awk --version names gawk"
+      },
+      "stdout": "diff (GNU diffutils) 3.12\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Paul Eggert, Mike Haertel, David Hayes,\nRichard Stallman, and Len Tower.\n",
+      "exit": 0
+    },
+    {
+      "name": "name with a space and a backslash",
+      "args": [
+        "-u",
+        "b s\\x",
+        "a"
+      ],
+      "stdout": "--- \"b s\\\\x\"\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-both\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a dollar",
+      "args": [
+        "-u",
+        "$x",
+        "a"
+      ],
+      "stdout": "--- $x\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-dollar\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with an apostrophe",
+      "args": [
+        "-u",
+        "ap'os",
+        "a"
+      ],
+      "stdout": "--- ap'os\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-apostrophe\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a newline",
+      "args": [
+        "-u",
+        "nl\nname",
+        "a"
+      ],
+      "stdout": "--- \"nl\\nname\"\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-newline\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a control character",
+      "args": [
+        "-u",
+        "ctl\u0001x",
+        "a"
+      ],
+      "stdout": "--- \"ctl\\001x\"\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-control\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a star",
+      "args": [
+        "-u",
+        "st*r",
+        "a"
+      ],
+      "stdout": "--- st*r\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-star\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with a hash",
+      "args": [
+        "-u",
+        "hash#",
+        "a"
+      ],
+      "stdout": "--- hash#\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-hash\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "name with an accent",
+      "args": [
+        "-u",
+        "é",
+        "a"
+      ],
+      "stdout": "--- é\t2026-09-29 12:52:48.311000000 +0000\n+++ a\t2026-09-29 12:52:48.311000000 +0000\n@@ -1 +1,7 @@\n-accent\n+a\n+b\n+c\n+d\n+e\n+f\n+g\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a dollar",
+      "args": [
+        "-q",
+        "$x",
+        "a"
+      ],
+      "stdout": "Files '$x' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with an apostrophe",
+      "args": [
+        "-q",
+        "ap'os",
+        "a"
+      ],
+      "stdout": "Files \"ap'os\" and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a tab",
+      "args": [
+        "-q",
+        "tab\tn",
+        "a"
+      ],
+      "stdout": "Files 'tab'$'\\t''n' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a newline",
+      "args": [
+        "-q",
+        "nl\nname",
+        "a"
+      ],
+      "stdout": "Files 'nl'$'\\n''name' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a backslash",
+      "args": [
+        "-q",
+        "bs\\x",
+        "a"
+      ],
+      "stdout": "Files 'bs\\x' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a star",
+      "args": [
+        "-q",
+        "st*r",
+        "a"
+      ],
+      "stdout": "Files 'st*r' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a hash",
+      "args": [
+        "-q",
+        "hash#",
+        "a"
+      ],
+      "stdout": "Files hash# and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with an accent",
+      "args": [
+        "-q",
+        "é",
+        "a"
+      ],
+      "stdout": "Files é and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "brief with a control character",
+      "args": [
+        "-q",
+        "ctl\u0001x",
+        "a"
+      ],
+      "stdout": "Files 'ctl'$'\\001''x' and a differ\n",
+      "exit": 1
+    },
+    {
+      "name": "binary with a space",
+      "args": [
+        "sp nul",
+        "nul1"
+      ],
+      "stdout": "Binary files 'sp nul' and nul1 differ\n",
+      "exit": 1
+    },
+    {
+      "name": "incomplete line with -b",
+      "args": [
+        "-b",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "incomplete line with -w",
+      "args": [
+        "-w",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "incomplete line with -Z",
+      "args": [
+        "-Z",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "incomplete line with -E",
+      "args": [
+        "-E",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "3c3\n< c\n---\n> c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "incomplete line with -i",
+      "args": [
+        "-i",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "3c3\n< c\n---\n> c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "incomplete line with -B",
+      "args": [
+        "-B",
+        "nl",
+        "nonl"
+      ],
+      "stdout": "3c3\n< c\n---\n> c\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "incomplete line with a trailing blank",
+      "args": [
+        "-b",
+        "wsnl",
+        "wsnonl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "incomplete line unified with -w",
+      "args": [
+        "-u",
+        "-w",
+        "nl",
+        "nonl2"
+      ],
+      "stdout": "--- nl\t2026-09-29 12:52:48.311000000 +0000\n+++ nonl2\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,3 +1,3 @@\n a\n b\n-c\n+d\n\\ No newline at end of file\n",
+      "exit": 1
+    },
+    {
+      "name": "crlf with -b",
+      "args": [
+        "-b",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "crlf with -w",
+      "args": [
+        "-w",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "crlf with -Z",
+      "args": [
+        "-Z",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "crlf with -E",
+      "args": [
+        "-E",
+        "crlf",
+        "nl"
+      ],
+      "stdout": "1,3c1,3\n< a\r\n< b\r\n< c\r\n---\n> a\n> b\n> c\n",
+      "exit": 1
+    },
+    {
+      "name": "long c function",
+      "args": [
+        "-u",
+        "-p",
+        "long1.c",
+        "long2.c"
+      ],
+      "stdout": "--- long1.c\t2026-09-29 12:52:48.311000000 +0000\n+++ long2.c\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,5 +6,5 @@ int a_function_with_a_rather_long_name(i\n   a4;\n   a5;\n   a6;\n-  return 1;\n+  return 2;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "long utf-8 heading",
+      "args": [
+        "-u",
+        "-F",
+        "^#",
+        "utf1.md",
+        "utf2.md"
+      ],
+      "stdout": "--- utf1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ utf2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -5,4 +5,4 @@ # Überschrift mit Umlauten äöü und n\n   a4;\n   a5;\n   a6;\n-alt\n+neu\n",
+      "exit": 1
+    },
+    {
+      "name": "function with trailing blanks",
+      "args": [
+        "-u",
+        "-p",
+        "trail1.c",
+        "trail2.c"
+      ],
+      "stdout": "--- trail1.c\t2026-09-29 12:52:48.311000000 +0000\n+++ trail2.c\t2026-09-29 12:52:48.311000000 +0000\n@@ -6,5 +6,5 @@ int f(void)\n   a4;\n   a5;\n   a6;\n-  return 1;\n+  return 2;\n }\n",
+      "exit": 1
+    },
+    {
+      "name": "function line in context",
+      "args": [
+        "-c",
+        "-p",
+        "long1.c",
+        "long2.c"
+      ],
+      "stdout": "*** long1.c\t2026-09-29 12:52:48.311000000 +0000\n--- long2.c\t2026-09-29 12:52:48.311000000 +0000\n*************** int a_function_with_a_rather_long_name(i\n*** 6,10 ****\n    a4;\n    a5;\n    a6;\n!   return 1;\n  }\n--- 6,10 ----\n    a4;\n    a5;\n    a6;\n!   return 2;\n  }\n",
+      "exit": 1
+    },
+    {
+      "name": "heading of exactly forty bytes",
+      "args": [
+        "-u",
+        "-F",
+        "^#",
+        "exact1.md",
+        "exact2.md"
+      ],
+      "stdout": "--- exact1.md\t2026-09-29 12:52:48.311000000 +0000\n+++ exact2.md\t2026-09-29 12:52:48.311000000 +0000\n@@ -5,4 +5,4 @@ # exactly forty bytes of heading text 40\n   a4;\n   a5;\n   a6;\n-alt\n+neu\n",
+      "exit": 1
+    },
+    {
+      "name": "heading cut inside a character",
+      "args": [
+        "-u",
+        "-F",
+        "^#",
+        "cut1.md",
+        "cut2.md"
+      ],
+      "stdoutBase64": "LS0tIGN1dDEubWQJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKKysrIGN1dDIubWQJMjAyNi0wOS0yOSAxMjo1Mjo0OC4zMTEwMDAwMDAgKzAwMDAKQEAgLTUsNCArNSw0IEBAICMgeHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eMMKICAgYTQ7CiAgIGE1OwogICBhNjsKLWFsdAorbmV1Cg==",
+      "exit": 1
+    },
+    {
+      "name": "color never",
+      "args": [
+        "--color=never",
+        "-u",
+        "a",
+        "b"
+      ],
+      "stdout": "--- a\t2026-09-29 12:52:48.311000000 +0000\n+++ b\t2026-09-29 12:52:48.311000000 +0000\n@@ -1,7 +1,8 @@\n-a\n+A\n b\n c\n-d\n+D\n e\n f\n g\n+h\n",
+      "exit": 1
+    },
+    {
+      "name": "color auto",
+      "args": [
+        "--color",
+        "a",
+        "b"
+      ],
+      "stdout": "1c1\n< a\n---\n> A\n4c4\n< d\n---\n> D\n7a8\n> h\n",
+      "exit": 1
+    }
+  ]
+}

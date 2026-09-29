@@ -8,7 +8,11 @@
 import { expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
 import {
+  type FileValue,
   type Fixture,
+  fileBytes,
+  fileValue,
+  maskTimes,
   type RecordedCase,
   sortLines,
 } from "../../../scripts/record-cases.ts";
@@ -24,8 +28,13 @@ export async function runCase(
 ) {
   const fs = new InMemoryFs({}, {});
   const files = { ...fixture.files, ...c.files };
-  for (const [name, text] of Object.entries(files)) {
-    fs.writeFileSync(`/work/${name}`, text);
+  const mtime =
+    fixture.mtime === undefined ? undefined : new Date(fixture.mtime);
+  for (const name of fixture.dirs ?? []) {
+    fs.mkdirSync(`/work/${name}`, { recursive: true });
+  }
+  for (const [name, value] of Object.entries(files)) {
+    fs.writeFileSync(`/work/${name}`, fileBytes(value), undefined, { mtime });
   }
   const bash = new Bash({
     fs,
@@ -36,12 +45,28 @@ export async function runCase(
     [command, ...c.args].map((a, i) => (i === 0 ? a : quote(a))).join(" "),
     { stdin: c.stdin ?? "" },
   );
-  const written: Record<string, string> = {};
-  for (const [name, text] of Object.entries(files)) {
-    const now = await fs.readFile(`/work/${name}`);
-    if (now !== text) written[name] = now;
+  const written: Record<string, FileValue> = {};
+  for (const [name, value] of Object.entries(files)) {
+    const now = await fs.readFileBuffer(`/work/${name}`);
+    if (!Bun.deepEquals(now, fileBytes(value))) written[name] = fileValue(now);
   }
   return { ...result, written };
+}
+
+/** What the case expects on stdout, as the shell hands it back. */
+function expectedStdout(c: RecordedCase): string {
+  if (c.accept) return c.accept.stdout;
+  // bytes that are not UTF-8 come back one character per byte
+  if (c.stdoutBase64 !== undefined) return atob(c.stdoutBase64);
+  return c.stdout as string;
+}
+
+function gotStdout(
+  c: RecordedCase,
+  result: Awaited<ReturnType<typeof runCase>>,
+): string {
+  const got = c.unordered ? sortLines(result.stdout) : result.stdout;
+  return c.maskTimes ? maskTimes(got) : got;
 }
 
 function matches(
@@ -49,10 +74,8 @@ function matches(
   result: Awaited<ReturnType<typeof runCase>>,
   exactExit: boolean,
 ): boolean {
-  const stdout = c.accept ? c.accept.stdout : c.stdout;
   const exit = c.accept ? c.accept.exit : c.exit;
-  const got = c.unordered ? sortLines(result.stdout) : result.stdout;
-  if (got !== stdout) return false;
+  if (gotStdout(c, result) !== expectedStdout(c)) return false;
   if (
     exactExit
       ? result.exitCode !== exit
@@ -89,10 +112,8 @@ export function recordedCases(
         expect(matches(c, result, exactExit)).toBe(false);
         return;
       }
-      const stdout = c.accept ? c.accept.stdout : c.stdout;
       const exit = c.accept ? c.accept.exit : c.exit;
-      const got = c.unordered ? sortLines(result.stdout) : result.stdout;
-      expect(got).toBe(stdout as string);
+      expect(gotStdout(c, result)).toBe(expectedStdout(c));
       if (exactExit) expect(result.exitCode).toBe(exit as number);
       else if (exit === 0) expect(result.exitCode).toBe(0);
       else expect(result.exitCode).not.toBe(0);
