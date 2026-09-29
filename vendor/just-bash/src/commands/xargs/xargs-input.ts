@@ -157,6 +157,9 @@ export function readXargsInput(
       prev = c;
       continue;
     }
+    // before an item any space character is skipped, leaving prev as
+    // it was; inside one only blanks and newlines separate
+    if (item === null && (c === "\r" || c === "\v" || c === "\f")) continue;
     item = (item ?? "") + c;
     prev = c;
   }

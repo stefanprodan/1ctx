@@ -50,13 +50,28 @@ describe("xargs -t", () => {
 
 describe("xargs -P", () => {
   test("runs commands at once and keeps their output in input order", async () => {
-    const bash = new Bash({ cwd: "/work" });
-    const started = performance.now();
+    let running = 0;
+    let peak = 0;
+    // the later a command starts, the sooner it ends
+    const fetch: SecureFetch = async (url) => {
+      running++;
+      peak = Math.max(peak, running);
+      await Bun.sleep(10 * (5 - Number(url.slice(-1))));
+      running--;
+      return {
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        body: new TextEncoder().encode(`${url.slice(-1)}\n`),
+        url,
+      };
+    };
+    const bash = new Bash({ cwd: "/work", fetch });
     const result = await bash.exec(
-      "printf '1\\n2\\n3\\n4\\n' | xargs -P 4 -n1 sh -c 'sleep 0.2; echo $0'",
+      "printf '1\\n2\\n3\\n4\\n' | xargs -P 4 -I{} curl -sS http://files.test/{}",
     );
     expect(result.stdout).toBe("1\n2\n3\n4\n");
-    expect(performance.now() - started).toBeLessThan(700);
+    expect(peak).toBe(4);
   });
 
   test("caps -P at 16", async () => {
@@ -116,15 +131,12 @@ describe("xargs -P", () => {
       fetch,
       files: { "/work/dl2.txt": `${names.join("\n")}\n` },
     });
-    const started = performance.now();
     const result = await bash.exec(
       `cat dl2.txt | xargs -P 12 -I{} sh -c 'mkdir -p "1ctx/$(dirname "{}")"; curl -sS "http://files.test/{}" -o "1ctx/{}"'`,
     );
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
     expect(peak).toBe(12);
-    // five rounds of 40 ms, where one at a time takes two seconds
-    expect(performance.now() - started).toBeLessThan(1500);
     for (const name of names) {
       expect(await bash.fs.readFile(`/work/1ctx/${name}`)).toBe(
         `body of http://files.test/${name}\n`,
@@ -209,6 +221,57 @@ describe("xargs's words", () => {
       expect(result.exitCode).toBe(exitCode);
     });
   }
+
+  const more: [string, string, number][] = [
+    [
+      "printf 'a\\nb\\n' | xargs -n1 -P2 nosuch",
+      "xargs: failed to run command ‘nosuch’: No such file or directory\n",
+      127,
+    ],
+    [
+      "printf 'x\\n' | xargs -s 0 echo",
+      "xargs: value 0 for -s option should be >= 1\nxargs: cannot fit single argument within argument list size limit\n",
+      1,
+    ],
+    [
+      "printf 'a\\nb\\n' | xargs -d '\\n' -E b echo 2>&1 >/dev/null",
+      "xargs: warning: the -E option has no effect if -0 or -d is used.\n\n",
+      0,
+    ],
+    [
+      "printf 'x\\n' | xargs -d '\\777' echo",
+      "xargs: Invalid escape sequence \\777 in input delimiter specification; character values must not exceed 377.\n",
+      1,
+    ],
+    [
+      "printf 'x\\n' | xargs -a . echo",
+      "xargs: Cannot open input file ‘.’: Is a directory\n",
+      1,
+    ],
+  ];
+  for (const [command, said, exitCode] of more) {
+    test(command, async () => {
+      const merged = command.includes("2>&1") ? command : `${command} 2>&1`;
+      const result = await run(merged);
+      expect(result.stdout).toBe(said);
+      expect(result.exitCode).toBe(exitCode);
+    });
+  }
+
+  test("a limit inside a command is its own failure, not a missing command", async () => {
+    const bash = new Bash({
+      cwd: "/work",
+      files: { "/work/big": "a b c d e f g h i j k l\n" },
+      executionLimits: { maxArrayElements: 10 },
+    });
+    const result = await bash.exec(
+      "printf 'big\\nbig\\n' | xargs -n1 xargs -a",
+    );
+    expect(result.stderr).toBe(
+      "bash: xargs: array element limit exceeded (10)\n".repeat(2),
+    );
+    expect(result.exitCode).toBe(123);
+  });
 
   test("-p and -o need no terminal when nothing runs", async () => {
     const result = await run("xargs -r -p -o echo < /dev/null");

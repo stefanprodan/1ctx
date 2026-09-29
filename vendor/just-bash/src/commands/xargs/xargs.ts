@@ -74,8 +74,6 @@ const XARGS_VERSION =
   "xargs (GNU findutils) 4.11.0 (just-bash, compatible)\n" +
   "A sandboxed xargs that answers as GNU xargs 4.11.0 does; see xargs --help.\n";
 
-const SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
 /** (1ctx) An argument is a C string: it ends at a NUL, as GNU passes it. */
 function cString(arg: string): string {
   const nul = arg.indexOf("\0");
@@ -84,7 +82,7 @@ function cString(arg: string): string {
 
 type Outcome =
   | { kind: "ok" | "failed" }
-  | { kind: "stop"; code: number; stderr: string };
+  | { kind: "stop"; code: number; stderr: string; own: string };
 
 /**
  * (1ctx) What a command's end means to xargs, as GNU reads its child: a
@@ -103,17 +101,18 @@ function commandOutcome(name: string, result: ExecResult): Outcome {
       kind: "stop",
       code: 127,
       stderr: `xargs: failed to run command ${q}: No such file or directory\n`,
+      own: "",
     };
   }
   if (
     result.exitCode === 126 &&
-    result.stderr.startsWith(`bash: ${name}: `) &&
-    result.stderr.indexOf("\n") === result.stderr.length - 1
+    result.stderr === `bash: ${name}: Permission denied\n`
   ) {
     return {
       kind: "stop",
       code: 126,
       stderr: `xargs: failed to run command ${q}: Permission denied\n`,
+      own: "",
     };
   }
   if (result.exitCode === 255) {
@@ -121,9 +120,31 @@ function commandOutcome(name: string, result: ExecResult): Outcome {
       kind: "stop",
       code: 124,
       stderr: `${result.stderr}xargs: ${name}: exited with status 255; aborting\n`,
+      own: result.stderr,
     };
   }
   return { kind: result.exitCode === 0 ? "ok" : "failed" };
+}
+
+/**
+ * (1ctx) A result with its stderr rewritten. The bytes the child charged
+ * stay charged; only as many as the new text holds are carried as already
+ * counted, so the budget is never refunded nor charged twice.
+ */
+function withStderr(result: ExecResult, stderr: string): ExecResult {
+  const counted = result.internalOutputAccounting;
+  return {
+    ...result,
+    stderr,
+    ...(counted
+      ? {
+          internalOutputAccounting: {
+            stdout: counted.stdout,
+            stderr: Math.min(counted.stderr, utf8ByteLength(stderr)),
+          },
+        }
+      : {}),
+  };
 }
 
 /** (1ctx) The bytes the environment takes, as GNU counts it for -s. */
@@ -172,18 +193,24 @@ export const xargsCommand: RuntimeCommand = {
     const warnings = [...options.warnings];
     let maxChars = options.maxChars ?? Math.min(DEFAULT_MAX_CHARS, posixLimit);
     if (maxChars > posixLimit) {
-      warnings.push(`value ${maxChars} for -s option should be <= ${posixLimit}`);
+      warnings.push(
+        `value ${maxChars} for -s option should be <= ${posixLimit}`,
+      );
       maxChars = posixLimit;
     }
 
-    // (1ctx) -a reads the items from a file and leaves stdin to the command
+    // (1ctx) -a reads the items from a file and leaves stdin to the
+    // command; - and /dev/stdin are stdin itself
+    const fromFile =
+      options.argFile !== null &&
+      options.argFile !== "-" &&
+      options.argFile !== "/dev/stdin";
     let inputText: string;
-    if (options.argFile !== null) {
+    if (fromFile) {
+      const argFile = options.argFile as string;
+      const path = ctx.fs.resolvePath(ctx.cwd, argFile);
       try {
-        const bytes = await readBytesFrom(
-          ctx.fs,
-          ctx.fs.resolvePath(ctx.cwd, options.argFile),
-        );
+        const bytes = await readBytesFrom(ctx.fs, path);
         const size = latin1FromBytes(bytes).length;
         if (size > maxStringLength) {
           throw new ExecutionLimitError(
@@ -195,9 +222,16 @@ export const xargsCommand: RuntimeCommand = {
         inputText = decodeBytesToUtf8(bytes);
       } catch (error) {
         rethrowFatalExecutionError(error);
+        const isDirectory = await ctx.fs
+          .stat(path)
+          .then((st) => st.isDirectory)
+          .catch(() => false);
+        const reason = isDirectory
+          ? "Is a directory"
+          : "No such file or directory";
         return {
           stdout: "",
-          stderr: `xargs: Cannot open input file ‘${options.argFile}’: No such file or directory\n`,
+          stderr: `xargs: Cannot open input file \u2018${argFile}\u2019: ${reason}\n`,
           exitCode: 1,
         };
       }
@@ -289,7 +323,7 @@ export const xargsCommand: RuntimeCommand = {
       outputBytes += addedBytes;
     };
     for (const w of warnings) {
-      appendStderr(`xargs: ${w.startsWith("WARNING") ? w : `warning: ${w}`}\n`);
+      appendStderr(`xargs: ${w}\n`);
     }
     if (options.showLimits) {
       appendStderr(
@@ -304,7 +338,7 @@ export const xargsCommand: RuntimeCommand = {
 
     // (1ctx) under -a the first command gets xargs' stdin, as it would
     // drain the inherited descriptor
-    let stdinLeft = options.argFile !== null;
+    let stdinLeft = fromFile;
 
     const executeCommand = async (
       rawArgs: string[],
@@ -324,11 +358,14 @@ export const xargsCommand: RuntimeCommand = {
       }
       // an assignment before the name exports the slot to the command
       const slotPrefix =
-        options.slotVar !== null && SHELL_NAME.test(options.slotVar)
+        options.slotVar !== null
           ? `${options.slotVar}=${slot} `
           : "";
       const script = `${slotPrefix}${shellJoinArgs([cmdArgs[0]])}`;
+      // the exported variables reach the command, as a child's
+      // environment does
       const execOptions = {
+        env: { ...ctx.exportedEnv },
         cwd: ctx.cwd,
         signal: ctx.signal,
         args: cmdArgs.slice(1),
@@ -367,6 +404,7 @@ export const xargsCommand: RuntimeCommand = {
     // soon as its own ends; output is kept in input order, and a command
     // that stops xargs lets the running ones finish and starts no more
     const results: (ExecResult | undefined)[] = [];
+    const outcomes: Outcome[] = [];
     let emitted = 0;
     let next = 0;
     let failure: unknown;
@@ -376,14 +414,16 @@ export const xargsCommand: RuntimeCommand = {
     const emitReady = () => {
       while (emitted < commands.length && results[emitted] !== undefined) {
         const result = results[emitted] as ExecResult;
-        const name = cString(commands[emitted][0]);
         results[emitted] = undefined;
         emitted++;
-        const outcome = commandOutcome(name, result);
+        const outcome = outcomes[emitted - 1] as Outcome;
         if (outcome.kind === "failed") failed = true;
-        if (outcome.kind === "stop") {
-          appendOutput({ ...result, stderr: outcome.stderr });
-          stopCode ??= outcome.code;
+        // only the first stop speaks, as GNU stops at it
+        if (outcome.kind === "stop" && stopCode === null) {
+          appendOutput(withStderr(result, outcome.stderr));
+          stopCode = outcome.code;
+        } else if (outcome.kind === "stop") {
+          appendOutput(withStderr(result, outcome.own));
         } else {
           appendOutput(result);
         }
@@ -394,9 +434,10 @@ export const xargsCommand: RuntimeCommand = {
         const index = next++;
         try {
           const result = await executeCommand(commands[index], id);
+          const outcome = commandOutcome(cString(commands[index][0]), result);
+          outcomes[index] = outcome;
           results[index] = result;
-          const name = cString(commands[index][0]);
-          if (commandOutcome(name, result).kind === "stop") stopping = true;
+          if (outcome.kind === "stop") stopping = true;
           emitReady();
         } catch (error) {
           failure ??= error;

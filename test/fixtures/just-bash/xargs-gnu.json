@@ -1116,6 +1116,29 @@
       "error": true
     },
     {
+      "name": "-d an octal escape past 377",
+      "args": [
+        "-d",
+        "\\777",
+        "echo"
+      ],
+      "stdin": "x\n",
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "-d a hex escape without digits",
+      "args": [
+        "-d",
+        "\\x",
+        "echo"
+      ],
+      "stdin": "axb",
+      "stdout": "axb\n",
+      "exit": 0
+    },
+    {
       "name": "-d a multibyte character",
       "args": [
         "-d",
@@ -1573,6 +1596,50 @@
       "exit": 0
     },
     {
+      "name": "a carriage return before an item is skipped",
+      "args": [
+        "-n1",
+        "echo",
+        "["
+      ],
+      "stdin": "x \r\ny\n",
+      "stdout": "[ x\n[ y\n",
+      "exit": 0
+    },
+    {
+      "name": "a leading carriage return",
+      "args": [
+        "-n1",
+        "echo",
+        "["
+      ],
+      "stdin": "\ra\n",
+      "stdout": "[ a\n",
+      "exit": 0
+    },
+    {
+      "name": "a leading vertical tab and form feed",
+      "args": [
+        "-n1",
+        "echo",
+        "["
+      ],
+      "stdin": "\u000ba \fb\n",
+      "stdout": "[ a\n[ b\n",
+      "exit": 0
+    },
+    {
+      "name": "only carriage returns with -r",
+      "args": [
+        "-r",
+        "echo",
+        "X"
+      ],
+      "stdin": "\r\n\r\n",
+      "stdout": "",
+      "exit": 0
+    },
+    {
       "name": "multibyte items",
       "args": [
         "-n1",
@@ -1684,6 +1751,17 @@
       ],
       "stdin": "a\n\n \nb\n",
       "stdout": "[a]\n[b]\n",
+      "exit": 0
+    },
+    {
+      "name": "-I skips blanks and a carriage return",
+      "args": [
+        "-I{}",
+        "echo",
+        "[{}]"
+      ],
+      "stdin": "  \r\n",
+      "stdout": "",
       "exit": 0
     },
     {
@@ -2025,6 +2103,17 @@
       ],
       "stdin": "a b \nc",
       "stdout": "[ a b c\n",
+      "exit": 0
+    },
+    {
+      "name": "-L carries on past a carriage return",
+      "args": [
+        "-L1",
+        "echo",
+        "["
+      ],
+      "stdin": "x \r\ny\nz\n",
+      "stdout": "[ x y\n[ z\n",
       "exit": 0
     },
     {
@@ -2531,6 +2620,34 @@
       "exit": 0
     },
     {
+      "name": "-s under the command name with -I",
+      "args": [
+        "-s",
+        "3",
+        "-I{}",
+        "echo",
+        "{}"
+      ],
+      "stdin": "x\n",
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "-s fitting only the command name with -I",
+      "args": [
+        "-s",
+        "5",
+        "-I{}",
+        "echo",
+        "{}"
+      ],
+      "stdin": "x\n",
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
       "name": "a list past 128 KiB runs twice",
       "args": [
         "-a",
@@ -2688,6 +2805,42 @@
       "exit": 0
     },
     {
+      "name": "-a - reads stdin",
+      "args": [
+        "-a",
+        "-",
+        "echo"
+      ],
+      "stdin": "a b\n",
+      "stdout": "a b\n",
+      "exit": 0
+    },
+    {
+      "name": "-a /dev/stdin reads stdin",
+      "args": [
+        "-a",
+        "/dev/stdin",
+        "echo"
+      ],
+      "stdin": "a b\n",
+      "stdout": "a b\n",
+      "exit": 0
+    },
+    {
+      "name": "an exported variable reaches the command",
+      "args": [
+        "sh",
+        "-c",
+        "echo \"[$S]\""
+      ],
+      "stdin": "a\n",
+      "env": {
+        "S": "keep"
+      },
+      "stdout": "[keep]\n",
+      "exit": 0
+    },
+    {
       "name": "--process-slot-var with one process",
       "args": [
         "-n1",
@@ -2725,6 +2878,23 @@
       "stdout": "",
       "exit": 1,
       "error": true
+    },
+    {
+      "name": "--process-slot-var with a name the shell cannot assign",
+      "args": [
+        "--process-slot-var=a-b",
+        "sh",
+        "-c",
+        "echo ok"
+      ],
+      "stdin": "a\n",
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "the slot reaches the command as an assignment before its name, so a name the shell cannot assign is refused rather than dropped"
+      },
+      "stdout": "ok\n",
+      "exit": 0
     },
     {
       "name": "a command exiting 3",

@@ -32,7 +32,7 @@ export interface XargsOptions {
   openTty: boolean;
   showLimits: boolean;
   command: string[];
-  /** warnings in the order GNU prints them */
+  /** warnings in the order GNU prints them, after its "xargs: " */
   warnings: string[];
 }
 
@@ -46,6 +46,8 @@ export type ParsedArgs =
 const MAX_PROCS_LIMIT = 2147483647;
 
 const TRY = "Try 'xargs --help' for more information.\n";
+
+export const SHELL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function usageError(message: string): ParsedArgs {
   return {
@@ -154,11 +156,10 @@ export function parseDelimiter(
     code = C_ESCAPES[body[0]].charCodeAt(0);
     used = 1;
   } else if (body[0] === "x") {
-    const hex = /^x([0-9a-fA-F]{1,2})/.exec(body);
-    if (hex) {
-      code = Number.parseInt(hex[1], 16);
-      used = hex[0].length;
-    }
+    // \x without digits is NUL, as GNU reads it
+    const hex = /^x([0-9a-fA-F]{0,2})/.exec(body) as RegExpExecArray;
+    code = hex[1] === "" ? 0 : Number.parseInt(hex[1], 16);
+    used = hex[0].length;
   } else if (/[0-7]/.test(body[0])) {
     const oct = /^[0-7]{1,3}/.exec(body);
     if (oct) {
@@ -166,7 +167,15 @@ export function parseDelimiter(
       used = oct[0].length;
     }
   }
-  if (code === null || code > 0xff) {
+  if (code !== null && code > 0xff) {
+    return {
+      ok: false,
+      message:
+        `Invalid escape sequence ${spec} in input delimiter specification; ` +
+        "character values must not exceed 377.",
+    };
+  }
+  if (code === null) {
     return {
       ok: false,
       message: `Invalid escape sequence ${spec} in input delimiter specification.`,
@@ -206,7 +215,7 @@ export function parseXargsArgs(args: string[]): ParsedArgs {
   };
   const exclusive = (previous: string, next: string) =>
     o.warnings.push(
-      `options ${previous} and ${next} are mutually exclusive, ` +
+      `warning: options ${previous} and ${next} are mutually exclusive, ` +
         `ignoring previous ${previous} value`,
     );
   const setMaxLines = (n: number) => {
@@ -361,6 +370,13 @@ export function parseXargsArgs(args: string[]): ParsedArgs {
             "failed to unset environment variable : Invalid argument",
           );
         }
+        // (1ctx) the slot reaches the command as an assignment before
+        // its name, which takes a shell name only
+        if (!SHELL_NAME.test(value as string)) {
+          return plainError(
+            `option --process-slot-var takes a shell variable name here, not '${value}'`,
+          );
+        }
         o.slotVar = value as string;
         return;
       case "version":
@@ -436,7 +452,10 @@ export function parseXargsArgs(args: string[]): ParsedArgs {
   }
   o.command = args.slice(i);
   if (o.eof !== null && o.mode !== "blank") {
-    o.warnings.push("the -E option has no effect if -0 or -d is used.");
+    // GNU ends this one with a blank line
+    o.warnings.push(
+      "warning: the -E option has no effect if -0 or -d is used.\n",
+    );
     o.eof = null;
   }
   return { kind: "run", options: o };

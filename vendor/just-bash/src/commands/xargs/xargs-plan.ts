@@ -60,7 +60,17 @@ export function planCommands(lines: string[][], o: PlanOptions): Plan {
   if (o.replace !== null) {
     const replace = o.replace;
     for (const [item] of lines) {
-      if (base > o.maxChars) return { commands, error: "command too long" };
+      // GNU's order: the name, then any one initial argument, then the
+      // line, then the command line it builds
+      if (argSize(o.command[0]) > o.maxChars) {
+        return {
+          commands,
+          error: "cannot fit single argument within argument list size limit",
+        };
+      }
+      if (o.command.slice(1).some((arg) => argSize(arg) > o.maxChars)) {
+        return { commands, error: "command too long" };
+      }
       if (argSize(item) > o.maxChars) {
         return { commands, error: "argument line too long" };
       }
