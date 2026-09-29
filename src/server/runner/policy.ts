@@ -60,6 +60,8 @@ export type ToolsPort = {
   ): Offered;
   run(offered: Offered, call: ToolCall, ctx: ToolContext): Promise<ToolResult>;
   toolName?(offered: Offered, call: ToolCall): string;
+  // a closed name for the log, never the model's
+  logName?(offered: Offered, call: ToolCall): string;
   normalize?(offered: Offered, calls: ToolCall[]): ToolCall[];
 };
 

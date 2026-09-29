@@ -70,6 +70,24 @@ mount in `docs/bash.md`.
   travels without its result; detail and envelopes carry `resultBytes`,
   and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
   at the display cap. The runner reads the full row from the store.
+- **Words that name input or a server's answer are a `ToolError`.**
+  `ToolError` (`lib/errors.ts`) carries the words the model reads and
+  `logged`, a fixed phrase that `errorFields()` logs in their place. A
+  tool throws one whenever its words hold the call's input or what a
+  server sent: an unknown tool's name, a skill file's path and the file
+  list, webfetch's URL, scheme, host, redirect and media type,
+  datetime's timezone, an MCP tool's name and argument check, an MCP
+  `isError` answer, the MCP client's HTTP body and SDK or protocol
+  words (the status stays), and a search provider's words (the status
+  stays). Other tool failures are fixed text with closed values, or a
+  runtime's own error (a fetch that could not connect). `withClient`
+  rethrows a `ToolError` as it is and wraps anything else in one, and
+  websearch keeps the class when it scrubs the key. `skill refresh
+  failed` logs `skill source refused` and the status for a refusal; the
+  row keeps the words. `tool failed` names the tool by `toolLogName()`
+  (`tools/index.ts`): a built-in's name, `mcp:` and the server's
+  configured name for an offered MCP tool, whose own name is server
+  text, else `unknown`, never the name the model wrote.
 
 ## The offered set
 

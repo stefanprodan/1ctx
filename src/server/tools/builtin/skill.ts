@@ -3,6 +3,7 @@
 
 import type { OfferedSkill } from "../../../shared/contracts/skill.ts";
 import { skillContent } from "../../../shared/skills.ts";
+import { ToolError } from "../../lib/errors.ts";
 import type { SkillBody } from "../../skills/index.ts";
 import type { Tool } from "../types.ts";
 
@@ -25,7 +26,10 @@ function offeredSkill(
   const name = named(args);
   const skill = offered.find((item) => item.name === name);
   if (skill === undefined)
-    throw new Error(`skill ${name} is no longer available`);
+    throw new ToolError(
+      `skill ${name} is no longer available`,
+      "skill not available",
+    );
   return skill;
 }
 
@@ -57,7 +61,10 @@ export function makeSkillTools(
         const snapshot = offeredSkill(offered, args);
         const row = skills.body(snapshot.id, snapshot.name);
         if (row === null) {
-          throw new Error(`skill ${snapshot.name} is no longer available`);
+          throw new ToolError(
+            `skill ${snapshot.name} is no longer available`,
+            "skill not available",
+          );
         }
         return skillContent({
           name: row.name,
@@ -91,14 +98,18 @@ export function makeSkillTools(
         }
         const row = skills.body(snapshot.id, snapshot.name);
         if (row === null) {
-          throw new Error(`skill ${snapshot.name} is no longer available`);
+          throw new ToolError(
+            `skill ${snapshot.name} is no longer available`,
+            "skill not available",
+          );
         }
         const content = skills.file(snapshot.id, snapshot.name, args.path);
         if (content === null) {
           const available =
             row.files.length === 0 ? "none" : row.files.join(", ");
-          throw new Error(
+          throw new ToolError(
             `no file ${args.path}; available paths: ${available}`,
+            "skill file not found",
           );
         }
         return content;

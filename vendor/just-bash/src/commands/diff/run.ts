@@ -13,6 +13,8 @@ import { latin1FromBytes, readBytesFrom } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import type { FsStat } from "../../fs/interface.js";
 import { FileTraversalBudget } from "../../fs/traversal.js";
+// (1ctx) a header's time is in the exported TZ, never an unexported one
+import { processEnv } from "../../helpers/env.js";
 import type { RuntimeCommandContext } from "../../types.js";
 import type { WorkBudget } from "./budget.js";
 import { headerName, localeQuote, shellName, shellWord } from "./header.js";
@@ -417,7 +419,7 @@ export class DiffRun {
         o,
         tests: this.tests,
         budget: this.budget,
-        tz: this.ctx.env.get("TZ"),
+        tz: processEnv(this.ctx).get("TZ"),
         grouping: this.collate,
       },
       file(s0, bytes0),

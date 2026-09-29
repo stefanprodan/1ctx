@@ -11,6 +11,7 @@
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
+import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import {
   assertDefenseContext,
@@ -606,7 +607,8 @@ export const yqCommand: RuntimeCommand = {
               maxDepth: ctx.limits.maxQueryDepth,
             }
           : undefined,
-        env: ctx.env,
+        // (1ctx) $ENV, env and strenv read the exported variables only
+        env: processEnv(ctx),
         coverage: ctx.coverage,
         requireDefenseContext: ctx.requireDefenseContext,
         budget: { operations: 0, callDepth: 0 },
@@ -964,7 +966,8 @@ async function runEvalAll(
         maxArrayElements: ctx.limits.maxQueryElements,
         maxDepth: ctx.limits.maxQueryDepth,
       },
-      env: ctx.env,
+      // (1ctx) the exported variables only
+      env: processEnv(ctx),
       coverage: ctx.coverage,
       requireDefenseContext: ctx.requireDefenseContext,
       budget: { operations: 0, callDepth: 0 },

@@ -11,6 +11,7 @@ import {
 } from "../../shared/mcp.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { ToolError } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
@@ -301,7 +302,10 @@ export function mcpArea(deps: McpDeps): Mcp {
           key,
         );
         const mapped = resultText(result);
-        if (mapped.isError) throw new Error(mapped.text);
+        // the server's own words are the model's, never the log's
+        if (mapped.isError) {
+          throw new ToolError(mapped.text, "MCP tool answered an error");
+        }
         return {
           text: mapped.text,
           content: Array.isArray(result.content) ? result.content : [],

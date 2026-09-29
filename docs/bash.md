@@ -118,13 +118,13 @@ changes to it, its recorders) in `vendor/README.md`.
 - **A scratch name is what a real `/tmp` takes.** `bash/names.ts` holds
   the rule: any character but NUL, case-sensitive, no empty, `.` or `..`
   segment, well-formed Unicode (a lone surrogate would be stored as
-  U+FFFD), at most 255 bytes a segment (Linux's `NAME_MAX`) and 16
-  segments, so a name stays under `PATH_MAX`. The depth cap is low
-  because just-bash's tree walks grow with depth times entries: at 64,
-  one command could fill `/tmp` so deep that no later `rm -rf` or `ls
-  -R` finished within the deadline. A file and a folder cannot share a
-  path. The knowledge rule stays on `/knowledge`, so copying a spaced
-  scratch file there fails with its words.
+  U+FFFD), at most 255 bytes a segment (Linux's `NAME_MAX`), 64
+  segments and 4,095 bytes in all, under Linux's `PATH_MAX`. The depth
+  cap bounds just-bash's tree walks, linear in the entries since its
+  filesystem keeps each folder's children: at 64, the slowest `rm -rf`
+  or `ls -R` of a full `/tmp` takes about a second. A file and a folder
+  cannot share a path. The knowledge rule stays on `/knowledge`, so
+  copying a spaced scratch file there fails with its words.
 - **Scratch counts names as bytes.** A file's stored size is its bytes
   plus its path's, so empty files cannot hold megabytes of names under
   `scratchBytes`. The answer's written list is refused past

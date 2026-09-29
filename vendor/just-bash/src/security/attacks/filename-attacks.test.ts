@@ -302,7 +302,11 @@ describe("Filename Attack Prevention", () => {
         rm /tmp/broken_link
       `);
       // Should fail to read but not crash
-      expect(result.stderr).toBeTruthy();
+      // (1ctx) rm removes the broken link itself, as GNU rm does, so the
+      // only error is cat's, sent to stdout
+      expect(result.stdout).toContain("No such file or directory");
+      expect(result.stderr).toBe("");
+      expect(result.exitCode).toBe(0);
     });
 
     it("should handle circular symlinks gracefully", async () => {
