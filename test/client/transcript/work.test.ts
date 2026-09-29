@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import type { WorkNode } from "../../../src/client/transcript/rows.ts";
 import {
   capWord,
+  memorySummary,
   workJustEnded,
   workSummary,
 } from "../../../src/client/transcript/Work.model.ts";
@@ -243,6 +244,37 @@ describe("work summaries", () => {
     });
     expect(workSummary(withRow, true, 40_000).text).toBe(
       "Working 30 s · 1 tool",
+    );
+  });
+
+  test("says which retry a round waits on, only while it works", () => {
+    const running = node({
+      send: send({ status: "running", finishedAt: null }),
+    });
+    const retry = { attempt: 1, max: 3 };
+    expect(workSummary(running, true, 13_900, null).text).toBe("Working 3 s");
+    expect(workSummary(running, true, 13_900, retry).text).toBe(
+      "Working 3 s · retrying 1/3",
+    );
+    const tool = message({
+      id: "call-1",
+      seq: 3,
+      kind: "tool",
+      slot: null,
+      toolCalls: null,
+      toolCallId: "call-1",
+      toolName: "datetime",
+    });
+    const withRow = node({
+      rows: [message(), tool],
+      send: send({ status: "running", finishedAt: null }),
+    });
+    expect(
+      workSummary(withRow, true, 72_000, { attempt: 3, max: 3 }).text,
+    ).toBe("Working 1 min 2 s · 1 tool · retrying 3/3");
+    expect(workSummary(node(), false, 0, retry).text).not.toContain("retrying");
+    expect(memorySummary(running, true, 13_900, retry).text).toBe(
+      "Updating memory 3 s · retrying 1/3",
     );
   });
 

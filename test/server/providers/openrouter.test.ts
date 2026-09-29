@@ -347,7 +347,42 @@ describe("OpenRouter stream", () => {
   test("a body that echoes the key has it scrubbed", async () => {
     const { events } = await stream(`{"error":{"message":"bad ${KEY}"}}`, 401);
     expect(events).toEqual([
-      { kind: "error", message: "OpenRouter 401: bad [key]" },
+      {
+        kind: "error",
+        message: "OpenRouter 401: bad [key]",
+        status: 401,
+        remote: true,
+      },
+    ]);
+  });
+
+  test("headers that never come are one timed out, unanswered error", async () => {
+    // a server that holds its headers until the wait gives up
+    const fetcher = (async (_url: unknown, options?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError")),
+        );
+      })) as unknown as typeof fetch;
+    const provider = providerFor(row, {
+      fetcher,
+      secret: () => KEY,
+      headersTimeoutMs: 5,
+    });
+    const events: ChatEvent[] = [];
+    for await (const event of provider.chat(
+      request,
+      new AbortController().signal,
+    )) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      {
+        kind: "error",
+        message: expect.stringContaining("router failed:"),
+        unanswered: true,
+        timedOut: true,
+      },
     ]);
   });
 

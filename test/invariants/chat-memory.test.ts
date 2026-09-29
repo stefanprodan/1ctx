@@ -531,7 +531,7 @@ describe("a chat saves to the project's memory", () => {
 
       // failed after the save
       const failing = await message(chat, a);
-      chat.scripted.refuse(500, "boom");
+      chat.scripted.refuse(400, "boom");
       failing.script.toolRound([
         call("two", { action: "set", topic: "Time", text: "UTC" }),
       ]);

@@ -6,13 +6,14 @@
 // first tool call delta of a round marks the reply work at once, in its
 // own transaction, so the row moves into the fold with its reasoning;
 // the assembled calls land on round.calls when the stream ends. A
-// provider failure is an error event and becomes a throw here, so the
-// send ends through its one terminal transition. Once terminated the
+// provider failure is an error event, asked again when retry.ts says so
+// before the stream started, else a throw here, so the send ends
+// through its one terminal transition. Once terminated the
 // rest of the stream is dropped: the rows are already final.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Clock } from "../lib/clock.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
   type ChatEvent,
   type ChatRequest,
@@ -27,6 +28,7 @@ import {
   summaryRequest,
   withExhausted,
 } from "./context.ts";
+import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
@@ -45,6 +47,8 @@ export type RoundDeps = {
   lookups: ContextLookups;
   clock: Clock;
   log: Log;
+  // the jitter of a retry's wait, in [0, 1)
+  random?: () => number;
 };
 
 export const STREAM_IDLE_MS = 120_000;
@@ -68,6 +72,30 @@ function sleep(clock: Clock, ms: number) {
       if (timer !== undefined) clearTimeout(timer);
     },
   };
+}
+
+// false when the signal ended the wait
+async function pause(
+  clock: Clock,
+  ms: number,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (signal.aborted) return false;
+  if (ms <= 0) return true;
+  let stop = () => {};
+  const aborted = new Promise<void>((resolve) => {
+    stop = resolve;
+    signal.addEventListener("abort", stop, { once: true });
+  });
+  // listening first, so an abort however early ends the wait
+  const timer = sleep(clock, ms);
+  try {
+    await Promise.race([timer.promise, aborted]);
+  } finally {
+    timer.cancel();
+    signal.removeEventListener("abort", stop);
+  }
+  return !signal.aborted;
 }
 
 // idleMs is null before the first event: a local server says nothing
@@ -138,21 +166,50 @@ export function buildRequest(
   return req;
 }
 
+export type RoundOptions = {
+  request?: ChatRequest;
+  signal?: AbortSignal;
+  // when a retry's wait must be over: the turn's deadline unless a
+  // phase has its own, null for none
+  deadline?: number | null;
+};
+
 export async function runRound(
   deps: RoundDeps,
   send: ActiveSend,
   rows: Message[],
-  options: { request?: ChatRequest; signal?: AbortSignal } = {},
+  options: RoundOptions = {},
 ): Promise<void> {
   const round = send.round;
   if (round === null) return;
+  try {
+    await streamRound(deps, send, round, rows, options);
+  } finally {
+    // an answer, a failure or Stop ends a wait the line still shows
+    deps.writer.retrying(send, null);
+  }
+}
+
+async function streamRound(
+  deps: RoundDeps,
+  send: ActiveSend,
+  round: RoundState,
+  rows: Message[],
+  options: RoundOptions,
+): Promise<void> {
   const signal = options.signal ?? send.controller.signal;
+  const deadline =
+    options.deadline !== undefined
+      ? options.deadline
+      : send.policy.deadlineMs === null
+        ? null
+        : send.startedAt + send.policy.deadlineMs;
   const req =
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
-  let retried = false;
+  const retry: RetryState = { retries: 0, timeouts: 0 };
   const visuals =
     send.phase === "provider" &&
     send.kind !== "compact" &&
@@ -162,29 +219,71 @@ export async function runRound(
       ? new RoundVisuals(send, round, deps.writer, signal)
       : null;
   let replyBytes = bytes(round.content) + bytes(round.reasoning);
+  // heard: any event came, so the quiet timer runs; started: one reached
+  // the writer or the page, so asking again is no longer safe
+  let heard = false;
   let started = false;
   while (true) {
     const next = await nextEvent(
       iterator,
       deps.clock,
       visuals,
-      started ? STREAM_IDLE_MS : null,
+      heard ? STREAM_IDLE_MS : null,
     );
     if (next.kind === "idle") throw new Error("the provider went quiet");
     if (next.result.done) break;
     const event = next.result.value;
     if (signal.aborted) return;
-    if (!started && !retried && event.kind === "error" && event.unanswered) {
-      retried = true;
-      deps.log.warn("round retried", {
-        chat: send.sessionId,
-        round: send.roundNo,
-        ...errorFields(new Error(event.message), false),
-      });
-      iterator = open();
-      continue;
+    // nothing of the round reached the page yet, so asking again is safe
+    if (!started && event.kind === "error") {
+      const wait = retryWait(
+        event,
+        retry,
+        deadline === null ? null : deadline - deps.clock(),
+        (deps.random ?? Math.random)(),
+      );
+      if (wait !== null) {
+        retry.retries++;
+        if (event.timedOut) retry.timeouts++;
+        deps.log.warn("round retried", {
+          chat: send.sessionId,
+          round: send.roundNo,
+          attempt: retry.retries,
+          ...(event.status === undefined
+            ? {}
+            : { provider_status: event.status }),
+          wait,
+          // a failed connection has no status; its words carry no body
+          ...(event.unanswered
+            ? errorFields(new Error(event.message), false)
+            : {}),
+        });
+        // an error frame leaves its stream open; closing it lets go of
+        // the connection, and Stop during the wait finds nothing held
+        void iterator.return?.()?.catch(() => {});
+        // the failed attempt served nothing, so a round stopped during
+        // the wait names no one; the first token stays timed from the
+        // round's start, since the waits are what the reader sat through
+        round.upstream = null;
+        round.servedModel = null;
+        deps.writer.retrying(send, {
+          attempt: retry.retries,
+          max: MAX_RETRIES,
+        });
+        if (!(await pause(deps.clock, wait, signal))) return;
+        heard = false;
+        iterator = open();
+        continue;
+      }
     }
-    started = true;
+    heard = true;
+    // who serves the round reaches neither the writer nor the page, so
+    // a failure right after it is still asked again
+    if (event.kind !== "served") {
+      // the next attempt answered, so the line stops saying retrying
+      if (round.retry !== null) deps.writer.retrying(send, null);
+      started = true;
+    }
     switch (event.kind) {
       case "reasoning":
         if (send.summarizing) break;
@@ -250,7 +349,7 @@ export async function runRound(
         break;
       }
       case "error":
-        throw new Error(event.message);
+        throw roundError(event);
       default:
         break;
     }
@@ -266,6 +365,41 @@ export async function runRound(
     round.tokens = round.usage.promptTokens + round.usage.completionTokens;
     round.spent = spentTokens(round.usage);
   }
+}
+
+// A provider's refusal keeps its words for the chat row; a log names
+// only its status, since the words are the response's body
+export class ProviderRefusal extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null,
+  ) {
+    super(message);
+  }
+}
+
+function roundError(event: Extract<ChatEvent, { kind: "error" }>): Error {
+  return event.remote
+    ? new ProviderRefusal(event.message, event.status ?? null)
+    : new Error(event.message);
+}
+
+export const REFUSED = "the provider answered with an error";
+
+// what a log says of a refusal: the fixed phrase and the status, beside
+// a status field that already names something else
+export function refusalFields(status: number | null): LogFields {
+  return {
+    error: REFUSED,
+    ...(status === null ? {} : { provider_status: status }),
+  };
+}
+
+// the fields a failed round logs
+export function failureFields(error: unknown): LogFields {
+  return error instanceof ProviderRefusal
+    ? refusalFields(error.status)
+    : errorFields(error, false);
 }
 
 export function spentTokens(

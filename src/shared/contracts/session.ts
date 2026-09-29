@@ -211,9 +211,14 @@ export type VisualDraft = {
   html: string;
 };
 
+// a round waiting to ask its provider again: this attempt of max
+export type LiveRetry = { attempt: number; max: number };
+
 export type LiveSend = {
   // the previews at seq, absent when no call is streaming a visual
   drafts?: VisualDraft[];
+  // present only while a round waits to retry
+  retry?: LiveRetry;
 } & (
   | {
       phase: "reply";

@@ -80,8 +80,13 @@ export type Scripted = {
   requests: { inputTokens: number; maxTokens: number; accepted: boolean }[];
   // the next script once a chat request arrives
   next(): Promise<Script>;
-  // answer every chat request with an HTTP error
-  refuse(status: number, body?: string): void;
+  // answer every chat request with an HTTP error, or only the next
+  // `times`, with the headers given
+  refuse(
+    status: number,
+    body?: string,
+    options?: { times?: number; headers?: Record<string, string> },
+  ): void;
   // fail the next `count` chat requests before any response, as a reset
   // connection or a headers timeout does
   drop(count: number): void;
@@ -97,7 +102,12 @@ export function scriptedFetch(
   const scripts: Script[] = [];
   const requests: Scripted["requests"] = [];
   const waiting: ((s: Script) => void)[] = [];
-  let refusal: { status: number; body: string } | null = null;
+  let refusal: {
+    status: number;
+    body: string;
+    times: number;
+    headers: Record<string, string>;
+  } | null = null;
   let dropping = 0;
   let chats = 0;
   const fetcher = (async (
@@ -122,7 +132,9 @@ export function scriptedFetch(
       throw new TypeError("the connection was reset");
     }
     if (refusal !== null) {
-      return new Response(refusal.body, { status: refusal.status });
+      const { status, body, headers } = refusal;
+      if (--refusal.times <= 0) refusal = null;
+      return new Response(body, { status, headers });
     }
     const body = JSON.parse(
       typeof init?.body === "string" ? init.body : "{}",
@@ -258,8 +270,13 @@ export function scriptedFetch(
       new Promise<Script>((resolve) => {
         waiting.push(resolve);
       }),
-    refuse(status, body = "") {
-      refusal = { status, body };
+    refuse(status, body = "", options = {}) {
+      refusal = {
+        status,
+        body,
+        times: options.times ?? Number.POSITIVE_INFINITY,
+        headers: options.headers ?? {},
+      };
     },
     drop(count) {
       dropping = count;

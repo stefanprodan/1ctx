@@ -13,6 +13,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type { LiveRetry } from "../../shared/contracts/session.ts";
 import { visualPreviews } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
@@ -38,10 +39,13 @@ export function Transcript({
   onRegenerate,
   fork,
   foot,
+  retry = null,
 }: {
   sessionId: string;
   nodes: Node[];
   live: ReadonlyMap<string, Live>;
+  // the running round waiting to ask its provider again
+  retry?: LiveRetry | null;
   // the agent a reply names, by the row's agent id; null for one no
   // longer listed, and for a turn with no row yet the session's
   agentOf: (agentId: string | null) => Agent | null;
@@ -162,6 +166,7 @@ export function Transcript({
                     null,
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
+                retry={last ? retry : null}
                 fork={fork}
                 visuals={visualCards(node, visualPreviews.value).map((card) =>
                   isFileCard(card) ? (

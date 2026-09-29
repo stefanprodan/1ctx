@@ -59,6 +59,12 @@ describe("the summary fold", () => {
       text: "Summarizing 4 s",
       err: false,
     });
+    expect(
+      summaryLabel(summary(), true, 14_500, { attempt: 1, max: 3 }).text,
+    ).toBe("Summarizing 4 s · retrying 1/3");
+    expect(
+      summaryLabel(summary(), false, 14_500, { attempt: 1, max: 3 }).text,
+    ).toBe("Summarized 41K tokens");
     expect(summaryLabel(summary(), false).text).toBe("Summarized 41K tokens");
     expect(summaryLabel(summary({ promptTokens: null }), false).text).toBe(
       "Summarized",

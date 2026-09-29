@@ -12,6 +12,7 @@ import {
   parseSse,
   streamChat,
   ToolCallTracker,
+  Unanswered,
   wireName,
 } from "../../../src/server/providers/openai.ts";
 import type {
@@ -44,13 +45,14 @@ function delta(
 async function streamed(
   text: string,
   status = 200,
+  headers: Record<string, string> = {},
 ): Promise<{ events: ChatEvent[]; init: RequestInit | undefined }> {
   let init: RequestInit | undefined;
   const fetcher = (async (_url: unknown, options?: RequestInit) => {
     init = options;
     return new Response(text, {
       status,
-      headers: { "content-type": "text/event-stream" },
+      headers: { "content-type": "text/event-stream", ...headers },
     });
   }) as unknown as typeof fetch;
   const events: ChatEvent[] = [];
@@ -292,11 +294,29 @@ describe("OpenAI chat events", () => {
 
   test("an error frame and bad JSON are error events", () => {
     expect(chatEvents('{"error":{"message":"no such model"}}')).toEqual([
-      { kind: "error", message: "no such model" },
+      { kind: "error", message: "no such model", remote: true },
     ]);
     expect(chatEvents("{nope")).toEqual([
       { kind: "error", message: "invalid JSON in the stream" },
     ]);
+    // the status an error frame names, by code or by Google's word
+    expect(
+      chatEvents('{"error":{"code":502,"message":"upstream failed"}}'),
+    ).toEqual([
+      { kind: "error", message: "upstream failed", status: 502, remote: true },
+    ]);
+    expect(chatEvents('{"error":{"code":"429","message":"slow"}}')).toEqual([
+      { kind: "error", message: "slow", status: 429, remote: true },
+    ]);
+    expect(
+      chatEvents('{"error":{"message":"busy","status":"UNAVAILABLE"}}'),
+    ).toEqual([{ kind: "error", message: "busy", status: 503, remote: true }]);
+    expect(
+      chatEvents('{"error":{"message":"full","status":"RESOURCE_EXHAUSTED"}}'),
+    ).toEqual([{ kind: "error", message: "full", status: 429, remote: true }]);
+    expect(
+      chatEvents('{"error":{"code":"server_error","message":"odd"}}'),
+    ).toEqual([{ kind: "error", message: "odd", remote: true }]);
     expect(chatEvents("[DONE]")).toEqual([]);
   });
 });
@@ -466,7 +486,50 @@ describe("OpenAI chat stream", () => {
   test("a refused request is one error with the status and the body", async () => {
     const { events } = await streamed('{"error":"no"}', 500);
     expect(events).toEqual([
-      { kind: "error", message: 'HTTP 500: {"error":"no"}' },
+      {
+        kind: "error",
+        message: 'HTTP 500: {"error":"no"}',
+        status: 500,
+        remote: true,
+      },
     ]);
+  });
+
+  test("a refusal carries its Retry-After in milliseconds", async () => {
+    const { events } = await streamed("busy", 429, { "retry-after": "3" });
+    expect(events).toEqual([
+      {
+        kind: "error",
+        message: "HTTP 429: busy",
+        status: 429,
+        remote: true,
+        retryAfterMs: 3000,
+      },
+    ]);
+    const unread = await streamed("busy", 503, { "retry-after": "soon" });
+    expect(unread.events).toEqual([
+      { kind: "error", message: "HTTP 503: busy", status: 503, remote: true },
+    ]);
+  });
+
+  test("a failed connection is unanswered", async () => {
+    const fetcher = (async () => {
+      throw new TypeError("unable to connect");
+    }) as unknown as typeof fetch;
+    const stream = streamChat(
+      fetcher,
+      "http://models.test/v1/chat/completions",
+      buildChatBody(request),
+      new AbortController().signal,
+    );
+    let thrown: unknown;
+    try {
+      for await (const _ of stream) {
+      }
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Unanswered);
+    expect((thrown as Unanswered).timedOut).toBe(false);
   });
 });

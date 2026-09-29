@@ -34,6 +34,8 @@ export type ProviderDeps = {
   fetcher: Fetcher;
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
+  // the headers wait, shorter in a test
+  headersTimeoutMs?: number;
 };
 
 export const OPENROUTER_HEADERS = {
@@ -81,6 +83,9 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
             ? geminiEvents()
             : chatEvents,
         headers,
+        ...(deps.headersTimeoutMs === undefined
+          ? {}
+          : { headersTimeoutMs: deps.headersTimeoutMs }),
       });
       try {
         for await (const event of events) {
@@ -89,7 +94,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
             continue;
           }
           yield {
-            kind: "error",
+            ...event,
             message: scrub(
               openRouter
                 ? openRouterError(event.message)
@@ -106,7 +111,9 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           message: scrub(
             `${row.name} failed: ${err instanceof Error ? err.message : String(err)}`,
           ),
-          ...(err instanceof Unanswered ? { unanswered: true } : {}),
+          ...(err instanceof Unanswered
+            ? { unanswered: true, ...(err.timedOut ? { timedOut: true } : {}) }
+            : {}),
         };
       }
     },

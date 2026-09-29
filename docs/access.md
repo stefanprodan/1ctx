@@ -123,8 +123,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `knowledge.changed` reaches the same project audience as a `knowledge`
   frame with the file summary and `deleted`, including the delete revision,
   and an emptied bin as `knowledgeEmptied`;
-  a stream frame (`delta`, `html`, `visual`, with a sequence per send)
-  goes to the connections watching its session, straight from the
+  a stream frame (`delta`, `html`, `visual`, `retry`, with a sequence
+  per send) goes to the connections watching its session, straight from the
   writer through a port. `watch` and `unwatch` are the client's two
   commands. `watch` is authorized through a port to
   sessions and answered with `watched` and the runner's live snapshot.

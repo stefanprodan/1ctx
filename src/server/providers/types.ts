@@ -102,7 +102,21 @@ export type ChatEvent =
   // model that answered, as the router named them
   | { kind: "served"; upstream: string | null; model: string | null }
   | { kind: "usage"; usage: Usage }
-  | { kind: "error"; message: string; unanswered?: boolean };
+  | {
+      kind: "error";
+      message: string;
+      // no response came at all: the connection failed or, with
+      // timedOut, the headers wait ran out
+      unanswered?: boolean;
+      timedOut?: boolean;
+      // the HTTP status, or the code an error frame names
+      status?: number;
+      // the words are the provider's, from its body or an error frame,
+      // so a log never carries them
+      remote?: boolean;
+      // the response's Retry-After in milliseconds, when it had one
+      retryAfterMs?: number;
+    };
 
 // one provider row, ready to talk to
 export interface Provider {

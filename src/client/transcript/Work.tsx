@@ -10,7 +10,7 @@
 // fold too, as its last item.
 
 import { useEffect, useRef } from "preact/hooks";
-import type { Message } from "../../shared/contracts/session.ts";
+import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { folds, useTick } from "./fold.ts";
 import type { WorkNode } from "./rows.ts";
@@ -27,6 +27,7 @@ export function Work({
   live,
   running,
   memory = false,
+  retry = null,
 }: {
   node: WorkNode;
   // the answer, or the reply streaming after the work
@@ -35,13 +36,15 @@ export function Work({
   running: boolean;
   // the run's memory phase, folded after the answer
   memory?: boolean;
+  // the running round waiting to ask its provider again
+  retry?: LiveRetry | null;
 }) {
   const foldKey = memory ? `${node.sendId}:memory` : node.sendId;
   const { open, onToggle } = useFoldOpen(foldKey);
   useTick(running);
   const summary = memory
-    ? memorySummary(node, running, Date.now())
-    : workSummary(node, running, Date.now());
+    ? memorySummary(node, running, Date.now(), retry)
+    : workSummary(node, running, Date.now(), retry);
   const wasRunning = useRef(running);
 
   // only the transition shuts the fold: mounting a finished send must

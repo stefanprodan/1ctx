@@ -8,6 +8,7 @@
 // startRound begins the next round; finalizeSend ends the send once.
 
 import type {
+  LiveRetry,
   Message,
   SendSummary,
   SessionSummary,
@@ -29,7 +30,7 @@ import {
   type StartFields,
   startSend as startSendRows,
 } from "./start.ts";
-import { streamDelta, streamVisual } from "./stream.ts";
+import { streamDelta, streamRetry, streamVisual } from "./stream.ts";
 import {
   type CompactFields,
   type StartedCompact,
@@ -111,6 +112,11 @@ export class Writer {
     piece: Pick<VisualFrame, "callIndex" | "title" | "html" | "htmlAt">,
   ): void {
     streamVisual(this.deps, send, piece);
+  }
+
+  // a round began or ended a wait to ask its provider again
+  retrying(send: ActiveSend, retry: LiveRetry | null): void {
+    streamRetry(this.deps, send, retry);
   }
 
   private session(id: string, now: number): SessionSummary {

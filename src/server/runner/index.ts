@@ -35,7 +35,7 @@ import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { regenerateUser } from "./regenerate.ts";
 import { CHAT_POOL, Registry, runPool } from "./registry.ts";
-import type { RoundDeps } from "./round.ts";
+import { ProviderRefusal, type RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
@@ -148,6 +148,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
         const end = await toolLoop(loopDeps, send);
         void terminate(send, end.cause, end.error);
       } catch (error) {
+        if (send.cause === null && error instanceof ProviderRefusal) {
+          send.refusal = { status: error.status };
+        }
         void terminate(
           send,
           "failure",

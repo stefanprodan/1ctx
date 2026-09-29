@@ -75,9 +75,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   has let go. A stream quiet for two minutes after its first event
   (the wait for the first is bounded only by the deadline, since a
   local server reads a long prompt in silence) or a reply past 1 MB is
-  a failure (`runner/round.ts`). The headers wait is two minutes; a
-  request with no response at all (the headers wait or a failed
-  connection) is asked again once per round, never an HTTP error. A
+  a failure (`runner/round.ts`). The headers wait is two minutes. A
+  round's request that failed before its stream started is asked again
+  by the rule in `docs/providers.md`, every round alike, the memory
+  phase's included; the round stays in progress while it waits. A
   chat send (a message, regenerate or
   compact) past the `sendDeadlineMs` limit, thirty minutes by default, ends
   with cause `deadline`, status `stopped`; a run has its own deadline.

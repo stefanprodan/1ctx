@@ -8,6 +8,7 @@ import {
   memoryPhase,
   stopMainTools,
 } from "./memory-phase.ts";
+import { refusalFields } from "./round.ts";
 import type { ActiveSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { statusOf } from "./writer.ts";
@@ -95,7 +96,11 @@ export async function endSend(
     completion_tokens: send.completionTokens,
     spent_tokens: send.budget.tokens,
     duration: deps.phase.clock() - send.startedAt,
-    ...(send.error === null ? {} : errorFields(send.error, false)),
+    ...(send.error === null
+      ? {}
+      : send.refusal !== null
+        ? refusalFields(send.refusal.status)
+        : errorFields(send.error, false)),
   });
   send.end(finalized);
   // after the done state and its frames, so the ask never holds the run

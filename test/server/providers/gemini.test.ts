@@ -645,9 +645,32 @@ describe("Gemini errors", () => {
       {
         kind: "error",
         message: `Gemini 400: ${message.replace("default_api:datetime", "[key]")}`,
+        status: 400,
+        remote: true,
       },
     ]);
     expect(JSON.stringify(events)).not.toContain(KEY);
+  });
+
+  test("a busy server keeps its status for the retry", async () => {
+    const busy = JSON.stringify([
+      {
+        error: {
+          code: 503,
+          message: "The service is currently unavailable.",
+          status: "UNAVAILABLE",
+        },
+      },
+    ]);
+    const { events } = await stream(busy, 503);
+    expect(events).toEqual([
+      {
+        kind: "error",
+        message: "Gemini 503: The service is currently unavailable.",
+        status: 503,
+        remote: true,
+      },
+    ]);
   });
 
   test.each([

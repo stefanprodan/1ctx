@@ -8,7 +8,6 @@
 
 import { effect, signal } from "@preact/signals";
 import type {
-  CreateSessionRequest,
   RegenerateRequest,
   RenameSessionRequest,
   SendMessageRequest,
@@ -35,7 +34,8 @@ import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
-import { resetValues, syncValues } from "./session-values.ts";
+import { sending } from "./session-start.ts";
+import { resetValues, retrying, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./stream.ts";
@@ -47,11 +47,13 @@ export {
   projectAgentCount,
   projectAgents,
 } from "./project-agents.ts";
+export { createSession, sending, stopSession } from "./session-start.ts";
 export {
   loadOpened,
   loadToolResult,
   loadVisual,
   openedFiles,
+  retrying,
   toolResults,
   toolVisuals,
 } from "./session-values.ts";
@@ -65,13 +67,12 @@ export const session = signal<SessionDetail | null>(null);
 export const sessionError = signal<Failure | null>(null);
 // the replies streaming on the chat on screen, by message id
 export const live = signal<ReadonlyMap<string, Live>>(new Map());
-// a send the composer asked for and the server has not answered
-export const sending = signal(false);
 
 // A stored call keeps only a marker here. Its mounted frame keeps the paint.
 export const visualPreviews = signal<Previews>(new Map());
 
-type Frame = Extract<SocketEvent, { type: "delta" | "html" | "visual" }>;
+// the stream frames, each in its send's sequence
+type Frame = Extract<SocketEvent, { seq: number }>;
 
 let owner: string | null = null;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
@@ -108,6 +109,7 @@ function show(detail: SessionDetail): void {
   session.value = detail;
   live.value = liveFrom(detail);
   syncValues(detail);
+  retrying.value = detail.live?.retry ?? null;
   stream =
     detail.live === null
       ? null
@@ -198,23 +200,6 @@ function take(detail: SessionDetail): void {
   show(detail);
 }
 
-export async function createSession(
-  body: CreateSessionRequest,
-): Promise<SessionDetail> {
-  sending.value = true;
-  try {
-    // the flips made before the chat existed go with its first message
-    const sent = changeOf(null);
-    const detail = await carry(null, sent, () =>
-      api<SessionResponse>("/api/sessions", "POST", { ...body, ...sent }),
-    );
-    navigate(`/chat/${detail.session.id}`);
-    return detail;
-  } finally {
-    sending.value = false;
-  }
-}
-
 // a send of any kind answers the detail; the flips the person made ride
 // on the two kinds that take them and are forgotten once taken
 async function post(id: string, path: string, body?: object): Promise<void> {
@@ -248,11 +233,6 @@ export const regenerateSession = (id: string): Promise<void> =>
 
 // a summary round on its own; the next reply starts from the summary
 export const compactSession = (id: string) => post(id, "compact");
-
-// the answer is empty: the end of the send arrives as an envelope
-export async function stopSession(id: string): Promise<void> {
-  await api(`/api/sessions/${encodeURIComponent(id)}/stop`, "POST");
-}
 
 // a rename is not a send: it goes under a reply too, and the composer
 // stays free while it is on its way
@@ -340,6 +320,8 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
           },
   };
   syncValues(session.value);
+  // a lost clear frame never outlives the send
+  if (ev.session.status !== "running") retrying.value = null;
   live.value = map;
   // who archived it and until when are the detail's alone
   if (!held.session.archived && ev.session.archived) refetch();
@@ -359,6 +341,10 @@ function applyFrame(frame: Frame): boolean {
   }
   if (frame.seq !== stream.seq + 1) return false;
   stream.seq = frame.seq;
+  if (frame.type === "retry") {
+    retrying.value = frame.retry;
+    return true;
+  }
   if (frame.type === "visual") {
     const row = held.messages.find((row) => row.id === frame.messageId);
     if (!row || row.sendId !== frame.sendId) return false;
@@ -419,6 +405,7 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     live: ev.live,
   });
   session.value = { ...held, live: ev.live };
+  retrying.value = ev.live?.retry ?? null;
   if (ev.live === null) {
     // the rows say running and the runner has nothing: the end went by
     // before this connection heard it
@@ -484,6 +471,7 @@ export function onSocket(ev: SocketEvent): void {
     case "delta":
     case "html":
     case "visual":
+    case "retry":
       if (pending !== null) {
         if (pending.buffer.length >= BUFFER_MAX) pending.overflow = true;
         else pending.buffer.push(ev);

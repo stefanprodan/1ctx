@@ -291,12 +291,37 @@ async function readErrorBody(
   }
 }
 
-// no response at all, so asking again is safe
-export class Unanswered extends Error {}
+// no response at all, so asking again is safe; timedOut when the
+// headers wait ran out, which the round asks again only once
+export class Unanswered extends Error {
+  constructor(
+    message: string,
+    readonly timedOut = false,
+  ) {
+    super(message);
+  }
+}
+
+// an HTTP date as RFC 9110 requires a sender to write it
+const IMF_FIXDATE =
+  /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
+// Retry-After as whole seconds or an IMF-fixdate, in milliseconds from
+// now; a date already past is no wait, anything else is not a Retry-After
+export function retryAfterMs(header: string | null, now: number) {
+  if (header === null) return null;
+  const value = header.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  if (!IMF_FIXDATE.test(value)) return null;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? Math.max(0, at - now) : null;
+}
 
 export type StreamOptions = {
   mapEvents?: (json: string) => ChatEvent[];
   headers?: Record<string, string>;
+  // shorter in a test, so a timed out wait is seen without two minutes
+  headersTimeoutMs?: number;
 };
 
 export async function* streamChat(
@@ -310,10 +335,11 @@ export async function* streamChat(
   const headers = options.headers ?? {};
   const controller = new AbortController();
   const combined = AbortSignal.any([signal, controller.signal]);
-  const headersTimer = setTimeout(
-    () => controller.abort(new Error("the response headers timed out")),
-    CHAT_HEADERS_TIMEOUT_MS,
-  );
+  let timedOut = false;
+  const headersTimer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error("the response headers timed out"));
+  }, options.headersTimeoutMs ?? CHAT_HEADERS_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetcher(url, {
@@ -324,15 +350,22 @@ export async function* streamChat(
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new Unanswered(err instanceof Error ? err.message : String(err));
+    throw new Unanswered(
+      err instanceof Error ? err.message : String(err),
+      timedOut,
+    );
   } finally {
     clearTimeout(headersTimer);
   }
   if (!response.ok) {
+    const wait = retryAfterMs(response.headers.get("retry-after"), Date.now());
     const text = await readErrorBody(response, controller);
     yield {
       kind: "error",
       message: `HTTP ${response.status}${text ? `: ${text}` : ""}`,
+      status: response.status,
+      remote: true,
+      ...(wait === null ? {} : { retryAfterMs: wait }),
     };
     return;
   }

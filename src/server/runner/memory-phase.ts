@@ -16,7 +16,7 @@ import { type ContextLookups, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";
-import { runRound } from "./round.ts";
+import { failureFields, runRound } from "./round.ts";
 import { type ActiveSend, newRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { CUT_SHORT, NOT_RUN, statusOf } from "./writer.ts";
@@ -327,6 +327,8 @@ export async function memoryPhase(
   send.ending.signal.addEventListener("abort", stop, { once: true });
   if (send.ending.signal.aborted) stop();
   let done = false;
+  // the phase runs past the turn's deadline, within its own window
+  const deadline = deps.clock() + send.policy.limits.memoryPhaseMs;
   void deps.pause(send.policy.limits.memoryPhaseMs).then(() => {
     if (!done) stop();
   });
@@ -343,13 +345,14 @@ export async function memoryPhase(
         await runRound(deps.round, send, rows, {
           request,
           signal: controller.signal,
+          deadline,
         });
       } catch (error) {
         if (controller.signal.aborted) return;
         deps.log.warn("round failed", {
           chat: send.sessionId,
           round: send.roundNo,
-          ...errorFields(error, false),
+          ...failureFields(error),
         });
         throw error;
       }

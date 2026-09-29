@@ -33,6 +33,7 @@ import {
   projectAgents,
   regenerateSession,
   renameSession,
+  retrying,
   sending,
   sendMessage,
   session,
@@ -206,6 +207,7 @@ function SessionPage({
             sessionId={shown.session.id}
             nodes={groupRows(shown.messages, shown.send)}
             live={live.value}
+            retry={retrying.value}
             agentOf={agentOf}
             authorOf={authorOf}
             onRegenerate={
