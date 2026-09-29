@@ -24,6 +24,7 @@ import { BACKSTOP_MS, COMMAND_ITERATIONS } from "./commands.ts";
 import { type CommitDocs, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
 import { listKept, readKept } from "./kept.ts";
+import { checkScratchNames } from "./names.ts";
 import {
   checkOpened,
   mountPath,
@@ -153,6 +154,9 @@ export async function run(
     const docs = caps.knowledge;
     const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
     const scratch = deps.scratch.read(sessionId);
+    // the worker writes each row at /tmp/<path>, so a row never names
+    // a path outside it
+    checkScratchNames(scratch.entries.map((file) => file.path));
     const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
     const uploads = deps.knowledge.mountedUploads(sessionId);
     const kept = listKept(deps.db, sessionId);

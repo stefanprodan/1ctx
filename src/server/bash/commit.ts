@@ -8,9 +8,10 @@
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Change } from "../knowledge/index.ts";
-import { checkNames, checkUsage } from "../knowledge/rules.ts";
+import { checkUsage } from "../knowledge/rules.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { checkScratchNames } from "./names.ts";
 import { output } from "./output.ts";
 import type { Scratch, ScratchChanges, ScratchStore } from "./scratch.ts";
 
@@ -80,7 +81,7 @@ export function commit(
     // counted from the rows just written, so the caps hold whatever the
     // command worker answered
     const stored = deps.scratch.sizes(scratch.sessionId);
-    checkNames(stored.map((file) => file.path));
+    checkScratchNames(stored.map((file) => file.path));
     checkScratchTotals(
       scratch.before,
       {

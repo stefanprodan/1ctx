@@ -12,6 +12,7 @@ import {
   parseName,
   textFromBytes,
 } from "../knowledge/rules.ts";
+import { MAX_MOUNT_PATH_BYTES, parseScratchName } from "./names.ts";
 import { underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
 
@@ -46,7 +47,7 @@ export async function diff(
     }
     if (stat.isDirectory) continue;
     if (path.startsWith("/tmp/")) {
-      const name = parseName(path.slice("/tmp/".length));
+      const name = parseScratchName(path.slice("/tmp/".length));
       scratchNames.push(name);
       const data = await fs.readFileBuffer(path);
       const before = temporary.get(name);
@@ -180,7 +181,7 @@ export async function savedCwd(
   if (
     pwd === undefined ||
     !pwd.startsWith("/") ||
-    Buffer.byteLength(pwd) > 256 ||
+    Buffer.byteLength(pwd) > MAX_MOUNT_PATH_BYTES ||
     /\p{Cc}/u.test(pwd)
   )
     return home(docs);

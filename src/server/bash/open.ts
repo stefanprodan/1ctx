@@ -12,6 +12,7 @@ import {
 import { languageOf, lineCount, textFromBytes } from "../knowledge/rules.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { MAX_OPENS_PER_COMMAND } from "./commands.ts";
+import { MAX_MOUNT_PATH_BYTES } from "./names.ts";
 
 export type OpenedRecord = OpenedFile & { text: string };
 
@@ -67,7 +68,7 @@ export function mountPath(path: string): boolean {
   const parts = path.split("/").slice(1);
   return (
     path.startsWith("/") &&
-    Buffer.byteLength(path) <= 256 &&
+    Buffer.byteLength(path) <= MAX_MOUNT_PATH_BYTES &&
     !/\p{Cc}/u.test(path) &&
     ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
     parts.every((part) => part !== "" && part !== "." && part !== "..")
@@ -175,6 +176,15 @@ export function makeOpenCommand(
       const arg = args[0]!;
       const path = ctx.fs.resolvePath(ctx.cwd, arg);
       if (!mounted(path)) return refusal(arg, "not in the mount");
+      // the server takes only what mountPath allows, so a name it would
+      // refuse is refused here rather than failing the command
+      if (!mountPath(path))
+        return refusal(
+          arg,
+          /\p{Cc}/u.test(path)
+            ? "name has a control character"
+            : "path too long",
+        );
       // with the docs off a file made under /knowledge is discarded, so
       // it is missing here too
       if (!caps.knowledge && underKnowledge(path))
