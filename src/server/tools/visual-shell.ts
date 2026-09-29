@@ -8,8 +8,16 @@ import {
   visualScript,
 } from "./visual-inert.ts";
 import { bootVisual, visualConnect, visualMessage } from "./visual-painter.ts";
-import { visualContrast, visualSchemeQuery } from "./visual-scheme.ts";
-import { VISUAL_THEME_CSS, visualThemeValues } from "./visual-theme.ts";
+import {
+  visualContrast,
+  visualGround,
+  visualSchemeQuery,
+} from "./visual-scheme.ts";
+import {
+  VISUAL_BACKDROPS,
+  VISUAL_THEME_CSS,
+  visualThemeValues,
+} from "./visual-theme.ts";
 
 export {
   cleanVisual,
@@ -49,10 +57,13 @@ export function visualDocument(): string {
     measure: measureVisual,
     query: visualSchemeQuery,
     contrast: visualContrast,
+    ground: visualGround,
   };
-  const source = Object.entries(helpers)
-    .map(([name, fn]) => `${name}: ${fn.toString()}`)
-    .join(",\n");
+  const source = [
+    ...Object.entries(helpers).map(([name, fn]) => `${name}: ${fn.toString()}`),
+    // data, not a function, so it travels as a literal
+    `backdrops: ${JSON.stringify(VISUAL_BACKDROPS)}`,
+  ].join(",\n");
   const script = `${idiomorph}\n;(${bootVisual.toString()})({${source}}, Idiomorph);`;
   return `<!doctype html>
 <html data-theme="light"><head>

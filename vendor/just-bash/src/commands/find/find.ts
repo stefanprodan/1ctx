@@ -152,8 +152,10 @@ export const findCommand: RuntimeCommand = {
 
     // Starting points must precede the expression. Separating them first keeps
     // predicate operands and -exec command arguments from being mistaken for paths.
+    // (1ctx) a leading `--` ends the options, as in GNU find
+    const firstPath = args[0] === "--" ? 1 : 0;
     let expressionStart = args.length;
-    for (let i = 0; i < args.length; i++) {
+    for (let i = firstPath; i < args.length; i++) {
       const arg = args[i];
       if (
         arg.startsWith("-") ||
@@ -885,6 +887,9 @@ export const findCommand: RuntimeCommand = {
             part === "{}" ? file : part,
           );
           const result = await ctx.exec(shellJoinArgs([cmdWithFile[0]]), {
+            // (1ctx) the command is a process: it sees the exported variables
+            env: { ...ctx.exportedEnv },
+            replaceEnv: true,
             cwd: ctx.cwd,
             signal: ctx.signal,
             args: cmdWithFile.slice(1),
@@ -908,6 +913,9 @@ export const findCommand: RuntimeCommand = {
         else cmdWithFiles.push(part);
       }
       const result = await ctx.exec(shellJoinArgs([cmdWithFiles[0]]), {
+        // (1ctx) as above
+        env: { ...ctx.exportedEnv },
+        replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
         args: cmdWithFiles.slice(1),

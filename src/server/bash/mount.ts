@@ -31,8 +31,9 @@ import {
   type OpenedRecord,
   openedReceipt,
 } from "./open.ts";
-import { failed, output } from "./output.ts";
+import { failed, refused } from "./output.ts";
 import type {
+  Answer,
   Changes,
   CommandCause,
   CommandEnd,
@@ -140,6 +141,8 @@ export async function run(
   let release: (() => void) | undefined;
   let releaseSession: (() => void) | undefined;
   let notice = "";
+  // set once the command ran, so a refused save still shows its output
+  let answer: Answer | undefined;
   let phase: CommandPhase = "queue";
   // the worker's word when neither signal fired: a shutdown is an abort
   let ended: CommandCause = "error";
@@ -251,17 +254,17 @@ export async function run(
       ended = settled.cause;
       throw combined.aborted ? combined.reason : settled.error;
     }
-    const answer = settled.answer;
+    answer = settled.answer;
     phase = "diff";
     notice = left + answer.notice;
     combined.throwIfAborted();
     // the exit decides, whatever changes came with it
     if (answer.exitCode === 124 || answer.exitCode === 126) {
-      const printed = output(
+      const printed = refused(
         answer.stdout,
-        `${answer.stderr}\nnothing saved: command stopped at a deadline or limit`,
+        answer.stderr,
         answer.exitCode,
-        [],
+        "command stopped at a deadline or limit",
         caps.resultCut - notice.length,
       );
       return {
@@ -275,6 +278,7 @@ export async function run(
         },
       };
     }
+    if (answer.refused !== null) throw new Error(answer.refused);
     const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
     const answered = checked(
       answer.changes,
@@ -331,7 +335,10 @@ export async function run(
       opened,
     };
   } catch (error) {
-    const result = failed(error, caps.resultCut - notice.length);
+    const cut = caps.resultCut - notice.length;
+    const result = answer
+      ? refused(answer.stdout, answer.stderr, answer.exitCode, error, cut)
+      : failed(error, cut);
     return {
       ...result,
       content: notice + result.content,

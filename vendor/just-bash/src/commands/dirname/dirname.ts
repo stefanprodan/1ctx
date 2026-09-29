@@ -23,7 +23,12 @@ export const dirnameCommand: RuntimeCommand = {
       return showHelp(dirnameHelp);
     }
 
-    const names = args.filter((arg) => !arg.startsWith("-"));
+    // (1ctx) `--` ends the options, as in GNU dirname
+    const dashes = args.includes("--") ? args.indexOf("--") : args.length;
+    const names = [
+      ...args.slice(0, dashes).filter((arg) => !arg.startsWith("-")),
+      ...args.slice(dashes + 1),
+    ];
 
     if (names.length === 0) {
       return {

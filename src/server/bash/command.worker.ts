@@ -213,8 +213,18 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     opened,
   };
   if (result.exitCode === 124 || result.exitCode === 126)
-    return { ...printed, changes: null };
-  const changes = await diff(fs, job);
+    return { ...printed, changes: null, refused: null };
+  let changes: Awaited<ReturnType<typeof diff>>;
+  try {
+    changes = await diff(fs, job);
+  } catch (error) {
+    // the command ran, so its output goes back with why nothing saves
+    return {
+      ...printed,
+      changes: null,
+      refused: error instanceof Error ? error.message : String(error),
+    };
+  }
   const after = await savedCwd(fs, result.env.PWD, job.docs);
   return {
     ...printed,
@@ -225,6 +235,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
       cwd:
         !job.docs && underKnowledge(job.cwd) && after === cwd ? job.cwd : after,
     },
+    refused: null,
   };
 }
 

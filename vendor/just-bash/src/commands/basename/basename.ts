@@ -33,6 +33,11 @@ export const basenameCommand: RuntimeCommand = {
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
+      // (1ctx) `--` ends the options, as in GNU basename
+      if (arg === "--") {
+        names.push(...args.slice(i + 1));
+        break;
+      }
       if (arg === "-a" || arg === "--multiple") {
         multiple = true;
       } else if (arg === "-s" && i + 1 < args.length) {

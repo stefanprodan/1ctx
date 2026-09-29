@@ -135,7 +135,8 @@ describe("atomic knowledge and scratch commits", () => {
     try {
       expect(await run(s, edits)).toEqual({
         error: true,
-        content: "nothing saved: write failed",
+        content: "nothing saved: write failed\nexit 0",
+        tail: "nothing saved: write failed\nexit 0".length,
         ended: { phase: "commit", cause: "error" },
       });
       s.unchanged();

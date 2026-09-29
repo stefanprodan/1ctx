@@ -117,6 +117,9 @@ export async function readFileContent(
       if (matchesPreGlob(filename, options.preprocessorGlobs)) {
         // Run preprocessor on this file
         const result = await ctx.exec(shellJoinArgs([options.preprocessor]), {
+          // (1ctx) the preprocessor is a process: it sees the exported variables
+          env: { ...ctx.exportedEnv },
+          replaceEnv: true,
           cwd: ctx.cwd,
           signal: ctx.signal,
           args: [filePath],

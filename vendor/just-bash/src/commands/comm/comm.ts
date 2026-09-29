@@ -41,7 +41,12 @@ export const commCommand: RuntimeCommand = {
     let suppress3 = false;
     const files: string[] = [];
 
-    for (const arg of args) {
+    for (const [i, arg] of args.entries()) {
+      // (1ctx) `--` ends the options, as in GNU comm
+      if (arg === "--") {
+        files.push(...args.slice(i + 1));
+        break;
+      }
       if (arg === "-1") suppress1 = true;
       else if (arg === "-2") suppress2 = true;
       else if (arg === "-3") suppress3 = true;

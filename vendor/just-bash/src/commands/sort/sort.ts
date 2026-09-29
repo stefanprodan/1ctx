@@ -75,7 +75,14 @@ export const sortCommand: RuntimeCommand = {
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      if (arg === "-r" || arg === "--reverse") {
+      // (1ctx) `--` ends the options, as in GNU sort
+      if (arg === "--") {
+        files.push(...args.slice(i + 1));
+        break;
+      }
+      if (arg === "-") {
+        files.push(arg);
+      } else if (arg === "-r" || arg === "--reverse") {
         options.reverse = true;
       } else if (arg === "-n" || arg === "--numeric-sort") {
         options.numeric = true;

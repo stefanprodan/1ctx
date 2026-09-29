@@ -367,6 +367,17 @@ export const sedCommand: RuntimeCommand = {
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
+      // (1ctx) `--` ends the options, as in GNU sed
+      if (arg === "--") {
+        for (const operand of args.slice(i + 1)) {
+          if (scripts.length === 0 && scriptFiles.length === 0) {
+            scripts.push(operand);
+          } else {
+            files.push(operand);
+          }
+        }
+        break;
+      }
       if (arg === "-n" || arg === "--quiet" || arg === "--silent") {
         silent = true;
       } else if (arg === "-i" || arg === "--in-place") {

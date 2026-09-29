@@ -18,6 +18,16 @@ const envHelp = {
   ],
 };
 
+// (1ctx) env's own failures exit 125, as GNU's do
+function envFailure(stderr: string): ExecResult {
+  return { stdout: "", stderr, exitCode: 125 };
+}
+
+// (1ctx) a process sees the exported variables, never the shell's own
+function exportedEnv(ctx: RuntimeCommandContext): Record<string, string> {
+  return ctx.exportedEnv ?? mapToRecord(ctx.env);
+}
+
 export const envCommand: RuntimeCommand = {
   name: "env",
 
@@ -29,43 +39,59 @@ export const envCommand: RuntimeCommand = {
       return showHelp(envHelp);
     }
 
+    // (1ctx) GNU's parse: options up to the first operand or `--`, `-` is
+    // -i, a cluster may end in -u's value, then NAME=VALUE, then the command
     let ignoreEnv = false;
     const unsetVars: string[] = [];
     const setVars = new Map<string, string>();
-    let commandStart = -1;
-
-    // Parse arguments
-    for (let i = 0; i < args.length; i++) {
+    let i = 0;
+    for (; i < args.length; i++) {
       const arg = args[i];
-
-      if (arg === "-i" || arg === "--ignore-environment") {
-        ignoreEnv = true;
-      } else if (arg === "-u" && i + 1 < args.length) {
-        unsetVars.push(args[++i]);
-      } else if (arg.startsWith("-u")) {
-        unsetVars.push(arg.slice(2));
-      } else if (arg.startsWith("--unset=")) {
-        unsetVars.push(arg.slice(8));
-      } else if (arg.startsWith("--") && arg !== "--") {
-        return unknownOption("env", arg);
-      } else if (arg.startsWith("-") && arg !== "-") {
-        // Check for unknown single-char options
-        for (const c of arg.slice(1)) {
-          if (c !== "i" && c !== "u") {
-            return unknownOption("env", `-${c}`);
-          }
-        }
-        if (arg.includes("i")) ignoreEnv = true;
-      } else if (arg.includes("=") && commandStart === -1) {
-        // NAME=VALUE assignment
-        const eqIdx = arg.indexOf("=");
-        const name = arg.slice(0, eqIdx);
-        const value = arg.slice(eqIdx + 1);
-        setVars.set(name, value);
-      } else {
-        // Start of command
-        commandStart = i;
+      if (arg === "--") {
+        i++;
         break;
+      }
+      if (arg === "-" || arg === "-i" || arg === "--ignore-environment") {
+        ignoreEnv = true;
+        continue;
+      }
+      if (arg === "--unset" || arg.startsWith("--unset=")) {
+        const name = arg === "--unset" ? args[++i] : arg.slice(8);
+        if (name === undefined) {
+          return envFailure("env: option '--unset' requires an argument\n");
+        }
+        unsetVars.push(name);
+        continue;
+      }
+      if (arg.startsWith("--")) {
+        return envFailure(unknownOption("env", arg).stderr);
+      }
+      if (!arg.startsWith("-")) break;
+      for (let j = 1; j < arg.length; j++) {
+        const c = arg[j];
+        if (c === "i") {
+          ignoreEnv = true;
+        } else if (c === "u") {
+          const name = j + 1 < arg.length ? arg.slice(j + 1) : args[++i];
+          if (name === undefined) {
+            return envFailure("env: option requires an argument -- 'u'\n");
+          }
+          unsetVars.push(name);
+          break;
+        } else {
+          return envFailure(unknownOption("env", `-${c}`).stderr);
+        }
+      }
+    }
+    for (; i < args.length && args[i].includes("="); i++) {
+      const eqIdx = args[i].indexOf("=");
+      setVars.set(args[i].slice(0, eqIdx), args[i].slice(eqIdx + 1));
+    }
+    const commandStart = i < args.length ? i : -1;
+    // (1ctx) glibc's unsetenv refuses an empty name or one with `=`
+    for (const name of unsetVars) {
+      if (name === "" || name.includes("=")) {
+        return envFailure(`env: cannot unset '${name}': Invalid argument\n`);
       }
     }
 
@@ -74,7 +100,8 @@ export const envCommand: RuntimeCommand = {
     if (ignoreEnv) {
       newEnv = new Map(setVars);
     } else {
-      newEnv = new Map(ctx.env);
+      // (1ctx) from the exported variables, as a process's environment is
+      newEnv = new Map(Object.entries(exportedEnv(ctx)));
       // Unset variables
       for (const name of unsetVars) {
         newEnv.delete(name);
@@ -114,7 +141,8 @@ export const envCommand: RuntimeCommand = {
 
     // Execute with explicitly provided environment so untrusted values never
     // get reparsed as shell source via assignment prefixes.
-    return ctx.exec("command", {
+    // (1ctx) `--` so a command named like an option is not read as one
+    return ctx.exec("command --", {
       cwd: ctx.cwd,
       env: mapToRecord(newEnv),
       replaceEnv: true,
@@ -146,11 +174,13 @@ export const printenvCommand: RuntimeCommand = {
     }
 
     const vars = args.filter((arg) => !arg.startsWith("-"));
+    // (1ctx) the exported variables, as GNU printenv sees them
+    const env = new Map(Object.entries(exportedEnv(ctx)));
 
     if (vars.length === 0) {
       // Print all
       const lines: string[] = [];
-      for (const [key, value] of ctx.env) {
+      for (const [key, value] of env) {
         lines.push(`${key}=${value}`);
       }
       return {
@@ -164,7 +194,7 @@ export const printenvCommand: RuntimeCommand = {
     const lines: string[] = [];
     let exitCode = 0;
     for (const varName of vars) {
-      const value = ctx.env.get(varName);
+      const value = env.get(varName);
       if (value !== undefined) {
         lines.push(value);
       } else {

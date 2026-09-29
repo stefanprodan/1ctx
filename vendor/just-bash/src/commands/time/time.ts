@@ -122,7 +122,9 @@ export const timeCommand: RuntimeCommand = {
         };
       }
       result = await ctx.exec(shellJoinArgs([commandArgs[0]]), {
-        env: mapToRecord(ctx.env),
+        // (1ctx) the timed command is a process: it sees the exported variables
+        env: ctx.exportedEnv ?? mapToRecord(ctx.env),
+        replaceEnv: true,
         cwd: ctx.cwd,
         stdin: latin1FromBytes(ctx.stdin),
         // ctx.stdin is already byte-shaped — forward verbatim.

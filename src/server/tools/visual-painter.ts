@@ -7,8 +7,12 @@ import type {
   visualElementRule,
   visualScript,
 } from "./visual-inert.ts";
-import type { visualContrast, visualSchemeQuery } from "./visual-scheme.ts";
-import type { visualThemeValues } from "./visual-theme.ts";
+import type {
+  visualContrast,
+  visualGround,
+  visualSchemeQuery,
+} from "./visual-scheme.ts";
+import type { VISUAL_BACKDROPS, visualThemeValues } from "./visual-theme.ts";
 
 export type VisualMessage =
   | { type: "paint" | "final"; html: string }
@@ -88,6 +92,8 @@ type PainterHelpers = {
   measure: typeof measureVisual;
   query: typeof visualSchemeQuery;
   contrast: typeof visualContrast;
+  ground: typeof visualGround;
+  backdrops: typeof VISUAL_BACKDROPS;
 };
 type Morpher = {
   morph(
@@ -164,11 +170,15 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
   };
   // A whole page brings its own backdrop and the space around it, which the
   // chat already draws. Both go only when the page's text still reads on
-  // the chat's ground.
+  // the chat's ground; a page that reads on neither gets a plain backdrop.
   const ground = () => {
     const html = document.documentElement;
     let bare = false;
+    let backdrop: "light" | "dark" | null = null;
     try {
+      // measured without the frame's own answer, which paints the root
+      html.toggleAttribute("data-visual-bare", false);
+      html.removeAttribute("data-visual-backdrop");
       if (page) {
         // A canvas resolves any colour syntax the page or the theme used.
         const channels = (value: string) => {
@@ -189,14 +199,23 @@ export function bootVisual(helpers: PainterHelpers, morph: Morpher): void {
         const chat = channels(
           root.getPropertyValue("--color-background-primary"),
         );
-        bare =
-          root.backgroundImage === "none" &&
-          body.backgroundImage === "none" &&
-          !!text &&
-          !!chat &&
-          helpers.contrast(text, chat) >= 4.5;
+        ({ bare, backdrop } = helpers.ground(
+          {
+            text,
+            chat,
+            image:
+              root.backgroundImage !== "none" ||
+              body.backgroundImage !== "none",
+            color:
+              !!channels(root.backgroundColor) ||
+              !!channels(body.backgroundColor),
+          },
+          helpers.contrast,
+          helpers.backdrops,
+        ));
       }
       html.toggleAttribute("data-visual-bare", bare);
+      if (backdrop) html.setAttribute("data-visual-backdrop", backdrop);
     } catch {
       // Without computed styles the page keeps its own backdrop.
     }

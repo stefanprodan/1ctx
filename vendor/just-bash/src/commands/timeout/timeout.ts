@@ -65,6 +65,10 @@ export const timeoutCommand: RuntimeCommand = {
         commandStart = i + 1;
       } else if (arg.startsWith("--signal=")) {
         commandStart = i + 1;
+      } else if (arg === "--") {
+        // (1ctx) `--` ends the options, as in GNU timeout
+        commandStart = i + 1;
+        break;
       } else if (arg.startsWith("--") && arg !== "--") {
         return unknownOption("timeout", arg);
       } else if (arg.startsWith("-") && arg.length > 1 && arg !== "--") {
@@ -145,6 +149,9 @@ export const timeoutCommand: RuntimeCommand = {
 
       const execPromise = ctx
         .exec(shellJoinArgs([commandArgs[0]]), {
+          // (1ctx) the command is a process: it sees the exported variables
+          env: { ...ctx.exportedEnv },
+          replaceEnv: true,
           cwd: ctx.cwd,
           signal: combinedAbort.signal,
           stdin: latin1FromBytes(ctx.stdin),

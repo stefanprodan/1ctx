@@ -214,6 +214,7 @@ describe("the command worker", () => {
         notice: "",
         opened: [],
         changes: null,
+        refused: null,
       },
     });
     expect(asked).toBe(1);

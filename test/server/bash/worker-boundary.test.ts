@@ -18,7 +18,8 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { COMMAND_WORKER, callCaps, run, setup } from "./helpers.ts";
 
 const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
-const OUT = "nothing saved: the command worker answered out of protocol";
+const OUT =
+  "nothing saved: the command worker answered out of protocol\nexit 0";
 const all: CommandCaps = {
   ...callCaps,
   web: { mode: "all", domains: [] },
@@ -68,6 +69,21 @@ describe("a command worker's answer is untrusted", () => {
     });
     for (const url of [FORGED.href, "data:text/plain,x", "ftp://host/x"])
       await expect(fetch(url)).rejects.toThrow("only http and https");
+  });
+
+  test("a refusal that carries changes saves nothing", async () => {
+    const s = setup({}, FORGED);
+    try {
+      const result = await run(s, "refused");
+      expect(result).toMatchObject({
+        error: true,
+        content: "printed\nnothing saved: why\nexit 0",
+      });
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
+      expect(s.bash.scratch.read(s.session.id).revision).toBe(0);
+    } finally {
+      s.db.close();
+    }
   });
 
   test("a doc change with the docs off saves nothing", async () => {

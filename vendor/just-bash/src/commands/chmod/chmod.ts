@@ -37,6 +37,7 @@ export const chmodCommand: RuntimeCommand = {
     let recursive = false;
     let verbose = false;
     let argIdx = 0;
+    let optionsEnded = false;
 
     // Parse options
     while (argIdx < args.length && args[argIdx].startsWith("-")) {
@@ -49,6 +50,7 @@ export const chmodCommand: RuntimeCommand = {
         argIdx++;
       } else if (arg === "--") {
         argIdx++;
+        optionsEnded = true;
         break;
       } else {
         // Mode might start with - for removing permissions, check if it looks like a mode
@@ -71,7 +73,14 @@ export const chmodCommand: RuntimeCommand = {
     }
 
     const modeArg = args[argIdx];
-    const files = args.slice(argIdx + 1);
+    let files = args.slice(argIdx + 1);
+    // (1ctx) `--` after the mode ends the options too, as GNU chmod permutes
+    if (!optionsEnded && files.includes("--")) {
+      files = files.toSpliced(files.indexOf("--"), 1);
+      if (files.length === 0) {
+        return { stdout: "", stderr: "chmod: missing operand\n", exitCode: 1 };
+      }
+    }
 
     // Check if mode is numeric or symbolic
     const isNumericMode = /^[0-7]+$/.test(modeArg);

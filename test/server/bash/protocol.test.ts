@@ -25,6 +25,7 @@ const done = (patch: Record<string, unknown> = {}) => ({
     notice: "",
     opened: [],
     changes: { ...changes, ...patch },
+    refused: null,
   },
 });
 
@@ -42,6 +43,16 @@ describe("a command worker's messages", () => {
       removed: ["it's café.md"],
     };
     expect(fromWorker(done(patch), "job")).toEqual(done(patch) as never);
+  });
+
+  test("a refusal passes only as a string or null", () => {
+    const refused = (value: unknown) => {
+      const message = done();
+      return { ...message, answer: { ...message.answer, refused: value } };
+    };
+    expect(fromWorker(refused("why"), "job")).toEqual(refused("why") as never);
+    for (const value of [5, undefined, {}, ["why"]])
+      expect(fromWorker(refused(value), "job")).toBe(MALFORMED);
   });
 
   test("another id or an unknown type is dropped", () => {

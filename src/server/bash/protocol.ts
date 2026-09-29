@@ -55,8 +55,11 @@ export type Answer = {
   exitCode: number;
   notice: string;
   opened: OpenedRecord[];
-  // null for an exit at a deadline or limit: nothing is read back
+  // null for an exit at a deadline or limit, or with refused: nothing is
+  // read back
   changes: Changes | null;
+  // why the changes could not be read back, as the diff threw
+  refused: string | null;
 };
 
 // what curl asked for, headers as pairs since Headers do not clone
@@ -189,13 +192,15 @@ function isAnswer(value: unknown): value is Answer {
       "notice",
       "opened",
       "changes",
+      "refused",
     ]) &&
     isString(value.stdout) &&
     isString(value.stderr) &&
     isInt(value.exitCode) &&
     isString(value.notice) &&
     isList(value.opened, isOpened) &&
-    (value.changes === null || isChanges(value.changes))
+    (value.changes === null || isChanges(value.changes)) &&
+    (value.refused === null || isString(value.refused))
   );
 }
 

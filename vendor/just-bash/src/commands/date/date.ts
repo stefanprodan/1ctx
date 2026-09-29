@@ -145,6 +145,11 @@ export const dateCommand: RuntimeCommand = {
 
     for (let i = 0; i < args.length; i++) {
       const a = args[i];
+      // (1ctx) `--` ends the options, as in GNU date
+      if (a === "--") {
+        for (const o of args.slice(i + 1)) if (o.startsWith("+")) fmt = o.slice(1);
+        break;
+      }
       if (a === "-u" || a === "--utc") utc = true;
       else if (a === "-d" || a === "--date") dateStr = args[++i] ?? "";
       else if (a.startsWith("--date=")) dateStr = a.slice(7);

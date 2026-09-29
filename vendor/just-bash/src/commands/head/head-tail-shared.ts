@@ -45,6 +45,11 @@ export function parseHeadTailArgs(
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
+    // (1ctx) `--` ends the options, as in GNU head and tail
+    if (arg === "--") {
+      files.push(...args.slice(i + 1));
+      break;
+    }
     if (arg === "-n" && i + 1 < args.length) {
       const nextArg = args[++i];
       // tail supports +N syntax

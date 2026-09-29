@@ -17,7 +17,7 @@ import {
   setArrayKind,
 } from "../helpers/array.js";
 import { markNameref } from "../helpers/nameref.js";
-import { checkReadonlyError } from "../helpers/readonly.js";
+import { checkReadonlyError, markExported } from "../helpers/readonly.js";
 import { failure, result } from "../helpers/result.js";
 import type { InterpreterContext } from "../types.js";
 import { parseArrayElements } from "./declare-array-parsing.js";
@@ -54,6 +54,7 @@ export async function handleLocal(
   let declareNameref = false;
   let declareArray = false;
   let _printMode = false;
+  let declareExport = false;
 
   // Parse flags
   const processedArgs: string[] = [];
@@ -64,12 +65,15 @@ export async function handleLocal(
       declareArray = true;
     } else if (arg === "-p") {
       _printMode = true;
+    } else if (arg === "-x") {
+      declareExport = true;
     } else if (arg.startsWith("-") && !arg.includes("=")) {
       // Handle combined flags like -na
       for (const flag of arg.slice(1)) {
         if (flag === "n") declareNameref = true;
         else if (flag === "a") declareArray = true;
         else if (flag === "p") _printMode = true;
+        else if (flag === "x") declareExport = true;
         // Other flags are ignored for now
       }
     } else {
@@ -388,5 +392,13 @@ export async function handleLocal(
     }
   }
 
+  // (1ctx) -x exports each local for the function's lifetime, as bash does
+  if (declareExport) {
+    const scope = ctx.state.localScopes.at(-1);
+    for (const arg of processedArgs) {
+      const name = arg.split(/[=[+]/)[0];
+      if (scope?.has(name)) markExported(ctx, name);
+    }
+  }
   return result("", stderr, exitCode);
 }
