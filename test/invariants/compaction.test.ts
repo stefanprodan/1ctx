@@ -254,7 +254,7 @@ describe("compaction", () => {
     failed.script.content("answer");
     failed.script.finish();
     failed.script.usage({ prompt: HIGH_PROMPT, completion: 10 });
-    failedChat.scripted.refuse(429, '{"error":{"message":"summary failed"}}');
+    failedChat.scripted.refuse(400, '{"error":{"message":"summary failed"}}');
     failed.script.end();
     await settle(failedChat, failed.sessionId);
     const failedRows = rows(failedChat, failed.sessionId);
@@ -266,7 +266,7 @@ describe("compaction", () => {
     expect(failedRows[2]).toMatchObject({
       kind: "summary",
       status: "failed",
-      error: 'HTTP 429: {"error":{"message":"summary failed"}}',
+      error: 'HTTP 400: {"error":{"message":"summary failed"}}',
     });
     failedChat.app.socket.dispose();
   });

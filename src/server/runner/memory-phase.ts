@@ -327,6 +327,8 @@ export async function memoryPhase(
   send.ending.signal.addEventListener("abort", stop, { once: true });
   if (send.ending.signal.aborted) stop();
   let done = false;
+  // the phase runs past the turn's deadline, within its own window
+  const deadline = deps.clock() + send.policy.limits.memoryPhaseMs;
   void deps.pause(send.policy.limits.memoryPhaseMs).then(() => {
     if (!done) stop();
   });
@@ -343,6 +345,7 @@ export async function memoryPhase(
         await runRound(deps.round, send, rows, {
           request,
           signal: controller.signal,
+          deadline,
         });
       } catch (error) {
         if (controller.signal.aborted) return;

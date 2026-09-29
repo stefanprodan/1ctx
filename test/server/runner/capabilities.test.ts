@@ -189,7 +189,7 @@ describe("a send's disabled capabilities", () => {
   test("a later provider failure keeps the committed choice", async () => {
     const chat = await chatApp();
     try {
-      chat.scripted.refuse(503, "provider unavailable");
+      chat.scripted.refuse(400, "provider refused");
       const detail = await create(chat, { disable: ["web"] });
       await settled(chat, detail.session.id);
       expect(chat.app.sessions.byId(detail.session.id)).toMatchObject({

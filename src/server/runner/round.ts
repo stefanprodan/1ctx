@@ -6,8 +6,9 @@
 // first tool call delta of a round marks the reply work at once, in its
 // own transaction, so the row moves into the fold with its reasoning;
 // the assembled calls land on round.calls when the stream ends. A
-// provider failure is an error event and becomes a throw here, so the
-// send ends through its one terminal transition. Once terminated the
+// provider failure is an error event, asked again when retry.ts says so
+// before the stream started, else a throw here, so the send ends
+// through its one terminal transition. Once terminated the
 // rest of the stream is dropped: the rows are already final.
 
 import type { Message } from "../../shared/contracts/session.ts";
@@ -27,6 +28,7 @@ import {
   summaryRequest,
   withExhausted,
 } from "./context.ts";
+import { type RetryState, retryWait } from "./retry.ts";
 import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { Writer } from "./writer.ts";
@@ -45,6 +47,8 @@ export type RoundDeps = {
   lookups: ContextLookups;
   clock: Clock;
   log: Log;
+  // the jitter of a retry's wait, in [0, 1)
+  random?: () => number;
 };
 
 export const STREAM_IDLE_MS = 120_000;
@@ -68,6 +72,29 @@ function sleep(clock: Clock, ms: number) {
       if (timer !== undefined) clearTimeout(timer);
     },
   };
+}
+
+// false when the signal ended the wait
+async function pause(
+  clock: Clock,
+  ms: number,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (signal.aborted) return false;
+  if (ms <= 0) return true;
+  const timer = sleep(clock, ms);
+  let stop = () => {};
+  const aborted = new Promise<void>((resolve) => {
+    stop = resolve;
+    signal.addEventListener("abort", stop, { once: true });
+  });
+  try {
+    await Promise.race([timer.promise, aborted]);
+  } finally {
+    timer.cancel();
+    signal.removeEventListener("abort", stop);
+  }
+  return !signal.aborted;
 }
 
 // idleMs is null before the first event: a local server says nothing
@@ -142,17 +169,29 @@ export async function runRound(
   deps: RoundDeps,
   send: ActiveSend,
   rows: Message[],
-  options: { request?: ChatRequest; signal?: AbortSignal } = {},
+  options: {
+    request?: ChatRequest;
+    signal?: AbortSignal;
+    // when a retry's wait must be over: the turn's deadline unless a
+    // phase has its own, null for none
+    deadline?: number | null;
+  } = {},
 ): Promise<void> {
   const round = send.round;
   if (round === null) return;
   const signal = options.signal ?? send.controller.signal;
+  const deadline =
+    options.deadline !== undefined
+      ? options.deadline
+      : send.policy.deadlineMs === null
+        ? null
+        : send.startedAt + send.policy.deadlineMs;
   const req =
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
-  let retried = false;
+  const retry: RetryState = { retries: 0, timeouts: 0 };
   const visuals =
     send.phase === "provider" &&
     send.kind !== "compact" &&
@@ -174,15 +213,32 @@ export async function runRound(
     if (next.result.done) break;
     const event = next.result.value;
     if (signal.aborted) return;
-    if (!started && !retried && event.kind === "error" && event.unanswered) {
-      retried = true;
-      deps.log.warn("round retried", {
-        chat: send.sessionId,
-        round: send.roundNo,
-        ...errorFields(new Error(event.message), false),
-      });
-      iterator = open();
-      continue;
+    // nothing of the round reached the page yet, so asking again is safe
+    if (!started && event.kind === "error") {
+      const wait = retryWait(
+        event,
+        retry,
+        deadline === null ? null : deadline - deps.clock(),
+        (deps.random ?? Math.random)(),
+      );
+      if (wait !== null) {
+        retry.retries++;
+        if (event.timedOut) retry.timeouts++;
+        deps.log.warn("round retried", {
+          chat: send.sessionId,
+          round: send.roundNo,
+          attempt: retry.retries,
+          ...(event.status === undefined ? {} : { status: event.status }),
+          wait,
+          // a failed connection has no status; its words carry no body
+          ...(event.unanswered
+            ? errorFields(new Error(event.message), false)
+            : {}),
+        });
+        if (!(await pause(deps.clock, wait, signal))) return;
+        iterator = open();
+        continue;
+      }
     }
     started = true;
     switch (event.kind) {

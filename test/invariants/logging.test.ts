@@ -168,7 +168,7 @@ test("failure events scrub keys, URLs, later lines and causes", async () => {
   await tick();
   await tick();
 
-  chat.scripted.refuse(500, remoteError.message);
+  chat.scripted.refuse(400, remoteError.message);
   const failed = await chat.member.call("POST", "/api/sessions", {
     body: {
       projectId: chat.projectId,

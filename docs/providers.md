@@ -39,6 +39,23 @@ fields.
   request and scrubbed from every error, and the recorded frames under
   `test/fixtures/providers/` are what the tests and the fake fetch
   answer with.
+- **A busy provider is asked again, three times at most.** An error
+  event carries `status` (the HTTP status, or the code or Google status
+  word an error frame names, `errorStatus()` in `providers/frames.ts`),
+  `retryAfterMs` (a `Retry-After` in seconds or an HTTP date),
+  `unanswered` when no response came and `timedOut` when that was the
+  headers wait. `retryWait()` in `runner/retry.ts` decides: a round's
+  error before any other event of its stream, with status 429, 500,
+  502, 503 or 504 or no response at all, is asked again after about
+  1, 2 and 4 s with up to 25% jitter, or the `Retry-After`, which past
+  30 s fails the round. Four requests in all; a headers timeout is asked
+  again once and counts toward the three. Every wait runs under the
+  round's signal and one that would pass the turn's deadline (the
+  memory phase's own window in that phase) is not started. Each retry
+  is a `round retried` warning with the attempt, the status and the
+  wait; the last failure fails the round with its words. Other 4xx and
+  anything after the stream started fail at once. Deciders, catalogs
+  and MCP calls are never retried here.
 - **The round keeps who served it.** On the OpenRouter wire alone,
   `openRouterEvents` adds a
   `served` event (the upstream and the model that answered) on the
