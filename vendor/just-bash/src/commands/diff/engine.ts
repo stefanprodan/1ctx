@@ -202,8 +202,13 @@ class Search {
     const odd = ((fmid - bmid) & 1) !== 0;
     const begin = this.total;
     // past this many steps the search settles, which bounds a compare near
-    // N^1.5 log N as GNU's manual has it
-    const budget = this.bound * (x1 - x0 + y1 - y0);
+    // N^1.5 log N as GNU's manual has it; no box takes more than a
+    // sixteenth of what is left before giving up, so one hard box cannot
+    // leave the rest to be taken whole
+    const budget = Math.min(
+      this.bound * (x1 - x0 + y1 - y0),
+      (this.giveUp - this.total) / 16,
+    );
 
     let fmin = fmid;
     let fmax = fmid;

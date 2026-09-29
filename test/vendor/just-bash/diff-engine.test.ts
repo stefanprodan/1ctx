@@ -186,6 +186,23 @@ describe("diff's cost", () => {
     expect(got.units).toBeLessThan(tenth);
   });
 
+  test("one hard box leaves budget for the rest", () => {
+    // GNU diff changes 72728 lines of these, and 12738 of the blank-heavy
+    // pair; taking boxes whole would change every line
+    const shifted = run(
+      numbered(100000, (i) => `${i % 7}`),
+      numbered(100000, (i) => `${(i + 3) % 11}`),
+    );
+    expect(shifted.deleted + shifted.inserted).toBe(72728);
+    expect(shifted.units).toBeLessThan(LIMIT / 4);
+    const next = random(7);
+    const blanks = () =>
+      numbered(20000, (i) => (i % 3 ? "" : `l${(next() >> 8) % 50}`));
+    const sparse = run(blanks(), blanks());
+    expect(sparse.deleted + sparse.inserted).toBeLessThan(12800);
+    expect(sparse.units).toBeLessThan(LIMIT / 4);
+  });
+
   test("a default compare gives up looking before the limit", () => {
     const next = random(7);
     const a = numbered(20000, (i) => `x ${i}`);
