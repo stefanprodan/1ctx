@@ -97,7 +97,7 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, four of them over record-cases.ts
-                (docs/bash.md) and deciders-record.ts
+                (docs/just-bash.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
@@ -141,7 +141,7 @@ change before making it.
 | `docs/tools.md` | before changing `src/server/tools/`, `credentials/`, `skills/`, `limits/`, the tool loop in `runner/` or the visual frame |
 | `docs/mcp.md` | before changing `src/server/mcp/`, MCP tools in a send or the files under `/mcp` |
 | `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
-| `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch, kept MCP files or `vendor/just-bash/` |
+| `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
 | `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
 | `docs/just-bash.md` | before changing `vendor/just-bash/` or syncing it with upstream |
 

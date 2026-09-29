@@ -42,7 +42,8 @@ The trim keeps what the mount can run. Removed, with their tests:
 
 ## What we changed
 
-Every change in the source carries `(1ctx)` in a comment, so
+A fix to a command goes here, with a test, never around it in our
+code. Every change in the source carries `(1ctx)` in a comment, so
 `grep -rn "(1ctx)" vendor/just-bash/src` lists them. Our tests of them
 are in `test/vendor/just-bash/`, `fixes.test.ts` for the rows below
 without a file of their own.
