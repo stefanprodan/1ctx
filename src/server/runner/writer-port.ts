@@ -19,17 +19,28 @@ import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
 export type UploadsPort = {
+  // one call for a turn, since each tree write upserts every file
   claimUploads(
-    userId: string,
     projectId: string,
     sessionId: string,
-    messageId: string,
-    ids: readonly string[],
-  ): MessageUpload[];
+    claims: readonly {
+      userId: string;
+      messageId: string;
+      ids: readonly string[];
+    }[],
+  ): MessageUpload[][];
 };
 
 export type SessionsPort = {
   byId(id: string): SessionRow | null;
+  // the queued rows a turn takes, deleted by id and revision; false when
+  // any changed or went
+  queue: {
+    claim(
+      sessionId: string,
+      claims: readonly { id: string; revision: number }[],
+    ): boolean;
+  };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
     id?: string;
@@ -57,10 +68,10 @@ export type SessionsPort = {
     now: number;
   }): Message;
   replaceSend(
-    user: Message,
+    users: readonly Message[],
     newSendId: string,
   ): {
-    user: Message;
+    users: Message[];
     removedMessageIds: string[];
   };
   addReply(fields: {

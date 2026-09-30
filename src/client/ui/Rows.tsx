@@ -119,6 +119,28 @@ export function RowsLink({ label, href }: { label: string; href: string }) {
   );
 }
 
+// a head's button that acts on the whole list, as RowsLink leads away
+export function RowsAction({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      class="btn btn-small rows-add"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function RowsNote({ children }: { children: ComponentChildren }) {
   return <p class="rows-note">{children}</p>;
 }

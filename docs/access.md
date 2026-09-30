@@ -73,7 +73,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   on every change (`description is required`); a personal project's
   may be empty. A team project is open to its members and to
   admins. Deleting one takes its chats, keeps their
-  usage and is refused while a chat runs.
+  usage and is refused while a chat runs. Removing a member deletes the
+  messages they had waiting in its chats, queued or not sent, in the
+  same transaction.
   `GET /api/projects/:id/usage` (admin, a team project alone) sums its
   last 30 days. `GET /api/admin/access?tz=` (admin) is the Access
   board's: the users who signed in each of the reader's last 30 days
@@ -122,7 +124,11 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   and `memory`, from `memory.changed`, by the note's revision;
   `knowledge.changed` reaches the same project audience as a `knowledge`
   frame with the file summary and `deleted`, including the delete revision,
-  and an emptied bin as `knowledgeEmptied`;
+  and an emptied bin as `knowledgeEmptied`; `queue.changed` goes as
+  `queue` only to the chat's watchers that hold the project, as a
+  stream frame does, and `queue.mine` goes as
+  `notSent` only to the connections of the user it names that hold the
+  project, since a not-sent row is its author's alone;
   a stream frame (`delta`, `html`, `visual`, `retry`, with a sequence
   per send) goes to the connections watching its session, straight from the
   writer through a port. `watch` and `unwatch` are the client's two

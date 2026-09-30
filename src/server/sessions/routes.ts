@@ -71,6 +71,9 @@ export type RoutesDeps = {
   keptDays(): number;
   // the session when the principal may see it, else the one 404
   visible(principal: Principal, id: string): SessionRow;
+  // an archive leaves the chat's waiting messages to the queue, which
+  // turns them not sent
+  wakeQueue(): void;
 };
 
 export function detail(
@@ -78,6 +81,8 @@ export function detail(
   session: SessionRow,
   live: LiveSend | null,
   keptDays: number,
+  // who reads it: a not-sent message shows to its author alone
+  viewerId: string | null,
 ): SessionResponse {
   return {
     session,
@@ -88,6 +93,7 @@ export function detail(
     authors: store.authors(session.id),
     agents: store.agents(session.id),
     archive: store.archiveOf(session.id, keptDays),
+    queued: store.queue.ofChat(session.id, viewerId),
   };
 }
 
@@ -115,7 +121,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const session = deps.visible(ctx.principal!, ctx.params.id);
         return json(
-          detail(deps.store, session, deps.live(session.id), deps.keptDays()),
+          detail(
+            deps.store,
+            session,
+            deps.live(session.id),
+            deps.keptDays(),
+            ctx.principal!.userId,
+          ),
         );
       },
     },
@@ -231,7 +243,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             messageIds,
           );
           const result: ForkSessionResponse = {
-            ...detail(deps.store, session, null, deps.keptDays()),
+            ...detail(
+              deps.store,
+              session,
+              null,
+              deps.keptDays(),
+              principal.userId,
+            ),
             draftUploads,
           };
           return {
@@ -292,7 +310,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           };
         });
         return json(
-          detail(deps.store, renamed, deps.live(renamed.id), deps.keptDays()),
+          detail(
+            deps.store,
+            renamed,
+            deps.live(renamed.id),
+            deps.keptDays(),
+            principal.userId,
+          ),
         );
       },
     },
@@ -328,6 +352,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             events: [archivedEvent(row, deps.store.lastSend(row.id))],
           };
         });
+        deps.wakeQueue();
         return new Response(null, { status: 204 });
       },
     },

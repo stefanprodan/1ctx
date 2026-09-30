@@ -282,8 +282,7 @@ describe("the terminal transition", () => {
       await tick();
       const res = await chat.member.call(
         "POST",
-        `/api/sessions/${sessionId}/messages`,
-        { body: { message: "again" } },
+        `/api/sessions/${sessionId}/regenerate`,
       );
       expect(res.status).toBe(409);
     } finally {

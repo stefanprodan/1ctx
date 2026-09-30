@@ -29,17 +29,120 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   `registry.free()` that freed a send (a finalize, a rollback of
   `startSend` or `startCompact`, an abandoned run) calls the `wake`
   port, except a shutdown's, and so does a limits write that moves a
-  send cap; `compose.ts` binds it to the scheduler's `wake()`. A
+  send cap or `queuedMinutes`; `compose.ts` binds it to the queue's
+  dispatcher, then the scheduler's `wake()`. A
   finalize that fails keeps the lock and the send's places until
   `sessions.repair()` at the next start.
 - **The writer has three transactions.** The writer's three transactions:
-  `startSend` (the session when new, the user message, the streaming
+  `startSend` (the session when new, the user messages, the streaming
   reply, the send row, the running state), `finalizeRound` (the
   reply's end and its usage row) and `finalizeSend` (the send's end
   and the session's state, with the last round inside it). Each bumps
   the session's revision once and publishes one `session.changed`
   envelope after commit. Create and send accept up to ten distinct
   staged `uploads` ids.
+- **A turn may open with several user messages.** `runner.sendTurn()`
+  starts one send from 1 to `MAX_TURN_MESSAGES` (16) messages in order
+  (`runner/turn.ts`), each its own `messages` row with its own author
+  and seq, and each held to a message's bounds, a staged upload in one
+  message only; the routes send a list of one. It takes each author by
+  id and reads them as they are at the start: a missing or disabled
+  user is a 400, one who must change their password a 403 as the router
+  gives, and every author must see the chat and write in its project. The send counts against the first author, or the one the
+  dispatcher names, and its policy is theirs. On the
+  wire each is its own user message with its author's `name`, since
+  every wire is the OpenAI chat shape, which takes consecutive user
+  messages. The envelope's `last` is the last message's.
+- **A message to a busy chat waits in the queue.** `POST
+  /api/sessions/:id/messages` on a chat whose lock is held (a turn
+  running or still stopping) writes a `queued_messages` row, never a
+  `messages` row, and answers 202 `{ queued }`; on a free chat it first
+  starts the chat's own queue, then sends as before (201, or the 429 of
+  a full cap). Regenerate, compact, Run now and a new chat never queue.
+  Each message is its own row (text, staged upload ids, capabilities
+  change, author), held to a message's bounds, an upload id in another
+  queued row of the chat a 400. A user holds at most `queuedPerUser`
+  rows, queued and not sent together, and a chat `MAX_QUEUED_PER_CHAT`
+  (16, `MAX_TURN_MESSAGES`) queued ones, each past it a 429 with the
+  count. A queued row holds no place in any cap. Every change to a row
+  (queue, edit, remove, start, not sent, discard, sweep) bumps the
+  session's revision alone and publishes no project-wide envelope,
+  since nothing a list shows moved (`queueChanged()`). A change to the
+  queued rows publishes `queue.changed`: every member's queued rows at
+  that revision, each text a preview of `QUEUED_PREVIEW` characters
+  with `cut` set, which the socket sends as a `queue` frame to the
+  chat's watchers alone, as the stream frames go, and a watch answers
+  the same rows in `watched`; so a frame stays small whatever the rows
+  hold. A start's transaction publishes the queue left (`turn`) right
+  before its envelope, and the client holds it until that envelope
+  brings the user messages the rows became. A start whose user messages
+  pass `START_FRAME_BYTES` sends its envelope with the reply alone and
+  `messagesCut`, and a tab showing the chat reads its detail. A not-sent
+  row is its author's alone: a change to one (turned, removed,
+  discarded, swept) publishes `queue.mine`, the author's not-sent rows
+  in the chat as previews, which the socket sends as `notSent` to that
+  user's connections holding the project; a change to their not-sent
+  rows alone (a Discard, Discard all, the sweep) publishes nothing else.
+  `GET /api/sessions/:id/queued/:queuedId` is the author's row whole,
+  for an Edit or a Send again of a row a frame carried cut. A write's
+  answer (the 202, PATCH, DELETE) is the caller's whole queue with the
+  revision its commit made (`QueueState`), which the client takes only
+  when newer than the queue it holds;
+  the detail's `queued` lists the chat's queued rows for every viewer
+  and not-sent ones to their author only, oldest first by `queued_at`
+  then `rowid`, which an edit never moves.
+- **The dispatcher starts a chat's queue as one turn.**
+  `runner/queue.ts`, started in `compose.ts` after `sessions.repair()`
+  and before the scheduler, closed first at shutdown. The `wake` port
+  runs a pass before the scheduler hears it, so a freed place goes to a
+  waiting message before a due run; a pass inside a transaction, and
+  what is left after four passes of one wake, is put off to a timer (a
+  macrotask, never a microtask, so the process goes on), and a wake
+  during a pass runs one more. A pass walks the chats with queued rows
+  whose lock is free, oldest first, in keyset pages of `WAITING_PAGE`
+  queued rows over `queued_waiting` (one indexed read when none waits,
+  each queued row read once), passing over a chat whose authors or
+  project are at their cap and ending only at a full process. For each chat it sorts the rows: an author who no longer sees
+  the chat loses theirs (deleted); an archived chat (`archived`), a
+  retired agent (`agent-deleted`), a row past `queuedMinutes` from
+  `queued_at` (`expired`), a gone, disabled or must-change-password
+  author or a staged upload that no longer checks (`failed`) turn not
+  sent. The rest start through the runner's turn in order, each with
+  its own author, counted against the oldest author with room under
+  `sendsPerUser`, whose policy the turn runs under; with none, they
+  wait. The start carries a claim: `startSend`'s transaction deletes
+  the rows by id and revision, and one that lost (edited or removed)
+  throws `ClaimLost`, so the start writes nothing and its freed lock
+  wakes again. Only a full cap (`CapFull`, `RunCapacity`), the lock's
+  own refusals (`LockHeld`: held, stopping, shutting down) and
+  `ClaimLost` leave the rows queued, matched by class. Any other
+  refusal (an upload that clashes with the chat's files, the tree's
+  totals, an agent that cannot read files, capability changes that
+  overflow together) finds its rows: each row is tried after those
+  that passed, in a start rolled back with its transaction and not
+  admitted, the ones that fail turn not sent (`failed`, logged with the
+  status alone) and the rest start. A trial writes only SQLite rows,
+  which its rollback takes with their envelopes; its registry entry is
+  freed before it returns and launches nothing. When the real start
+  still fails after its trial passed, its rows turn not sent too, so a
+  chat never loops. A failed start never asks for
+  another pass of its chat. One timer, on the clock port, is set to the
+  oldest queued row's expiry and reset when the limit moves, so an idle
+  process expires rows too; a restart expires at start. An archive, the
+  hourly sweep when it archived a chat and an agent's delete wake the
+  dispatcher, so their chats' rows turn not
+  sent at once. A queue's start builds no session detail; a POST's
+  answer reads it.
+  start. Removing a member drops their rows in its transaction. `PATCH`
+  and `DELETE /api/sessions/:id/queued/:queuedId` are the author's
+  alone, an admin's included (403), each naming the revision seen: a
+  row that started or changed is a 409, and an edit takes only a
+  queued row. `GET /api/me/not-sent` is Home's list, the caller's
+  not-sent rows in projects they see, and `DELETE /api/me/not-sent`
+  discards the ones its `ids` name that are the caller's, not sent, and
+  in those same projects (at most `MAX_DISCARD_IDS`). The hourly sweep
+  (`sweepNotSent()`) deletes a not-sent row `NOT_SENT_KEPT_MS` (7 days)
+  after it turned.
 - **An envelope's row is one statement, read after the commit.**
   `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
   does for one session: it seeks the session by id and walks only that
@@ -63,15 +166,20 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   letters or digits; unknown or unassigned server, skill and credential
   keys are kept and ignored.
   The policy resolves it before schemas are built; `startSend` applies
-  it again to the current row in its transaction, with the message's
+  it again to the current row in its transaction, a turn's changes in
+  its messages' order, the later winning per key, with the message's
   revision and envelope. A refused start writes nothing; a later failure
   keeps the choice. Compact takes no change. A fork copies the source
   session's current set, including a run's saved automation set.
 - **A send's uploads are claimed in `startSend`.** For staged uploads,
-  synchronous preflight checks their user, project and lease and requires
+  synchronous preflight checks each message's against its author, project
+  and lease and requires
   `bash` in the offered set. Inside `startSend`, after the session exists,
   the claim rechecks staging and current caps, merges the files in order
-  and writes the bounded `messages.uploads` record with the user message.
+  and writes the bounded `messages.uploads` record with each user message.
+  A turn's messages are claimed in one call, in order, each against its
+  author, reading and writing the tree once (`UploadStore.claimTurn()`),
+  since each write upserts every file in it.
   A later throw rolls back the tree, staging and rows and frees the lock.
   User history appends `uploadsBlock()` from that record alone; a done
   summary gains `UPLOADS_SUMMARY_LINE` only from earlier user records.
@@ -248,16 +356,20 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   automations' pointers to it.
 - **Regenerate replaces the last turn.**
   Regenerate (`POST /api/sessions/:id/regenerate`) is a send that
-  reuses the last user message: inside `startSend`'s transaction the
-  rows after it and their send go, their usage stays, and the envelope
-  names them in `removedMessageIds`; 409 while the session runs, 400 when
-  the last message is the user's. Its optional JSON body goes through
-  `readBody()` under `MAX_REGENERATE_BODY` and `parseRegenerate()`.
+  reuses the last turn's user messages, the user rows of the last user
+  row's send in seq order: inside `startSend`'s transaction they move to the new
+  send, the rows after them and every send in that tail go, their usage
+  stays, and the envelope names the rows in `removedMessageIds`; 409
+  while the session runs, 400 when the last message is the user's. Its
+  optional JSON body goes through `readBody()` under
+  `MAX_REGENERATE_BODY` and `parseRegenerate()`.
 - **Fork copies a chat through a settled turn.**
   Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
   turn and its following done summaries, never memory phase rows, into
   a chat owned by the caller on the picked agent, recording the source
-  session and message ids without foreign keys; a user turn is left
+  session and message ids without foreign keys; at a user message the
+  rows before it stay, an earlier message of its turn included, in its
+  own send that regenerate never redoes; a user turn is left
   unsent, and usage is not copied. The title is the body's, else
   "Fork of <the source's>"; the composer's `/fork <name>` forks at the
   last turn on the same agent under that name, and a run is forked
@@ -283,7 +395,7 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
 - **A chat downloads as Markdown.**
   `GET /api/sessions/:id/markdown?tz=` is the chat as a file for
   anyone who sees it (`sessions/markdown.ts`, pure): the title, then
-  per send the user message and the agent's turn under `@author
+  per send each user message and the agent's turn under `@author
   YYYY-MM-DD HH:mm` in the zone, the answer with the transcript's cut
   line (stopped, the error, cut at max tokens); no work, tools,
   summaries or running turns, and the title and errors escaped. User
@@ -296,4 +408,6 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   the wire's least effort (`EFFORTS[wire][0]`) for a model whose
   catalog says it always thinks (`thinkingRequired`), since a provider
   refuses Off there. History starts from the last done summary. Compact
-  on demand is a send of kind `compact` under the same runner lock.
+  on demand is a send of kind `compact` under the same runner lock; it
+  needs a done answer since the last summary and a reply after the last
+  user row, so a fork's unanswered messages are a 400.

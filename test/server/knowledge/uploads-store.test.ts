@@ -1255,3 +1255,75 @@ describe("upload store", () => {
     }
   });
 });
+
+describe("a turn's claim", () => {
+  const claimTurn = (
+    ctx: Fixture,
+    claims: { messageId: string; ids: string[] }[],
+    caps: UploadCaps = ctx.caps,
+  ) =>
+    transact(ctx.db, () => ({
+      result: ctx.uploads.claimTurn(
+        ctx.projectId,
+        ctx.session.id,
+        claims.map((claim) => ({ ...claim, userId: ctx.userId })),
+        caps,
+        ctx.now.value,
+      ),
+    }));
+
+  test("writes the tree once with each message's files and records", () => {
+    const ctx = fixture();
+    try {
+      const first = ctx.stage([file("a", "one"), file("b", "two")]);
+      const second = ctx.stage([file("a", "again")], { name: "a.md" });
+      const records = claimTurn(ctx, [
+        { messageId: "m1", ids: [first.id!] },
+        { messageId: "m2", ids: [] },
+        { messageId: "m3", ids: [second.id!] },
+      ]);
+      expect(records.map((record) => record.map((item) => item.saved))).toEqual(
+        [[["a", "b"]], [], [["a"]]],
+      );
+      expect(ctx.read()).toMatchObject({ revision: 1, files: 2, bytes: 8 });
+      expect(
+        ctx.read().entries.map((entry) => [entry.name, entry.messageId]),
+      ).toEqual([
+        ["a", "m3"],
+        ["b", "m1"],
+      ]);
+      expect(ctx.list()).toEqual([]);
+    } finally {
+      ctx.db.close();
+    }
+  });
+
+  test("holds the limits over the whole turn and claims nothing past them", () => {
+    const ctx = fixture();
+    try {
+      const first = ctx.stage([file("a", ""), file("b", "")]);
+      const second = ctx.stage([file("c", "")]);
+      expect(() =>
+        claimTurn(
+          ctx,
+          [
+            { messageId: "m1", ids: [first.id!] },
+            { messageId: "m2", ids: [second.id!] },
+          ],
+          { ...ctx.caps, uploadFiles: 2 },
+        ),
+      ).toThrow("3 files, the limit is 2");
+      expect(ctx.read()).toEqual(blank);
+      expect(ctx.list()).toHaveLength(2);
+      expect(() =>
+        claimTurn(ctx, [
+          { messageId: "m1", ids: [first.id!] },
+          { messageId: "m2", ids: [first.id!] },
+        ]),
+      ).toThrow("an attached file is gone");
+      expect(ctx.list()).toHaveLength(2);
+    } finally {
+      ctx.db.close();
+    }
+  });
+});

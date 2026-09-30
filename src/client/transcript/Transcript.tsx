@@ -3,9 +3,10 @@
 //
 // The transcript in the shell's scroll box. It follows the reply: only
 // a scroll upwards lets go, since a programmatic scroll only ever moves
-// down, and a new row sticks it to the bottom again. The foot, stuck to
-// the bottom of the window, holds what the view passes (the composer)
-// and Jump to latest above it. The Copy button of a code block arrives
+// down, and a new row sticks it to the bottom again. The messages that
+// wait for the reply follow the last turn. The foot, stuck to the
+// bottom of the window, holds what the view passes (the composer) and
+// Jump to latest above it. The Copy button of a code block arrives
 // inside the server's HTML, so one delegated listener serves every
 // block.
 
@@ -20,6 +21,7 @@ import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
 import { FileCard } from "./FileCard.tsx";
 import type { OnFork } from "./Fork.tsx";
+import { QueuedRows, type QueueProps } from "./Queued.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
@@ -39,6 +41,7 @@ export function Transcript({
   onRegenerate,
   fork,
   foot,
+  queue,
   retry = null,
 }: {
   sessionId: string;
@@ -58,6 +61,8 @@ export function Transcript({
   onRegenerate?: () => void;
   // Fork under every finished answer; absent in a run
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
+  // the messages that wait, under the last turn
+  queue?: QueueProps;
   foot?: ComponentChildren;
 }) {
   const rows = useRef<HTMLDivElement>(null);
@@ -132,10 +137,11 @@ export function Transcript({
     toEnd();
     jumpHidden.value = true;
   }, [sessionId, jumpHidden]);
-  // a new row sticks the view to the bottom again
+  // a new row sticks the view to the bottom again, a waiting one too
+  const waiting = queue?.rows.length ?? 0;
   useLayoutEffect(() => {
     stick.current = true;
-  }, [nodes.length]);
+  }, [nodes.length, waiting]);
   useLayoutEffect(() => {
     if (stick.current) toEnd();
   });
@@ -178,6 +184,7 @@ export function Transcript({
               />
             );
           })}
+          {queue !== undefined && <QueuedRows {...queue} />}
         </div>
       </div>
       <div class="transcript-foot" ref={footEl}>

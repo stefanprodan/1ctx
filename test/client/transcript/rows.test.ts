@@ -288,6 +288,31 @@ describe("transcript rows", () => {
     },
   );
 
+  test.serial(
+    "shows each user message of a turn with its author before the reply",
+    () => {
+      const nodes = groupRows([
+        message("answer", 4, "reply"),
+        message("two", 2, "user", { userId: "u2" }),
+        message("one", 1, "user"),
+        message("three", 3, "user"),
+      ]);
+      expect(
+        nodes.map((node) =>
+          node.kind === "user"
+            ? [node.message.id, node.message.userId]
+            : [node.message?.id, null],
+        ),
+      ).toEqual([
+        ["one", "u1"],
+        ["two", "u2"],
+        ["three", "u1"],
+        ["answer", null],
+      ]);
+      expect(replyNode(nodes).compact).toBeFalse();
+    },
+  );
+
   test("puts the work in the agent's turn and pairs duplicate call ids once", () => {
     const messages = [
       message("answer", 6, "reply", { round: 2 }),

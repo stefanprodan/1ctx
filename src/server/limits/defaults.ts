@@ -66,6 +66,13 @@ export type SendCaps = {
   sendsRunning: number;
 };
 
+// the messages sent to a busy chat one user may have waiting, not sent
+// ones included, and the minutes one may wait from when it was sent
+export type QueueCaps = {
+  queuedPerUser: number;
+  queuedMinutes: number;
+};
+
 // the places scheduled runs may hold under a project's or the process's
 // cap; the rest is kept for sends a user started, at least 1 at the
 // floor of 4
@@ -83,6 +90,7 @@ export type Limits = LoopLimits &
   ToolCaps &
   KnowledgeCaps &
   SendCaps &
+  QueueCaps &
   ChatCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
@@ -360,6 +368,20 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     min: 4,
     max: 256,
     unit: "count",
+    scope: "sends",
+  },
+  queuedPerUser: {
+    default: 8,
+    min: 1,
+    max: 32,
+    unit: "count",
+    scope: "sends",
+  },
+  queuedMinutes: {
+    default: 60,
+    min: 10,
+    max: 240,
+    unit: "minutes",
     scope: "sends",
   },
   archiveIdleDays: {

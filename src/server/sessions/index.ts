@@ -11,6 +11,7 @@ import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
+import type { QueueFrame } from "../../shared/socket.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
@@ -31,6 +32,8 @@ import {
 } from "./activity.ts";
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
+import { chatQueue, queueChanged } from "./queued.ts";
+import { queuedRoutes } from "./queued-routes.ts";
 import {
   type AccessPort,
   detail,
@@ -60,15 +63,30 @@ export {
   MAX_SESSION_BODY,
   MAX_SMALL_BODY,
   parseCreateSession,
+  parseEditQueued,
   parseForkSession,
   parseMessage,
   parseMessageId,
+  parseQueuedId,
   parseRegenerate,
+  parseRemoveQueued,
   parseRenameSession,
   parseSendMessage,
   parseStreamQuery,
   titleFrom,
 } from "./parse.ts";
+export {
+  MAX_QUEUED_PER_CHAT,
+  NOT_SENT_KEPT_MS,
+  onWire as queuedOnWire,
+  type QueuedRow,
+  type QueueLoad,
+  QueueStore,
+  queueChanged,
+  queueFrameEvent,
+  type WaitingCursor,
+} from "./queued.ts";
+export { queueAnswer } from "./queued-routes.ts";
 export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {
   cutResult,
@@ -95,6 +113,8 @@ export type SessionsDeps = {
   uploads: UploadsPort;
   scratch: SweepScratch;
   limits: { current(): { archivedDeleteDays: number } };
+  // the queue's dispatcher, built later in the runner
+  wakeQueue(): void;
 };
 
 export type Sessions = {
@@ -126,6 +146,14 @@ export type Sessions = {
   // a revision and one rows-free envelope, never activity; false when
   // the session is gone
   markAttention(sessionId: string, attention: number, by: string): boolean;
+  // in the caller's transaction: the user's queued and not-sent messages
+  // in a project they left, and one envelope per chat they were in
+  dropQueued(projectId: string, userId: string): BusEvent[];
+  // not-sent messages past their keeping gone, each author's open
+  // views told; how many went
+  sweepNotSent(now: number): number;
+  // the chat's queued rows as previews, at its revision, for a watch
+  queueFrame(sessionId: string): QueueFrame;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -193,6 +221,31 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       return row ?? null;
     },
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
+    dropQueued: (projectId, userId) =>
+      [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
+        (sessionId) => queueChanged(deps.db, sessionId, { shared: true }),
+      ),
+    queueFrame(sessionId) {
+      return {
+        revision: store.byId(sessionId)?.revision ?? 0,
+        rows: chatQueue(deps.db, sessionId, null, { cut: true }),
+      };
+    },
+    sweepNotSent(now) {
+      return transact(deps.db, () => {
+        const gone = store.queue.sweep(now);
+        const byChat = new Map<string, string[]>();
+        for (const { sessionId, authorId } of gone) {
+          byChat.set(sessionId, [...(byChat.get(sessionId) ?? []), authorId]);
+        }
+        return {
+          result: gone.length,
+          events: [...byChat].flatMap(([chat, authors]) =>
+            queueChanged(deps.db, chat, { shared: false, authors }),
+          ),
+        };
+      });
+    },
     markAttention: (sessionId, attention, by) =>
       markAttention(deps.db, store, sessionId, attention, by),
     repair() {
@@ -222,17 +275,27 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         now,
         caps,
       ),
-    routes: routes({
-      db: deps.db,
-      clock: deps.clock,
-      agents: deps.agents,
-      store,
-      access: deps.access,
-      live: deps.live,
-      uploads: deps.uploads,
-      keptDays: () => deps.limits.current().archivedDeleteDays,
-      visible,
-    }),
+    routes: [
+      ...routes({
+        db: deps.db,
+        clock: deps.clock,
+        agents: deps.agents,
+        store,
+        access: deps.access,
+        live: deps.live,
+        uploads: deps.uploads,
+        keptDays: () => deps.limits.current().archivedDeleteDays,
+        visible,
+        wakeQueue: () => deps.wakeQueue(),
+      }),
+      ...queuedRoutes({
+        db: deps.db,
+        clock: deps.clock,
+        store,
+        visibleProjectIds: (userId) => deps.access.visibleProjectIds(userId),
+        visible,
+      }),
+    ],
   };
 }
 

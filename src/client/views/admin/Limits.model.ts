@@ -166,6 +166,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "At once",
     text: "Chats and runs going at once, every project counted.",
   },
+  queuedPerUser: {
+    label: "Waiting per user",
+    text: "Messages one user may have waiting, not sent ones included.",
+  },
+  queuedMinutes: {
+    label: "Waiting time",
+    text: "How long a message may wait for the reply to end.",
+  },
   archiveIdleDays: {
     label: "Archive idle chats",
     text: "Days without a turn before a chat is archived.",
@@ -195,6 +203,8 @@ export function displayOf(row: LimitRow): Display {
       return { word: "tokens", factor: 1 };
     case "days":
       return { word: "days", factor: 1 };
+    case "minutes":
+      return { word: "min", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

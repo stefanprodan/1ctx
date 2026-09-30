@@ -36,6 +36,7 @@ import { KnowledgeStore, type MountedDoc, summary } from "./store.ts";
 import {
   type MountedUploads,
   type RestageUploads,
+  type UploadClaim,
   UploadStore,
   type UploadTree,
 } from "./uploads.ts";
@@ -50,12 +51,10 @@ export type KnowledgeDeps = {
 export type KnowledgeCapability = KnowledgePort & {
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   claimUploads(
-    userId: string,
     projectId: string,
     sessionId: string,
-    messageId: string,
-    ids: readonly string[],
-  ): MessageUpload[];
+    claims: readonly UploadClaim[],
+  ): MessageUpload[][];
   copyUploads(
     sourceSessionId: string,
     targetSessionId: string,
@@ -115,13 +114,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const capability: KnowledgeCapability = {
     checkUploads: (userId, projectId, ids) =>
       uploads.check(userId, projectId, ids, deps.clock()),
-    claimUploads: (userId, projectId, sessionId, messageId, ids) =>
-      uploads.claim(
-        userId,
+    claimUploads: (projectId, sessionId, claims) =>
+      uploads.claimTurn(
         projectId,
         sessionId,
-        messageId,
-        ids,
+        claims,
         deps.limits.current(),
         deps.clock(),
       ),

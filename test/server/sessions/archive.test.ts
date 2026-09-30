@@ -143,12 +143,13 @@ describe("an archived chat is read-only", () => {
       startSend(deps, {
         sendId: "send1",
         replyId: "reply1",
-        userId: "user1",
         sessionId: id,
         session: stale,
         title: stale.title,
         policy,
-        text: "again",
+        turn: {
+          users: [{ id: "user1", userId: "u", username: "u", text: "again" }],
+        },
         mcpDigest: null,
       }),
     ).toThrow(new Conflict("the chat is archived"));

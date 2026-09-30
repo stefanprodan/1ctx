@@ -7,8 +7,11 @@
 
 import type {
   CreateSessionRequest,
+  DiscardNotSentRequest,
+  EditQueuedRequest,
   ForkSessionRequest,
   RegenerateRequest,
+  RemoveQueuedRequest,
   RenameSessionRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -109,6 +112,41 @@ export function parseSendMessage(body: unknown): SendMessageRequest {
     ...parseUploads(b),
     ...parseCapabilities(b),
   };
+}
+
+export function parseEditQueued(body: unknown): EditQueuedRequest {
+  const b = fields(body, ["message", "revision"]);
+  return {
+    message: parseMessage(b.message),
+    revision: parseRevision(b.revision),
+  };
+}
+
+export function parseRemoveQueued(body: unknown): RemoveQueuedRequest {
+  const b = fields(body, ["revision"]);
+  return { revision: parseRevision(b.revision) };
+}
+
+export function parseQueuedId(value: unknown): string {
+  return storedId(value, "queuedId");
+}
+
+// a user holds at most the largest queuedPerUser, so Home never shows more
+export const MAX_DISCARD_IDS = 32;
+
+export function parseDiscardNotSent(body: unknown): DiscardNotSentRequest {
+  const { ids } = fields(body, ["ids"]);
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_DISCARD_IDS) {
+    throw new BadRequest(`ids must list 1 to ${MAX_DISCARD_IDS} ids`);
+  }
+  return { ids: [...new Set(ids.map((id) => storedId(id, "ids")))] };
+}
+
+function parseRevision(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new BadRequest("revision must be a non-negative integer");
+  }
+  return value;
 }
 
 export function parseRegenerate(body: unknown): RegenerateRequest {

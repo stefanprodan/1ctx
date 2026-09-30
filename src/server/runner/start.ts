@@ -4,11 +4,7 @@
 // The first transaction of a send: its rows, regeneration cleanup and
 // the previous MCP snapshot the runner compares before launch.
 
-import {
-  applyChange,
-  type CapabilityChange,
-  sameSet,
-} from "../../shared/capabilities.ts";
+import { type CapabilityChange, sameSet } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type {
   Message,
@@ -19,37 +15,71 @@ import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest, NotFound } from "../lib/errors.ts";
-import { refuseArchived, type SessionRow } from "../sessions/index.ts";
+import { Conflict, NotFound } from "../lib/errors.ts";
+import {
+  queueFrameEvent,
+  refuseArchived,
+  type SessionRow,
+} from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
+import { applyChanges } from "./turn.ts";
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type Started = {
   session: SessionSummary;
-  user: Message;
+  users: Message[];
   reply: Message;
   send: SendSummary;
   previousMcpDigest: McpDigest | null;
 };
 
+export type StartUser = {
+  id: string;
+  userId: string;
+  // the author's name, for the stream's last line
+  username: string;
+  text: string;
+  uploads?: readonly string[];
+};
+
 export type StartFields = {
   sendId: string;
   replyId: string;
-  userId: string;
   sessionId: string;
   session: SessionRow | null;
   origin?: "chat" | "automation";
   automationId?: string | null;
   kind?: SendKind;
-  existingUser?: Message;
+  turn:
+    | { users: readonly StartUser[] }
+    | { existing: readonly Message[]; lastAuthor: string };
   title: string;
   policy: SendPolicy;
-  text: string;
-  uploads?: readonly string[];
-  capabilities?: CapabilityChange;
+  // applied in order, the later winning per key
+  changes?: readonly (CapabilityChange | undefined)[];
   mcpDigest: McpDigest | null;
+  // the queued messages the turn opens with, taken by id and revision
+  claim?: readonly QueuedClaim[];
 };
+
+// the user messages a start's envelope carries whole, half the socket's
+// backpressure limit, so no frame of a turn of queued messages closes a
+// tab; past it the envelope carries the reply alone and says so
+export const START_FRAME_BYTES = 512 * 1024;
+
+export type QueuedClaim = { id: string; revision: number };
+
+// a queued message was edited or removed before its start took it, so
+// the start writes nothing
+export class ClaimLost extends Conflict {
+  constructor() {
+    super("a waiting message changed");
+  }
+}
+
+export const firstMessageId = (turn: StartFields["turn"]): string =>
+  "users" in turn ? turn.users[0]!.id : turn.existing[0]!.id;
 
 export type StartDeps = {
   db: Db;
@@ -82,11 +112,17 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         });
     if (base === null) throw new NotFound("no such chat");
     refuseArchived(base);
-    const changed = applyChange(base.disabledCapabilities, fields.capabilities);
-    if (!changed.ok) throw new BadRequest(changed.error);
-    if (!sameSet(base.disabledCapabilities, changed.set)) {
-      deps.sessions.setDisabledCapabilities(base.id, changed.set);
+    if (fields.claim && !deps.sessions.queue.claim(base.id, fields.claim)) {
+      throw new ClaimLost();
     }
+    const changed = applyChanges(
+      base.disabledCapabilities,
+      fields.changes ?? [],
+    );
+    if (!sameSet(base.disabledCapabilities, changed)) {
+      deps.sessions.setDisabledCapabilities(base.id, changed);
+    }
+    const { turn } = fields;
     const send = deps.sessions.createSend({
       id: fields.sendId,
       kind: fields.kind ?? "chat",
@@ -95,38 +131,47 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       agentId: policy.agentId,
       providerId: policy.providerId,
       model: policy.model,
-      firstMessageId: fields.userId,
+      firstMessageId: firstMessageId(turn),
       mcpDigest: fields.mcpDigest,
       now,
     });
     let removedMessageIds: string[] = [];
-    let user: Message;
-    if (fields.existingUser === undefined) {
-      const uploads = fields.uploads?.length
-        ? deps.uploads.claimUploads(
-            policy.userId,
-            policy.projectId,
-            base.id,
-            fields.userId,
-            fields.uploads,
-          )
-        : null;
-      user = deps.sessions.addUserMessage({
-        id: fields.userId,
-        sessionId: base.id,
-        sendId: send.id,
-        userId: policy.userId,
-        content: fields.text,
-        uploads,
-        now,
-      });
-    } else {
-      const replacement = deps.sessions.replaceSend(
-        fields.existingUser,
-        send.id,
+    let users: Message[];
+    let lastAuthor: string;
+    if ("users" in turn) {
+      const attaching = turn.users.filter((user) => user.uploads?.length);
+      const claimed =
+        attaching.length === 0
+          ? []
+          : deps.uploads.claimUploads(
+              policy.projectId,
+              base.id,
+              attaching.map((user) => ({
+                userId: user.userId,
+                messageId: user.id,
+                ids: user.uploads!,
+              })),
+            );
+      const records = new Map(
+        attaching.map((user, index) => [user.id, claimed[index]!]),
       );
-      user = replacement.user;
+      users = turn.users.map((user) =>
+        deps.sessions.addUserMessage({
+          id: user.id,
+          sessionId: base.id,
+          sendId: send.id,
+          userId: user.userId,
+          content: user.text,
+          uploads: records.get(user.id) ?? null,
+          now,
+        }),
+      );
+      lastAuthor = turn.users.at(-1)!.username;
+    } else {
+      const replacement = deps.sessions.replaceSend(turn.existing, send.id);
+      users = replacement.users;
       removedMessageIds = replacement.removedMessageIds;
+      lastAuthor = turn.lastAuthor;
       // the rows that saved are gone, so the chat has seen only its snapshot
       deps.views.resetSeen(base.id);
     }
@@ -148,15 +193,24 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       status: "running",
       now,
     })!;
+    // a turn of queued messages can outgrow a socket frame: its tabs then
+    // read the detail
+    const cut = Buffer.byteLength(JSON.stringify(users)) > START_FRAME_BYTES;
     return {
-      result: { session, user, reply, send, previousMcpDigest },
+      result: { session, users, reply, send, previousMcpDigest },
       events: [
+        // the queue left goes first to the chat's watchers, which hold it
+        // until the frame below brings the messages the rows became
+        ...(fields.claim === undefined
+          ? []
+          : queueFrameEvent(deps.db, base.id, true)),
         envelope(
           session,
-          [user, reply],
+          cut ? [reply] : [...users, reply],
           send,
           removedMessageIds,
-          lastLine(user, policy.username),
+          lastLine(users.at(-1)!, lastAuthor),
+          cut,
         ),
       ],
     };

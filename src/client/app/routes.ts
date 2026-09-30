@@ -44,6 +44,7 @@ import {
   servers,
 } from "../data/mcp.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
+import { loadNotSent } from "../data/not-sent.ts";
 import {
   loadAttention,
   loadOverview,
@@ -210,14 +211,16 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
-    // the stream for the query, the week for the aside, and the agents of
-    // the composer's project, the picked one or the personal; it comes
-    // from the rail's list, waited for only when none is held
+    // the stream for the query, the user's messages that were not sent,
+    // the week for the aside, and the agents of the composer's project,
+    // the picked one or the personal; it comes from the rail's list,
+    // waited for only when none is held
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
       const origin = originOf(`?${query.toString()}`);
       const rows = loadList({ project: null, q, origin });
       const spent = loadWeek();
+      const unsent = loadNotSent();
       const listed = loadProjects();
       if (projects.value === null) await listed;
       const target = composeProjectOf(projects.value, homeProjectId.value);
@@ -225,6 +228,7 @@ export const ROUTES: Route[] = [
         listed,
         rows,
         spent,
+        unsent,
         target === null ? Promise.resolve() : loadProjectAgents(target.id),
         // the files staged for the composer's draft, and the limits a
         // pick is judged with

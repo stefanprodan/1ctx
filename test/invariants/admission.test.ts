@@ -25,13 +25,13 @@ import { createTeam } from "../helpers/projects.ts";
 const PROCESS = "Too many chats and runs are going. Try again in a moment.";
 
 describe("admission", () => {
+  // a message waits behind the running turn instead (queue.test.ts)
   test("a second send into a running chat is refused with who is sending", async () => {
     const chat = await chatApp();
     const { script, sessionId } = await startChat(chat);
     const res = await chat.member.call(
       "POST",
-      `/api/sessions/${sessionId}/messages`,
-      { body: { message: "again" } },
+      `/api/sessions/${sessionId}/regenerate`,
     );
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "Casey Doe is sending" });
@@ -269,7 +269,7 @@ describe("admission", () => {
     const chat = await chatApp();
     const { script, sessionId } = await startChat(chat, "when");
     // the reply moves into the fold at the first call delta; the send is
-    // still running, so a second message is refused
+    // still running, so a regenerate is refused
     script.content("checking");
     script.toolCall({
       id: "c1",
@@ -279,8 +279,7 @@ describe("admission", () => {
     await tick();
     const res = await chat.member.call(
       "POST",
-      `/api/sessions/${sessionId}/messages`,
-      { body: { message: "again" } },
+      `/api/sessions/${sessionId}/regenerate`,
     );
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "Casey Doe is sending" });

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { CapabilityChange } from "../../shared/capabilities.ts";
-import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
+import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
@@ -16,6 +16,7 @@ import {
 import type { SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
 import { live, newSend, type SendOp } from "./send.ts";
+import { firstMessageId, type QueuedClaim, type StartFields } from "./start.ts";
 import type { Writer } from "./writer.ts";
 
 export type PreparedRun = {
@@ -38,9 +39,13 @@ export function prepareSend(fields: {
   session: SessionRow | null;
   policy: SendPolicy;
   op: SendOp;
-  text: string;
-  uploads?: readonly string[];
-  capabilities?: CapabilityChange;
+  turn: StartFields["turn"];
+  changes: readonly (CapabilityChange | undefined)[];
+  // the queued messages the turn takes
+  claim?: readonly QueuedClaim[];
+  // a start tried in a transaction the caller rolls back: not admitted,
+  // since it asks only whether the rows would start
+  probe?: boolean;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   startKept(
     sessionId: string,
@@ -56,30 +61,29 @@ export function prepareSend(fields: {
   kind: SendKind;
   origin: SessionOrigin;
   automationId: string | null;
-  existingUser: Message | null;
   now: number;
 }): PreparedRun {
   const now = fields.now;
-  if (fields.uploads?.length) {
-    if (fields.kind !== "chat" || fields.existingUser !== null) {
+  const { turn } = fields;
+  // a regenerate reuses its rows, and their files are in the tree already
+  for (const user of "users" in turn ? turn.users : []) {
+    if (!user.uploads?.length) continue;
+    if (fields.kind !== "chat") {
       throw new BadRequest("uploads require a new chat message");
     }
-    fields.checkUploads(
-      fields.policy.userId,
-      fields.policy.projectId,
-      fields.uploads,
-    );
+    fields.checkUploads(user.userId, fields.policy.projectId, user.uploads);
     if (!fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
       throw new BadRequest("this agent cannot read files");
     }
   }
-  fields.registry.admit(
-    fields.sessionId,
-    { userId: fields.startedBy, projectId: fields.policy.projectId },
-    fields.policy.sendCaps,
-  );
+  if (fields.probe !== true) {
+    fields.registry.admit(
+      fields.sessionId,
+      { userId: fields.startedBy, projectId: fields.policy.projectId },
+      fields.policy.sendCaps,
+    );
+  }
   const sendId = newId();
-  const userId = fields.existingUser?.id ?? newId();
   const replyId = newId();
   const send = newSend({
     id: sendId,
@@ -89,7 +93,7 @@ export function prepareSend(fields: {
     kind: fields.kind,
     op: fields.op,
     policy: fields.policy,
-    firstMessageId: userId,
+    firstMessageId: firstMessageId(turn),
     replyId,
     now,
   });
@@ -102,7 +106,7 @@ export function prepareSend(fields: {
       // a regenerate's kept files go with the rows it replaces
       const kept = fields.startKept(
         fields.sessionId,
-        fields.existingUser?.seq ?? null,
+        "existing" in turn ? turn.existing.at(-1)!.seq : null,
       );
       let next = kept.next;
       send.keep = {
@@ -116,21 +120,17 @@ export function prepareSend(fields: {
     started = fields.writer.startSend({
       sendId,
       replyId,
-      userId,
       sessionId: fields.sessionId,
       session: fields.session,
-      ...(fields.existingUser === null
-        ? {}
-        : { existingUser: fields.existingUser }),
+      turn,
       origin: fields.origin,
       automationId: fields.automationId,
       kind: fields.kind,
       title: fields.title,
       policy: fields.policy,
-      text: fields.text,
-      uploads: fields.uploads,
-      capabilities: fields.capabilities,
+      changes: fields.changes,
       mcpDigest: fields.policy.offered.mcpPrompt.digest,
+      ...(fields.claim === undefined ? {} : { claim: fields.claim }),
     });
     send.mcpNote = changeNote(
       started.previousMcpDigest,
@@ -141,10 +141,21 @@ export function prepareSend(fields: {
     throw err;
   }
   let settled = false;
+  let detail: SessionDetail | null = null;
   return {
-    // a send starts only on a chat that is not archived, so no
-    // archive is read and its kept days go unused
-    detail: sessionDetail(fields.sessions, started.session, live(send), 0),
+    // read once, when asked: a queue's start needs none. A send starts
+    // only on a chat that is not archived, so no archive is read and its
+    // kept days go unused
+    get detail() {
+      detail ??= sessionDetail(
+        fields.sessions,
+        started.session,
+        live(send),
+        0,
+        fields.startedBy,
+      );
+      return detail;
+    },
     launch() {
       if (settled) return;
       settled = true;

@@ -10,7 +10,6 @@ import { effect, signal } from "@preact/signals";
 import type {
   RegenerateRequest,
   RenameSessionRequest,
-  SendMessageRequest,
   SessionResponse,
 } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
@@ -34,6 +33,8 @@ import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
+import { session } from "./session-held.ts";
+import { onQueueSocket, queueShown } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
 import { resetValues, retrying, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
@@ -63,7 +64,7 @@ export { type ListFilter, list, loadList, loadMore } from "./stream.ts";
 // snapshot is refetched instead
 export const BUFFER_MAX = 256;
 
-export const session = signal<SessionDetail | null>(null);
+export { session };
 export const sessionError = signal<Failure | null>(null);
 // the replies streaming on the chat on screen, by message id
 export const live = signal<ReadonlyMap<string, Live>>(new Map());
@@ -101,7 +102,8 @@ effect(() => {
   stream = null;
 });
 
-function show(detail: SessionDetail): void {
+function show(shown: SessionDetail): void {
+  const detail = queueShown(shown);
   visualPreviews.value = snapshotVisuals(
     reconcileVisuals(visualPreviews.value, detail),
     detail,
@@ -193,7 +195,7 @@ export function leaveSession(id?: string): void {
 
 // a write's answer is the detail: applied like an envelope, so the
 // socket's copy of the same commit changes nothing
-function take(detail: SessionDetail): void {
+export function take(detail: SessionDetail): void {
   const held = session.value;
   if (held === null || held.session.id !== detail.session.id) return;
   if (detail.session.revision <= held.session.revision) return;
@@ -212,19 +214,6 @@ async function post(id: string, path: string, body?: object): Promise<void> {
   } finally {
     sending.value = false;
   }
-}
-
-export function sendMessage(
-  id: string,
-  message: string,
-  uploads: string[],
-): Promise<void> {
-  const body: SendMessageRequest = {
-    message,
-    ...(uploads.length === 0 ? {} : { uploads }),
-    ...changeOf(id),
-  };
-  return post(id, "messages", body);
 }
 
 // the last turn goes and its user message is sent again
@@ -323,8 +312,12 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   // a lost clear frame never outlives the send
   if (ev.session.status !== "running") retrying.value = null;
   live.value = map;
-  // who archived it and until when are the detail's alone
-  if (!held.session.archived && ev.session.archived) refetch();
+  onQueueSocket(ev);
+  // who archived it and until when are the detail's alone, and so are
+  // the messages of a turn too large for the envelope
+  if (ev.messagesCut || (!held.session.archived && ev.session.archived)) {
+    refetch();
+  }
 }
 
 // one detail answers a gap, an overflow, a frame ahead of the buffer
@@ -466,7 +459,12 @@ export function onSocket(ev: SocketEvent): void {
       break;
     }
     case "watched":
+      onQueueSocket(ev);
       onWatched(ev);
+      break;
+    case "queue":
+    case "notSent":
+      onQueueSocket(ev);
       break;
     case "delta":
     case "html":

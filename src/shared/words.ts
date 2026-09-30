@@ -272,6 +272,20 @@ export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
 export const ARCHIVE_REASONS = ["manual", "agent", "idle"] as const;
 export type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
 
+// a message sent to a busy chat waits as queued until the reply ends;
+// one that cannot start is not sent, with why: it waited past
+// queuedMinutes, its chat was archived, its agent deleted, or its start
+// failed
+export const QUEUED_STATES = ["queued", "not-sent"] as const;
+export type QueuedState = (typeof QUEUED_STATES)[number];
+export const NOT_SENT_REASONS = [
+  "expired",
+  "archived",
+  "agent-deleted",
+  "failed",
+] as const;
+export type NotSentReason = (typeof NOT_SENT_REASONS)[number];
+
 // what made an automation's event: its schedule, or someone's Run now
 export const EVENT_SOURCES = ["schedule", "manual"] as const;
 export type EventSource = (typeof EVENT_SOURCES)[number];
@@ -396,6 +410,8 @@ export const LIMIT_NAMES = [
   "sendsPerUser",
   "sendsPerProject",
   "sendsRunning",
+  "queuedPerUser",
+  "queuedMinutes",
   "archiveIdleDays",
   "archivedDeleteDays",
 ] as const;
@@ -409,6 +425,7 @@ export const LIMIT_UNITS = [
   "chars",
   "tokens",
   "days",
+  "minutes",
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 

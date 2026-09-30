@@ -52,6 +52,7 @@ import {
 import { readOpenedFile, writeOpenedFiles } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
 import { titleFrom } from "./parse.ts";
+import { QueueStore } from "./queued.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
 import {
@@ -84,11 +85,15 @@ export type ScratchPort = {
 };
 
 export class SessionStore {
+  // the messages waiting behind a busy chat
+  readonly queue: QueueStore;
   constructor(
     private readonly db: Db,
     private readonly usage: UsagePort,
     private readonly scratch: ScratchPort,
-  ) {}
+  ) {
+    this.queue = new QueueStore(db);
+  }
 
   byId(id: string): SessionRow | null {
     const raw = this.db
@@ -340,8 +345,8 @@ export class SessionStore {
     return this.message(id)!;
   }
 
-  replaceSend(user: Message, newSendId: string) {
-    return replaceSendRows(this.db, user, newSendId);
+  replaceSend(users: readonly Message[], newSendId: string) {
+    return replaceSendRows(this.db, users, newSendId);
   }
   addReply(fields: {
     id?: string;

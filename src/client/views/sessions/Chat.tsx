@@ -12,9 +12,11 @@
 // runs, and Fork waits until it is done or stopped. An archived chat
 // has the same foot, why and until when in place of the state, and no
 // Regenerate. A reply keeps its agent's name once the agent is deleted,
-// from the detail's agents. Leaving the page
-// ends the watch on its session, unless the next chat's load already
-// owns the entity, as it does when a chat moves to its fork.
+// from the detail's agents. The messages that wait for the reply follow
+// the last turn; their author's Edit and Send again hand the text to the
+// composer. Leaving the page ends the watch on its session, unless the
+// next chat's load already owns the entity, as it does when a chat
+// moves to its fork.
 
 import { useEffect } from "preact/hooks";
 import type { SessionOrigin } from "../../../shared/words.ts";
@@ -25,6 +27,7 @@ import { automations } from "../../data/automations.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
+import { editQueued, sendMessage } from "../../data/queued.ts";
 import {
   compactSession,
   deleteSession,
@@ -35,7 +38,6 @@ import {
   renameSession,
   retrying,
   sending,
-  sendMessage,
   session,
   sessionError,
   stopSession,
@@ -54,6 +56,7 @@ import { Page } from "../../ui/Page.tsx";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
+import { queueActions } from "./queue.ts";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
 
@@ -228,6 +231,17 @@ function SessionPage({
                       forkSession(shown.session.id, messageId, agentId),
                   }
             }
+            queue={
+              shown.queued.length === 0
+                ? undefined
+                : {
+                    rows: shown.queued,
+                    running: shown.session.status === "running",
+                    userId: user?.id ?? null,
+                    authorOf,
+                    ...queueActions(shown.session.id, archived),
+                  }
+            }
             foot={
               run || archived ? (
                 <RunFoot
@@ -271,6 +285,10 @@ function SessionPage({
                   off={shown.session.disabledCapabilities}
                   onSend={(text, _agentId, uploads) =>
                     sendMessage(shown.session.id, text, uploads)
+                  }
+                  queued={shown.queued}
+                  onEdit={(row, text) =>
+                    editQueued(shown.session.id, row, text)
                   }
                   onStop={() => stopSession(shown.session.id)}
                   onCompact={() => compactSession(shown.session.id)}

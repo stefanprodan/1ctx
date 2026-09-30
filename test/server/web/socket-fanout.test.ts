@@ -50,6 +50,7 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
     sessionProject: () => "p",
     live: () => null,
     envelopeRow: () => null,
+    queue: () => ({ revision: 0, rows: [] }),
     ...overrides,
   });
   built.push(socket);
@@ -241,5 +242,35 @@ describe("the socket fan-out", () => {
     socket.drain(slow);
     expect(slow.data.closeCause).toBeUndefined();
     socket.dispose();
+  });
+
+  test.serial("an author's own rows reach their connections alone", () => {
+    const socket = area();
+    const [author, other] = opened(socket, 2) as [RecordingConn, RecordingConn];
+    const elsewhere = memberConn("u0", ["q"]);
+    socket.open(elsewhere);
+    elsewhere.frames = [];
+    publish({
+      type: "queue.mine",
+      data: {
+        userId: "u0",
+        projectId: "p",
+        sessionId: "s",
+        revision: 3,
+        rows: [],
+      },
+    });
+    expect(author.frames).toEqual([
+      {
+        type: "notSent",
+        projectId: "p",
+        sessionId: "s",
+        revision: 3,
+        rows: [],
+      },
+    ]);
+    expect(other.frames).toEqual([]);
+    // the same user in a tab that no longer holds the project
+    expect(elsewhere.frames).toEqual([]);
   });
 });

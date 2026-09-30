@@ -13,7 +13,9 @@ import type {
   EventSource,
   MessageKind,
   MessageStatus,
+  NotSentReason,
   OpenedKind,
+  QueuedState,
   SendCause,
   SendKind,
   SessionOrigin,
@@ -261,6 +263,30 @@ export type SessionDetail = {
   // set exactly when session.archived is; the client reads the detail
   // again when an envelope archives the chat it shows
   archive: SessionArchive | null;
+  // the messages waiting for the reply to end, oldest first; a not-sent
+  // one only to its author
+  queued: QueuedMessage[];
+};
+
+// the characters of a queued message's text a socket frame carries
+export const QUEUED_PREVIEW = 2048;
+
+// a message sent while the chat's turn ran, kept apart from the
+// transcript until it starts. revision counts its own changes, and an
+// edit or a remove names the one it saw; uploads counts its staged
+// files. On a socket frame text is a preview of QUEUED_PREVIEW
+// characters at most, cut then true; the detail and an answer carry it
+// whole
+export type QueuedMessage = {
+  id: string;
+  author: { id: string; username: string };
+  text: string;
+  cut: boolean;
+  uploads: number;
+  state: QueuedState;
+  reason: NotSentReason | null;
+  revision: number;
+  queuedAt: number;
 };
 
 // retired is true once an admin deleted the agent: its name is plain

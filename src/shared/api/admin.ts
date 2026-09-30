@@ -263,7 +263,8 @@ export const LOAD_SAMPLES = 180;
 // the process's; scheduled the runs no user started, against
 // scheduledCap, the share of cap they may hold; projectsFull the
 // projects at their own cap; online the users with an open socket;
-// waiting the automations whose fire is past due by WAIT_GRACE_MS. cpu is the
+// waiting the automations whose fire is past due by WAIT_GRACE_MS; the
+// queue's counts are the answer's one indexed read. cpu is the
 // process's share of the cores it may use, 0 to 1; rss its resident
 // bytes against memoryLimit, a container's limit when contained, else
 // the host's memory. The samples are oldest first, the last the newest
@@ -278,6 +279,11 @@ export type LoadResponse = {
   online: number;
   automations: number;
   waiting: number;
+  // messages waiting behind a busy chat and those not sent, and the
+  // oldest wait's start, null with none queued
+  queued: number;
+  notSent: number;
+  oldestQueuedAt: number | null;
   cores: number;
   memoryLimit: number;
   contained: boolean;

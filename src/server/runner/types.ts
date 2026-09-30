@@ -5,6 +5,7 @@
 
 import type {
   CreateSessionRequest,
+  QueuedResponse,
   RegenerateRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -26,10 +27,13 @@ import type { AttentionPort } from "./attention.ts";
 import type { Event } from "./event.ts";
 import type { ToolsPort } from "./policy.ts";
 import type { PreparedRun } from "./prepare.ts";
+import type { Dispatcher } from "./queue.ts";
 import type { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import type { live } from "./send.ts";
 import type { ShutdownResult } from "./shutdown.ts";
+import type { QueuedClaim } from "./start.ts";
+import type { TurnMessage } from "./turn.ts";
 import type { WriterDeps } from "./writer.ts";
 
 export type RunnerDeps = {
@@ -68,6 +72,10 @@ export type RunnerDeps = {
   attention: AttentionPort;
 };
 
+export type MessageAnswer =
+  | { status: 201; body: SessionDetail }
+  | { status: 202; body: QueuedResponse };
+
 export type Runner = {
   registry: Registry;
   start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
@@ -76,6 +84,22 @@ export type Runner = {
     sessionId: string,
     fields: SendMessageRequest,
   ): SessionDetail;
+  // one turn opened by 1 to MAX_TURN_MESSAGES user messages in order,
+  // each by its own author, counted against the first; a claim takes
+  // the queued rows they came from in the same transaction
+  sendTurn(
+    sessionId: string,
+    messages: readonly TurnMessage[],
+    claim?: readonly QueuedClaim[],
+    // the index of the author it counts against, the first by default
+    starter?: number,
+  ): SessionDetail;
+  // a message: its turn when the chat is free, else queued behind it
+  message(
+    principal: Principal,
+    sessionId: string,
+    fields: SendMessageRequest,
+  ): MessageAnswer;
   regenerate(
     principal: Principal,
     sessionId: string,
@@ -92,5 +116,7 @@ export type Runner = {
   shutdown(): Promise<ShutdownResult>;
   // every attention ask queued or in flight has ended
   settled(): Promise<void>;
+  // the messages waiting behind busy chats
+  queue: Dispatcher;
   routes: RouteDescriptor[];
 };

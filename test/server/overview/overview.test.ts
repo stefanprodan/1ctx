@@ -865,6 +865,7 @@ describe("the overview cache", () => {
       running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      queue: () => ({ queued: 0, notSent: 0, oldestQueuedAt: null }),
       attention: NO_ATTENTION,
       probe: probe([]),
       worker: new URL(
@@ -1030,6 +1031,7 @@ describe("the load", () => {
       },
       online: () => state.online,
       automations: () => ({ total: state.total, waiting: state.waiting }),
+      queue: () => ({ queued: 2, notSent: 1, oldestQueuedAt: 500 }),
       attention: NO_ATTENTION,
       probe: probe(
         [{ cpuMicros: 1_000_000, rss: 512, ms: 0, uptimeMs: 1000 }],
@@ -1051,6 +1053,9 @@ describe("the load", () => {
       online: 3,
       automations: 4,
       waiting: 1,
+      queued: 2,
+      notSent: 1,
+      oldestQueuedAt: 500,
       cores: 2,
       memoryLimit: 2048,
       contained: true,
@@ -1079,6 +1084,7 @@ describe("the load", () => {
       running: () => IDLE,
       online: () => 0,
       automations: () => ({ total: 0, waiting: 0 }),
+      queue: () => ({ queued: 0, notSent: 0, oldestQueuedAt: null }),
       attention: NO_ATTENTION,
       probe: {
         ...probe([]),

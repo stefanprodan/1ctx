@@ -9,10 +9,12 @@ import type { AgentSummary } from "../contracts/agent.ts";
 import type {
   LastLine,
   OpenedFile,
+  QueuedMessage,
   SendSummary,
   SessionDetail,
   SessionSummary,
 } from "../contracts/session.ts";
+import type { NotSentReason } from "../words.ts";
 
 // GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
 // the caller may see, running first, then by last activity, each with
@@ -88,6 +90,47 @@ export type SendMessageRequest = {
   uploads?: string[];
   capabilities?: CapabilityChange;
 };
+
+// a chat's queue as the caller sees it after a write: every queued row
+// and the caller's not-sent ones, at the session revision the write
+// committed, which orders it against the envelopes' queues
+export type QueueState = { queue: QueuedMessage[]; revision: number };
+
+// the answer of POST /api/sessions/:id/messages, 202, when the chat's
+// turn is running: the message waits and starts when the reply ends
+export type QueuedResponse = QueueState & { queued: QueuedMessage };
+
+// GET /api/sessions/:id/queued/:queuedId: the author's row whole, for an
+// Edit or a Send again of a row a socket frame carried cut
+export type QueuedRowResponse = { queued: QueuedMessage };
+
+// PATCH /api/sessions/:id/queued/:queuedId: the author's new text, with
+// the revision they saw; 409 once it started or changed. Answers the
+// row as QueuedResponse
+export type EditQueuedRequest = { message: string; revision: number };
+
+// DELETE /api/sessions/:id/queued/:queuedId: the author's Remove,
+// Discard and Send again, with the revision they saw; answers QueueState
+export type RemoveQueuedRequest = { revision: number };
+
+// GET /api/me/not-sent: the caller's messages that were not sent, newest
+// first, each with its chat, for Home. line is the text's first line
+export type NotSentRow = {
+  id: string;
+  sessionId: string;
+  title: string;
+  project: string;
+  agent: string;
+  line: string;
+  reason: NotSentReason;
+  changedAt: number;
+};
+export type NotSentResponse = { rows: NotSentRow[] };
+
+// DELETE /api/me/not-sent: the caller's not-sent messages it names, the
+// ones Home showed; an id not theirs or not sent is passed over
+export type DiscardNotSentRequest = { ids: string[] };
+export type DiscardNotSentResponse = { deleted: number };
 
 // POST /api/sessions/:id/regenerate: the body is optional
 export type RegenerateRequest = { capabilities?: CapabilityChange };

@@ -38,6 +38,20 @@ export class RunCapacity extends TooManyRequests {
   }
 }
 
+// a full cap met by a send a user started; the queue's dispatcher reads
+// which one from the class, never from the words
+export class CapFull extends TooManyRequests {
+  constructor(
+    readonly cap: "user" | "project" | "process",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+// the lock's own refusals: the chat's send holds it, or shutdown began
+export class LockHeld extends Conflict {}
+
 // the count, not the cap: a lowered cap leaves more going
 const going = (n: number): string =>
   n === 1 ? "1 chat or run" : `${n} chats and runs`;
@@ -84,15 +98,15 @@ export class Registry {
   // the lock's refusals alone, for a caller that checks before it builds
   // a send
   locked(sessionId: string): void {
-    if (this.closed) throw new Conflict("the server is shutting down");
+    if (this.closed) throw new LockHeld("the server is shutting down");
     const own = this.sends.get(sessionId);
     if (own === undefined) return;
     if (own.terminal !== null) {
-      throw new Conflict(
+      throw new LockHeld(
         "still stopping the last reply; try again in a moment",
       );
     }
-    throw new Conflict(`${own.policy.fullName} is sending`);
+    throw new LockHeld(`${own.policy.fullName} is sending`);
   }
 
   // throws the refusal, or returns; the caller reserves with set() in
@@ -134,18 +148,29 @@ export class Registry {
       return;
     }
     if (mine >= caps.sendsPerUser) {
-      throw new TooManyRequests(
+      throw new CapFull(
+        "user",
         `You have ${going(mine)} going. Wait for one to end.`,
       );
     }
     if (project >= caps.sendsPerProject) {
-      throw new TooManyRequests(projectFull(project));
+      throw new CapFull("project", projectFull(project));
     }
     if (running >= caps.sendsRunning) {
-      throw new TooManyRequests(
+      throw new CapFull(
+        "process",
         "Too many chats and runs are going. Try again in a moment.",
       );
     }
+  }
+
+  // the sends a user started that hold a place now
+  startedBy(userId: string): number {
+    let n = 0;
+    for (const send of this.sends.values()) {
+      if (send.startedBy === userId) n++;
+    }
+    return n;
   }
 
   set(send: ActiveSend): void {

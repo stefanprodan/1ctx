@@ -14,6 +14,7 @@ import type {
   LiveRetry,
   LiveSend,
   Message,
+  QueuedMessage,
   SendSummary,
   SessionSummary,
 } from "./contracts/session.ts";
@@ -21,7 +22,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 15;
+export const PROTOCOL = 16;
 
 export type VisualFrame = {
   type: "visual";
@@ -35,6 +36,9 @@ export type VisualFrame = {
   // the decoded piece's offset in UTF-16 code units
   htmlAt: number;
 };
+
+// a chat's queued rows at a session revision, each text a preview
+export type QueueFrame = { revision: number; rows: QueuedMessage[] };
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -50,7 +54,8 @@ export type SocketEvent =
   // the stream's last line when the transaction wrote one. row is the
   // stream row as it stands after the commit, read once per event;
   // null when the session was gone by then or the read failed, which
-  // the list treats alike
+  // the list treats alike. messagesCut: the rows written were too large
+  // to carry, so a tab showing the chat reads its detail
   | {
       type: "session";
       projectId: string;
@@ -59,7 +64,29 @@ export type SocketEvent =
       removedMessageIds?: string[];
       send: SendSummary | null;
       last?: LastLine;
+      messagesCut?: true;
       row: EnvelopeRow | null;
+    }
+  // to the chat's watchers alone: its queued rows, every member's, each
+  // text a preview (QUEUED_PREVIEW), at the session revision of the
+  // change. turn: the same commit started a turn from them, whose
+  // session frame follows and carries its user messages
+  | {
+      type: "queue";
+      sessionId: string;
+      revision: number;
+      turn: boolean;
+      rows: QueuedMessage[];
+    }
+  // to the author alone: their not-sent rows in the chat after one
+  // turned not sent or went, at the session revision of that change,
+  // each text a preview
+  | {
+      type: "notSent";
+      projectId: string;
+      sessionId: string;
+      revision: number;
+      rows: QueuedMessage[];
     }
   | { type: "deleted"; projectId: string; sessionId: string }
   // an automation's row after a write, by the same revision rule
@@ -95,8 +122,14 @@ export type SocketEvent =
   | { type: "revoked"; projectId: string }
   // an admin changed the user's role: the tab's user takes it
   | { type: "role"; role: Role }
-  // the answer to a watch: the send in flight as far as it got
-  | { type: "watched"; sessionId: string; live: LiveSend | null }
+  // the answer to a watch: the send in flight as far as it got, and the
+  // queue as the queue frame carries it
+  | {
+      type: "watched";
+      sessionId: string;
+      live: LiveSend | null;
+      queue?: QueueFrame;
+    }
   | {
       type: "delta";
       sessionId: string;

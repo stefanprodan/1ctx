@@ -19,6 +19,21 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   `MAX_LAST_LINE`). Home and a project's Feed tab are one
   `views/home/Feed.tsx`: the stream under the composer, its search and
   filter on the address, and `startChat()` for the composer's send.
+- **Home's Not sent card.** Between Home's composer and the feed,
+  `views/home/NotSent.tsx` shows the user's messages that were not
+  sent, only while there is one: a `RowsCard` titled Not sent with its
+  count and `RowsAction` Discard all in the head (no ask), and a
+  `stream/NotSentRow.tsx` per message in the feed row's shape (the chat
+  icon in the failed colour, the first line, `#project · @agent` and
+  the short reason, when it turned) leading to its chat. `GET
+  /api/me/not-sent` is read by Home's load and after Discard all, never
+  through the feed; Discard all sends the ids the card shows, so a row
+  that turned since is never discarded unseen. While the card is
+  mounted (`watchNotSent()`), the user's `notSent` event (sent to them
+  alone when one of their rows turned not sent or went, the sweep
+  included), a listed chat's delete and a revocation read it again
+  through one `Flight`, so a burst costs one trailing read; Discard all
+  asks that flight too, folding into it the `notSent` events it causes.
 - **Pages by cursor.** A page is `STREAM_LIMIT`, 50 rows: the server
   reads one more and answers `next`, the cursor of the last row sent,
   or null. `sessions/cursor.ts` holds both shapes, the stream's
@@ -97,9 +112,60 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **A deleted agent keeps its name.** The transcript names a reply's
   agent from `SessionDetail.agents`; a retired one is plain text with
   a `deleted` tag, and a memory note names it without a link.
+- **The messages that wait.** `SessionDetail.queued` is drawn under the
+  last turn by `transcript/Queued.tsx`, oldest first, each as a user
+  message with a dashed card: the author (their username when the page
+  knows no name), the text, its file count, then the line from
+  `Queued.words.ts`, "Queued. Starts when the reply ends." while the
+  chat runs, "Queued. Waiting for a free place." while it is idle, or
+  "Not sent." and why. Only the author gets actions, `btn-text` words
+  that ask nothing: Edit and Remove while it waits, Send again and
+  Discard once not sent (no Send again in an archived chat, which has
+  no composer). The actions are `views/sessions/queue.ts`: Edit hands
+  the row to the chat's composer through `composer/handoff.ts`; Send
+  again deletes the row first and hands its text over, before the
+  draft, only once the delete landed; both are refused with "Save or
+  cancel the open edit first." while an edit is open; Remove of the row
+  open for an edit closes the edit with its own words. A refused action
+  is the row's failure line, never a word to reload.
+- **The queue lands by revision, with no read.** The held queue is two
+  parts (`data/queued-rows.ts`, kept by `data/session-queue.ts`): the
+  queued rows every member sees, which the chat's `queue` frame (to its
+  watchers alone) and a watch's `watched` answer carry, each text a
+  preview marked `cut` past `QUEUED_PREVIEW` and drawn with an ellipsis,
+  and the user's own not-sent rows, which only their `notSent` event
+  carries. A start's frame (`turn`) is held until the envelope that
+  brings the user messages the rows became, and both land in one task,
+  so the rows turn into messages with no flicker and no duplicate; an
+  envelope with `messagesCut` reads the detail, which brings both. Edit
+  and Send again read a cut row whole first (`readQueued()`). A write's
+  answer (`data/queued.ts`: the 202, the edit, the delete) is the
+  caller's whole queue at its commit's revision. Each part is taken only
+  from a revision above the one it holds, so a late answer never puts
+  back a row a start took and a detail read before a change never
+  undoes it.
 
 ## The composer
 
+- **Send beside Stop.** While the chat's turn runs the composer shows
+  Stop, then Send (`SendButtons` in `composer/Edit.tsx`): a message
+  sent then is answered 202 and waits, its row shown under the turn at
+  once, and the composer empties as after any send; a 429 keeps the
+  draft and shows the words under the box. The box then reads "Write a
+  message for after the reply". An Edit handed over opens an edit: the
+  box holds the row's text alone and the draft's text is set aside,
+  "Editing a queued message" and Cancel over the box, no slash
+  commands, and Send becomes Save, which sends the text with the
+  revision read; Save and Cancel give the set-aside text back. The edit
+  lives in the draft (`DraftEdit` in `composer/draft.ts`), so a reload
+  or a navigation keeps editing and never leaves its text as a plain
+  draft. The draft's files and switch flips stay for the next message,
+  since an edit changes the text alone. A 409, or the row leaving the
+  queue while no save or Remove here is on its way, ends the edit with
+  its text kept and the set-aside text after it, with words that say
+  so, "The message was not sent." for a row that turned not sent. A
+  Remove here marks its row (`removing`) before the delete is sent. The
+  queued row's files stay with it and are not handed back.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under
@@ -515,8 +581,9 @@ compare the two before reporting.
   A `LimitsSetting` card sends only its own limits, and Use defaults
   fills the draft without saving. A save that lowers the days archived
   chats are kept asks first (`deleteAsk()` in `Limits.model.ts`). The
-  Running card holds the three `sends` limits together, since the
-  server refuses a save that puts one above the next; `collect()`
+  Running card holds the `sends` limits together, the queue's two
+  after the three caps, since the server refuses a save that puts one
+  cap above the next; `collect()`
   refuses it first, on the field changed, in the labels' words, and
   `limitRefusal()` turns the names in a server refusal into labels.
 - **Page rules that are not visible in one file.**

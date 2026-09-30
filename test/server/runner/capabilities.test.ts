@@ -276,20 +276,27 @@ describe("a send's disabled capabilities", () => {
     await setLimits(chat, { sendsPerUser: 1 });
     try {
       const started = await startChat(chat);
-      const before = chat.app.sessions.byId(started.sessionId);
-      for (const action of ["messages", "regenerate"]) {
-        const refused = await chat.member.call(
-          "POST",
-          `/api/sessions/${started.sessionId}/${action}`,
-          {
-            body: {
-              ...(action === "messages" ? { message: "wait" } : {}),
-              capabilities: { disable: ["web"] },
-            },
-          },
-        );
-        expect(refused.status).toBe(409);
-      }
+      const before = chat.app.sessions.byId(started.sessionId)!;
+      const refused = await chat.member.call(
+        "POST",
+        `/api/sessions/${started.sessionId}/regenerate`,
+        { body: { capabilities: { disable: ["web"] } } },
+      );
+      expect(refused.status).toBe(409);
+      // a message to the busy chat waits, its change kept for its start
+      const queued = await chat.member.call(
+        "POST",
+        `/api/sessions/${started.sessionId}/messages`,
+        { body: { message: "wait", capabilities: { disable: ["web"] } } },
+      );
+      expect(queued.status).toBe(202);
+      const { queued: row } = await queued.json();
+      const removed = await chat.member.call(
+        "DELETE",
+        `/api/sessions/${started.sessionId}/queued/${row.id}`,
+        { body: { revision: row.revision } },
+      );
+      expect(removed.status).toBe(200);
       const invalid = await chat.member.call(
         "POST",
         `/api/sessions/${started.sessionId}/messages`,
@@ -310,7 +317,10 @@ describe("a send's disabled capabilities", () => {
         },
       });
       expect(capped.status).toBe(429);
-      expect(chat.app.sessions.byId(started.sessionId)).toEqual(before);
+      expect(chat.app.sessions.byId(started.sessionId)).toEqual({
+        ...before,
+        revision: before.revision + 2,
+      });
       expect(chat.app.sessions.count(chat.projectId)).toBe(1);
       expect(chat.app.sessions.messages(started.sessionId)).toHaveLength(2);
       started.script.reply("done");
@@ -386,17 +396,25 @@ describe("a send's disabled capabilities", () => {
         {
           sendId: newId(),
           replyId: newId(),
-          userId: newId(),
           sessionId: stale.id,
           session: stale,
           title: stale.title,
-          text: "again",
+          turn: {
+            users: [
+              {
+                id: newId(),
+                userId: active.policy.userId,
+                username: active.policy.username,
+                text: "again",
+              },
+            ],
+          },
           policy: {
             ...active.policy,
             disabledCapabilities: ["web"],
             web: null,
           },
-          capabilities: { disable: ["web"] },
+          changes: [{ disable: ["web"] }],
           mcpDigest: null,
         },
       );

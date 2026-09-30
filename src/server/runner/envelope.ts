@@ -21,6 +21,7 @@ export const envelope = (
   send: SendSummary | null,
   removedMessageIds: string[] = [],
   last?: LastLine,
+  messagesCut = false,
 ): BusEvent => ({
   type: "session.changed",
   data: {
@@ -30,6 +31,7 @@ export const envelope = (
     ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
     send,
     ...(last === undefined ? {} : { last }),
+    ...(messagesCut ? { messagesCut: true as const } : {}),
   },
 });
 
