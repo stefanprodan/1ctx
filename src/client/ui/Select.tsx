@@ -12,6 +12,7 @@ import {
   initialHighlight,
   keyMove,
   type Option,
+  pickOutcome,
 } from "./Select.model.ts";
 import "./select.css";
 
@@ -60,9 +61,10 @@ export function Select({
     if (focus) trigger.current?.focus();
   };
   const pick = (option: Option) => {
-    if (disabled || option.disabled) return;
+    const outcome = pickOutcome(option, value, disabled);
+    if (outcome === "none") return;
     close(true);
-    if (option.value !== value) onChange(option.value);
+    if (outcome === "change") onChange(option.value);
   };
 
   useEffect(() => {

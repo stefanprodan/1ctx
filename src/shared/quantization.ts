@@ -36,3 +36,12 @@ export function isFourBit(quantization: string): boolean {
 export function isFourBitTag(tag: string): boolean {
   return tag.split("/").slice(1).some(isFourBit);
 }
+// the endpoint's precision decides, its tag's suffix when it does not say
+export function fourBitEndpoint(e: {
+  tag: string;
+  quantization: string | null;
+}): boolean {
+  return e.quantization !== null && e.quantization.toLowerCase() !== "unknown"
+    ? isFourBit(e.quantization)
+    : isFourBitTag(e.tag);
+}

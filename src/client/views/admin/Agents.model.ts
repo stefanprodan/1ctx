@@ -6,7 +6,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../../shared/contracts/provider.ts";
-import { isFourBit, isFourBitTag } from "../../../shared/quantization.ts";
+import { fourBitEndpoint, isFourBitTag } from "../../../shared/quantization.ts";
 import { fixedThinking } from "../../../shared/thinking.ts";
 import {
   EFFORTS,
@@ -200,14 +200,20 @@ export function upstreamOptions(
     })),
   ];
   if (saved !== null && !shown.some((e) => e.tag === saved)) {
-    const listed = endpoints?.some((e) => e.tag === saved);
+    const listed = endpoints?.find((e) => e.tag === saved);
+    const skipped =
+      skip4Bit &&
+      (listed === undefined ? isFourBitTag(saved) : fourBitEndpoint(listed))
+        ? { disabled: true, title: SKIPPED }
+        : {};
     options.push(
       endpoints === null
-        ? { value: saved, label: saved }
+        ? { value: saved, label: saved, ...skipped }
         : {
             value: saved,
             label: saved,
             detail: listed ? "no tools" : "not listed now",
+            ...skipped,
           },
     );
   }
@@ -217,14 +223,6 @@ export function upstreamOptions(
 export const SKIPPED = "Skipped by Skip 4-bit providers";
 export const PREFERRED_FOUR_BIT = "The preferred provider is 4-bit";
 export const ALL_FOUR_BIT = "Every provider of this model is 4-bit";
-
-// the endpoint's precision decides, its tag's suffix when it does not
-// say, as the server judges a save
-export function fourBitEndpoint(e: Endpoint): boolean {
-  return e.quantization !== null && e.quantization.toLowerCase() !== "unknown"
-    ? isFourBit(e.quantization)
-    : isFourBitTag(e.tag);
-}
 
 // why Skip 4-bit providers cannot be turned on, or null: the filter
 // leaves out the preferred host too, and a model no host passes answers

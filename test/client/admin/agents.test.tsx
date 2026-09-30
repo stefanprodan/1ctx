@@ -46,7 +46,6 @@ import {
   defaultThinking,
   effortApplies,
   effortChoices,
-  fourBitEndpoint,
   PREFERRED_FOUR_BIT,
   SKIPPED,
   sentEffort,
@@ -76,6 +75,7 @@ import type {
   Endpoint,
   ProviderSummary,
 } from "../../../src/shared/contracts/provider.ts";
+import { fourBitEndpoint } from "../../../src/shared/quantization.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import {
   admin as adminFixture,
@@ -491,6 +491,15 @@ describe("Skip 4-bit providers", () => {
     for (const o of locked) expect(o.title).toBe(SKIPPED);
     expect(SKIPPED).toBe("Skipped by Skip 4-bit providers");
     expect(off.some((o) => o.disabled || o.title)).toBe(false);
+    // a saved tag outside the list is judged the same way
+    for (const endpoints of [recorded, null]) {
+      expect(
+        upstreamOptions(endpoints, true, "gone/fp4", true).at(-1),
+      ).toMatchObject({ value: "gone/fp4", disabled: true, title: SKIPPED });
+      expect(
+        upstreamOptions(endpoints, true, "gone", true).at(-1)?.disabled,
+      ).toBeUndefined();
+    }
   });
 
   test("the switch cannot be turned on where the filter could not serve", () => {

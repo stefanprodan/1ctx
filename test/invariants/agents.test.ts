@@ -5,6 +5,8 @@
 // what the catalog said about the model rides on the row.
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseAgent } from "../../src/server/agents/parse.ts";
 import {
   Catalogs,
@@ -837,6 +839,82 @@ describe("a preferred upstream", () => {
       body: { ...body, upstream: "deepinfra/fp4" },
     });
     expect(made.status).toBe(201);
+  });
+
+  test("is refused for a model whose every serving host is 4-bit", async () => {
+    // the recorded answer with only its fp4 hosts
+    const fourBit = readFileSync(
+      join(
+        import.meta.dir,
+        "..",
+        "fixtures",
+        "providers",
+        "openrouter",
+        "endpoints-4bit.json",
+      ),
+      "utf8",
+    );
+    const full = JSON.parse(
+      await (
+        await fakeFetch().fetcher(`${PROVIDER_URL}/models/${GLM}/endpoints`)
+      ).text(),
+    );
+    // every host but the fp4 ones without tools, for a model that takes them
+    for (const e of full.data.endpoints) {
+      if (e.quantization !== "fp4") {
+        e.supported_parameters = e.supported_parameters.filter(
+          (p: string) => p !== "tools" && p !== "tool_choice",
+        );
+      }
+    }
+    let answer = fourBit;
+    let calls = 0;
+    const fake = fakeFetch();
+    const fetcher = (async (input: unknown, init?: RequestInit) => {
+      if (String(input) !== `${PROVIDER_URL}/models/${GLM}/endpoints`) {
+        return fake.fetcher(input as string, init);
+      }
+      calls++;
+      return new Response(answer, {
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+    const { client, provider } = await setup(fetcher);
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: GLM,
+    };
+    const refused = await client.call("POST", "/api/agents", {
+      body: { ...body, skip4Bit: true },
+    });
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({
+      error: `skip4Bit leaves no provider serving ${GLM}`,
+    });
+    // without the filter it saves, and a save that keeps it asks nothing
+    const made = await client.call("POST", "/api/agents", { body });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    answer = JSON.stringify(full);
+    const tools = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, skip4Bit: true },
+    });
+    expect(tools.status).toBe(400);
+    expect((await tools.json()).error).toStartWith("skip4Bit");
+    // a list that fails cannot judge
+    answer = "not json";
+    const unjudged = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, skip4Bit: true },
+    });
+    expect(unjudged.status).toBe(200);
+    const before = calls;
+    const kept = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, skip4Bit: true, prompt: "edited" },
+    });
+    expect(kept.status).toBe(200);
+    expect(calls).toBe(before);
   });
 
   test("a 4-bit host is known by its tag when the endpoints do not answer", async () => {

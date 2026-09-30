@@ -22,7 +22,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../shared/contracts/provider.ts";
-import { isFourBit, isFourBitTag } from "../../shared/quantization.ts";
+import { fourBitEndpoint, isFourBitTag } from "../../shared/quantization.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -180,12 +180,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       before.upstream === body.upstream;
     const listed = body.upstream !== null && model !== null && !kept;
     // the filter applies to the preferred host too, so a 4-bit one would
-    // never serve: its precision is the endpoint's, else its tag's
+    // never serve, and a model whose every host is 4-bit is served by
+    // none; a list that fails cannot judge either
     const weighed =
-      body.skip4Bit &&
-      body.upstream !== null &&
-      model !== null &&
-      !(kept && before.skip4Bit);
+      body.skip4Bit && model !== null && !(kept && before.skip4Bit);
     const endpoints = listed
       ? await deps.providers.endpoints(checked.provider, body.model)
       : weighed
@@ -209,13 +207,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
       }
       if (body.skip4Bit && body.upstream !== null) {
-        const said = endpoints?.find(
-          (e) => e.tag === body.upstream,
-        )?.quantization;
+        const listed = endpoints?.find((e) => e.tag === body.upstream);
         const fourBit =
-          said != null && said.toLowerCase() !== "unknown"
-            ? isFourBit(said)
-            : isFourBitTag(body.upstream);
+          listed === undefined
+            ? isFourBitTag(body.upstream)
+            : fourBitEndpoint(listed);
         if (fourBit) {
           throw new BadRequest(
             `upstream ${body.upstream} is a 4-bit host, which skip4Bit leaves out`,
@@ -223,6 +219,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         }
       }
       const resolved = stated(model, body.stated);
+      if (body.skip4Bit && endpoints !== null) {
+        const serving = endpoints.filter((e) => !resolved.tools || e.tools);
+        if (serving.length > 0 && serving.every(fourBitEndpoint)) {
+          throw new BadRequest(
+            `skip4Bit leaves no provider serving ${body.model}`,
+          );
+        }
+      }
       return {
         name: body.name,
         avatar: body.avatar,

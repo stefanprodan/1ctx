@@ -140,8 +140,12 @@ upstream and skip4Bit fields.
   with it on and a 4-bit upstream is a 400: the endpoint's
   `quantization` decides, and the precision after the tag's slash
   (`deepinfra/fp4`, any case) when the endpoints do not answer or say
-  `unknown`. A model no host passes answers 404, so the filter is never
-  a default.
+  `unknown` (`fourBitEndpoint()`, which the form uses too). A model no
+  host passes answers 404, so the filter is never a default, and a save
+  with it on is a 400 when every endpoint that serves the model (with
+  tools, for a model that takes them) is 4-bit. Both checks read the
+  endpoints unless the provider, model, upstream and filter are kept; a
+  list the filter alone asked for that fails judges only the tag.
 - **Every chat, run and memory round sends `max_tokens`.** The agent
   keeps the model's output limit as `outputLimit` with `output_read`,
   re-read on every save and on every chat catalog refresh
