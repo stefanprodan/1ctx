@@ -225,6 +225,24 @@ export function socketArea(deps: SocketDeps): Socket {
           row: row(event),
         }));
         break;
+      case "queue.mine": {
+        // the author's own rows: their connections alone, and only while
+        // they hold the chat's project
+        const { userId, ...data } = event.data;
+        let text: string | undefined;
+        each((conn) => {
+          if (
+            conn.data.principal.userId !== userId ||
+            conn.data.principal.mustChangePassword ||
+            !conn.data.projects.has(data.projectId)
+          ) {
+            return;
+          }
+          text ??= JSON.stringify({ type: "notSent", ...data });
+          deliverText(conn, text);
+        });
+        break;
+      }
       case "session.deleted":
         toProject(
           event.data.projectId,

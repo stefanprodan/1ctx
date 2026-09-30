@@ -14,6 +14,7 @@ import type {
   LiveRetry,
   LiveSend,
   Message,
+  QueuedMessage,
   SendSummary,
   SessionSummary,
 } from "./contracts/session.ts";
@@ -21,7 +22,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 15;
+export const PROTOCOL = 16;
 
 export type VisualFrame = {
   type: "visual";
@@ -50,7 +51,8 @@ export type SocketEvent =
   // the stream's last line when the transaction wrote one. row is the
   // stream row as it stands after the commit, read once per event;
   // null when the session was gone by then or the read failed, which
-  // the list treats alike
+  // the list treats alike. queued is the chat's queued rows, every
+  // member's, when the transaction changed the queue
   | {
       type: "session";
       projectId: string;
@@ -59,7 +61,17 @@ export type SocketEvent =
       removedMessageIds?: string[];
       send: SendSummary | null;
       last?: LastLine;
+      queued?: QueuedMessage[];
       row: EnvelopeRow | null;
+    }
+  // to the author alone: their not-sent rows in the chat after one
+  // turned not sent or went, at the session revision of that change
+  | {
+      type: "notSent";
+      projectId: string;
+      sessionId: string;
+      revision: number;
+      rows: QueuedMessage[];
     }
   | { type: "deleted"; projectId: string; sessionId: string }
   // an automation's row after a write, by the same revision rule

@@ -564,7 +564,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const chats = sessions.sweep(now, limits.current());
         // an idle chat archived may hold messages that now cannot start
         if (chats.chats_archived > 0) runner.queue.wake();
-        const notSent = sessions.store.queue.sweep(now);
+        const notSent = sessions.sweepNotSent(now);
         const removed =
           logins + visits + knowledgeRows + scratchRows + digests + notSent;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {

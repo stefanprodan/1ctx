@@ -14,6 +14,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import { newId } from "../lib/ids.ts";
 import { archivedEvent } from "./archive.ts";
 import { lineFrom } from "./parse.ts";
@@ -82,23 +83,72 @@ export const onWire = (queued: QueuedRow, username: string): QueuedMessage => ({
   queuedAt: queued.queuedAt,
 });
 
+// a chat's rows on the wire, oldest first: every queued one, and the
+// viewer's not sent (none for a null viewer); mine: the viewer's not
+// sent alone
+export function chatQueue(
+  db: Db,
+  sessionId: string,
+  viewerId: string | null,
+  mine = false,
+): QueuedMessage[] {
+  const which = mine
+    ? "q.state = 'not-sent' and q.author_id = ?"
+    : "(q.state = 'queued' or q.author_id = ?)";
+  return db
+    .query<RawQueued & { username: string }, [string, string]>(
+      `select q.id, q.session_id, q.author_id, q.content, q.uploads,
+         q.capabilities, q.state, q.reason, q.revision, q.queued_at,
+         q.changed_at, u.username
+       from queued_messages q join users u on u.id = q.author_id
+       where q.session_id = ? and ${which}
+       order by q.queued_at, q.rowid`,
+    )
+    .all(sessionId, viewerId ?? "")
+    .map((raw) => onWire(row(raw), raw.username));
+}
+
+type Sessions = {
+  byId(id: string): SessionRow | null;
+  lastSend(id: string): SendSummary | null;
+};
+
 // in the caller's transaction: the chat's revision bumped, never its
-// activity, and the one rows-free envelope; null for a chat gone
+// activity, and one envelope that carries the chat's queued rows, so a
+// member's tab replaces its own with no read; then, to each author
+// named, their not-sent rows in the chat at that revision, which only
+// they may see. Nothing for a chat gone
 export function queueChanged(
   db: Db,
-  store: {
-    byId(id: string): SessionRow | null;
-    lastSend(id: string): SendSummary | null;
-  },
+  store: Sessions,
   sessionId: string,
-): ReturnType<typeof archivedEvent> | null {
+  authors: Iterable<string> = [],
+): BusEvent[] {
   db.query("update sessions set revision = revision + 1 where id = ?").run(
     sessionId,
   );
   const session = store.byId(sessionId);
-  return session === null
-    ? null
-    : archivedEvent(session, store.lastSend(session.id));
+  if (session === null) return [];
+  const shared = archivedEvent(session, store.lastSend(session.id));
+  const events: BusEvent[] = [
+    {
+      type: "session.changed",
+      data: { ...shared.data, queued: chatQueue(db, sessionId, null) },
+    },
+  ];
+  for (const userId of new Set(authors)) {
+    events.push({
+      type: "queue.mine",
+      data: {
+        userId,
+        projectId: session.projectId,
+        sessionId,
+        revision: session.revision,
+        rows: chatQueue(db, sessionId, userId, true),
+      },
+    });
+  }
+  return events;
 }
 
 export type WaitingCursor = { sessionId: string; queuedAt: number };
@@ -165,17 +215,7 @@ export class QueueStore {
 
   // what the detail shows: every queued row, and the viewer's not sent
   ofChat(sessionId: string, viewerId: string | null): QueuedMessage[] {
-    return this.db
-      .query<RawQueued & { username: string }, [string, string]>(
-        `select q.id, q.session_id, q.author_id, q.content, q.uploads,
-           q.capabilities, q.state, q.reason, q.revision, q.queued_at,
-           q.changed_at, u.username
-         from queued_messages q join users u on u.id = q.author_id
-         where q.session_id = ? and (q.state = 'queued' or q.author_id = ?)
-         order by q.queued_at, q.rowid`,
-      )
-      .all(sessionId, viewerId ?? "")
-      .map((raw) => onWire(row(raw), raw.username));
+    return chatQueue(this.db, sessionId, viewerId);
   }
 
   chatCount(sessionId: string): number {
@@ -355,15 +395,17 @@ export class QueueStore {
       }));
   }
 
-  // every not-sent row of the author's gone; the chats they were in
-  discardNotSent(userId: string): string[] {
+  // the author's not-sent rows named gone, any other id passed over;
+  // the chats they were in
+  discardNotSent(userId: string, ids: readonly string[]): string[] {
     return this.db
-      .query<{ session_id: string }, [string]>(
+      .query<{ session_id: string }, [string, string]>(
         `delete from queued_messages
          where author_id = ? and state = 'not-sent'
+           and id in (select value from json_each(?))
          returning session_id`,
       )
-      .all(userId)
+      .all(userId, JSON.stringify(ids))
       .map((r) => r.session_id);
   }
 
@@ -381,13 +423,16 @@ export class QueueStore {
       .map((r) => r.session_id);
   }
 
-  // not-sent rows past their keeping; how many went
-  sweep(now: number): number {
+  // not-sent rows past their keeping gone; each one's chat and author
+  sweep(now: number): { sessionId: string; authorId: string }[] {
     return this.db
-      .query(
-        "delete from queued_messages where state = 'not-sent' and changed_at < ?",
+      .query<{ session_id: string; author_id: string }, [number]>(
+        `delete from queued_messages
+         where state = 'not-sent' and changed_at < ?
+         returning session_id, author_id`,
       )
-      .run(now - NOT_SENT_KEPT_MS).changes;
+      .all(now - NOT_SENT_KEPT_MS)
+      .map((r) => ({ sessionId: r.session_id, authorId: r.author_id }));
   }
 
   load(): QueueLoad {

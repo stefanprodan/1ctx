@@ -14,8 +14,10 @@
 // goes. One timer, set to the oldest row's expiry, expires rows in an
 // idle process.
 
-import type { SendMessageRequest } from "../../shared/api/sessions.ts";
-import type { QueuedMessage } from "../../shared/contracts/session.ts";
+import type {
+  QueuedResponse,
+  SendMessageRequest,
+} from "../../shared/api/sessions.ts";
 import type { NotSentReason } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -107,7 +109,7 @@ export type Dispatcher = {
     principal: Principal,
     sessionId: string,
     fields: SendMessageRequest,
-  ): QueuedMessage | null;
+  ): QueuedResponse | null;
 };
 
 export function dispatcher(deps: DispatcherDeps): Dispatcher {
@@ -167,14 +169,13 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       for (const [reason, rows] of notSent) {
         turned.set(reason, queue.notSend(rows, reason, now));
       }
-      const event =
+      // the authors whose rows turned learn it on their own connections
+      const authors = [...notSent.values()].flat().map((row) => row.authorId);
+      const events =
         dropped > 0 || [...turned.values()].some((n) => n > 0)
-          ? queueChanged(db, sessions, sessionId)
-          : null;
-      return {
-        result: { dropped, turned },
-        events: event === null ? [] : [event],
-      };
+          ? queueChanged(db, sessions, sessionId, authors)
+          : [];
+      return { result: { dropped, turned }, events };
     });
     if (counts.dropped > 0) {
       deps.log.info("queue dropped", {
@@ -460,7 +461,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     principal: Principal,
     sessionId: string,
     fields: SendMessageRequest,
-  ): QueuedMessage | null => {
+  ): QueuedResponse | null => {
     const session = deps.visible(principal, sessionId);
     if (session.origin === "automation") {
       throw new Conflict("a run cannot continue");

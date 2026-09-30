@@ -6,6 +6,8 @@
 // hourly sweep of old not-sent rows and the admin's load.
 
 import { describe, expect, test } from "bun:test";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { NOT_SENT_KEPT_MS } from "../../../src/server/sessions/index.ts";
 import type { QueuedMessage } from "../../../src/shared/contracts/session.ts";
 import {
@@ -90,7 +92,13 @@ describe("a queued message's routes", () => {
       const { queued } = await edited.json();
       expect(queued).toMatchObject({ text: "edited", revision: 1 });
       expect((await remove(chat.member, sessionId, row)).status).toBe(409);
-      expect((await remove(chat.member, sessionId, queued)).status).toBe(204);
+      const removed = await remove(chat.member, sessionId, queued);
+      expect(removed.status).toBe(200);
+      // the caller's queue at the revision the remove made
+      expect(await removed.json()).toEqual({
+        queue: [],
+        revision: chat.app.sessions.byId(sessionId)!.revision,
+      });
       expect(chat.app.sessions.queue.waiting(sessionId)).toEqual([]);
       const bad = await chat.member.call(
         "PATCH",
@@ -148,8 +156,8 @@ describe("a queued message's routes", () => {
       expect((await edit(chat.member, sessionId, mine)).status).toBe(409);
       expect(
         (await remove(chat.member, sessionId, { ...mine, revision: 1 })).status,
-      ).toBe(204);
-      expect((await remove(dana.client, sessionId, hers)).status).toBe(204);
+      ).toBe(200);
+      expect((await remove(dana.client, sessionId, hers)).status).toBe(200);
       script.reply("done");
       await settleRun(chat, sessionId);
     } finally {
@@ -186,7 +194,10 @@ describe("a queued message's routes", () => {
         ],
       });
       const before = chat.app.sessions.byId(sessionId)!.revision;
-      const discarded = await chat.member.call("DELETE", "/api/me/not-sent");
+      // only the ids named that are the caller's and not sent go
+      const discarded = await chat.member.call("DELETE", "/api/me/not-sent", {
+        body: { ids: [mine.id, waiting.id, hers.id] },
+      });
       expect(discarded.status).toBe(200);
       expect(await discarded.json()).toEqual({ deleted: 1 });
       expect(chat.app.sessions.byId(sessionId)!.revision).toBe(before + 1);
@@ -226,8 +237,17 @@ describe("a queued message's routes", () => {
       chat.app.sweep();
       expect(chat.app.sessions.queue.byId(old.id)).not.toBeNull();
       chat.app.now.value += 1;
+      const told: BusEvent[] = [];
+      const unsubscribe = subscribe((event) => {
+        if (event.type === "queue.mine") told.push(event);
+      }, silent);
       chat.app.sweep();
+      unsubscribe();
       expect(chat.app.sessions.queue.byId(old.id)).toBeNull();
+      // the author's open views learn the row went
+      expect(told.map((event) => event.data)).toMatchObject([
+        { userId: chat.memberId, sessionId, rows: [] },
+      ]);
       expect(
         logs.events.findLast((event) => event.msg === "sweep")?.fields,
       ).toMatchObject({ not_sent: 1 });

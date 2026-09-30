@@ -222,7 +222,7 @@ describe("uploads claimed by a send", () => {
           `/api/sessions/${started.sessionId}/queued/${queued.id}`,
           { body: { revision: queued.revision } },
         );
-        expect(removed.status).toBe(204);
+        expect(removed.status).toBe(200);
         expect(staged(chat)).toEqual([item]);
       }
       await finish(chat, started.sessionId, started.script);

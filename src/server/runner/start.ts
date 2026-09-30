@@ -193,6 +193,10 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
           send,
           removedMessageIds,
           lastLine(users.at(-1)!, lastAuthor),
+          // the rows taken leave every tab with the messages they became
+          fields.claim === undefined
+            ? undefined
+            : deps.sessions.queue.ofChat(base.id, null),
         ),
       ],
     };

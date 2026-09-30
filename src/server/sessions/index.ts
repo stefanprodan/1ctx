@@ -84,6 +84,7 @@ export {
   queueChanged,
   type WaitingCursor,
 } from "./queued.ts";
+export { queueAnswer } from "./queued-routes.ts";
 export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {
   cutResult,
@@ -146,6 +147,9 @@ export type Sessions = {
   // in the caller's transaction: the user's queued and not-sent messages
   // in a project they left, and one envelope per chat they were in
   dropQueued(projectId: string, userId: string): BusEvent[];
+  // not-sent messages past their keeping gone, each author's open
+  // views told; how many went
+  sweepNotSent(now: number): number;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -215,8 +219,23 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
     dropQueued: (projectId, userId) =>
       [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
-        (sessionId) => queueChanged(deps.db, store, sessionId) ?? [],
+        (sessionId) => queueChanged(deps.db, store, sessionId),
       ),
+    sweepNotSent(now) {
+      return transact(deps.db, () => {
+        const gone = store.queue.sweep(now);
+        const byChat = new Map<string, string[]>();
+        for (const { sessionId, authorId } of gone) {
+          byChat.set(sessionId, [...(byChat.get(sessionId) ?? []), authorId]);
+        }
+        return {
+          result: gone.length,
+          events: [...byChat].flatMap(([chat, authors]) =>
+            queueChanged(deps.db, store, chat, authors),
+          ),
+        };
+      });
+    },
     markAttention: (sessionId, attention, by) =>
       markAttention(deps.db, store, sessionId, attention, by),
     repair() {

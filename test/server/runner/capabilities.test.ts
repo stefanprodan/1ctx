@@ -296,7 +296,7 @@ describe("a send's disabled capabilities", () => {
         `/api/sessions/${started.sessionId}/queued/${row.id}`,
         { body: { revision: row.revision } },
       );
-      expect(removed.status).toBe(204);
+      expect(removed.status).toBe(200);
       const invalid = await chat.member.call(
         "POST",
         `/api/sessions/${started.sessionId}/messages`,

@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The session.changed envelope the writer publishes after each of its
-// transactions, and the stream's last line it carries when the
-// transaction wrote a user message or a finished answer. Out of the
-// writer so that file stays under the size rule.
+// transactions, the stream's last line it carries when the
+// transaction wrote a user message or a finished answer, and the
+// chat's queued rows when it took some. Out of the writer so that
+// file stays under the size rule.
 
 import type {
   LastLine,
   Message,
+  QueuedMessage,
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
@@ -21,6 +23,7 @@ export const envelope = (
   send: SendSummary | null,
   removedMessageIds: string[] = [],
   last?: LastLine,
+  queued?: QueuedMessage[],
 ): BusEvent => ({
   type: "session.changed",
   data: {
@@ -30,6 +33,7 @@ export const envelope = (
     ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
     send,
     ...(last === undefined ? {} : { last }),
+    ...(queued === undefined ? {} : { queued }),
   },
 });
 

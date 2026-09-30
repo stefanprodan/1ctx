@@ -124,7 +124,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   and `memory`, from `memory.changed`, by the note's revision;
   `knowledge.changed` reaches the same project audience as a `knowledge`
   frame with the file summary and `deleted`, including the delete revision,
-  and an emptied bin as `knowledgeEmptied`;
+  and an emptied bin as `knowledgeEmptied`; `queue.mine` goes as
+  `notSent` only to the connections of the user it names that hold the
+  project, since a not-sent row is its author's alone;
   a stream frame (`delta`, `html`, `visual`, `retry`, with a sequence
   per send) goes to the connections watching its session, straight from the
   writer through a port. `watch` and `unwatch` are the client's two

@@ -464,6 +464,102 @@ describe("the queue behind a busy chat", () => {
     }
   });
 
+  test.serial(
+    "every envelope carries the queue, the start empties it with its messages",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const { sessionId, script } = await teamChat(chat);
+        const events: BusEvent[] = [];
+        const unsubscribe = subscribe((event) => {
+          if (event.type === "session.changed" || event.type === "queue.mine") {
+            events.push(event);
+          }
+        }, silent);
+        const one = await queue(chat, sessionId, "one");
+        const answer = await send(chat, sessionId, "two", chat.admin);
+        const body = await answer.json();
+        // the answer is the caller's queue at the revision it made
+        expect(body.revision).toBe(chat.app.sessions.byId(sessionId)!.revision);
+        expect(body.queue.map((row: QueuedMessage) => row.text)).toEqual([
+          "one",
+          "two",
+        ]);
+        const queuedOf = (event: BusEvent | undefined) =>
+          event?.type === "session.changed"
+            ? event.data.queued?.map((row) => row.id)
+            : undefined;
+        expect(queuedOf(events[0])).toEqual([one.id]);
+        expect(queuedOf(events[1])).toEqual([one.id, body.queued.id]);
+        script.reply("first answer");
+        const next = await waitScript(chat.scripted, 2);
+        unsubscribe();
+        // one envelope: the two user messages and the queue left empty
+        const start = events.find(
+          (event) =>
+            event.type === "session.changed" &&
+            event.data.messages.some((m) => m.content === "one"),
+        );
+        expect(start?.type === "session.changed" && start.data.queued).toEqual(
+          [],
+        );
+        expect(
+          start?.type === "session.changed" &&
+            start.data.messages
+              .filter((m) => m.kind === "user")
+              .map((m) => m.content),
+        ).toEqual(["one", "two"]);
+        // nothing turned not sent, so no author was told alone
+        expect(events.some((event) => event.type === "queue.mine")).toBe(false);
+        next.reply("done");
+        await settleRun(chat, sessionId);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
+
+  test.serial(
+    "a row that turns not sent reaches its author alone with the row",
+    async () => {
+      const chat = await chatApp();
+      try {
+        await setLimits(chat, { sendDeadlineMs: 4 * HOUR });
+        const { sessionId, script } = await startChat(chat, "slow");
+        const late = await queue(chat, sessionId, "too late");
+        const events: BusEvent[] = [];
+        const unsubscribe = subscribe((event) => {
+          if (event.type === "session.changed" || event.type === "queue.mine") {
+            events.push(event);
+          }
+        }, silent);
+        chat.app.now.value += HOUR;
+        await tick();
+        unsubscribe();
+        const revision = chat.app.sessions.byId(sessionId)!.revision;
+        expect(events.map((event) => event.type)).toEqual([
+          "session.changed",
+          "queue.mine",
+        ]);
+        const [shared, mine] = events;
+        // the shared envelope names no not-sent row
+        expect(
+          shared?.type === "session.changed" && shared.data.queued,
+        ).toEqual([]);
+        expect(mine?.type === "queue.mine" && mine.data).toMatchObject({
+          userId: chat.memberId,
+          sessionId,
+          revision,
+          rows: [{ id: late.id, state: "not-sent", reason: "expired" }],
+        });
+        script.reply("done");
+        await settleRun(chat, sessionId);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
+
   test("a lowered wait moves the expiry", async () => {
     const chat = await chatApp();
     try {

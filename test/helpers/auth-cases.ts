@@ -734,6 +734,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "DELETE",
     path: "/api/me/not-sent",
+    body: { ids: ["aaaaaaaaaaaa"] },
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {

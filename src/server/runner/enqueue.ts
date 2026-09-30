@@ -6,8 +6,10 @@
 // under queuedPerUser, the chat's under MAX_QUEUED_PER_CHAT, and a
 // staged file in one queued message of the chat only.
 
-import type { SendMessageRequest } from "../../shared/api/sessions.ts";
-import type { QueuedMessage } from "../../shared/contracts/session.ts";
+import type {
+  QueuedResponse,
+  SendMessageRequest,
+} from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, TooManyRequests } from "../lib/errors.ts";
@@ -15,7 +17,7 @@ import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
 import {
   MAX_QUEUED_PER_CHAT,
-  queueChanged,
+  queueAnswer,
   queuedOnWire,
   type SessionRow,
   type SessionStore,
@@ -46,7 +48,7 @@ export function queueMessage(
   session: SessionRow,
   userId: string,
   fields: SendMessageRequest,
-): QueuedMessage {
+): QueuedResponse {
   const queue = deps.sessions.queue;
   const user = deps.users.byId(userId);
   if (user === null) throw new BadRequest("the user is gone");
@@ -79,10 +81,16 @@ export function queueMessage(
       capabilities: fields.capabilities,
       now,
     });
-    const event = queueChanged(deps.db, deps.sessions, session.id);
+    const { state, events } = queueAnswer(
+      deps.db,
+      deps.sessions,
+      session.id,
+      user.id,
+      false,
+    );
     return {
-      result: queuedOnWire(row, user.username),
-      events: event === null ? [] : [event],
+      result: { ...state, queued: queuedOnWire(row, user.username) },
+      events,
     };
   });
   deps.log.info("queued", { chat: session.id, user: user.username });

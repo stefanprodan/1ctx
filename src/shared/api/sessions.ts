@@ -91,9 +91,14 @@ export type SendMessageRequest = {
   capabilities?: CapabilityChange;
 };
 
+// a chat's queue as the caller sees it after a write: every queued row
+// and the caller's not-sent ones, at the session revision the write
+// committed, which orders it against the envelopes' queues
+export type QueueState = { queue: QueuedMessage[]; revision: number };
+
 // the answer of POST /api/sessions/:id/messages, 202, when the chat's
 // turn is running: the message waits and starts when the reply ends
-export type QueuedResponse = { queued: QueuedMessage };
+export type QueuedResponse = QueueState & { queued: QueuedMessage };
 
 // PATCH /api/sessions/:id/queued/:queuedId: the author's new text, with
 // the revision they saw; 409 once it started or changed. Answers the
@@ -101,7 +106,7 @@ export type QueuedResponse = { queued: QueuedMessage };
 export type EditQueuedRequest = { message: string; revision: number };
 
 // DELETE /api/sessions/:id/queued/:queuedId: the author's Remove,
-// Discard and Send again, with the revision they saw; 204
+// Discard and Send again, with the revision they saw; answers QueueState
 export type RemoveQueuedRequest = { revision: number };
 
 // GET /api/me/not-sent: the caller's messages that were not sent, newest
@@ -118,7 +123,9 @@ export type NotSentRow = {
 };
 export type NotSentResponse = { rows: NotSentRow[] };
 
-// DELETE /api/me/not-sent: every not-sent message of the caller's gone
+// DELETE /api/me/not-sent: the caller's not-sent messages it names, the
+// ones Home showed; an id not theirs or not sent is passed over
+export type DiscardNotSentRequest = { ids: string[] };
 export type DiscardNotSentResponse = { deleted: number };
 
 // POST /api/sessions/:id/regenerate: the body is optional

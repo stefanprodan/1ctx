@@ -7,6 +7,7 @@
 
 import type {
   CreateSessionRequest,
+  DiscardNotSentRequest,
   EditQueuedRequest,
   ForkSessionRequest,
   RegenerateRequest,
@@ -128,6 +129,17 @@ export function parseRemoveQueued(body: unknown): RemoveQueuedRequest {
 
 export function parseQueuedId(value: unknown): string {
   return storedId(value, "queuedId");
+}
+
+// a user holds at most the largest queuedPerUser, so Home never shows more
+export const MAX_DISCARD_IDS = 32;
+
+export function parseDiscardNotSent(body: unknown): DiscardNotSentRequest {
+  const { ids } = fields(body, ["ids"]);
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_DISCARD_IDS) {
+    throw new BadRequest(`ids must list 1 to ${MAX_DISCARD_IDS} ids`);
+  }
+  return { ids: [...new Set(ids.map((id) => storedId(id, "ids")))] };
 }
 
 function parseRevision(value: unknown): number {

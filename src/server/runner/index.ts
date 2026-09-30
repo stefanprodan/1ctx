@@ -377,7 +377,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const queued = runner.queue.enqueue(principal, sessionId, fields);
       return queued === null
         ? { status: 201, body: runner.send(principal, sessionId, fields) }
-        : { status: 202, body: { queued } };
+        : { status: 202, body: queued };
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = deps.visible(principal, sessionId);

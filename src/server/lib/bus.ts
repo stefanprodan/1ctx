@@ -11,6 +11,7 @@ import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type {
   LastLine,
   Message,
+  QueuedMessage,
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
@@ -24,7 +25,8 @@ export type BusEvents = {
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
-  // the stream's last line when the transaction wrote one
+  // the stream's last line when the transaction wrote one, and the
+  // chat's queued rows when it changed the queue
   "session.changed": {
     projectId: string;
     session: SessionSummary;
@@ -32,6 +34,16 @@ export type BusEvents = {
     removedMessageIds?: string[];
     send: SendSummary | null;
     last?: LastLine;
+    queued?: QueuedMessage[];
+  };
+  // a user's not-sent rows in a chat changed: the rows as they are now,
+  // for that user's connections alone
+  "queue.mine": {
+    userId: string;
+    projectId: string;
+    sessionId: string;
+    revision: number;
+    rows: QueuedMessage[];
   };
   "session.deleted": { projectId: string; sessionId: string };
   "automation.changed": {
