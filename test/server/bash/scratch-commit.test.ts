@@ -161,9 +161,11 @@ describe("atomic knowledge and scratch commits", () => {
       return rows;
     };
     try {
-      expect((await run(s, edits)).content).toContain(
+      const refused = await run(s, edits);
+      expect(refused.content).toContain(
         "existing changed while the command ran",
       );
+      expect(refused.saved).toBeUndefined();
       expect(scratchState(s)).toEqual(s.before);
       expect(s.knowledge.read(s.projectId, s.file.id).text).toBe(
         "other writer",
@@ -187,9 +189,11 @@ describe("atomic knowledge and scratch commits", () => {
       return before;
     };
     try {
-      expect((await run(s, edits)).content).toContain(
+      const refused = await run(s, edits);
+      expect(refused.content).toContain(
         "the scratch changed while the command ran",
       );
+      expect(refused.saved).toBeUndefined();
       expect(scratchState(s)).toEqual({
         ...s.before,
         cwd: "/tmp",
@@ -210,6 +214,7 @@ describe("atomic knowledge and scratch commits", () => {
         error: true,
         content: "exit 1\nwrote existing (rev 2, 1 lines)",
         opened: [],
+        saved: ["/knowledge/existing"],
         tail: "exit 1\nwrote existing (rev 2, 1 lines)".length,
       });
       expect(scratchState(s)).toMatchObject({

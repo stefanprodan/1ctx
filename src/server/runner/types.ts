@@ -43,7 +43,10 @@ export type RunnerDeps = {
   sessions: SessionStore;
   access: { project(principal: Principal, id: string): ProjectRow };
   visible(principal: Principal, id: string): SessionRow;
-  agents: { byId(id: string): AgentRow | null };
+  agents: {
+    byId(id: string): AgentRow | null;
+    byName(name: string): AgentRow | null;
+  };
   users: { byId(id: string): UserRow | null };
   providers: {
     chat: RoundDeps["chat"];

@@ -335,6 +335,10 @@
     right: 0;
     bottom: calc(100% + 6px);
     z-index: 1;
+    /* many agents scroll inside the box, never past a phone's viewport
+       with the keyboard up */
+    max-height: min(290px, 40dvh);
+    overflow-y: auto;
   }
   /* the tall composer is at the top of its page, so its menus drop
      below the chip instead of rising over the head */
@@ -374,6 +378,14 @@
     color: var(--dim);
   }
   .composer-cmd-blocked .composer-cmd-name {
+    color: var(--faint);
+  }
+  /* an agent's model in the @ menu takes the rest of the row */
+  .composer-cmd-model {
+    flex-grow: 1;
+    min-width: 0;
+    font-family: var(--mono);
+    font-size: var(--text-label);
     color: var(--faint);
   }
 
@@ -452,6 +464,9 @@
     }
     .composer-files-x {
       width: 36px;
+    }
+    .composer-cmd {
+      min-height: 36px;
     }
     /* a chip near the right edge would carry its list off the screen,
        so on a phone the lists span the card */

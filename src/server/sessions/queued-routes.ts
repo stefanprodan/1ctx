@@ -8,7 +8,8 @@
 // queue frame already moved past; the author reads a row whole for an
 // Edit, since a frame carries its text cut. Home reads the caller's
 // not-sent messages by their own query, never through the feed, and
-// discards only the ones it names.
+// discards only the ones it names. An edit is checked for a summon of
+// no agent as a queued message is, with the same 400.
 
 import type {
   DiscardNotSentResponse,
@@ -17,11 +18,13 @@ import type {
   QueuedRowResponse,
   QueueState,
 } from "../../shared/api/sessions.ts";
+import { noAgentNamed, readSummon } from "../../shared/summon.ts";
+import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, Forbidden } from "../lib/errors.ts";
+import { BadRequest, Conflict, Forbidden } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
   MAX_SESSION_BODY,
@@ -41,10 +44,31 @@ const CHANGED = "the message changed since it was shown";
 export type QueuedRoutesDeps = {
   db: Db;
   clock: Clock;
+  agents: {
+    byId(id: string): AgentRow | null;
+    byName(name: string): AgentRow | null;
+  };
   store: SessionStore;
   visibleProjectIds(userId: string): string[] | null;
   visible(principal: Principal, id: string): SessionRow;
 };
+
+// a first word naming no live agent is refused, the chat's own name
+// being an ordinary turn, as runner/enqueue.ts refuses it
+function checkSummon(
+  agents: QueuedRoutesDeps["agents"],
+  session: SessionRow,
+  text: string,
+): void {
+  const chatAgent = agents.byId(session.agentId);
+  if (chatAgent === null) return;
+  const read = readSummon(
+    text,
+    chatAgent.name,
+    (name) => agents.byName(name) !== null,
+  );
+  if (read.kind === "unknown") throw new BadRequest(noAgentNamed(read.word));
+}
 
 // in a transaction: the row when it is in the chat and the caller's
 function own(
@@ -116,6 +140,7 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
         const body: QueuedResponse = transact(deps.db, () => {
           const row = own(store, principal, session.id, id);
           if (row.state !== "queued") throw new Conflict("it was not sent");
+          checkSummon(deps.agents, session, fields.message);
           const next = store.queue.edit(
             row.id,
             fields.revision,

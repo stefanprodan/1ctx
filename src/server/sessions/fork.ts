@@ -111,12 +111,12 @@ export function copyRows(
   const insertSend = db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
        provider_name, model, status, cause, error, first_message_id, rounds,
-       tool_calls, mcp, memory_round, memory_error, memory_skipped,
+       tool_calls, mcp, memory_round, memory_error, memory_skipped, summoned,
        started_at, finished_at)
      select ?, ?, kind, user_id, agent_id, provider_id, provider_name, model,
        case when status = 'running' then 'done' else status end,
        case when status = 'running' then 'finish' else cause end,
-       error, ?, ?, ?, null, null, null, null, started_at,
+       error, ?, ?, ?, null, null, null, null, summoned, started_at,
        case when status = 'running' then ? else finished_at end
      from sends where id = ?`,
   );
@@ -143,12 +143,12 @@ export function copyRows(
        user_id, agent_id, content, reasoning, html, status, error,
        finish_reason, reasoning_details, tool_calls, tool_call_id, tool_name,
        model, ttft_ms, thinking_ms, upstream, served_model, native_finish,
-       created_at, finished_at, uploads)
+       created_at, finished_at, uploads, saved)
      select ?, ?, seq, kind, ?, round, slot, user_id, agent_id,
        coalesce(?, content), reasoning, html, status, error, finish_reason, reasoning_details,
        tool_calls, tool_call_id, tool_name, model, ttft_ms, thinking_ms,
        upstream, served_model, native_finish,
-       created_at, finished_at, uploads from messages where id = ?`,
+       created_at, finished_at, uploads, saved from messages where id = ?`,
   );
   const insertOpened = db.query(
     `insert into opened_files

@@ -127,8 +127,10 @@ export async function toolLoop(
         send.policy.contextLength,
         limits.contextReserve,
       );
+      // a summoned turn never compacts: compaction is the chat agent's
       if (
         send.kind === "chat" &&
+        send.policy.summoned === null &&
         threshold !== null &&
         round.tokens >= threshold
       ) {

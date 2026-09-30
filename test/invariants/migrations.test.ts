@@ -48,6 +48,8 @@ const EXPECTED_IDS = [
   "0034-send-limits",
   "0035-queued-messages",
   "0036-skip-4bit",
+  "0037-summoned",
+  "0038-saved-paths",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1190,11 +1192,41 @@ describe("the schema", () => {
   test("0036 leaves an agent's hosts unfiltered", () => {
     const db = seed(MIGRATIONS.slice(0, 35));
     try {
-      expect(migrate(db)).toEqual(["0036-skip-4bit"]);
+      expect(migrate(db)).toEqual(expectedFrom("0036-skip-4bit"));
       expect(db.query("select skip_4bit from agents").get()).toEqual({
         skip_4bit: 0,
       });
       expect(() => db.exec("update agents set skip_4bit = 2")).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0037 marks every existing send as the chat's own", () => {
+    const db = seed(MIGRATIONS.slice(0, 36));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0037-summoned"));
+      expect(
+        db.query("select id, summoned from sends order by id").all(),
+      ).toEqual([
+        { id: "send1", summoned: 0 },
+        { id: "send2", summoned: 0 },
+      ]);
+      expect(() => db.exec("update sends set summoned = 2")).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0038 leaves every existing row without saved paths", () => {
+    const db = seed(MIGRATIONS.slice(0, 37));
+    try {
+      expect(migrate(db)).toEqual(["0038-saved-paths"]);
+      const rows = db
+        .query<{ saved: string | null }, []>("select saved from messages")
+        .all();
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.saved === null)).toBe(true);
     } finally {
       db.close();
     }

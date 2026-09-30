@@ -19,6 +19,7 @@ import {
   SUMMARIZE,
   SUMMARY_LEAD,
   summaryRequest,
+  unmarked,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../../src/server/runner/limits.ts";
@@ -82,6 +83,7 @@ const policy: SendPolicy = {
   projectDescription: "Incidents and pages.",
   agentId: "a",
   agentName: "coder",
+  summoned: null,
   providerId: "pr",
   providerName: "local",
   wire: "openai-compatible",
@@ -116,6 +118,7 @@ const row = (
   sessionId: "s",
   uploads: null,
   files: null,
+  saved: null,
   seq: 1,
   sendId: "snd1",
   round: 1,
@@ -150,6 +153,7 @@ const lookups: ContextLookups = {
     id === "r2" && providerId === policy.providerId && model === policy.model
       ? [{ type: "reasoning.text", text: "t" }]
       : null,
+  turnsOf: () => new Map(),
 };
 
 const EMPTY_KNOWLEDGE =
@@ -168,6 +172,24 @@ describe("knowledgeBlock", () => {
     ],
   ] as const)("names the aliases and tab for %i files", (files, expected) => {
     expect(knowledgeBlock(files, [])).toBe(expected);
+  });
+});
+
+describe("unmarked", () => {
+  test.each([
+    ["[checker] yes", "yes"],
+    ["  [checker]\n\nyes", "yes"],
+    ["[checker]", ""],
+    ["[coder] yes", "[coder] yes"],
+    ["yes [checker] no", "yes [checker] no"],
+    ["[checkers] yes", "[checkers] yes"],
+    ["[Checker] yes", "yes"],
+    ["[CHECKER]", ""],
+    ["[checker](https://x) says", "[checker](https://x) says"],
+    ["[checker]: x", "[checker]: x"],
+    ["[checker][1]", "[checker][1]"],
+  ])("%j", (text, want) => {
+    expect(unmarked(text, "checker")).toBe(want);
   });
 });
 
@@ -1231,6 +1253,28 @@ describe("skills after a summary", () => {
     ];
     expect(history(rows, without, lookups, NOW)[1]?.content).toBe(
       `${SUMMARY_LEAD}\n\nsummary`,
+    );
+  });
+
+  test("a skill another agent loaded is not counted as loaded", () => {
+    const rows = [
+      work("c1", "ops", "one"),
+      loaded("c1", "ops", "one"),
+      row({ id: "s", kind: "summary", content: "summary" }),
+    ];
+    const summoned: ContextLookups = {
+      ...lookups,
+      turnsOf: () =>
+        new Map([
+          ["one", { agentId: "b", agentName: "checker", summoned: true }],
+        ]),
+    };
+    expect(history(rows, withSkills, summoned, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary`,
+    );
+    const itself = { ...withSkills, agentId: "b", summoned: "coder" };
+    expect(history(rows, itself, summoned, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops`,
     );
   });
 });

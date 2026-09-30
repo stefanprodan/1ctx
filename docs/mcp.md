@@ -85,8 +85,9 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
 - **A change in the offer is a note, not a new prefix.** A send records
   a content-addressed digest of what it offered from MCP (`mcp_digests`,
   `sends.mcp`, null for a compact send, swept with the logins);
-  `startSend` compares it with the session's previous send (a
-  regenerated turn against the turn before it), and a difference is the
+  `startSend` compares it with the session's previous send of the same
+  agent (a regenerated turn against the turn before it), so agents
+  taking turns in a chat see no change each turn, and a difference is the
   note after the date line naming added, removed and changed wire names,
   so the stable prefix stays cacheable. A running send never changes its
   set.

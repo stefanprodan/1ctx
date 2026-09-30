@@ -58,7 +58,7 @@ export function Transcript({
     username: string | null;
   };
   // the last turn's Regenerate; absent while a send runs
-  onRegenerate?: () => void;
+  onRegenerate?: () => Promise<void>;
   // Fork under every finished answer; absent in a run
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   // the messages that wait, under the last turn
@@ -80,6 +80,10 @@ export function Transcript({
     scroller.scrollTop = scroller.scrollHeight;
     lastTop.current = scroller.scrollTop;
     lastHeight.current = scroller.scrollHeight;
+  };
+
+  const follow = () => {
+    if (stick.current) toEnd();
   };
 
   useEffect(() => {
@@ -172,6 +176,7 @@ export function Transcript({
                     null,
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
+                follow={last ? follow : undefined}
                 retry={last ? retry : null}
                 fork={fork}
                 visuals={visualCards(node, visualPreviews.value).map((card) =>

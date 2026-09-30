@@ -11,7 +11,11 @@ import {
   type CapabilityChange,
 } from "../../shared/capabilities.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { MAX_QUEUED_PER_CHAT, parseSendMessage } from "../sessions/index.ts";
+import {
+  MAX_QUEUED_PER_CHAT,
+  parseSendMessage,
+  type QueuedRow,
+} from "../sessions/index.ts";
 
 // the most user messages one turn opens with: a chat's whole queue
 export const MAX_TURN_MESSAGES = MAX_QUEUED_PER_CHAT;
@@ -56,3 +60,20 @@ export function applyChanges(
   }
   return current;
 }
+
+// queued rows as the turn's messages, each by its author
+export const messagesOf = (rows: readonly QueuedRow[]): TurnMessage[] =>
+  rows.map((row) => ({
+    userId: row.authorId,
+    message: row.text,
+    ...(row.uploads.length > 0 ? { uploads: row.uploads } : {}),
+    ...(row.capabilities === undefined
+      ? {}
+      : { capabilities: row.capabilities }),
+  }));
+
+// the claim a start takes the rows with, by id and revision
+export const claimsOf = (
+  rows: readonly QueuedRow[],
+): { id: string; revision: number }[] =>
+  rows.map((row) => ({ id: row.id, revision: row.revision }));

@@ -4,7 +4,8 @@
 // One message written to the queue of a chat whose lock is held, in one
 // transaction with its bounds: the author's rows, queued and not sent,
 // under queuedPerUser, the chat's under MAX_QUEUED_PER_CHAT, and a
-// staged file in one queued message of the chat only.
+// staged file in one queued message of the chat only. A summon of no
+// agent is refused here, not when it would start.
 
 import type {
   QueuedResponse,
@@ -23,6 +24,7 @@ import {
   type SessionStore,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { type SummonAgents, summonOf } from "./summon.ts";
 
 export type EnqueueDeps = {
   db: Db;
@@ -31,6 +33,7 @@ export type EnqueueDeps = {
   sessions: SessionStore;
   limits: { current(): Limits };
   users: { byId(id: string): UserRow | null };
+  agents: SummonAgents;
   uploads: {
     checkUploads(
       userId: string,
@@ -52,6 +55,8 @@ export function queueMessage(
   const queue = deps.sessions.queue;
   const user = deps.users.byId(userId);
   if (user === null) throw new BadRequest("the user is gone");
+  const chatAgent = deps.agents.byId(session.agentId);
+  if (chatAgent !== null) summonOf(deps.agents, chatAgent.name, fields.message);
   if (fields.uploads?.length) {
     deps.uploads.checkUploads(user.id, session.projectId, fields.uploads);
   }

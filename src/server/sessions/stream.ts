@@ -26,12 +26,18 @@ type RawLastLine = {
   content: string;
 };
 
-// the same row lastSend() answers for one session, for many at once
+type RawLastSend = RawSend & { agent_name: string; agent_retired: number };
+
+// the same row lastSend() answers for one session, for many at once,
+// with its agent
 function lastSends(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
-    .query<RawSend, string[]>(
-      `select current.*, ${sendTokens("current")} from sends current
+    .query<RawLastSend, string[]>(
+      `select current.*, ${sendTokens("current")},
+         agents.name as agent_name,
+         agents.deleted_at is not null as agent_retired
+       from sends current join agents on agents.id = current.agent_id
        where current.session_id in (${marks})
          and not exists (
            select 1 from sends later
@@ -42,7 +48,15 @@ function lastSends(db: Db, sessionIds: string[]) {
          )`,
     )
     .all(...sessionIds);
-  return new Map(rows.map((raw) => [raw.session_id, send(raw)]));
+  return new Map(
+    rows.map(({ agent_name, agent_retired, ...raw }) => [
+      raw.session_id,
+      {
+        send: send(raw),
+        agent: { name: agent_name, retired: agent_retired === 1 },
+      },
+    ]),
+  );
 }
 
 // a user message or a finished answer reply, never a work reply, a
@@ -99,8 +113,9 @@ function automations(db: Db, sessionIds: string[]) {
   );
 }
 
-// the agent of each session by name; a session keeps its agent for
-// life, and a deleted agent is retired, never removed, so its name stays
+// the agent of each session by name; a chat keeps its agent for life,
+// a summoned turn names its own on the send, and a deleted agent is
+// retired, never removed, so its name stays
 function agentNames(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
@@ -154,7 +169,8 @@ export function streamRows(
       session: session(raw, usage.get(raw.id) ?? null),
       agent: agents.get(raw.id)?.name ?? null,
       agentRetired: agents.get(raw.id)?.retired ?? false,
-      send: sends.get(raw.id) ?? null,
+      send: sends.get(raw.id)?.send ?? null,
+      sendAgent: sends.get(raw.id)?.agent ?? null,
       last: lines.get(raw.id) ?? null,
       automation: automationRows.get(raw.id) ?? null,
       runBy: username === undefined ? null : { id: raw.owner_id, username },
@@ -185,6 +201,7 @@ const SEND_COLUMNS = [
   "memory_round",
   "memory_error",
   "memory_skipped",
+  "summoned",
   "started_at",
   "finished_at",
 ] as const satisfies readonly Exclude<keyof RawSend, "tokens">[];
@@ -197,6 +214,8 @@ type SendColumn = Listed<
 type RawEnvelopeRow = {
   agent: string;
   retired: number;
+  send_agent: string | null;
+  send_agent_retired: number | null;
   automation_id: string | null;
   automation_name: string | null;
   owner_id: string;
@@ -217,7 +236,8 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     line.seq as line_seq, substr(line.content, 1, 600) as line_content,
     coalesce(author.username, speaker.name) as line_author,
     ${SEND_COLUMNS.map((column) => `last.${column} as send_${column}`).join(", ")},
-    ${sendTokens("last")}
+    ${sendTokens("last")},
+    turn.name as send_agent, turn.deleted_at is not null as send_agent_retired
   from sessions
   join agents on agents.id = sessions.agent_id
   left join automations on automations.id = sessions.automation_id
@@ -233,6 +253,7 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     select newest.id from sends newest
     where newest.session_id = sessions.id
     order by newest.started_at desc, newest.rowid desc limit 1)
+  left join agents turn on turn.id = last.agent_id
   where sessions.id = ?`;
 
 /** What a session envelope carries of its stream row, or null when gone. */
@@ -254,6 +275,10 @@ export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
     agent: raw.agent,
     agentRetired: raw.retired === 1,
     send: sent,
+    sendAgent:
+      raw.send_agent === null
+        ? null
+        : { name: raw.send_agent, retired: raw.send_agent_retired === 1 },
     last:
       text === "" || raw.line_seq === null
         ? null

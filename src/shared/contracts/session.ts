@@ -81,6 +81,15 @@ export type RoundUsage = {
 
 export type { OpenedKind };
 
+// the docs a bash command wrote: the first /knowledge paths in commit
+// order, bounded, how many it wrote in all, and the one directory they
+// share, null when they are in several
+export type SavedDocs = {
+  paths: string[];
+  count: number;
+  dir: string | null;
+};
+
 // a file a bash command put on the page with open, as the tool row
 // carries it: the stored copy's text stays behind and the file route
 // answers it
@@ -127,6 +136,9 @@ export type Message = {
   // order, without their text; null on every other row and on a bash
   // row that opened nothing
   files: OpenedFile[] | null;
+  // the docs a bash command wrote; null on every other row and on a bash
+  // row that wrote no doc
+  saved: SavedDocs | null;
   // the UTF-8 byte length of stored tool content on the wire; null on
   // every non-tool row
   resultBytes: number | null;
@@ -195,6 +207,8 @@ export type SendSummary = {
   memoryError: string | null;
   // edits the commit skipped because the note moved during the run
   memorySkipped: number | null;
+  // another agent answered this one turn, summoned by the first word
+  summoned: boolean;
   // prompt plus completion tokens over every round the provider counted
   tokens: number;
   startedAt: number;

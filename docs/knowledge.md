@@ -88,7 +88,8 @@ file page are in `docs/views.md`.
   of its own and checks live identities, revisions and current caps; an
   upload's is authored by the user without a session, and a command's
   runs through the area's `commitDocs` inside the bash commit's
-  transaction. All-unchanged uploads write and evict nothing.
+  transaction, the written paths kept on the call's row
+  (`docs/bash.md`). All-unchanged uploads write and evict nothing.
   Answers count every outcome but carry at most 200 saved names and
   200 skips, raw names cut to 200 characters and 300 JSON bytes, with
   reason codes and clash indexes.

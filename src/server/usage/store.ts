@@ -112,7 +112,10 @@ const usageOf = (raw: Raw): RoundUsage => ({
   contextLength: raw.context_length,
 });
 
-const LIVE_SEND = "exists (select 1 from sends where sends.id = usage.send_id)";
+// the chat's own rounds: a summoned turn's model and window are not the
+// chat's, so the meter and a compaction's room read the chat agent's
+const CHAT_ROUND = `exists (select 1 from sends
+  where sends.id = usage.send_id and sends.summoned = 0)`;
 
 // a turn is a send still there: a regenerate's replaced send and a
 // deleted chat's keep their tokens but are no longer turns
@@ -333,7 +336,7 @@ export class UsageStore {
   latest(sessionId: string): RoundUsage | null {
     const raw = this.db
       .query<Raw, [string]>(
-        `select * from usage where session_id = ? and ${LIVE_SEND}
+        `select * from usage where session_id = ? and ${CHAT_ROUND}
          order by seq desc limit 1`,
       )
       .get(sessionId);
@@ -348,7 +351,7 @@ export class UsageStore {
       .query<Raw, string[]>(
         `select u.* from usage u
          join (select session_id, max(seq) as seq from usage
-               where session_id in (${marks}) and ${LIVE_SEND}
+               where session_id in (${marks}) and ${CHAT_ROUND}
                group by session_id) last
            on last.session_id = u.session_id and last.seq = u.seq`,
       )

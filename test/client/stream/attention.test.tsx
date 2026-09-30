@@ -41,6 +41,7 @@ const run = (attention: number | null): StreamRow => {
     session,
     agent: "sre",
     send: null,
+    sendAgent: null,
     last: { seq: 2, author: "sre", text: "three objects failing" },
     automation: { id: "au1", name: "Check the cluster" },
     runBy: null,

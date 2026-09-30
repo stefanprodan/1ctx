@@ -50,8 +50,41 @@ afterEach(() => {
   }
 });
 
-// the box's key handler, from a render of the composer over a draft
-function keysOver(text: string): (key: string) => boolean {
+const agent = (id: string, name: string): AgentSummary => ({
+  id,
+  name,
+  avatar: "bot",
+  providerId: "pr1",
+  model: {
+    id: "acme/small",
+    name: "Small",
+    contextLength: null,
+    promptPrice: null,
+    completionPrice: null,
+    tools: false,
+    reasoning: false,
+    thinkingRequired: false,
+    reasoningKnown: true,
+    described: true,
+  },
+  thinking: null,
+  effort: null,
+  prompt: "",
+  skills: [],
+  servers: [],
+  mcpMode: "auto",
+  upstream: null,
+  skip4Bit: false,
+  default: id === "a1",
+  createdAt: 0,
+});
+// the box's key handler, from a render of the composer over a draft,
+// and the page it drew
+function keysOver(
+  text: string,
+  agents: AgentSummary[] | null = null,
+  agentId: string | null = null,
+): ((key: string) => boolean) & { html: string } {
   rows.set(draftKey("u1", SCOPE), JSON.stringify({ text, uploads: [] }));
   const previous = options.vnode;
   let onKeyDown: ((event: KeyboardEvent) => void) | undefined;
@@ -62,13 +95,14 @@ function keysOver(text: string): (key: string) => boolean {
       onKeyDown = props.onKeyDown as (event: KeyboardEvent) => void;
     }
   };
+  let html = "";
   try {
-    render(
+    html = render(
       <Composer
         scope={SCOPE}
         filesProjectId="p1"
-        agents={null}
-        agentId={null}
+        agents={agents}
+        agentId={agentId}
         running={false}
         busy={false}
         onSend={async () => {}}
@@ -80,7 +114,7 @@ function keysOver(text: string): (key: string) => boolean {
   }
   if (onKeyDown === undefined) throw new Error("no message box");
   const handler = onKeyDown;
-  return (key) => {
+  const press = (key: string) => {
     let prevented = false;
     handler({
       key,
@@ -92,6 +126,7 @@ function keysOver(text: string): (key: string) => boolean {
     } as unknown as KeyboardEvent);
     return prevented;
   };
+  return Object.assign(press, { html });
 }
 
 describe("the composer's keys", () => {
@@ -109,35 +144,35 @@ describe("the composer's keys", () => {
   });
 });
 
-describe("the composer's agent", () => {
-  const agent = (id: string, name: string): AgentSummary => ({
-    id,
-    name,
-    avatar: "bot",
-    providerId: "pr1",
-    model: {
-      id: "acme/small",
-      name: "Small",
-      contextLength: null,
-      promptPrice: null,
-      completionPrice: null,
-      tools: false,
-      reasoning: false,
-      thinkingRequired: false,
-      reasoningKnown: true,
-      described: true,
-    },
-    thinking: null,
-    effort: null,
-    prompt: "",
-    skills: [],
-    servers: [],
-    mcpMode: "auto",
-    upstream: null,
-    skip4Bit: false,
-    default: id === "a1",
-    createdAt: 0,
+describe("the @ menu", () => {
+  const agents = [agent("a1", "coder"), agent("a2", "writer")];
+  const listed = (html: string) =>
+    [...html.matchAll(/composer-cmd-name">@(?:<!-- -->)?([^<]*)</g)].map(
+      (m) => m[1],
+    );
+
+  test.serial("a chat lists the other agents and takes the keys", () => {
+    const press = keysOver("@", agents, "a1");
+    expect(listed(press.html)).toEqual(["writer"]);
+    expect(press.html).toContain('aria-label="Agents"');
+    expect(press("ArrowDown")).toBe(true);
+    expect(press("Tab")).toBe(true);
   });
+
+  test.serial("a word no agent starts leaves the keys to the box", () => {
+    const press = keysOver("@x", agents, "a1");
+    expect(listed(press.html)).toEqual([]);
+    expect(press("Tab")).toBe(false);
+  });
+
+  test.serial("a new chat opens no menu", () => {
+    const press = keysOver("@", agents, null);
+    expect(press.html).not.toContain('aria-label="Agents"');
+    expect(press("ArrowDown")).toBe(false);
+  });
+});
+
+describe("the composer's agent", () => {
   const agents = [agent("a1", "coder"), agent("a2", "writer")];
   const chip = (fixed: string | null = null) =>
     render(

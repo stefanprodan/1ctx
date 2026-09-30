@@ -219,7 +219,7 @@ function SessionPage({
               shown.session.status === "running" ||
               sending.value
                 ? undefined
-                : () => void regenerateSession(shown.session.id)
+                : () => regenerateSession(shown.session.id)
             }
             fork={
               run
@@ -250,6 +250,7 @@ function SessionPage({
                     agent: null,
                     agentRetired: false,
                     send: shown.send,
+                    sendAgent: null,
                     last: null,
                     automation: null,
                     runBy: null,

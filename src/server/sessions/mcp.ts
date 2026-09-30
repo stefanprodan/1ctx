@@ -46,6 +46,7 @@ export type McpSendFields = {
   model: string;
   firstMessageId: string;
   mcpDigest?: McpDigest | null;
+  summoned?: boolean;
   now: number;
 };
 
@@ -54,10 +55,11 @@ export function insertMcpSend(db: Db, fields: McpSendFields): string {
   const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
   db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
-       provider_name, model, status, first_message_id, mcp, started_at)
+       provider_name, model, status, first_message_id, mcp, summoned,
+       started_at)
      values (?, ?, ?, ?, ?, ?,
        coalesce((select name from providers where id = ?), ?), ?,
-       'running', ?, ?, ?)`,
+       'running', ?, ?, ?, ?)`,
   ).run(
     id,
     fields.sessionId,
@@ -71,24 +73,35 @@ export function insertMcpSend(db: Db, fields: McpSendFields): string {
     fields.model,
     fields.firstMessageId,
     mcp,
+    fields.summoned === true ? 1 : 0,
     fields.now,
   );
   return id;
 }
 
-export function lastMcpDigest(
-  db: Db,
+export type DigestArgs = [
   sessionId: string,
   excludeSendId: string,
+  agentId: string,
+];
+
+// the last send of the same agent, so turns of agents taking turns in a
+// chat do not each read as a change. The unary plus keeps the planner
+// off sends_agent, which also orders by start and would walk the
+// agent's sends in every chat
+export function lastMcpDigest(
+  db: Db,
+  ...[sessionId, excludeSendId, agentId]: DigestArgs
 ): McpDigest | null {
   const row = db
-    .query<{ body: string }, [string, string]>(
+    .query<{ body: string }, [string, string, string]>(
       `select mcp_digests.body from sends
        join mcp_digests on mcp_digests.key = sends.mcp
        where sends.session_id = ? and sends.id != ? and sends.mcp is not null
+         and +sends.agent_id = ?
        order by sends.started_at desc, sends.rowid desc limit 1`,
     )
-    .get(sessionId, excludeSendId);
+    .get(sessionId, excludeSendId, agentId);
   if (row === null) return null;
   try {
     return JSON.parse(row.body) as McpDigest;

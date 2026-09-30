@@ -49,6 +49,7 @@ function packet(): MemoryPacket {
       resultBytes: null,
       uploads: null,
       files: null,
+      saved: null,
       promptTokens: null,
       reasoning: "",
       html: "",

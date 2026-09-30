@@ -22,6 +22,7 @@ import type { ProjectRow } from "../projects/index.ts";
 import {
   refuseArchived,
   type SessionRow,
+  sendTurns,
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
@@ -41,6 +42,7 @@ import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
 import { shutdownRunner } from "./shutdown.ts";
 import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
+import { refuseNewSummon, regeneratedAgent, turnAgent } from "./summon.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
@@ -93,6 +95,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       usernameOf: (userId) => deps.users.byId(userId)?.username ?? null,
       reasoningDetailsOf: (messageId, providerId, model) =>
         deps.sessions.reasoningDetails(messageId, providerId, model),
+      turnsOf: (sessionId) => sendTurns(deps.db, sessionId),
     },
     clock: deps.clock,
     log: deps.log,
@@ -173,25 +176,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
   };
 
-  const policyFor = (
-    sessionId: string,
-    project: ProjectRow,
-    user: UserRow,
-    agent: AgentRow,
-    event: Event | null = null,
-    offerTools = true,
-    disabledCapabilities: readonly string[] = [],
-  ) =>
-    sendPolicy(deps, {
-      sessionId,
-      project,
-      user,
-      agent,
-      event,
-      offerTools,
-      disabledCapabilities,
-    });
-
   const author = (principal: Principal): UserRow => {
     const user = deps.users.byId(principal.userId);
     if (user === null) throw new BadRequest("the user is gone");
@@ -211,6 +195,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     // who starts it: the first author, the regenerator, the automation's
     user: UserRow;
     agent: AgentRow;
+    // the chat's agent, when the agent was summoned for the turn
+    summoned?: string | null;
     title: string;
     event?: Event | null;
     turn: StartFields["turn"];
@@ -237,15 +223,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       run: (send) => void run(send),
       sessionId: fields.sessionId,
       session,
-      policy: policyFor(
-        fields.sessionId,
-        fields.project,
-        user,
-        fields.agent,
+      policy: sendPolicy(deps, {
+        ...fields,
         event,
-        true,
-        disabled,
-      ),
+        disabledCapabilities: disabled,
+      }),
       op,
       turn,
       changes: fields.changes,
@@ -312,7 +294,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       session: first,
       project: project!,
       user: authors[starter]!,
-      agent: agentOf(first.agentId),
+      ...turnAgent(
+        deps,
+        first.id,
+        agentOf(first.agentId),
+        messages.map((fields) => fields.message),
+      ),
       title: first.title,
       turn: {
         users: messages.map((fields, i) =>
@@ -356,6 +343,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, fields.projectId);
       const user = author(principal);
       const agent = agentOf(fields.agentId);
+      refuseNewSummon(deps.agents, agent.name, fields.message);
       return begin({
         sessionId: newId(),
         session: null,
@@ -392,14 +380,18 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const existing = regenerateUsers(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
-      const agent = agentOf(session.agentId);
       const lastId = existing.at(-1)!.userId;
       return begin({
         sessionId: session.id,
         session,
         project,
         user,
-        agent,
+        ...regeneratedAgent(
+          deps,
+          session.id,
+          agentOf(session.agentId),
+          existing[0]!.sendId,
+        ),
         title: session.title,
         turn: {
           existing,
@@ -424,16 +416,14 @@ export function runnerArea(deps: RunnerDeps): Runner {
       }
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
-      const agent = agentOf(session.agentId);
-      const policy = policyFor(
-        session.id,
+      const policy = sendPolicy(deps, {
+        sessionId: session.id,
         project,
         user,
-        agent,
-        null,
-        false,
-        session.disabledCapabilities,
-      );
+        agent: agentOf(session.agentId),
+        offerTools: false,
+        disabledCapabilities: session.disabledCapabilities,
+      });
       return compactSend(
         { ...deps, registry, writer, run, wake: deps.wake },
         session,

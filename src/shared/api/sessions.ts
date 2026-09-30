@@ -32,12 +32,15 @@ export type SessionsResponse = { rows: StreamRow[]; next: string | null };
 // row is built without it; agentRetired is true once that agent was
 // deleted, so the row draws the name as plain text. runs is how many
 // runs the automation keeps, set only on its one line in All, which
-// stands for them all
+// stands for them all. sendAgent is the agent of the last send, the
+// summoned one's for a summoned turn, which a working or failed line
+// names; null before the first send
 export type StreamRow = {
   session: SessionSummary;
   agent: string | null;
   agentRetired: boolean;
   send: SendSummary | null;
+  sendAgent: { name: string; retired: boolean } | null;
   last: LastLine | null;
   automation: { id: string; name: string } | null;
   runBy: { id: string; username: string } | null;

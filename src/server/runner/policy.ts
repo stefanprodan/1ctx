@@ -78,6 +78,9 @@ export type SendPolicy = {
   tz: string;
   agentId: string;
   agentName: string;
+  // the chat's own agent when this agent was summoned for the turn, null
+  // for the chat's own turns and a run
+  summoned: string | null;
   providerId: string;
   providerName: string;
   // the provider's wire, null when its row is gone; the answer round's
@@ -158,6 +161,7 @@ export function buildPolicy(input: {
   projectMemory?: readonly MemoryEntry[];
   automationMemory?: readonly MemoryEntry[];
   deadlineMs?: number | null;
+  summoned?: string | null;
 }): SendPolicy {
   const { user, agent } = input;
   const disabledCapabilities = [...(input.disabledCapabilities ?? [])];
@@ -212,6 +216,7 @@ export function buildPolicy(input: {
     tz: user.tz,
     agentId: agent.id,
     agentName: agent.name,
+    summoned: input.summoned ?? null,
     providerId: agent.providerId,
     providerName: input.providerName ?? "",
     wire: input.wire ?? null,

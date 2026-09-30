@@ -31,6 +31,7 @@ export function visualRow(fields: Partial<Message> = {}): Message {
     resultBytes: null,
     uploads: null,
     files: null,
+    saved: null,
     promptTokens: null,
     ttftMs: null,
     thinkingMs: null,
@@ -71,7 +72,8 @@ export function visualDetail(): SessionDetail {
       providerId: "provider0001", model: "test", status: "running",
       cause: null, error: null, firstMessageId: "userrow00001",
       rounds: 1, toolCalls: 0, memoryRound: null, memoryError: null,
-      memorySkipped: null, tokens: 0, startedAt: 1, finishedAt: null,
+      memorySkipped: null, summoned: false, tokens: 0, startedAt: 1,
+      finishedAt: null,
     },
     live: {
       phase: "reply", sendId: "send00000001", messageId: "reply0000001",

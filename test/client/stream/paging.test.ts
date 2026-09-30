@@ -35,6 +35,7 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
     },
     agent: "assistant",
     send: null,
+    sendAgent: null,
     last: null,
     automation: null,
     runBy: null,

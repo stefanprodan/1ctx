@@ -106,3 +106,59 @@ export function bumpSendCounters(
   ).run(fields.rounds, fields.toolCalls, fields.memoryRound ?? null, id);
   return readSend(db, id);
 }
+
+// who answered each send of the session, a retired agent by its name
+export function sendTurns(
+  db: Db,
+  sessionId: string,
+): Map<string, { agentId: string; agentName: string; summoned: boolean }> {
+  const rows = db
+    .query<
+      { id: string; agent_id: string; name: string; summoned: number },
+      [string]
+    >(
+      `select sends.id, sends.agent_id, agents.name, sends.summoned
+       from sends join agents on agents.id = sends.agent_id
+       where sends.session_id = ?`,
+    )
+    .all(sessionId);
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        agentId: row.agent_id,
+        agentName: row.name,
+        summoned: row.summoned === 1,
+      },
+    ]),
+  );
+}
+
+// the size of the chat's last round, whichever agent answered it: its
+// prompt, or a summary round's answer, since the chat is that summary
+// now. A regenerate leaves out the send it replaces, whose rounds the
+// rerun starts before. Null before the first counted round
+export function lastPrompt(
+  db: Db,
+  sessionId: string,
+  excludeSendId: string | null = null,
+): number | null {
+  const row = db
+    .query<
+      { prompt_tokens: number; completion_tokens: number; summary: number },
+      [string, string | null]
+    >(
+      `select usage.prompt_tokens, usage.completion_tokens,
+         exists (select 1 from messages
+           where messages.send_id = usage.send_id
+             and messages.round = usage.round
+             and messages.kind = 'summary') as summary
+       from usage
+       where usage.session_id = ? and usage.send_id is not ?
+         and exists (select 1 from sends where sends.id = usage.send_id)
+       order by usage.seq desc limit 1`,
+    )
+    .get(sessionId, excludeSendId);
+  if (row === null) return null;
+  return row.summary === 1 ? row.completion_tokens : row.prompt_tokens;
+}

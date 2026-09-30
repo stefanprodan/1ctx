@@ -63,6 +63,8 @@ export type ToolResult = {
   error: boolean;
   tail?: number;
   opened?: OpenedRecord[];
+  // the /knowledge paths a bash command wrote, stored on its row
+  saved?: string[];
   // MCP results and resources kept under /mcp, written with the row
   kept?: KeptFile[];
   // Kept in memory for the log and deliberately omitted from stored rows.

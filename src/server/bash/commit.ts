@@ -45,6 +45,13 @@ export function checkScratchTotals(
   checkUsage(before, after, caps.scratchFiles, caps.scratchBytes, "scratch");
 }
 
+// the docs a command wrote, as paths a reader can cat, in commit order;
+// a delete saved nothing and is left out
+export const savedPaths = (changes: readonly Change[]): string[] =>
+  changes
+    .filter((change) => change.text !== null)
+    .map((change) => `/knowledge/${change.name}`);
+
 export function commit(
   deps: {
     db: Db;
@@ -98,6 +105,7 @@ export function commit(
       [...receipts, ...extraReceipts],
       resultCut,
     );
-    return { result: content, events };
+    const saved = savedPaths(changes);
+    return { result: saved.length ? { ...content, saved } : content, events };
   });
 }

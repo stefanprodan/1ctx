@@ -65,6 +65,7 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
   memoryRound: null,
   memoryError: null,
   memorySkipped: null,
+  summoned: false,
   tokens: 0,
   startedAt: now - 40_000,
   finishedAt: now - 12 * 60_000,
@@ -76,6 +77,7 @@ const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
   session: session(),
   agent: "assistant",
   send: send(),
+  sendAgent: null,
   last: { seq: 2, author: "assistant", text: "nine pods, all expected" },
   automation: null,
   runBy: null,
@@ -168,6 +170,38 @@ describe("stateLine", () => {
         }),
       ),
     ).toEqual(plain("stopped · past its deadline"));
+  });
+
+  test("a summoned turn's state names its agent, greyed once retired", () => {
+    const summoned = { name: "glm", retired: false };
+    const working = row({
+      session: session({ status: "running" }),
+      send: send({ status: "running", cause: null, finishedAt: null }),
+      sendAgent: summoned,
+    });
+    expect(stateLine(working)).toEqual({ author: "glm", text: "working" });
+    expect(authorGone(working, stateLine(working))).toBe(false);
+    const failed = row({
+      session: session({ status: "failed" }),
+      send: send({ status: "failed", cause: "failure", error: "boom" }),
+      sendAgent: { ...summoned, retired: true },
+    });
+    expect(stateLine(failed)).toEqual({ author: "glm", text: "failed · boom" });
+    expect(authorGone(failed, stateLine(failed))).toBe(true);
+    // the chat's agent's last line keeps its own colour
+    const done = row({ sendAgent: { ...summoned, retired: true } });
+    expect(stateLine(done).author).toBe("assistant");
+    expect(authorGone(done, stateLine(done))).toBe(false);
+  });
+
+  test("chat agent retired live, sendAgent stale", () => {
+    const stale = row({
+      agentRetired: true,
+      session: session({ status: "failed" }),
+      send: send({ status: "failed", cause: "failure", error: "boom" }),
+      sendAgent: { name: "assistant", retired: false },
+    });
+    expect(authorGone(stale, stateLine(stale))).toBe(true);
   });
 });
 

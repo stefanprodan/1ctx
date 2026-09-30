@@ -112,6 +112,7 @@ test("rounds without usage accumulate the request estimate without fabricating u
           usernameOf: (id) => chat.app.users.byId(id)?.username ?? null,
           reasoningDetailsOf: (id, providerId, model) =>
             chat.app.sessions.reasoningDetails(id, providerId, model),
+          turnsOf: () => new Map(),
         },
         chat.app.now.value,
       );

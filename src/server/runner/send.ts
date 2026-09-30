@@ -15,6 +15,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
+import { unmarked } from "./context.ts";
 import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
 
 export type RoundState = {
@@ -145,6 +146,12 @@ export type ActiveSend = {
   drained: Promise<void>;
   letGo: () => void;
 };
+
+// the answer as the agent's own words, without the mark another agent's
+// answer carries in its history
+export function unmarkAnswer(round: RoundState, agentName: string): void {
+  round.content = unmarked(round.content, agentName);
+}
 
 export function newRound(messageId: string, now: number): RoundState {
   return {

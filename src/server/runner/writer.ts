@@ -23,7 +23,8 @@ import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { ToolResult } from "./policy.ts";
-import type { ActiveSend, RoundState } from "./send.ts";
+import { toolFinish } from "./results.ts";
+import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
 import {
   type StartDeps,
   type Started,
@@ -265,13 +266,7 @@ export class Writer {
     if (rowId === undefined) return false;
     const now = this.deps.clock();
     const changed = transact(this.deps.db, () => {
-      const row = this.deps.sessions.finishTool(rowId, {
-        content: result.content,
-        status: result.error ? "failed" : "done",
-        error: result.error ? result.content : null,
-        finishedAt: now,
-        opened: result.opened,
-      });
+      const row = this.deps.sessions.finishTool(rowId, toolFinish(result, now));
       if (row === null) return { result: false, events: [] };
       if (result.kept?.length) writeKeptFiles(this.deps.db, rowId, result.kept);
       const session = this.session(send.sessionId, now);
@@ -411,8 +406,7 @@ export class Writer {
   ): Message | null {
     const round = send.round;
     if (round === null) return null;
-    // a round cut after its first call delta keeps work; otherwise the
-    // reply is the answer, an empty stopped row included
+    // work once a call delta came, else the answer, even empty and stopped
     const memory = send.phase === "memory";
     const slot = memory
       ? "work"
@@ -429,6 +423,7 @@ export class Writer {
           : "done"
       : status;
     const finalError = memory ? send.memoryError : error;
+    if (slot === "answer") unmarkAnswer(round, send.policy.agentName);
     this.recordUsage(send, round, now);
     return this.finishReplyRow(round, finalStatus, finalError, slot, null, now);
   }

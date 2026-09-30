@@ -62,6 +62,7 @@ describe("bash command mounts", () => {
         error: false,
         content: "exit 0\nwrote docs/x.md (rev 2, 1 lines)",
         opened: [],
+        saved: ["/knowledge/docs/x.md"],
         tail: "exit 0\nwrote docs/x.md (rev 2, 1 lines)".length,
       });
       expect(s.knowledge.read(s.projectId, first.id)).toMatchObject({
@@ -86,6 +87,8 @@ describe("bash command mounts", () => {
       const moved = await run(s, "mv docs/x.md docs/y.md");
       expect(moved.content).toContain("wrote docs/y.md (rev 1, 1 lines)");
       expect(moved.content).toContain("deleted docs/x.md");
+      // a delete saved nothing
+      expect(moved.saved).toEqual(["/knowledge/docs/y.md"]);
       expect(s.knowledge.store.byName(s.projectId, "docs/y.md")?.id).not.toBe(
         first.id,
       );

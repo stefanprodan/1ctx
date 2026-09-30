@@ -125,6 +125,8 @@ export type SessionsPort = {
       error: string | null;
       finishedAt: number;
       opened?: OpenedRecord[] | null;
+      // the /knowledge paths a bash command wrote
+      saved?: readonly string[] | null;
     },
   ): Message | null;
   createSend(fields: {
@@ -137,9 +139,15 @@ export type SessionsPort = {
     model: string;
     firstMessageId: string;
     mcpDigest: McpDigest | null;
+    summoned?: boolean;
     now: number;
   }): SendSummary;
-  lastMcpDigest(sessionId: string, excludeSendId: string): McpDigest | null;
+  // the last digest of the same agent's sends in the session
+  lastMcpDigest(
+    sessionId: string,
+    excludeSendId: string,
+    agentId: string,
+  ): McpDigest | null;
   // the running counters as the loop advances, without ending the send
   bumpCounters(
     id: string,

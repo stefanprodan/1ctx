@@ -35,6 +35,8 @@ export function sendPolicy(
     event?: Event | null;
     offerTools?: boolean;
     disabledCapabilities?: readonly string[];
+    // the chat's agent, when the agent was summoned into its chat
+    summoned?: string | null;
   },
 ): SendPolicy {
   const { sessionId, project, user, agent } = fields;
@@ -56,6 +58,7 @@ export function sendPolicy(
     disabledCapabilities: fields.disabledCapabilities ?? [],
     limits,
     automation,
+    summoned: event === null ? (fields.summoned ?? null) : null,
     sessionId: event === null ? sessionId : null,
     knowledge: deps.knowledge.snapshot(project.id),
     projectMemory:
