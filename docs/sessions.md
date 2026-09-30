@@ -171,6 +171,20 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   revision and envelope. A refused start writes nothing; a later failure
   keeps the choice. Compact takes no change. A fork copies the source
   session's current set, including a run's saved automation set.
+- **The system prompt's order.** `systemPrompt()` in `runner/prompt.ts`
+  opens with the line naming the agent and its project (`You are
+  <agent>, an agent in the <project> project`, a personal project named
+  by its owner, the description after it when set), then the agent's
+  prompt when set, the user's line or a run's automation line, the
+  skills catalog, the MCP catalog, the servers' `<mcp_instructions>`
+  block, the project memory block (a chat's snapshot, a run's live
+  note), the automation memory block, the knowledge block, the date
+  line, the chat's web-off line when applicable, the visualize-off line
+  when applicable, the knowledge-off line when applicable, the
+  memory-off line when applicable, the MCP-off line when applicable,
+  the skills-off line when applicable, and last the change note. What
+  is fixed per agent and project comes first; the user's line follows
+  the agent's prompt because it changes with the author of a team chat.
 - **A send's uploads are claimed in `startSend`.** For staged uploads,
   synchronous preflight checks each message's against its author, project
   and lease and requires
