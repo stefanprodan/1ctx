@@ -102,7 +102,11 @@ export function summonedAgain(
 ): AgentRow {
   const agent = agents.byId(agentId);
   if (agent === null) {
-    throw new BadRequest(`${retiredName ?? "the agent"} is gone`);
+    throw new BadRequest(
+      retiredName === undefined
+        ? "the agent is gone"
+        : `the agent ${retiredName} is gone`,
+    );
   }
   return agent;
 }

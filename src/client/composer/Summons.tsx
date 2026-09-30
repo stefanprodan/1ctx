@@ -5,10 +5,12 @@
 // agents the draft names, each with its avatar, its @name and its
 // model, the highlighted one lit. A click picks like Tab does.
 
+import { useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { Fit } from "../ui/Fit.tsx";
+import { useActiveInView } from "../ui/Listbox.tsx";
 
 export function Summons({
   matches,
@@ -22,10 +24,13 @@ export function Summons({
   // the pointer moves the highlight, so one row is lit at a time
   onHover: (index: number) => void;
 }) {
+  const list = useRef<HTMLUListElement>(null);
+  // the box scrolls, so the keys never move the highlight out of sight
+  useActiveInView(list, chosen, true);
   return (
-    <ul class="menu composer-cmds" aria-label="Agents">
+    <ul ref={list} class="menu composer-cmds" aria-label="Agents">
       {matches.map((agent, index) => (
-        <li key={agent.id}>
+        <li key={agent.id} data-index={index}>
           <button
             type="button"
             class={`menu-item composer-cmd${index === chosen ? " menu-item-on" : ""}`}

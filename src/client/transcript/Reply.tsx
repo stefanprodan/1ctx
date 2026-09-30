@@ -123,7 +123,9 @@ export function Reply({
   const refused = useSignal<string | null>(null);
   // a failure says so in its own block, never squeezed into the actions
   const failure = cut?.err === true ? cut.text : null;
-  const said = refused.value ?? failure;
+  // only while the turn still offers Regenerate, so an older turn never
+  // keeps words no press can clear
+  const said = (onRegenerate !== undefined ? refused.value : null) ?? failure;
   const regenerate =
     onRegenerate === undefined
       ? undefined

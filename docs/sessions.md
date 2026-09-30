@@ -194,17 +194,19 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   word is `@name` (`shared/summon.ts`, a live agent's name in any case)
   runs on that agent (`runner/summon.ts`); the chat's own name is an
   ordinary turn, a name past the first word plain text, and a first
-  word naming no live agent the 400 "no agent named <word>", at a send
-  and at queueing. A new chat's first message cannot summon (the same
-  400), a turn of several messages holds a summon alone, and a run never
-  summons. The send is written with `sends.summoned` and its agent, which
-  fork copies; the policy's `summoned` names the chat's agent. A summon
-  is refused, "the chat is too long for <name>", when the prompt of the
-  chat's last round, of any agent (`lastPrompt()`: a summary round
-  counts its answer, and a regenerate leaves out the send it replaces),
-  reaches the summoned model's `compactsAt()`; a queued one refused so
-  turns not sent `failed`, since the reason check is frozen in its table.
-  A word's trailing punctuation is dropped (`@glm,` summons glm). History (`runner/context.ts`): a turn
+  word naming no live agent the 400 "no agent named <word>", at a send,
+  at queueing and on an edit of a queued message. A new chat's first
+  message cannot summon (the same 400), a turn of several messages holds
+  a summon alone, and a run never summons. The send is written with
+  `sends.summoned` and its agent, which fork copies; the policy's
+  `summoned` names the chat's agent. A summon is refused, "the chat is
+  too long for <name>", when the prompt of the chat's last round, of
+  any agent (`lastPrompt()`: a summary round counts its answer, and a
+  regenerate leaves out the send it replaces), reaches the summoned
+  model's `compactsAt()`; a queued one refused so turns not sent
+  `failed`, since the reason check is frozen in its table. A word's
+  trailing punctuation is dropped (`@glm,` summons glm). History
+  (`runner/context.ts`): a turn
   is the building agent's own when neither send is summoned or both are
   summoned sends of the same agent; any other turn goes as its answer in
   a user message opening `[name] `, with no author field, then its trace
@@ -409,7 +411,7 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   optional JSON body goes through `readBody()` under
   `MAX_REGENERATE_BODY` and `parseRegenerate()`. A summoned turn reruns
   on its send's agent and flag, never the text; one whose agent was
-  retired is the 400 "<name> is gone".
+  retired is the 400 "the agent <name> is gone".
 - **Fork copies a chat through a settled turn.**
   Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
   turn and its following done summaries, never memory phase rows, into

@@ -71,10 +71,10 @@ import { Files } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import { Summons } from "./Summons.tsx";
-import { summonFill, summonMatches, summonRefusal } from "./summons.ts";
+import { summonFill, summonMatches } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
 import "./composer.css";
-import { says, sentence } from "../lib/format.ts";
+import { says } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
 
 const MAX_HEIGHT = 160;
@@ -242,14 +242,6 @@ export function Composer({
       return saveEdit(edit, content, onEdit, { ...box, saving });
     if (content === "" || agent === null || busy) return;
     const named = commandOf(content);
-    // a first word naming no agent is refused before it goes, drawn as
-    // the server's 400 would be
-    const refused =
-      named === null ? summonRefusal(content, agents, agent, fixed) : null;
-    if (refused !== null) {
-      failure.value = sentence(refused);
-      return;
-    }
     if (named === null && (!ready || !placed || files.busy)) return;
     failure.value = null;
     const sent = text.value;

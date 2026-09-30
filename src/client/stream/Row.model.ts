@@ -39,8 +39,9 @@ export const needsAttention = (
 // since deleted: the name is greyed, with no tag, since rows are dense
 export function authorGone(row: StreamRow, line: StateLine): boolean {
   if (line.author === null) return false;
-  if (row.sendAgent !== null && line.author === row.sendAgent.name) {
-    return row.sendAgent.retired;
+  // a live retire sets agentRetired alone, so the send's flag only adds
+  if (row.sendAgent?.retired && line.author === row.sendAgent.name) {
+    return true;
   }
   return row.agentRetired && line.author === row.agent;
 }

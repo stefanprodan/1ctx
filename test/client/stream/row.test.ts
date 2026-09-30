@@ -193,6 +193,16 @@ describe("stateLine", () => {
     expect(stateLine(done).author).toBe("assistant");
     expect(authorGone(done, stateLine(done))).toBe(false);
   });
+
+  test("chat agent retired live, sendAgent stale", () => {
+    const stale = row({
+      agentRetired: true,
+      session: session({ status: "failed" }),
+      send: send({ status: "failed", cause: "failure", error: "boom" }),
+      sendAgent: { name: "assistant", retired: false },
+    });
+    expect(authorGone(stale, stateLine(stale))).toBe(true);
+  });
 });
 
 describe("whenText", () => {

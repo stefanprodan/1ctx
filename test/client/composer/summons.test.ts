@@ -6,7 +6,6 @@ import {
   summonFill,
   summonMatches,
   summonQuery,
-  summonRefusal,
 } from "../../../src/client/composer/summons.ts";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 
@@ -78,35 +77,5 @@ describe("the @ menu", () => {
 
   test("a pick fills the name and a space for the ask", () => {
     expect(summonFill(AGENTS[1]!)).toBe("@glm ");
-  });
-});
-
-describe("the refusal on Enter", () => {
-  test("a chat refuses a first word naming no agent, in the server's words", () => {
-    const refuse = (text: string) => summonRefusal(text, AGENTS, "a1", true);
-    expect(refuse("@glmm check this")).toBe("no agent named glmm");
-    expect(refuse("@Nobody, check")).toBe("no agent named Nobody,");
-    expect(refuse("@glm check this")).toBeNull();
-    expect(refuse("@GLM: check this")).toBeNull();
-    // the chat's own name is an ordinary turn
-    expect(refuse("@gemini go on")).toBeNull();
-    // past the first word it is text
-    expect(refuse("ask @nobody")).toBeNull();
-    expect(refuse("plain")).toBeNull();
-    expect(refuse("@")).toBeNull();
-  });
-
-  test("a new chat refuses any other agent's name", () => {
-    const refuse = (text: string) => summonRefusal(text, AGENTS, "a1", false);
-    expect(refuse("@glm check this")).toBe("no agent named glm");
-    expect(refuse("@nobody hi")).toBe("no agent named nobody");
-    expect(refuse("@gemini hi")).toBeNull();
-    expect(refuse("hi")).toBeNull();
-  });
-
-  test("an unloaded list leaves it to the server", () => {
-    expect(summonRefusal("@nobody", null, "a1", true)).toBeNull();
-    expect(summonRefusal("@nobody", AGENTS, null, true)).toBeNull();
-    expect(summonRefusal("@nobody", AGENTS, "gone", true)).toBeNull();
   });
 });

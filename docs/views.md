@@ -49,7 +49,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   agent (`sendAgent`, the summoned one for a summoned turn), else the
   chat's. An archived chat's row wears the archive icon, quiet,
   and "archived ·" before its line; a retired agent's name, the chat's
-  or the send's, is greyed (`authorGone()`), with no tag. A run whose `attention` is at
+  or the send's, is greyed (`authorGone()`), with no tag. A live retire
+  marks only the chat's agent, so a summoned agent retired live is
+  greyed from the row's next envelope. A run whose `attention` is at
   `ATTENTION_AT` or more (`needsAttention()` in `stream/Row.model.ts`)
   draws its icon in `--attention` orange and says "needs attention"
   after the agent, where a failure's words go, in the same orange;
@@ -176,11 +178,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **The @ menu summons.** In a chat, a draft that is one word starting
   with `@` opens the project's agents by prefix, the chat's own left
   out (`composer/summons.ts`, `Summons.tsx`), with the command menu's
-  box, keys and highlight; a pick fills `@name `. A new chat's composer
-  has no @ menu. On Enter, a first word naming no agent is refused in
-  the failure slot with the server's words (`summonRefusal()`, over
-  `shared/summon.ts`), and a new chat refuses any agent's name but the
-  picked one's.
+  box, keys and highlight; a pick fills `@name `. Both menus scroll in
+  a capped box that keeps the highlight in sight, with 36px rows on a
+  phone. A new chat's composer has no @ menu. Whether a first word names an agent is the server's to
+  say, since the composer's list is loaded once a visit: its 400 shows
+  in the failure slot, or an edit's, and the draft stays.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under

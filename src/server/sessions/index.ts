@@ -108,7 +108,11 @@ export type SessionsDeps = {
   clock: Clock;
   log: Log;
   access: AccessPort;
-  agents: { byId(id: string): AgentRow | null };
+  // live agents by name, for a summon in an edited queued message
+  agents: {
+    byId(id: string): AgentRow | null;
+    byName(name: string): AgentRow | null;
+  };
   live: LivePort;
   usage: UsagePort;
   uploads: UploadsPort;
@@ -292,6 +296,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       ...queuedRoutes({
         db: deps.db,
         clock: deps.clock,
+        agents: deps.agents,
         store,
         visibleProjectIds: (userId) => deps.access.visibleProjectIds(userId),
         visible,

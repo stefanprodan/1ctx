@@ -270,6 +270,32 @@ describe("a summon", () => {
     }
   });
 
+  test("an edit of a queued message is checked as the queue is", async () => {
+    const { chat } = await summonApp();
+    try {
+      const { sessionId, script } = await startChat(chat, "hello");
+      const queued = await post(chat, sessionId, "later");
+      expect(queued.status).toBe(202);
+      const row = (await queued.json()).queued;
+      const edit = (message: string, revision: number) =>
+        chat.member.call(
+          "PATCH",
+          `/api/sessions/${sessionId}/queued/${row.id}`,
+          { body: { message, revision } },
+        );
+      const refused = await edit("@glm check", row.revision);
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toBe("no agent named glm");
+      expect(
+        chat.app.db.query("select content from queued_messages").all(),
+      ).toEqual([{ content: "later" }]);
+      expect((await edit("@checker check", row.revision)).status).toBe(200);
+      script.reply("hi");
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test.serial("a queued summon is a turn of its own, in order", async () => {
     const { chat, checkerId } = await summonApp();
     try {
@@ -374,7 +400,7 @@ describe("a summon", () => {
         `/api/sessions/${sessionId}/regenerate`,
       );
       expect(gone.status).toBe(400);
-      expect((await gone.json()).error).toBe("checker is gone");
+      expect((await gone.json()).error).toBe("the agent checker is gone");
     } finally {
       await chat.app.shutdown();
     }

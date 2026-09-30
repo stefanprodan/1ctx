@@ -6,6 +6,8 @@
 // argument named after the word. The keyboard is the box's; a click
 // picks like Tab does.
 
+import { useRef } from "preact/hooks";
+import { useActiveInView } from "../ui/Listbox.tsx";
 import type { Command } from "./commands.ts";
 
 export function Commands({
@@ -23,12 +25,15 @@ export function Commands({
   // the pointer moves the highlight, so one row is lit at a time
   onHover: (index: number) => void;
 }) {
+  const list = useRef<HTMLUListElement>(null);
+  // the box scrolls, so the keys never move the highlight out of sight
+  useActiveInView(list, chosen, true);
   return (
-    <ul class="menu composer-cmds" aria-label="Commands">
+    <ul ref={list} class="menu composer-cmds" aria-label="Commands">
       {matches.map((command, index) => {
         const why = block(command);
         return (
-          <li key={command.name}>
+          <li key={command.name} data-index={index}>
             <button
               type="button"
               class={`menu-item composer-cmd${index === chosen ? " menu-item-on" : ""}${
