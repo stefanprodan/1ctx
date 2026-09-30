@@ -13,6 +13,13 @@ describe("tokens", () => {
     expect(tokens("hello world")).toBe(2);
     expect(tokens("You are a senior software tester.")).toBe(7);
   });
+
+  test("counts a special token's text as plain text", () => {
+    const text = "before <|im_start|>user hi<|im_end|> and <|endoftext|> after";
+    expect(tokens(text)).toBe(tokens(text.replaceAll("|", "| ")));
+    expect(tokens(`${"line\n".repeat(2000)}<|im_start|>`)).toBeGreaterThan(0);
+    expect(cutToTokens("<|endoftext|> tail", 3).length).toBeGreaterThan(0);
+  });
 });
 
 describe("long text", () => {
