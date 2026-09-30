@@ -169,8 +169,10 @@ upstream and skip4Bit fields.
   ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
   long those models think; Gemini 3 maps the effort to a level. On
   the Gemini wire thinking counts against `max_tokens`: a round whose
-  thinking reaches the cap ends as `length` with no answer, and a
-  `thinking_budget` above the cap is not refused, only cut at it.
+  thinking reaches the cap ends as `length` with no answer, so an
+  earlier model's `thinking_budget` is fitted to at most half the cap,
+  never under 512 (`fitThinkingBudget()` in `providers/gemini.ts`). A
+  cap above what a round needs leaves its thinking as it was.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and
