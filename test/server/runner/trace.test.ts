@@ -97,6 +97,15 @@ describe("the trace", () => {
     );
   });
 
+  test("only an odd run of backslashes continues a bash line", () => {
+    const first = (command: string) => summary(done("bash", { command }));
+    expect(first("echo a\\\\\nrm -rf x")).toBe("echo a\\\\");
+    expect(first("a \\\nb")).toBe("a b");
+    expect(first("a \\\\\\\nb")).toBe("a \\\\ b");
+    expect(first("a\\\r\nb\\\n\\\nc\nd")).toBe("a b c");
+    expect(first("\\\nls\nx")).toBe("ls");
+  });
+
   test("a tool name with a newline stays on one line", () => {
     expect(traceLine(done("mcp__a\nb", { q: "x" }), YOURS)).toBe(
       "mcp__a b q=x ok (not your tool)",
