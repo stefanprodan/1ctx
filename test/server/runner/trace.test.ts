@@ -152,12 +152,33 @@ describe("the trace", () => {
     );
     expect(theirs.length).toBe(TRACE_LINE_CHARS);
     expect(theirs).toEndWith(`y… ok saved ${long}${NOT_YOURS}`);
-    // a path that cannot fit whole is left out for a …
-    const huge = traceLine(
-      done("bash", { command: "ls" }, ["/k".repeat(200)]),
+    // a path that cannot fit gives way to a shorter form, never to none
+    const deep = `/knowledge/${"p".repeat(191)}`;
+    expect(traceLine(done("bash", { command: "ls" }, [deep]), YOURS)).toBe(
+      "bash ls ok saved 1 file in /knowledge/",
+    );
+    const path = `/knowledge/notes/${"q".repeat(190)}.md`;
+    const both = traceLine(
+      done("bash", { command: "x".repeat(300) }, [path]),
       YOURS,
     );
-    expect(huge).toBe("bash ls ok …");
+    expect(both.length).toBeLessThanOrEqual(TRACE_LINE_CHARS);
+    expect(both).toEndWith("x… ok saved 1 file in /knowledge/notes/");
+    const deepDir = `/knowledge/${"d".repeat(190)}`;
+    const many = traceLine(
+      done("bash", { command: "x".repeat(300) }, [
+        `${deepDir}/a.md`,
+        `${deepDir}/b.md`,
+      ]),
+      YOURS,
+    );
+    expect(many).toEndWith("x… ok saved 2 files");
+    const named = traceLine(
+      done("x".repeat(300), {}, [`${deepDir}/a.md`]),
+      YOURS,
+    );
+    expect(named.length).toBe(TRACE_LINE_CHARS);
+    expect(named).toEndWith("x… ok saved …");
   });
 
   test("a long line is cut before its status, at a code point", () => {

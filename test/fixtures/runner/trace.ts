@@ -10,7 +10,7 @@ import { savedDocs } from "../../../src/server/sessions/messages.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import type { ToolCall } from "../../../src/shared/contracts/tool.ts";
 
-const row = (
+export const row = (
   fields: Partial<Message> & Pick<Message, "id" | "kind">,
 ): Message => ({
   sessionId: "s1",
@@ -45,13 +45,13 @@ const row = (
   ...fields,
 });
 
-const call = (id: string, name: string, args: unknown): ToolCall => ({
+export const call = (id: string, name: string, args: unknown): ToolCall => ({
   id,
   name,
   arguments: typeof args === "string" ? args : JSON.stringify(args),
 });
 
-const tool = (
+export const tool = (
   id: string,
   round: number,
   name: string,

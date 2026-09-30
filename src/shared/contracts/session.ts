@@ -81,9 +81,6 @@ export type RoundUsage = {
 
 export type { OpenedKind };
 
-// a file a bash command put on the page with open, as the tool row
-// carries it: the stored copy's text stays behind and the file route
-// answers it
 // the docs a bash command wrote: the first /knowledge paths in commit
 // order, bounded, how many it wrote in all, and the one directory they
 // share, null when they are in several
@@ -93,6 +90,9 @@ export type SavedDocs = {
   dir: string | null;
 };
 
+// a file a bash command put on the page with open, as the tool row
+// carries it: the stored copy's text stays behind and the file route
+// answers it
 export type OpenedFile = {
   // the absolute path in the mount, as it was resolved
   path: string;

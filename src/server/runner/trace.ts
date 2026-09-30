@@ -166,42 +166,46 @@ function foreign(
 }
 
 export const NOT_YOURS = " (not your tool)";
-const LEFT_OUT = " …";
+// the shortest saved form, which always fits
+const SAVED_ANY = " saved …";
 
-// one doc by its path, several in one directory by it, else the first
-// and a count; never cut
-export function savedText(saved: SavedDocs | null): string {
-  if (saved === null || saved.count === 0) return "";
-  if (saved.count === 1) return ` saved ${saved.paths[0]}`;
-  if (saved.dir !== null) return ` saved ${saved.count} files in ${saved.dir}/`;
-  return ` saved ${saved.paths[0]} and ${saved.count - 1} more`;
+// the saved docs, the fullest form first: one doc by its path, several
+// in one directory by it, else the first and a count; then shorter forms
+// down to a bare count. Never cut
+export function savedForms(saved: SavedDocs | null): string[] {
+  if (saved === null || saved.count === 0) return [];
+  const files = saved.count === 1 ? "1 file" : `${saved.count} files`;
+  const inDir = saved.dir === null ? [] : [` saved ${files} in ${saved.dir}/`];
+  const full =
+    saved.count === 1
+      ? ` saved ${saved.paths[0]}`
+      : saved.dir !== null
+        ? inDir[0]!
+        : ` saved ${saved.paths[0]} and ${saved.count - 1} more`;
+  return [...new Set([full, ...inDir, ` saved ${files}`, SAVED_ANY])];
 }
 
 // name, summary and status, then the saved docs, then the mark. The
-// name, status and mark always show; the summary is cut to leave room
-// for the saved docs, which show whole or as a … when they cannot fit
+// name, status, mark and a saved form always show: the fullest saved
+// form that fits, the summary cut to the room left
 export function traceLine(call: TraceCall, yours: Yours): string {
   const status = call.status === "done" ? "ok" : "failed";
   const mark = foreign(call, yours) ? NOT_YOURS : "";
+  const forms = savedForms(call.saved);
+  const least = forms.length === 0 ? 0 : SAVED_ANY.length;
   const name = cut(
     call.name,
-    TRACE_LINE_CHARS - status.length - 1 - mark.length,
+    TRACE_LINE_CHARS - status.length - 1 - mark.length - least,
   );
   const fixed = name.length + 1 + status.length + mark.length;
-  const docs = savedText(call.saved);
-  const fits = fixed + docs.length <= TRACE_LINE_CHARS;
+  const docs =
+    forms.find((form) => fixed + form.length <= TRACE_LINE_CHARS) ?? "";
   const said = cut(
     summary(call),
-    Math.max(TRACE_LINE_CHARS - fixed - (fits ? docs.length : 0) - 1, 0),
+    Math.max(TRACE_LINE_CHARS - fixed - docs.length - 1, 0),
   );
   const line = said === "" ? `${name} ${status}` : `${name} ${said} ${status}`;
-  const tail =
-    docs === "" || fits
-      ? docs
-      : line.length + LEFT_OUT.length + mark.length <= TRACE_LINE_CHARS
-        ? LEFT_OUT
-        : "";
-  return line + tail + mark;
+  return line + docs + mark;
 }
 
 // the heading and one line a call, identical lines as one with ×N where

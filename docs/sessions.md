@@ -221,9 +221,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   only `action=` and `topic=`, never its text. A bash call that wrote
   docs ends, from the tool row's `saved`, with ` saved <path>` for one,
   ` saved N files in <dir>/` for several in one directory, else ` saved
-  <first path> and N-1 more`; the cut keeps the status, the mark and
-  that part whole, shortening the summary, or shows ` …` when it
-  cannot fit. A call to an MCP tool (by wire
+  <first path> and N-1 more`. The cut keeps the status, the mark and
+  the fullest saved form that fits, never cut: then ` saved N files in
+  <dir>/`, ` saved N files`, at least ` saved …`, so a saving call
+  always says it saved; the summary takes the room left. A call to an MCP tool (by wire
   name, a catalog `mcp_call` unwrapped) or a skill (`skill`,
   `skill_file`, by the skill's name) the building send is not offered
   ends with ` (not your tool)` (`yoursOf(policy.offered)`); every

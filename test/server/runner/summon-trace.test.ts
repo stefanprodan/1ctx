@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A bash call that writes docs keeps their paths on its tool row, a
-// summoned agent reads them in the trace, a delete saves nothing and a
-// fork copies the paths.
+// summoned agent reads them in the trace, a fork copies them, and a
+// delete, a doc gone within its command or a refused commit saves none.
 
 import { describe, expect, test } from "bun:test";
 import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
@@ -13,6 +13,7 @@ import {
   chatApp,
   FLASH,
   type Script,
+  setLimits,
   startChat,
   tick,
   waitScript,
@@ -110,6 +111,41 @@ describe("saved paths", () => {
       );
       again.reply("same");
       await free(chat, fork);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("an overwrite saves, a doc gone within the command and a refused commit do not", async () => {
+    const chat = await chatApp();
+    try {
+      const { sessionId, script } = await startChat(chat, "write");
+      await bashRound(chat, script, "echo a > /knowledge/x.md", "one");
+      const over = await turn(chat, sessionId, "again");
+      await bashRound(chat, over, "echo changed > /knowledge/x.md", "two");
+      const gone = await turn(chat, sessionId, "scratch it");
+      await bashRound(
+        chat,
+        gone,
+        "echo t > /knowledge/t.md; rm /knowledge/t.md",
+        "three",
+      );
+      await free(chat, sessionId);
+      await setLimits(chat, { knowledgeFiles: 1 });
+      const capped = await turn(chat, sessionId, "two more");
+      await bashRound(
+        chat,
+        capped,
+        "echo a > /knowledge/a.md; echo b > /knowledge/b.md",
+        "four",
+      );
+      await free(chat, sessionId);
+      const one = { paths: ["/knowledge/x.md"], count: 1, dir: "/knowledge" };
+      expect(saved(chat, sessionId)).toEqual([one, one, null, null]);
+      const rows = chat.app.sessions.messages(sessionId);
+      expect(
+        rows.filter((row) => row.kind === "tool").at(-1)!.content,
+      ).toContain("the limit is 1");
     } finally {
       await chat.app.shutdown();
     }
