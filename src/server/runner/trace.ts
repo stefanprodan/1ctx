@@ -116,13 +116,20 @@ const text = (args: Record<string, unknown>, key: string) =>
 // what identifies the call: bash's first command line, a search's
 // query, a fetch's URL, a path, an MCP tool's arguments, the skill it
 // loaded, which a summoned agent may lack; a memory edit by its action
-// and topic, never its text
+// and topic, never its text, so none when its arguments do not parse
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = parsed(call.arguments);
-  if (args === null) return flat(call.arguments);
+  if (args === null) {
+    return call.name === "memory_edit" ? "" : flat(call.arguments);
+  }
   switch (call.name) {
     case "bash":
-      return flat(text(args, "command").split("\n", 1)[0] ?? "");
+      // a continued line is one command line
+      return flat(
+        text(args, "command")
+          .replace(/\\\r?\n/g, " ")
+          .split("\n", 1)[0] ?? "",
+      );
     case "websearch":
       return flat(text(args, "query"));
     case "webfetch":
@@ -194,7 +201,7 @@ export function traceLine(call: TraceCall, yours: Yours): string {
   const forms = savedForms(call.saved);
   const least = forms.length === 0 ? 0 : SAVED_ANY.length;
   const name = cut(
-    call.name,
+    flat(call.name),
     TRACE_LINE_CHARS - status.length - 1 - mark.length - least,
   );
   const fixed = name.length + 1 + status.length + mark.length;

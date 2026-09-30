@@ -218,21 +218,22 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   line a call, `tool summary status`, cut to 200 characters, identical
   lines as one with `×N`, past 30 lines a count. `visualize` and
   `mcp_describe` calls get no line and no count. `memory_edit` shows
-  only `action=` and `topic=`, never its text. A bash call that wrote
-  docs ends, from the tool row's `saved`, with ` saved <path>` for one,
+  only `action=` and `topic=`, never its text, nothing when its
+  arguments do not parse. A bash call that wrote docs ends, from the
+  tool row's `saved`, with ` saved <path>` for one,
   ` saved N files in <dir>/` for several in one directory, else ` saved
   <first path> and N-1 more`. The cut keeps the status, the mark and
   the fullest saved form that fits, never cut: then ` saved N files in
   <dir>/`, ` saved N files`, at least ` saved …`, so a saving call
-  always says it saved; the summary takes the room left. A call to an MCP tool (by wire
-  name, a catalog `mcp_call` unwrapped) or a skill (`skill`,
-  `skill_file`, by the skill's name) the building send is not offered
-  ends with ` (not your tool)` (`yoursOf(policy.offered)`); every
-  builtin counts as the reader's, since the chat's switches hold for
-  every agent in it. A model that
-  read marked answers may open its own with `[its name]`: the summoned
-  line asks it not to, and the writer drops that mark, in any case and
-  followed by a space or the end, from a stored answer (`unmarked`);
+  always says it saved; the summary takes the room left. A call to an
+  MCP tool (by wire name, a catalog `mcp_call` unwrapped) or a skill
+  (`skill`, `skill_file`, by the skill's name) the building send is not
+  offered ends with ` (not your tool)` (`yoursOf(policy.offered)`);
+  every builtin counts as the reader's, since the chat's switches hold
+  for every agent in it. A model that read marked answers may open its
+  own with `[its name]`: the summoned line asks it not to, and the
+  writer drops that mark, in any case and followed by a space or the
+  end, from a stored answer (`unmarked`);
   the live frames of a reply still streaming may show it. A summoned
   send's cache key is `<chat>:<agent>`, so agents share no sticky route or
   slot. `SessionSummary.usage` reads the chat's own rounds only, so the

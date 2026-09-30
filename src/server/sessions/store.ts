@@ -431,8 +431,6 @@ export class SessionStore {
     return addToolRows(this.db, calls);
   }
 
-  // guarded by status, so a tool that ends after a terminal cleanup
-  // writes nothing
   finishTool(id: string, fields: ToolFinish): Message | null {
     return finishToolRow(this.db, id, fields) ? this.message(id) : null;
   }

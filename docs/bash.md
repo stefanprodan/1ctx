@@ -109,7 +109,8 @@ changes to it, its recorders) in `vendor/README.md`.
   them on the call's tool row as `{paths, count, dir}` (`savedDocs`:
   the first 50 paths, the total, the one shared directory or null),
   null when none, for another agent's trace (`docs/sessions.md`); a
-  fork copies them.
+  fork copies them. A call a terminal stop ends after its commit but
+  before its row is finished keeps no `saved`, as it keeps no receipts.
 - **Scratch is the chat's `/tmp`.** `ScratchStore` (`bash/scratch.ts`)
   over `session_scratch` and `session_scratch_files`, cascading with the
   session, keeps regular files of any bytes and their modes; a symlink

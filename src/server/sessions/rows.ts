@@ -184,7 +184,7 @@ function messageFiles(raw: string | null): OpenedFile[] | null {
   return record.length > 0 ? record : null;
 }
 
-const savedDocs = (raw: string | null): SavedDocs | null =>
+const parseSavedDocs = (raw: string | null): SavedDocs | null =>
   raw ? JSON.parse(raw) : null;
 
 export const message = (raw: RawMessage): Message => ({
@@ -202,7 +202,7 @@ export const message = (raw: RawMessage): Message => ({
   resultBytes: raw.kind === "tool" ? raw.packed_bytes : null,
   uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
   files: raw.kind === "tool" ? messageFiles(raw.files) : null,
-  saved: raw.kind === "tool" ? savedDocs(raw.saved) : null,
+  saved: raw.kind === "tool" ? parseSavedDocs(raw.saved) : null,
   promptTokens:
     raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
   reasoning: raw.reasoning,

@@ -90,6 +90,17 @@ describe("the trace", () => {
       "path=/a lines=3",
     );
     expect(summary({ name: "bash", arguments: "not json" })).toBe("not json");
+    const continued =
+      "mkdir -p /knowledge/notes && \\\n  cat > \"$F\" <<'EOF'\nhi\nEOF";
+    expect(summary(done("bash", { command: continued }))).toBe(
+      `mkdir -p /knowledge/notes && cat > "$F" <<'EOF'`,
+    );
+  });
+
+  test("a tool name with a newline stays on one line", () => {
+    expect(traceLine(done("mcp__a\nb", { q: "x" }), YOURS)).toBe(
+      "mcp__a b q=x ok (not your tool)",
+    );
   });
 
   test("a memory edit shows its action and topic, never its text", () => {
@@ -100,6 +111,11 @@ describe("the trace", () => {
     ).toBe("action=remove");
     expect(summary(done("memory_edit", { action: "append", text: "y" }))).toBe(
       "action=append",
+    );
+    const broken = { name: "memory_edit", arguments: '{"text":"secret' };
+    expect(summary(broken)).toBe("");
+    expect(traceLine({ ...broken, status: "done", saved: null }, YOURS)).toBe(
+      "memory_edit ok",
     );
   });
 
@@ -227,9 +243,12 @@ describe("the trace", () => {
     const yours = yoursOf(offered);
     expect([...yours.mcp]).toEqual(["mcp__gh__a", "mcp__gh__b"]);
     expect([...yours.skills]).toEqual(["flux-ops"]);
-    // the same turn read by an agent that has the tools carries no mark
-    expect(trace(traceCalls(TURN), yoursOf(offered))).not.toContain(
-      "skill flux-ops failed (not your tool)",
+    // the same turn read by an agent that has the skill marks only the
+    // MCP tool it lacks
+    const lines = trace(traceCalls(TURN), yours).split("\n");
+    expect(lines).toContain("skill flux-ops failed");
+    expect(lines).toContain(
+      `mcp__github__search_issues q=is:open crash per_page=5 ok${NOT_YOURS}`,
     );
   });
 
