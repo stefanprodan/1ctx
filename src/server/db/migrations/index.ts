@@ -42,6 +42,7 @@ import { m0033 } from "./0033-feed-arms.ts";
 import { m0034 } from "./0034-send-limits.ts";
 import { m0035 } from "./0035-queued-messages.ts";
 import { m0036 } from "./0036-skip-4bit.ts";
+import { m0037 } from "./0037-summoned.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -80,4 +81,5 @@ export const MIGRATIONS: Migration[] = [
   m0034,
   m0035,
   m0036,
+  m0037,
 ];

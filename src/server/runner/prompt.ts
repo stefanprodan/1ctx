@@ -76,6 +76,11 @@ function automationLine(
   return `This is a ${kind} run of the ${automation.name} automation, started at ${at} ${automation.tz}. You run autonomously. Do not ask questions. Do the task and stop.`;
 }
 
+// after the agent's prompt, so the fixed prefix stays the agent's own
+export function summonedLine(chatAgent: string): string {
+  return `You were summoned for one turn into a chat whose agent is ${chatAgent}. Answers by other agents are marked with their names in brackets.`;
+}
+
 function userLine(
   policy: Pick<SendPolicy, "fullName" | "username" | "about" | "tz">,
 ): string {
@@ -88,6 +93,7 @@ export function systemPrompt(
     SendPolicy,
     | "prompt"
     | "agentName"
+    | "summoned"
     | "projectName"
     | "projectKind"
     | "projectDescription"
@@ -109,6 +115,7 @@ export function systemPrompt(
 ): string {
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
+  if (policy.summoned !== null) parts.push(summonedLine(policy.summoned));
   parts.push(
     policy.automation === null
       ? userLine(policy)

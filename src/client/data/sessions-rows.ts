@@ -116,6 +116,7 @@ export function swapRun(
                 ? line.agentRetired
                 : false,
             send: next.send ?? null,
+            sendAgent: null,
             last: next.last ?? null,
             automation: line.automation,
             runBy: null,

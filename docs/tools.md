@@ -268,7 +268,8 @@ mount in `docs/bash.md`.
   when it can answer. These two tools come from skills, never the tools
   rows or their admin pages, a deliberate exception to the offered-set rule.
   A call reads the current body by the snapshot's id and name. After a
-  summary, the user message names still-offered skills loaded before it,
+  summary, the user message names still-offered skills the building
+  agent itself loaded before it, never another agent's in the chat,
   each load paired with its call by position in its round, as the
   writer pairs them.
   Before the catalog is built, `tools/offer.ts` removes the agent's skills

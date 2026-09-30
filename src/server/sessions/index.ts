@@ -97,6 +97,7 @@ export {
   STREAM_LIMIT,
   type UsagePort,
 } from "./rows.ts";
+export { lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
 export type { ChatSweep } from "./sweep.ts";
 

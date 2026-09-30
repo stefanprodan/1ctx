@@ -67,6 +67,7 @@ function rowOf(session: SessionSummary, runs: number | null = null): StreamRow {
     agent: "assistant",
     agentRetired: false,
     send: null,
+    sendAgent: null,
     last: null,
     automation:
       session.automationId === null

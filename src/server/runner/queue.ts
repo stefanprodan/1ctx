@@ -3,7 +3,8 @@
 //
 // The dispatcher: a message sent to a chat whose turn is running waits
 // as a queued row, and every wake starts each free chat's queue as one
-// turn through sendTurn, before the scheduler hears the wake, so a due
+// turn through sendTurn, up to a summon, which is a turn of its own,
+// before the scheduler hears the wake, so a due
 // run never takes the place a user's message waits for. A wake is
 // level-triggered: a pass reads the chats with queued rows, one indexed
 // read when there are none, and a wake during a pass runs another. A
@@ -19,7 +20,6 @@ import type {
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
 import type { NotSentReason } from "../../shared/words.ts";
-import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, HttpError } from "../lib/errors.ts";
@@ -41,7 +41,8 @@ import { queueMessage } from "./enqueue.ts";
 import type { PreparedRun } from "./prepare.ts";
 import { CapFull, LockHeld, type Registry, RunCapacity } from "./registry.ts";
 import { ClaimLost, type QueuedClaim } from "./start.ts";
-import type { TurnMessage } from "./turn.ts";
+import { type SummonAgents, summonGone, summons, turnBatch } from "./summon.ts";
+import { claimsOf, messagesOf, type TurnMessage } from "./turn.ts";
 
 const MINUTE_MS = 60_000;
 // passes one wake may run before it hands the rest to a later turn
@@ -59,7 +60,7 @@ export type DispatcherDeps = {
   registry: Registry;
   limits: { current(): Limits };
   users: { byId(id: string): UserRow | null };
-  agents: { byId(id: string): AgentRow | null };
+  agents: SummonAgents;
   access: { project(principal: Principal, id: string): ProjectRow };
   visible(principal: Principal, id: string): SessionRow;
   uploads: {
@@ -193,19 +194,20 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
   // settled
   const sort = (
     sessionId: string,
-  ): { session: SessionRow; ready: QueuedRow[] } | null => {
+  ): { session: SessionRow; ready: QueuedRow[]; agent: string } | null => {
     const rows = queue.waiting(sessionId);
     if (rows.length === 0) return null;
     const session = sessions.byId(sessionId);
     if (session === null) return null;
     const cutoff =
       deps.clock() - deps.limits.current().queuedMinutes * MINUTE_MS;
+    const agent = deps.agents.byId(session.agentId)?.name ?? "";
     const whole: NotSentReason | null =
       session.archived !== null
         ? session.archived.reason === "agent"
           ? "agent-deleted"
           : "archived"
-        : deps.agents.byId(session.agentId) === null
+        : agent === ""
           ? "agent-deleted"
           : null;
     const drop: string[] = [];
@@ -219,14 +221,16 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       }
       const reason: NotSentReason | null =
         whole ??
-        (row.queuedAt <= cutoff
-          ? "expired"
-          : user === null ||
-              user.disabled ||
-              user.mustChangePassword ||
-              uploadsFail(row, user, session.projectId)
-            ? "failed"
-            : null);
+        (summonGone(deps.agents, agent, row.text)
+          ? "agent-deleted"
+          : row.queuedAt <= cutoff
+            ? "expired"
+            : user === null ||
+                user.disabled ||
+                user.mustChangePassword ||
+                uploadsFail(row, user, session.projectId)
+              ? "failed"
+              : null);
       if (reason === null) {
         ready.push(row);
         continue;
@@ -234,20 +238,8 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       notSent.set(reason, [...(notSent.get(reason) ?? []), row]);
     }
     settle(session.id, drop, notSent);
-    return { session, ready };
+    return { session, ready, agent };
   };
-
-  const messagesOf = (rows: readonly QueuedRow[]): TurnMessage[] =>
-    rows.map((row) => ({
-      userId: row.authorId,
-      message: row.text,
-      ...(row.uploads.length > 0 ? { uploads: row.uploads } : {}),
-      ...(row.capabilities === undefined
-        ? {}
-        : { capabilities: row.capabilities }),
-    }));
-  const claimsOf = (rows: readonly QueuedRow[]): QueuedClaim[] =>
-    rows.map((row) => ({ id: row.id, revision: row.revision }));
 
   // the turn counts against its oldest author with room under their own
   // cap, so a capped author never holds back the others
@@ -315,7 +307,8 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     if (sorted === null || sorted.ready.length === 0) return "none";
     // a start that fails frees and wakes; only a lost claim asks again
     const before = again;
-    let rows = sorted.ready;
+    // a summon is a turn of its own: those before it start first
+    let rows = turnBatch(sorted.ready, summons(sorted.agent));
     let err = launch(sessionId, rows);
     if (err !== null && !keeps(err)) {
       const found = culprits(sessionId, rows);

@@ -106,3 +106,45 @@ export function bumpSendCounters(
   ).run(fields.rounds, fields.toolCalls, fields.memoryRound ?? null, id);
   return readSend(db, id);
 }
+
+// who answered each send of the session, a retired agent by its name
+export function sendTurns(
+  db: Db,
+  sessionId: string,
+): Map<string, { agentId: string; agentName: string; summoned: boolean }> {
+  const rows = db
+    .query<
+      { id: string; agent_id: string; name: string; summoned: number },
+      [string]
+    >(
+      `select sends.id, sends.agent_id, agents.name, sends.summoned
+       from sends join agents on agents.id = sends.agent_id
+       where sends.session_id = ?`,
+    )
+    .all(sessionId);
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        agentId: row.agent_id,
+        agentName: row.name,
+        summoned: row.summoned === 1,
+      },
+    ]),
+  );
+}
+
+// the prompt of the chat's last round, whichever agent answered it;
+// null before the first counted round
+export function lastPrompt(db: Db, sessionId: string): number | null {
+  return (
+    db
+      .query<{ prompt_tokens: number }, [string]>(
+        `select usage.prompt_tokens from usage
+         where usage.session_id = ?
+           and exists (select 1 from sends where sends.id = usage.send_id)
+         order by usage.seq desc limit 1`,
+      )
+      .get(sessionId)?.prompt_tokens ?? null
+  );
+}

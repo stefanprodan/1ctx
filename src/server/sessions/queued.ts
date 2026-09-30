@@ -16,7 +16,7 @@ import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { newId } from "../lib/ids.ts";
-import { lineFrom } from "./parse.ts";
+import { notSentOf } from "./not-sent.ts";
 
 // a chat's queue starts as one turn, so it holds at most what one turn
 // opens with
@@ -390,41 +390,7 @@ export class QueueStore {
   // Home's list: the author's not-sent rows in the projects they see,
   // newest first
   notSentOf(userId: string, projectIds: readonly string[]): NotSentRow[] {
-    return this.db
-      .query<
-        {
-          id: string;
-          session_id: string;
-          title: string;
-          project: string;
-          agent: string;
-          content: string;
-          reason: NotSentReason;
-          changed_at: number;
-        },
-        [string, string]
-      >(
-        `select q.id, q.session_id, s.title, p.name as project,
-           a.name as agent, q.content, q.reason, q.changed_at
-         from queued_messages q
-         join sessions s on s.id = q.session_id
-         join projects p on p.id = s.project_id
-         join agents a on a.id = s.agent_id
-         where q.author_id = ? and q.state = 'not-sent'
-           and s.project_id in (select value from json_each(?))
-         order by q.changed_at desc, q.id`,
-      )
-      .all(userId, JSON.stringify(projectIds))
-      .map((raw) => ({
-        id: raw.id,
-        sessionId: raw.session_id,
-        title: raw.title,
-        project: raw.project,
-        agent: raw.agent,
-        line: lineFrom(raw.content),
-        reason: raw.reason,
-        changedAt: raw.changed_at,
-      }));
+    return notSentOf(this.db, userId, projectIds);
   }
 
   // the author's not-sent rows named gone, in the projects they see as

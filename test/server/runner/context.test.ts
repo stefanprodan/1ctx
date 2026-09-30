@@ -82,6 +82,7 @@ const policy: SendPolicy = {
   projectDescription: "Incidents and pages.",
   agentId: "a",
   agentName: "coder",
+  summoned: null,
   providerId: "pr",
   providerName: "local",
   wire: "openai-compatible",
@@ -150,6 +151,7 @@ const lookups: ContextLookups = {
     id === "r2" && providerId === policy.providerId && model === policy.model
       ? [{ type: "reasoning.text", text: "t" }]
       : null,
+  turnsOf: () => new Map(),
 };
 
 const EMPTY_KNOWLEDGE =
@@ -1231,6 +1233,28 @@ describe("skills after a summary", () => {
     ];
     expect(history(rows, without, lookups, NOW)[1]?.content).toBe(
       `${SUMMARY_LEAD}\n\nsummary`,
+    );
+  });
+
+  test("a skill another agent loaded is not counted as loaded", () => {
+    const rows = [
+      work("c1", "ops", "one"),
+      loaded("c1", "ops", "one"),
+      row({ id: "s", kind: "summary", content: "summary" }),
+    ];
+    const summoned: ContextLookups = {
+      ...lookups,
+      turnsOf: () =>
+        new Map([
+          ["one", { agentId: "b", agentName: "checker", summoned: true }],
+        ]),
+    };
+    expect(history(rows, withSkills, summoned, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary`,
+    );
+    const itself = { ...withSkills, agentId: "b", summoned: "coder" };
+    expect(history(rows, itself, summoned, NOW)[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops`,
     );
   });
 });

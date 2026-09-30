@@ -7,7 +7,8 @@ Markdown download and compaction. The tool loop is in `docs/tools.md`,
 memory in `docs/memory.md`, runs in `docs/automations.md`.
 
 - **A send is a row and ends once.** A chat is a session in a project
-  with one agent for its life; a user message starts a send under the
+  with one agent for its life, which a summon joins for a turn (below);
+  a user message starts a send under the
   runner's lock, one per session, taken synchronously before anything
   is written (`runner/registry.ts`). Every send counts in one tally,
   whatever its kind (a message, regenerate, compact, Run now or
@@ -107,7 +108,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   retired agent (`agent-deleted`), a row past `queuedMinutes` from
   `queued_at` (`expired`), a gone, disabled or must-change-password
   author or a staged upload that no longer checks (`failed`) turn not
-  sent. The rest start through the runner's turn in order, each with
+  sent, and so does a queued summon whose agent was retired since
+  (`agent-deleted`). The rest start through the runner's turn in order
+  up to the first summon, which starts alone once they end, the rows
+  after it waiting for the next turn; each with
   its own author, counted against the oldest author with room under
   `sendsPerUser`, whose policy the turn runs under; with none, they
   wait. The start carries a claim: `startSend`'s transaction deletes
@@ -175,7 +179,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   opens with the line naming the agent and its project (`You are
   <agent>, an agent in the <project> project`, a personal project named
   by its owner, the description after it when set), then the agent's
-  prompt when set, the user's line or a run's automation line, the
+  prompt when set, a summoned send's `summonedLine()`, the user's line
+  or a run's automation line, the
   skills catalog, the MCP catalog, the servers' `<mcp_instructions>`
   block, the project memory block (a chat's snapshot, a run's live
   note), the automation memory block, the knowledge block, the date
@@ -185,6 +190,29 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   the skills-off line when applicable, and last the change note. What
   is fixed per agent and project comes first; the user's line follows
   the agent's prompt because it changes with the author of a team chat.
+- **A summon is one turn of another agent.** A chat message whose first
+  word is `@name` (`shared/summon.ts`, a live agent's name in any case)
+  runs on that agent (`runner/summon.ts`); the chat's own name is an
+  ordinary turn, a name past the first word plain text, and a first
+  word naming no live agent the 400 "no agent named <word>", at a send
+  and at queueing. A new chat's first message cannot summon (the same
+  400), a turn of several messages holds a summon alone, and a run never
+  summons. The send is written with `sends.summoned` and its agent, which
+  fork copies; the policy's `summoned` names the chat's agent. A summon
+  is refused, "the chat is too long for <name>", when the prompt of the
+  chat's last round, of any agent (`lastPrompt()`), reaches the
+  summoned model's `compactsAt()`. History (`runner/context.ts`): a turn
+  is the building agent's own when neither send is summoned or both are
+  summoned sends of the same agent; any other turn goes as its answer in
+  a user message opening `[name] `, with no author field, then its trace
+  (`runner/trace.ts`) as its own user message, never its calls, results,
+  reasoning or signatures, so no provider sees a call without its
+  result; a skill it loaded is not counted as loaded. A summoned send's
+  cache key is `<chat>:<agent>`, so agents share no sticky route or
+  slot. `SessionSummary.usage` reads the chat's own rounds only, so the
+  meter and a compaction's room stay the chat agent's. The feed and
+  envelope row's `sendAgent` names the last send's agent, and a not-sent
+  summon the agent it called.
 - **A send's uploads are claimed in `startSend`.** For staged uploads,
   synchronous preflight checks each message's against its author, project
   and lease and requires
@@ -268,7 +296,7 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   policy names the agent, so a chat archived while running ends as a
   stop does. `GET
   /api/agents/:id/impact` counts what it would archive, pause and
-  stop. `GET /api/agents` answers with the list each agent's last send
+  stop, a summoned turn it answers in another chat included. `GET /api/agents` answers with the list each agent's last send
   start and whether one runs now (`agentActivity()`, over the
   `sends_agent` and `sends_running` indexes), and `GET
   /api/agents/:id/usage` its sends, tokens and cost over `lastDays()`. Every `AgentStore` read skips a retired agent; history reads
@@ -376,7 +404,9 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   stays, and the envelope names the rows in `removedMessageIds`; 409
   while the session runs, 400 when the last message is the user's. Its
   optional JSON body goes through `readBody()` under
-  `MAX_REGENERATE_BODY` and `parseRegenerate()`.
+  `MAX_REGENERATE_BODY` and `parseRegenerate()`. A summoned turn reruns
+  on its send's agent and flag, never the text; one whose agent was
+  retired is the 400 "<name> is gone".
 - **Fork copies a chat through a settled turn.**
   Fork (`POST /api/sessions/:id/fork`) copies the rows through a settled
   turn and its following done summaries, never memory phase rows, into
@@ -418,7 +448,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   kind `summary`, triggered from an answer round's usage at
   `contextLength - min(contextReserve, contextLength / 4)` through
   `shared/compaction.ts`; `contextReserve` and `summaryMaxTokens` are
-  send limits. The summary round sends no tools and thinking off, or
+  send limits. A summoned send never starts one: compaction is the chat
+  agent's. The summary round sends no tools and thinking off, or
   the wire's least effort (`EFFORTS[wire][0]`) for a model whose
   catalog says it always thinks (`thinkingRequired`), since a provider
   refuses Off there. History starts from the last done summary. Compact

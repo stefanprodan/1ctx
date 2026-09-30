@@ -12,7 +12,7 @@ import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
-import { type ContextLookups, historyMessages } from "./context.ts";
+import { type ContextLookups, cacheKeyOf, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";
@@ -173,7 +173,7 @@ function memoryRequest(
     thinking: send.policy.thinking,
     thinkingOff: send.policy.thinkingOff,
     reasoningEffort: send.policy.effort,
-    cacheKey: send.sessionId,
+    cacheKey: cacheKeyOf(send.policy, send.sessionId),
     upstream: send.policy.upstream,
     skip4Bit: send.policy.skip4Bit,
     ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),

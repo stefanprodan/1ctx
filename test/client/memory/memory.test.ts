@@ -77,6 +77,7 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
     memoryRound: 3,
     memoryError: null,
     memorySkipped: null,
+    summoned: false,
     tokens: 0,
     startedAt: 9_000,
     finishedAt: 40_000,

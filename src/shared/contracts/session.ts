@@ -195,6 +195,8 @@ export type SendSummary = {
   memoryError: string | null;
   // edits the commit skipped because the note moved during the run
   memorySkipped: number | null;
+  // another agent answered this one turn, summoned by the first word
+  summoned: boolean;
   // prompt plus completion tokens over every round the provider counted
   tokens: number;
   startedAt: number;

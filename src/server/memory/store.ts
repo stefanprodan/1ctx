@@ -69,9 +69,13 @@ type Raw = {
   agent_name: string | null;
 };
 
-// the name of a saving session's agent, null for a hand edit
-const AGENT_OF = `(select agents.name from sessions
-  join agents on agents.id = sessions.agent_id where sessions.id = ?)`;
+// the name of a saving session's agent, null for a hand edit: the
+// running send's, a summoned one's included, else the session's
+const AGENT_OF = `coalesce(
+  (select agents.name from sends join agents on agents.id = sends.agent_id
+   where sends.session_id = ? and sends.status = 'running'),
+  (select agents.name from sessions
+   join agents on agents.id = sessions.agent_id where sessions.id = ?))`;
 
 function entries(value: string): MemoryEntry[] {
   const parsed: unknown = JSON.parse(value);
@@ -358,6 +362,7 @@ export class MemoryStore {
           userId,
           sessionId,
           sessionId,
+          sessionId,
         );
       return;
     }
@@ -373,6 +378,7 @@ export class MemoryStore {
         JSON.stringify(current.entries),
         now,
         userId,
+        sessionId,
         sessionId,
         sessionId,
         target.projectId,

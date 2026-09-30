@@ -111,12 +111,12 @@ export function copyRows(
   const insertSend = db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
        provider_name, model, status, cause, error, first_message_id, rounds,
-       tool_calls, mcp, memory_round, memory_error, memory_skipped,
+       tool_calls, mcp, memory_round, memory_error, memory_skipped, summoned,
        started_at, finished_at)
      select ?, ?, kind, user_id, agent_id, provider_id, provider_name, model,
        case when status = 'running' then 'done' else status end,
        case when status = 'running' then 'finish' else cause end,
-       error, ?, ?, ?, null, null, null, null, started_at,
+       error, ?, ?, ?, null, null, null, null, summoned, started_at,
        case when status = 'running' then ? else finished_at end
      from sends where id = ?`,
   );

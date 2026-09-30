@@ -282,6 +282,7 @@ export async function runAutomation(id: string): Promise<SessionDetail> {
       agent: null,
       agentRetired: false,
       send: detail.send,
+      sendAgent: null,
       last: null,
       automation: labelOf(id),
       // the one who pressed it is the one signed in

@@ -62,6 +62,7 @@ function rowOf(session: SessionSummary, changes: Partial<StreamRow> = {}) {
     agent: "assistant",
     agentRetired: false,
     send: null,
+    sendAgent: null,
     last: null,
     automation:
       session.automationId === null
@@ -90,6 +91,7 @@ function env(
             agent: "writer",
             agentRetired: false,
             send: sent,
+            sendAgent: null,
             last: { seq: 3, author: "writer", text: "done" },
             automation:
               session.automationId === null

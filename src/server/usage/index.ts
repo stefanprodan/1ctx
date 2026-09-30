@@ -49,7 +49,8 @@ export type Usage = {
   decisions: DecisionUsageStore;
   record(fields: UsageFields): UsageRow;
   recordDecision(fields: DecisionUsageFields): DecisionUsageRow;
-  // the last round counted for a session, or for many at once
+  // the last round of a chat agent counted for a session, never a
+  // summoned turn's, or for many at once
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
   // an agent's year of days in the zone, every project in one series

@@ -38,6 +38,7 @@ import {
 import { type ListArgs, listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
 import {
+  type DigestArgs,
   insertMcpSend,
   type McpSendFields,
   lastMcpDigest as readLastMcpDigest,
@@ -433,8 +434,7 @@ export class SessionStore {
     return addToolRows(this.db, calls);
   }
 
-  // guarded by status, so a tool that ends after a terminal cleanup
-  // writes nothing
+  // guarded by status: a tool ending after a terminal cleanup writes nothing
   finishTool(
     id: string,
     fields: {
@@ -462,8 +462,8 @@ export class SessionStore {
     return this.send(insertMcpSend(this.db, fields))!;
   }
 
-  lastMcpDigest(sessionId: string, excludeSendId: string): McpDigest | null {
-    return readLastMcpDigest(this.db, sessionId, excludeSendId);
+  lastMcpDigest(...args: DigestArgs): McpDigest | null {
+    return readLastMcpDigest(this.db, ...args);
   }
 
   sweepDigests(): number {
@@ -486,8 +486,7 @@ export class SessionStore {
     return bumpSendCounters(this.db, id, fields);
   }
 
-  // the rows are read back through this store so the envelope carries
-  // them
+  // the rows read back through this store, for the envelope
   repair(now: number, error: string): RepairedSession[] {
     return repairRows(this.db, now, error, {
       touch: (id) => this.touch(id, { status: "failed", now })!,

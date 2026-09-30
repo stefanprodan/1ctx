@@ -133,6 +133,7 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       model: policy.model,
       firstMessageId: firstMessageId(turn),
       mcpDigest: fields.mcpDigest,
+      summoned: policy.summoned !== null,
       now,
     });
     let removedMessageIds: string[] = [];
@@ -179,7 +180,11 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     if ((fields.kind ?? "chat") === "chat") {
       deps.views.start(base.id, policy.projectMemory);
     }
-    const previousMcpDigest = deps.sessions.lastMcpDigest(base.id, send.id);
+    const previousMcpDigest = deps.sessions.lastMcpDigest(
+      base.id,
+      send.id,
+      policy.agentId,
+    );
     const reply = deps.sessions.addReply({
       id: fields.replyId,
       sessionId: base.id,

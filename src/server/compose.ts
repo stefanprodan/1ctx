@@ -375,7 +375,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: sessions.store,
     access,
     visible: (principal, id) => sessions.visible(principal, id),
-    agents,
+    agents: {
+      byId: (id) => agents.byId(id),
+      byName: (name) => agents.store.byName(name),
+    },
     users,
     providers,
     tools,

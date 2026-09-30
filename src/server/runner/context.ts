@@ -11,8 +11,9 @@
 // result rows is sent without its calls and without its structured
 // reasoning, as plain text if it has any, else skipped; an orphan tool
 // row is skipped. The answer round ends the request with the ask as a
-// user message, never a stored row. Tested on fixtures,
-// malformed histories among them.
+// user message, never a stored row. Another agent's turn in the chat
+// goes as its answer and its trace, never its calls, results or
+// reasoning. Tested on fixtures, malformed histories among them.
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
@@ -27,6 +28,7 @@ import type {
 } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
 import { systemPrompt } from "./prompt.ts";
+import { trace, traceCalls } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far so that it can continue from the summary alone: the messages before this point are dropped and only the summary is kept. Write Markdown with these sections, terse bullets, no prose:
 
@@ -44,6 +46,10 @@ Do not mention the summary process.`;
 export const SUMMARY_LEAD =
   "The conversation so far, summarized; the earlier messages were dropped:";
 
+// who answered a send of the session: its agent and whether it was
+// summoned for the turn
+export type Turn = { agentId: string; agentName: string; summoned: boolean };
+
 export type ContextLookups = {
   // the author's username, for the name field on the wire
   usernameOf(userId: string): string | null;
@@ -52,7 +58,43 @@ export type ContextLookups = {
     providerId: string,
     model: string,
   ): ReasoningDetail[] | null;
+  // the session's sends by id
+  turnsOf(sessionId: string): ReadonlyMap<string, Turn>;
 };
+
+type Builder = Pick<SendPolicy, "agentId" | "summoned">;
+
+// a turn is the building agent's own when neither is summoned (a fork's
+// copied turns included) or both are summoned sends of the same agent;
+// a send the lookup does not know is its own
+function ownTurn(turn: Turn | undefined, policy: Builder): boolean {
+  if (turn === undefined) return true;
+  return policy.summoned === null
+    ? !turn.summoned
+    : turn.summoned && turn.agentId === policy.agentId;
+}
+
+// another agent's turn: its answer as a user message opened by its
+// name, with no author field, then its trace as its own message
+function foreignTurn(turn: Turn, rows: readonly Message[]): ChatMessageIn[] {
+  const out: ChatMessageIn[] = [];
+  const answer = rows
+    .filter(
+      (row) =>
+        row.kind === "reply" &&
+        row.slot !== "work" &&
+        row.status !== "streaming" &&
+        row.content !== "",
+    )
+    .map((row) => row.content)
+    .join("\n\n");
+  if (answer !== "") {
+    out.push({ role: "user", content: `[${turn.agentName}] ${answer}` });
+  }
+  const calls = trace(traceCalls(rows));
+  if (calls !== "") out.push({ role: "user", content: calls });
+  return out;
+}
 
 // the tool result rows of one (sendId, round), in call order
 function toolRowsByRound(rows: Message[]): Map<string, Message[]> {
@@ -118,6 +160,8 @@ function loadedSkills(
   rows: Message[],
   cut: number,
   offered: Set<string>,
+  // the skill was loaded by the building agent itself
+  own: (sendId: string) => boolean,
 ): string[] {
   let start = 0;
   for (let i = cut - 1; i >= 0; i--) {
@@ -134,6 +178,7 @@ function loadedSkills(
   const names: string[] = [];
   const seen = new Set<string>();
   for (const row of rows.slice(start, cut)) {
+    if (!own(row.sendId)) continue;
     const key = `${row.sendId}:${row.round}`;
     if (row.kind === "reply" && row.slot === "work") {
       calls.set(key, row.toolCalls ?? []);
@@ -169,6 +214,8 @@ export function history(
     SendPolicy,
     | "prompt"
     | "agentName"
+    | "agentId"
+    | "summoned"
     | "projectName"
     | "projectKind"
     | "projectDescription"
@@ -202,11 +249,22 @@ export function historyMessages(
   rows: Message[],
   policy: Pick<
     SendPolicy,
-    "username" | "userId" | "providerId" | "model" | "offered"
+    | "username"
+    | "userId"
+    | "providerId"
+    | "model"
+    | "offered"
+    | "agentId"
+    | "summoned"
   >,
   lookups: ContextLookups,
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
+  const turns =
+    rows.length === 0
+      ? new Map<string, Turn>()
+      : lookups.turnsOf(rows[0]!.sessionId);
+  const own = (sendId: string) => ownTurn(turns.get(sendId), policy);
   let start = 0;
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]!;
@@ -215,6 +273,7 @@ export function historyMessages(
         rows,
         i,
         new Set(policy.offered.skills.skills.map((skill) => skill.name)),
+        own,
       );
       const remembered =
         names.length === 0 ? "" : `\n\n${SKILLS_LEAD} ${names.join(", ")}`;
@@ -233,8 +292,23 @@ export function historyMessages(
   }
   const active = rows.slice(start);
   const byRound = toolRowsByRound(active);
+  // another agent's rows of one send, sent as its answer and trace once
+  // the send's rows end
+  let foreign: Message[] = [];
+  const flush = () => {
+    const first = foreign[0];
+    if (first !== undefined) {
+      out.push(...foreignTurn(turns.get(first.sendId)!, foreign));
+    }
+    foreign = [];
+  };
   for (const row of active) {
+    if (foreign.length > 0 && row.sendId !== foreign[0]!.sendId) flush();
     if (row.kind === "summary") continue;
+    if (row.kind !== "user" && !own(row.sendId)) {
+      foreign.push(row);
+      continue;
+    }
     if (row.kind === "user") {
       out.push(userMessage(row, policy, lookups));
       continue;
@@ -292,8 +366,17 @@ export function historyMessages(
       ...(details ? { reasoningDetails: details } : {}),
     });
   }
+  flush();
   return out;
 }
+
+// a summoned agent keeps its own key, so two agents never share a
+// router's sticky routing or a local engine's slot
+export const cacheKeyOf = (
+  policy: Pick<SendPolicy, "agentId" | "summoned">,
+  sessionId: string,
+): string =>
+  policy.summoned === null ? sessionId : `${sessionId}:${policy.agentId}`;
 
 export function request(
   policy: SendPolicy,
@@ -306,7 +389,7 @@ export function request(
     thinking: policy.thinking,
     thinkingOff: policy.thinkingOff,
     reasoningEffort: policy.effort,
-    cacheKey: sessionId,
+    cacheKey: cacheKeyOf(policy, sessionId),
     upstream: policy.upstream,
     skip4Bit: policy.skip4Bit,
     ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
@@ -353,7 +436,7 @@ export function summaryRequest(
     thinking: policy.thinkingRequired,
     thinkingOff: policy.thinkingOff,
     reasoningEffort: policy.thinkingRequired ? leastEffort(policy.wire) : null,
-    cacheKey: sessionId,
+    cacheKey: cacheKeyOf(policy, sessionId),
     upstream: policy.upstream,
     skip4Bit: policy.skip4Bit,
     maxTokens,

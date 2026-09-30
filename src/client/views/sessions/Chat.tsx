@@ -250,6 +250,7 @@ function SessionPage({
                     agent: null,
                     agentRetired: false,
                     send: shown.send,
+                    sendAgent: null,
                     last: null,
                     automation: null,
                     runBy: null,

@@ -258,6 +258,7 @@ export type RawSend = {
   memory_round: number | null;
   memory_error: string | null;
   memory_skipped: number | null;
+  summoned: number;
   tokens: number;
   started_at: number;
   finished_at: number | null;
@@ -286,6 +287,7 @@ export const send = (raw: RawSend): SendSummary => ({
   memoryRound: raw.memory_round,
   memoryError: raw.memory_error,
   memorySkipped: raw.memory_skipped,
+  summoned: raw.summoned === 1,
   tokens: raw.tokens,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,

@@ -55,7 +55,8 @@ and the note card under `src/client/views/memory/`.
   read, save and undo. `Memory.session` names the chat or run that
   saved last (id, title, origin, the automation for a run), from the
   memory area's session info port, null for a hand edit or once the
-  session is deleted. `Memory.agentName` is that session's agent,
+  session is deleted. `Memory.agentName` is the saving send's agent (a
+  summoned one's in a summoned turn), else the session's,
   written with the note (`agent_name`) so it outlives the session, null
   for a hand edit or an undo; a chat's save also records the chat's
   user in `updatedBy`. `Memory.agentRetired` is true when no live agent

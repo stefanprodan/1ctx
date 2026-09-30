@@ -49,13 +49,18 @@ export function agentChats(db: Db, agentId: string): string[] {
     .map((row) => row.id);
 }
 
-// chats and runs on the agent with a send in flight
+// chats and runs on the agent with a send in flight, and the other
+// chats it answers a summoned turn in now
 export function agentRunning(db: Db, agentId: string): number {
   return db
-    .query<{ n: number }, [string]>(
-      "select count(*) as n from sessions where agent_id = ? and status = 'running'",
+    .query<{ n: number }, [string, string]>(
+      `select (select count(*) from sessions
+                where agent_id = ? and status = 'running')
+            + (select count(*) from sends
+                where agent_id = ? and status = 'running' and summoned = 1)
+         as n`,
     )
-    .get(agentId)!.n;
+    .get(agentId, agentId)!.n;
 }
 
 // the one envelope an archive, an attention mark or a queued message's

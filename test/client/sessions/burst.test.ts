@@ -50,6 +50,7 @@ const rowOf = (session: SessionSummary): StreamRow => ({
   agent: "assistant",
   agentRetired: false,
   send: null,
+  sendAgent: null,
   last: null,
   automation:
     session.automationId === null
