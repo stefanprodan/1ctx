@@ -23,7 +23,7 @@ import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { ToolResult } from "./policy.ts";
-import type { ActiveSend, RoundState } from "./send.ts";
+import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
 import {
   type StartDeps,
   type Started,
@@ -411,8 +411,7 @@ export class Writer {
   ): Message | null {
     const round = send.round;
     if (round === null) return null;
-    // a round cut after its first call delta keeps work; otherwise the
-    // reply is the answer, an empty stopped row included
+    // work once a call delta came, else the answer, even empty and stopped
     const memory = send.phase === "memory";
     const slot = memory
       ? "work"
@@ -429,6 +428,7 @@ export class Writer {
           : "done"
       : status;
     const finalError = memory ? send.memoryError : error;
+    if (slot === "answer") unmarkAnswer(round, send.policy.agentName);
     this.recordUsage(send, round, now);
     return this.finishReplyRow(round, finalStatus, finalError, slot, null, now);
   }

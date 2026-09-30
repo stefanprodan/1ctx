@@ -133,7 +133,8 @@ describe("a summon", () => {
         { role: "user", content: "@Checker is that right", name: "casey" },
       ]);
       expect(summoned.body.prompt_cache_key).toBe(`${sessionId}:${checkerId}`);
-      summoned.reply("yes, noon");
+      // a mark copied from the history leaves the stored answer
+      summoned.reply("[checker] yes, noon");
 
       const next = await turn(chat, sessionId, "thanks");
       expect(system(next)).toStartWith("You are coder,");

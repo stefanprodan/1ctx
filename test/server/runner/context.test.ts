@@ -19,6 +19,7 @@ import {
   SUMMARIZE,
   SUMMARY_LEAD,
   summaryRequest,
+  unmarked,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
 import { LOOP_LIMITS } from "../../../src/server/runner/limits.ts";
@@ -170,6 +171,19 @@ describe("knowledgeBlock", () => {
     ],
   ] as const)("names the aliases and tab for %i files", (files, expected) => {
     expect(knowledgeBlock(files, [])).toBe(expected);
+  });
+});
+
+describe("unmarked", () => {
+  test.each([
+    ["[checker] yes", "yes"],
+    ["  [checker]\n\nyes", "yes"],
+    ["[checker]", ""],
+    ["[coder] yes", "[coder] yes"],
+    ["yes [checker] no", "yes [checker] no"],
+    ["[checkers] yes", "[checkers] yes"],
+  ])("%j", (text, want) => {
+    expect(unmarked(text, "checker")).toBe(want);
   });
 });
 

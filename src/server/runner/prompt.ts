@@ -78,7 +78,7 @@ function automationLine(
 
 // after the agent's prompt, so the fixed prefix stays the agent's own
 export function summonedLine(chatAgent: string): string {
-  return `You were summoned for one turn into a chat whose agent is ${chatAgent}. Answers by other agents are marked with their names in brackets.`;
+  return `You were summoned for one turn into a chat whose agent is ${chatAgent}. Answers by other agents are marked with their names in brackets. Write yours without a mark.`;
 }
 
 function userLine(

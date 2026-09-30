@@ -213,7 +213,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   a user message opening `[name] `, with no author field, then its trace
   (`runner/trace.ts`) as its own user message, never its calls, results,
   reasoning or signatures, so no provider sees a call without its
-  result; a skill it loaded is not counted as loaded. A summoned send's
+  result; a skill it loaded is not counted as loaded. A model that
+  read marked answers may open its own with `[its name]`: the summoned
+  line asks it not to, and the writer drops that mark from a stored
+  answer (`unmarked`). A summoned send's
   cache key is `<chat>:<agent>`, so agents share no sticky route or
   slot. `SessionSummary.usage` reads the chat's own rounds only, so the
   meter and a compaction's room stay the chat agent's. The feed and

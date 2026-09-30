@@ -74,6 +74,17 @@ function ownTurn(turn: Turn | undefined, policy: Builder): boolean {
     : turn.summoned && turn.agentId === policy.agentId;
 }
 
+// the mark that opens another agent's answer in a history
+const markOf = (name: string) => `[${name}] `;
+
+// an answer without the agent's own mark: a model that read other
+// agents' marked answers may open its own the same way
+export function unmarked(text: string, name: string): string {
+  const mark = markOf(name).trimEnd();
+  const start = text.trimStart();
+  return start.startsWith(mark) ? start.slice(mark.length).trimStart() : text;
+}
+
 // another agent's turn: its answer as a user message opened by its
 // name, with no author field, then its trace as its own message
 function foreignTurn(turn: Turn, rows: readonly Message[]): ChatMessageIn[] {
@@ -89,7 +100,7 @@ function foreignTurn(turn: Turn, rows: readonly Message[]): ChatMessageIn[] {
     .map((row) => row.content)
     .join("\n\n");
   if (answer !== "") {
-    out.push({ role: "user", content: `[${turn.agentName}] ${answer}` });
+    out.push({ role: "user", content: `${markOf(turn.agentName)}${answer}` });
   }
   const calls = trace(traceCalls(rows));
   if (calls !== "") out.push({ role: "user", content: calls });
