@@ -1134,6 +1134,19 @@ describe("the output cap", () => {
     );
   });
 
+  test("a history holding a special token's text is still sized", () => {
+    const special: ChatMessageIn[] = [
+      ...messages,
+      {
+        role: "user",
+        content: "the template has <|im_start|>user and <|endoftext|>",
+      },
+    ];
+    const sized = sizedRequest(window, "s1", special);
+    expect(sized.estimate).toBeGreaterThan(0);
+    expect(sized.request.maxTokens).toBeLessThan(20_000);
+  });
+
   test("a later round counts only what it added to the measured one", () => {
     const added: ChatMessageIn[] = [
       { role: "tool", toolCallId: "c1", content: "a result ".repeat(300) },

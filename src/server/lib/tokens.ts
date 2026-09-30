@@ -16,13 +16,17 @@
 
 import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
 
+// a special token's text (<|im_start|>, <|endoftext|>) in a chat or a
+// file is counted as plain text: the library throws on it by default
+const AS_TEXT = { disallowedSpecial: new Set<string>() };
+
 export const TOKEN_PIECE = 4096;
 const LONG_WORD = new RegExp(`\\S{${TOKEN_PIECE + 1}}|\\s{${TOKEN_PIECE + 1}}`);
 
 export function tokens(text: string): number {
   if (text === "") return 0;
   if (text.length <= TOKEN_PIECE || !LONG_WORD.test(text)) {
-    return countTokens(text);
+    return countTokens(text, AS_TEXT);
   }
   let total = 0;
   for (let at = 0; at < text.length; ) {
@@ -31,7 +35,7 @@ export function tokens(text: string): number {
       const line = text.lastIndexOf("\n", end);
       if (line > at) end = line + 1;
     }
-    total += countTokens(text.slice(at, end));
+    total += countTokens(text.slice(at, end), AS_TEXT);
     at = end;
   }
   return total;
