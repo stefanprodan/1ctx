@@ -5,7 +5,7 @@
 // The fetch is a fake, so the suite never reaches a network.
 
 import { describe, expect, test } from "bun:test";
-import { silent } from "../../../src/server/lib/log.ts";
+import { errorFields, silent } from "../../../src/server/lib/log.ts";
 import {
   buildRequest as buildExaRequest,
   EXA_URL,
@@ -333,6 +333,44 @@ describe("the area reads the key at each call", () => {
     expect(result.error).toBe(true);
     expect(result.content).toContain("[key]");
     expect(result.content).not.toContain("exa-key");
+  });
+  test("logs a fixed phrase for a provider's error, never its words", async () => {
+    const answers: [() => Response, string][] = [
+      [
+        () =>
+          new Response('{"error":"quota for alice@example.com"}', {
+            status: 500,
+          }),
+        "websearch failed (HTTP 500)",
+      ],
+      [
+        () =>
+          exaResponse(
+            JSON.stringify({
+              result: {
+                isError: true,
+                content: [
+                  { type: "text", text: "quota for alice@example.com" },
+                ],
+              },
+            }),
+          ),
+        "websearch answer refused",
+      ],
+    ];
+    for (const [answer, logged] of answers) {
+      const fetcher = (async () => answer()) as unknown as typeof fetch;
+      const area = areaWith({ "search-exa": "exa-key" }, fetcher);
+      const result = await area.run(
+        area.offered(Date.now(), ""),
+        { id: "s", name: "websearch", arguments: '{"query":"find"}' },
+        context(),
+      );
+      expect(result.content).toContain("alice@example.com");
+      const fields = errorFields(result.failure, false);
+      expect(fields.error).toBe(logged);
+      expect(JSON.stringify(fields)).not.toContain("alice");
+    }
   });
   test("a key removed since offered() runs keyless, never a switch", async () => {
     const secrets: Record<string, string> = { "search-exa": "exa-key" };

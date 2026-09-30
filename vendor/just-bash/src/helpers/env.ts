@@ -48,3 +48,15 @@ export function mergeToNullPrototype<T extends object>(
 ): Record<string, unknown> {
   return Object.assign(Object.create(null), ...objects);
 }
+
+/**
+ * (1ctx) A process's environment: the exported variables, never the shell's
+ * own, as bash hands a child only what is exported. A context built without
+ * them (a direct call in a test) falls back to every variable.
+ */
+export function processEnv(ctx: {
+  env: Map<string, string>;
+  exportedEnv?: Record<string, string>;
+}): Map<string, string> {
+  return ctx.exportedEnv ? new Map(Object.entries(ctx.exportedEnv)) : ctx.env;
+}

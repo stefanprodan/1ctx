@@ -297,8 +297,8 @@ async function runCalls(
       };
     }
     if (result.error) {
-      const tool =
-        deps.tools.toolName?.(send.policy.offered, call) ?? call.name;
+      // a closed name: the model may call any name at all
+      const tool = deps.tools.logName?.(send.policy.offered, call) ?? "unknown";
       deps.log.warn("tool failed", {
         chat: send.sessionId,
         tool,

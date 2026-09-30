@@ -7,19 +7,17 @@
 
 import { BadRequest, Conflict } from "../lib/errors.ts";
 
-// Linux's NAME_MAX. The shell's tree walks grow with depth times
-// entries, so a deeper cap lets one command make a /tmp no later command
-// can list or remove within its deadline. Together they keep a name
-// under Linux's PATH_MAX.
+// Linux's NAME_MAX a segment and PATH_MAX, less its NUL, a name. The
+// depth cap bounds the shell's tree walks, linear in the entries: at 64
+// the slowest rm -rf or ls -R of a full /tmp stays near a second.
 export const MAX_SCRATCH_SEGMENT_BYTES = 255;
-export const MAX_SCRATCH_SEGMENTS = 16;
-export const MAX_SCRATCH_NAME_BYTES =
-  MAX_SCRATCH_SEGMENTS * (MAX_SCRATCH_SEGMENT_BYTES + 1) - 1;
+export const MAX_SCRATCH_SEGMENTS = 64;
+export const MAX_SCRATCH_NAME_BYTES = 4095;
 
 // the longest absolute path in the mount, a /tmp path at the cap
 export const MAX_MOUNT_PATH_BYTES = "/tmp/".length + MAX_SCRATCH_NAME_BYTES;
 
-const WORDS = `a /tmp path must be valid Unicode with no NUL and no empty, . or .. part, at most ${MAX_SCRATCH_SEGMENTS} parts of ${MAX_SCRATCH_SEGMENT_BYTES} bytes each`;
+const WORDS = `a /tmp path must be valid Unicode with no NUL and no empty, . or .. part, at most ${MAX_SCRATCH_SEGMENTS} parts of ${MAX_SCRATCH_SEGMENT_BYTES} bytes each and ${MAX_SCRATCH_NAME_BYTES} bytes in all`;
 
 // a name under /tmp, without the root: case-sensitive, any character
 // but NUL, since it is stored as a row's text key
@@ -29,6 +27,7 @@ export function isScratchName(value: unknown): value is string {
   if (value.length > MAX_SCRATCH_NAME_BYTES) return false;
   // a lone surrogate would be stored as U+FFFD, another name
   if (!value.isWellFormed() || value.includes("\u0000")) return false;
+  if (Buffer.byteLength(value) > MAX_SCRATCH_NAME_BYTES) return false;
   const parts = value.split("/");
   return (
     parts.length <= MAX_SCRATCH_SEGMENTS &&

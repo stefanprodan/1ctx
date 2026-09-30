@@ -16,6 +16,7 @@ import {
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
+import { ToolError } from "../lib/errors.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
 
@@ -309,31 +310,47 @@ export function connectionFailed(error: unknown): boolean {
   return false;
 }
 
-function errorText(error: unknown, key: string | null, budget: Budget): string {
+// the words the caller shows, and a fixed phrase for the log, since the
+// server's body and the SDK's messages may carry what the call sent
+function errorText(
+  error: unknown,
+  key: string | null,
+  budget: Budget,
+): ToolError {
   if (budget.over) {
-    return `the MCP server's answer is over ${budgetWords(budget.limit)}`;
+    return new ToolError(
+      `the MCP server's answer is over ${budgetWords(budget.limit)}`,
+      "MCP answer over the limit",
+    );
   }
   let text: string;
+  let logged: string;
   if (
     error instanceof UnauthorizedError ||
     (error instanceof SdkHttpError && error.status === 401)
   ) {
     text = "the MCP server refused the key";
+    logged = text;
   } else if (connectionFailed(error)) {
     text = "the MCP server is offline";
+    logged = text;
   } else if (error instanceof SdkHttpError) {
     text = `the MCP server answered ${error.status}: ${error.message}`;
+    logged = `the MCP server answered ${error.status}`;
   } else if (
     error instanceof SdkError &&
     error.code === SdkErrorCode.RequestTimeout
   ) {
     text = "MCP request timed out";
+    logged = text;
   } else if (error instanceof ProtocolError || error instanceof SdkError) {
     text = error.message;
+    logged = "MCP protocol error";
   } else {
     text = error instanceof Error ? error.message : String(error);
+    logged = "MCP call failed";
   }
-  return cut(scrubText(text, key), MAX_ERROR);
+  return new ToolError(cut(scrubText(text, key), MAX_ERROR), logged);
 }
 
 async function cleanup(
@@ -456,8 +473,10 @@ export async function withClient<T>(
     signal.removeEventListener("abort", close);
     clearTimeout(timer);
   }
+  // a tool's own error answer is already in the caller's words
+  if (!budget.over && failure instanceof ToolError) throw failure;
   if (budget.over || failure !== undefined) {
-    throw new Error(errorText(failure, key, budget));
+    throw errorText(failure, key, budget);
   }
   return value as T;
 }

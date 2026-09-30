@@ -51,12 +51,12 @@ describe("atomic knowledge and scratch commits", () => {
     [
       "long segment",
       `touch /tmp/${"x".repeat(256)}`,
-      "at most 16 parts of 255 bytes",
+      "at most 64 parts of 255 bytes",
     ],
     [
-      "depth 17",
-      "p=/tmp; for i in $(seq 16); do p=$p/d; done; mkdir -p $p; touch $p/f",
-      "at most 16 parts",
+      "depth 65",
+      "p=/tmp; for i in $(seq 64); do p=$p/d; done; mkdir -p $p; touch $p/f",
+      "at most 64 parts",
     ],
     [
       "doc name",

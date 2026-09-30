@@ -11,6 +11,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   utimes,
   writeFile,
 } from "node:fs/promises";
@@ -58,6 +59,8 @@ export interface Fixture {
   files: Record<string, FileValue>;
   /** directories made even when empty */
   dirs?: string[];
+  /** symbolic links, each name to its target, made after the files */
+  links?: Record<string, string>;
   /** the modification time of every file, as an ISO date */
   mtime?: string;
   cases: RecordedCase[];
@@ -136,6 +139,10 @@ export async function record(
       for (const [name, value] of Object.entries(files)) {
         await mkdir(dirname(join(dir, name)), { recursive: true });
         await writeFile(join(dir, name), fileBytes(value));
+      }
+      for (const [name, target] of Object.entries(fixture.links ?? {})) {
+        await mkdir(dirname(join(dir, name)), { recursive: true });
+        await symlink(target, join(dir, name));
       }
       if (fixture.mtime !== undefined) {
         const time = new Date(fixture.mtime);
