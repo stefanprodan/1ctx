@@ -68,8 +68,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   rename leaves it alone. The system prompt names it by its owner.
   Admins make, rename, describe, fill and delete team projects; team
   project names are unique. A project's description is one trimmed line
-  (`isDescription`) that goes into the system prompt after the agent's
-  prompt, only when set. A team project's is required, on create and
+  (`isDescription`) that goes into the system prompt's first line,
+  after the project's name, only when set. A team project's is required, on create and
   on every change (`description is required`); a personal project's
   may be empty. A team project is open to its members and to
   admins. Deleting one takes its chats, keeps their

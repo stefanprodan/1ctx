@@ -71,17 +71,11 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   timeout, one client per call over the snapshot's URL and key name; the
   row is a tool row like any other. Access to an agent grants its MCP
   tools.
-- **The system prompt's order.** The system prompt is the agent's
-  prompt, the part that names the agent, its project and the user or
-  the automation, the skills catalog, the MCP catalog, the servers'
+- **MCP in the system prompt.** The MCP catalog and the servers'
   instructions as the delimited `<mcp_instructions>` block (capped,
-  tags neutered, off per server),
-  the project memory block (a chat's snapshot, a run's live note), the
-  automation memory block, the knowledge block, the date line, the
-  chat's web-off line when applicable, the visualize-off line when
-  applicable, the memory-off line when applicable, the MCP-off line when
-  applicable, the skills-off line when applicable, and last the change
-  note. The policy's `mcpOff` holds the sorted names of disabled linked
+  tags neutered, off per server) follow the skills catalog; the MCP-off
+  line and the change note come after the date line. The whole order is
+  in `docs/sessions.md`. The policy's `mcpOff` holds the sorted names of disabled linked
   servers with otherwise-offered tools, empty for a model without tools;
   `mcpOffLine()` names them. `GET /api/projects/:id/agents` also answers
   `servers`, keyed by agent id, with `{id, name, tools}` from

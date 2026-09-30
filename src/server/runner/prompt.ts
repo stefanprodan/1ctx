@@ -1,15 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The system prompt: the agent's prompt and name, the project and the
-// user with what was written about each, the skills catalog and the date.
-// A run belongs to its project, not to a person, so the run's line takes
-// the user's place.
-// The project comes before the user, who changes with the author of a
-// team chat, and a day, not a time, so the prefix holds until midnight
-// and a provider's cache with it. The skills catalog arrives on the
-// policy's offered snapshot; memory and knowledge are captured once per
-// send so a tool's writes cannot move the prefix between rounds.
+// The system prompt: the agent's name and project, the agent's prompt,
+// the user with what was written about them, the skills catalog and the
+// date. The model learns who it is and where before its instructions, as
+// a harness's prompt opens. A run belongs to its project, not to a
+// person, so the run's line takes the user's place.
+// The user comes after what is fixed per agent and project, since the
+// user changes with the author of a team chat, and a day, not a time, so
+// the prefix holds until midnight and a provider's cache with it. The
+// skills catalog arrives on the policy's offered snapshot; memory and
+// knowledge are captured once per send so a tool's writes cannot move
+// the prefix between rounds.
 
 import {
   KNOWLEDGE,
@@ -105,15 +107,13 @@ export function systemPrompt(
   now: number,
   mcpNote = "",
 ): string {
-  const parts: string[] = [];
+  const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
-  const context = [
-    projectLine(policy),
+  parts.push(
     policy.automation === null
       ? userLine(policy)
       : automationLine(policy.automation),
-  ];
-  parts.push(context.join("\n"));
+  );
   if (policy.offered.skills.block !== "") {
     parts.push(policy.offered.skills.block);
   }
