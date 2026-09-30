@@ -128,7 +128,7 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
       // is escaped backslashes and ends the command
       return flat(
         text(args, "command")
-          .replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1 ")
+          .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
           .split("\n", 1)[0] ?? "",
       );
     case "websearch":

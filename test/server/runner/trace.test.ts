@@ -102,7 +102,8 @@ describe("the trace", () => {
     expect(first("echo a\\\\\nrm -rf x")).toBe("echo a\\\\");
     expect(first("a \\\nb")).toBe("a b");
     expect(first("a \\\\\\\nb")).toBe("a \\\\ b");
-    expect(first("a\\\r\nb\\\n\\\nc\nd")).toBe("a b c");
+    expect(first("a\\\r\nrm -rf x")).toBe("a\\");
+    expect(first("b\\\n\\\nc\nd")).toBe("b c");
     expect(first("\\\nls\nx")).toBe("ls");
   });
 
