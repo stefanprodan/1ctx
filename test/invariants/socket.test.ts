@@ -354,6 +354,8 @@ describe("the socket", () => {
           sendId: detail.send.id,
           messageId: detail.messages[1].id,
         }),
+        // the chat's queue as the queue frame carries it
+        queue: { revision: detail.session.revision, rows: [] },
       },
     ]);
 
@@ -842,6 +844,7 @@ describe("the envelope row read", () => {
       visibleProjectIds: () => [],
       sessionProject: () => null,
       live: () => null,
+      queue: () => ({ revision: 0, rows: [] }),
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -871,6 +874,7 @@ describe("the envelope row read", () => {
       visibleProjectIds: () => [],
       sessionProject: () => null,
       live: () => null,
+      queue: () => ({ revision: 0, rows: [] }),
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -896,6 +900,7 @@ describe("the envelope row read", () => {
       visibleProjectIds: () => [],
       sessionProject: () => null,
       live: () => null,
+      queue: () => ({ revision: 0, rows: [] }),
       envelopeRow() {
         throw new Error("disk I/O error");
       },

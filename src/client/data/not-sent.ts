@@ -73,7 +73,8 @@ export async function discardNotSent(): Promise<void> {
   const body: DiscardNotSentRequest = { ids };
   await api<DiscardNotSentResponse>("/api/me/not-sent", "DELETE", body);
   notSent.value = (notSent.value ?? []).filter((row) => !ids.includes(row.id));
-  await flight.run(read);
+  // the notSent events of the same delete ask too: one flight folds them
+  flight.ask();
 }
 
 export function onNotSentSocket(ev: SocketEvent): void {

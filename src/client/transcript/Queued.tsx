@@ -73,7 +73,8 @@ function QueuedRow({
         <span class="transcript-when">{clock(row.queuedAt)}</span>
       </div>
       <div class="card transcript-card transcript-queued-card">
-        {row.text}
+        {/* a frame carries a long text cut; Edit reads it whole */}
+        {row.cut ? `${row.text}…` : row.text}
         {row.uploads > 0 && (
           <span class="transcript-queued-files">
             <Icon name="clip" size={12} />

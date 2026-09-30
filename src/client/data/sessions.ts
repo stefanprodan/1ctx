@@ -313,8 +313,11 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   if (ev.session.status !== "running") retrying.value = null;
   live.value = map;
   onQueueSocket(ev);
-  // who archived it and until when are the detail's alone
-  if (!held.session.archived && ev.session.archived) refetch();
+  // who archived it and until when are the detail's alone, and so are
+  // the messages of a turn too large for the envelope
+  if (ev.messagesCut || (!held.session.archived && ev.session.archived)) {
+    refetch();
+  }
 }
 
 // one detail answers a gap, an overflow, a frame ahead of the buffer
@@ -456,8 +459,10 @@ export function onSocket(ev: SocketEvent): void {
       break;
     }
     case "watched":
+      onQueueSocket(ev);
       onWatched(ev);
       break;
+    case "queue":
     case "notSent":
       onQueueSocket(ev);
       break;

@@ -366,6 +366,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessionProject: (principal, id) => sessions.sessionProject(principal, id),
     envelopeRow: (sessionId) => sessions.envelopeRow(sessionId),
     live: (sessionId) => runner.live(sessionId),
+    queue: (sessionId) => sessions.queueFrame(sessionId),
   });
   const runner = runnerArea({
     db,

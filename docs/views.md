@@ -32,7 +32,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   mounted (`watchNotSent()`), the user's `notSent` event (sent to them
   alone when one of their rows turned not sent or went, the sweep
   included), a listed chat's delete and a revocation read it again
-  through one `Flight`, so a burst costs one trailing read.
+  through one `Flight`, so a burst costs one trailing read; Discard all
+  asks that flight too, folding into it the `notSent` events it causes.
 - **Pages by cursor.** A page is `STREAM_LIMIT`, 50 rows: the server
   reads one more and answers `next`, the cursor of the last row sent,
   or null. `sessions/cursor.ts` holds both shapes, the stream's
@@ -129,15 +130,20 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   is the row's failure line, never a word to reload.
 - **The queue lands by revision, with no read.** The held queue is two
   parts (`data/queued-rows.ts`, kept by `data/session-queue.ts`): the
-  queued rows every member sees, which a queue change's envelope
-  carries as `queued` (a start's envelope carries its user messages and
-  the queue left in one frame, so the rows turn into messages with no
-  flicker and no duplicate), and the user's own not-sent rows, which
-  only their `notSent` event carries. A write's answer (`data/queued.ts`:
-  the 202, the edit, the delete) is the caller's whole queue at its
-  commit's revision. Each part is taken only from a revision above the
-  one it holds, so a late answer never puts back a row a start took and
-  a detail read before a change never undoes it.
+  queued rows every member sees, which the chat's `queue` frame (to its
+  watchers alone) and a watch's `watched` answer carry, each text a
+  preview marked `cut` past `QUEUED_PREVIEW` and drawn with an ellipsis,
+  and the user's own not-sent rows, which only their `notSent` event
+  carries. A start's frame (`turn`) is held until the envelope that
+  brings the user messages the rows became, and both land in one task,
+  so the rows turn into messages with no flicker and no duplicate; an
+  envelope with `messagesCut` reads the detail, which brings both. Edit
+  and Send again read a cut row whole first (`readQueued()`). A write's
+  answer (`data/queued.ts`: the 202, the edit, the delete) is the
+  caller's whole queue at its commit's revision. Each part is taken only
+  from a revision above the one it holds, so a late answer never puts
+  back a row a start took and a detail read before a change never
+  undoes it.
 
 ## The composer
 
@@ -155,9 +161,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   or a navigation keeps editing and never leaves its text as a plain
   draft. The draft's files and switch flips stay for the next message,
   since an edit changes the text alone. A 409, or the row leaving the
-  queue while no save is on its way, ends the edit with its text kept
-  and the set-aside text after it, with words that say so. The queued
-  row's files stay with it and are not handed back.
+  queue while no save or Remove here is on its way, ends the edit with
+  its text kept and the set-aside text after it, with words that say
+  so, "The message was not sent." for a row that turned not sent. A
+  Remove here marks its row (`removing`) before the delete is sent. The
+  queued row's files stay with it and are not handed back.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under

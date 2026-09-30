@@ -31,7 +31,12 @@ export const EDIT_LOST =
   "The message started or changed before the edit. The text is kept here.";
 export const EDIT_GONE =
   "The message left the queue before the edit. The text is kept here.";
+export const EDIT_NOT_SENT = "The message was not sent. The text is kept here.";
 export const EDIT_REMOVED = "The message was removed. The edit is closed.";
+
+// the rows a Remove here is deleting: the edit open on one waits for the
+// Remove's own words, not the words for a row gone elsewhere
+export const removing = new Set<string>();
 
 // taken by the composer of its chat
 export const handoff = signal<Handoff | null>(null);

@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A chat's queue in the client: the answers and the envelopes carry the
-// queue and land by revision with no read, a start swaps the rows for
-// their messages in one frame, a write's late answer never puts a row
+// A chat's queue in the client: the answers and the watchers' frames
+// carry the queue and land by revision with no read, a start swaps the
+// rows for their messages at once, a write's late answer never puts a row
 // back, the author's own not-sent rows come on their own event, the
 // author alone acts on a row, and an edit keeps the draft apart, lives
 // in the draft across a reload and ends plainly when it cannot land.
@@ -104,6 +104,7 @@ function queued(changes: Partial<QueuedMessage> = {}): QueuedMessage {
     id: "q1",
     author: { id: "u1", username: "casey" },
     text: "and the logs too",
+    cut: false,
     uploads: 0,
     state: "queued",
     reason: null,
@@ -124,11 +125,11 @@ const userMessage = (id: string): Message =>
     content: "and the logs too",
   }) as Message;
 
-// an envelope of the chat at a revision, with the queue it carries
+// an envelope of the chat at a revision, with the rows it wrote
 const envelope = (
   revision: number,
-  queue?: QueuedMessage[],
   messages: Message[] = [],
+  extra: { messagesCut?: true } = {},
 ): SocketEvent => ({
   type: "session",
   row: null,
@@ -136,8 +137,15 @@ const envelope = (
   session: summary({ revision }),
   messages,
   send: null,
-  ...(queue === undefined ? {} : { queued: queue }),
+  ...extra,
 });
+
+// the watchers' queue frame at a revision; turn when a start made it
+const frame = (
+  revision: number,
+  rows: QueuedMessage[],
+  turn = false,
+): SocketEvent => ({ type: "queue", sessionId: "s1", revision, turn, rows });
 
 const ids = () => session.value?.queued.map((row) => row.id);
 
@@ -219,25 +227,26 @@ describe("the queue on screen", () => {
     expect(sending.value).toBe(false);
   });
 
-  test.serial(
-    "an envelope's queue replaces the rows with no read",
-    async () => {
-      await open([queued()]);
-      const two = queued({ id: "q2", author: { id: "u2", username: "ana" } });
-      onSocket(envelope(2, [queued(), two]));
-      // a rename carries no queue and leaves it alone
-      onSocket(envelope(3));
-      await settle();
-      expect(calls).toEqual([]);
-      expect(ids()).toEqual(["q1", "q2"]);
-    },
-  );
+  test.serial("a queue frame replaces the rows with no read", async () => {
+    await open([queued()]);
+    const two = queued({ id: "q2", author: { id: "u2", username: "ana" } });
+    onSocket(frame(2, [queued(), two]));
+    // an envelope carries no queue and leaves it alone
+    onSocket(envelope(3));
+    await settle();
+    expect(calls).toEqual([]);
+    expect(ids()).toEqual(["q1", "q2"]);
+  });
 
   test.serial(
     "a start swaps the rows for their messages in one frame",
     async () => {
       await open([queued()]);
-      onSocket(envelope(2, [], [userMessage("m9")]));
+      // the start's frame comes first and waits for its envelope
+      onSocket(frame(2, [], true));
+      expect(ids()).toEqual(["q1"]);
+      expect(session.value?.messages).toEqual([]);
+      onSocket(envelope(2, [userMessage("m9")]));
       expect(ids()).toEqual([]);
       expect(session.value?.messages.map((m) => m.id)).toEqual(["m9"]);
       await settle();
@@ -262,7 +271,8 @@ describe("the queue on screen", () => {
             );
         });
       const edit = editQueued("s1", queued(), "x");
-      onSocket(envelope(3, [], [userMessage("m9")]));
+      onSocket(frame(3, [], true));
+      onSocket(envelope(3, [userMessage("m9")]));
       release();
       await edit;
       expect(calls.map((c) => c.body)).toEqual([{ message: "x", revision: 1 }]);
@@ -270,6 +280,43 @@ describe("the queue on screen", () => {
       expect(session.value?.messages).toHaveLength(1);
     },
   );
+
+  test.serial("a watch's answer brings the queue by revision", async () => {
+    answer = () =>
+      Response.json(detail({ session: summary({ status: "done" }) }));
+    await loadSession("s1");
+    const watched = (revision: number, rows: QueuedMessage[]): SocketEvent => ({
+      type: "watched",
+      sessionId: "s1",
+      live: null,
+      queue: { revision, rows },
+    });
+    onSocket(watched(2, [queued()]));
+    expect(ids()).toEqual(["q1"]);
+    // an older one changes nothing
+    onSocket(watched(1, []));
+    expect(ids()).toEqual(["q1"]);
+  });
+
+  test.serial("a start too large for its envelope reads the chat", async () => {
+    await open([queued()]);
+    onSocket(frame(2, [], true));
+    answer = () =>
+      Response.json(
+        detail({
+          session: summary({ revision: 2 }),
+          messages: [userMessage("m9")],
+        }),
+      );
+    onSocket(envelope(2, [], { messagesCut: true }));
+    // the rows stay until the detail brings the messages with them
+    expect(ids()).toEqual(["q1"]);
+    await settle();
+    await settle();
+    expect(calls.map((c) => c.url)).toEqual(["/api/sessions/s1"]);
+    expect(ids()).toEqual([]);
+    expect(session.value?.messages.map((m) => m.id)).toEqual(["m9"]);
+  });
 
   test.serial("a remove names the revision and takes the answer", async () => {
     await open([queued()]);
@@ -289,8 +336,8 @@ describe("the queue on screen", () => {
     "the user's not-sent rows come on their own event, never the envelope",
     async () => {
       await open([queued(), queued({ id: "q2", queuedAt: 40 })]);
-      // q1 turned not sent: the shared envelope drops it
-      onSocket(envelope(2, [queued({ id: "q2", queuedAt: 40 })]));
+      // q1 turned not sent: the watchers' frame drops it
+      onSocket(frame(2, [queued({ id: "q2", queuedAt: 40 })]));
       const late = queued({ state: "not-sent", reason: "expired" });
       onSocket({
         type: "notSent",
@@ -433,11 +480,20 @@ describe("an edit", () => {
     expect(state.saving.value).toBe(false);
   });
 
-  test("a row gone ends it, unless a save or a Remove here answers", () => {
+  test("a row gone or not sent ends it, unless a save or a Remove answers", () => {
     const gone: QueuedMessage[] = [];
-    expect(editGone(open, [queued()], false, null)).toBe(false);
-    expect(editGone(open, gone, false, null)).toBe(true);
-    expect(editGone(open, gone, true, null)).toBe(false);
+    expect(editGone(open, [queued()], false, null)).toBeNull();
+    expect(editGone(open, gone, false, null)).toBe("gone");
+    // a row that expired while it was edited says so
+    expect(
+      editGone(
+        open,
+        [queued({ state: "not-sent", reason: "expired" })],
+        false,
+        null,
+      ),
+    ).toBe("not-sent");
+    expect(editGone(open, gone, true, null)).toBeNull();
     expect(
       editGone(open, gone, false, {
         kind: "close",
@@ -445,7 +501,9 @@ describe("an edit", () => {
         id: "q1",
         words: EDIT_REMOVED,
       }),
-    ).toBe(false);
+    ).toBeNull();
+    // the queue frame of a Remove here landing before its answer
+    expect(editGone(open, gone, false, null, new Set(["q1"]))).toBeNull();
   });
 });
 
@@ -479,7 +537,41 @@ describe("the row's actions in a chat", () => {
       expect(handoff.value).toBeNull();
       answer = () => Response.json({ queue: [], revision: 2 });
       await queueActions("s1", false).onSendAgain!(row);
+      // read after the reset above
+      expect(handoff.peek() as unknown).toEqual({
+        kind: "again",
+        sessionId: "s1",
+        text: "and the logs too",
+      });
+    },
+  );
+
+  test.serial(
+    "a row a frame carried cut is read whole for Edit and Send again",
+    async () => {
+      const cut = queued({ text: "and the", cut: true });
+      answer = (_url, method) =>
+        method === "GET"
+          ? Response.json({ queued: queued({ revision: 2 }) })
+          : Response.json({ queue: [], revision: 3 });
+      await queueActions("s1", false).onEdit(cut);
       expect(handoff.value).toEqual({
+        kind: "edit",
+        sessionId: "s1",
+        row: queued({ revision: 2 }),
+      });
+      handoff.value = null;
+      await queueActions("s1", false).onSendAgain!({
+        ...cut,
+        state: "not-sent",
+      });
+      expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+        "GET /api/sessions/s1/queued/q1",
+        "GET /api/sessions/s1/queued/q1",
+        "DELETE /api/sessions/s1/queued/q1",
+      ]);
+      // read past the reset above, which narrows the signal's type
+      expect(handoff.peek() as unknown).toEqual({
         kind: "again",
         sessionId: "s1",
         text: "and the logs too",
@@ -490,8 +582,23 @@ describe("the row's actions in a chat", () => {
   test.serial("Remove of the row open for an edit closes it", async () => {
     await open([queued()]);
     editing.value = { sessionId: "s1", id: "q1", revision: 1, before: "" };
-    answer = () => Response.json({ queue: [], revision: 2 });
-    await queueActions("s1", false).onRemove(queued());
+    const open1 = editing.value;
+    let release = () => {};
+    answer = () =>
+      new Promise<Response>((resolve) => {
+        release = () => resolve(Response.json({ queue: [], revision: 3 }));
+      });
+    const removed = queueActions("s1", false).onRemove(queued());
+    await settle();
+    // the queue frame lands before the answer: the edit is not ended as
+    // a row gone elsewhere
+    onSocket(frame(2, []));
+    expect(ids()).toEqual([]);
+    expect(
+      editGone(open1, session.value?.queued, false, handoff.value),
+    ).toBeNull();
+    release();
+    await removed;
     expect(handoff.value).toEqual({
       kind: "close",
       sessionId: "s1",

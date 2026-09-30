@@ -25,8 +25,8 @@ export type BusEvents = {
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
-  // the stream's last line when the transaction wrote one, and the
-  // chat's queued rows when it changed the queue
+  // the stream's last line when the transaction wrote one; messagesCut
+  // when the rows were too large to carry
   "session.changed": {
     projectId: string;
     session: SessionSummary;
@@ -34,10 +34,19 @@ export type BusEvents = {
     removedMessageIds?: string[];
     send: SendSummary | null;
     last?: LastLine;
-    queued?: QueuedMessage[];
+    messagesCut?: true;
+  };
+  // a chat's queued rows changed: the rows, each text a preview, for
+  // the chat's watchers alone; turn when the commit started a turn
+  "queue.changed": {
+    projectId: string;
+    sessionId: string;
+    revision: number;
+    turn: boolean;
+    rows: QueuedMessage[];
   };
   // a user's not-sent rows in a chat changed: the rows as they are now,
-  // for that user's connections alone
+  // each text a preview, for that user's connections alone
   "queue.mine": {
     userId: string;
     projectId: string;

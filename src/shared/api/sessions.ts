@@ -100,6 +100,10 @@ export type QueueState = { queue: QueuedMessage[]; revision: number };
 // turn is running: the message waits and starts when the reply ends
 export type QueuedResponse = QueueState & { queued: QueuedMessage };
 
+// GET /api/sessions/:id/queued/:queuedId: the author's row whole, for an
+// Edit or a Send again of a row a socket frame carried cut
+export type QueuedRowResponse = { queued: QueuedMessage };
+
 // PATCH /api/sessions/:id/queued/:queuedId: the author's new text, with
 // the revision they saw; 409 once it started or changed. Answers the
 // row as QueuedResponse

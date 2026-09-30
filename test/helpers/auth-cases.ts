@@ -714,6 +714,12 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     // the author's alone once the chat is seen; no chat here
+    method: "GET",
+    path: "/api/sessions/:id/queued/:queuedId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    // the author's alone once the chat is seen; no chat here
     method: "PATCH",
     path: "/api/sessions/:id/queued/:queuedId",
     body: { message: "hi", revision: 0 },

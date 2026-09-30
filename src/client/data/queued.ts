@@ -13,6 +13,7 @@
 import type {
   EditQueuedRequest,
   QueuedResponse,
+  QueuedRowResponse,
   QueueState,
   RemoveQueuedRequest,
   SendMessageRequest,
@@ -61,6 +62,16 @@ export async function sendMessage(
 
 const at = (sessionId: string, id: string) =>
   `/api/sessions/${encodeURIComponent(sessionId)}/queued/${encodeURIComponent(id)}`;
+
+// the author's row whole, where a socket frame carried its text cut
+export async function readQueued(
+  sessionId: string,
+  row: QueuedMessage,
+): Promise<QueuedMessage> {
+  if (!row.cut) return row;
+  const { queued } = await api<QueuedRowResponse>(at(sessionId, row.id));
+  return queued;
+}
 
 export async function editQueued(
   sessionId: string,

@@ -23,6 +23,7 @@ import { readDraft, writeDraftEdit } from "./draft.ts";
 import {
   EDIT_GONE,
   EDIT_LOST,
+  EDIT_NOT_SENT,
   EDIT_OPEN,
   EDITING,
   type Editing,
@@ -30,6 +31,7 @@ import {
   type Handoff,
   handoff,
   merged,
+  removing,
   takeHandoff,
 } from "./handoff.ts";
 
@@ -67,18 +69,22 @@ function endEdit(box: Box, open: Editing, words: string): void {
   box.failure.value = words;
 }
 
-// an open edit whose row left the queue, read when the effect runs: a
-// save on its way answers for itself, and a Remove here closes the edit
-// with its own words
+// why an open edit can no longer land, read when the effect runs: its
+// row turned not sent, or left the queue. A save on its way answers
+// for itself, and a Remove here closes the edit with its own words,
+// from before its delete is sent
 export function editGone(
   open: Editing,
   queued: readonly QueuedMessage[] | undefined,
   saving: boolean,
   pending: Handoff | null,
-): boolean {
-  if (queued === undefined || saving) return false;
-  if (pending?.kind === "close" && pending.id === open.id) return false;
-  return !queued.some((row) => row.id === open.id && row.state === "queued");
+  deleting: ReadonlySet<string> = removing,
+): "not-sent" | "gone" | null {
+  if (queued === undefined || saving || deleting.has(open.id)) return null;
+  if (pending?.kind === "close" && pending.id === open.id) return null;
+  const row = queued.find((r) => r.id === open.id);
+  if (row?.state === "queued") return null;
+  return row === undefined ? "gone" : "not-sent";
 }
 
 // the composer's side of an edit; answers the signal a save holds
@@ -119,8 +125,10 @@ export function useHandoff(
   }, [chat, next, key, text, failure, input]);
   useEffect(() => {
     const now = chat === null ? null : editOf(chat);
-    if (now !== null && editGone(now, queued, saving.value, handoff.value)) {
-      endEdit(box, now, EDIT_GONE);
+    if (now === null) return;
+    const why = editGone(now, queued, saving.value, handoff.value);
+    if (why !== null) {
+      endEdit(box, now, why === "gone" ? EDIT_GONE : EDIT_NOT_SENT);
     }
   });
   return saving;

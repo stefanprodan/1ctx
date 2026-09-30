@@ -11,6 +11,7 @@ import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
+import type { QueueFrame } from "../../shared/socket.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
@@ -31,7 +32,7 @@ import {
 } from "./activity.ts";
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
-import { queueChanged } from "./queued.ts";
+import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
 import {
   type AccessPort,
@@ -82,6 +83,7 @@ export {
   type QueueLoad,
   QueueStore,
   queueChanged,
+  queueFrameEvent,
   type WaitingCursor,
 } from "./queued.ts";
 export { queueAnswer } from "./queued-routes.ts";
@@ -150,6 +152,8 @@ export type Sessions = {
   // not-sent messages past their keeping gone, each author's open
   // views told; how many went
   sweepNotSent(now: number): number;
+  // the chat's queued rows as previews, at its revision, for a watch
+  queueFrame(sessionId: string): QueueFrame;
   // end what a crash left running, before the first request; how many
   // sessions were touched
   repair(): number;
@@ -219,8 +223,14 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
     dropQueued: (projectId, userId) =>
       [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
-        (sessionId) => queueChanged(deps.db, store, sessionId),
+        (sessionId) => queueChanged(deps.db, sessionId, { shared: true }),
       ),
+    queueFrame(sessionId) {
+      return {
+        revision: store.byId(sessionId)?.revision ?? 0,
+        rows: chatQueue(deps.db, sessionId, null, { cut: true }),
+      };
+    },
     sweepNotSent(now) {
       return transact(deps.db, () => {
         const gone = store.queue.sweep(now);
@@ -231,7 +241,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         return {
           result: gone.length,
           events: [...byChat].flatMap(([chat, authors]) =>
-            queueChanged(deps.db, store, chat, authors),
+            queueChanged(deps.db, chat, { shared: false, authors }),
           ),
         };
       });

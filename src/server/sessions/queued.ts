@@ -8,17 +8,15 @@
 
 import type { NotSentRow } from "../../shared/api/sessions.ts";
 import type { CapabilityChange } from "../../shared/capabilities.ts";
-import type {
-  QueuedMessage,
-  SendSummary,
+import {
+  QUEUED_PREVIEW,
+  type QueuedMessage,
 } from "../../shared/contracts/session.ts";
 import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { newId } from "../lib/ids.ts";
-import { archivedEvent } from "./archive.ts";
 import { lineFrom } from "./parse.ts";
-import type { SessionRow } from "./rows.ts";
 
 // a chat's queue starts as one turn, so it holds at most what one turn
 // opens with
@@ -72,10 +70,26 @@ const row = (raw: RawQueued): QueuedRow => ({
   changedAt: raw.changed_at,
 });
 
-export const onWire = (queued: QueuedRow, username: string): QueuedMessage => ({
+// the text cut at QUEUED_PREVIEW characters, never inside a surrogate
+// pair
+function preview(text: string): { text: string; cut: boolean } {
+  if (text.length <= QUEUED_PREVIEW) return { text, cut: false };
+  let end = QUEUED_PREVIEW;
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end--;
+  return { text: text.slice(0, end), cut: true };
+}
+
+// a row on the wire: whole for the detail and an answer, a preview on
+// a socket frame, which goes to every watcher and must stay small
+export const onWire = (
+  queued: QueuedRow,
+  username: string,
+  cut = false,
+): QueuedMessage => ({
   id: queued.id,
   author: { id: queued.authorId, username },
-  text: queued.text,
+  ...(cut ? preview(queued.text) : { text: queued.text, cut: false }),
   uploads: queued.uploads.length,
   state: queued.state,
   reason: queued.reason,
@@ -85,12 +99,12 @@ export const onWire = (queued: QueuedRow, username: string): QueuedMessage => ({
 
 // a chat's rows on the wire, oldest first: every queued one, and the
 // viewer's not sent (none for a null viewer); mine: the viewer's not
-// sent alone
+// sent alone; cut: previews, for a socket frame
 export function chatQueue(
   db: Db,
   sessionId: string,
   viewerId: string | null,
-  mine = false,
+  { mine = false, cut = false }: { mine?: boolean; cut?: boolean } = {},
 ): QueuedMessage[] {
   const which = mine
     ? "q.state = 'not-sent' and q.author_id = ?"
@@ -105,46 +119,64 @@ export function chatQueue(
        order by q.queued_at, q.rowid`,
     )
     .all(sessionId, viewerId ?? "")
-    .map((raw) => onWire(row(raw), raw.username));
+    .map((raw) => onWire(row(raw), raw.username, cut));
 }
 
-type Sessions = {
-  byId(id: string): SessionRow | null;
-  lastSend(id: string): SendSummary | null;
-};
+const chatOf = (db: Db, sessionId: string) =>
+  db
+    .query<{ project_id: string; revision: number }, [string]>(
+      "select project_id, revision from sessions where id = ?",
+    )
+    .get(sessionId);
+
+// the chat's queued rows for its watchers, at its revision now; turn
+// when the commit that made it started a turn from them
+export function queueFrameEvent(
+  db: Db,
+  sessionId: string,
+  turn: boolean,
+): BusEvent[] {
+  const chat = chatOf(db, sessionId);
+  if (chat === null) return [];
+  return [
+    {
+      type: "queue.changed",
+      data: {
+        projectId: chat.project_id,
+        sessionId,
+        revision: chat.revision,
+        turn,
+        rows: chatQueue(db, sessionId, null, { cut: true }),
+      },
+    },
+  ];
+}
 
 // in the caller's transaction: the chat's revision bumped, never its
-// activity, and one envelope that carries the chat's queued rows, so a
-// member's tab replaces its own with no read; then, to each author
-// named, their not-sent rows in the chat at that revision, which only
-// they may see. Nothing for a chat gone
+// activity, and no project-wide envelope, since nothing a list shows
+// moved. When the queued rows changed (shared), they go to the chat's
+// watchers as previews; to each author named, their own not-sent rows
+// in the chat, which only they may see. Nothing for a chat gone
 export function queueChanged(
   db: Db,
-  store: Sessions,
   sessionId: string,
-  authors: Iterable<string> = [],
+  { shared, authors = [] }: { shared: boolean; authors?: Iterable<string> },
 ): BusEvent[] {
   db.query("update sessions set revision = revision + 1 where id = ?").run(
     sessionId,
   );
-  const session = store.byId(sessionId);
-  if (session === null) return [];
-  const shared = archivedEvent(session, store.lastSend(session.id));
-  const events: BusEvent[] = [
-    {
-      type: "session.changed",
-      data: { ...shared.data, queued: chatQueue(db, sessionId, null) },
-    },
-  ];
+  const chat = chatOf(db, sessionId);
+  if (chat === null) return [];
+  const events = shared ? queueFrameEvent(db, sessionId, false) : [];
   for (const userId of new Set(authors)) {
     events.push({
       type: "queue.mine",
       data: {
         userId,
-        projectId: session.projectId,
+        projectId: chat.project_id,
         sessionId,
-        revision: session.revision,
-        rows: chatQueue(db, sessionId, userId, true),
+        revision: chat.revision,
+        rows: chatQueue(db, sessionId, userId, { mine: true, cut: true }),
       },
     });
   }
@@ -395,17 +427,24 @@ export class QueueStore {
       }));
   }
 
-  // the author's not-sent rows named gone, any other id passed over;
-  // the chats they were in
-  discardNotSent(userId: string, ids: readonly string[]): string[] {
+  // the author's not-sent rows named gone, in the projects they see as
+  // Home lists them, any other id passed over; the chats they were in
+  discardNotSent(
+    userId: string,
+    ids: readonly string[],
+    projectIds: readonly string[],
+  ): string[] {
     return this.db
-      .query<{ session_id: string }, [string, string]>(
+      .query<{ session_id: string }, [string, string, string]>(
         `delete from queued_messages
          where author_id = ? and state = 'not-sent'
            and id in (select value from json_each(?))
+           and exists (select 1 from sessions s
+             where s.id = queued_messages.session_id
+               and s.project_id in (select value from json_each(?)))
          returning session_id`,
       )
-      .all(userId, JSON.stringify(ids))
+      .all(userId, JSON.stringify(ids), JSON.stringify(projectIds))
       .map((r) => r.session_id);
   }
 

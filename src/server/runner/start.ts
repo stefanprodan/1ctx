@@ -16,7 +16,11 @@ import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
-import { refuseArchived, type SessionRow } from "../sessions/index.ts";
+import {
+  queueFrameEvent,
+  refuseArchived,
+  type SessionRow,
+} from "../sessions/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
 import { applyChanges } from "./turn.ts";
@@ -58,6 +62,11 @@ export type StartFields = {
   // the queued messages the turn opens with, taken by id and revision
   claim?: readonly QueuedClaim[];
 };
+
+// the user messages a start's envelope carries whole, half the socket's
+// backpressure limit, so no frame of a turn of queued messages closes a
+// tab; past it the envelope carries the reply alone and says so
+export const START_FRAME_BYTES = 512 * 1024;
 
 export type QueuedClaim = { id: string; revision: number };
 
@@ -184,19 +193,24 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       status: "running",
       now,
     })!;
+    // a turn of queued messages can outgrow a socket frame: its tabs then
+    // read the detail
+    const cut = Buffer.byteLength(JSON.stringify(users)) > START_FRAME_BYTES;
     return {
       result: { session, users, reply, send, previousMcpDigest },
       events: [
+        // the queue left goes first to the chat's watchers, which hold it
+        // until the frame below brings the messages the rows became
+        ...(fields.claim === undefined
+          ? []
+          : queueFrameEvent(deps.db, base.id, true)),
         envelope(
           session,
-          [...users, reply],
+          cut ? [reply] : [...users, reply],
           send,
           removedMessageIds,
           lastLine(users.at(-1)!, lastAuthor),
-          // the rows taken leave every tab with the messages they became
-          fields.claim === undefined
-            ? undefined
-            : deps.sessions.queue.ofChat(base.id, null),
+          cut,
         ),
       ],
     };

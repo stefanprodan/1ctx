@@ -173,7 +173,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       const authors = [...notSent.values()].flat().map((row) => row.authorId);
       const events =
         dropped > 0 || [...turned.values()].some((n) => n > 0)
-          ? queueChanged(db, sessions, sessionId, authors)
+          ? queueChanged(db, sessionId, { shared: true, authors })
           : [];
       return { result: { dropped, turned }, events };
     });

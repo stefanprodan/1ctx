@@ -66,17 +66,28 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   (16, `MAX_TURN_MESSAGES`) queued ones, each past it a 429 with the
   count. A queued row holds no place in any cap. Every change to a row
   (queue, edit, remove, start, not sent, discard, sweep) bumps the
-  session's revision alone, with one envelope whose `queued` is the
-  chat's queued rows, every member's (`queueChanged()`; the start's
-  envelope carries its user messages and the queue left, in one frame),
-  so a tab replaces its rows by that revision with no read. A not-sent
-  row is its author's alone and never rides on it: a change to one
-  (turned, removed, discarded, swept) also publishes `queue.mine`, the
-  author's not-sent rows in the chat at that revision, which the socket
-  sends as `notSent` to that user's connections holding the project.
-  A write's answer (the 202, PATCH, DELETE) is the caller's queue with
-  the revision its commit made (`QueueState`), which the client takes
-  only when newer than the queue it holds;
+  session's revision alone and publishes no project-wide envelope,
+  since nothing a list shows moved (`queueChanged()`). A change to the
+  queued rows publishes `queue.changed`: every member's queued rows at
+  that revision, each text a preview of `QUEUED_PREVIEW` characters
+  with `cut` set, which the socket sends as a `queue` frame to the
+  chat's watchers alone, as the stream frames go, and a watch answers
+  the same rows in `watched`; so a frame stays small whatever the rows
+  hold. A start's transaction publishes the queue left (`turn`) right
+  before its envelope, and the client holds it until that envelope
+  brings the user messages the rows became. A start whose user messages
+  pass `START_FRAME_BYTES` sends its envelope with the reply alone and
+  `messagesCut`, and a tab showing the chat reads its detail. A not-sent
+  row is its author's alone: a change to one (turned, removed,
+  discarded, swept) publishes `queue.mine`, the author's not-sent rows
+  in the chat as previews, which the socket sends as `notSent` to that
+  user's connections holding the project; a change to their not-sent
+  rows alone (a Discard, Discard all, the sweep) publishes nothing else.
+  `GET /api/sessions/:id/queued/:queuedId` is the author's row whole,
+  for an Edit or a Send again of a row a frame carried cut. A write's
+  answer (the 202, PATCH, DELETE) is the caller's whole queue with the
+  revision its commit made (`QueueState`), which the client takes only
+  when newer than the queue it holds;
   the detail's `queued` lists the chat's queued rows for every viewer
   and not-sent ones to their author only, oldest first by `queued_at`
   then `rowid`, which an edit never moves.
@@ -128,9 +139,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   row that started or changed is a 409, and an edit takes only a
   queued row. `GET /api/me/not-sent` is Home's list, the caller's
   not-sent rows in projects they see, and `DELETE /api/me/not-sent`
-  discards the ones its `ids` name that are the caller's and not sent
-  (at most `MAX_DISCARD_IDS`). The hourly sweep (`sweepNotSent()`)
-  deletes a not-sent row `NOT_SENT_KEPT_MS` (7 days) after it turned.
+  discards the ones its `ids` name that are the caller's, not sent, and
+  in those same projects (at most `MAX_DISCARD_IDS`). The hourly sweep
+  (`sweepNotSent()`) deletes a not-sent row `NOT_SENT_KEPT_MS` (7 days)
+  after it turned.
 - **An envelope's row is one statement, read after the commit.**
   `envelopeRow()` (`sessions/stream.ts`) answers what `streamRows()`
   does for one session: it seeks the session by id and walks only that

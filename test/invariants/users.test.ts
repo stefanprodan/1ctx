@@ -560,6 +560,7 @@ describe("admin users", () => {
           type: "watched",
           sessionId: chat.id,
           live: null,
+          queue: { revision: expect.any(Number), rows: [] },
         });
         expect(seen).toContainEqual({
           type: "access.changed",

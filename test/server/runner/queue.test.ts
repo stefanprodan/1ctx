@@ -10,7 +10,9 @@ import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { WAITING_PAGE } from "../../../src/server/runner/queue.ts";
+import { MAX_QUEUED_PER_CHAT } from "../../../src/server/sessions/index.ts";
 import type { QueuedMessage } from "../../../src/shared/contracts/session.ts";
+import { MAX_MESSAGE_BYTES } from "../../../src/shared/words.ts";
 import { hashPassword, testApp } from "../../helpers/app.ts";
 import { createAutomation, settleRun } from "../../helpers/automations.ts";
 import {
@@ -60,6 +62,25 @@ async function queue(
   return (await response.json()).queued;
 }
 
+// the reasons a chat's author was told alone while the call ran
+async function toldOf(
+  sessionId: string,
+  call: () => Promise<void>,
+): Promise<(string | null)[][]> {
+  const told: (string | null)[][] = [];
+  const unsubscribe = subscribe((event) => {
+    if (event.type === "queue.mine" && event.data.sessionId === sessionId) {
+      told.push(event.data.rows.map((row) => row.reason));
+    }
+  }, silent);
+  try {
+    await call();
+  } finally {
+    unsubscribe();
+  }
+  return told;
+}
+
 const rows = (chat: ChatApp, sessionId: string) =>
   chat.app.db
     .query<{ content: string; state: string; reason: string | null }, [string]>(
@@ -105,8 +126,10 @@ describe("the queue behind a busy chat", () => {
         const events: BusEvent[] = [];
         const unsubscribe = subscribe((event) => {
           if (
-            event.type === "session.changed" &&
-            event.data.session.id === sessionId
+            (event.type === "session.changed" &&
+              event.data.session.id === sessionId) ||
+            (event.type === "queue.changed" &&
+              event.data.sessionId === sessionId)
           ) {
             events.push(event);
           }
@@ -124,8 +147,13 @@ describe("the queue behind a busy chat", () => {
           revision: 0,
         });
         expect(two.author.username).toBe("admin");
-        // one revision and one envelope per message, no transcript row
-        expect(events).toHaveLength(3);
+        // one revision and one watchers' frame per message, no project-wide
+        // envelope and no transcript row
+        expect(events.map((event) => event.type)).toEqual([
+          "queue.changed",
+          "queue.changed",
+          "queue.changed",
+        ]);
         expect(chat.app.sessions.byId(sessionId)!.revision).toBe(before + 3);
         expect(chat.app.sessions.messages(sessionId)).toHaveLength(2);
         const seen = await (
@@ -465,14 +493,18 @@ describe("the queue behind a busy chat", () => {
   });
 
   test.serial(
-    "every envelope carries the queue, the start empties it with its messages",
+    "the queue goes to watchers, and a start's frame precedes its messages",
     async () => {
       const chat = await chatApp();
       try {
         const { sessionId, script } = await teamChat(chat);
         const events: BusEvent[] = [];
         const unsubscribe = subscribe((event) => {
-          if (event.type === "session.changed" || event.type === "queue.mine") {
+          if (
+            event.type === "session.changed" ||
+            event.type === "queue.changed" ||
+            event.type === "queue.mine"
+          ) {
             events.push(event);
           }
         }, silent);
@@ -485,24 +517,32 @@ describe("the queue behind a busy chat", () => {
           "one",
           "two",
         ]);
-        const queuedOf = (event: BusEvent | undefined) =>
-          event?.type === "session.changed"
-            ? event.data.queued?.map((row) => row.id)
+        const rowsOf = (event: BusEvent | undefined) =>
+          event?.type === "queue.changed"
+            ? event.data.rows.map((row) => row.id)
             : undefined;
-        expect(queuedOf(events[0])).toEqual([one.id]);
-        expect(queuedOf(events[1])).toEqual([one.id, body.queued.id]);
+        expect(rowsOf(events[0])).toEqual([one.id]);
+        expect(rowsOf(events[1])).toEqual([one.id, body.queued.id]);
         script.reply("first answer");
         const next = await waitScript(chat.scripted, 2);
         unsubscribe();
-        // one envelope: the two user messages and the queue left empty
-        const start = events.find(
+        // the watchers' frame of the start comes right before the envelope
+        // that carries the user messages the rows became
+        const at = events.findIndex(
           (event) =>
             event.type === "session.changed" &&
             event.data.messages.some((m) => m.content === "one"),
         );
-        expect(start?.type === "session.changed" && start.data.queued).toEqual(
-          [],
-        );
+        const start = events[at];
+        const frame = events[at - 1];
+        expect(frame?.type === "queue.changed" && frame.data).toMatchObject({
+          turn: true,
+          rows: [],
+          revision:
+            start?.type === "session.changed"
+              ? start.data.session.revision
+              : -1,
+        });
         expect(
           start?.type === "session.changed" &&
             start.data.messages
@@ -529,7 +569,11 @@ describe("the queue behind a busy chat", () => {
         const late = await queue(chat, sessionId, "too late");
         const events: BusEvent[] = [];
         const unsubscribe = subscribe((event) => {
-          if (event.type === "session.changed" || event.type === "queue.mine") {
+          if (
+            event.type === "session.changed" ||
+            event.type === "queue.changed" ||
+            event.type === "queue.mine"
+          ) {
             events.push(event);
           }
         }, silent);
@@ -538,14 +582,14 @@ describe("the queue behind a busy chat", () => {
         unsubscribe();
         const revision = chat.app.sessions.byId(sessionId)!.revision;
         expect(events.map((event) => event.type)).toEqual([
-          "session.changed",
+          "queue.changed",
           "queue.mine",
         ]);
         const [shared, mine] = events;
-        // the shared envelope names no not-sent row
-        expect(
-          shared?.type === "session.changed" && shared.data.queued,
-        ).toEqual([]);
+        // the watchers' frame names no not-sent row
+        expect(shared?.type === "queue.changed" && shared.data.rows).toEqual(
+          [],
+        );
         expect(mine?.type === "queue.mine" && mine.data).toMatchObject({
           userId: chat.memberId,
           sessionId,
@@ -553,6 +597,46 @@ describe("the queue behind a busy chat", () => {
           rows: [{ id: late.id, state: "not-sent", reason: "expired" }],
         });
         script.reply("done");
+        await settleRun(chat, sessionId);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
+
+  test.serial(
+    "sixteen rows at the message cap keep every frame far under the limit",
+    async () => {
+      const chat = await chatApp();
+      try {
+        await setLimits(chat, { queuedPerUser: 16 });
+        const { sessionId, script } = await startChat(chat, "busy");
+        const sizes: [string, number][] = [];
+        let cut = false;
+        const unsubscribe = subscribe((event) => {
+          if (event.type === "session.changed" && event.data.messagesCut) {
+            cut = true;
+          }
+          // the socket's frame is the event's data with its type
+          sizes.push([
+            event.type,
+            Buffer.byteLength(JSON.stringify(event.data)),
+          ]);
+        }, silent);
+        const big = "é".repeat(MAX_MESSAGE_BYTES / 2);
+        for (let i = 0; i < MAX_QUEUED_PER_CHAT; i++) {
+          await queue(chat, sessionId, big);
+        }
+        script.reply("done");
+        const next = await waitScript(chat.scripted, 2);
+        unsubscribe();
+        expect(sizes.some(([type]) => type === "queue.changed")).toBe(true);
+        // the start's envelope carried the reply alone and said so
+        expect(cut).toBe(true);
+        for (const [type, size] of sizes) {
+          expect([type, size < 128 * 1024]).toEqual([type, true]);
+        }
+        next.reply("done");
         await settleRun(chat, sessionId);
       } finally {
         await chat.app.shutdown();
@@ -616,55 +700,65 @@ describe("the queue behind a busy chat", () => {
     }
   });
 
-  test("a deleted agent and an archived chat turn their rows not sent", async () => {
-    const chat = await chatApp();
-    try {
-      const { sessionId } = await startChat(chat, "on the old agent");
-      await queue(chat, sessionId, "never");
-      const deleted = await chat.admin.call(
-        "DELETE",
-        `/api/agents/${chat.agentId}`,
-      );
-      expect(deleted.status).toBe(200);
-      await settleRun(chat, sessionId);
-      await tick();
-      expect(rows(chat, sessionId)).toEqual([
-        { content: "never", state: "not-sent", reason: "agent-deleted" },
-      ]);
-      expect(chat.scripted.scripts).toHaveLength(1);
-    } finally {
-      await chat.app.shutdown();
-    }
+  test.serial(
+    "a deleted agent and an archived chat turn their rows not sent",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const { sessionId } = await startChat(chat, "on the old agent");
+        await queue(chat, sessionId, "never");
+        const told = await toldOf(sessionId, async () => {
+          const deleted = await chat.admin.call(
+            "DELETE",
+            `/api/agents/${chat.agentId}`,
+          );
+          expect(deleted.status).toBe(200);
+          await settleRun(chat, sessionId);
+          await tick();
+        });
+        // its author is told alone
+        expect(told).toEqual([["agent-deleted"]]);
+        expect(rows(chat, sessionId)).toEqual([
+          { content: "never", state: "not-sent", reason: "agent-deleted" },
+        ]);
+        expect(chat.scripted.scripts).toHaveLength(1);
+      } finally {
+        await chat.app.shutdown();
+      }
 
-    const other = await chatApp();
-    try {
-      await setLimits(other, { sendsPerUser: 1 });
-      const { sessionId, script } = await teamChat(other);
-      const busy = await startChat(
-        other,
-        "busy",
-        other.admin,
-        adminProject(other),
-      );
-      await queue(other, sessionId, "waits", other.admin);
-      script.reply("done");
-      await settleRun(other, sessionId);
-      expect(rows(other, sessionId)[0]?.state).toBe("queued");
-      // the archive wakes the queue, with no place freed
-      const archived = await other.member.call(
-        "POST",
-        `/api/sessions/${sessionId}/archive`,
-      );
-      expect(archived.status).toBe(204);
-      expect(rows(other, sessionId)).toEqual([
-        { content: "waits", state: "not-sent", reason: "archived" },
-      ]);
-      busy.script.reply("done");
-      await settleRun(other, busy.sessionId);
-    } finally {
-      await other.app.shutdown();
-    }
-  });
+      const other = await chatApp();
+      try {
+        await setLimits(other, { sendsPerUser: 1 });
+        const { sessionId, script } = await teamChat(other);
+        const busy = await startChat(
+          other,
+          "busy",
+          other.admin,
+          adminProject(other),
+        );
+        await queue(other, sessionId, "waits", other.admin);
+        script.reply("done");
+        await settleRun(other, sessionId);
+        expect(rows(other, sessionId)[0]?.state).toBe("queued");
+        // the archive wakes the queue, with no place freed
+        const told = await toldOf(sessionId, async () => {
+          const archived = await other.member.call(
+            "POST",
+            `/api/sessions/${sessionId}/archive`,
+          );
+          expect(archived.status).toBe(204);
+        });
+        expect(told).toEqual([["archived"]]);
+        expect(rows(other, sessionId)).toEqual([
+          { content: "waits", state: "not-sent", reason: "archived" },
+        ]);
+        busy.script.reply("done");
+        await settleRun(other, busy.sessionId);
+      } finally {
+        await other.app.shutdown();
+      }
+    },
+  );
 
   test("an agent's delete turns an idle chat's waiting rows not sent at once", async () => {
     const chat = await chatApp();
@@ -698,27 +792,33 @@ describe("the queue behind a busy chat", () => {
     }
   });
 
-  test("a queued file that clashes with the chat's turns not sent and the process goes on", async () => {
-    const chat = await chatApp();
-    try {
-      const { sessionId } = await withDocs(chat);
-      const busy = await uploadSend(chat, sessionId);
-      const item = await stage(chat, "docs.tar", await archive());
-      await queue(chat, sessionId, "read the archive", chat.member, {
-        uploads: [item.id],
-      });
-      busy.script.reply("done");
-      await settleRun(chat, sessionId);
-      await tick();
-      expect(rows(chat, sessionId)).toEqual([
-        { content: "read the archive", state: "not-sent", reason: "failed" },
-      ]);
-      expect(chat.app.runner.registry.get(sessionId)).toBeNull();
-      expect(chat.scripted.scripts).toHaveLength(2);
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
+  test.serial(
+    "a queued file that clashes with the chat's turns not sent and the process goes on",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const { sessionId } = await withDocs(chat);
+        const busy = await uploadSend(chat, sessionId);
+        const item = await stage(chat, "docs.tar", await archive());
+        await queue(chat, sessionId, "read the archive", chat.member, {
+          uploads: [item.id],
+        });
+        const told = await toldOf(sessionId, async () => {
+          busy.script.reply("done");
+          await settleRun(chat, sessionId);
+          await tick();
+        });
+        expect(told).toEqual([["failed"]]);
+        expect(rows(chat, sessionId)).toEqual([
+          { content: "read the archive", state: "not-sent", reason: "failed" },
+        ]);
+        expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+        expect(chat.scripted.scripts).toHaveLength(2);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
 
   test("a clashing queued file left behind turns not sent on the next message", async () => {
     const chat = await chatApp();

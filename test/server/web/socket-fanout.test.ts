@@ -50,6 +50,7 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
     sessionProject: () => "p",
     live: () => null,
     envelopeRow: () => null,
+    queue: () => ({ revision: 0, rows: [] }),
     ...overrides,
   });
   built.push(socket);

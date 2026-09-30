@@ -4,15 +4,17 @@
 // A queued message is its author's alone to edit or remove, an admin's
 // included, each change naming the revision it saw so a start that took
 // the row first wins. Each answers the queue as the caller sees it at
-// the revision its commit made, so a tab never puts back a row an
-// envelope already moved past. Home reads the caller's not-sent
-// messages by their own query, never through the feed, and discards
-// only the ones it names.
+// the revision its commit made, so a tab never puts back a row a
+// queue frame already moved past; the author reads a row whole for an
+// Edit, since a frame carries its text cut. Home reads the caller's
+// not-sent messages by their own query, never through the feed, and
+// discards only the ones it names.
 
 import type {
   DiscardNotSentResponse,
   NotSentResponse,
   QueuedResponse,
+  QueuedRowResponse,
   QueueState,
 } from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -60,15 +62,20 @@ function own(
 }
 
 // in the change's transaction: its events, and the caller's queue at
-// the revision it made; mine tells the author's other tabs too
+// the revision it made. A change to a queued row goes to the chat's
+// watchers; one to the caller's not-sent row to their own tabs alone
 export function queueAnswer(
   db: Db,
   store: SessionStore,
   sessionId: string,
   userId: string,
-  mine: boolean,
+  notSent: boolean,
 ): { state: QueueState; events: BusEvent[] } {
-  const events = queueChanged(db, store, sessionId, mine ? [userId] : []);
+  const events = queueChanged(
+    db,
+    sessionId,
+    notSent ? { shared: false, authors: [userId] } : { shared: true },
+  );
   return {
     state: {
       queue: chatQueue(db, sessionId, userId),
@@ -81,6 +88,22 @@ export function queueAnswer(
 export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
   const { store } = deps;
   return [
+    {
+      // the author's row whole, where a socket frame carried it cut
+      method: "GET",
+      path: "/api/sessions/:id/queued/:queuedId",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const principal = ctx.principal!;
+        const session = deps.visible(principal, ctx.params.id);
+        const id = parseQueuedId(ctx.params.queuedId);
+        const row = own(store, principal, session.id, id);
+        const body: QueuedRowResponse = {
+          queued: onWire(row, principal.username),
+        };
+        return json(body);
+      },
+    },
     {
       method: "PATCH",
       path: "/api/sessions/:id/queued/:queuedId",
@@ -169,11 +192,15 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
           await jsonBody(req, MAX_SMALL_BODY),
         );
         const deleted = transact(deps.db, () => {
-          const chats = store.queue.discardNotSent(userId, ids);
+          const chats = store.queue.discardNotSent(
+            userId,
+            ids,
+            deps.visibleProjectIds(userId) ?? [],
+          );
           return {
             result: chats.length,
             events: [...new Set(chats)].flatMap((chat) =>
-              queueChanged(deps.db, store, chat, [userId]),
+              queueChanged(deps.db, chat, { shared: false, authors: [userId] }),
             ),
           };
         });

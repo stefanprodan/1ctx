@@ -5,11 +5,7 @@
 // own port: compose passes the sessions area's store. Every method is a
 // single row write the writer wraps in one transact() with a touch().
 
-import type {
-  Message,
-  QueuedMessage,
-  SendSummary,
-} from "../../shared/contracts/session.ts";
+import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
@@ -38,13 +34,12 @@ export type UploadsPort = {
 export type SessionsPort = {
   byId(id: string): SessionRow | null;
   // the queued rows a turn takes, deleted by id and revision; false when
-  // any changed or went. ofChat with no viewer: the rows left queued
+  // any changed or went
   queue: {
     claim(
       sessionId: string,
       claims: readonly { id: string; revision: number }[],
     ): boolean;
-    ofChat(sessionId: string, viewerId: null): QueuedMessage[];
   };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
