@@ -72,9 +72,10 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   row is a tool row like any other. Access to an agent grants its MCP
   tools.
 - **The system prompt's order.** The system prompt is the agent's
-  prompt, the project and user or automation part, the skills catalog,
-  the MCP catalog, the servers' instructions as the delimited
-  `<mcp_instructions>` block (capped, tags neutered, off per server),
+  prompt, the part that names the agent, its project and the user or
+  the automation, the skills catalog, the MCP catalog, the servers'
+  instructions as the delimited `<mcp_instructions>` block (capped,
+  tags neutered, off per server),
   the project memory block (a chat's snapshot, a run's live note), the
   automation memory block, the knowledge block, the date line, the
   chat's web-off line when applicable, the visualize-off line when

@@ -12,6 +12,7 @@ import { hashPassword, ORIGIN, type TestClient } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
+  FLASH,
   type Script,
   startChat,
   tick,
@@ -290,7 +291,7 @@ describe("team project administration", () => {
     }[];
     expect(messages[0]!.role).toBe("system");
     expect(messages[0]!.content).toContain(
-      "You work in the ops project: Incidents and pages",
+      "You are coder, an agent in the ops project: Incidents and pages",
     );
     await finish(chat, script);
     chat.app.socket.dispose();
@@ -669,7 +670,7 @@ describe("the personal project's settings", () => {
       (script.body.messages as { content: string }[])[0]!.content;
     const username = chat.app.users.byId(chat.memberId)!.username;
     expect(prompt(first.script)).toContain(
-      `You work in @${username}'s personal project.\n`,
+      `You are coder, an agent in @${username}'s personal project.\n`,
     );
     await finish(chat, first.script);
     await chat.member.call("PATCH", "/api/profile/project", {
@@ -677,6 +678,36 @@ describe("the personal project's settings", () => {
     });
     const second = await startChat(chat, "again");
     expect(prompt(second.script)).toContain(": My scratch work\n");
+    await finish(chat, second.script);
+    chat.app.socket.dispose();
+  });
+
+  test("the agent is told its name as it is on the next send", async () => {
+    const chat = await chatApp();
+    const prompt = (script: Script) =>
+      (script.body.messages as { content: string }[])[0]!.content;
+    const first = await startChat(chat, "hi");
+    expect(prompt(first.script)).toContain("You are coder, an agent in @");
+    await finish(chat, first.script);
+    const renamed = await chat.admin.call(
+      "PATCH",
+      `/api/agents/${chat.agentId}`,
+      {
+        body: {
+          name: "reviewer",
+          providerId: chat.providerId,
+          model: FLASH,
+          thinking: null,
+          effort: null,
+          servers: [],
+          mcpMode: "auto",
+        },
+      },
+    );
+    expect(renamed.status).toBe(200);
+    const second = await startChat(chat, "again");
+    expect(prompt(second.script)).toContain("You are reviewer, an agent in @");
+    expect(prompt(second.script)).not.toContain("coder");
     await finish(chat, second.script);
     chat.app.socket.dispose();
   });

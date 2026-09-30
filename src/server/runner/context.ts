@@ -168,6 +168,7 @@ export function history(
   policy: Pick<
     SendPolicy,
     | "prompt"
+    | "agentName"
     | "projectName"
     | "projectKind"
     | "projectDescription"

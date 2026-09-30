@@ -243,7 +243,7 @@ describe("systemPrompt", () => {
 
   test("joins the agent's prompt, the about text and the date", () => {
     expect(systemPrompt(policy, NOW)).toBe(
-      `You write Go.\n\nYou work in the ops project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\nToday is 2026-09-13.`,
+      `You write Go.\n\nYou are coder, an agent in the ops project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\nToday is 2026-09-13.`,
     );
   });
 
@@ -254,7 +254,7 @@ describe("systemPrompt", () => {
         NOW,
       ),
     ).toBe(
-      `You work in the ops project.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
+      `You are coder, an agent in the ops project.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
     );
   });
 
@@ -270,7 +270,7 @@ describe("systemPrompt", () => {
         NOW,
       ),
     ).toBe(
-      `You work in @casey's personal project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
+      `You are coder, an agent in @casey's personal project: Incidents and pages.\nYou talk to @casey (Casey Doe), in the Europe/Bucharest time zone: I run clusters.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
     );
   });
 
@@ -292,7 +292,7 @@ describe("systemPrompt", () => {
         NOW,
       );
     expect(run("schedule")).toBe(
-      `You write Go.\n\nYou work in the ops project: Incidents and pages.\nThis is a scheduled run of the morning-check automation, started at 2026-09-14 20:10 Europe/Bucharest. You run autonomously. Do not ask questions. Do the task and stop.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
+      `You write Go.\n\nYou are coder, an agent in the ops project: Incidents and pages.\nThis is a scheduled run of the morning-check automation, started at 2026-09-14 20:10 Europe/Bucharest. You run autonomously. Do not ask questions. Do the task and stop.\n\n${EMPTY_KNOWLEDGE}\n\n${dateLine(NOW)}`,
     );
     expect(run("manual")).toContain(
       "This is a manual run of the morning-check",

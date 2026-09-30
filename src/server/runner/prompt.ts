@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The system prompt: the agent's prompt, the project and the user with
-// what was written about each, the skills catalog and the date. A run belongs
-// to its project, not to a person, so the run's line takes the user's place.
+// The system prompt: the agent's prompt and name, the project and the
+// user with what was written about each, the skills catalog and the date.
+// A run belongs to its project, not to a person, so the run's line takes
+// the user's place.
 // The project comes before the user, who changes with the author of a
 // team chat, and a day, not a time, so the prefix holds until midnight
 // and a provider's cache with it. The skills catalog arrives on the
@@ -36,7 +37,11 @@ export function dateLine(now: number): string {
 function projectLine(
   policy: Pick<
     SendPolicy,
-    "projectName" | "projectKind" | "projectDescription" | "username"
+    | "agentName"
+    | "projectName"
+    | "projectKind"
+    | "projectDescription"
+    | "username"
   >,
 ): string {
   const about = policy.projectDescription.trim();
@@ -44,7 +49,7 @@ function projectLine(
     policy.projectKind === "personal"
       ? `@${policy.username}'s personal project`
       : `the ${policy.projectName} project`;
-  return `You work in ${where}${about === "" ? "." : `: ${about}`}`;
+  return `You are ${policy.agentName}, an agent in ${where}${about === "" ? "." : `: ${about}`}`;
 }
 
 // a run has nobody to answer it, so it is told to finish on its own
@@ -80,6 +85,7 @@ export function systemPrompt(
   policy: Pick<
     SendPolicy,
     | "prompt"
+    | "agentName"
     | "projectName"
     | "projectKind"
     | "projectDescription"
