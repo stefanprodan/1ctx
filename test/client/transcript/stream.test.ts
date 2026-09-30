@@ -39,6 +39,7 @@ const message = (fields: Partial<Message> = {}): Message => ({
   content: "",
   uploads: null,
   files: null,
+  saved: null,
   reasoning: "",
   html: "",
   status: "streaming",

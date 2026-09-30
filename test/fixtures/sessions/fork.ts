@@ -70,6 +70,7 @@ export function forkRow(fields: Partial<Message>): Message {
     resultBytes: null,
     uploads: null,
     files: null,
+    saved: null,
     promptTokens: null,
     reasoning: "",
     html: "",

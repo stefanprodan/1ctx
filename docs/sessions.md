@@ -214,7 +214,21 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   a user message opening `[name] `, with no author field, then its trace
   (`runner/trace.ts`) as its own user message, never its calls, results,
   reasoning or signatures, so no provider sees a call without its
-  result; a skill it loaded is not counted as loaded. A model that
+  result; a skill it loaded is not counted as loaded. The trace is one
+  line a call, `tool summary status`, cut to 200 characters, identical
+  lines as one with `×N`, past 30 lines a count. `visualize` and
+  `mcp_describe` calls get no line and no count. `memory_edit` shows
+  only `action=` and `topic=`, never its text. A bash call that wrote
+  docs ends, from the tool row's `saved`, with ` saved <path>` for one,
+  ` saved N files in <dir>/` for several in one directory, else ` saved
+  <first path> and N-1 more`; the cut keeps the status, the mark and
+  that part whole, shortening the summary, or shows ` …` when it
+  cannot fit. A call to an MCP tool (by wire
+  name, a catalog `mcp_call` unwrapped) or a skill (`skill`,
+  `skill_file`, by the skill's name) the building send is not offered
+  ends with ` (not your tool)` (`yoursOf(policy.offered)`); every
+  builtin counts as the reader's, since the chat's switches hold for
+  every agent in it. A model that
   read marked answers may open its own with `[its name]`: the summoned
   line asks it not to, and the writer drops that mark, in any case and
   followed by a space or the end, from a stored answer (`unmarked`);

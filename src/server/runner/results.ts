@@ -12,6 +12,19 @@ function prefix(text: string, length: number): string {
   return text.slice(0, last >= 0xd800 && last <= 0xdbff ? length - 1 : length);
 }
 
+// a tool's end as its row stores it: fields by name, so one the log
+// keeps, like ended, never reaches the row
+export function toolFinish(result: ToolResult, now: number) {
+  return {
+    content: result.content,
+    status: result.error ? ("failed" as const) : ("done" as const),
+    error: result.error ? result.content : null,
+    finishedAt: now,
+    opened: result.opened,
+    saved: result.saved,
+  };
+}
+
 export function cutResult(result: ToolResult, chars: number): ToolResult {
   if (result.content.length <= chars) return result;
   const tail = result.tail ?? 0;

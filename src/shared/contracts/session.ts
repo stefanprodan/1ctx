@@ -84,6 +84,15 @@ export type { OpenedKind };
 // a file a bash command put on the page with open, as the tool row
 // carries it: the stored copy's text stays behind and the file route
 // answers it
+// the docs a bash command wrote: the first /knowledge paths in commit
+// order, bounded, how many it wrote in all, and the one directory they
+// share, null when they are in several
+export type SavedDocs = {
+  paths: string[];
+  count: number;
+  dir: string | null;
+};
+
 export type OpenedFile = {
   // the absolute path in the mount, as it was resolved
   path: string;
@@ -127,6 +136,9 @@ export type Message = {
   // order, without their text; null on every other row and on a bash
   // row that opened nothing
   files: OpenedFile[] | null;
+  // the docs a bash command wrote; null on every other row and on a bash
+  // row that wrote no doc
+  saved: SavedDocs | null;
   // the UTF-8 byte length of stored tool content on the wire; null on
   // every non-tool row
   resultBytes: number | null;

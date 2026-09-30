@@ -118,6 +118,7 @@ const row = (
   sessionId: "s",
   uploads: null,
   files: null,
+  saved: null,
   seq: 1,
   sendId: "snd1",
   round: 1,

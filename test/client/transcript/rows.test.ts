@@ -228,6 +228,7 @@ const message = (
   resultBytes: null,
   uploads: null,
   files: null,
+  saved: null,
   promptTokens: null,
   reasoning: "",
   html: kind === "user" || kind === "tool" ? "" : `<p>${id}</p>`,

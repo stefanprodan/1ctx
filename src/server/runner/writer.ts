@@ -23,6 +23,7 @@ import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { ToolResult } from "./policy.ts";
+import { toolFinish } from "./results.ts";
 import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
 import {
   type StartDeps,
@@ -265,13 +266,7 @@ export class Writer {
     if (rowId === undefined) return false;
     const now = this.deps.clock();
     const changed = transact(this.deps.db, () => {
-      const row = this.deps.sessions.finishTool(rowId, {
-        content: result.content,
-        status: result.error ? "failed" : "done",
-        error: result.error ? result.content : null,
-        finishedAt: now,
-        opened: result.opened,
-      });
+      const row = this.deps.sessions.finishTool(rowId, toolFinish(result, now));
       if (row === null) return { result: false, events: [] };
       if (result.kept?.length) writeKeptFiles(this.deps.db, rowId, result.kept);
       const session = this.session(send.sessionId, now);

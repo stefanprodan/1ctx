@@ -64,6 +64,8 @@ export type CommandResult = {
   error: boolean;
   tail?: number;
   opened?: OpenedRecord[];
+  // the /knowledge paths the command wrote, stored on its tool row
+  saved?: string[];
   // where a command that saved nothing ended, for the log; finishTool
   // stores a row's fields by name, so it never reaches one
   ended?: CommandEnd;

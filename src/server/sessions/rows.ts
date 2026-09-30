@@ -8,6 +8,7 @@ import type {
   Message,
   OpenedFile,
   RoundUsage,
+  SavedDocs,
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
@@ -122,6 +123,7 @@ export type RawMessage = {
   packed_bytes: number | null;
   uploads: string | null;
   files: string | null;
+  saved: string | null;
   reasoning: string;
   html: string;
   status: MessageStatus;
@@ -150,7 +152,7 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
       'path', path, 'kind', kind, 'language', language,
       'bytes', bytes, 'lines', lines, 'title', title) order by position)
     from opened_files where message_id = messages.id) as files,
-   messages.reasoning, messages.html,
+   messages.saved, messages.reasoning, messages.html,
    messages.status, messages.error, messages.finish_reason,
    messages.tool_calls, messages.tool_call_id, messages.tool_name,
    messages.model, messages.ttft_ms, messages.thinking_ms,
@@ -182,6 +184,9 @@ function messageFiles(raw: string | null): OpenedFile[] | null {
   return record.length > 0 ? record : null;
 }
 
+const savedDocs = (raw: string | null): SavedDocs | null =>
+  raw ? JSON.parse(raw) : null;
+
 export const message = (raw: RawMessage): Message => ({
   id: raw.id,
   sessionId: raw.session_id,
@@ -197,6 +202,7 @@ export const message = (raw: RawMessage): Message => ({
   resultBytes: raw.kind === "tool" ? raw.packed_bytes : null,
   uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
   files: raw.kind === "tool" ? messageFiles(raw.files) : null,
+  saved: raw.kind === "tool" ? savedDocs(raw.saved) : null,
   promptTokens:
     raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
   reasoning: raw.reasoning,

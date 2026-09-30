@@ -28,7 +28,7 @@ import type {
 } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
 import { systemPrompt } from "./prompt.ts";
-import { trace, traceCalls } from "./trace.ts";
+import { trace, traceCalls, type Yours, yoursOf } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far so that it can continue from the summary alone: the messages before this point are dropped and only the summary is kept. Write Markdown with these sections, terse bullets, no prose:
 
@@ -90,8 +90,13 @@ export function unmarked(text: string, name: string): string {
 }
 
 // another agent's turn: its answer as a user message opened by its
-// name, with no author field, then its trace as its own message
-function foreignTurn(turn: Turn, rows: readonly Message[]): ChatMessageIn[] {
+// name, with no author field, then its trace as its own message, the
+// calls to tools the building agent lacks marked
+function foreignTurn(
+  turn: Turn,
+  rows: readonly Message[],
+  yours: Yours,
+): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
   const answer = rows
     .filter(
@@ -106,7 +111,7 @@ function foreignTurn(turn: Turn, rows: readonly Message[]): ChatMessageIn[] {
   if (answer !== "") {
     out.push({ role: "user", content: `${markOf(turn.agentName)}${answer}` });
   }
-  const calls = trace(traceCalls(rows));
+  const calls = trace(traceCalls(rows), yours);
   if (calls !== "") out.push({ role: "user", content: calls });
   return out;
 }
@@ -280,6 +285,7 @@ export function historyMessages(
       ? new Map<string, Turn>()
       : lookups.turnsOf(rows[0]!.sessionId);
   const own = (sendId: string) => ownTurn(turns.get(sendId), policy);
+  const yours = yoursOf(policy.offered);
   let start = 0;
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]!;
@@ -313,7 +319,7 @@ export function historyMessages(
   const flush = () => {
     const first = foreign[0];
     if (first !== undefined) {
-      out.push(...foreignTurn(turns.get(first.sendId)!, foreign));
+      out.push(...foreignTurn(turns.get(first.sendId)!, foreign, yours));
     }
     foreign = [];
   };

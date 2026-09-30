@@ -210,6 +210,7 @@ describe("atomic knowledge and scratch commits", () => {
         error: true,
         content: "exit 1\nwrote existing (rev 2, 1 lines)",
         opened: [],
+        saved: ["/knowledge/existing"],
         tail: "exit 1\nwrote existing (rev 2, 1 lines)".length,
       });
       expect(scratchState(s)).toMatchObject({

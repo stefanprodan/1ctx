@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Message } from "../../shared/contracts/session.ts";
-import type { MessageKind } from "../../shared/words.ts";
+import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
+import type { MessageKind, MessageStatus } from "../../shared/words.ts";
+import type { OpenedRecord } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
+import { writeOpenedFiles } from "./opened-store.ts";
 import {
   MESSAGE_COLUMNS,
   message,
@@ -93,6 +95,57 @@ export function addToolRows(
     );
     return read(db, id);
   });
+}
+
+export type ToolFinish = {
+  content: string;
+  status: Exclude<MessageStatus, "streaming">;
+  error: string | null;
+  finishedAt: number;
+  opened?: readonly OpenedRecord[] | null;
+  // the /knowledge paths a bash command wrote, for another agent's trace
+  saved?: readonly string[] | null;
+};
+
+// a command may write hundreds of docs; the row keeps the first paths
+export const SAVED_PATHS = 50;
+
+const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
+
+export function savedDocs(paths: readonly string[]): SavedDocs {
+  const dir = parent(paths[0] ?? "");
+  return {
+    paths: paths.slice(0, SAVED_PATHS),
+    count: paths.length,
+    dir: paths.every((path) => parent(path) === dir) ? dir : null,
+  };
+}
+
+// guarded by status, so a tool that ends after a terminal cleanup
+// writes nothing
+export function finishToolRow(db: Db, id: string, fields: ToolFinish) {
+  const saved = fields.saved?.length
+    ? JSON.stringify(savedDocs(fields.saved))
+    : null;
+  const changed =
+    db
+      .query(
+        `update messages set content = ?, status = ?, error = ?,
+           finished_at = ?, saved = ?
+         where id = ? and kind = 'tool' and status = 'streaming'`,
+      )
+      .run(
+        fields.content,
+        fields.status,
+        fields.error,
+        fields.finishedAt,
+        saved,
+        id,
+      ).changes > 0;
+  if (changed && fields.opened?.length) {
+    writeOpenedFiles(db, id, fields.opened);
+  }
+  return changed;
 }
 
 export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {

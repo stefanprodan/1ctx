@@ -35,6 +35,7 @@ function result(changes: Partial<Message> = {}): Message {
     content: "result",
     uploads: null,
     files: null,
+    saved: null,
     resultBytes: 6,
     promptTokens: null,
     reasoning: "",

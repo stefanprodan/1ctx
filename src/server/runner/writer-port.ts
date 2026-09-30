@@ -125,6 +125,8 @@ export type SessionsPort = {
       error: string | null;
       finishedAt: number;
       opened?: OpenedRecord[] | null;
+      // the /knowledge paths a bash command wrote
+      saved?: readonly string[] | null;
     },
   ): Message | null;
   createSend(fields: {

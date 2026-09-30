@@ -5,12 +5,7 @@ import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
-import type {
-  ArchiveReason,
-  MessageStatus,
-  SessionStatus,
-} from "../../shared/words.ts";
-import type { OpenedRecord } from "../bash/index.ts";
+import type { ArchiveReason, SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
@@ -48,9 +43,11 @@ import {
   addAgentMessage,
   addToolRows,
   finishReply,
+  finishToolRow,
   nextSeq,
+  type ToolFinish,
 } from "./messages.ts";
-import { readOpenedFile, writeOpenedFiles } from "./opened-store.ts";
+import { readOpenedFile } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
 import { titleFrom } from "./parse.ts";
 import { QueueStore } from "./queued.ts";
@@ -436,27 +433,8 @@ export class SessionStore {
 
   // guarded by status, so a tool that ends after a terminal cleanup
   // writes nothing
-  finishTool(
-    id: string,
-    fields: {
-      content: string;
-      status: Exclude<MessageStatus, "streaming">;
-      error: string | null;
-      finishedAt: number;
-      opened?: OpenedRecord[] | null;
-    },
-  ): Message | null {
-    const changed =
-      this.db
-        .query(
-          "update messages set content = ?, status = ?, error = ?, finished_at = ? where id = ? and kind = 'tool' and status = 'streaming'",
-        )
-        .run(fields.content, fields.status, fields.error, fields.finishedAt, id)
-        .changes > 0;
-    if (changed && fields.opened?.length) {
-      writeOpenedFiles(this.db, id, fields.opened);
-    }
-    return changed ? this.message(id) : null;
+  finishTool(id: string, fields: ToolFinish): Message | null {
+    return finishToolRow(this.db, id, fields) ? this.message(id) : null;
   }
 
   createSend(fields: McpSendFields): SendSummary {

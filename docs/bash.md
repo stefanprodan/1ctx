@@ -104,7 +104,12 @@ changes to it, its recorders) in `vendor/README.md`.
   `commitDocs` (one version and `knowledge.changed` per file), then
   scratch under its revision, with the cwd and last use, re-read so the
   totals count stored rows. Receipts list the docs, then `open`; an
-  overflow rolls both back.
+  overflow rolls both back. The paths of the docs written (a delete
+  saves none) go back on the result as `saved`, and `finishTool` stores
+  them on the call's tool row as `{paths, count, dir}` (`savedDocs`:
+  the first 50 paths, the total, the one shared directory or null),
+  null when none, for another agent's trace (`docs/sessions.md`); a
+  fork copies them.
 - **Scratch is the chat's `/tmp`.** `ScratchStore` (`bash/scratch.ts`)
   over `session_scratch` and `session_scratch_files`, cascading with the
   session, keeps regular files of any bytes and their modes; a symlink
