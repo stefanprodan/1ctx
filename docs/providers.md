@@ -167,7 +167,10 @@ upstream and skip4Bit fields.
   derives an Anthropic model's thinking budget from `max_tokens` when
   only `reasoning.effort` is sent (`max_tokens` times the effort's
   ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
-  long those models think; Gemini 3 maps the effort to a level.
+  long those models think; Gemini 3 maps the effort to a level. On
+  the Gemini wire thinking counts against `max_tokens`: a round whose
+  thinking reaches the cap ends as `length` with no answer, and a
+  `thinking_budget` above the cap is not refused, only cut at it.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and
