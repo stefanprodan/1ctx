@@ -52,6 +52,7 @@ export function cardBody(
     servers: listed(agent.servers, (s) => s.serverId, rows.servers),
     mcpMode: agent.mcpMode,
     upstream: agent.upstream,
+    skip4Bit: agent.skip4Bit,
     ...statedFields(
       agent.model,
       agent.model.contextLength?.toString() ?? "",

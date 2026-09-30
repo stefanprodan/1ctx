@@ -40,6 +40,8 @@ export class AgentDrafts {
   readonly thinking = signal<"on" | "off" | null>(null);
   readonly effort = signal<Effort | null>(null);
   readonly upstream = signal<string | null>(null);
+  // kept as saved until the form offers it; another wire refuses it
+  readonly skip4Bit = signal(false);
   readonly windowText = signal("");
   readonly takesTools = signal(false);
   // the model the upstream was chosen for: a tag names a provider of it
@@ -86,6 +88,7 @@ export class AgentDrafts {
     this.thinking.value = agent.thinking;
     this.effort.value = agent.effort;
     this.upstream.value = agent.upstream;
+    this.skip4Bit.value = agent.skip4Bit;
     this.upstreamOf = agent.model.id;
     this.windowText.value = agent.model.contextLength?.toString() ?? "";
     this.takesTools.value = agent.model.tools;
@@ -206,6 +209,7 @@ export class AgentDrafts {
       thinking: this.thinking.value,
       effort: sentEffort(m, this.thinking.value, this.effort.value, wire),
       upstream: wire === "openrouter" ? this.upstream.value : null,
+      skip4Bit: wire === "openrouter" ? this.skip4Bit.value : false,
       ...statedFields(m, this.windowText.value, this.takesTools.value),
     };
   }

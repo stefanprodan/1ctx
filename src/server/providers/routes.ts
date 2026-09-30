@@ -13,7 +13,10 @@ import type {
   ProviderResponse,
   ProvidersResponse,
 } from "../../shared/api/providers.ts";
-import type { Endpoint } from "../../shared/contracts/provider.ts";
+import type {
+  CatalogMatch,
+  Endpoint,
+} from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
@@ -30,6 +33,8 @@ import { type ProviderRow, type ProviderStore, summary } from "./store.ts";
 
 export type AgentsPort = {
   usesProvider(providerId: string): boolean;
+  // a fresh chat catalog's output limits onto the agents on the provider
+  setOutputLimits(providerId: string, models: CatalogMatch[]): void;
 };
 
 export type DecidersPort = {

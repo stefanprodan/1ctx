@@ -1192,8 +1192,17 @@ describe("the schema", () => {
     try {
       expect(migrate(db)).toEqual(["0036-output-limit"]);
       expect(
-        db.query("select output_limit, skip_4bit from agents").get(),
-      ).toEqual({ output_limit: null, skip_4bit: 0 });
+        db
+          .query("select output_limit, output_read, skip_4bit from agents")
+          .get(),
+      ).toEqual({ output_limit: null, output_read: 0, skip_4bit: 0 });
+      for (const set of [
+        "output_limit = 0",
+        "output_read = 2",
+        "skip_4bit = 2",
+      ]) {
+        expect(() => db.exec(`update agents set ${set}`)).toThrow(/CHECK/);
+      }
     } finally {
       db.close();
     }
@@ -1898,6 +1907,7 @@ describe("0008 search tavily migration", () => {
             is_default: 0,
             deleted_at: null,
             output_limit: null,
+            output_read: 0,
             skip_4bit: 0,
           })),
         );

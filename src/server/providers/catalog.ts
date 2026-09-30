@@ -89,7 +89,8 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       typeof m.context_length === "number" && m.context_length > 0
         ? m.context_length
         : null;
-    // OpenRouter says it of the endpoint it prefers, Groq of the model
+    // OpenRouter says it of the endpoint it prefers, a plain catalog (Groq)
+    // of the model
     const top = (m.top_provider ?? {}) as Record<string, unknown>;
     const outputLimit =
       positive(top.max_completion_tokens) ?? positive(m.max_completion_tokens);
@@ -230,6 +231,9 @@ export class Catalogs {
       secret: (name: string) => string | null;
       log?: Log;
       ttlMs?: number;
+      // told of every chat catalog fetched, so what an agent keeps of
+      // its model follows the catalog
+      fetched?: (provider: ProviderRow, models: CatalogMatch[]) => void;
     },
   ) {}
 
@@ -258,6 +262,7 @@ export class Catalogs {
             kind,
             models: models.length,
           });
+          if (kind === "chat") this.deps.fetched?.(provider, models);
         }
         return models;
       })

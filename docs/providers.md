@@ -137,24 +137,33 @@ upstream and skip4Bit fields.
   `unknown` included, since OpenRouter leaves out a host of unknown
   precision unless the filter names it; beside `order` when an upstream
   is preferred. The filter applies to the preferred host too, so a save
-  with it on and an upstream whose tag says a 4-bit precision after the
-  slash (`deepinfra/fp4`) is a 400, decided from the tag alone. A model
-  no host passes answers 404, so the filter is never a default.
-- **Every chat, run and memory round sends `max_tokens`.** The catalog
-  keeps the model's output limit on the agent as `outputLimit`
-  (OpenRouter's `top_provider.max_completion_tokens`, Groq's
-  `max_completion_tokens`, Gemini's `outputTokenLimit`; null elsewhere,
-  and on an agent until its model is picked again). `outputCap()` in
-  `runner/context.ts` asks for that limit, or `OUTPUT_FALLBACK` (32,000)
-  when unknown, at most `OUTPUT_MAX` (256,000), fitted to the room the
-  prompt leaves in the window (`contextLength - ceil(estimate * 1.15)`,
-  the estimate `requestTokens()` of the request) and never under
-  `OUTPUT_MIN` (1,024); a null window skips the fit and the count. A
-  hit ends the turn as `length`. The summary keeps `summaryMaxTokens`.
-  OpenRouter derives an Anthropic model's thinking budget from
-  `max_tokens` when only `reasoning.effort` is sent (`max_tokens` times
-  the effort's ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap
-  sets how long those models think; Gemini 3 maps the effort to a level.
+  with it on and a 4-bit upstream is a 400: the endpoint's
+  `quantization` decides, and the precision after the tag's slash
+  (`deepinfra/fp4`, any case) when the endpoints do not answer or say
+  `unknown`. A model no host passes answers 404, so the filter is never
+  a default.
+- **Every chat, run and memory round sends `max_tokens`.** The agent
+  keeps the model's output limit as `outputLimit` with `output_read`,
+  re-read on every save and on every chat catalog refresh
+  (`Catalogs` tells the agents area through its port) for a model the
+  catalog describes: OpenRouter's `top_provider.max_completion_tokens`,
+  else a plain catalog's `max_completion_tokens` (Groq's), else
+  Gemini's `outputTokenLimit`; null when it says none. An agent never
+  read (a model the catalog does not describe, or a row saved before)
+  sends no `max_tokens`. `outputCap()` in `runner/context.ts` asks for
+  the limit, or `OUTPUT_FALLBACK` (32,000) when none, at most
+  `OUTPUT_MAX` (256,000), fitted to the room left in the window: the
+  window less the last round's reported prompt and completion
+  (`send.measured`), less the messages added since counted in o200k and
+  taken 15% larger; the whole request is counted when no round was
+  reported or the request does not extend it. Never under `OUTPUT_MIN`
+  (1,024); a null window skips the fit and the count, and the count is
+  the round's size when the provider reports no usage. A hit ends the
+  turn as `length`. The summary keeps `summaryMaxTokens`. OpenRouter
+  derives an Anthropic model's thinking budget from `max_tokens` when
+  only `reasoning.effort` is sent (`max_tokens` times the effort's
+  ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
+  long those models think; Gemini 3 maps the effort to a level.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and

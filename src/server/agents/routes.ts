@@ -22,7 +22,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../shared/contracts/provider.ts";
-import { isFourBitTag } from "../../shared/quantization.ts";
+import { isFourBit, isFourBitTag } from "../../shared/quantization.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -154,16 +154,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     if (body.skip4Bit && provider.wire !== "openrouter") {
       throw new BadRequest("skip4Bit is only for an OpenRouter provider");
     }
-    // the filter applies to the preferred host too, so it would never serve
-    if (
-      body.skip4Bit &&
-      body.upstream !== null &&
-      isFourBitTag(body.upstream)
-    ) {
-      throw new BadRequest(
-        `upstream ${body.upstream} is a 4-bit host, which skip4Bit leaves out`,
-      );
-    }
     const effort = body.effort;
     if (effort !== null && !isEffort(provider.wire, effort)) {
       throw new BadRequest(
@@ -188,10 +178,21 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       before.providerId === checked.provider.id &&
       before.model.id === body.model &&
       before.upstream === body.upstream;
-    const endpoints =
-      body.upstream === null || model === null || kept
-        ? null
-        : await deps.providers.endpoints(checked.provider, body.model);
+    const listed = body.upstream !== null && model !== null && !kept;
+    // the filter applies to the preferred host too, so a 4-bit one would
+    // never serve: its precision is the endpoint's, else its tag's
+    const weighed =
+      body.skip4Bit &&
+      body.upstream !== null &&
+      model !== null &&
+      !(kept && before.skip4Bit);
+    const endpoints = listed
+      ? await deps.providers.endpoints(checked.provider, body.model)
+      : weighed
+        ? await deps.providers
+            .endpoints(checked.provider, body.model)
+            .catch(() => null)
+        : null;
     // called by the handler right before its write, with no await between
     return () => {
       const { provider, effort } = check(body, except);
@@ -199,12 +200,27 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         throw new BadRequest(`${provider.name} does not list ${body.model}`);
       }
       if (
+        listed &&
         endpoints !== null &&
         !endpoints.some((e) => e.tag === body.upstream)
       ) {
         throw new BadRequest(
           `upstream ${body.upstream} does not serve ${body.model} on ${provider.name}`,
         );
+      }
+      if (body.skip4Bit && body.upstream !== null) {
+        const said = endpoints?.find(
+          (e) => e.tag === body.upstream,
+        )?.quantization;
+        const fourBit =
+          said != null && said.toLowerCase() !== "unknown"
+            ? isFourBit(said)
+            : isFourBitTag(body.upstream);
+        if (fourBit) {
+          throw new BadRequest(
+            `upstream ${body.upstream} is a 4-bit host, which skip4Bit leaves out`,
+          );
+        }
       }
       const resolved = stated(model, body.stated);
       return {

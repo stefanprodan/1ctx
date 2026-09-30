@@ -10,7 +10,7 @@ import {
 } from "../../src/shared/quantization.ts";
 
 test("a tag is 4-bit by the precision after its slash", () => {
-  for (const tag of ["deepinfra/fp4", "a/int4", "a/mxfp4", "a/nvfp4"]) {
+  for (const tag of ["deepinfra/fp4", "a/int4", "a/MXFP4", "a/nvfp4"]) {
     expect(isFourBitTag(tag)).toBe(true);
   }
   for (const tag of ["relace", "fp4", "baseten/fp8", "a/fp4x", "cloudflare"]) {

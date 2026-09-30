@@ -54,6 +54,7 @@ const agent: AgentRow = {
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,
+  outputRead: true,
   default: false,
   createdAt: 1,
 };

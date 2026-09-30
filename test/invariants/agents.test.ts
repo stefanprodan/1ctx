@@ -11,11 +11,12 @@ import {
   type ProviderRow,
 } from "../../src/server/providers/index.ts";
 import { fakeFetch, NIM_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
-import { chatApp } from "../helpers/chat.ts";
+import { settleRun } from "../helpers/automations.ts";
+import { chatApp, startChat } from "../helpers/chat.ts";
 import { refuses } from "../helpers/refuses.ts";
 
-const setup = async () => {
-  const app = await testApp();
+const setup = async (fetcher?: typeof fetch) => {
+  const app = await testApp(fetcher === undefined ? {} : { fetcher });
   const client = app.client();
   await client.login("admin", "hunter2-test");
   const { provider } = await (
@@ -777,7 +778,7 @@ describe("a preferred upstream", () => {
     expect(agent).toMatchObject({ skip4Bit: true, upstream: "baseten/fp8" });
     const listed = await (await client.call("GET", "/api/agents")).json();
     expect(listed.agents[0].skip4Bit).toBe(true);
-    for (const upstream of ["deepinfra/fp4", "vendor/int4", "a/mxfp4"]) {
+    for (const upstream of ["deepinfra/fp4", "inference-net/fp4"]) {
       const refused = await client.call("PATCH", `/api/agents/${agent.id}`, {
         body: { ...body, skip4Bit: true, upstream },
       });
@@ -797,6 +798,72 @@ describe("a preferred upstream", () => {
     expect(pinned.status).toBe(200);
     // left out is off
     expect((await pinned.json()).agent.skip4Bit).toBe(false);
+  });
+
+  test("a 4-bit host is known by its endpoint's precision before its tag", async () => {
+    const fake = fakeFetch();
+    const recorded = JSON.parse(
+      await (
+        await fake.fetcher(`${PROVIDER_URL}/models/${GLM}/endpoints`)
+      ).text(),
+    );
+    // the endpoint says otherwise than the tag
+    for (const e of recorded.data.endpoints) {
+      if (e.tag === "relace") e.quantization = "FP4";
+      if (e.tag === "deepinfra/fp4") e.quantization = "fp8";
+    }
+    const fetcher = (async (input: unknown, init?: RequestInit) =>
+      String(input) === `${PROVIDER_URL}/models/${GLM}/endpoints`
+        ? new Response(JSON.stringify(recorded), {
+            headers: { "content-type": "application/json" },
+          })
+        : fake.fetcher(input as string, init)) as unknown as typeof fetch;
+    const { client, provider } = await setup(fetcher);
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: GLM,
+      skip4Bit: true,
+    };
+    const refused = await client.call("POST", "/api/agents", {
+      body: { ...body, upstream: "relace" },
+    });
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({
+      error: "upstream relace is a 4-bit host, which skip4Bit leaves out",
+    });
+    const made = await client.call("POST", "/api/agents", {
+      body: { ...body, upstream: "deepinfra/fp4" },
+    });
+    expect(made.status).toBe(201);
+  });
+
+  test("a 4-bit host is known by its tag when the endpoints do not answer", async () => {
+    const { app, client, provider } = await setup();
+    // the catalog lists this model and its endpoints answer 404
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: "z-ai/glm-5.3",
+    };
+    const made = await client.call("POST", "/api/agents", { body });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    for (const [upstream, status] of [
+      ["gone/FP4", 400],
+      ["gone", 200],
+    ] as const) {
+      app.db.run("update agents set upstream = ? where id = ?", [
+        upstream,
+        agent.id,
+      ]);
+      const saved = await client.call("PATCH", `/api/agents/${agent.id}`, {
+        body: { ...body, upstream, skip4Bit: true },
+      });
+      expect(saved.status).toBe(status);
+    }
   });
 
   test("is refused on another wire", async () => {
@@ -828,5 +895,66 @@ describe("a preferred upstream", () => {
     expect(await filtered.json()).toEqual({
       error: "skip4Bit is only for an OpenRouter provider",
     });
+  });
+});
+
+describe("an agent's output limit", () => {
+  test("a catalog refresh fills a row that never read it", async () => {
+    const chat = await chatApp({ wire: "openrouter" });
+    try {
+      const agent = chat.app.agents.byId(chat.agentId)!;
+      expect(agent).toMatchObject({
+        outputRead: true,
+        model: { outputLimit: 384000 },
+      });
+      chat.app.db.run(
+        "update agents set output_limit = null, output_read = 0 where id = ?",
+        [agent.id],
+      );
+      const provider = chat.app.providers.byId(agent.providerId)!;
+      chat.app.catalogs.forget(provider.id);
+      await chat.app.catalogs.models(provider);
+      expect(chat.app.agents.byId(agent.id)).toMatchObject({
+        outputRead: true,
+        model: { outputLimit: 384000 },
+      });
+      // a window the admin stated is theirs, and so is what it lacks
+      chat.app.db.run(
+        `update agents set model_described = 0, output_limit = null,
+           output_read = 0 where id = ?`,
+        [agent.id],
+      );
+      chat.app.catalogs.forget(provider.id);
+      await chat.app.catalogs.models(provider);
+      expect(chat.app.agents.byId(agent.id)).toMatchObject({
+        outputRead: false,
+        model: { outputLimit: null },
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a row that never read it sends no max_tokens", async () => {
+    const chat = await chatApp();
+    try {
+      chat.app.db.run(
+        "update agents set output_limit = null, output_read = 0 where id = ?",
+        [chat.agentId],
+      );
+      const unread = await startChat(chat);
+      expect(unread.script.body).not.toHaveProperty("max_tokens");
+      unread.script.reply("done");
+      await settleRun(chat, unread.sessionId);
+      chat.app.db.run("update agents set output_read = 1 where id = ?", [
+        chat.agentId,
+      ]);
+      const read = await startChat(chat);
+      expect(read.script.body.max_tokens).toBe(32_000);
+      read.script.reply("done");
+      await settleRun(chat, read.sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
   });
 });

@@ -126,9 +126,19 @@ describe("a card's body", () => {
       servers: [{ serverId: "s1", read: true, write: false }],
       mcpMode: "auto",
       upstream: "vendor/fp8",
+      skip4Bit: false,
     });
     expect(body).not.toHaveProperty("contextLength");
     expect(body).not.toHaveProperty("default");
+  });
+
+  test("keeps the saved host filter on every card's save", () => {
+    const filtered = { ...agent, skip4Bit: true };
+    expect(cardBody(filtered, { prompt: "x" }, rows).skip4Bit).toBe(true);
+    const d = AgentDrafts.of(filtered);
+    expect(d.modelBody("openrouter").skip4Bit).toBe(true);
+    // another wire refuses it, as it refuses an upstream
+    expect(d.modelBody("openai-compatible").skip4Bit).toBe(false);
   });
 
   test("carries a stated window and tools on every other card's save", () => {
@@ -288,6 +298,7 @@ describe("the model draft", () => {
       thinking: null,
       effort: null,
       upstream: null,
+      skip4Bit: false,
     });
   });
 

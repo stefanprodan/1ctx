@@ -148,7 +148,8 @@ export type AgentSpec = {
   tools?: boolean;
   // the OpenRouter endpoint tag tried first, as the agents API takes it
   upstream?: string | null;
-  // leave out OpenRouter's 4-bit hosts, as the agents API takes it
+  // leave out OpenRouter's 4-bit hosts, as the agents API takes it; an
+  // upstream changed to a 4-bit host while it stays on is refused
   skip4Bit?: boolean;
   // only true: the agent a new chat starts on for anyone who has not
   // picked one; left out, the mark stays where it is

@@ -29,10 +29,10 @@ export const FOUR_BIT: readonly Quantization[] = [
 export const NOT_FOUR_BIT: readonly Quantization[] = QUANTIZATIONS.filter(
   (q) => !FOUR_BIT.includes(q),
 );
+export function isFourBit(quantization: string): boolean {
+  return (FOUR_BIT as readonly string[]).includes(quantization.toLowerCase());
+}
 // an endpoint tag names its precision after the slash, deepinfra/fp4
 export function isFourBitTag(tag: string): boolean {
-  return tag
-    .split("/")
-    .slice(1)
-    .some((part) => (FOUR_BIT as readonly string[]).includes(part));
+  return tag.split("/").slice(1).some(isFourBit);
 }
