@@ -6,13 +6,17 @@
 // localStorage under the signed-in user, so a shared browser never
 // hands one person another's words. A draft is its text and the staged
 // files added to it, each with the project it was staged in, since
-// Home's draft stays while its project changes. Storage can be absent
-// or full, so every access is guarded and a failure loses nothing but
-// the draft.
+// Home's draft stays while its project changes, and the edit of a
+// waiting message when one is open. Storage can be absent or full, so
+// every access is guarded and a failure loses nothing but the draft.
 
 // the name is kept so a file whose lease ran out can still be named
 export type DraftUpload = { projectId: string; id: string; name: string };
-export type Draft = { text: string; uploads: DraftUpload[] };
+// a waiting message open for an edit: the draft's text is its new text,
+// and the text set aside until Save or Cancel is before, so a reload
+// keeps the edit and never turns its text into a message of its own
+export type DraftEdit = { id: string; revision: number; before: string };
+export type Draft = { text: string; uploads: DraftUpload[]; edit?: DraftEdit };
 
 export const EMPTY_DRAFT: Draft = { text: "", uploads: [] };
 
@@ -31,16 +35,28 @@ const isUpload = (value: unknown): value is DraftUpload =>
   typeof (value as DraftUpload).id === "string" &&
   typeof (value as DraftUpload).name === "string";
 
+const isEdit = (value: unknown): value is DraftEdit =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as DraftEdit).id === "string" &&
+  typeof (value as DraftEdit).revision === "number" &&
+  typeof (value as DraftEdit).before === "string";
+
 export function readDraft(key: string): Draft {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return EMPTY_DRAFT;
     const value: unknown = JSON.parse(raw);
     if (typeof value !== "object" || value === null) return EMPTY_DRAFT;
-    const { text, uploads } = value as { text?: unknown; uploads?: unknown };
+    const { text, uploads, edit } = value as {
+      text?: unknown;
+      uploads?: unknown;
+      edit?: unknown;
+    };
     return {
       text: typeof text === "string" ? text : "",
       uploads: Array.isArray(uploads) ? uploads.filter(isUpload) : [],
+      ...(isEdit(edit) ? { edit } : {}),
     };
   } catch {
     return EMPTY_DRAFT;
@@ -49,7 +65,11 @@ export function readDraft(key: string): Draft {
 
 export function writeDraft(key: string, draft: Draft): void {
   try {
-    if (draft.text === "" && draft.uploads.length === 0) {
+    if (
+      draft.text === "" &&
+      draft.uploads.length === 0 &&
+      draft.edit === undefined
+    ) {
       localStorage.removeItem(key);
     } else localStorage.setItem(key, JSON.stringify(draft));
   } catch {
@@ -64,6 +84,17 @@ export function writeDraftText(key: string, text: string): void {
 
 export function writeDraftUploads(key: string, uploads: DraftUpload[]): void {
   writeDraft(key, { ...readDraft(key), uploads });
+}
+
+// an edit opened with its text, or closed with the text the box then
+// holds; the files stay as they are
+export function writeDraftEdit(
+  key: string,
+  text: string,
+  edit: DraftEdit | undefined,
+): void {
+  const { uploads } = readDraft(key);
+  writeDraft(key, { text, uploads, ...(edit === undefined ? {} : { edit }) });
 }
 
 // a send claimed these: they leave the draft as it is stored now, which

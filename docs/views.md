@@ -27,9 +27,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   icon in the failed colour, the first line, `#project · @agent` and
   the short reason, when it turned) leading to its chat. `GET
   /api/me/not-sent` is read by Home's load and after Discard all, never
-  through the feed. While the card is mounted (`watchNotSent()`), an
-  envelope without rows for a chat it lists, or for one where this tab
-  saw a message of the user's wait (`noteWaits()`), reads it again
+  through the feed; Discard all sends the ids the card shows, so a row
+  that turned since is never discarded unseen. While the card is
+  mounted (`watchNotSent()`), the user's `notSent` event (sent to them
+  alone when one of their rows turned not sent or went, the sweep
+  included), a listed chat's delete and a revocation read it again
   through one `Flight`, so a burst costs one trailing read.
 - **Pages by cursor.** A page is `STREAM_LIMIT`, 50 rows: the server
   reads one more and answers `next`, the cursor of the last row sent,
@@ -118,18 +120,24 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   "Not sent." and why. Only the author gets actions, `btn-text` words
   that ask nothing: Edit and Remove while it waits, Send again and
   Discard once not sent (no Send again in an archived chat, which has
-  no composer). Edit and Send again hand the text to the chat's
-  composer through `composer/handoff.ts`, the text before the draft;
-  Send again then deletes the row. A refused action is the row's
-  failure line. Each write names the row's revision (`data/queued.ts`)
-  and lands on the chat at once.
-- **The detail is read again for the queue.** The queue's rows ride on
-  no envelope. `queueMoved()` in `data/queued-rows.ts` reads the detail
-  again for an envelope above the held revision that carries no rows
-  and changes nothing else in the summary (a queue change, whatever its
-  keys' order), and for one that brings a new user message while rows
-  wait (the queue started). A rename, a status or an archive carries
-  its change and reads nothing more.
+  no composer). The actions are `views/sessions/queue.ts`: Edit hands
+  the row to the chat's composer through `composer/handoff.ts`; Send
+  again deletes the row first and hands its text over, before the
+  draft, only once the delete landed; both are refused with "Save or
+  cancel the open edit first." while an edit is open; Remove of the row
+  open for an edit closes the edit with its own words. A refused action
+  is the row's failure line, never a word to reload.
+- **The queue lands by revision, with no read.** The held queue is two
+  parts (`data/queued-rows.ts`, kept by `data/session-queue.ts`): the
+  queued rows every member sees, which a queue change's envelope
+  carries as `queued` (a start's envelope carries its user messages and
+  the queue left in one frame, so the rows turn into messages with no
+  flicker and no duplicate), and the user's own not-sent rows, which
+  only their `notSent` event carries. A write's answer (`data/queued.ts`:
+  the 202, the edit, the delete) is the caller's whole queue at its
+  commit's revision. Each part is taken only from a revision above the
+  one it holds, so a late answer never puts back a row a start took and
+  a detail read before a change never undoes it.
 
 ## The composer
 
@@ -137,14 +145,19 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   Stop, then Send (`SendButtons` in `composer/Edit.tsx`): a message
   sent then is answered 202 and waits, its row shown under the turn at
   once, and the composer empties as after any send; a 429 keeps the
-  draft and shows the words under the box. An Edit handed over opens
-  an edit: "Editing a queued message" and Cancel over the box (Cancel
-  gives the draft back as it was), no slash commands, and Send becomes
-  Save, which sends the text with the revision read and empties the
-  composer. A 409, or the row leaving the queue, ends the edit and
-  keeps the text as the draft, with words that say so. Leaving the chat
-  lets the edit go; its text stays the draft. The queued row's files
-  stay with it and are not handed back.
+  draft and shows the words under the box. The box then reads "Write a
+  message for after the reply". An Edit handed over opens an edit: the
+  box holds the row's text alone and the draft's text is set aside,
+  "Editing a queued message" and Cancel over the box, no slash
+  commands, and Send becomes Save, which sends the text with the
+  revision read; Save and Cancel give the set-aside text back. The edit
+  lives in the draft (`DraftEdit` in `composer/draft.ts`), so a reload
+  or a navigation keeps editing and never leaves its text as a plain
+  draft. The draft's files and switch flips stay for the next message,
+  since an edit changes the text alone. A 409, or the row leaving the
+  queue while no save is on its way, ends the edit with its text kept
+  and the set-aside text after it, with words that say so. The queued
+  row's files stay with it and are not handed back.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under

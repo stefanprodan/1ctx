@@ -16,6 +16,7 @@ import {
   rememberAgent,
   startsOn,
 } from "../../../src/client/data/project-agents.ts";
+import { sendMessage } from "../../../src/client/data/queued.ts";
 import {
   BUFFER_MAX,
   compactSession,
@@ -34,7 +35,6 @@ import {
   renameSession,
   retrying,
   sending,
-  sendMessage,
   session,
   sessionError,
   toolResults,

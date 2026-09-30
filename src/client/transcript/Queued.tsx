@@ -26,7 +26,7 @@ export type QueueProps = {
     name: string;
     username: string | null;
   };
-  onEdit: (row: QueuedMessage) => void;
+  onEdit: (row: QueuedMessage) => Promise<void>;
   onRemove: (row: QueuedMessage) => Promise<void>;
   // absent where no composer takes the text, as in an archived chat
   onSendAgain?: (row: QueuedMessage) => Promise<void>;
@@ -94,7 +94,7 @@ function QueuedRow({
                 type="button"
                 class="btn-text"
                 disabled={busy}
-                onClick={() => onEdit(row)}
+                onClick={() => void action.run(() => onEdit(row))}
               >
                 Edit
               </button>

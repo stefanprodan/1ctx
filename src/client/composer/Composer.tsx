@@ -15,31 +15,13 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
-import {
-  CREDENTIAL,
-  KNOWLEDGE,
-  MCP,
-  MEMORY,
-  SKILL,
-  VISUALIZE,
-  WEB,
-} from "../../shared/capabilities.ts";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type {
   QueuedMessage,
   RoundUsage,
 } from "../../shared/contracts/session.ts";
-import {
-  credentials,
-  dropFlips,
-  dropKind,
-  flip,
-  isOff,
-  servers,
-  skills,
-  switchable,
-} from "../data/capabilities.ts";
+import { flip } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
 import { rememberAgent, startingAgent } from "../data/project-agents.ts";
 import {
@@ -55,13 +37,6 @@ import {
 } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
 import { stepHighlight } from "../ui/Select.model.ts";
-import {
-  agentMoved,
-  serversItem,
-  skillsItem,
-  switchItem,
-  webPaneItem,
-} from "./Add.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
 import { AttachState } from "./Attach.state.ts";
@@ -86,6 +61,7 @@ import {
 import {
   EditLine,
   editOf,
+  placeholderOf,
   SendButtons,
   saveEdit,
   useHandoff,
@@ -93,6 +69,7 @@ import {
 import { Files } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
+import { useSwitches } from "./switches.ts";
 import "./composer.css";
 import { says } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
@@ -221,63 +198,14 @@ export function Composer({
   const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
   const chat = "sessionId" in scope ? scope.sessionId : null;
   const edit = editOf(chat);
-  const saving = useHandoff(chat, key, text, failure, input, queued);
-  // a flip never sent does not wait for the next visit to the chat
-  useEffect(() => () => dropFlips(chat), [chat]);
-  const offKey = (key: string) => isOff(chat, off, key);
-  const web = switchItem(WEB, {
-    tools: readable,
-    switchable: switchable.value,
-    off: offKey(WEB),
-  });
-  // the credentials are the project's, so another agent keeps their
-  // flips and another project, on Home, drops them
-  const webPane = webPaneItem({
-    web,
-    credentials: credentials.value,
-    isOff: offKey,
-  });
-  const lastProject = useRef<string | null>(null);
-  useEffect(() => {
-    if (agentMoved(lastProject.current, filesProjectId)) {
-      dropKind(chat, CREDENTIAL);
-    }
-    lastProject.current = filesProjectId;
-  }, [chat, filesProjectId]);
-  const visuals = switchItem(VISUALIZE, {
-    tools: readable,
-    switchable: switchable.value,
-    off: offKey(VISUALIZE),
-  });
-  const knowledge = switchItem(KNOWLEDGE, {
-    tools: readable,
-    switchable: switchable.value,
-    off: offKey(KNOWLEDGE),
-  });
-  const memory = switchItem(MEMORY, {
-    tools: readable,
-    switchable: switchable.value,
-    off: offKey(MEMORY),
-  });
-  // another agent's servers and skills are other keys, so its flips go
-  // with it
-  const lastAgent = useRef<string | null>(null);
-  useEffect(() => {
-    if (agentMoved(lastAgent.current, agent)) {
-      dropKind(chat, MCP);
-      dropKind(chat, SKILL);
-    }
-    if (agent !== null) lastAgent.current = agent;
-  }, [chat, agent]);
-  const mcp = serversItem({
-    tools: readable,
-    servers: (agent === null ? undefined : servers.value[agent]) ?? [],
-    isOff: offKey,
-  });
-  const skill = skillsItem({
-    tools: readable,
-    skills: (agent === null ? undefined : skills.value[agent]) ?? [],
-    isOff: offKey,
+  const box = { key, text, failure };
+  const saving = useHandoff(chat, box, input, queued);
+  const switches = useSwitches({
+    chat,
+    off,
+    agent,
+    readable,
+    projectId: filesProjectId,
   });
   const attach = (picked: File[]) => {
     failure.value = null;
@@ -294,9 +222,8 @@ export function Composer({
   const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
   const submit = async () => {
     const content = text.value.trim();
-    if (edit !== null && onEdit !== undefined) {
-      return saveEdit(edit, content, onEdit, { key, text, failure, saving });
-    }
+    if (edit !== null)
+      return saveEdit(edit, content, onEdit, { ...box, saving });
     if (content === "" || agent === null || busy) return;
     const named = commandOf(content);
     if (named === null && (!ready || !placed || files.busy)) return;
@@ -333,12 +260,7 @@ export function Composer({
   // a chat not started yet has the page to itself, so the box shows
   // two lines at rest; in a chat the transcript needs the room
   const tall = !("sessionId" in scope);
-  const placeholder =
-    agents !== null && list.length === 0
-      ? "No agent yet: an admin adds one first"
-      : running
-        ? "Replying"
-        : idle;
+  const placeholder = placeholderOf(agents, running, idle);
   const refusal = failure.value ?? files.refusal.value;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a drop target has no role, and the plus does the same by keyboard
@@ -363,7 +285,7 @@ export function Composer({
         attach(dropped);
       }}
     >
-      {edit !== null && <EditLine open={edit} draftKey={key} text={text} />}
+      {edit !== null && <EditLine open={edit} box={box} />}
       <textarea
         ref={input}
         class="composer-text"
@@ -451,13 +373,7 @@ export function Composer({
         <Add
           readable={readable}
           onFiles={attach}
-          web={web}
-          webPane={webPane}
-          visuals={visuals}
-          knowledge={knowledge}
-          memory={memory}
-          servers={mcp}
-          skills={skill}
+          {...switches}
           onFlip={(key) => flip(chat, off, key)}
         />
         {project && (

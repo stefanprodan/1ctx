@@ -1,77 +1,63 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The pure half of a chat's queue: a write's answer over the held rows,
-// and when an envelope means the detail must be read again. A queue
-// change bumps the session's revision with an envelope that carries no
-// rows and changes nothing else, so an envelope that brings nothing new
-// holds a change only the detail has. A turn that opens while messages
-// wait took them, so its first user row reads the detail again too.
+// The queue a chat on screen holds, in two parts ordered by the
+// session revision that last wrote each: the queued rows every member
+// sees, which envelopes carry, and the user's own not-sent rows, which
+// only their notSent event carries. A write's answer holds both. A part
+// is taken only from a newer revision than the one held, so a write's
+// answer that lands after an envelope moved past it never puts back a
+// row that started, and a detail read before a change never undoes it.
 
-import type {
-  Message,
-  QueuedMessage,
-  SessionDetail,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
+import type { QueuedMessage } from "../../shared/contracts/session.ts";
 
-// a queued row added or replaced by id, in the order the server keeps
-export function withQueued(
-  rows: readonly QueuedMessage[],
-  row: QueuedMessage,
+export type QueueAt = { shared: number; mine: number };
+
+export type QueuePart = {
+  revision: number;
+  // the queued rows, every member's
+  shared?: readonly QueuedMessage[];
+  // the user's not-sent rows
+  mine?: readonly QueuedMessage[];
+};
+
+const waits = (row: QueuedMessage) => row.state === "queued";
+
+// both parts as the server orders them, by when each was queued
+function joined(
+  shared: readonly QueuedMessage[],
+  mine: readonly QueuedMessage[],
 ): QueuedMessage[] {
-  const i = rows.findIndex((r) => r.id === row.id);
-  if (i === -1) return [...rows, row];
-  const out = rows.slice();
-  out[i] = row;
-  return out;
+  return [...shared, ...mine].sort((a, b) => a.queuedAt - b.queuedAt);
 }
 
-// the detail with the row a write answered
-export const queuedOnto = (
-  detail: SessionDetail,
-  row: QueuedMessage,
-): SessionDetail => ({ ...detail, queued: withQueued(detail.queued, row) });
+// a whole queue, a detail's or an answer's, as its two parts
+export const partsOf = (
+  revision: number,
+  queue: readonly QueuedMessage[],
+): QueuePart => ({
+  revision,
+  shared: queue.filter(waits),
+  mine: queue.filter((row) => !waits(row)),
+});
 
-export const withoutQueued = (
-  rows: readonly QueuedMessage[],
-  id: string,
-): QueuedMessage[] => rows.filter((r) => r.id !== id);
-
-// two JSON values alike whatever their keys' order
-function alike(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object") return false;
-  if (a === null || b === null) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  return ka.every((k) =>
-    alike((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
-  );
-}
-
-// an envelope above the held revision: whether the detail is read again
-export function queueMoved(
-  held: {
-    session: SessionSummary;
-    messages: readonly Message[];
-    queued: readonly QueuedMessage[];
-  },
-  ev: {
-    session: SessionSummary;
-    messages: readonly Message[];
-    removedMessageIds?: readonly string[];
-  },
-): boolean {
-  if (ev.messages.length === 0 && (ev.removedMessageIds ?? []).length === 0) {
-    return alike(
-      { ...held.session, revision: 0 },
-      { ...ev.session, revision: 0 },
-    );
-  }
-  if (!held.queued.some((q) => q.state === "queued")) return false;
-  const seen = new Set(held.messages.map((m) => m.id));
-  return ev.messages.some((m) => m.kind === "user" && !seen.has(m.id));
+// the held queue with the newer parts of another; the revisions after
+export function queueOnto(
+  held: readonly QueuedMessage[],
+  at: QueueAt,
+  part: QueuePart,
+): { queued: QueuedMessage[]; at: QueueAt } | null {
+  const shared = part.shared !== undefined && part.revision > at.shared;
+  const mine = part.mine !== undefined && part.revision > at.mine;
+  if (!shared && !mine) return null;
+  return {
+    queued: joined(
+      shared ? part.shared! : held.filter(waits),
+      mine ? part.mine! : held.filter((row) => !waits(row)),
+    ),
+    at: {
+      shared: shared ? part.revision : at.shared,
+      mine: mine ? part.revision : at.mine,
+    },
+  };
 }

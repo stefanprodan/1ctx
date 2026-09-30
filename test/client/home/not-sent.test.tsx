@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Home's Not sent card: it shows only while the user has one, each row
-// leads to its chat, Discard all empties it, and a queue change in a
-// chat it lists reads it again only while the card is on screen.
+// leads to its chat, Discard all names the rows it shows, and the
+// user's notSent event reads it again, folded, only while the card is
+// on screen.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -11,14 +12,13 @@ import { me } from "../../../src/client/data/me.ts";
 import {
   discardNotSent,
   loadNotSent,
-  noteWaits,
   notSent,
   onNotSentSocket,
   watchNotSent,
 } from "../../../src/client/data/not-sent.ts";
 import { NotSent } from "../../../src/client/views/home/NotSent.tsx";
 import type { NotSentRow } from "../../../src/shared/api/sessions.ts";
-import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
+import type { SocketEvent } from "../../../src/shared/socket.ts";
 
 const row = (changes: Partial<NotSentRow> = {}): NotSentRow => ({
   id: "q1",
@@ -32,38 +32,16 @@ const row = (changes: Partial<NotSentRow> = {}): NotSentRow => ({
   ...changes,
 });
 
-const summary = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
-  archived: null,
-  attention: null,
-  id: "s1",
+const notSentEvent = (sessionId: string): SocketEvent => ({
+  type: "notSent",
   projectId: "p1",
-  ownerId: "u1",
-  agentId: "a1",
-  origin: "chat",
-  automationId: null,
-  runSource: null,
-  forkedFromId: null,
-  title: "Chat",
-  status: "done",
+  sessionId,
   revision: 4,
-  createdAt: 10,
-  lastActivityAt: 20,
-  usage: null,
-  disabledCapabilities: [],
-  ...changes,
-});
-
-const envelope = (id: string, messages: never[] = []) => ({
-  type: "session" as const,
-  row: null,
-  projectId: "p1",
-  session: summary({ id }),
-  messages,
-  send: null,
+  rows: [],
 });
 
 const realFetch = globalThis.fetch;
-let calls: string[] = [];
+let calls: { call: string; body: unknown }[] = [];
 let answer: (method: string) => Response;
 let user = 0;
 
@@ -83,7 +61,11 @@ beforeEach(() => {
   answer = () => Response.json({ rows: [row()] });
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    calls.push(`${method} ${url}`);
+    calls.push({
+      call: `${method} ${url}`,
+      body:
+        init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+    });
     return answer(method);
   }) as unknown as typeof fetch;
 });
@@ -120,35 +102,38 @@ describe("Home's Not sent card", () => {
     },
   );
 
-  test.serial("Discard all empties it and reads it again", async () => {
+  test.serial("Discard all names the rows it shows", async () => {
+    answer = () =>
+      Response.json({ rows: [row(), row({ id: "q2", sessionId: "s2" })] });
     await loadNotSent();
     answer = (method) =>
       method === "DELETE"
-        ? Response.json({ deleted: 1 })
+        ? Response.json({ deleted: 2 })
         : Response.json({ rows: [] });
     await discardNotSent();
     expect(calls).toEqual([
-      "GET /api/me/not-sent",
-      "DELETE /api/me/not-sent",
-      "GET /api/me/not-sent",
+      { call: "GET /api/me/not-sent", body: undefined },
+      { call: "DELETE /api/me/not-sent", body: { ids: ["q1", "q2"] } },
+      { call: "GET /api/me/not-sent", body: undefined },
     ]);
     expect(notSent.value).toEqual([]);
   });
 
   test.serial(
-    "a queue change in a chat it lists reads it again while watched",
+    "the user's notSent event reads it again while watched, folded",
     async () => {
       await loadNotSent();
       // not on screen: nothing is read
-      onNotSentSocket(envelope("s1"));
+      onNotSentSocket(notSentEvent("s9"));
       await settle();
       expect(calls).toHaveLength(1);
       const stop = watchNotSent();
       try {
-        onNotSentSocket(envelope("s1"));
-        // a chat it does not list and where nothing of the user's waits
-        onNotSentSocket(envelope("s9"));
+        onNotSentSocket(notSentEvent("s9"));
+        onNotSentSocket(notSentEvent("s8"));
+        onNotSentSocket(notSentEvent("s7"));
         await settle();
+        // one read now, the rest folded into one trailing read
         expect(calls).toHaveLength(2);
       } finally {
         stop();
@@ -156,24 +141,18 @@ describe("Home's Not sent card", () => {
     },
   );
 
-  test.serial(
-    "a chat where the user's message waits is watched too",
-    async () => {
-      answer = () => Response.json({ rows: [] });
-      await loadNotSent();
-      const stop = watchNotSent();
-      try {
-        noteWaits("s7", [{ author: { id: "someone" } }]);
-        onNotSentSocket(envelope("s7"));
-        await settle();
-        expect(calls).toHaveLength(1);
-        noteWaits("s7", [{ author: { id: `u${user}` } }]);
-        onNotSentSocket(envelope("s7"));
-        await settle();
-        expect(calls).toHaveLength(2);
-      } finally {
-        stop();
-      }
-    },
-  );
+  test.serial("a chat it lists deleted reads it again", async () => {
+    await loadNotSent();
+    const stop = watchNotSent();
+    try {
+      onNotSentSocket({ type: "deleted", projectId: "p1", sessionId: "s9" });
+      await settle();
+      expect(calls).toHaveLength(1);
+      onNotSentSocket({ type: "deleted", projectId: "p1", sessionId: "s1" });
+      await settle();
+      expect(calls).toHaveLength(2);
+    } finally {
+      stop();
+    }
+  });
 });

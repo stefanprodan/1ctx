@@ -1,109 +1,160 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A chat's composer over a waiting message: it takes the text a row
-// hands it, saves an edit over the row instead of sending, and lets the
-// edit go when the chat changes or the row leaves the queue, keeping the
-// text as the draft. A save the row no longer takes (a 409) does the
-// same, with words that say so.
+// A chat's composer over a waiting message. It takes what a row hands
+// it (handoff.ts), keeps an open edit in the draft so a reload keeps
+// editing, saves the edit over the row instead of sending, and gives
+// the set-aside draft back after Save or Cancel. An edit the row no
+// longer takes (a 409, or the row gone from the queue while no save is
+// on its way) ends with its text kept and the draft after it, with
+// words that say so; the files and switches of the draft wait for the
+// next message, since an edit changes the text alone.
 
 import { type Signal, useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect } from "preact/hooks";
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { QueuedMessage } from "../../shared/contracts/session.ts";
 import { ApiError } from "../data/api.ts";
 import { says } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { touch } from "../lib/touch.ts";
-import { readDraft, writeDraftText } from "./draft.ts";
+import { readDraft, writeDraftEdit } from "./draft.ts";
 import {
   EDIT_GONE,
   EDIT_LOST,
+  EDIT_OPEN,
   EDITING,
   type Editing,
   editing,
+  type Handoff,
   handoff,
+  merged,
   takeHandoff,
 } from "./handoff.ts";
+
+export const PLACEHOLDER_RUNNING = "Write a message for after the reply";
 
 // the edit open in this chat's composer, or null
 export const editOf = (chat: string | null): Editing | null =>
   chat !== null && editing.value?.sessionId === chat ? editing.value : null;
 
-// answers whether a save is on its way
+// the box at rest: no agent yet, a reply running, or the view's words
+export function placeholderOf(
+  agents: AgentSummary[] | null,
+  running: boolean,
+  idle: string,
+): string {
+  if (agents !== null && agents.length === 0) {
+    return "No agent yet: an admin adds one first";
+  }
+  return running ? PLACEHOLDER_RUNNING : idle;
+}
+
+type Box = {
+  key: string;
+  text: Signal<string>;
+  failure: Signal<string | null>;
+};
+
+// the edit let go: the box keeps its text with the set-aside draft
+// after it, as a draft of its own, and says why
+function endEdit(box: Box, open: Editing, words: string): void {
+  if (editing.value?.id === open.id) editing.value = null;
+  const text = merged(box.text.value, open.before);
+  box.text.value = text;
+  writeDraftEdit(box.key, text, undefined);
+  box.failure.value = words;
+}
+
+// an open edit whose row left the queue, read when the effect runs: a
+// save on its way answers for itself, and a Remove here closes the edit
+// with its own words
+export function editGone(
+  open: Editing,
+  queued: readonly QueuedMessage[] | undefined,
+  saving: boolean,
+  pending: Handoff | null,
+): boolean {
+  if (queued === undefined || saving) return false;
+  if (pending?.kind === "close" && pending.id === open.id) return false;
+  return !queued.some((row) => row.id === open.id && row.state === "queued");
+}
+
+// the composer's side of an edit; answers the signal a save holds
+// while it is on its way
 export function useHandoff(
   chat: string | null,
-  draftKey: string,
-  text: Signal<string>,
-  failure: Signal<string | null>,
+  box: Box,
   input: RefObject<HTMLTextAreaElement>,
   queued: readonly QueuedMessage[] | undefined,
 ): Signal<boolean> {
   const saving = useSignal(false);
+  const { key, text, failure } = box;
+  // the draft's edit is the chat's, after a navigation or a reload too
+  useEffect(() => {
+    if (chat === null) return;
+    const edit = readDraft(key).edit;
+    editing.value = edit === undefined ? null : { ...edit, sessionId: chat };
+    // leaving lets the mirror go; the draft keeps the edit
+    return () => {
+      if (editing.value?.sessionId === chat) editing.value = null;
+    };
+  }, [chat, key]);
   const next = handoff.value;
   useEffect(() => {
     if (chat === null || next === null || next.sessionId !== chat) return;
     handoff.value = null;
-    const taken = takeHandoff(next, text.value, editing.value);
+    const taken = takeHandoff(next, text.value, editOf(chat));
+    if (taken === null) {
+      if (next.kind !== "close") failure.value = EDIT_OPEN;
+      return;
+    }
     text.value = taken.text;
-    writeDraftText(draftKey, taken.text);
-    failure.value = null;
-    editing.value = taken.editing;
+    writeDraftEdit(key, taken.text, taken.edit);
+    editing.value =
+      taken.edit === undefined ? null : { ...taken.edit, sessionId: chat };
+    failure.value = taken.words;
     if (!touch()) input.current?.focus();
-  }, [chat, next, draftKey, text, failure, input]);
-  // leaving the chat lets the edit go; its text stays the draft
-  useEffect(
-    () => () => {
-      if (chat !== null && editing.value?.sessionId === chat) {
-        editing.value = null;
-      }
-    },
-    [chat],
-  );
-  const open = editOf(chat);
-  const gone =
-    open !== null &&
-    queued !== undefined &&
-    !queued.some((row) => row.id === open.id && row.state === "queued");
+  }, [chat, next, key, text, failure, input]);
   useEffect(() => {
-    if (!gone) return;
-    editing.value = null;
-    failure.value = EDIT_GONE;
-  }, [gone, failure]);
+    const now = chat === null ? null : editOf(chat);
+    if (now !== null && editGone(now, queued, saving.value, handoff.value)) {
+      endEdit(box, now, EDIT_GONE);
+    }
+  });
   return saving;
 }
 
-// Save over the row: the composer empties as after a send; a row that
-// started or changed first ends the edit and keeps the text
+// Save over the row: the set-aside draft comes back as after a send
 export async function saveEdit(
   open: Editing,
   content: string,
-  onEdit: (row: Editing, text: string) => Promise<void>,
-  state: {
-    key: string;
-    text: Signal<string>;
-    failure: Signal<string | null>;
-    saving: Signal<boolean>;
-  },
+  onEdit: ((row: Editing, text: string) => Promise<void>) | undefined,
+  box: Box & { saving: Signal<boolean> },
 ): Promise<void> {
-  if (content === "" || state.saving.value) return;
-  state.saving.value = true;
-  state.failure.value = null;
-  const sent = state.text.value;
+  if (onEdit === undefined || content === "" || box.saving.value) return;
+  box.saving.value = true;
+  box.failure.value = null;
+  const sent = box.text.value;
   try {
     await onEdit(open, content);
     if (editing.value?.id === open.id) editing.value = null;
-    if (state.text.value === sent) state.text.value = "";
-    if (readDraft(state.key).text === sent) {
-      writeDraftText(state.key, "");
-    }
+    // what was typed while the save was on its way stays, before the
+    // draft that comes back
+    const text =
+      box.text.value === sent
+        ? open.before
+        : merged(box.text.value, open.before);
+    box.text.value = text;
+    writeDraftEdit(box.key, text, undefined);
+    box.failure.value = null;
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) {
-      if (editing.value?.id === open.id) editing.value = null;
-      state.failure.value = EDIT_LOST;
-    } else state.failure.value = says(err);
+      endEdit(box, open, EDIT_LOST);
+    } else box.failure.value = says(err);
   } finally {
-    state.saving.value = false;
+    box.saving.value = false;
   }
 }
 
@@ -156,15 +207,7 @@ export function SendButtons({
 
 // the line over the box while an edit is open; Cancel gives the draft
 // back as it was before the edit
-export function EditLine({
-  open,
-  draftKey,
-  text,
-}: {
-  open: Editing;
-  draftKey: string;
-  text: Signal<string>;
-}) {
+export function EditLine({ open, box }: { open: Editing; box: Box }) {
   return (
     <p class="composer-editing">
       <span class="cut">{EDITING}</span>
@@ -173,8 +216,9 @@ export function EditLine({
         class="btn-text"
         onClick={() => {
           editing.value = null;
-          text.value = open.before;
-          writeDraftText(draftKey, open.before);
+          box.text.value = open.before;
+          box.failure.value = null;
+          writeDraftEdit(box.key, open.before, undefined);
         }}
       >
         Cancel

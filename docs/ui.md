@@ -39,10 +39,11 @@ client change. What each page draws is in `docs/views.md`.
   so a reconnect goes through the path a navigation does. It knows no
   entity: `data/sessions.ts` registers for the frames, applies a
   durable envelope only when its revision is above the one held, and
-  reads the detail again for one that carries nothing new (a queue
-  change, `queueMoved()` in `docs/views.md`), and applies stream frames
-  through `transcript/stream.ts`, in sequence; a gap, a frame ahead of
-  the buffer, or too many frames before `watched` refetch the detail.
+  hands a chat's queue and the user's `notSent` rows to
+  `data/session-queue.ts`, which takes each by revision with no read
+  (`docs/views.md`), and applies stream frames through
+  `transcript/stream.ts`, in sequence; a gap, a frame ahead of the
+  buffer, or too many frames before `watched` refetch the detail.
   The reducers are pure and tested on fixtures; the transcript, the
   composer and the chat view render what the entity holds. The
   server's side is in `docs/access.md`.
@@ -161,14 +162,15 @@ client change. What each page draws is in `docs/views.md`.
   `RowsEnd` (buttons, after the words that ask or the failure),
   `RowsSwitch` or `RowsCheck`, and `RowsRadio` or `RowsCheck` first
   in a label row; a `RowsCheck` with no words outside a label row takes
-  a `label`, which names it aloud and makes the box its own label. A card's head holds `RowsAdd`, `RowsLink`, `RowsAction`
-  (a button over the whole list, Discard all) or `RowsFilters`; its
-  `search` or `tabs` (`ui/Tabs.tsx` with `head`, a
-  phone hiding the hint) takes the label's place, the label still
-  naming the card aloud. `RowsNote` says why a list is empty, `RowsBlock` is a
-  row of text. The controls live in `ui/RowsControls.tsx`, exported
-  through `Rows.tsx`. A list whose load failed shows `RowsFailed`
-  under its rows: the words, then the `CodeTag`.
+  a `label`, which names it aloud and makes the box its own label. A
+  card's head holds `RowsAdd`, `RowsLink`, `RowsAction` (a button over
+  the whole list, Discard all) or `RowsFilters`; its `search` or `tabs`
+  (`ui/Tabs.tsx` with `head`, a phone hiding the hint) takes the
+  label's place, the label still naming the card aloud. `RowsNote` says
+  why a list is empty, `RowsBlock` is a row of text. The controls live
+  in `ui/RowsControls.tsx`, exported through `Rows.tsx`. A list whose
+  load failed shows `RowsFailed` under its rows: the words, then the
+  `CodeTag`.
 - **A view draws no row of its own.**
   Card head buttons never wrap; hints stay on one ellipsized line. A
   view never draws a row, a head, a list box, a switch, a box or filter

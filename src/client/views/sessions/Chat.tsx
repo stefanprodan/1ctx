@@ -22,13 +22,12 @@ import { useEffect } from "preact/hooks";
 import type { SessionOrigin } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
-import { editing, handOver } from "../../composer/handoff.ts";
 import { archiveSession } from "../../data/archive.ts";
 import { automations } from "../../data/automations.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
-import { editQueued, removeQueued } from "../../data/queued.ts";
+import { editQueued, sendMessage } from "../../data/queued.ts";
 import {
   compactSession,
   deleteSession,
@@ -39,7 +38,6 @@ import {
   renameSession,
   retrying,
   sending,
-  sendMessage,
   session,
   sessionError,
   stopSession,
@@ -58,6 +56,7 @@ import { Page } from "../../ui/Page.tsx";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
+import { queueActions } from "./queue.ts";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
 
@@ -239,28 +238,8 @@ function SessionPage({
                     rows: shown.queued,
                     running: shown.session.status === "running",
                     userId: user?.id ?? null,
-                    editing:
-                      editing.value?.sessionId === shown.session.id
-                        ? editing.value.id
-                        : null,
                     authorOf,
-                    onEdit: (row) =>
-                      handOver({
-                        sessionId: shown.session.id,
-                        text: row.text,
-                        edit: { id: row.id, revision: row.revision },
-                      }),
-                    onRemove: (row) => removeQueued(shown.session.id, row),
-                    onSendAgain: archived
-                      ? undefined
-                      : async (row) => {
-                          handOver({
-                            sessionId: shown.session.id,
-                            text: row.text,
-                            edit: null,
-                          });
-                          await removeQueued(shown.session.id, row);
-                        },
+                    ...queueActions(shown.session.id, archived),
                   }
             }
             foot={
