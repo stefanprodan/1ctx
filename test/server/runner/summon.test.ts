@@ -238,7 +238,7 @@ describe("a summon", () => {
   });
 
   test("an unknown name is refused on a send, in the queue and on a new chat", async () => {
-    const { chat } = await summonApp();
+    const { chat, checkerId } = await summonApp();
     try {
       const { sessionId, script } = await startChat(chat, "hello");
       const queued = await post(chat, sessionId, "@glm check");
@@ -267,6 +267,21 @@ describe("a summon", () => {
         expect(started.status).toBe(400);
         expect((await started.json()).error).toBe(error);
       }
+      // a retired agent's name is no longer a pick in the wrong place
+      const retired = await chat.admin.call(
+        "DELETE",
+        `/api/agents/${checkerId}`,
+      );
+      expect(retired.status).toBe(200);
+      const started = await chat.member.call("POST", "/api/sessions", {
+        body: {
+          projectId: chat.projectId,
+          agentId: chat.agentId,
+          message: "@checker hi",
+        },
+      });
+      expect(started.status).toBe(400);
+      expect((await started.json()).error).toBe("no agent named checker");
     } finally {
       await chat.app.shutdown();
     }

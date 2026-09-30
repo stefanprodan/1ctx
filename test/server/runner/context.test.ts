@@ -182,6 +182,11 @@ describe("unmarked", () => {
     ["[coder] yes", "[coder] yes"],
     ["yes [checker] no", "yes [checker] no"],
     ["[checkers] yes", "[checkers] yes"],
+    ["[Checker] yes", "yes"],
+    ["[CHECKER]", ""],
+    ["[checker](https://x) says", "[checker](https://x) says"],
+    ["[checker]: x", "[checker]: x"],
+    ["[checker][1]", "[checker][1]"],
   ])("%j", (text, want) => {
     expect(unmarked(text, "checker")).toBe(want);
   });

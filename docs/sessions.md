@@ -196,9 +196,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   ordinary turn, a name past the first word plain text, and a first
   word naming no live agent the 400 "no agent named <word>", at a send,
   at queueing and on an edit of a queued message. A new chat's first
-  message cannot summon: a live agent's name is the 400 "a new chat
-  starts on the picked agent", any other the same 400. A turn of
-  several messages holds a summon alone, and a run never summons. The send is written with
+  message cannot summon: a live agent's name other than the picked one
+  is the 400 "a new chat starts on the picked agent", any other `@word`
+  the 400 "no agent named <word>". A turn of several messages holds a
+  summon alone, and a run never summons. The send is written with
   `sends.summoned` and its agent, which fork copies; the policy's
   `summoned` names the chat's agent. A summon is refused, "the chat is
   too long for <name>", when the prompt of the chat's last round, of
@@ -215,9 +216,10 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   reasoning or signatures, so no provider sees a call without its
   result; a skill it loaded is not counted as loaded. A model that
   read marked answers may open its own with `[its name]`: the summoned
-  line asks it not to, and the writer drops that mark from a stored
-  answer (`unmarked`). A summoned send's
-  cache key is `<chat>:<agent>`, so agents share no sticky route or
+  line asks it not to, and the writer drops that mark, in any case and
+  followed by a space or the end, from a stored answer (`unmarked`);
+  the live frames of a reply still streaming may show it. A summoned
+  send's cache key is `<chat>:<agent>`, so agents share no sticky route or
   slot. `SessionSummary.usage` reads the chat's own rounds only, so the
   meter and a compaction's room stay the chat agent's. The feed and
   envelope row's `sendAgent` names the last send's agent, and a not-sent

@@ -78,11 +78,15 @@ function ownTurn(turn: Turn | undefined, policy: Builder): boolean {
 const markOf = (name: string) => `[${name}] `;
 
 // an answer without the agent's own mark: a model that read other
-// agents' marked answers may open its own the same way
+// agents' marked answers may open its own the same way. Only a mark
+// followed by a space or the end, so a link or reference that opens
+// with the name stays; names are lowercase but a model's case is not
 export function unmarked(text: string, name: string): string {
-  const mark = markOf(name).trimEnd();
+  const mark = markOf(name).trimEnd().toLowerCase();
   const start = text.trimStart();
-  return start.startsWith(mark) ? start.slice(mark.length).trimStart() : text;
+  if (start.slice(0, mark.length).toLowerCase() !== mark) return text;
+  const rest = start.slice(mark.length);
+  return rest === "" || /^\s/.test(rest) ? rest.trimStart() : text;
 }
 
 // another agent's turn: its answer as a user message opened by its
