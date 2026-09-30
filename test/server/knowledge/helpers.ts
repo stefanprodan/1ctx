@@ -61,7 +61,6 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
       id: "test-model",
       name: "Test model",
       contextLength: null,
-      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,

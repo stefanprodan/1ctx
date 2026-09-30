@@ -70,8 +70,6 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
           : id,
       contextLength:
         num(model.inputTokenLimit) > 0 ? num(model.inputTokenLimit) : null,
-      outputLimit:
-        num(model.outputTokenLimit) > 0 ? num(model.outputTokenLimit) : null,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -87,20 +85,6 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
 }
 
 const THINKING_BUDGETS = { low: 1024, medium: 8192, high: 24576 } as const;
-
-// Gemini 2.5 refuses a budget under the model's minimum: 512 on
-// Flash-Lite, the highest, and 128 on Pro
-const MIN_THINKING_BUDGET = 512;
-
-// a budget at most half the cap: Gemini takes one above max_tokens, but
-// thinking then fills the cap and the answer comes back empty
-export function fitThinkingBudget(
-  budget: number,
-  maxTokens: number | null | undefined,
-): number {
-  if (maxTokens == null || budget <= maxTokens / 2) return budget;
-  return Math.max(MIN_THINKING_BUDGET, Math.floor(maxTokens / 2));
-}
 
 // https://ai.google.dev/gemini-api/docs/thought-signatures
 export const FOREIGN_SIGNATURE = "skip_thought_signature_validator";
@@ -153,12 +137,7 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
       throw new Error("unknown Gemini thinking effort");
     }
     if (level) config.thinking_level = effort;
-    else {
-      config.thinking_budget = fitThinkingBudget(
-        THINKING_BUDGETS[effort],
-        req.maxTokens,
-      );
-    }
+    else config.thinking_budget = THINKING_BUDGETS[effort];
   }
   body.extra_body = { google: { thinking_config: config } };
   return body;

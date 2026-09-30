@@ -254,7 +254,6 @@ describe("provision through the composed app", () => {
         id: "bare-model",
         name: "bare-model",
         contextLength: 65_536,
-        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: true,

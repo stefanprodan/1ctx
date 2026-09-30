@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { fitThinkingBudget } from "../../../src/server/providers/gemini.ts";
 import {
   buildGeminiChatBody as buildChatBody,
   CatalogError,
@@ -95,7 +94,6 @@ describe("Gemini catalog", () => {
       id: "gemini-2.5-flash",
       name: "Gemini 2.5 Flash",
       contextLength: 1048576,
-      outputLimit: 65536,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -171,7 +169,6 @@ describe("Gemini catalog", () => {
         id: "chat",
         name: "chat",
         contextLength: null,
-        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: true,
@@ -253,7 +250,6 @@ describe("Gemini chat body", () => {
           ...request,
           model,
           reasoningEffort: effort,
-          maxTokens: null,
         });
         expect(body.extra_body).toEqual({
           google: { thinking_config: { include_thoughts: true, ...config } },
@@ -684,30 +680,5 @@ describe("Gemini errors", () => {
     "connection failed",
   ])("keeps a failure without Google's message: %s", (message) => {
     expect(geminiError(message)).toBe(message);
-  });
-});
-
-describe("Gemini thinking budget", () => {
-  test("stays at most half the output cap, never under the minimum", () => {
-    expect(fitThinkingBudget(24576, null)).toBe(24576);
-    expect(fitThinkingBudget(24576, 65536)).toBe(24576);
-    expect(fitThinkingBudget(24576, 32000)).toBe(16000);
-    expect(fitThinkingBudget(8192, 2048)).toBe(1024);
-    expect(fitThinkingBudget(1024, 1024)).toBe(512);
-  });
-
-  test("an earlier model's budget follows the request's cap", () => {
-    const body = buildChatBody({
-      ...request,
-      model: "gemini-2.5-flash",
-      reasoningEffort: "high",
-      maxTokens: 20000,
-    });
-    expect(body.extra_body).toEqual({
-      google: {
-        thinking_config: { include_thoughts: true, thinking_budget: 10000 },
-      },
-    });
-    expect(body.max_tokens).toBe(20000);
   });
 });

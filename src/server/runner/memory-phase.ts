@@ -10,14 +10,9 @@ import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
-import type { ToolCall } from "../providers/index.ts";
+import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
-import {
-  type ContextLookups,
-  historyMessages,
-  type Sized,
-  sized,
-} from "./context.ts";
+import { type ContextLookups, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";
@@ -138,7 +133,7 @@ function memoryRequest(
   rows: Message[],
   offered: Offered,
   lookups: ContextLookups,
-): Sized | null {
+): ChatRequest | null {
   if (
     send.policy.automation === null ||
     send.memoryRound === null ||
@@ -172,21 +167,17 @@ function memoryRequest(
     tokens,
   );
   if (messages === null) return null;
-  return sized(
-    {
-      model: send.policy.model,
-      messages,
-      thinking: send.policy.thinking,
-      thinkingOff: send.policy.thinkingOff,
-      reasoningEffort: send.policy.effort,
-      cacheKey: send.sessionId,
-      upstream: send.policy.upstream,
-      skip4Bit: send.policy.skip4Bit,
-      ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),
-    },
-    send.policy,
-    send.measured,
-  );
+  return {
+    model: send.policy.model,
+    messages,
+    thinking: send.policy.thinking,
+    thinkingOff: send.policy.thinkingOff,
+    reasoningEffort: send.policy.effort,
+    cacheKey: send.sessionId,
+    upstream: send.policy.upstream,
+    skip4Bit: send.policy.skip4Bit,
+    ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),
+  };
 }
 
 function cut(result: ToolResult, chars: number): ToolResult {

@@ -15,7 +15,6 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import type { Measured } from "./context.ts";
 import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
 
 export type RoundState = {
@@ -116,9 +115,6 @@ export type ActiveSend = {
   // the tokens the last counted round used, prompt plus completion: the
   // room the summary round has to fit in; null when nothing was counted
   used: number | null;
-  // the last round the provider counted, which the next round's output
-  // cap measures from; null before one, or after a round it did not count
-  measured: Measured | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;
   // the current round's launched tool rows still streaming, keyed by
@@ -232,7 +228,6 @@ export function newSend(fields: {
     bare: false,
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,
-    measured: null,
     mcpNote: "",
     openTools: new Map(),
     tools: null,

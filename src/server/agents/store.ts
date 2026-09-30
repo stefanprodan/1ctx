@@ -8,9 +8,7 @@ import type { Avatar, Effort, McpMode } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
-// outputRead: the catalog was asked for the model's output limit, on a
-// save or a refresh; a row never asked sends no max_tokens
-export type AgentRow = AgentSummary & { outputRead: boolean };
+export type AgentRow = AgentSummary;
 
 type Raw = {
   id: string;
@@ -20,8 +18,6 @@ type Raw = {
   model: string;
   model_name: string;
   context_length: number | null;
-  output_limit: number | null;
-  output_read: number;
   prompt_price: number | null;
   completion_price: number | null;
   tools: number;
@@ -52,7 +48,6 @@ const row = (
     id: raw.model,
     name: raw.model_name,
     contextLength: raw.context_length,
-    outputLimit: raw.output_limit,
     promptPrice: raw.prompt_price,
     completionPrice: raw.completion_price,
     tools: raw.tools === 1,
@@ -71,13 +66,9 @@ const row = (
   skip4Bit: raw.skip_4bit === 1,
   default: raw.id === defaultId,
   createdAt: raw.created_at,
-  outputRead: raw.output_read === 1,
 });
 
-export const summary = ({
-  outputRead: _read,
-  ...agent
-}: AgentRow): AgentSummary => agent;
+export const summary = (agent: AgentRow): AgentSummary => agent;
 
 export type AgentFields = {
   name: string;
@@ -183,11 +174,10 @@ export class AgentStore {
     this.db
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
-           context_length, output_limit, output_read, prompt_price,
-           completion_price, tools, reasoning, thinking_required,
-           reasoning_known, model_described, thinking, effort, prompt,
-           mcp_mode, upstream, skip_4bit, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           context_length, prompt_price, completion_price, tools, reasoning,
+           thinking_required, reasoning_known, model_described, thinking,
+           effort, prompt, mcp_mode, upstream, skip_4bit, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -197,9 +187,6 @@ export class AgentStore {
         m.id,
         m.name,
         m.contextLength,
-        m.outputLimit,
-        // a model the catalog does not describe says nothing of it
-        m.described ? 1 : 0,
         m.promptPrice,
         m.completionPrice,
         m.tools ? 1 : 0,
@@ -223,12 +210,10 @@ export class AgentStore {
     this.db
       .query(
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
-           context_length = ?, output_limit = ?, output_read = ?,
-           prompt_price = ?,
-           completion_price = ?, tools = ?, reasoning = ?,
-           thinking_required = ?, reasoning_known = ?, model_described = ?,
-           thinking = ?, effort = ?, prompt = ?, mcp_mode = ?, upstream = ?,
-           skip_4bit = ?
+           context_length = ?, prompt_price = ?, completion_price = ?,
+           tools = ?, reasoning = ?, thinking_required = ?,
+           reasoning_known = ?, model_described = ?, thinking = ?,
+           effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?
          where id = ? and deleted_at is null`,
       )
       .run(
@@ -238,8 +223,6 @@ export class AgentStore {
         m.id,
         m.name,
         m.contextLength,
-        m.outputLimit,
-        m.described ? 1 : 0,
         m.promptPrice,
         m.completionPrice,
         m.tools ? 1 : 0,
@@ -256,42 +239,6 @@ export class AgentStore {
         id,
       );
     return this.byId(id);
-  }
-
-  // what a fresh catalog says of the output limit of each live agent's
-  // model on the provider; a model it does not describe or no longer
-  // lists is left as it was
-  setOutputLimits(providerId: string, models: CatalogMatch[]): number {
-    const byId = new Map(models.map((m) => [m.id, m]));
-    const rows = this.db
-      .query<
-        {
-          id: string;
-          model: string;
-          output_limit: number | null;
-          output_read: number;
-        },
-        [string]
-      >(
-        `select id, model, output_limit, output_read from agents
-         where provider_id = ? and model_described = 1 and deleted_at is null`,
-      )
-      .all(providerId);
-    let changed = 0;
-    for (const raw of rows) {
-      const m = byId.get(raw.model);
-      if (!m?.described) continue;
-      if (raw.output_read === 1 && raw.output_limit === m.outputLimit) {
-        continue;
-      }
-      this.db
-        .query(
-          "update agents set output_limit = ?, output_read = 1 where id = ?",
-        )
-        .run(m.outputLimit, raw.id);
-      changed++;
-    }
-    return changed;
   }
 
   // retired, never removed: its chats, sends and usage keep pointing at

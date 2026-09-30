@@ -114,7 +114,7 @@ test("rounds without usage accumulate the request estimate without fabricating u
             chat.app.sessions.reasoningDetails(id, providerId, model),
         },
         chat.app.now.value,
-      ).request;
+      );
       return tokens(
         JSON.stringify({
           messages: req.messages,

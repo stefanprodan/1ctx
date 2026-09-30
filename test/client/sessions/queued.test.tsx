@@ -729,7 +729,6 @@ describe("the composer while a turn runs", () => {
       id: "acme/small",
       name: "Small",
       contextLength: null,
-      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: false,

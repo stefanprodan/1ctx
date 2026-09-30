@@ -18,7 +18,6 @@ function agent(id: string): AgentSummary {
       id: `org/${id}`,
       name: id,
       contextLength: null,
-      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,

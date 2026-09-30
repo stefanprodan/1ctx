@@ -410,7 +410,6 @@ describe("a decider's drafts", () => {
     id: "vendor/kev-4b",
     name: "Kev 4B",
     contextLength: 8192,
-    outputLimit: null,
     promptPrice: 0.04,
     completionPrice: null,
     tools: false,

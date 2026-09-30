@@ -47,7 +47,7 @@ const EXPECTED_IDS = [
   "0033-feed-arms",
   "0034-send-limits",
   "0035-queued-messages",
-  "0036-output-limit",
+  "0036-skip-4bit",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1187,22 +1187,14 @@ describe("the schema", () => {
     }
   });
 
-  test("0036 leaves an agent's output limit unknown and its hosts unfiltered", () => {
+  test("0036 leaves an agent's hosts unfiltered", () => {
     const db = seed(MIGRATIONS.slice(0, 35));
     try {
-      expect(migrate(db)).toEqual(["0036-output-limit"]);
-      expect(
-        db
-          .query("select output_limit, output_read, skip_4bit from agents")
-          .get(),
-      ).toEqual({ output_limit: null, output_read: 0, skip_4bit: 0 });
-      for (const set of [
-        "output_limit = 0",
-        "output_read = 2",
-        "skip_4bit = 2",
-      ]) {
-        expect(() => db.exec(`update agents set ${set}`)).toThrow(/CHECK/);
-      }
+      expect(migrate(db)).toEqual(["0036-skip-4bit"]);
+      expect(db.query("select skip_4bit from agents").get()).toEqual({
+        skip_4bit: 0,
+      });
+      expect(() => db.exec("update agents set skip_4bit = 2")).toThrow(/CHECK/);
     } finally {
       db.close();
     }
@@ -1906,8 +1898,6 @@ describe("0008 search tavily migration", () => {
             upstream: null,
             is_default: 0,
             deleted_at: null,
-            output_limit: null,
-            output_read: 0,
             skip_4bit: 0,
           })),
         );
