@@ -24,8 +24,7 @@ import {
 import {
   type ContextLookups,
   history,
-  type Sized,
-  sizedRequest,
+  request,
   summaryRequest,
   withExhausted,
 } from "./context.ts";
@@ -144,37 +143,31 @@ export function buildRequest(
   rows: Message[],
   lookups: ContextLookups,
   now: number,
-): Sized {
+): ChatRequest {
   const messages = history(rows, send.policy, lookups, now, send.mcpNote);
   if (send.summarizing) {
-    return {
-      request: summaryRequest(send.policy, send.sessionId, messages, send.used),
-      estimate: null,
-    };
+    return summaryRequest(send.policy, send.sessionId, messages, send.used);
   }
-  const sized = sizedRequest(
+  const req = request(
     send.policy,
     send.sessionId,
     // the answer round ends with the ask as a request-local user
     // message, never a stored row
     send.answering ? withExhausted(messages, send.answering) : messages,
-    send.measured,
   );
-  const req = sized.request;
   // The answer round keeps the schemas untouched and asks in words: a
   // tool_choice changes the prompt a server renders and misses its
   // cache (mlx-serve: 138 s against 1.4 s for 64k tokens). A call anyway
   // is asked again with no schemas, with nothing left to call.
   if (send.bare) {
     const { tools: _tools, ...bare } = req;
-    return { request: bare, estimate: sized.estimate };
+    return bare;
   }
-  return sized;
+  return req;
 }
 
 export type RoundOptions = {
-  // a request built elsewhere, with its prompt's size when it was counted
-  request?: Sized;
+  request?: ChatRequest;
   signal?: AbortSignal;
   // when a retry's wait must be over: the turn's deadline unless a
   // phase has its own, null for none
@@ -211,7 +204,7 @@ async function streamRound(
       : send.policy.deadlineMs === null
         ? null
         : send.startedAt + send.policy.deadlineMs;
-  const { request: req, estimate } =
+  const req =
     options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
@@ -366,13 +359,11 @@ async function streamRound(
   }
   visuals?.flush();
   if (round.usage === null) {
-    round.tokens = estimate ?? requestTokens(req);
+    round.tokens = requestTokens(req);
     round.spent = round.tokens;
-    send.measured = null;
   } else {
     round.tokens = round.usage.promptTokens + round.usage.completionTokens;
     round.spent = spentTokens(round.usage);
-    send.measured = { tokens: round.tokens, messages: req.messages };
   }
 }
 

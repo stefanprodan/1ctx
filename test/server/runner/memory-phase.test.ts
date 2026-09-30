@@ -98,21 +98,20 @@ describe("automation memory phase", () => {
     await chat.app.shutdown();
   });
 
-  test("the answer and the phase both skip 4-bit hosts and cap their output", async () => {
+  test("the answer and the phase both skip 4-bit hosts and send no output cap", async () => {
     const chat = await chatApp({ wire: "openrouter" });
-    chat.app.db.run(
-      "update agents set skip_4bit = 1, output_limit = 4000 where id = ?",
-      [chat.agentId],
-    );
+    chat.app.db.run("update agents set skip_4bit = 1 where id = ?", [
+      chat.agentId,
+    ]);
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
     const provider = { quantizations: [...NOT_FOUR_BIT] };
     expect(run.main.body.provider).toEqual(provider);
-    expect(run.main.body.max_tokens).toBe(4000);
+    expect(run.main.body).not.toHaveProperty("max_tokens");
     run.main.reply("The check passed.");
     const phase = await waitScript(chat.scripted, 2);
     expect(phase.body.provider).toEqual(provider);
-    expect(phase.body.max_tokens).toBe(4000);
+    expect(phase.body).not.toHaveProperty("max_tokens");
     phase.reply("No change.");
     await settle(chat, run.sessionId);
     await chat.app.shutdown();

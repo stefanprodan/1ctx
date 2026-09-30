@@ -572,10 +572,7 @@ function round(
     },
   } as unknown as ActiveSend;
   const run = runRound(deps, send, [], {
-    request: {
-      request: { model: "m", messages: [], thinking: false },
-      estimate: null,
-    },
+    request: { model: "m", messages: [], thinking: false },
     ...(fields.deadline === undefined ? {} : { deadline: fields.deadline }),
   });
   return { run, asked: () => asked, sleeps, logs, send, shown };

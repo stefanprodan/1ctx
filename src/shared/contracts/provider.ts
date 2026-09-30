@@ -26,8 +26,6 @@ export type CatalogMatch = {
   id: string;
   name: string;
   contextLength: number | null;
-  // the most tokens one reply may have, null when the catalog did not say
-  outputLimit: number | null;
   promptPrice: number | null;
   completionPrice: number | null;
   tools: boolean;

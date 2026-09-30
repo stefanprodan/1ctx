@@ -154,8 +154,6 @@ export function providersArea(deps: ProvidersDeps): Providers {
     clock: deps.clock,
     secret: deps.secret,
     log: deps.log,
-    fetched: (provider, models) =>
-      deps.agents.setOutputLimits(provider.id, models),
   });
   return {
     store,

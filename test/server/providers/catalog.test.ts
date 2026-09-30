@@ -42,7 +42,6 @@ describe("parseCatalog", () => {
       id: "deepseek/deepseek-v4.1-flash",
       name: "DeepSeek: DeepSeek V4.1 Flash",
       contextLength: 1048576,
-      outputLimit: 384000,
       promptPrice: 0.15,
       completionPrice: 0.6,
       tools: true,
@@ -60,18 +59,6 @@ describe("parseCatalog", () => {
     ).toBe(true);
   });
 
-  test("reads the output limit where a catalog names one, else none", () => {
-    const limits = parseCatalog({
-      data: [
-        { id: "router", top_provider: { max_completion_tokens: 8192 } },
-        { id: "groq", max_completion_tokens: 4096 },
-        { id: "unsaid", top_provider: { max_completion_tokens: null } },
-        { id: "odd", max_completion_tokens: 0.5 },
-      ],
-    }).map((m) => m.outputLimit);
-    expect(limits).toEqual([8192, 4096, null, null]);
-  });
-
   test("takes the plain list an OpenAI-compatible server answers", () => {
     expect(
       parseCatalog({ data: [{ id: "local/qwen", object: "model" }] }),
@@ -80,7 +67,6 @@ describe("parseCatalog", () => {
         id: "local/qwen",
         name: "local/qwen",
         contextLength: null,
-        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: false,
@@ -361,7 +347,6 @@ describe("the decisions catalog", () => {
         id,
         name: id,
         contextLength: null,
-        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: false,

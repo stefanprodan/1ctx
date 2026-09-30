@@ -1,8 +1,8 @@
 # Providers
 
 Governs `src/server/providers/`, `deciders/`, `lib/fetcher.ts` and an
-agent's provider, model, window, output limit, tools, thinking, effort,
-upstream and skip4Bit fields.
+agent's provider, model, window, tools, thinking, effort, upstream and
+skip4Bit fields.
 
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
@@ -146,33 +146,10 @@ upstream and skip4Bit fields.
   tools, for a model that takes them) is 4-bit. Both checks read the
   endpoints unless the provider, model, upstream and filter are kept; a
   list the filter alone asked for that fails judges only the tag.
-- **Every chat, run and memory round sends `max_tokens`.** The agent
-  keeps the model's output limit as `outputLimit` with `output_read`,
-  re-read on every save and on every chat catalog refresh
-  (`Catalogs` tells the agents area through its port) for a model the
-  catalog describes: OpenRouter's `top_provider.max_completion_tokens`,
-  else a plain catalog's `max_completion_tokens` (Groq's), else
-  Gemini's `outputTokenLimit`; null when it says none. An agent never
-  read (a model the catalog does not describe, or a row saved before)
-  sends no `max_tokens`. `outputCap()` in `runner/context.ts` asks for
-  the limit, or `OUTPUT_FALLBACK` (32,000) when none, at most
-  `OUTPUT_MAX` (256,000), fitted to the room left in the window: the
-  window less the last round's reported prompt and completion
-  (`send.measured`), less the messages added since counted in o200k and
-  taken 15% larger; the whole request is counted when no round was
-  reported or the request does not extend it. Never under `OUTPUT_MIN`
-  (1,024); a null window skips the fit and the count, and the count is
-  the round's size when the provider reports no usage. A hit ends the
-  turn as `length`. The summary keeps `summaryMaxTokens`. OpenRouter
-  derives an Anthropic model's thinking budget from `max_tokens` when
-  only `reasoning.effort` is sent (`max_tokens` times the effort's
-  ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
-  long those models think; Gemini 3 maps the effort to a level. On
-  the Gemini wire thinking counts against `max_tokens`: a round whose
-  thinking reaches the cap ends as `length` with no answer, so an
-  earlier model's `thinking_budget` is fitted to at most half the cap,
-  never under 512 (`fitThinkingBudget()` in `providers/gemini.ts`). A
-  cap above what a round needs leaves its thinking as it was.
+- **No chat, run or memory round sends `max_tokens`.** Only the
+  compaction summary does, `summaryMaxTokens` fitted to the window.
+  OpenRouter skips or fails the hosts that advertise less than a large
+  `max_tokens`, or refuse it, so a cap costs hosts and buys nothing.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and

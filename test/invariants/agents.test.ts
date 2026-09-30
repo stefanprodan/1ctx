@@ -38,7 +38,6 @@ const flash = {
   id: "deepseek/deepseek-v4.1-flash",
   name: "DeepSeek: DeepSeek V4.1 Flash",
   contextLength: 1048576,
-  outputLimit: 384000,
   promptPrice: 0.15,
   completionPrice: 0.6,
   tools: true,
@@ -571,7 +570,6 @@ describe("a model its catalog does not describe", () => {
       id: ULTRA,
       name: ULTRA,
       contextLength: 262144,
-      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -976,61 +974,14 @@ describe("a preferred upstream", () => {
   });
 });
 
-describe("an agent's output limit", () => {
-  test("a catalog refresh fills a row that never read it", async () => {
+describe("an agent's output", () => {
+  test("a chat round sends no max_tokens", async () => {
     const chat = await chatApp({ wire: "openrouter" });
     try {
-      const agent = chat.app.agents.byId(chat.agentId)!;
-      expect(agent).toMatchObject({
-        outputRead: true,
-        model: { outputLimit: 384000 },
-      });
-      chat.app.db.run(
-        "update agents set output_limit = null, output_read = 0 where id = ?",
-        [agent.id],
-      );
-      const provider = chat.app.providers.byId(agent.providerId)!;
-      chat.app.catalogs.forget(provider.id);
-      await chat.app.catalogs.models(provider);
-      expect(chat.app.agents.byId(agent.id)).toMatchObject({
-        outputRead: true,
-        model: { outputLimit: 384000 },
-      });
-      // a window the admin stated is theirs, and so is what it lacks
-      chat.app.db.run(
-        `update agents set model_described = 0, output_limit = null,
-           output_read = 0 where id = ?`,
-        [agent.id],
-      );
-      chat.app.catalogs.forget(provider.id);
-      await chat.app.catalogs.models(provider);
-      expect(chat.app.agents.byId(agent.id)).toMatchObject({
-        outputRead: false,
-        model: { outputLimit: null },
-      });
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
-
-  test("a row that never read it sends no max_tokens", async () => {
-    const chat = await chatApp();
-    try {
-      chat.app.db.run(
-        "update agents set output_limit = null, output_read = 0 where id = ?",
-        [chat.agentId],
-      );
-      const unread = await startChat(chat);
-      expect(unread.script.body).not.toHaveProperty("max_tokens");
-      unread.script.reply("done");
-      await settleRun(chat, unread.sessionId);
-      chat.app.db.run("update agents set output_read = 1 where id = ?", [
-        chat.agentId,
-      ]);
-      const read = await startChat(chat);
-      expect(read.script.body.max_tokens).toBe(32_000);
-      read.script.reply("done");
-      await settleRun(chat, read.sessionId);
+      const started = await startChat(chat);
+      expect(started.script.body).not.toHaveProperty("max_tokens");
+      started.script.reply("done");
+      await settleRun(chat, started.sessionId);
     } finally {
       await chat.app.shutdown();
     }

@@ -93,7 +93,6 @@ describe("Home", () => {
           id: "acme/small",
           name: "Small",
           contextLength: null,
-          outputLimit: null,
           promptPrice: null,
           completionPrice: null,
           tools: false,

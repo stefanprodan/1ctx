@@ -41,7 +41,7 @@ import { m0032 } from "./0032-admin-activity.ts";
 import { m0033 } from "./0033-feed-arms.ts";
 import { m0034 } from "./0034-send-limits.ts";
 import { m0035 } from "./0035-queued-messages.ts";
-import { m0036 } from "./0036-output-limit.ts";
+import { m0036 } from "./0036-skip-4bit.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,

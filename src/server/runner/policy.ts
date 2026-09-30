@@ -85,10 +85,6 @@ export type SendPolicy = {
   wire: Wire | null;
   model: string;
   contextLength: number | null;
-  // the most a reply of the model may hold, null when the catalog did
-  // not say; never read, the request sends no cap at all
-  outputLimit: number | null;
-  outputRead: boolean;
   prompt: string;
   thinking: boolean;
   // the agent's own Off, not a default that resolved to off
@@ -221,8 +217,6 @@ export function buildPolicy(input: {
     wire: input.wire ?? null,
     model: agent.model.id,
     contextLength: agent.model.contextLength,
-    outputLimit: agent.model.outputLimit,
-    outputRead: agent.outputRead,
     prompt: agent.prompt,
     thinking,
     thinkingOff: fixed === null && agent.thinking === "off",

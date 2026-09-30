@@ -37,7 +37,6 @@ const agent: AgentRow = {
     id: "org/model",
     name: "Model",
     contextLength: 1000,
-    outputLimit: null,
     promptPrice: null,
     completionPrice: null,
     tools: false,
@@ -54,7 +53,6 @@ const agent: AgentRow = {
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,
-  outputRead: true,
   default: false,
   createdAt: 1,
 };
@@ -238,7 +236,6 @@ describe("send policy upstream", () => {
         ...agent,
         upstream: "inference-net/fp4",
         skip4Bit: true,
-        model: { ...agent.model, outputLimit: 8192 },
       },
       wire,
       now: 1,
@@ -257,9 +254,5 @@ describe("send policy upstream", () => {
     expect(routed("openrouter").skip4Bit).toBe(true);
     expect(routed("openai-compatible").skip4Bit).toBe(false);
     expect(routed(null).skip4Bit).toBe(false);
-  });
-
-  test("the model's output limit rides on every wire", () => {
-    expect(routed("openai-strict").outputLimit).toBe(8192);
   });
 });
