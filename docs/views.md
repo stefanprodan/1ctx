@@ -24,8 +24,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   sent, only while there is one: a `RowsCard` titled Not sent with its
   count and `RowsAction` Discard all in the head (no ask), and a
   `stream/NotSentRow.tsx` per message in the feed row's shape (the chat
-  icon in the failed colour, the first line, `#project · @agent` and
-  the short reason, when it turned) leading to its chat. `GET
+  icon in the failed colour, the first line, `#project · @agent`, the
+  summoned agent for a summon as the server names it, and the short
+  reason, when it turned) leading to its chat. `GET
   /api/me/not-sent` is read by Home's load and after Discard all, never
   through the feed; Discard all sends the ids the card shows, so a row
   that turned since is never discarded unseen. While the card is
@@ -44,9 +45,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   its envelope brings it. The `session.changed` envelope carries `last`
   only when its transaction wrote such a row. `stream/Row.model.ts`
   composes the state line and the time from those and never reads a
-  transcript. An archived chat's row wears the archive icon, quiet,
-  and "archived ·" before its line; a retired agent's name is greyed
-  (`authorGone()`), with no tag. A run whose `attention` is at
+  transcript; a working, failed or stopped line names the send's
+  agent (`sendAgent`, the summoned one for a summoned turn), else the
+  chat's. An archived chat's row wears the archive icon, quiet,
+  and "archived ·" before its line; a retired agent's name, the chat's
+  or the send's, is greyed (`authorGone()`), with no tag. A run whose `attention` is at
   `ATTENTION_AT` or more (`needsAttention()` in `stream/Row.model.ts`)
   draws its icon in `--attention` orange and says "needs attention"
   after the agent, where a failure's words go, in the same orange;
@@ -111,7 +114,11 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   whose list of the project's live agents opens up from its right edge.
 - **A deleted agent keeps its name.** The transcript names a reply's
   agent from `SessionDetail.agents`; a retired one is plain text with
-  a `deleted` tag, and a memory note names it without a link.
+  a `deleted` tag, and a memory note names it without a link. A
+  summoned reply names its own agent the same way. Regenerate sends no
+  agent (the server reruns the send's); a refusal, such as a summoned
+  agent since retired, shows in the turn's failure block until the
+  next press.
 - **The messages that wait.** `SessionDetail.queued` is drawn under the
   last turn by `transcript/Queued.tsx`, oldest first, each as a user
   message with a dashed card: the author (their username when the page
@@ -166,6 +173,14 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   so, "The message was not sent." for a row that turned not sent. A
   Remove here marks its row (`removing`) before the delete is sent. The
   queued row's files stay with it and are not handed back.
+- **The @ menu summons.** In a chat, a draft that is one word starting
+  with `@` opens the project's agents by prefix, the chat's own left
+  out (`composer/summons.ts`, `Summons.tsx`), with the command menu's
+  box, keys and highlight; a pick fills `@name `. A new chat's composer
+  has no @ menu. On Enter, a first word naming no agent is refused in
+  the failure slot with the server's words (`summonRefusal()`, over
+  `shared/summon.ts`), and a new chat refuses any agent's name but the
+  picked one's.
 - **The composer adds files through one panel.** `composer/Add.tsx` is
   the plus at the start of the row; its `.menu` is placed as the agent
   list is and holds Add files, off with "Agent cannot read files" under

@@ -9,6 +9,7 @@
 // summary fold alone. Under a finished turn, why it was cut when it
 // was, Copy, Fork, Regenerate on the last turn, and when it was.
 
+import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
@@ -16,7 +17,7 @@ import { finishWords } from "../../shared/finish.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { sentence, stamp } from "../lib/format.ts";
+import { reason, sentence, stamp } from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { CopyButton } from "./Copy.tsx";
@@ -102,8 +103,8 @@ export function Reply({
   // the running round waiting to ask its provider again
   retry?: LiveRetry | null;
   // set on the last turn alone: regenerate drops it and sends its
-  // user message again
-  onRegenerate?: () => void;
+  // user message again; a refusal shows in the failure slot
+  onRegenerate?: () => Promise<void>;
   // the fork action under a finished answer; absent where the session
   // cannot be forked yet
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
@@ -117,8 +118,21 @@ export function Reply({
   const lead = current !== null && m?.slot === null && leadIn(content);
   const ended = running ? null : endedBy(node);
   const cut = ended === null ? null : cutReason(ended);
+  // a regenerate the server refused, such as a summoned agent since
+  // retired, until the next press
+  const refused = useSignal<string | null>(null);
   // a failure says so in its own block, never squeezed into the actions
   const failure = cut?.err === true ? cut.text : null;
+  const said = refused.value ?? failure;
+  const regenerate =
+    onRegenerate === undefined
+      ? undefined
+      : () => {
+          refused.value = null;
+          onRegenerate().catch((err: unknown) => {
+            refused.value = reason(err);
+          });
+        };
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
   const served = servedBy(m);
@@ -197,14 +211,14 @@ export function Reply({
             retry={retry}
           />
         )}
-        {!running && failure !== null && (
+        {!running && said !== null && (
           <p class="notice-failed transcript-failure" role="alert">
-            {sentence(failure)}
+            {sentence(said)}
           </p>
         )}
         {!running && (
           <div class="transcript-after">
-            {cut && failure === null && (
+            {cut && said === null && (
               <span class="transcript-cut">{cut.text}</span>
             )}
             {content !== "" && <CopyButton text={content} />}
@@ -219,13 +233,13 @@ export function Reply({
                   onFork={fork.onFork}
                 />
               )}
-            {onRegenerate !== undefined && (
+            {regenerate !== undefined && (
               <button
                 type="button"
                 class="transcript-act"
                 title="Regenerate"
                 aria-label="Regenerate"
-                onClick={onRegenerate}
+                onClick={regenerate}
               >
                 <Icon name="redo" size={14} />
               </button>

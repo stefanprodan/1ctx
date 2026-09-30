@@ -5,13 +5,14 @@
 // added to it, the plus, the project chip on Home, the agent chip, the
 // context readout, and Send, with Stop before it while the reply runs: a
 // message sent then waits for the reply to end. Enter sends, Shift+Enter
-// breaks a line. A waiting message's Edit puts its text here, and Send
-// is Save until the edit is saved or let go. Two modes: a chat, where
-// the message goes into it, and a project, where it starts one. Files
-// come from the plus, a drop on the card or a paste, are staged as they
-// are picked, and go with the send. The draft, text and staged files,
-// survives a navigation; a refusal shows under the box until the next
-// keystroke.
+// breaks a line. A lone /word opens the command menu and, in a chat, a
+// lone @word the agents to summon. A waiting message's Edit puts its
+// text here, and Send is Save until the edit is saved or let go. Two
+// modes: a chat, where the message goes into it, and a project, where
+// it starts one. Files come from the plus, a drop on the card or a
+// paste, are staged as they are picked, and go with the send. The
+// draft, text and staged files, survives a navigation; a refusal shows
+// under the box until the next keystroke.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
@@ -69,9 +70,11 @@ import {
 import { Files } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
+import { Summons } from "./Summons.tsx";
+import { summonFill, summonMatches, summonRefusal } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
 import "./composer.css";
-import { says } from "../lib/format.ts";
+import { says, sentence } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
 
 const MAX_HEIGHT = 160;
@@ -214,18 +217,39 @@ export function Composer({
   const started = onCompact !== undefined && onFork !== undefined;
   const block = (command: Command) =>
     commandBlock({ started, running }, command);
-  const matches =
-    shut.value || edit !== null
-      ? []
-      : commandMatches(text.value, !started || onRename !== undefined);
+  const quiet = shut.value || edit !== null;
+  const matches = quiet
+    ? []
+    : commandMatches(text.value, !started || onRename !== undefined);
+  // the @ menu, in a chat only: a new chat cannot summon
+  const summonable = quiet ? [] : summonMatches(text.value, agents, agentId);
+  // one menu at most is open, since a draft starts with / or @
+  const count = matches.length + summonable.length;
+  const fillAt = (index: number): string =>
+    matches.length > 0
+      ? commandFill(matches[index]!)
+      : summonFill(summonable[index]!);
   // the highlight follows the list as it shrinks
-  const chosen = Math.min(highlight.value, Math.max(0, matches.length - 1));
+  const chosen = Math.min(highlight.value, Math.max(0, count - 1));
+  const pick = (fill: string) => {
+    text.value = fill;
+    writeDraftText(key, fill);
+    input.current?.focus();
+  };
   const submit = async () => {
     const content = text.value.trim();
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
     if (content === "" || agent === null || busy) return;
     const named = commandOf(content);
+    // a first word naming no agent is refused before it goes, drawn as
+    // the server's 400 would be
+    const refused =
+      named === null ? summonRefusal(content, agents, agent, fixed) : null;
+    if (refused !== null) {
+      failure.value = sentence(refused);
+      return;
+    }
     if (named === null && (!ready || !placed || files.busy)) return;
     failure.value = null;
     const sent = text.value;
@@ -312,12 +336,12 @@ export function Composer({
         }}
         onKeyDown={(ev) => {
           if (ev.isComposing) return;
-          if (matches.length > 0) {
+          if (count > 0) {
             const move =
               ev.key === "ArrowDown" ? 1 : ev.key === "ArrowUp" ? -1 : 0;
             if (move !== 0) {
               ev.preventDefault();
-              highlight.value = stepHighlight(chosen, matches.length, move);
+              highlight.value = stepHighlight(chosen, count, move);
               return;
             }
             if (ev.key === "Escape") {
@@ -325,7 +349,7 @@ export function Composer({
               shut.value = true;
               return;
             }
-            const fill = commandFill(matches[chosen]!);
+            const fill = fillAt(chosen);
             if (
               ev.key === "Tab" ||
               (ev.key === "Enter" && text.value !== fill)
@@ -347,11 +371,17 @@ export function Composer({
           matches={matches}
           chosen={chosen}
           block={block}
-          onPick={(command) => {
-            text.value = commandFill(command);
-            writeDraftText(key, text.value);
-            input.current?.focus();
+          onPick={(command) => pick(commandFill(command))}
+          onHover={(index) => {
+            highlight.value = index;
           }}
+        />
+      )}
+      {summonable.length > 0 && (
+        <Summons
+          matches={summonable}
+          chosen={chosen}
+          onPick={(agent) => pick(summonFill(agent))}
           onHover={(index) => {
             highlight.value = index;
           }}

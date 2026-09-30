@@ -58,7 +58,7 @@ export function Transcript({
     username: string | null;
   };
   // the last turn's Regenerate; absent while a send runs
-  onRegenerate?: () => void;
+  onRegenerate?: () => Promise<void>;
   // Fork under every finished answer; absent in a run
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   // the messages that wait, under the last turn

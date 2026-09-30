@@ -219,7 +219,7 @@ function SessionPage({
               shown.session.status === "running" ||
               sending.value
                 ? undefined
-                : () => void regenerateSession(shown.session.id)
+                : () => regenerateSession(shown.session.id)
             }
             fork={
               run

@@ -35,17 +35,23 @@ export const needsAttention = (
   session: Pick<SessionSummary, "attention">,
 ): boolean => session.attention !== null && session.attention >= ATTENTION_AT;
 
-// whether the line's author is the session's agent, since deleted: the
-// name is greyed, with no tag, since rows are dense
+// whether the line's author is the session's agent or the last send's,
+// since deleted: the name is greyed, with no tag, since rows are dense
 export function authorGone(row: StreamRow, line: StateLine): boolean {
-  return row.agentRetired && line.author !== null && line.author === row.agent;
+  if (line.author === null) return false;
+  if (row.sendAgent !== null && line.author === row.sendAgent.name) {
+    return row.sendAgent.retired;
+  }
+  return row.agentRetired && line.author === row.agent;
 }
 
 export function stateLine(row: StreamRow): StateLine {
   const { session, send, last } = row;
-  // a send that did not finish is the agent's, so its state is credited
-  // to the agent the way a last line is to its author
-  const agent = (text: string): StateLine => ({ author: row.agent, text });
+  // a send that did not finish is its agent's, the summoned one's for a
+  // summoned turn, so its state is credited to the agent the way a last
+  // line is to its author
+  const author = row.sendAgent?.name ?? row.agent;
+  const agent = (text: string): StateLine => ({ author, text });
   switch (session.status) {
     case "running": {
       const calls = send?.toolCalls ?? 0;
