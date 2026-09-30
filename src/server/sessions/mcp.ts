@@ -86,18 +86,19 @@ export type DigestArgs = [
 ];
 
 // the last send of the same agent, so turns of agents taking turns in a
-// chat do not each read as a change. Indexed by the session: sends_agent
-// also orders by start and would walk the agent's sends in every chat
+// chat do not each read as a change. The unary plus keeps the planner
+// off sends_agent, which also orders by start and would walk the
+// agent's sends in every chat
 export function lastMcpDigest(
   db: Db,
   ...[sessionId, excludeSendId, agentId]: DigestArgs
 ): McpDigest | null {
   const row = db
     .query<{ body: string }, [string, string, string]>(
-      `select mcp_digests.body from sends indexed by sends_session
+      `select mcp_digests.body from sends
        join mcp_digests on mcp_digests.key = sends.mcp
        where sends.session_id = ? and sends.id != ? and sends.mcp is not null
-         and sends.agent_id = ?
+         and +sends.agent_id = ?
        order by sends.started_at desc, sends.rowid desc limit 1`,
     )
     .get(sessionId, excludeSendId, agentId);

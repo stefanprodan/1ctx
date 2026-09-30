@@ -25,6 +25,13 @@ describe("summon", () => {
     expect(read("@GLM check")).toEqual({ kind: "summon", name: "glm" });
   });
 
+  test("punctuation ending the word is not part of the name", () => {
+    expect(read("@glm, check")).toEqual({ kind: "summon", name: "glm" });
+    expect(read("@Glm: check")).toEqual({ kind: "summon", name: "glm" });
+    expect(read("@coder, go on")).toEqual({ kind: "none" });
+    expect(read("@, hi")).toEqual({ kind: "none" });
+  });
+
   test("the chat's own agent is an ordinary turn", () => {
     expect(read("@coder go on")).toEqual({ kind: "none" });
     expect(read("@Coder go on")).toEqual({ kind: "none" });
@@ -32,7 +39,7 @@ describe("summon", () => {
 
   test("a word naming no agent is unknown, as typed", () => {
     expect(read("@Glmm check")).toEqual({ kind: "unknown", word: "Glmm" });
-    expect(read("@glm, check")).toEqual({ kind: "unknown", word: "glm," });
+    expect(read("@glmm, check")).toEqual({ kind: "unknown", word: "glmm," });
     expect(noAgentNamed("Glmm")).toBe("no agent named Glmm");
   });
 

@@ -434,7 +434,8 @@ export class SessionStore {
     return addToolRows(this.db, calls);
   }
 
-  // guarded by status: a tool ending after a terminal cleanup writes nothing
+  // guarded by status, so a tool that ends after a terminal cleanup
+  // writes nothing
   finishTool(
     id: string,
     fields: {
@@ -486,7 +487,8 @@ export class SessionStore {
     return bumpSendCounters(this.db, id, fields);
   }
 
-  // the rows read back through this store, for the envelope
+  // the rows are read back through this store so the envelope carries
+  // them
   repair(now: number, error: string): RepairedSession[] {
     return repairRows(this.db, now, error, {
       touch: (id) => this.touch(id, { status: "failed", now })!,

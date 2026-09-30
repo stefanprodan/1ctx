@@ -9,6 +9,7 @@
 // follow the turn's agent.
 
 import { describe, expect, test } from "bun:test";
+import { SUMMARY_LEAD } from "../../../src/server/runner/context.ts";
 import { summonedLine } from "../../../src/server/runner/prompt.ts";
 import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
 import { envelopeRow } from "../../../src/server/sessions/stream.ts";
@@ -82,6 +83,18 @@ const sends = (chat: ChatApp, sessionId: string) =>
       "select agent_id, summoned from sends where session_id = ? order by started_at, rowid",
     )
     .all(sessionId);
+
+// a whole round with the usage given
+function answer(
+  script: Script,
+  text: string,
+  usage: { prompt: number; completion: number },
+) {
+  script.content(text);
+  script.finish();
+  script.usage(usage);
+  script.end();
+}
 
 // a chat whose first turn on coder called datetime, then answered
 async function checkedChat(chat: ChatApp) {
@@ -491,6 +504,189 @@ describe("a summon", () => {
       } finally {
         await chat.app.shutdown();
       }
+    }
+  });
+
+  test("a compacted chat is counted by its summary, asked or automatic", async () => {
+    const { chat, checkerId } = await summonApp();
+    try {
+      const window = (id: string) =>
+        chat.app.db
+          .query("update agents set context_length = 1000 where id = ?")
+          .run(id);
+      window(checkerId);
+      const { sessionId, script } = await startChat(chat, "hello");
+      answer(script, "hi", { prompt: 900, completion: 10 });
+      await free(chat, sessionId);
+      expect((await post(chat, sessionId, "@checker check")).status).toBe(400);
+      const count = chat.scripted.scripts.length;
+      const compacted = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/compact`,
+      );
+      expect(compacted.status).toBe(200);
+      const summary = await waitScript(chat.scripted, count + 1);
+      answer(summary, "the summary", { prompt: 910, completion: 40 });
+      const asked = await turn(chat, sessionId, "@checker check");
+      expect(turns(asked)[0]!.content).toStartWith(SUMMARY_LEAD);
+      asked.reply("fine");
+      await free(chat, sessionId);
+
+      // the chat's agent compacts by itself past its own window
+      window(chat.agentId);
+      const long = await turn(chat, sessionId, "go on");
+      answer(long, "long", { prompt: 900, completion: 10 });
+      const automatic = await waitScript(chat.scripted, count + 4);
+      answer(automatic, "second summary", { prompt: 920, completion: 30 });
+      const after = await turn(chat, sessionId, "@checker again");
+      expect(turns(after)).toEqual([
+        { role: "user", content: `${SUMMARY_LEAD}\n\nsecond summary` },
+        { role: "user", content: "@checker again", name: "casey" },
+      ]);
+      after.reply("fine again");
+      await free(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a regenerate leaves the replaced turn's rounds out of the count", async () => {
+    const { chat, checkerId } = await summonApp();
+    try {
+      chat.app.db
+        .query("update agents set context_length = 1000 where id = ?")
+        .run(checkerId);
+      const { sessionId, script } = await startChat(chat, "hello");
+      script.reply("hi");
+      const summoned = await turn(chat, sessionId, "@checker check");
+      answer(summoned, "fine", { prompt: 950, completion: 10 });
+      await free(chat, sessionId);
+      const count = chat.scripted.scripts.length;
+      const again = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/regenerate`,
+      );
+      expect(again.status).toBe(201);
+      (await waitScript(chat.scripted, count + 1)).reply("fine again");
+      await free(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a fork keeps a summoned turn and each agent's view of it", async () => {
+    const { chat, checkerId } = await summonApp();
+    try {
+      const sessionId = await checkedChat(chat);
+      const summoned = await turn(chat, sessionId, "@checker look");
+      summoned.toolRound([{ id: "k1", name: "datetime", arguments: "{}" }]);
+      summoned.end();
+      (await waitScript(chat.scripted, 4)).reply("checked");
+      await free(chat, sessionId);
+      const rows = chat.app.sessions.messages(sessionId);
+      const forked = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/fork`,
+        { body: { messageId: rows.at(-1)!.id, agentId: chat.agentId } },
+      );
+      expect(forked.status).toBe(201);
+      const fork = (await forked.json()).session.id as string;
+      expect(sends(chat, fork)).toEqual([
+        { agent_id: chat.agentId, summoned: 0 },
+        { agent_id: checkerId, summoned: 1 },
+      ]);
+      const own = await turn(chat, fork, "next");
+      expect(turns(own).slice(-5)).toEqual([
+        { role: "assistant", content: "it is noon" },
+        { role: "user", content: "@checker look", name: "casey" },
+        { role: "user", content: "[checker] checked" },
+        { role: "user", content: `${TRACE_HEADING}\ndatetime ok` },
+        { role: "user", content: "next", name: "casey" },
+      ]);
+      own.reply("noted");
+      const again = await turn(chat, fork, "@checker again");
+      expect(turns(again)).toEqual([
+        { role: "user", content: "what time is it", name: "casey" },
+        { role: "user", content: "[coder] it is noon" },
+        {
+          role: "user",
+          content: `${TRACE_HEADING}\ndatetime timezone=UTC ok`,
+        },
+        { role: "user", content: "@checker look", name: "casey" },
+        { role: "assistant", content: null, calls: ["datetime"] },
+        {
+          role: "tool",
+          content: expect.any(String) as unknown as string,
+          result: true,
+        },
+        { role: "assistant", content: "checked" },
+        { role: "user", content: "next", name: "casey" },
+        { role: "user", content: "[coder] noted" },
+        { role: "user", content: "@checker again", name: "casey" },
+      ]);
+      again.reply("same");
+      await free(chat, fork);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("two summoned agents see each other's turns as foreign", async () => {
+    const { chat } = await summonApp();
+    try {
+      await chat.makeAgent({ name: "auditor", model: FLASH });
+      const sessionId = await checkedChat(chat);
+      const first = await turn(chat, sessionId, "@checker look");
+      first.toolRound([{ id: "k1", name: "datetime", arguments: "{}" }]);
+      first.end();
+      (await waitScript(chat.scripted, 4)).reply("checked");
+      const second = await turn(chat, sessionId, "@auditor audit");
+      expect(system(second)).toStartWith("You are auditor,");
+      expect(turns(second)).toEqual([
+        { role: "user", content: "what time is it", name: "casey" },
+        { role: "user", content: "[coder] it is noon" },
+        {
+          role: "user",
+          content: `${TRACE_HEADING}\ndatetime timezone=UTC ok`,
+        },
+        { role: "user", content: "@checker look", name: "casey" },
+        { role: "user", content: "[checker] checked" },
+        { role: "user", content: `${TRACE_HEADING}\ndatetime ok` },
+        { role: "user", content: "@auditor audit", name: "casey" },
+      ]);
+      second.reply("audited");
+      await free(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a stopped summoned turn with no answer leaves its trace alone", async () => {
+    const { chat } = await summonApp();
+    try {
+      const { sessionId, script } = await startChat(chat, "hello");
+      script.reply("hi");
+      const summoned = await turn(chat, sessionId, "@checker look");
+      summoned.toolRound([{ id: "k1", name: "datetime", arguments: "{}" }]);
+      summoned.end();
+      await waitScript(chat.scripted, 3);
+      const stopped = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/stop`,
+      );
+      expect(stopped.status).toBe(200);
+      const next = await turn(chat, sessionId, "go on");
+      expect(turns(next)).toEqual([
+        { role: "user", content: "hello", name: "casey" },
+        { role: "assistant", content: "hi" },
+        { role: "user", content: "@checker look", name: "casey" },
+        { role: "user", content: `${TRACE_HEADING}\ndatetime ok` },
+        { role: "user", content: "go on", name: "casey" },
+      ]);
+      next.reply("ok");
+      await free(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
     }
   });
 });

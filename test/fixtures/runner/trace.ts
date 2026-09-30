@@ -127,6 +127,6 @@ bash kubectl get pods -A ok ×3
 websearch flux 2.8 release failed
 mcp__github__search_issues q=is:open crash per_page=5 ok
 visualize ok
-skill failed
+skill flux-ops failed
 webfetch https://fluxcd.io/blog ok
 datetime timezone=Europe/Bucharest failed`;

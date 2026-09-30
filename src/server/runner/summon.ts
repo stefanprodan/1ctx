@@ -8,7 +8,12 @@
 // run never summons.
 
 import { compactsAt } from "../../shared/compaction.ts";
-import { noAgentNamed, readSummon, summonWord } from "../../shared/summon.ts";
+import {
+  noAgentNamed,
+  readSummon,
+  summonName,
+  summonWord,
+} from "../../shared/summon.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -52,9 +57,9 @@ export function turnSummon(
 
 // a new chat's first message starts on the picked agent
 export function refuseNewSummon(pickedAgent: string, text: string): void {
-  const word = summonWord(text);
-  if (word !== null && word.toLowerCase() !== pickedAgent) {
-    throw new BadRequest(noAgentNamed(word));
+  const name = summonName(text);
+  if (name !== null && name !== pickedAgent) {
+    throw new BadRequest(noAgentNamed(summonWord(text)!));
   }
 }
 
@@ -62,8 +67,8 @@ export function refuseNewSummon(pickedAgent: string, text: string): void {
 export const summons =
   (chatAgent: string) =>
   (text: string): boolean => {
-    const word = summonWord(text)?.toLowerCase();
-    return word !== undefined && word !== chatAgent;
+    const name = summonName(text);
+    return name !== null && name !== chatAgent;
   };
 
 // a queued summon whose agent was retired since it was checked
@@ -72,10 +77,7 @@ export function summonGone(
   chatAgent: string,
   text: string,
 ): boolean {
-  return (
-    summons(chatAgent)(text) &&
-    agents.byName(summonWord(text)!.toLowerCase()) === null
-  );
+  return summons(chatAgent)(text) && agents.byName(summonName(text)!) === null;
 }
 
 // a summoned turn never compacts, so it is refused when the chat's last
@@ -132,10 +134,12 @@ const summoning = (
   sessionId: string,
   agent: AgentRow,
   chatAgent: AgentRow,
+  // the send a regenerate replaces
+  replaced: string | null = null,
 ): TurnAgent => {
   refuseTooLong(
     agent,
-    lastPrompt(deps.db, sessionId),
+    lastPrompt(deps.db, sessionId, replaced),
     deps.limits.current().contextReserve,
   );
   return { agent, summoned: chatAgent.name };
@@ -170,5 +174,5 @@ export function regeneratedAgent(
     .agents(sessionId)
     .find((agent) => agent.id === turn.agentId)?.name;
   const agent = summonedAgain(deps.agents, turn.agentId, retired);
-  return summoning(deps, sessionId, agent, chatAgent);
+  return summoning(deps, sessionId, agent, chatAgent, sendId);
 }

@@ -6,7 +6,7 @@
 // answered it.
 
 import type { NotSentRow } from "../../shared/api/sessions.ts";
-import { summonWord } from "../../shared/summon.ts";
+import { summonName } from "../../shared/summon.ts";
 import type { NotSentReason } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { lineFrom } from "./parse.ts";
@@ -40,7 +40,7 @@ export function notSentOf(
        order by q.changed_at desc, q.id`,
     )
     .all(userId, JSON.stringify(projectIds));
-  const words = raws.map((raw) => summonWord(raw.content)?.toLowerCase());
+  const words = raws.map((raw) => summonName(raw.content) ?? undefined);
   const asked = [...new Set(words.filter((word) => word !== undefined))];
   const named = new Set(
     asked.length === 0

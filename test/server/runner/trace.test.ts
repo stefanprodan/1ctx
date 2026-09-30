@@ -54,7 +54,9 @@ describe("the trace", () => {
     expect(summary(done("webfetch", { url: "https://x.io", start: 3 }))).toBe(
       "https://x.io",
     );
-    expect(summary(done("skill_file", { name: "s", path: "a.md" }))).toBe("");
+    expect(summary(done("skill_file", { name: "s", path: "a.md" }))).toBe("s");
+    expect(summary(done("skill", { name: "flux-ops" }))).toBe("flux-ops");
+    expect(summary(done("visualize", { title: "t", html: "<p>" }))).toBe("");
     expect(summary(done("notes", { path: "/knowledge/a.md", n: 1 }))).toBe(
       "/knowledge/a.md",
     );
@@ -72,6 +74,9 @@ describe("the trace", () => {
     expect(emoji.length).toBeLessThanOrEqual(TRACE_LINE_CHARS);
     expect(emoji).toEndWith("… ok");
     expect(emoji).not.toMatch(/[\ud800-\udbff]…/);
+    const named = traceLine(done("x".repeat(300), { a: 1 }));
+    expect(named.length).toBe(TRACE_LINE_CHARS);
+    expect(named).toEndWith("x… ok");
   });
 
   test("past the cap one line counts the calls left", () => {

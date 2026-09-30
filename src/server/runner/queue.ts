@@ -3,17 +3,16 @@
 //
 // The dispatcher: a message sent to a chat whose turn is running waits
 // as a queued row, and every wake starts each free chat's queue as one
-// turn through sendTurn, up to a summon, which is a turn of its own,
-// before the scheduler hears the wake, so a due
-// run never takes the place a user's message waits for. A wake is
-// level-triggered: a pass reads the chats with queued rows, one indexed
-// read when there are none, and a wake during a pass runs another. A
-// queued row holds no place in any cap. A full cap, the lock or a lost
-// claim leaves the rows queued; any other refusal turns the rows that
-// cause it not sent, each found by a start tried in a transaction that
-// is rolled back, and the rest start. One whose author lost the chat
-// goes. One timer, set to the oldest row's expiry, expires rows in an
-// idle process.
+// turn through sendTurn, a summon as a turn of its own, before the
+// scheduler hears the wake, so a due run never takes the place a user's
+// message waits for. A wake is level-triggered: a pass reads the chats
+// with queued rows, one indexed read when there are none, and a wake
+// during a pass runs another. A queued row holds no place in any cap. A
+// full cap, the lock or a lost claim leaves the rows queued; any other
+// refusal turns the rows that cause it not sent, each found by a start
+// tried in a transaction that is rolled back, and the rest start. One
+// whose author lost the chat goes. One timer, set to the oldest row's
+// expiry, expires rows in an idle process.
 
 import type {
   QueuedResponse,

@@ -88,8 +88,8 @@ const text = (args: Record<string, unknown>, key: string) =>
   typeof args[key] === "string" ? (args[key] as string) : "";
 
 // what identifies the call: bash's first command line, a search's
-// query, a fetch's URL, a path, an MCP tool's arguments; a visual and a
-// skill by their tool name alone
+// query, a fetch's URL, a path, an MCP tool's arguments, the skill it
+// loaded, which a summoned agent may lack; a visual by its tool name
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = parsed(call.arguments);
   if (args === null) return flat(call.arguments);
@@ -100,9 +100,10 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
       return flat(text(args, "query"));
     case "webfetch":
       return flat(text(args, "url"));
-    case "visualize":
     case "skill":
     case "skill_file":
+      return flat(text(args, "name"));
+    case "visualize":
       return "";
   }
   if (call.name.startsWith("mcp__")) return flat(pairs(args));
@@ -122,11 +123,10 @@ function cut(value: string, chars: number): string {
 
 export function traceLine(call: TraceCall): string {
   const status = call.status === "done" ? "ok" : "failed";
-  const room = TRACE_LINE_CHARS - call.name.length - status.length - 2;
+  const name = cut(call.name, TRACE_LINE_CHARS - status.length - 1);
+  const room = TRACE_LINE_CHARS - name.length - status.length - 2;
   const said = cut(summary(call), Math.max(room, 0));
-  return said === ""
-    ? `${call.name} ${status}`
-    : `${call.name} ${said} ${status}`;
+  return said === "" ? `${name} ${status}` : `${name} ${said} ${status}`;
 }
 
 // the heading and one line a call, identical lines as one with ×N where

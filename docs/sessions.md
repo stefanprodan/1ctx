@@ -200,8 +200,11 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   summons. The send is written with `sends.summoned` and its agent, which
   fork copies; the policy's `summoned` names the chat's agent. A summon
   is refused, "the chat is too long for <name>", when the prompt of the
-  chat's last round, of any agent (`lastPrompt()`), reaches the
-  summoned model's `compactsAt()`. History (`runner/context.ts`): a turn
+  chat's last round, of any agent (`lastPrompt()`: a summary round
+  counts its answer, and a regenerate leaves out the send it replaces),
+  reaches the summoned model's `compactsAt()`; a queued one refused so
+  turns not sent `failed`, since the reason check is frozen in its table.
+  A word's trailing punctuation is dropped (`@glm,` summons glm). History (`runner/context.ts`): a turn
   is the building agent's own when neither send is summoned or both are
   summoned sends of the same agent; any other turn goes as its answer in
   a user message opening `[name] `, with no author field, then its trace

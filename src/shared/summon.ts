@@ -18,16 +18,25 @@ export function summonWord(text: string): string | null {
   return FIRST.exec(text)?.[1] ?? null;
 }
 
-// names are lowercase, so the word matches regardless of case; the
-// chat's own agent is an ordinary turn
+// the name the word calls: lowercase, since names are, without the
+// punctuation that ends it in "@glm, check" or "@glm: check"; null when
+// the message does not open with one
+export function summonName(text: string): string | null {
+  const name = summonWord(text)
+    ?.replace(/[.,:;!?]+$/, "")
+    .toLowerCase();
+  return name === undefined || name === "" ? null : name;
+}
+
+// the chat's own agent is an ordinary turn
 export function readSummon(
   text: string,
   chatAgent: string,
   isAgent: (name: string) => boolean,
 ): Summon {
   const word = summonWord(text);
-  if (word === null) return { kind: "none" };
-  const name = word.toLowerCase();
+  const name = summonName(text);
+  if (word === null || name === null) return { kind: "none" };
   if (name === chatAgent) return { kind: "none" };
   return isAgent(name) ? { kind: "summon", name } : { kind: "unknown", word };
 }

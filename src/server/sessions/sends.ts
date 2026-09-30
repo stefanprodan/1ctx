@@ -134,17 +134,31 @@ export function sendTurns(
   );
 }
 
-// the prompt of the chat's last round, whichever agent answered it;
-// null before the first counted round
-export function lastPrompt(db: Db, sessionId: string): number | null {
-  return (
-    db
-      .query<{ prompt_tokens: number }, [string]>(
-        `select usage.prompt_tokens from usage
-         where usage.session_id = ?
-           and exists (select 1 from sends where sends.id = usage.send_id)
-         order by usage.seq desc limit 1`,
-      )
-      .get(sessionId)?.prompt_tokens ?? null
-  );
+// the size of the chat's last round, whichever agent answered it: its
+// prompt, or a summary round's answer, since the chat is that summary
+// now. A regenerate leaves out the send it replaces, whose rounds the
+// rerun starts before. Null before the first counted round
+export function lastPrompt(
+  db: Db,
+  sessionId: string,
+  excludeSendId: string | null = null,
+): number | null {
+  const row = db
+    .query<
+      { prompt_tokens: number; completion_tokens: number; summary: number },
+      [string, string | null]
+    >(
+      `select usage.prompt_tokens, usage.completion_tokens,
+         exists (select 1 from messages
+           where messages.send_id = usage.send_id
+             and messages.round = usage.round
+             and messages.kind = 'summary') as summary
+       from usage
+       where usage.session_id = ? and usage.send_id is not ?
+         and exists (select 1 from sends where sends.id = usage.send_id)
+       order by usage.seq desc limit 1`,
+    )
+    .get(sessionId, excludeSendId);
+  if (row === null) return null;
+  return row.summary === 1 ? row.completion_tokens : row.prompt_tokens;
 }
