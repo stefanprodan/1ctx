@@ -18,6 +18,7 @@ function agent(id: string): AgentSummary {
       id: `org/${id}`,
       name: id,
       contextLength: null,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -33,6 +34,7 @@ function agent(id: string): AgentSummary {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    skip4Bit: false,
     default: false,
     createdAt: 0,
   };

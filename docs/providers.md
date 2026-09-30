@@ -1,8 +1,8 @@
 # Providers
 
 Governs `src/server/providers/`, `deciders/`, `lib/fetcher.ts` and an
-agent's provider, model, window, tools, thinking, effort and upstream
-fields.
+agent's provider, model, window, output limit, tools, thinking, effort,
+upstream and skip4Bit fields.
 
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
@@ -129,6 +129,50 @@ fields.
   provider that is down or gone costs the preference and not the turn.
   The form's Preferred provider leaves out endpoints without tools when the
   model takes them, and a new model or provider clears the pick.
+- **An OpenRouter agent may skip 4-bit hosts.** An agent's `skip4Bit`
+  (false by default, a 400 on another wire) makes every request of a
+  send, the summary and the memory phase included, send
+  `provider.quantizations` with every precision in
+  `shared/quantization.ts` but `int4`, `fp4`, `mxfp4` and `nvfp4`,
+  `unknown` included, since OpenRouter leaves out a host of unknown
+  precision unless the filter names it; beside `order` when an upstream
+  is preferred. The filter applies to the preferred host too, so a save
+  with it on and a 4-bit upstream is a 400: the endpoint's
+  `quantization` decides, and the precision after the tag's slash
+  (`deepinfra/fp4`, any case) when the endpoints do not answer or say
+  `unknown` (`fourBitEndpoint()`, which the form uses too). A model no
+  host passes answers 404, so the filter is never a default, and a save
+  with it on is a 400 when every endpoint that serves the model (with
+  tools, for a model that takes them) is 4-bit. Both checks read the
+  endpoints unless the provider, model, upstream and filter are kept; a
+  list the filter alone asked for that fails judges only the tag.
+- **Every chat, run and memory round sends `max_tokens`.** The agent
+  keeps the model's output limit as `outputLimit` with `output_read`,
+  re-read on every save and on every chat catalog refresh
+  (`Catalogs` tells the agents area through its port) for a model the
+  catalog describes: OpenRouter's `top_provider.max_completion_tokens`,
+  else a plain catalog's `max_completion_tokens` (Groq's), else
+  Gemini's `outputTokenLimit`; null when it says none. An agent never
+  read (a model the catalog does not describe, or a row saved before)
+  sends no `max_tokens`. `outputCap()` in `runner/context.ts` asks for
+  the limit, or `OUTPUT_FALLBACK` (32,000) when none, at most
+  `OUTPUT_MAX` (256,000), fitted to the room left in the window: the
+  window less the last round's reported prompt and completion
+  (`send.measured`), less the messages added since counted in o200k and
+  taken 15% larger; the whole request is counted when no round was
+  reported or the request does not extend it. Never under `OUTPUT_MIN`
+  (1,024); a null window skips the fit and the count, and the count is
+  the round's size when the provider reports no usage. A hit ends the
+  turn as `length`. The summary keeps `summaryMaxTokens`. OpenRouter
+  derives an Anthropic model's thinking budget from `max_tokens` when
+  only `reasoning.effort` is sent (`max_tokens` times the effort's
+  ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
+  long those models think; Gemini 3 maps the effort to a level. On
+  the Gemini wire thinking counts against `max_tokens`: a round whose
+  thinking reaches the cap ends as `length` with no answer, so an
+  earlier model's `thinking_budget` is fitted to at most half the cap,
+  never under 512 (`fitThinkingBudget()` in `providers/gemini.ts`). A
+  cap above what a round needs leaves its thinking as it was.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and

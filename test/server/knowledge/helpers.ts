@@ -61,6 +61,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
       id: "test-model",
       name: "Test model",
       contextLength: null,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -76,6 +77,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    skip4Bit: false,
     now: now.value,
   });
   const sessions = new SessionStore(

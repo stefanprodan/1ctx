@@ -187,7 +187,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keys: () => options.secretNames?.("provider-") ?? [],
     fetcher,
     log: log("providers"),
-    agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
+    agents: {
+      usesProvider: (providerId) => agents.usesProvider(providerId),
+      setOutputLimits: (providerId, models) =>
+        agents.store.setOutputLimits(providerId, models),
+    },
     deciders: {
       usesProvider: (providerId) => deciders.usesProvider(providerId),
     },

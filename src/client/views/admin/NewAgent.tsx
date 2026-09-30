@@ -79,7 +79,14 @@ function Form({ providerId }: { providerId: string }) {
       });
       if (address() === from) navigate(configAgentHref(created.name));
     },
-    cardFieldOf(["name", "prompt", "model", "upstream", "contextLength"]),
+    cardFieldOf([
+      "name",
+      "prompt",
+      "model",
+      "upstream",
+      "skip4Bit",
+      "contextLength",
+    ]),
   );
   const name = d.name.value.trim();
   const asked = new URLSearchParams(query.value).get("provider");

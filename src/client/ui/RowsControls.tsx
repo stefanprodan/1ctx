@@ -82,21 +82,29 @@ export function RowsSwitch({
   on,
   label,
   disabled,
+  title,
+  name,
   onClick,
 }: {
   on: boolean;
   label: string;
   disabled?: boolean;
+  // why it is off, for a switch that cannot be turned
+  title?: string;
+  // so a refusal can take the focus here
+  name?: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       role="switch"
+      name={name}
       aria-checked={on}
       aria-label={`${label} ${on ? "on" : "off"}`}
       class={`switch${on ? " switch-on" : ""}`}
       disabled={disabled}
+      title={title}
       onClick={onClick}
     >
       <span class="switch-knob" />

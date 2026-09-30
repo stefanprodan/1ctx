@@ -7,6 +7,7 @@ import {
   filterOptions,
   initialHighlight,
   keyMove,
+  pickOutcome,
   stepHighlight,
 } from "../../../src/client/ui/Select.model.ts";
 
@@ -81,5 +82,18 @@ describe("keyMove", () => {
     expect(keyMove("ArrowUp", -1, 0)).toBe(-1);
     expect(keyMove("Enter", 1, 3)).toBe("pick");
     expect(keyMove("Escape", 1, 3)).toBeNull();
+  });
+});
+
+describe("pickOutcome", () => {
+  test("a click or Enter on a disabled option does nothing", () => {
+    const off = { value: "fp4", label: "fp4", disabled: true, title: "why" };
+    // Enter is a pick of the highlighted option, the same as a click
+    expect(keyMove("Enter", 0, 1)).toBe("pick");
+    expect(pickOutcome(off, "", false)).toBe("none");
+    expect(pickOutcome(off, "fp4", false)).toBe("none");
+    expect(pickOutcome(zones[2]!, "", true)).toBe("none");
+    expect(pickOutcome(zones[2]!, "UTC", false)).toBe("close");
+    expect(pickOutcome(zones[2]!, "", false)).toBe("change");
   });
 });

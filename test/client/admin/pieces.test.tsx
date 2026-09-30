@@ -163,6 +163,7 @@ describe("ModelPicker", () => {
     id,
     name,
     contextLength: null,
+    outputLimit: null,
     promptPrice: null,
     completionPrice: null,
     tools: true,

@@ -8,6 +8,9 @@ export type Option = {
   // what a search also matches but the option does not show: the
   // cities of a zone
   keywords?: string;
+  // shown for what it is, never picked; the title says why
+  disabled?: boolean;
+  title?: string;
 };
 
 // A word typed with spaces finds punctuation in a name, so "new york"
@@ -48,6 +51,17 @@ export function stepHighlight(at: number, count: number, move: 1 | -1) {
   if (count === 0) return -1;
   if (at < 0) return move === 1 ? 0 : count - 1;
   return (at + move + count) % count;
+}
+
+// what a click or Enter on an option does: nothing on a disabled list or
+// option, else the panel closes and a new value is reported
+export function pickOutcome(
+  option: Option,
+  value: string,
+  disabled: boolean | undefined,
+): "none" | "close" | "change" {
+  if (disabled || option.disabled) return "none";
+  return option.value === value ? "close" : "change";
 }
 
 // a list's arrows and Enter: the new highlight, a pick, or not a key

@@ -602,8 +602,14 @@ compare the two before reporting.
     card's clearing rules (a provider change, a pick, Cancel) live in
     `AgentDrafts`. `ModelPicker` is the catalog search inside
     `ModelFields` (an agent, New agent) and `DeciderModelFields` (a
-    decider, New decider). Preferred provider shows only
-    on an OpenRouter provider.
+    decider, New decider). Preferred provider and the Skip 4-bit
+    providers switch beside it show only on an OpenRouter provider and
+    share one endpoints fetch (`UpstreamField.tsx`). A choice that
+    cannot work stays in sight, disabled with its reason as the tooltip:
+    the switch while off when the preferred provider or every provider
+    serving the model is 4-bit (`skip4BitLock()`), and with it on the
+    4-bit options of Preferred provider (`Option.disabled` in
+    `Select`). A provider change turns it off.
   - An MCP server's matchers decide in the order of `decide()` in
     `shared/mcp.ts`: excluded, then read, then write, and an empty write
     list takes every tool no matcher holds. `moveTools()` never names a

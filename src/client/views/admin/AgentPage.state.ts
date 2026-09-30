@@ -25,6 +25,7 @@ type ModelDraft = {
   thinking: "on" | "off" | null;
   effort: Effort | null;
   upstream: string | null;
+  skip4Bit: boolean;
   windowText: string;
   takesTools: boolean;
 };
@@ -40,6 +41,7 @@ export class AgentDrafts {
   readonly thinking = signal<"on" | "off" | null>(null);
   readonly effort = signal<Effort | null>(null);
   readonly upstream = signal<string | null>(null);
+  readonly skip4Bit = signal(false);
   readonly windowText = signal("");
   readonly takesTools = signal(false);
   // the model the upstream was chosen for: a tag names a provider of it
@@ -86,6 +88,7 @@ export class AgentDrafts {
     this.thinking.value = agent.thinking;
     this.effort.value = agent.effort;
     this.upstream.value = agent.upstream;
+    this.skip4Bit.value = agent.skip4Bit;
     this.upstreamOf = agent.model.id;
     this.windowText.value = agent.model.contextLength?.toString() ?? "";
     this.takesTools.value = agent.model.tools;
@@ -130,6 +133,7 @@ export class AgentDrafts {
       this.thinking.value === before.thinking &&
       this.effort.value === before.effort &&
       this.upstream.value === before.upstream &&
+      this.skip4Bit.value === before.skip4Bit &&
       this.windowText.value ===
         (before.model.contextLength?.toString() ?? "") &&
       this.takesTools.value === before.model.tools;
@@ -145,6 +149,7 @@ export class AgentDrafts {
       thinking: this.thinking.value,
       effort: this.effort.value,
       upstream: this.upstream.value,
+      skip4Bit: this.skip4Bit.value,
       windowText: this.windowText.value,
       takesTools: this.takesTools.value,
     };
@@ -163,6 +168,7 @@ export class AgentDrafts {
       this.thinking.value = b.thinking;
       this.effort.value = b.effort;
       this.upstream.value = b.upstream;
+      this.skip4Bit.value = b.skip4Bit;
       this.windowText.value = b.windowText;
       this.takesTools.value = b.takesTools;
     }
@@ -187,6 +193,7 @@ export class AgentDrafts {
     this.model.value = null;
     this.effort.value = null;
     this.upstream.value = null;
+    this.skip4Bit.value = false;
   }
 
   generalDirty(agent: AgentSummary): boolean {
@@ -206,6 +213,7 @@ export class AgentDrafts {
       thinking: this.thinking.value,
       effort: sentEffort(m, this.thinking.value, this.effort.value, wire),
       upstream: wire === "openrouter" ? this.upstream.value : null,
+      skip4Bit: wire === "openrouter" ? this.skip4Bit.value : false,
       ...statedFields(m, this.windowText.value, this.takesTools.value),
     };
   }
@@ -241,6 +249,7 @@ export class AgentDrafts {
       sentEffort(model, this.thinking.value, this.effort.value, wire) !==
         agent.effort ||
       this.upstream.value !== agent.upstream ||
+      this.skip4Bit.value !== agent.skip4Bit ||
       picked?.contextLength !== agent.model.contextLength ||
       picked?.tools !== agent.model.tools ||
       // a window it cannot take reads as none, yet is an edit to refuse

@@ -119,6 +119,7 @@ describe("the composer's agent", () => {
       id: "acme/small",
       name: "Small",
       contextLength: null,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: false,
@@ -134,6 +135,7 @@ describe("the composer's agent", () => {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    skip4Bit: false,
     default: id === "a1",
     createdAt: 0,
   });

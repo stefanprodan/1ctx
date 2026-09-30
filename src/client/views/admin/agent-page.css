@@ -61,6 +61,10 @@
   .agent-page-settings .pair-wide {
     min-width: 280px;
   }
+  /* the switch sits level with the select beside it */
+  .agent-page-skip .switch {
+    margin-block: var(--space-2);
+  }
 
   /* the tool count and the access keep their width, so a pick never
      moves the row */

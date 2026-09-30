@@ -364,6 +364,9 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
       (fields.model ?? before.model.id) === before.model.id
         ? before.upstream
         : null,
+    // another provider may speak another wire, which refuses the filter
+    skip4Bit:
+      before && providerId === before.providerId ? before.skip4Bit : false,
     ...keep(before),
     ...fields,
     skills: savedSkills,

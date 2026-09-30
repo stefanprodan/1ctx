@@ -12,6 +12,7 @@ import {
   initialHighlight,
   keyMove,
   type Option,
+  pickOutcome,
 } from "./Select.model.ts";
 import "./select.css";
 
@@ -60,9 +61,10 @@ export function Select({
     if (focus) trigger.current?.focus();
   };
   const pick = (option: Option) => {
-    if (disabled) return;
+    const outcome = pickOutcome(option, value, disabled);
+    if (outcome === "none") return;
     close(true);
-    if (option.value !== value) onChange(option.value);
+    if (outcome === "change") onChange(option.value);
   };
 
   useEffect(() => {
@@ -190,7 +192,9 @@ export function Select({
                   role="option"
                   tabIndex={-1}
                   aria-selected={option.value === value}
-                  class={`select-option${i === activeAt ? " select-option-on" : ""}`}
+                  aria-disabled={option.disabled || undefined}
+                  title={option.title}
+                  class={`select-option${i === activeAt ? " select-option-on" : ""}${option.disabled ? " select-option-off" : ""}`}
                   // the press keeps focus in the search box
                   onMouseDown={(ev) => ev.preventDefault()}
                   onPointerMove={() => {

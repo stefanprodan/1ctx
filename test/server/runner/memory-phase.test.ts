@@ -8,6 +8,7 @@ import {
   MEMORY_EXCERPT_CHARS,
   memorySystem,
 } from "../../../src/server/runner/memory-packet.ts";
+import { NOT_FOUR_BIT } from "../../../src/shared/quantization.ts";
 import {
   createAutomation,
   settleRun as settle,
@@ -92,6 +93,26 @@ describe("automation memory phase", () => {
     run.main.reply("The check passed.");
     const phase = await waitScript(chat.scripted, 2);
     expect(phase.body.provider).toEqual({ order: ["deepinfra/fp4"] });
+    phase.reply("No change.");
+    await settle(chat, run.sessionId);
+    await chat.app.shutdown();
+  });
+
+  test("the answer and the phase both skip 4-bit hosts and cap their output", async () => {
+    const chat = await chatApp({ wire: "openrouter" });
+    chat.app.db.run(
+      "update agents set skip_4bit = 1, output_limit = 4000 where id = ?",
+      [chat.agentId],
+    );
+    const automation = await createAutomation(chat, { ownMemory: true });
+    const run = await startRun(chat, automation.id);
+    const provider = { quantizations: [...NOT_FOUR_BIT] };
+    expect(run.main.body.provider).toEqual(provider);
+    expect(run.main.body.max_tokens).toBe(4000);
+    run.main.reply("The check passed.");
+    const phase = await waitScript(chat.scripted, 2);
+    expect(phase.body.provider).toEqual(provider);
+    expect(phase.body.max_tokens).toBe(4000);
     phase.reply("No change.");
     await settle(chat, run.sessionId);
     await chat.app.shutdown();

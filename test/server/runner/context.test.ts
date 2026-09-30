@@ -5,16 +5,25 @@
 // exhausted line on a copy, and the system prompt, on fixtures.
 
 import { describe, expect, test } from "bun:test";
-import type { ChatMessageIn } from "../../../src/server/providers/index.ts";
+import { tokens } from "../../../src/server/lib/tokens.ts";
+import {
+  type ChatMessageIn,
+  requestTokens,
+} from "../../../src/server/providers/index.ts";
 import {
   type ContextLookups,
   EXHAUSTED_LINE,
   history,
   LOOP_LINE,
+  OUTPUT_FALLBACK,
+  OUTPUT_MAX,
+  OUTPUT_MIN,
+  outputCap,
   request,
   SKILLS_LEAD,
   SUMMARIZE,
   SUMMARY_LEAD,
+  sizedRequest,
   summaryRequest,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
@@ -84,12 +93,15 @@ const policy: SendPolicy = {
   wire: "openai-compatible",
   model: "org/model",
   contextLength: 1000,
+  outputLimit: null,
+  outputRead: true,
   prompt: "You write Go.",
   thinking: true,
   thinkingOff: false,
   thinkingRequired: false,
   effort: "high",
   upstream: null,
+  skip4Bit: false,
   offered: WITH_BASH,
   disabledCapabilities: [],
   mcpOff: [],
@@ -998,6 +1010,7 @@ describe("history", () => {
       reasoningEffort: null,
       cacheKey: "s1",
       upstream: null,
+      skip4Bit: false,
       maxTokens: 2000,
     });
     // the answer left less room than the reserve: the summary fits it
@@ -1030,6 +1043,9 @@ describe("history", () => {
       reasoningEffort: "high",
       cacheKey: "s1",
       upstream: null,
+      skip4Bit: false,
+      // the window of 1,000 leaves less than the floor
+      maxTokens: OUTPUT_MIN,
     });
     // the agent's own Off rides along, for the summary round too
     const off = { ...policy, thinking: false, thinkingOff: true, effort: null };
@@ -1039,6 +1055,10 @@ describe("history", () => {
     const pinned = { ...policy, upstream: "inference-net/fp4", offered: NONE };
     expect(request(pinned, "s1", []).upstream).toBe("inference-net/fp4");
     expect(summaryRequest(pinned, "s1", []).upstream).toBe("inference-net/fp4");
+    // and the host filter
+    const filtered = { ...policy, skip4Bit: true, offered: NONE };
+    expect(request(filtered, "s1", []).skip4Bit).toBe(true);
+    expect(summaryRequest(filtered, "s1", []).skip4Bit).toBe(true);
   });
 
   test("the request carries the offered tools when there are any", () => {
@@ -1061,6 +1081,86 @@ describe("history", () => {
     expect(req.tools).toEqual([
       { name: "time", description: "d", parameters: {} },
     ]);
+  });
+});
+
+describe("the output cap", () => {
+  test("is the model's limit, bounded", () => {
+    expect(outputCap(8_192, null, 0, 0)).toBe(8_192);
+    expect(outputCap(null, null, 0, 0)).toBe(OUTPUT_FALLBACK);
+    expect(outputCap(943_717, null, 0, 0)).toBe(OUTPUT_MAX);
+    // a limit under the floor is the model's own and stays
+    expect(outputCap(448, 100_000, 0, 0)).toBe(448);
+  });
+
+  test("fits the room the prompt leaves, the counted part taken larger", () => {
+    expect(outputCap(128_000, 200_000, 0, 100_000)).toBe(85_000);
+    expect(outputCap(128_000, 200_000, 0, 1_001)).toBe(128_000);
+    expect(outputCap(null, 40_000, 0, 10_000)).toBe(28_500);
+    expect(outputCap(128_000, 100_000, 0, 99_000)).toBe(OUTPUT_MIN);
+    // what the provider measured is taken as it is
+    expect(outputCap(128_000, 200_000, 100_000, 10_000)).toBe(88_500);
+  });
+
+  const messages: ChatMessageIn[] = [
+    { role: "system", content: "You write Go." },
+    { role: "user", content: "a question ".repeat(500) },
+  ];
+  const window = { ...policy, contextLength: 20_000, outputLimit: 64_000 };
+
+  test("a round asks for it, counted on the request it sends", () => {
+    const sized = sizedRequest(window, "s1", messages);
+    const { maxTokens: _cap, ...sent } = sized.request;
+    expect(sized.estimate).toBe(requestTokens(sent));
+    expect(sized.request.maxTokens).toBe(
+      20_000 - Math.ceil(requestTokens(sent) * 1.15),
+    );
+    expect(
+      request({ ...window, contextLength: null }, "s1", messages).maxTokens,
+    ).toBe(64_000);
+    expect(
+      sizedRequest({ ...window, contextLength: null }, "s1", messages).estimate,
+    ).toBeNull();
+    expect(
+      request(
+        { ...window, contextLength: 1_000_000, outputLimit: null },
+        "s1",
+        messages,
+      ).maxTokens,
+    ).toBe(OUTPUT_FALLBACK);
+    // the summary keeps its own cap
+    expect(summaryRequest(window, "s1", messages).maxTokens).toBe(
+      LOOP_LIMITS.summaryMaxTokens,
+    );
+  });
+
+  test("a later round counts only what it added to the measured one", () => {
+    const added: ChatMessageIn[] = [
+      { role: "tool", toolCallId: "c1", content: "a result ".repeat(300) },
+    ];
+    const measured = { tokens: 9_000, messages: [...messages] };
+    const sized = sizedRequest(window, "s1", [...messages, ...added], measured);
+    const fresh = tokens(JSON.stringify(added));
+    expect(sized.estimate).toBe(9_000 + fresh);
+    expect(sized.request.maxTokens).toBe(
+      20_000 - 9_000 - Math.ceil(fresh * 1.15),
+    );
+    // a request that does not extend the measured one is counted whole
+    const other = sizedRequest(
+      window,
+      "s1",
+      [{ role: "system", content: "another packet" }, ...added],
+      measured,
+    );
+    const { maxTokens: _cap, ...sent } = other.request;
+    expect(other.estimate).toBe(requestTokens(sent));
+  });
+
+  test("a model whose limit was never read sends none", () => {
+    const unread = { ...window, outputRead: false };
+    const sized = sizedRequest(unread, "s1", messages);
+    expect(sized.request).not.toHaveProperty("maxTokens");
+    expect(sized.estimate).toBeNull();
   });
 });
 
