@@ -14,60 +14,6 @@
 (fail) ReadWriteFs replacement mode and copy behavior > appends to a private write-only regular file
 (fail) ReadWriteFs replacement mode and copy behavior > changes metadata on a private mode-000 regular file
 (fail) ReadWriteFs special-file metadata operations > preserves a Unix socket during chmod and utimes
-(fail) WorkerDefenseInDepth > activation > should activate when enabled
-(fail) WorkerDefenseInDepth > activation > should deactivate and restore globals
-(fail) WorkerDefenseInDepth > activation > should generate an execution ID
-(fail) WorkerDefenseInDepth > audit mode > should log but not block in audit mode
-(fail) WorkerDefenseInDepth > audit mode > should record violations in audit mode
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow checking .constructor with typeof
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.length
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.name
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading .constructor.prototype
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should allow reading Function.prototype.constructor.name
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor property reads (allowed for type introspection) > should block .constructor() invocation while allowing property reads
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (() => {}).constructor
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (async () => {}).constructor
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block (function*(){}).constructor
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block [].constructor.constructor
-(fail) WorkerDefenseInDepth > blocking in worker context > .constructor.constructor escape vector > should block {}.constructor.constructor
-(fail) WorkerDefenseInDepth > blocking in worker context > Error.prepareStackTrace blocking > should allow Error.prepareStackTrace reading
-(fail) WorkerDefenseInDepth > blocking in worker context > Error.prepareStackTrace blocking > should block Error.prepareStackTrace assignment
-(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block Function accessed via globalThis
-(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block Function() call without new
-(fail) WorkerDefenseInDepth > blocking in worker context > Function constructor blocking > should block new Function()
-(fail) WorkerDefenseInDepth > blocking in worker context > Proxy blocking > should block new Proxy()
-(fail) WorkerDefenseInDepth > blocking in worker context > WebAssembly blocking > should block WebAssembly.Module access
-(fail) WorkerDefenseInDepth > blocking in worker context > eval blocking > should block direct eval
-(fail) WorkerDefenseInDepth > blocking in worker context > eval blocking > should block indirect eval via globalThis
-(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block Atomics access
-(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block FinalizationRegistry
-(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block SharedArrayBuffer
-(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should block WeakRef
-(fail) WorkerDefenseInDepth > blocking in worker context > other blocked globals > should freeze Reflect and expose it through a read-only proxy
-(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.binding calls
-(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.dlopen calls
-(fail) WorkerDefenseInDepth > blocking in worker context > process.binding blocking > should block process.mainModule access when it exists (CJS contexts)
-(fail) WorkerDefenseInDepth > blocking in worker context > process.env blocking > should block process.env access
-(fail) WorkerDefenseInDepth > blocking in worker context > process.env blocking > should block process.env iteration
-(fail) WorkerDefenseInDepth > blocking in worker context > process.getBuiltinModule blocking > should block process.getBuiltinModule
-(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setImmediate
-(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setInterval
-(fail) WorkerDefenseInDepth > blocking in worker context > setTimeout/setInterval blocking > should block setTimeout
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow excluded violation types to work normally
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow multiple exclusions (as used by Python worker)
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should allow setImmediate when excluded (as used by Python worker)
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should exclude WebAssembly when specified
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should not record violations for excluded types
-(fail) WorkerDefenseInDepth > excludeViolationTypes > should still block non-excluded violation types
-(fail) WorkerDefenseInDepth > restoration > should restore Function constructor after deactivation
-(fail) WorkerDefenseInDepth > restoration > should restore all globals after deactivation
-(fail) WorkerDefenseInDepth > violation recording > should clear violations when requested
-(fail) WorkerDefenseInDepth > violation recording > should include violations in stats
-(fail) WorkerDefenseInDepth > violation recording > should invoke onViolation callback
-(fail) WorkerDefenseInDepth > violation recording > should record violations with correct information
-(fail) WorkerDefenseInDepth > worker-specific behavior > blocks require and direct loader calls without consulting stack text
-(fail) WorkerDefenseInDepth > worker-specific behavior > should always block (no context tracking needed)
-(fail) WorkerDefenseInDepth > worker-specific behavior > should include 'worker context' in error messages
 (fail) awk built-in variables > FILENAME > should be empty for stdin
 (fail) awk command > error handling > should error on missing file
 (fail) awk command > printf formats > should format scientific with %e

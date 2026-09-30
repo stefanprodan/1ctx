@@ -67,6 +67,8 @@ never execute guest-provided JavaScript.
 Every invocation is bound by `maxExecutionTimeMs`. On cancellation, just-bash
 revokes the command context immediately; `maxExtensionCleanupTimeMs` only
 bounds how long it waits for the now-authority-free command promise to settle.
+A command that is still resolving, such as one whose module is loading, is
+never started and reports cancellation immediately instead.
 A late continuation cannot use `ctx.fs`, `ctx.env`, `ctx.exec`, or other context
 capabilities. Cleanup work that must run at scope closure can be registered with
 `ctx.executionScope.registerCleanup()`. A cleanup failure is returned as a

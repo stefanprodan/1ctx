@@ -50,7 +50,10 @@ without a file of their own.
 
 | File | Change | Why |
 |---|---|---|
-| `src/security/defense-in-depth-box.ts` | `withValue()` installs a patched Module method as a data descriptor, without `get` or `set` | Bun reports some `Module` statics as accessors; spreading them beside `value` made `defineProperty` throw, so every critical patch failed and `defenseInDepth: true` refused to run |
+| `src/security/defense-in-depth-box.ts` | `withValue()` installs a patched value as a data descriptor, never with a `get` or `set` beside `value`, where upstream spreads the descriptor | before #443 the accessor `Module._resolveFilename` went through it, and the spread made `defineProperty` throw, so every critical patch failed and `defenseInDepth: true` refused to run; on Bun 1.4.2 both callers now pass only data descriptors (the Module branch runs only for a `value`, the freeze branch patches `Reflect`, `JSON` and `Math`), so either side is safe at the 3.5.0 sync |
+| `src/security/defense-in-depth-box.ts`, `worker-defense-in-depth.ts`, upstream's `module-accessor-descriptors.bun.test.ts` | upstream #443, ported ahead of the sync: `Module._load` and `Module._resolveFilename` reported as accessors are installed through their own setter with a guarded get and set in front; a set during a command is blocked as a call is, a set in audit mode is recorded and wrapped, and teardown resets the native slot through the original setter before the descriptors are restored | on Bun 1.4.2 `_resolveFilename` is an accessor whose native slot only its setter writes, so our data property installed, reported no failure and blocked nothing: `require()` inside a command loaded anything. Now it throws `module_resolve_filename`, so a package a command initialises outside a registry load or `runTrustedAsync` throws in the binary, where Bun bundles CommonJS with a real `require`. The worker box, which we never start, failed its critical patch on Bun, so upstream's `WorkerDefenseInDepth` suite failed; it passes now. Take theirs at the 3.5.0 sync |
+| `src/security/defense-in-depth-box.ts` | upstream #503, ported ahead of the sync: `runTrustedAsync` returns the awaited value, not the promise (its other half is in the worker bridge we removed) | adopting the promise went through the box's patched `Promise.prototype.then`, which drops callbacks once the execution is deactivated, so host work settling after a cancel lost its value and left its rejection unhandled; take theirs at the 3.5.0 sync |
+| `src/abort-signals.ts`, `src/commands/registry.ts`, `src/custom-commands.ts`, `src/security/trusted-globals.ts`, `defense-in-depth-box.ts`, `src/test-utils/unhandled-rejections.ts` (new), upstream's `timeout.resolve-cancellation.test.ts`, `custom-command-lazy-load.test.ts`, `defense-in-depth-trusted-scope.test.ts` | upstream #506, ported ahead of the sync: a cancelled invocation stops waiting for its command's module load (`raceCancellation`), a custom command's lazy load is shared and its waiters detach, settled through the intrinsic `then` (`_promiseThen`), and deactivating an execution releases its trusted scope | `timeout` on a command still loading ended the whole script with `bash: execution aborted`, exit 124, since the load cannot be cancelled and held the invocation past the cleanup window; take theirs at the 3.5.0 sync |
 | `src/network/fetch.ts` | a redirect to anything but `http:` or `https:` is `RedirectNotAllowedError` | Bun's fetch reads `file:` URLs from the host's disk, and full internet access checks no scheme |
 | `src/network/fetch.ts` | a response refused for its `content-length` cancels its body | the connection was left open until the body was collected |
 | `src/commands/curl/curl.ts`, `parse.ts`, `types.ts`, `help.ts` | `-V` and `--version` answer `curl 8.21.0 (just-bash, compatible)`, the protocols and a line saying what this is, exit 0, before the URL check | `curl --version` was `unrecognized option`, exit 1, where every curl answers it |
@@ -521,7 +524,6 @@ suite under `bun test`, which accepts vitest's imports, with
 `src/vitest-setup.ts` preloaded, and runs in CI after `make test`. Some
 tests fail upstream under Bun as well:
 
-- `WorkerDefenseInDepth`: the worker sandbox, which we never start;
 - the `bundle` tests: they need the built `dist/`;
 - browser mode;
 - the host-disk file systems `ReadWriteFs` and `OverlayFs`, which we
@@ -529,7 +531,13 @@ tests fail upstream under Bun as well:
 
 Others fail because of the trim: the removed commands, the documents
 and the fixtures. The fuzzers need `fast-check` and two lifecycle tests
-need `tsx`, which we do not install.
+need `tsx`, which we do not install. The ports of #443, #503 and #506
+left out the tests they need `tsx` or python3 for:
+`module-accessor-descriptors.test.ts`,
+`module-accessor-redefinition.test.ts`,
+`defense-in-depth-trusted-settlement.test.ts` and
+`python3.cancelled-load.test.ts`; a sync brings the first three back,
+to fail as the other `tsx` tests do.
 
 `vendor/just-bash-failures.txt` lists every expected failure by name,
 and the first error line of every test file that failed to load, since
