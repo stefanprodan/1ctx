@@ -85,6 +85,9 @@ export type SendPolicy = {
   wire: Wire | null;
   model: string;
   contextLength: number | null;
+  // the most a reply of the model may hold, null when the catalog did
+  // not say
+  outputLimit: number | null;
   prompt: string;
   thinking: boolean;
   // the agent's own Off, not a default that resolved to off
@@ -94,6 +97,8 @@ export type SendPolicy = {
   effort: Effort | null;
   // the OpenRouter endpoint tag the agent prefers, null to let it route
   upstream: string | null;
+  // leave out OpenRouter's 4-bit hosts; false on every other wire
+  skip4Bit: boolean;
   // the snapshot the send runs under, its tools the schemas on the wire
   offered: Offered;
   disabledCapabilities: string[];
@@ -215,12 +220,14 @@ export function buildPolicy(input: {
     wire: input.wire ?? null,
     model: agent.model.id,
     contextLength: agent.model.contextLength,
+    outputLimit: agent.model.outputLimit,
     prompt: agent.prompt,
     thinking,
     thinkingOff: fixed === null && agent.thinking === "off",
     thinkingRequired: agent.model.thinkingRequired,
     effort: thinking ? agent.effort : null,
     upstream: input.wire === "openrouter" ? agent.upstream : null,
+    skip4Bit: input.wire === "openrouter" && agent.skip4Bit,
     offered,
     disabledCapabilities,
     mcpOff:

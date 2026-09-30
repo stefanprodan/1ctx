@@ -13,6 +13,7 @@
 // precede the first token, and a free endpoint refuses with an HTTP 429
 // whose body names the upstream pool.
 
+import { NOT_FOUR_BIT } from "../../shared/quantization.ts";
 import {
   buildChatBody as buildOpenAiChatBody,
   frameEvents,
@@ -106,7 +107,8 @@ export function mergeReasoningDetail(
 // usage asked for on the last frame, the session id as session_id (the
 // sticky routing key: every turn goes to the upstream that holds the
 // cached prefix; prompt_cache_key is only its fallback), the preferred
-// upstream as provider.order and the per-family message rules above.
+// upstream as provider.order, the precisions allowed as
+// provider.quantizations and the per-family message rules above.
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   const body = buildOpenAiChatBody(req, {
     reasoningField: "reasoning",
@@ -118,7 +120,12 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   if (req.cacheKey) body.session_id = req.cacheKey;
   // order, never only: a tag that stopped serving is skipped, so the
   // preference costs a discount and never the turn
-  if (req.upstream) body.provider = { order: [req.upstream] };
+  const provider: Record<string, unknown> = {};
+  if (req.upstream) provider.order = [req.upstream];
+  // a filter no host of the model passes is a 404, so it is the agent's
+  // choice and never a default
+  if (req.skip4Bit) provider.quantizations = [...NOT_FOUR_BIT];
+  if (Object.keys(provider).length > 0) body.provider = provider;
   body.usage = { include: true };
   // no middle-out: OpenRouter would cut a long prompt to the window on
   // its own, silently, and the runner compacts from the usage it counts

@@ -66,6 +66,8 @@ export type ChatRequest = {
   // the OpenRouter endpoint tag tried first, others after it; another
   // wire has no such choice and never gets one
   upstream?: string | null;
+  // OpenRouter alone: leave out the hosts serving the model at 4 bits
+  skip4Bit?: boolean;
 };
 
 // the tokens and cost of one round, as the provider reported them: null

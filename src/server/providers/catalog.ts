@@ -47,6 +47,7 @@ function parseNamed(models: unknown[]): CatalogMatch[] {
       id,
       name: id,
       contextLength: null,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: false,
@@ -58,6 +59,11 @@ function parseNamed(models: unknown[]): CatalogMatch[] {
   }
   return out;
 }
+
+const positive = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : null;
 
 export function parseCatalog(body: unknown): CatalogMatch[] {
   const out: CatalogMatch[] = [];
@@ -83,10 +89,15 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       typeof m.context_length === "number" && m.context_length > 0
         ? m.context_length
         : null;
+    // OpenRouter says it of the endpoint it prefers, Groq of the model
+    const top = (m.top_provider ?? {}) as Record<string, unknown>;
+    const outputLimit =
+      positive(top.max_completion_tokens) ?? positive(m.max_completion_tokens);
     out.push({
       id: m.id,
       name: typeof m.name === "string" && m.name !== "" ? m.name : m.id,
       contextLength,
+      outputLimit,
       promptPrice: perMillion(pricing.prompt),
       completionPrice: perMillion(pricing.completion),
       tools: params.includes("tools") || params.includes("tool_use"),

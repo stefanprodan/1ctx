@@ -37,6 +37,7 @@ const agent: AgentRow = {
     id: "org/model",
     name: "Model",
     contextLength: 1000,
+    outputLimit: null,
     promptPrice: null,
     completionPrice: null,
     tools: false,
@@ -52,6 +53,7 @@ const agent: AgentRow = {
   servers: [],
   mcpMode: "auto",
   upstream: null,
+  skip4Bit: false,
   default: false,
   createdAt: 1,
 };
@@ -227,21 +229,36 @@ describe("send policy thinking", () => {
 });
 
 describe("send policy upstream", () => {
-  const pinned = (wire: SendPolicy["wire"]) =>
+  const routed = (wire: SendPolicy["wire"]) =>
     buildPolicy({
       project: { id: "project", kind: "team", name: "ops", description: "" },
       user,
-      agent: { ...agent, upstream: "inference-net/fp4" },
+      agent: {
+        ...agent,
+        upstream: "inference-net/fp4",
+        skip4Bit: true,
+        model: { ...agent.model, outputLimit: 8192 },
+      },
       wire,
       now: 1,
       tools: null,
       knowledge: { files: 0, recent: [] },
       limits: DEFAULT_LIMITS,
-    }).upstream;
+    });
 
   test("rides only on the OpenRouter wire", () => {
-    expect(pinned("openrouter")).toBe("inference-net/fp4");
-    expect(pinned("openai-compatible")).toBeNull();
-    expect(pinned(null)).toBeNull();
+    expect(routed("openrouter").upstream).toBe("inference-net/fp4");
+    expect(routed("openai-compatible").upstream).toBeNull();
+    expect(routed(null).upstream).toBeNull();
+  });
+
+  test("the host filter rides only on the OpenRouter wire", () => {
+    expect(routed("openrouter").skip4Bit).toBe(true);
+    expect(routed("openai-compatible").skip4Bit).toBe(false);
+    expect(routed(null).skip4Bit).toBe(false);
+  });
+
+  test("the model's output limit rides on every wire", () => {
+    expect(routed("openai-strict").outputLimit).toBe(8192);
   });
 });

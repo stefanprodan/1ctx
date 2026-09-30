@@ -33,6 +33,7 @@ const described: CatalogMatch = {
   id: "vendor/flash",
   name: "Flash",
   contextLength: 128000,
+  outputLimit: null,
   promptPrice: 0.14,
   completionPrice: 0.28,
   tools: true,
@@ -46,6 +47,7 @@ const stated: CatalogMatch = {
   id: "local/model",
   name: "local/model",
   contextLength: 32768,
+  outputLimit: null,
   promptPrice: null,
   completionPrice: null,
   tools: true,
@@ -67,6 +69,7 @@ const agent: AgentSummary = {
   servers: [{ serverId: "s1", read: true, write: false }],
   mcpMode: "auto",
   upstream: "vendor/fp8",
+  skip4Bit: false,
   default: false,
   createdAt: 0,
 };

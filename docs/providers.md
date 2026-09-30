@@ -1,8 +1,8 @@
 # Providers
 
 Governs `src/server/providers/`, `deciders/`, `lib/fetcher.ts` and an
-agent's provider, model, window, tools, thinking, effort and upstream
-fields.
+agent's provider, model, window, output limit, tools, thinking, effort,
+upstream and skip4Bit fields.
 
 - **A provider is added and deleted, never changed.** Its wire is
   `openrouter`, `openai-compatible`, `openai-strict` or `gemini`. The
@@ -129,6 +129,32 @@ fields.
   provider that is down or gone costs the preference and not the turn.
   The form's Preferred provider leaves out endpoints without tools when the
   model takes them, and a new model or provider clears the pick.
+- **An OpenRouter agent may skip 4-bit hosts.** An agent's `skip4Bit`
+  (false by default, a 400 on another wire) makes every request of a
+  send, the summary and the memory phase included, send
+  `provider.quantizations` with every precision in
+  `shared/quantization.ts` but `int4`, `fp4`, `mxfp4` and `nvfp4`,
+  `unknown` included, since OpenRouter leaves out a host of unknown
+  precision unless the filter names it; beside `order` when an upstream
+  is preferred. The filter applies to the preferred host too, so a save
+  with it on and an upstream whose tag says a 4-bit precision after the
+  slash (`deepinfra/fp4`) is a 400, decided from the tag alone. A model
+  no host passes answers 404, so the filter is never a default.
+- **Every chat, run and memory round sends `max_tokens`.** The catalog
+  keeps the model's output limit on the agent as `outputLimit`
+  (OpenRouter's `top_provider.max_completion_tokens`, Groq's
+  `max_completion_tokens`, Gemini's `outputTokenLimit`; null elsewhere,
+  and on an agent until its model is picked again). `outputCap()` in
+  `runner/context.ts` asks for that limit, or `OUTPUT_FALLBACK` (32,000)
+  when unknown, at most `OUTPUT_MAX` (256,000), fitted to the room the
+  prompt leaves in the window (`contextLength - ceil(estimate * 1.15)`,
+  the estimate `requestTokens()` of the request) and never under
+  `OUTPUT_MIN` (1,024); a null window skips the fit and the count. A
+  hit ends the turn as `length`. The summary keeps `summaryMaxTokens`.
+  OpenRouter derives an Anthropic model's thinking budget from
+  `max_tokens` when only `reasoning.effort` is sent (`max_tokens` times
+  the effort's ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap
+  sets how long those models think; Gemini 3 maps the effort to a level.
 - **Decisions are a second catalog and a second call.** A decision model
   answers typed questions about a state with probabilities and no text.
   `DECIDER_WIRES` in `shared/contracts/decider.ts`, `openrouter` and

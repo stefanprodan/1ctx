@@ -145,6 +145,41 @@ describe("OpenRouter chat body", () => {
     ).toEqual({ order: ["inference-net/fp4"] });
   });
 
+  test("skipping 4-bit hosts allows every other precision, unknown included", () => {
+    const allowed = [
+      "int8",
+      "fp6",
+      "fp8",
+      "mxfp8",
+      "fp16",
+      "bf16",
+      "fp32",
+      "unknown",
+    ];
+    expect(
+      (buildChatBody({ ...request, skip4Bit: true }) as any).provider,
+    ).toEqual({ quantizations: allowed });
+    expect(
+      (
+        buildChatBody({
+          ...request,
+          skip4Bit: true,
+          upstream: "baseten/fp8",
+        }) as any
+      ).provider,
+    ).toEqual({ order: ["baseten/fp8"], quantizations: allowed });
+    expect(buildChatBody({ ...request, skip4Bit: false })).not.toHaveProperty(
+      "provider",
+    );
+  });
+
+  test("carries the output cap as max_tokens", () => {
+    expect((buildChatBody(request) as any).max_tokens).toBe(300);
+    expect(buildChatBody({ ...request, maxTokens: null })).not.toHaveProperty(
+      "max_tokens",
+    );
+  });
+
   test("marks the system prompt and the last two turns as cache breakpoints on Claude", () => {
     const CLAUDE = "anthropic/claude-sonnet-4.5";
     const body = buildChatBody({ ...request, model: CLAUDE }) as any;

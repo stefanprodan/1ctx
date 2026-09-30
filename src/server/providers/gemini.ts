@@ -70,6 +70,8 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
           : id,
       contextLength:
         num(model.inputTokenLimit) > 0 ? num(model.inputTokenLimit) : null,
+      outputLimit:
+        num(model.outputTokenLimit) > 0 ? num(model.outputTokenLimit) : null,
       promptPrice: null,
       completionPrice: null,
       tools: true,

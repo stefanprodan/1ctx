@@ -79,6 +79,7 @@ const flash: CatalogMatch = {
   id: "deepseek/deepseek-v4-flash",
   name: "DeepSeek: V4 Flash",
   contextLength: 128000,
+  outputLimit: null,
   promptPrice: 0.14,
   completionPrice: 0.28,
   tools: true,
@@ -100,6 +101,7 @@ const coder: AgentSummary = {
   servers: [],
   mcpMode: "auto",
   upstream: null,
+  skip4Bit: false,
   default: false,
   createdAt: 0,
 };
@@ -283,6 +285,7 @@ describe("a model its catalog does not describe", () => {
     id: "nvidia/nemotron-3-ultra-550b-a55b",
     name: "nvidia/nemotron-3-ultra-550b-a55b",
     contextLength: null,
+    outputLimit: null,
     promptPrice: null,
     completionPrice: null,
     tools: false,

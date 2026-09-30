@@ -63,6 +63,7 @@ const agent: DirectoryAgentResponse = {
       id: "deepseek/deepseek-v4-flash",
       name: "DeepSeek: V4 Flash",
       contextLength: 128_000,
+      outputLimit: null,
       promptPrice: 0.14,
       completionPrice: 0.28,
       tools: true,
@@ -78,6 +79,7 @@ const agent: DirectoryAgentResponse = {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    skip4Bit: false,
     default: false,
     createdAt: 0,
   },
@@ -397,6 +399,7 @@ describe("Directory.model", () => {
       agentLine("local", {
         ...model,
         contextLength: null,
+        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
       }),

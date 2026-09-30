@@ -78,6 +78,12 @@ describe("the openai-strict wire", () => {
 });
 
 describe("strict chat body", () => {
+  test("never carries OpenRouter's host filter", () => {
+    expect(buildChatBody({ ...request, skip4Bit: true })).not.toHaveProperty(
+      "provider",
+    );
+  });
+
   test("keeps the spec fields and drops every field outside it", () => {
     const body = buildChatBody(request);
     expect(Object.keys(body).sort()).toEqual([
@@ -158,6 +164,7 @@ describe("strict catalog", () => {
         id: m.id,
         name: m.id,
         contextLength: null,
+        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: false,
@@ -176,6 +183,7 @@ describe("strict catalog", () => {
       id: "openai/gpt-oss-120b",
       name: "GPT OSS 120B",
       contextLength: 131072,
+      outputLimit: 65536,
       promptPrice: 0.15,
       completionPrice: 0.6,
       tools: true,

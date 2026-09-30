@@ -35,6 +35,7 @@ const flash = {
   id: "deepseek/deepseek-v4.1-flash",
   name: "DeepSeek: DeepSeek V4.1 Flash",
   contextLength: 1048576,
+  outputLimit: 384000,
   promptPrice: 0.15,
   completionPrice: 0.6,
   tools: true,
@@ -242,6 +243,7 @@ describe("the agents", () => {
       servers: [],
       mcpMode: "auto",
       upstream: null,
+      skip4Bit: false,
       // the first agent is the default until an admin marks another
       default: true,
       createdAt: app.now.value,
@@ -566,6 +568,7 @@ describe("a model its catalog does not describe", () => {
       id: ULTRA,
       name: ULTRA,
       contextLength: 262144,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: true,
@@ -758,6 +761,44 @@ describe("a preferred upstream", () => {
     expect((await cleared.json()).agent.upstream).toBeNull();
   });
 
+  test("skipping 4-bit hosts saves, reads back and refuses a 4-bit upstream", async () => {
+    const { client, provider } = await setup();
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: GLM,
+    };
+    const made = await client.call("POST", "/api/agents", {
+      body: { ...body, skip4Bit: true, upstream: "baseten/fp8" },
+    });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    expect(agent).toMatchObject({ skip4Bit: true, upstream: "baseten/fp8" });
+    const listed = await (await client.call("GET", "/api/agents")).json();
+    expect(listed.agents[0].skip4Bit).toBe(true);
+    for (const upstream of ["deepinfra/fp4", "vendor/int4", "a/mxfp4"]) {
+      const refused = await client.call("PATCH", `/api/agents/${agent.id}`, {
+        body: { ...body, skip4Bit: true, upstream },
+      });
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toEqual({
+        error: `upstream ${upstream} is a 4-bit host, which skip4Bit leaves out`,
+      });
+    }
+    const odd = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, skip4Bit: "yes" },
+    });
+    expect(odd.status).toBe(400);
+    // a 4-bit upstream with fallbacks of any precision stays a choice
+    const pinned = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, upstream: "deepinfra/fp4" },
+    });
+    expect(pinned.status).toBe(200);
+    // left out is off
+    expect((await pinned.json()).agent.skip4Bit).toBe(false);
+  });
+
   test("is refused on another wire", async () => {
     const { client } = await setup();
     const other = await strict(client);
@@ -773,6 +814,19 @@ describe("a preferred upstream", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
       error: "upstream is only for an OpenRouter provider",
+    });
+    const filtered = await client.call("POST", "/api/agents", {
+      body: {
+        ...defaults,
+        name: "coder",
+        providerId: other.id,
+        model: "meta/llama-3.3-70b-instruct",
+        skip4Bit: true,
+      },
+    });
+    expect(filtered.status).toBe(400);
+    expect(await filtered.json()).toEqual({
+      error: "skip4Bit is only for an OpenRouter provider",
     });
   });
 });

@@ -19,11 +19,12 @@ import type { Message } from "../../shared/contracts/session.ts";
 import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
 import { EFFORTS, type Effort, type Wire } from "../../shared/words.ts";
 import { tokens } from "../lib/tokens.ts";
-import type {
-  ChatMessageIn,
-  ChatRequest,
-  ReasoningDetail,
-  ToolCall,
+import {
+  type ChatMessageIn,
+  type ChatRequest,
+  type ReasoningDetail,
+  requestTokens,
+  type ToolCall,
 } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
 import { systemPrompt } from "./prompt.ts";
@@ -295,21 +296,63 @@ export function historyMessages(
   return out;
 }
 
+// used when the catalog has no output limit for the model
+export const OUTPUT_FALLBACK = 32_000;
+// no reply needs more, however much the model allows
+export const OUTPUT_MAX = 256_000;
+// the prompt is counted in o200k, which can run low on another vendor's
+// tokens and on dense text such as code
+export const ESTIMATE_ERROR = 0.15;
+// never ask for less; compaction keeps the window from filling this far
+export const OUTPUT_MIN = 1_024;
+
+// the most tokens a round asks for: the model's own limit, bounded, and
+// fitted to the room the prompt leaves in the window when it is known
+export function outputCap(
+  outputLimit: number | null,
+  contextLength: number | null,
+  estimate: number,
+): number {
+  const requested = Math.min(outputLimit ?? OUTPUT_FALLBACK, OUTPUT_MAX);
+  if (contextLength === null) return requested;
+  const room = contextLength - Math.ceil(estimate * (1 + ESTIMATE_ERROR));
+  return Math.min(requested, Math.max(OUTPUT_MIN, room));
+}
+
+// a chat, run or memory round with its cap; the prompt is counted only
+// when there is a window to fit
+export function capped(
+  req: ChatRequest,
+  policy: Pick<SendPolicy, "outputLimit" | "contextLength">,
+): ChatRequest {
+  const estimate = policy.contextLength === null ? 0 : requestTokens(req);
+  return {
+    ...req,
+    maxTokens: outputCap(policy.outputLimit, policy.contextLength, estimate),
+  };
+}
+
 export function request(
   policy: SendPolicy,
   sessionId: string,
   messages: ChatMessageIn[],
 ): ChatRequest {
-  return {
-    model: policy.model,
-    messages,
-    thinking: policy.thinking,
-    thinkingOff: policy.thinkingOff,
-    reasoningEffort: policy.effort,
-    cacheKey: sessionId,
-    upstream: policy.upstream,
-    ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
-  };
+  return capped(
+    {
+      model: policy.model,
+      messages,
+      thinking: policy.thinking,
+      thinkingOff: policy.thinkingOff,
+      reasoningEffort: policy.effort,
+      cacheKey: sessionId,
+      upstream: policy.upstream,
+      skip4Bit: policy.skip4Bit,
+      ...(policy.offered.tools.length > 0
+        ? { tools: policy.offered.tools }
+        : {}),
+    },
+    policy,
+  );
 }
 
 // what the instruction and the lead line add to the request, and the
@@ -354,6 +397,7 @@ export function summaryRequest(
     reasoningEffort: policy.thinkingRequired ? leastEffort(policy.wire) : null,
     cacheKey: sessionId,
     upstream: policy.upstream,
+    skip4Bit: policy.skip4Bit,
     maxTokens,
   };
 }

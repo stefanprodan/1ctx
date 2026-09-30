@@ -729,6 +729,7 @@ describe("the composer while a turn runs", () => {
       id: "acme/small",
       name: "Small",
       contextLength: null,
+      outputLimit: null,
       promptPrice: null,
       completionPrice: null,
       tools: false,
@@ -744,6 +745,7 @@ describe("the composer while a turn runs", () => {
     servers: [],
     mcpMode: "auto",
     upstream: null,
+    skip4Bit: false,
     default: true,
     createdAt: 0,
   };

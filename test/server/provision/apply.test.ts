@@ -254,6 +254,7 @@ describe("provision through the composed app", () => {
         id: "bare-model",
         name: "bare-model",
         contextLength: 65_536,
+        outputLimit: null,
         promptPrice: null,
         completionPrice: null,
         tools: true,
@@ -387,6 +388,25 @@ describe("provision through the composed app", () => {
       expect(() =>
         documents(object("Agent", "guide", { upstream: 7 })),
       ).toThrow("spec.upstream");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("passes an agent's host filter to the API, which holds its rule", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(await fullDocuments(), ignore);
+      await expect(
+        app.provision.apply(
+          documents(object("Agent", "guide", { skip4Bit: true })),
+          ignore,
+        ),
+      ).rejects.toThrow("skip4Bit is only for an OpenRouter provider");
+      expect(app.agents.byName("guide")!.skip4Bit).toBe(false);
+      expect(() =>
+        documents(object("Agent", "guide", { skip4Bit: "yes" })),
+      ).toThrow("spec.skip4Bit");
     } finally {
       await app.shutdown();
     }

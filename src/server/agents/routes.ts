@@ -22,6 +22,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../shared/contracts/provider.ts";
+import { isFourBitTag } from "../../shared/quantization.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -150,6 +151,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     if (body.upstream !== null && provider.wire !== "openrouter") {
       throw new BadRequest("upstream is only for an OpenRouter provider");
     }
+    if (body.skip4Bit && provider.wire !== "openrouter") {
+      throw new BadRequest("skip4Bit is only for an OpenRouter provider");
+    }
+    // the filter applies to the preferred host too, so it would never serve
+    if (
+      body.skip4Bit &&
+      body.upstream !== null &&
+      isFourBitTag(body.upstream)
+    ) {
+      throw new BadRequest(
+        `upstream ${body.upstream} is a 4-bit host, which skip4Bit leaves out`,
+      );
+    }
     const effort = body.effort;
     if (effort !== null && !isEffort(provider.wire, effort)) {
       throw new BadRequest(
@@ -207,6 +221,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         servers: body.servers,
         mcpMode: body.mcpMode,
         upstream: body.upstream,
+        skip4Bit: body.skip4Bit,
         mark: body.mark,
       };
     };
