@@ -60,7 +60,7 @@ export function Select({
     if (focus) trigger.current?.focus();
   };
   const pick = (option: Option) => {
-    if (disabled) return;
+    if (disabled || option.disabled) return;
     close(true);
     if (option.value !== value) onChange(option.value);
   };
@@ -190,7 +190,9 @@ export function Select({
                   role="option"
                   tabIndex={-1}
                   aria-selected={option.value === value}
-                  class={`select-option${i === activeAt ? " select-option-on" : ""}`}
+                  aria-disabled={option.disabled || undefined}
+                  title={option.title}
+                  class={`select-option${i === activeAt ? " select-option-on" : ""}${option.disabled ? " select-option-off" : ""}`}
                   // the press keeps focus in the search box
                   onMouseDown={(ev) => ev.preventDefault()}
                   onPointerMove={() => {

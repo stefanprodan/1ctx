@@ -8,6 +8,9 @@ export type Option = {
   // what a search also matches but the option does not show: the
   // cities of a zone
   keywords?: string;
+  // shown for what it is, never picked; the title says why
+  disabled?: boolean;
+  title?: string;
 };
 
 // A word typed with spaces finds punctuation in a name, so "new york"

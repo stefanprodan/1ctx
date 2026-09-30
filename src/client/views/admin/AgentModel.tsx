@@ -33,7 +33,7 @@ export function AgentModel({
         );
         d.resetModel(saved);
       }),
-    cardFieldOf(["model", "upstream", "contextLength"]),
+    cardFieldOf(["model", "upstream", "skip4Bit", "contextLength"]),
   );
   const changing = d.changing.value;
   return (

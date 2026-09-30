@@ -237,7 +237,9 @@ client change. What each page draws is in `docs/views.md`.
   refusal in words until the next try.
 - **A segmented switch is `ui/Seg.tsx`,** base's `.seg` as pressed
   buttons, `name` on the picked one so a refusal's focus finds it, a
-  `title` on an option saying why it is off; a card head's switch is
+  `title` on an option saying why it is off (a `ui/Select.tsx` option
+  and a `RowsSwitch` take the same `disabled` and `title`); a card
+  head's switch is
   `RowsFilters`. A Seg holds a closed set fixed in code (the words in
   `shared/words.ts`, Yes and No, the tool schemas modes), never rows
   from the database, at most five options that fit one line at 390.

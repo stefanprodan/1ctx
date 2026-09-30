@@ -266,6 +266,40 @@ describe("the model draft", () => {
     expect(d.upstream.value).toBe("vendor/fp8");
   });
 
+  test("the host filter is an edit, saved, reset by a provider change and put back by Cancel", () => {
+    const d = AgentDrafts.of(agent);
+    expect(d.modelDirty(agent, "openrouter")).toBe(false);
+    d.skip4Bit.value = true;
+    expect(d.modelDirty(agent, "openrouter")).toBe(true);
+    expect(d.modelBody("openrouter").skip4Bit).toBe(true);
+    expect(cardBody(agent, d.modelBody("openrouter"), rows).skip4Bit).toBe(
+      true,
+    );
+    d.change();
+    d.chooseProvider("pr2");
+    expect(d.skip4Bit.value).toBe(false);
+    d.cancel();
+    expect(d.skip4Bit.value).toBe(true);
+    // the same provider again changes nothing
+    d.chooseProvider("pr1");
+    expect(d.skip4Bit.value).toBe(true);
+    // an edited filter stays when another card's save moves the row
+    d.follow(agent, { ...agent, prompt: "Be kind." });
+    expect(d.skip4Bit.value).toBe(true);
+  });
+
+  test("a new agent's body carries the host filter", () => {
+    const d = AgentDrafts.blank("pr1");
+    d.pick(described, false);
+    d.skip4Bit.value = true;
+    expect(d.modelBody("openrouter")).toMatchObject({
+      providerId: "pr1",
+      model: "vendor/flash",
+      upstream: null,
+      skip4Bit: true,
+    });
+  });
+
   test("a pick clears what belonged to another model", () => {
     const d = AgentDrafts.of({ ...agent, model: stated });
     d.change();

@@ -83,10 +83,15 @@ export function ModelFields({
               providerId={d.providerId.value}
               model={picked}
               value={d.upstream.value}
+              skip4Bit={d.skip4Bit.value}
               busy={busy}
               save={save}
               onChange={(value) => {
                 d.upstream.value = value;
+                save.touch();
+              }}
+              onSkip4Bit={(value) => {
+                d.skip4Bit.value = value;
                 save.touch();
               }}
             />

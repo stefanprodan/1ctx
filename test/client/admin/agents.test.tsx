@@ -6,6 +6,8 @@
 // Admin group in the rail, and the page rendered over the rows.
 
 import { beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render } from "preact-render-to-string";
 import {
   priceLine,
@@ -38,12 +40,17 @@ import { AgentList } from "../../../src/client/views/admin/AgentList.tsx";
 import { AgentModel } from "../../../src/client/views/admin/AgentModel.tsx";
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import {
+  ALL_FOUR_BIT,
   agentFieldOf,
   contextProblem,
   defaultThinking,
   effortApplies,
   effortChoices,
+  fourBitEndpoint,
+  PREFERRED_FOUR_BIT,
+  SKIPPED,
   sentEffort,
+  skip4BitLock,
   statedFields,
   statedModel,
   statedProblem,
@@ -61,9 +68,12 @@ import {
   providerFieldOf,
 } from "../../../src/client/views/admin/Providers.model.ts";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
+import { Skip4BitField } from "../../../src/client/views/admin/UpstreamField.tsx";
+import { parseEndpoints } from "../../../src/server/providers/index.ts";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
   CatalogMatch,
+  Endpoint,
   ProviderSummary,
 } from "../../../src/shared/contracts/provider.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
@@ -436,6 +446,136 @@ describe("a model its catalog does not describe", () => {
       <AgentModel agent={coder} drafts={AgentDrafts.of(coder)} />,
     );
     expect(described).not.toContain("Context window");
+    providers.value = null;
+  });
+});
+
+describe("Skip 4-bit providers", () => {
+  // the recorded answer: two fp4 hosts, one fp8 and two that do not say
+  const recorded: Endpoint[] = parseEndpoints(
+    JSON.parse(
+      readFileSync(
+        join(
+          import.meta.dir,
+          "..",
+          "..",
+          "fixtures",
+          "providers",
+          "openrouter",
+          "endpoints.json",
+        ),
+        "utf8",
+      ),
+    ),
+  );
+
+  test("a 4-bit host is its precision, else its tag", () => {
+    const byTag = (tag: string) => recorded.find((e) => e.tag === tag)!;
+    expect(fourBitEndpoint(byTag("inference-net/fp4"))).toBe(true);
+    expect(fourBitEndpoint(byTag("baseten/fp8"))).toBe(false);
+    expect(fourBitEndpoint(byTag("relace"))).toBe(false);
+    expect(fourBitEndpoint({ ...byTag("relace"), tag: "relace/NVFP4" })).toBe(
+      true,
+    );
+  });
+
+  test("with the filter on, 4-bit options stay listed and cannot be picked", () => {
+    const on = upstreamOptions(recorded, true, null, true);
+    const off = upstreamOptions(recorded, true, null);
+    expect(on.map((o) => o.value)).toEqual(off.map((o) => o.value));
+    const locked = on.filter((o) => o.disabled);
+    expect(locked.map((o) => o.value)).toEqual([
+      "inference-net/fp4",
+      "deepinfra/fp4",
+    ]);
+    for (const o of locked) expect(o.title).toBe(SKIPPED);
+    expect(SKIPPED).toBe("Skipped by Skip 4-bit providers");
+    expect(off.some((o) => o.disabled || o.title)).toBe(false);
+  });
+
+  test("the switch cannot be turned on where the filter could not serve", () => {
+    expect(skip4BitLock(recorded, true, null)).toBeNull();
+    expect(skip4BitLock(recorded, true, "baseten/fp8")).toBeNull();
+    expect(skip4BitLock(recorded, true, "deepinfra/fp4")).toBe(
+      "The preferred provider is 4-bit",
+    );
+    // a list that failed judges the tag
+    expect(skip4BitLock(null, true, "deepinfra/fp4")).toBe(PREFERRED_FOUR_BIT);
+    expect(skip4BitLock(null, true, "baseten")).toBeNull();
+    const fourBit = recorded.filter(fourBitEndpoint);
+    expect(skip4BitLock(fourBit, true, null)).toBe(
+      "Every provider of this model is 4-bit",
+    );
+    // a host without tools never serves a model that takes them
+    const noTools = recorded.map((e) =>
+      fourBitEndpoint(e) ? e : { ...e, tools: false },
+    );
+    expect(skip4BitLock(noTools, true, null)).toBe(ALL_FOUR_BIT);
+    expect(skip4BitLock(noTools, false, null)).toBeNull();
+    expect(skip4BitLock([], true, null)).toBeNull();
+  });
+
+  test("a locked switch is disabled with its reason, and one on may go off", () => {
+    const save = { fieldError: () => null };
+    const locked = render(
+      <Skip4BitField
+        on={false}
+        lock={ALL_FOUR_BIT}
+        busy={false}
+        save={save}
+        onChange={() => {}}
+      />,
+    );
+    expect(locked).toContain("Skip 4-bit providers");
+    expect(locked).toMatch(
+      /role="switch"[^>]*disabled[^>]*title="Every provider of this model is 4-bit"/,
+    );
+    const on = render(
+      <Skip4BitField
+        on
+        lock={PREFERRED_FOUR_BIT}
+        busy={false}
+        save={save}
+        onChange={() => {}}
+      />,
+    );
+    expect(on).toContain('aria-checked="true"');
+    expect(on).not.toContain("disabled");
+    expect(on).not.toContain("title=");
+    const refused = render(
+      <Skip4BitField
+        on
+        lock={null}
+        busy={false}
+        save={{
+          fieldError: (f: string) =>
+            f === "skip4Bit"
+              ? "skip4Bit is only for an OpenRouter provider"
+              : null,
+        }}
+        onChange={() => {}}
+      />,
+    );
+    expect(refused).toContain('name="skip4Bit"');
+    expect(refused).toContain('class="field-error"');
+    expect(agentFieldOf("skip4Bit is only for an OpenRouter provider")).toBe(
+      "skip4Bit",
+    );
+  });
+
+  test.serial("the switch shows only on an OpenRouter provider", () => {
+    providers.value = [router];
+    const html = render(
+      <AgentModel agent={coder} drafts={AgentDrafts.of(coder)} />,
+    );
+    expect(html).toContain("Preferred provider");
+    expect(html).toContain("Skip 4-bit providers");
+    providers.value = [{ ...router, wire: "openai-compatible" }];
+    const plain = render(
+      <AgentModel agent={coder} drafts={AgentDrafts.of(coder)} />,
+    );
+    expect(plain).not.toContain("Preferred provider");
+    expect(plain).not.toContain("Skip 4-bit providers");
     providers.value = null;
   });
 });

@@ -6,6 +6,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../../shared/contracts/provider.ts";
+import { isFourBit, isFourBitTag } from "../../../shared/quantization.ts";
 import { fixedThinking } from "../../../shared/thinking.ts";
 import {
   EFFORTS,
@@ -19,6 +20,7 @@ import { priceLine } from "../../agents/meta.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export function agentFieldOf(message: string): string | undefined {
+  if (message.startsWith("skip4Bit")) return "skip4Bit";
   if (message.startsWith("upstream")) return "upstream";
   if (message.startsWith("name") || message.startsWith("an agent named"))
     return "name";
@@ -173,6 +175,7 @@ export function upstreamOptions(
   endpoints: Endpoint[] | null,
   takesTools: boolean,
   saved: string | null,
+  skip4Bit = false,
 ): Option[] {
   const shown = (endpoints ?? []).filter((e) => !takesTools || e.tools);
   const label = (e: Endpoint) =>
@@ -191,6 +194,9 @@ export function upstreamOptions(
         .filter((part) => part !== "")
         .join(" · "),
       keywords: e.tag,
+      ...(skip4Bit && fourBitEndpoint(e)
+        ? { disabled: true, title: SKIPPED }
+        : {}),
     })),
   ];
   if (saved !== null && !shown.some((e) => e.tag === saved)) {
@@ -206,4 +212,37 @@ export function upstreamOptions(
     );
   }
   return options;
+}
+
+export const SKIPPED = "Skipped by Skip 4-bit providers";
+export const PREFERRED_FOUR_BIT = "The preferred provider is 4-bit";
+export const ALL_FOUR_BIT = "Every provider of this model is 4-bit";
+
+// the endpoint's precision decides, its tag's suffix when it does not
+// say, as the server judges a save
+export function fourBitEndpoint(e: Endpoint): boolean {
+  return e.quantization !== null && e.quantization.toLowerCase() !== "unknown"
+    ? isFourBit(e.quantization)
+    : isFourBitTag(e.tag);
+}
+
+// why Skip 4-bit providers cannot be turned on, or null: the filter
+// leaves out the preferred host too, and a model no host passes answers
+// nothing. A list that failed judges the preferred tag alone
+export function skip4BitLock(
+  endpoints: Endpoint[] | null,
+  takesTools: boolean,
+  upstream: string | null,
+): string | null {
+  if (upstream !== null) {
+    const listed = endpoints?.find((e) => e.tag === upstream);
+    const fourBit =
+      listed === undefined ? isFourBitTag(upstream) : fourBitEndpoint(listed);
+    if (fourBit) return PREFERRED_FOUR_BIT;
+  }
+  const serving = (endpoints ?? []).filter((e) => !takesTools || e.tools);
+  if (serving.length > 0 && serving.every(fourBitEndpoint)) {
+    return ALL_FOUR_BIT;
+  }
+  return null;
 }

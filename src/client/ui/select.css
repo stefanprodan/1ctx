@@ -89,6 +89,11 @@
     background: var(--hover);
     color: var(--fg);
   }
+  .select-option-off,
+  .select-option-off.select-option-on {
+    color: var(--faint);
+    cursor: default;
+  }
   .select-check {
     flex-shrink: 0;
     margin-left: auto;
