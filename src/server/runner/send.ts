@@ -15,7 +15,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import type { Measured } from "./context.ts";
+import type { Measured } from "./cap.ts";
 import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
 
 export type RoundState = {

@@ -12,12 +12,8 @@ import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
-import {
-  type ContextLookups,
-  historyMessages,
-  type Sized,
-  sized,
-} from "./context.ts";
+import { type Sized, sized } from "./cap.ts";
+import { type ContextLookups, historyMessages } from "./context.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { RoundDeps } from "./round.ts";

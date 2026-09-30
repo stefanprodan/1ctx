@@ -502,6 +502,8 @@ function round(
     quiet?: boolean;
     // Stop lands during the first retry's wait
     stopInWait?: boolean;
+    // what made counting the prompt fail, so the round has no cap
+    skipped?: unknown;
   } = {},
 ) {
   const logs = collectLogs();
@@ -575,6 +577,7 @@ function round(
     request: {
       request: { model: "m", messages: [], thinking: false },
       estimate: null,
+      ...(fields.skipped === undefined ? {} : { skipped: fields.skipped }),
     },
     ...(fields.deadline === undefined ? {} : { deadline: fields.deadline }),
   });
@@ -592,6 +595,33 @@ const answer: ChatEvent[] = [
   { kind: "content", text: "hi" },
   { kind: "finish", reason: "stop", details: null },
 ];
+
+describe("runRound without a cap", () => {
+  test("a prompt that could not be counted is sent without one and warned", async () => {
+    const sent: ChatRequest[] = [];
+    const r = round([], {
+      skipped: new Error("count failed"),
+      chat: (req) => {
+        sent.push(req);
+        return (async function* () {
+          yield* answer;
+        })();
+      },
+    });
+    await r.run;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).not.toHaveProperty("maxTokens");
+    expect(r.send.round!.finishReason).toBe("stop");
+    const skipped = r.logs.events.filter((e) => e.msg === "output cap skipped");
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0]).toMatchObject({ level: "warn", area: "runner" });
+    expect(skipped[0]!.fields).toMatchObject({
+      chat: "chat",
+      round: 1,
+      error_type: "Error",
+    });
+  });
+});
 
 describe("runRound retries", () => {
   test("a Stop during the wait leaves no one named as serving", async () => {

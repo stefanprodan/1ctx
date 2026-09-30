@@ -21,10 +21,10 @@ import {
   requestTokens,
   type Usage,
 } from "../providers/index.ts";
+import type { Sized } from "./cap.ts";
 import {
   type ContextLookups,
   history,
-  type Sized,
   sizedRequest,
   summaryRequest,
   withExhausted,
@@ -60,6 +60,16 @@ type TimedNext =
   | { kind: "idle" };
 
 const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
+
+// a round's size when the provider reported none; a count that throws
+// falls back to four bytes a token, since a finished round must not fail
+function sizeOf(req: ChatRequest): number {
+  try {
+    return requestTokens(req);
+  } catch {
+    return Math.ceil(bytes(JSON.stringify(req.messages)) / 4);
+  }
+}
 
 function sleep(clock: Clock, ms: number) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -211,8 +221,18 @@ async function streamRound(
       : send.policy.deadlineMs === null
         ? null
         : send.startedAt + send.policy.deadlineMs;
-  const { request: req, estimate } =
-    options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
+  const {
+    request: req,
+    estimate,
+    skipped,
+  } = options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
+  if (skipped !== undefined) {
+    deps.log.warn("output cap skipped", {
+      chat: send.sessionId,
+      round: send.roundNo,
+      ...errorFields(skipped),
+    });
+  }
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
@@ -366,7 +386,7 @@ async function streamRound(
   }
   visuals?.flush();
   if (round.usage === null) {
-    round.tokens = estimate ?? requestTokens(req);
+    round.tokens = estimate ?? sizeOf(req);
     round.spent = round.tokens;
     send.measured = null;
   } else {

@@ -11,14 +11,16 @@ import {
   requestTokens,
 } from "../../../src/server/providers/index.ts";
 import {
-  type ContextLookups,
-  EXHAUSTED_LINE,
-  history,
-  LOOP_LINE,
   OUTPUT_FALLBACK,
   OUTPUT_MAX,
   OUTPUT_MIN,
   outputCap,
+} from "../../../src/server/runner/cap.ts";
+import {
+  type ContextLookups,
+  EXHAUSTED_LINE,
+  history,
+  LOOP_LINE,
   request,
   SKILLS_LEAD,
   SUMMARIZE,
@@ -1132,6 +1134,19 @@ describe("the output cap", () => {
     expect(summaryRequest(window, "s1", messages).maxTokens).toBe(
       LOOP_LIMITS.summaryMaxTokens,
     );
+  });
+
+  test("a prompt that cannot be counted sends the round without a cap", () => {
+    // a value JSON cannot write makes the count throw
+    const broken = [
+      ...messages,
+      { role: "user", content: 1n as unknown as string },
+    ] as ChatMessageIn[];
+    const sized = sizedRequest(window, "s1", broken);
+    expect(sized.request).not.toHaveProperty("maxTokens");
+    expect(sized.estimate).toBeNull();
+    expect(sized.skipped).toBeInstanceOf(Error);
+    expect(sizedRequest(window, "s1", messages).skipped).toBeUndefined();
   });
 
   test("a history holding a special token's text is still sized", () => {

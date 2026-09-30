@@ -163,7 +163,8 @@ upstream and skip4Bit fields.
   reported or the request does not extend it. Never under `OUTPUT_MIN`
   (1,024); a null window skips the fit and the count, and the count is
   the round's size when the provider reports no usage. A hit ends the
-  turn as `length`. The summary keeps `summaryMaxTokens`. OpenRouter
+  turn as `length`. The cap never stops a turn: a count that throws
+  sends the round without `max_tokens` and logs `output cap skipped`. The summary keeps `summaryMaxTokens`. OpenRouter
   derives an Anthropic model's thinking budget from `max_tokens` when
   only `reasoning.effort` is sent (`max_tokens` times the effort's
   ratio, 0.1 to 0.95, within 1,024 and 128,000), so the cap sets how
