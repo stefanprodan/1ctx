@@ -343,7 +343,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const project = deps.access.project(principal, fields.projectId);
       const user = author(principal);
       const agent = agentOf(fields.agentId);
-      refuseNewSummon(agent.name, fields.message);
+      refuseNewSummon(deps.agents, agent.name, fields.message);
       return begin({
         sessionId: newId(),
         session: null,

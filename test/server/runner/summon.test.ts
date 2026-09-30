@@ -256,14 +256,15 @@ describe("a summon", () => {
       expect(system(own)).toStartWith("You are coder,");
       own.reply("going");
       await free(chat, sessionId);
-      for (const message of ["@glm hi", "@checker hi"]) {
+      for (const [message, error] of [
+        ["@glm hi", "no agent named glm"],
+        ["@checker hi", "a new chat starts on the picked agent"],
+      ]) {
         const started = await chat.member.call("POST", "/api/sessions", {
           body: { projectId: chat.projectId, agentId: chat.agentId, message },
         });
         expect(started.status).toBe(400);
-        expect((await started.json()).error).toBe(
-          `no agent named ${message.slice(1, -3)}`,
-        );
+        expect((await started.json()).error).toBe(error);
       }
     } finally {
       await chat.app.shutdown();

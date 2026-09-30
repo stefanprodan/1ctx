@@ -196,8 +196,9 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   ordinary turn, a name past the first word plain text, and a first
   word naming no live agent the 400 "no agent named <word>", at a send,
   at queueing and on an edit of a queued message. A new chat's first
-  message cannot summon (the same 400), a turn of several messages holds
-  a summon alone, and a run never summons. The send is written with
+  message cannot summon: a live agent's name is the 400 "a new chat
+  starts on the picked agent", any other the same 400. A turn of
+  several messages holds a summon alone, and a run never summons. The send is written with
   `sends.summoned` and its agent, which fork copies; the policy's
   `summoned` names the chat's agent. A summon is refused, "the chat is
   too long for <name>", when the prompt of the chat's last round, of

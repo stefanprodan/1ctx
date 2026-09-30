@@ -56,11 +56,21 @@ export function turnSummon(
 }
 
 // a new chat's first message starts on the picked agent
-export function refuseNewSummon(pickedAgent: string, text: string): void {
+const NEW_CHAT_PICKS = "a new chat starts on the picked agent";
+
+export function refuseNewSummon(
+  agents: Pick<SummonAgents, "byName">,
+  pickedAgent: string,
+  text: string,
+): void {
   const name = summonName(text);
-  if (name !== null && name !== pickedAgent) {
-    throw new BadRequest(noAgentNamed(summonWord(text)!));
-  }
+  if (name === null || name === pickedAgent) return;
+  // naming a live agent is a pick in the wrong place, not a typo
+  throw new BadRequest(
+    agents.byName(name) === null
+      ? noAgentNamed(summonWord(text)!)
+      : NEW_CHAT_PICKS,
+  );
 }
 
 // whether a queued message, checked when it was queued, summons
