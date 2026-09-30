@@ -11,6 +11,7 @@
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useLayoutEffect } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { finishWords } from "../../shared/finish.ts";
@@ -92,6 +93,7 @@ export function Reply({
   live,
   agent,
   onRegenerate,
+  follow,
   fork,
   visuals,
   retry = null,
@@ -105,6 +107,9 @@ export function Reply({
   // set on the last turn alone: regenerate drops it and sends its
   // user message again; a refusal shows in the failure slot
   onRegenerate?: () => Promise<void>;
+  // keeps a view that follows the transcript's end following, set with
+  // onRegenerate: a refusal grows the turn with no transcript render
+  follow?: () => void;
   // the fork action under a finished answer; absent where the session
   // cannot be forked yet
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
@@ -135,6 +140,10 @@ export function Reply({
             refused.value = reason(err);
           });
         };
+  const shown = running ? null : said;
+  useLayoutEffect(() => {
+    if (shown !== null) follow?.();
+  }, [shown, follow]);
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
   const served = servedBy(m);

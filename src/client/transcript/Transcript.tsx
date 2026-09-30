@@ -21,7 +21,6 @@ import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
 import { FileCard } from "./FileCard.tsx";
 import type { OnFork } from "./Fork.tsx";
-import { followRows } from "./follow.ts";
 import { QueuedRows, type QueueProps } from "./Queued.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
@@ -83,6 +82,10 @@ export function Transcript({
     lastHeight.current = scroller.scrollHeight;
   };
 
+  const follow = () => {
+    if (stick.current) toEnd();
+  };
+
   useEffect(() => {
     const el = rows.current;
     const scroller = el ? scrollParent(el) : null;
@@ -109,48 +112,23 @@ export function Transcript({
       else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
-    // a fold's click comes before the resize it causes and its toggle
-    // event before or after it, so either marks the next two frames,
-    // which hold that resize, as a toggle the view does not follow
-    let toggled = false;
-    let toggles = 0;
-    const markToggle = () => {
-      toggled = true;
-      const mark = ++toggles;
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (mark === toggles) toggled = false;
-        }),
-      );
-    };
     // rows that shrink while the view is at the top move nothing, so no
     // scroll event tells Jump that the end is in view again
     const resized = new ResizeObserver(() => {
-      const next = followRows({
-        stick: stick.current,
-        toggled,
-        gap: scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight,
-      });
-      stick.current = next.stick;
-      jumpHidden.value = next.jumpHidden;
-      if (next.toEnd) toEnd();
+      const gap =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+      if (gap < 40) stick.current = true;
+      jumpHidden.value = stick.current || gap < 80;
     });
     resized.observe(el);
-    const onClick = (ev: MouseEvent) => {
-      if (ev.target instanceof Element && ev.target.closest("summary")) {
-        markToggle();
-      }
-      void copyCode(ev);
-    };
+    const onClick = (ev: MouseEvent) => void copyCode(ev);
     scroller.addEventListener("scroll", onScroll);
     el.addEventListener("click", onClick);
-    el.addEventListener("toggle", markToggle, true);
     return () => {
       grown.disconnect();
       resized.disconnect();
       scroller.removeEventListener("scroll", onScroll);
       el.removeEventListener("click", onClick);
-      el.removeEventListener("toggle", markToggle, true);
     };
   }, [jumpHidden]);
 
@@ -198,6 +176,7 @@ export function Transcript({
                     null,
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
+                follow={last ? follow : undefined}
                 retry={last ? retry : null}
                 fork={fork}
                 visuals={visualCards(node, visualPreviews.value).map((card) =>

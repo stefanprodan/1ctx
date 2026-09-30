@@ -120,10 +120,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   summoned reply names its own agent the same way. Regenerate sends no
   agent (the server reruns the send's); a refusal, such as a summoned
   agent since retired, shows in the turn's failure block until the
-  next press. Rows that grow without a transcript render keep a view
-  that follows the end following, so the block is never left under
-  the composer; a fold the user opens or closes is never followed
-  (`transcript/follow.ts`), so what they opened stays in view.
+  next press. The block asks the transcript to follow it (`follow`),
+  so a view at the end never leaves it under the composer.
 - **The messages that wait.** `SessionDetail.queued` is drawn under the
   last turn by `transcript/Queued.tsx`, oldest first, each as a user
   message with a dashed card: the author (their username when the page
