@@ -14,7 +14,11 @@ const yesHelp = {
   description: [
     "Repeatedly output a line with all specified STRING(s), or 'y'.",
   ],
-  options: ["    --help  display this help and exit"],
+  options: [
+    "    --help     display this help and exit",
+    // (1ctx version-flags)
+    "    --version  output version information and exit",
+  ],
   notes: [
     "Real yes writes until its reader goes away. Pipelines here are not",
     "streaming — a stage runs to completion before the next one starts — so",
@@ -24,6 +28,10 @@ const yesHelp = {
     "sees a finite stream.",
   ],
 };
+
+const YES_VERSION =
+  "yes (GNU coreutils) 9.11 (just-bash, compatible)\n" +
+  "A sandboxed yes that follows GNU coreutils 9.11; see yes --help.\n";
 
 export const yesCommand: RuntimeCommand = {
   name: "yes",
@@ -46,6 +54,11 @@ export const yesCommand: RuntimeCommand = {
       }
       if (arg === "--help") {
         return showHelp(yesHelp);
+      }
+      // (1ctx version-flags) reached in getopt order, so `yes -x --version` is
+      // still the bad option and `yes -- --version` a string
+      if (arg === "--version") {
+        return { stdout: YES_VERSION, stderr: "", exitCode: 0 };
       }
       // A lone "-" is an operand, as in GNU yes; anything else that starts
       // with a dash is an option, even after an operand (getopt permutes).

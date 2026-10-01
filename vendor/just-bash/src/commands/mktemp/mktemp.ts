@@ -9,11 +9,11 @@ import type {
 import { type ArgDef, parseArgs } from "../../utils/args.js";
 import { showHelp } from "../help.js";
 
-/**
- * Version reported by `mktemp --version`. just-bash emulates the GNU coreutils
- * surface, so the number tracks the coreutils release the behaviour follows.
- */
-const MKTEMP_VERSION = "mktemp (just-bash) 9.4\n";
+// (1ctx version-flags) answered here rather than before load, since only
+// this parser knows when --version is reached as an option, as GNU does
+const MKTEMP_VERSION =
+  "mktemp (GNU coreutils) 9.11 (just-bash, compatible)\n" +
+  "A sandboxed mktemp that follows GNU coreutils 9.11; see mktemp --help.\n";
 
 /** GNU default template when none is given. */
 const DEFAULT_TEMPLATE = "tmp.XXXXXXXXXX";

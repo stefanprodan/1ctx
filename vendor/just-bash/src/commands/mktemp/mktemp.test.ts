@@ -491,7 +491,11 @@ describe("mktemp", () => {
   it("should show the version", async () => {
     const env = new Bash();
     const result = await env.exec("mktemp --version");
-    expect(result.stdout).toBe("mktemp (just-bash) 9.4\n");
+    // (1ctx version-flags) coreutils' first line, marked
+    expect(result.stdout).toBe(
+      "mktemp (GNU coreutils) 9.11 (just-bash, compatible)\n" +
+        "A sandboxed mktemp that follows GNU coreutils 9.11; see mktemp --help.\n",
+    );
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
   });
