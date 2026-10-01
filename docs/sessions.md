@@ -1,8 +1,17 @@
 # Sessions and sends
 
 Governs `src/server/sessions/` and the runner's sends in
-`src/server/runner/`. The tool loop is in `docs/tools.md`, memory in
-`docs/memory.md`, runs in `docs/automations.md`.
+`src/server/runner/`.
+
+A session is one conversation row, of one of two origins
+(`SESSION_ORIGINS`): a chat, which users write in, or a run, which an
+automation starts on its schedule or by Run now. Both share the table,
+the writer, the runner, the caps and the sweep, so this doc covers
+both and says "chat" or "run" where a rule holds for one only. A send
+is one pass of the runner over a session (`SEND_KINDS`: `chat`,
+`compact`, `run`): a turn in a chat, the whole of a run. What only
+runs and automations do is in `docs/automations.md`; the tool loop in
+`docs/tools.md`; memory in `docs/memory.md`.
 
 ## Sends and caps
 
@@ -164,26 +173,6 @@ Governs `src/server/sessions/` and the runner's sends in
   `shutdown`.** It aborts the asks and waits within `SHUTDOWN_DRAIN_MS`
   for the streams, the asks and `close` (bash, MCP). Past it `close`
   still starts, unwaited. The sockets then close with 1012.
-
-## Run attention
-
-- **Only a run that finished is asked.** `runner/attention.ts` starts
-  from `endSend()` after `finalizeSend` committed, for cause `finish`
-  only, never a chat. It reads the send's last done `answer` before the
-  memory phase (`sessions.runAnswer()`) when the ask starts; none means
-  no ask.
-- **It is the `run-attention` decision** (`docs/providers.md`), read at
-  each ask. The answer is cut to 80% of the decider's window less 256
-  tokens, or 4,000 with no window. No decider or no room skips quietly.
-- **The mark never moves the chat's activity.** `markAttention()`
-  stores `attention` and `attention_by` in one transaction that bumps
-  `revision` alone, never `last_activity_at`, with one rows-free
-  envelope. A gone session is a no-op.
-- **A failure stores nothing and is never retried.** It logs `run
-  attention failed`, never the answer. There is no repair at start.
-- **Asks are bounded.** `ASKS_AT_ONCE` run, at most `MAX_QUEUED` wait
-  and the oldest is dropped past it. Shutdown aborts those in flight;
-  `runner.settled()` waits for all.
 
 ## Capabilities and the system prompt
 

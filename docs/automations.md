@@ -1,8 +1,10 @@
 # Automations and runs
 
 Governs `src/server/automations/` (the rows, the schedule, the
-scheduler) and runs in `src/server/runner/`. The send caps, the
-scheduled share and the attention ask are in `docs/sessions.md`.
+scheduler), runs in `src/server/runner/` and the attention ask
+(`runner/attention.ts`). A run is a session, so what it shares with
+chats (the caps, the scheduled share, the writer, the sweep) is in
+`docs/sessions.md`.
 
 ## Automations
 
@@ -99,3 +101,27 @@ scheduled share and the attention ask are in `docs/sessions.md`.
   sweep.** The scheduler deletes runs past `retention_days` through
   the sessions area's one delete. A run whose automation is gone is
   deleted `archivedDeleteDays` after its last activity.
+
+## Attention
+
+Once a run finishes, a decider is asked whether its answer needs a
+user to look at it. The answer is stored on the session as
+`attention`, which the stream shows.
+
+- **Only a run that finished is asked.** `runner/attention.ts` starts
+  from `endSend()` after `finalizeSend` committed, for cause `finish`
+  only, never a chat. It reads the send's last done `answer` before the
+  memory phase (`sessions.runAnswer()`) when the ask starts; none means
+  no ask.
+- **It is the `run-attention` decision** (`docs/providers.md`), read at
+  each ask. The answer is cut to 80% of the decider's window less 256
+  tokens, or 4,000 with no window. No decider or no room skips quietly.
+- **The mark never moves the run's activity.** `markAttention()`
+  stores `attention` and `attention_by` in one transaction that bumps
+  `revision` alone, never `last_activity_at`, with one rows-free
+  envelope. A gone session is a no-op.
+- **A failure stores nothing and is never retried.** It logs `run
+  attention failed`, never the answer. There is no repair at start.
+- **Asks are bounded.** `ASKS_AT_ONCE` run, at most `MAX_QUEUED` wait
+  and the oldest is dropped past it. Shutdown aborts those in flight;
+  `runner.settled()` waits for all.

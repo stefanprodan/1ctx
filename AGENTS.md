@@ -114,9 +114,9 @@ change it in the same commit as the code that changes a rule.
 | `docs/views.md` | what a page draws: `views/`, the composer, the stream, the admin pages |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
-| `docs/sessions.md` | `sessions/` and the runner's sends: caps, writer, queue, compaction |
+| `docs/sessions.md` | `sessions/` and the runner's sends, for chats and runs: caps, writer, queue, compaction |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
-| `docs/automations.md` | `automations/`, the scheduler, runs |
+| `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention ask |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
