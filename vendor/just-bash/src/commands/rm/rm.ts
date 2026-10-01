@@ -20,7 +20,7 @@ const argDefs = {
   verbose: { short: "v", long: "verbose", type: "boolean" as const },
 };
 
-// (1ctx rm-walk) GNU's words for the errors a backend names by code
+// (1ctx rm) GNU's words for the errors a backend names by code
 const GNU_WORDS: Record<string, string> = {
   ENOENT: "No such file or directory",
   ENOTEMPTY: "Directory not empty",
@@ -46,7 +46,7 @@ function gnuWords(message: string): string {
   return code === undefined ? sanitizeErrorMessage(message) : GNU_WORDS[code];
 }
 
-// (1ctx rm-walk) a limit or a cancel ends the command, whatever -f says
+// (1ctx rm) a limit or a cancel ends the command, whatever -f says
 function isStop(error: unknown): boolean {
   return (
     error instanceof ExecutionLimitError ||
@@ -57,7 +57,7 @@ function isStop(error: unknown): boolean {
 type Options = { force: boolean; verbose: boolean };
 type Report = { stdout: string; stderr: string; failed: boolean };
 
-// (1ctx rm-walk) an iterative post-order walk that never follows a link, charged
+// (1ctx rm) an iterative post-order walk that never follows a link, charged
 // to the command's traversal budget, removing one entry at a time; a
 // failed entry is reported by its path and keeps its folders, as GNU's
 // fts walk does. The root stays when it was reached through a link.
@@ -157,7 +157,7 @@ export const rmCommand: RuntimeCommand = {
       try {
         budget.checkpoint();
         const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
-        // (1ctx rm-links) rm removes a link, never what it points to, as GNU rm's
+        // (1ctx rm) rm removes a link, never what it points to, as GNU rm's
         // lstat does; a trailing slash resolves the link, as in any path
         const slashed = path.length > 1 && path.endsWith("/");
         const stat = slashed
@@ -177,7 +177,7 @@ export const rmCommand: RuntimeCommand = {
           if (verbose) report.stdout += `removed '${path}'\n`;
           continue;
         }
-        // (1ctx rm-links) GNU's `rm -r link/` empties the folder the link names,
+        // (1ctx rm) GNU's `rm -r link/` empties the folder the link names,
         // then fails to remove the link as a folder: ENOTDIR, which -f
         // takes for a missing file
         const viaLink =
@@ -196,7 +196,7 @@ export const rmCommand: RuntimeCommand = {
       } catch (error) {
         if (isStop(error)) throw error;
         const message = getErrorMessage(error);
-        // (1ctx rm-walk) -f ignores a missing file only, as GNU's does
+        // (1ctx rm) -f ignores a missing file only, as GNU's does
         if (force && errorCode(message) === "ENOENT") continue;
         fail(gnuWords(message));
       }

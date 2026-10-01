@@ -12,7 +12,7 @@ import { toStr } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
 /**
- * (1ctx awk-fs) A field separator as gawk reads FS: " " is runs of space, tab and
+ * (1ctx awk) A field separator as gawk reads FS: " " is runs of space, tab and
  * newline with the ends trimmed, "" each character, any other single
  * character that character, and two or more characters a regex.
  */
@@ -32,7 +32,7 @@ export function compileSeparator(fs: string): FieldSeparator {
 }
 
 /**
- * (1ctx awk-fs) Fields and the separators between them. seps[i] is the text
+ * (1ctx awk) Fields and the separators between them. seps[i] is the text
  * between fields i and i+1 (from 1); under the space separator seps[0]
  * and seps[n] hold the leading and trailing whitespace when there is any.
  */
@@ -97,7 +97,7 @@ export function splitText(text: string, sep: FieldSeparator): SplitText {
 
 /**
  * Split a record into fields based on the field separator.
- * (1ctx awk-fs awk-records) The one splitter for records, $0 assignments and sub/gsub on $0:
+ * (1ctx awk) The one splitter for records, $0 assignments and sub/gsub on $0:
  * in paragraph mode (RS == "") a newline also separates fields.
  */
 export function splitRecord(ctx: AwkRuntimeContext, line: string): string[] {
@@ -120,7 +120,7 @@ export function getField(ctx: AwkRuntimeContext, index: number): AwkValue {
   if (index === 0) {
     return ctx.line;
   }
-  // (1ctx awk-fatal-errors) gawk's fatal error
+  // (1ctx awk) gawk's fatal error
   if (index < 0) throw new Error(`attempt to access field ${index}`);
   if (index > ctx.fields.length) {
     return "";
@@ -143,10 +143,10 @@ export function setField(
     ctx.fields = splitRecord(ctx, ctx.line);
     ctx.NF = ctx.fields.length;
   } else if (index < 0) {
-    // (1ctx awk-fatal-errors) gawk's fatal error
+    // (1ctx awk) gawk's fatal error
     throw new Error(`attempt to access field ${index}`);
   } else {
-    // (1ctx awk-caps) fields are bounded like array elements
+    // (1ctx awk) fields are bounded like array elements
     if (index > ctx.maxArrayElements) {
       throw new ExecutionLimitError(
         `field limit exceeded (${ctx.maxArrayElements})`,

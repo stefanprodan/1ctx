@@ -228,7 +228,7 @@ const commandLoaders: LazyCommandDef<CommandName>[] = [
     name: "awk",
     load: async () => (await import("./awk/awk2.js")).awkCommand2,
   },
-  // (1ctx awk-gawk-name) the name models write for the awk of a Linux box
+  // (1ctx awk) the name models write for the awk of a Linux box
   {
     name: "gawk",
     load: async () => (await import("./awk/awk2.js")).awkCommand2,

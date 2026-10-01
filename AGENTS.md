@@ -131,8 +131,8 @@ builds it with its factory and fakes for its ports.
 ## Docs
 
 The files under `docs/` and the three under `vendor/` are rules with
-the same force as this file; each governs the code its first lines name. Read
-the one that covers a change before making it.
+the same force as this file; each governs the code its first lines
+name. Read the one that covers a change before making it.
 
 | Doc | Read it |
 |---|---|

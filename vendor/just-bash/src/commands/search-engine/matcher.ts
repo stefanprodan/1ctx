@@ -20,7 +20,7 @@ import type { LineCondition, PreFilter } from "./regex.js";
 function preFilterMatches(preFilter: PreFilter, line: string): boolean {
   const haystack = preFilter.ignoreCase ? line.toLowerCase() : line;
   if (hasNeedle(preFilter.needles, haystack)) return true;
-  // (1ctx rg-prefilter) -i folds ſ to s, and toLowerCase keeps it; the needles are
+  // (1ctx rg) -i folds ſ to s, and toLowerCase keeps it; the needles are
   // ASCII under -i, and ſ and the Kelvin sign (which lowercases to k) are
   // the only letters outside ASCII that fold into it
   return (
@@ -77,18 +77,18 @@ export interface SearchOptions {
   /** Print NUM lines of trailing context */
   afterContext?: number;
   /**
-   * (1ctx search-counts) Stop after NUM selected lines: undefined or negative is no
+   * (1ctx search-engine) Stop after NUM selected lines: undefined or negative is no
    * limit, 0 selects nothing
    */
   maxCount?: number;
-  /** Separator between context groups (default: --); (1ctx search-context) null for none */
+  /** Separator between context groups (default: --); (1ctx search-engine) null for none */
   contextSeparator?: string | null;
   /**
-   * (1ctx search-context) Separate groups even with zero lines of context, as GNU grep
+   * (1ctx search-engine) Separate groups even with zero lines of context, as GNU grep
    * does when a context option was given
    */
   groupSeparators?: boolean;
-  /** (1ctx search-context) An earlier file printed lines, so a first group is separated */
+  /** (1ctx search-engine) An earlier file printed lines, so a first group is separated */
   separateFirstGroup?: boolean;
   /** Show column number of first match */
   showColumn?: boolean;
@@ -98,7 +98,7 @@ export interface SearchOptions {
   showByteOffset?: boolean;
   /** Replace matched text with this string */
   replace?: string | null;
-  /** (1ctx rg-replace) Builds each replacement in place of `replace`'s own syntax */
+  /** (1ctx rg) Builds each replacement in place of `replace`'s own syntax */
   expand?: (match: RegExpExecArray) => string;
   /** Print all lines (matches use :, non-matches use -) */
   passthru?: boolean;
@@ -106,16 +106,16 @@ export interface SearchOptions {
   multiline?: boolean;
   /** If \K was used, this is the capture group index containing the "real" match */
   kResetGroup?: number;
-  /** (1ctx search-words) A match counts only with no word character on either side */
+  /** (1ctx search-engine) A match counts only with no word character on either side */
   wholeWord?: boolean;
-  /** (1ctx rg-regex) A match starts a word, rg's leading \< */
+  /** (1ctx rg) A match starts a word, rg's leading \< */
   wordStart?: boolean;
-  /** (1ctx rg-regex) A match ends a word, rg's trailing \> */
+  /** (1ctx rg) A match ends a word, rg's trailing \> */
   wordEnd?: boolean;
-  /** (1ctx rg-output) A line's final \r is left out of matching, rg --crlf */
+  /** (1ctx rg) A line's final \r is left out of matching, rg --crlf */
   crlf?: boolean;
   /**
-   * (1ctx rg-output) What a printed line becomes, rg's -M and --trim: `starts` are
+   * (1ctx rg) What a printed line becomes, rg's -M and --trim: `starts` are
    * where matches begin in `text`, for the words that count them, and
    * `ends` the bytes of the line's terminator, which -M counts
    */
@@ -125,27 +125,27 @@ export interface SearchOptions {
     starts: number[],
     ends: number,
   ) => string;
-  /** (1ctx grep-pcre) Patterns a line must also match, grep -P's leading lookaheads */
+  /** (1ctx grep) Patterns a line must also match, grep -P's leading lookaheads */
   conditions?: LineCondition[];
-  /** (1ctx rg-output) -o with -v prints the selected lines whole, as ripgrep */
+  /** (1ctx rg) -o with -v prints the selected lines whole, as ripgrep */
   invertedLines?: boolean;
-  /** (1ctx search-empty-match) -o prints an empty line for an empty match, as ripgrep */
+  /** (1ctx search-engine) -o prints an empty line for an empty match, as ripgrep */
   printEmptyMatches?: boolean;
-  /** (1ctx search-context) -o still prints context lines whole, as ripgrep; GNU grep not */
+  /** (1ctx search-engine) -o still prints context lines whole, as ripgrep; GNU grep not */
   contextWithOnlyMatching?: boolean;
-  /** (1ctx search-counts) -c with -o counts matches, as ripgrep; GNU grep counts lines */
+  /** (1ctx search-engine) -c with -o counts matches, as ripgrep; GNU grep counts lines */
   countOnlyMatching?: boolean;
-  /** (1ctx rg-parser) Written in place of : and - after each field (rg's separators) */
+  /** (1ctx rg) Written in place of : and - after each field (rg's separators) */
   fieldSeparators?: { match: string; context: string };
-  /** (1ctx grep-options) Written after the file name in place of : and - (grep -Z) */
+  /** (1ctx grep) Written after the file name in place of : and - (grep -Z) */
   nameSeparator?: string;
-  /** (1ctx grep-options) A tab after the line's head (grep -T) */
+  /** (1ctx grep) A tab after the line's head (grep -T) */
   initialTab?: boolean;
-  /** (1ctx grep-options) Line numbers and byte offsets padded to this width (grep -T) */
+  /** (1ctx grep) Line numbers and byte offsets padded to this width (grep -T) */
   offsetWidth?: number;
-  /** (1ctx grep-options) What ends a line in and out: newline, or NUL for grep -z */
+  /** (1ctx grep) What ends a line in and out: newline, or NUL for grep -z */
   lineTerminator?: string;
-  /** (1ctx rg-prefilter) Decide only whether and how often lines are selected */
+  /** (1ctx rg) Decide only whether and how often lines are selected */
   selectOnly?: boolean;
   /**
    * Optional substring fast-path: skip RE2 entirely for lines where no needle
@@ -161,7 +161,7 @@ export interface SearchOptions {
 }
 
 /**
- * (1ctx rg-replace) A printed line: a selected one, a context one, one -o match, or
+ * (1ctx rg) A printed line: a selected one, a context one, one -o match, or
  * a selected one whose matches are drawn apart (replaced, --vimgrep or
  * --column).
  */
@@ -176,7 +176,7 @@ export interface SearchResult {
   matchCount: number;
 }
 
-/** (1ctx grep-pcre) One match in a line, in UTF-16 offsets. */
+/** (1ctx grep) One match in a line, in UTF-16 offsets. */
 interface Hit {
   /** the reported match: the \K or kept group when there is one */
   start: number;
@@ -188,7 +188,7 @@ interface Hit {
 
 const WORD_CHAR = /[\p{L}\p{N}_]/u;
 
-/** (1ctx search-words) The code point ending just before `index`, or "" at the start. */
+/** (1ctx search-engine) The code point ending just before `index`, or "" at the start. */
 function charBefore(line: string, index: number): string {
   if (index <= 0) return "";
   const low = line.charCodeAt(index - 1);
@@ -199,7 +199,7 @@ function charBefore(line: string, index: number): string {
   return line[index - 1];
 }
 
-/** (1ctx search-empty-match) The index one code point after `index`. */
+/** (1ctx search-engine) The index one code point after `index`. */
 function nextIndex(line: string, index: number): number {
   const code = line.charCodeAt(index);
   if (code >= 0xd800 && code <= 0xdbff && index + 1 < line.length) {
@@ -219,12 +219,12 @@ function isWordAt(line: string, index: number): boolean {
   return WORD_CHAR.test(String.fromCodePoint(line.codePointAt(index) ?? 0));
 }
 
-/** (1ctx search-words) No word character touches the span on either side. */
+/** (1ctx search-engine) No word character touches the span on either side. */
 export function isWholeWord(line: string, start: number, end: number): boolean {
   return !isWordBefore(line, start) && !isWordAt(line, end);
 }
 
-/** (1ctx search-words rg-regex) The word checks a match must pass: -w, and rg's \< and \>. */
+/** (1ctx search-engine rg) The word checks a match must pass: -w, and rg's \< and \>. */
 export interface WordEdges {
   whole?: boolean;
   start?: boolean;
@@ -241,7 +241,7 @@ function endOk(edges: WordEdges, line: string, index: number): boolean {
   return !edges.end || isWordBefore(line, index);
 }
 
-/** (1ctx search-words rg-regex) Whether a span passes the word checks. */
+/** (1ctx search-engine rg) Whether a span passes the word checks. */
 export function edgesOk(
   edges: WordEdges,
   line: string,
@@ -252,7 +252,7 @@ export function edgesOk(
 }
 
 /**
- * (1ctx grep-pcre search-words search-empty-match) Finds matches in one line: the \K group, the -w check done in code
+ * (1ctx grep search-engine) Finds matches in one line: the \K group, the -w check done in code
  * as GNU grep does (no word character on either side, a shorter match at
  * the same start tried before a later start), and RE2 never asked past the
  * end of the line.
@@ -318,7 +318,7 @@ class LineMatcher {
     if (this.keepGroup !== undefined) return null;
     for (let k = hit.end - 1; k >= hit.start; k--) {
       if (!endOk(this.edges, line, k)) continue;
-      // (1ctx search-words) a retry re-reads the prefix: cubic on a hostile line, so it
+      // (1ctx search-engine) a retry re-reads the prefix: cubic on a hostile line, so it
       // pays toward the work limit and fails in seconds, not minutes
       this.charge(1 + ((k - hit.start) >> 6));
       const candidate = this.raw(line.slice(0, k), hit.start);
@@ -353,7 +353,7 @@ class LineMatcher {
   }
 }
 
-/** (1ctx search-byte-offsets) UTF-8 byte offsets of positions in one line, walked forward. */
+/** (1ctx search-engine) UTF-8 byte offsets of positions in one line, walked forward. */
 class ByteCounter {
   private index = 0;
   private bytes = 0;
@@ -428,7 +428,7 @@ export function searchContent(
     signal,
   } = options;
 
-  // (1ctx search-counts) -m 0 selects nothing
+  // (1ctx search-engine) -m 0 selects nothing
   const limit =
     maxCount === undefined || !(maxCount >= 0)
       ? Number.POSITIVE_INFINITY
@@ -483,7 +483,7 @@ export function searchContent(
   };
 
   const counting = countOnly || countMatches;
-  // (1ctx rg-output) rg --crlf ends the lines it writes itself with \r\n
+  // (1ctx rg) rg --crlf ends the lines it writes itself with \r\n
   const eol = crlf ? "\r" : "";
   const countResult = (count: number): SearchResult => {
     const name = filename ? `${filename}${nameSeparator ?? ":"}` : "";
@@ -529,7 +529,7 @@ export function searchContent(
     chargeWork,
     conditions,
   );
-  // (1ctx rg-output) what the pattern sees of a line: without its \r under --crlf
+  // (1ctx rg) what the pattern sees of a line: without its \r under --crlf
   const subject = (i: number): string =>
     crlf && lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
   const show = (
@@ -608,7 +608,7 @@ export function searchContent(
     return expand ? expand(match) : applyReplacement(rep, match);
   };
 
-  /** (1ctx rg-replace) The line with every match replaced, and where each begins. */
+  /** (1ctx rg) The line with every match replaced, and where each begins. */
   const replaced = (i: number, rep: string): [string, number[]] => {
     const line = lines[i];
     const sub = subject(i);
@@ -658,7 +658,7 @@ export function searchContent(
     }
     const byte = showByteOffset ? lineStarts[i] : null;
     if (vimgrep) {
-      // (1ctx rg-replace) replaced once, printed once per match
+      // (1ctx rg) replaced once, printed once per match
       const [text, starts] =
         replace !== null ? replaced(i, replace) : [line, hitStarts(i)];
       const shown = show(text, "spans", starts, i);
@@ -929,7 +929,7 @@ function searchContentMultiline(
     byteOffset: number;
     column: number;
     matchText: string;
-    /** (1ctx rg-replace) the whole match's length and what replaces it */
+    /** (1ctx rg) the whole match's length and what replaces it */
     length: number;
     replacement: string;
   }> = [];
@@ -1013,7 +1013,7 @@ function searchContentMultiline(
   let lastPrintedLine = -1;
   const outputLines: string[] = [];
 
-  // (1ctx rg-replace) prefixes for each line of a printed piece, numbered on
+  // (1ctx rg) prefixes for each line of a printed piece, numbered on
   const printPiece = (
     text: string,
     firstLine: number,
@@ -1032,7 +1032,7 @@ function searchContentMultiline(
   for (let k = 0; k < matchSpans.length; k++) {
     const span = matchSpans[k];
     chargeWork();
-    // (1ctx rg-replace) a replacement rewrites every match on the lines it prints
+    // (1ctx rg) a replacement rewrites every match on the lines it prints
     let endLine = span.endLine;
     let lastSpan = k;
     if (replace !== null && !onlyMatching) {

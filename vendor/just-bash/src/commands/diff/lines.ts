@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-engine diff-bytes) diff's lines: a file's bytes, one character per byte, split at
+ * (1ctx diff) diff's lines: a file's bytes, one character per byte, split at
  * newlines, its last line incomplete when no newline ends it, and each
  * line interned to a number after the options' folding, so the compare
  * works on numbers and the output prints the line's own bytes. Case folds

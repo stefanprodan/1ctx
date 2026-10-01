@@ -578,7 +578,7 @@ export class InMemoryFs implements IFileSystem {
   }
 
   /**
-   * (1ctx rm-walk) Resolve a path one component at a time, as the kernel does: a
+   * (1ctx rm) Resolve a path one component at a time, as the kernel does: a
    * link's target goes in front of the components still to resolve, so a
    * target through another link resolves too, and `..` after a link climbs
    * from where the link led. One count of links for the whole path, as
@@ -671,7 +671,7 @@ export class InMemoryFs implements IFileSystem {
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     validatePath(path, "scandir");
-    // (1ctx rm-links rm-walk) every link on the way, the last included, one component at
+    // (1ctx rm) every link on the way, the last included, one component at
     // a time, so a folder under or behind a linked folder is read
     let normalized: string;
     try {
@@ -713,7 +713,7 @@ export class InMemoryFs implements IFileSystem {
 
   async rm(path: string, options?: RmOptions): Promise<void> {
     validatePath(path, "rm");
-    // (1ctx rm-links) through linked folders above, never the last name, as unlink
+    // (1ctx rm) through linked folders above, never the last name, as unlink
     const normalized = this.resolveIntermediateSymlinks(path);
     const entry = this.data.get(normalized);
 
@@ -728,7 +728,7 @@ export class InMemoryFs implements IFileSystem {
         if (!options?.recursive) {
           throw new Error(`ENOTEMPTY: directory not empty, rm '${path}'`);
         }
-        // (1ctx rm-walk) an iterative post-order walk: a deep tree never grows
+        // (1ctx rm) an iterative post-order walk: a deep tree never grows
         // the call stack, and a link inside is removed, never followed
         const stack = [{ path: normalized, listed: false }];
         while (stack.length > 0) {

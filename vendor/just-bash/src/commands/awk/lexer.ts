@@ -91,7 +91,7 @@ export enum TokenType {
   EOF = "EOF",
 }
 
-// (1ctx awk-options) exported: an operand or -v name that is a keyword is refused
+// (1ctx awk) exported: an operand or -v name that is a keyword is refused
 export const KEYWORDS = new Map<string, TokenType>([
   ["BEGIN", TokenType.BEGIN],
   ["END", TokenType.END],
@@ -119,7 +119,7 @@ export interface Token {
   value: string | number;
   line: number;
   column: number;
-  // (1ctx awk-call-space) a name written right before "(": gawk calls only such a user
+  // (1ctx awk) a name written right before "(": gawk calls only such a user
   // function, and a space before "(" makes a user name a concatenation
   call?: boolean;
 }
@@ -798,7 +798,7 @@ export class AwkLexer {
             column: startColumn,
           };
         }
-        // (1ctx awk-pipes) a coprocess is refused, not read as a pipe and a name
+        // (1ctx awk) a coprocess is refused, not read as a pipe and a name
         if (next === "&") throw new AwkRefusal("|& is not supported", 2);
         return {
           type: TokenType.PIPE,
@@ -904,7 +904,7 @@ export class AwkLexer {
         };
 
       default:
-        // (1ctx awk-check) gawk's directives are refused, not read as names
+        // (1ctx awk) gawk's directives are refused, not read as names
         if (ch === "@") {
           const word = /^[A-Za-z_]+/.exec(this.input.slice(this.pos))?.[0];
           if (word === "include" || word === "load" || word === "namespace") {

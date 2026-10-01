@@ -1,5 +1,5 @@
 /**
- * (1ctx rg-output) How rg reads what it searches, moved out of rg-search.ts:
+ * (1ctx rg) How rg reads what it searches, moved out of rg-search.ts:
  * standard input, a file, a gzip file under -z, and --pre's output.
  */
 
@@ -89,7 +89,7 @@ function matchesPreGlob(filename: string, preGlobs: string[]): boolean {
 /**
  * Read file content, handling preprocessing and gzip decompression if needed
  */
-/** (1ctx rg-output) Standard input, searched as a file named `<stdin>`. */
+/** (1ctx rg) Standard input, searched as a file named `<stdin>`. */
 export function readStdin(ctx: RuntimeCommandContext): {
   content: string;
   isBinary: boolean;

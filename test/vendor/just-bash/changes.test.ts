@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const CHANGES = join(ROOT, "vendor", "changes.md");
@@ -57,17 +57,15 @@ function parseEntries(text: string): Entry[] {
   return entries;
 }
 
-// A path names a file from the repository root; a bare name sits in the
-// directory of the path before it.
-function testPaths(value: string): string[] {
-  const paths: string[] = [];
-  let dir = "";
-  for (const [, span] of value.matchAll(/`([^`]+)`/g)) {
-    const path = span.includes("/") ? span : join(dir, span);
-    dir = dirname(path);
-    paths.push(path);
-  }
-  return paths;
+function paths(value: string): string[] {
+  return [...value.matchAll(/`([^`]+)`/g)].map(([, span]) => span);
+}
+
+// Files are under the vendored package, but our own scripts/.
+function filesPath(path: string): string {
+  return path.startsWith("scripts/")
+    ? join(ROOT, path)
+    : join(ROOT, "vendor", "just-bash", path);
 }
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
@@ -122,10 +120,13 @@ describe("the record of our just-bash changes", () => {
       if (tests.startsWith("none")) {
         if (!/^none, \S/.test(tests))
           problems.push(`${at}: Tests is none without a reason`);
-      } else if (testPaths(tests).length === 0)
+      } else if (paths(tests).length === 0)
         problems.push(`${at}: Tests names no file`);
-      const now = e.body.findIndex((l) => l.startsWith("Now: "));
-      const before = e.body.findIndex((l) => l.startsWith("Before: "));
+      if (paths(field("Files")).length === 0)
+        problems.push(`${at}: Files names no file`);
+      // a merged change lists its parts under a bare Now: and Before:
+      const now = e.body.findIndex((l) => /^Now:( |$)/.test(l));
+      const before = e.body.findIndex((l) => /^Before:( |$)/.test(l));
       if (now !== 0 || before <= now)
         problems.push(`${at}: the body is not Now, then Before`);
     }
@@ -145,8 +146,18 @@ describe("the record of our just-bash changes", () => {
     for (const e of entries) {
       const tests = e.fields.find(([n]) => n === "Tests")?.[1] ?? "";
       if (tests.startsWith("none")) continue;
-      for (const path of testPaths(tests))
+      for (const path of paths(tests))
         if (!existsSync(join(ROOT, path))) missing.push(`${e.id}: ${path}`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("every Files path exists", () => {
+    const missing: string[] = [];
+    for (const e of entries) {
+      const files = e.fields.find(([n]) => n === "Files")?.[1] ?? "";
+      for (const path of paths(files))
+        if (!existsSync(filesPath(path))) missing.push(`${e.id}: ${path}`);
     }
     expect(missing).toEqual([]);
   });

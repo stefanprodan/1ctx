@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-engine diff-formats) How diff writes one line of a file: its mark, a space or with -T
+ * (1ctx diff) How diff writes one line of a file: its mark, a space or with -T
  * a tab, the text, and GNU's words after a line with no newline.
  */
 

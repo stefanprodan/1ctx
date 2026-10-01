@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-engine) diff's compare, written from Myers, "An O(ND) Difference
+ * (1ctx diff) diff's compare, written from Myers, "An O(ND) Difference
  * Algorithm and Its Variations" (Algorithmica 1, 1986): the middle-snake
  * search in linear space over lines interned to numbers, with GNU diff's
  * manual as the guide to what it does around the search. The common head

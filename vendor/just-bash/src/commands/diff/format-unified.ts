@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-engine diff-formats) GNU diff's unified format: `@@ -L,N +L,N @@` over each hunk, a
+ * (1ctx diff) GNU diff's unified format: `@@ -L,N +L,N @@` over each hunk, a
  * side of one line as `L`, an empty side as the line before it and `,0`,
  * then the context lines with a space and the changes with `-` and `+`.
  */

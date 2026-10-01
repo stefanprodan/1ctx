@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-options) GNU diff 3.12's options, read as its getopt_long reads them:
+ * (1ctx diff) GNU diff 3.12's options, read as its getopt_long reads them:
  * options may follow operands, `--` ends them, a value follows in the same
  * argument or the next, a value-taking option ends a cluster, digits are
  * the obsolete context length, and a long option may be any unambiguous

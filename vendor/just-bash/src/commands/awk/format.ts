@@ -1,5 +1,5 @@
 /**
- * (1ctx awk-numbers) AWK number and printf formatting, as gawk in a UTF-8 locale.
+ * (1ctx awk) AWK number and printf formatting, as gawk in a UTF-8 locale.
  *
  * Numbers are formatted from their exact binary value, rounding half to
  * even as C's printf does (JavaScript's toFixed rounds exact ties up), and
@@ -315,7 +315,7 @@ export function formatPrintf(
         flags += format[j++];
       }
 
-      // (1ctx awk-fatal-errors) gawk's fatal error for a conversion with no argument left
+      // (1ctx awk) gawk's fatal error for a conversion with no argument left
       const take = (index: number): AwkValue => {
         if (index >= values.length) {
           throw new Error("not enough arguments to satisfy format string");

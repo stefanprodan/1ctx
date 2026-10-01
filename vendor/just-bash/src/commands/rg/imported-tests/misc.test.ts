@@ -35,7 +35,7 @@ describe("rg misc: single_file", () => {
 
 // 2. dir
 describe("rg misc: dir", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search directory with filename prefix", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -105,7 +105,7 @@ describe("rg misc: with_filename", () => {
 
 // 6. with_heading
 describe("rg misc: with_heading", () => {
-  // (1ctx rg-output) one file has no heading, as ripgrep piped, unless -H
+  // (1ctx rg) one file has no heading, as ripgrep piped, unless -H
   it("should show heading format", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -330,7 +330,7 @@ describe("rg misc: replace_with_only_matching", () => {
 
 // 20. file_types
 describe("rg misc: file_types", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by type with -t", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -348,7 +348,7 @@ describe("rg misc: file_types", () => {
 
 // 21. file_types_all
 describe("rg misc: file_types_all", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter type 'all' (only typed files)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -365,7 +365,7 @@ describe("rg misc: file_types_all", () => {
 
 // 22. file_types_negate
 describe("rg misc: file_types_negate", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate type with -T", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -382,7 +382,7 @@ describe("rg misc: file_types_negate", () => {
 
 // 23. file_types_negate_all
 describe("rg misc: file_types_negate_all", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate type 'all' (only untyped files)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -411,7 +411,7 @@ describe("rg misc: file_type_clear", () => {
     });
     // Clear py type, then search for it - should find nothing
     const result = await bash.exec("rg --type-clear py -t py test");
-    // (1ctx rg-output) nothing is left to search, which ripgrep refuses with exit 2
+    // (1ctx rg) nothing is left to search, which ripgrep refuses with exit 2
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe("");
   });
@@ -419,7 +419,7 @@ describe("rg misc: file_type_clear", () => {
 
 // 25. file_type_add
 describe("rg misc: file_type_add", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should add type patterns with --type-add", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -439,7 +439,7 @@ describe("rg misc: file_type_add", () => {
 
 // 26. file_type_add_compose
 describe("rg misc: file_type_add_compose", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should compose types with include", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -492,7 +492,7 @@ describe("rg misc: preprocessing", () => {
 
 // 27. glob
 describe("rg misc: glob", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by glob with -g", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -510,7 +510,7 @@ describe("rg misc: glob", () => {
 
 // 28. glob_negate
 describe("rg misc: glob_negate", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate glob with -g !", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -527,7 +527,7 @@ describe("rg misc: glob_negate", () => {
 
 // 29. glob_case_insensitive
 describe("rg misc: glob_case_insensitive", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should use case-insensitive glob matching with --iglob", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -547,7 +547,7 @@ describe("rg misc: glob_case_insensitive", () => {
 
 // 30. glob_case_sensitive
 describe("rg misc: glob_case_sensitive", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should use case-sensitive glob matching", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -564,7 +564,7 @@ describe("rg misc: glob_case_sensitive", () => {
 
 // 31. glob_always_case_insensitive
 describe("rg misc: glob_always_case_insensitive", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should make all globs case-insensitive with --glob-case-insensitive", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -814,7 +814,7 @@ describe("rg misc: context_line_numbers", () => {
 
 // 47-52. max_filesize_*
 describe("rg misc: max_filesize", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter files by size with --max-filesize", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -829,7 +829,7 @@ describe("rg misc: max_filesize", () => {
     expect(result.stdout).toBe("small.txt:1:Sherlock\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept K suffix for kilobytes", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -842,7 +842,7 @@ describe("rg misc: max_filesize", () => {
     expect(result.stdout).toBe("test.txt:1:Sherlock\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept M suffix for megabytes", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -866,14 +866,14 @@ describe("rg misc: ignore_hidden", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx rg-output) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 });
 
 // 54. no_ignore_hidden
 describe("rg misc: no_ignore_hidden", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include hidden files with --hidden", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -901,7 +901,7 @@ describe("rg misc: ignore_git", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx rg-output) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 });
@@ -917,7 +917,7 @@ describe("rg misc: ignore_generic", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx rg-output) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 });
@@ -933,14 +933,14 @@ describe("rg misc: ignore_ripgrep", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx rg-output) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 });
 
 // 58. no_ignore
 describe("rg misc: no_ignore", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with --no-ignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1006,7 +1006,7 @@ describe("rg misc: symlink_follow", () => {
 
 // 66. unrestricted1
 describe("rg misc: unrestricted1", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with -u", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1025,7 +1025,7 @@ describe("rg misc: unrestricted1", () => {
 
 // 67. unrestricted2
 describe("rg misc: unrestricted2", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include hidden files with -uu", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -1203,7 +1203,7 @@ describe("rg misc: type_list", () => {
 
 // 91. sort_files
 describe("rg misc: sort_files", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should sort files by path with --sort path", async () => {
     const bash = new Bash({
       cwd: "/home/user",

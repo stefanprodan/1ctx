@@ -112,7 +112,7 @@ async function extractPatternArg(
   return pattern;
 }
 
-// (1ctx awk-sub-target) The target of sub and gsub: $0 or a field, a variable (a built-in
+// (1ctx awk) The target of sub and gsub: $0 or a field, a variable (a built-in
 // included), an array element, or any other expression, which gawk counts
 // the replacements in and leaves alone.
 type SubTarget =
@@ -202,13 +202,13 @@ async function awkLength(
   if (args.length === 0) {
     return charLength(ctx.line);
   }
-  // (1ctx awk-arrays) the number of elements of an array, a parameter holding one too
+  // (1ctx awk) the number of elements of an array, a parameter holding one too
   const arg = args[0];
   if (arg.type === "variable" && isArrayName(ctx, arg.name)) {
     return Object.keys(ctx.arrays[resolveArrayName(ctx, arg.name)]).length;
   }
   const str = toAwkString(await evaluator.evalExpr(arg), ctx.CONVFMT);
-  // (1ctx awk-chars) characters, not UTF-16 units
+  // (1ctx awk) characters, not UTF-16 units
   return charLength(str);
 }
 
@@ -224,7 +224,7 @@ async function awkSubstr(
     Math.floor(toNumber(await evaluator.evalExpr(args[1]))) - 1,
   );
 
-  // (1ctx awk-chars) positions and lengths count characters, as gawk does
+  // (1ctx awk) positions and lengths count characters, as gawk does
   if (args.length >= 3) {
     const len = Math.floor(toNumber(await evaluator.evalExpr(args[2])));
     return len > 0 ? charSlice(str, start, start + len) : "";
@@ -241,12 +241,12 @@ async function awkIndex(
   const str = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const target = toAwkString(await evaluator.evalExpr(args[1]), ctx.CONVFMT);
   const idx = str.indexOf(target);
-  // (1ctx awk-chars) a character position
+  // (1ctx awk) a character position
   return idx === -1 ? 0 : charsBefore(str, idx) + 1;
 }
 
 /**
- * (1ctx awk-arrays) The resolved name of an array argument, or gawk's fatal error
+ * (1ctx awk) The resolved name of an array argument, or gawk's fatal error
  * when the argument is not a variable or holds a scalar.
  */
 function arrayArgument(
@@ -262,7 +262,7 @@ function arrayArgument(
   throw new Error(`${fn}: ${position} argument is not an array`);
 }
 
-// (1ctx awk-fs) split as gawk does: both arrays cleared first, the separator read
+// (1ctx awk) split as gawk does: both arrays cleared first, the separator read
 // as FS is (" ", one character, "" or a regex), and seps filled when given.
 async function awkSplit(
   args: AwkExpr[],
@@ -320,7 +320,7 @@ async function awkSplit(
   return fields.length;
 }
 
-// (1ctx awk-asort) asort and asorti as gawk 5.4.1 orders them. The default is
+// (1ctx awk) asort and asorti as gawk 5.4.1 orders them. The default is
 // "@val_type_asc" for asort and "@ind_str_asc" for asorti; "@val_num"
 // breaks a tie by the value as a string, "@val_type" ranks an
 // uninitialized value before a number before a string, and every order
@@ -531,7 +531,7 @@ async function awkGsub(
   }
 }
 
-// (1ctx awk-sub-target) gawk's own rules for the replacement of sub and gsub: \\\& gives
+// (1ctx awk) gawk's own rules for the replacement of sub and gsub: \\\& gives
 // \&, \\\\ gives \\, \\& gives a backslash and the match, \& gives &, and
 // any other backslash is kept as it is.
 function createSubReplacement(
@@ -583,7 +583,7 @@ async function awkMatch(
     return 0;
   }
 
-  // (1ctx awk-match-groups) gawk's third argument, checked before anything is matched
+  // (1ctx awk) gawk's third argument, checked before anything is matched
   const arrayName =
     args.length >= 3
       ? arrayArgument(ctx, args[2], "match", "third")
@@ -612,7 +612,7 @@ async function awkMatch(
     return 0;
   }
 
-  // (1ctx awk-chars) character positions, not UTF-16 offsets
+  // (1ctx awk) character positions, not UTF-16 offsets
   ctx.RSTART = charsBefore(str, spans[0].start) + 1;
   ctx.RLENGTH = charLength(str.slice(spans[0].start, spans[0].end));
   if (arrayName !== undefined) {
@@ -759,7 +759,7 @@ async function awkSprintf(
   ctx: AwkRuntimeContext,
   evaluator: AwkEvaluator,
 ): Promise<string> {
-  // (1ctx awk-check) gawk's fatal error, when the call runs
+  // (1ctx awk) gawk's fatal error, when the call runs
   if (args.length === 0) throw new Error("sprintf: no arguments");
   const format = toAwkString(await evaluator.evalExpr(args[0]), ctx.CONVFMT);
   const values: AwkValue[] = [];
@@ -777,7 +777,7 @@ async function awkInt(
   evaluator: AwkEvaluator,
 ): Promise<number> {
   if (args.length === 0) return 0;
-  // (1ctx awk-numbers) toward zero, as gawk truncates
+  // (1ctx awk) toward zero, as gawk truncates
   return Math.trunc(toNumber(await evaluator.evalExpr(args[0])));
 }
 
@@ -855,7 +855,7 @@ async function awkSrand(
   return seed;
 }
 
-// (1ctx awk-records) close(name) ends what gawk would: the file getline reads (by
+// (1ctx awk) close(name) ends what gawk would: the file getline reads (by
 // path), the command getline reads (by its text, so it runs again), and
 // the output file of that name, so the next ">" truncates it.
 async function awkClose(
@@ -954,9 +954,9 @@ export const awkBuiltins: Map<string, AwkBuiltinFn> = new Map([
       "shell execution not allowed in sandboxed environment",
     ),
   ],
-  // (1ctx awk-records) close() ends a getline stream or an output file of that name
+  // (1ctx awk) close() ends a getline stream or an output file of that name
   ["close", awkClose],
-  // (1ctx awk-pipes) fflush() marks our output written, so a pipe closed later
+  // (1ctx awk) fflush() marks our output written, so a pipe closed later
   // follows it; a pipe's own command still runs only when it is closed
   ["fflush", awkFflush],
 

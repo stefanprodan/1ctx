@@ -493,7 +493,7 @@ export class AwkParser {
     this.expect(TokenType.DO);
     this.skipNewlines();
     const body = this.parseStatement();
-    // (1ctx awk-check) `do stmt; while (c)`: a simple body ends at its semicolon
+    // (1ctx awk) `do stmt; while (c)`: a simple body ends at its semicolon
     this.skipTerminators();
     this.expect(TokenType.WHILE);
     this.expect(TokenType.LPAREN);
@@ -694,7 +694,7 @@ export class AwkParser {
     return left;
   }
 
-  // (1ctx awk-concat-precedence) awk binds concatenation tighter than the comparisons, which
+  // (1ctx awk) awk binds concatenation tighter than the comparisons, which
   // bind tighter than ~ and !~: `x "" == "0.3"` compares the concatenation
   private parseIn(): AwkExpr {
     const left = this.parseMatch();
@@ -767,7 +767,7 @@ export class AwkParser {
     return left;
   }
 
-  // (1ctx awk-call-space) gawk takes "name (" as a call only for a builtin; for any other
+  // (1ctx awk) gawk takes "name (" as a call only for a builtin; for any other
   // name it is a concatenation, or a refusal when the name is a function
   private isCall(token: Token): boolean {
     return (
@@ -932,7 +932,7 @@ export class AwkParser {
     return left;
   }
 
-  // (1ctx awk-power) an exponent may carry its own sign: 2^-1
+  // (1ctx awk) an exponent may carry its own sign: 2^-1
   private parseExponent(): AwkExpr {
     if (this.match(TokenType.MINUS, TokenType.PLUS, TokenType.NOT)) {
       const op = this.advance().value as "!" | "-" | "+";
@@ -1034,7 +1034,7 @@ export class AwkParser {
       return { type: "unary", operator: op, operand };
     }
 
-    // (1ctx awk-power) $ binds tighter than ^, so $2^2 is ($2)^2 as in gawk
+    // (1ctx awk) $ binds tighter than ^, so $2^2 is ($2)^2 as in gawk
     return this.parseFieldIndexPrimary();
   }
 
@@ -1195,7 +1195,7 @@ export class AwkParser {
       const token = this.advance();
       const name = token.value as string;
 
-      // (1ctx awk-check) `length` without parentheses is length($0)
+      // (1ctx awk) `length` without parentheses is length($0)
       if (name === "length" && !this.check(TokenType.LPAREN)) {
         return { type: "call", name, args: [] };
       }

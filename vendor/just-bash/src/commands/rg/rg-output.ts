@@ -1,5 +1,5 @@
 /**
- * (1ctx rg-output) How rg prints a path and a line: --path-separator, and -M with
+ * (1ctx rg) How rg prints a path and a line: --path-separator, and -M with
  * --max-columns-preview and --trim in ripgrep's words.
  */
 

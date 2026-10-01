@@ -1,5 +1,5 @@
 /**
- * (1ctx rg-replace) ripgrep's replacement syntax: `$N`, `${N}`, `$name`, `${name}`
+ * (1ctx rg) ripgrep's replacement syntax: `$N`, `${N}`, `$name`, `${name}`
  * and `$$`. A bare name runs as far as letters, digits and `_` go, so
  * `$1x` is the group named `1x`; a group that did not take part, or does
  * not exist, is empty; a `$` that starts no reference stays as it is.

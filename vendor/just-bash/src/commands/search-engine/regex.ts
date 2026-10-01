@@ -31,7 +31,7 @@ export interface RegexOptions {
   mode: RegexMode;
   ignoreCase?: boolean;
   /**
-   * (1ctx search-words) Accepted for callers; the word check is the matcher's
+   * (1ctx search-engine) Accepted for callers; the word check is the matcher's
    * (`SearchOptions.wholeWord`), since RE2's \b knows only ASCII
    */
   wholeWord?: boolean;
@@ -39,9 +39,9 @@ export interface RegexOptions {
   multiline?: boolean;
   /** Makes . match newlines in multiline mode (ripgrep --multiline-dotall) */
   multilineDotall?: boolean;
-  /** (1ctx grep-pcre) grep -P: PCRE2's syntax, rewritten to RE2 or refused */
+  /** (1ctx grep) grep -P: PCRE2's syntax, rewritten to RE2 or refused */
   pcre?: boolean;
-  /** (1ctx rg-regex) rg's syntax: Unicode classes unless `unicode` is false, word edges */
+  /** (1ctx rg) rg's syntax: Unicode classes unless `unicode` is false, word edges */
   rust?: { unicode: boolean };
 }
 
@@ -56,16 +56,16 @@ export interface RegexResult {
    * optionally wrapped in \b...\b for -w mode). Null for anything more complex.
    */
   preFilter?: PreFilter;
-  /** (1ctx grep-gnu-regex) GNU grep's warnings about the pattern, each once */
+  /** (1ctx grep) GNU grep's warnings about the pattern, each once */
   warnings?: string[];
-  /** (1ctx grep-pcre) grep -P's leading lookaheads: a line must match each of these */
+  /** (1ctx grep) grep -P's leading lookaheads: a line must match each of these */
   conditions?: LineCondition[];
-  /** (1ctx rg-regex) rg's leading \< and trailing \>, checked in code */
+  /** (1ctx rg) rg's leading \< and trailing \>, checked in code */
   wordStart?: boolean;
   wordEnd?: boolean;
 }
 
-/** (1ctx grep-pcre) A pattern a selected line must match, or must not */
+/** (1ctx grep) A pattern a selected line must match, or must not */
 export interface LineCondition {
   regex: UserRegex;
   negated: boolean;
@@ -196,7 +196,7 @@ export function buildRegex(
 }
 
 /**
- * (1ctx grep-gnu-regex search-leftmost-longest) Build one regex from several patterns, any of which selects a
+ * (1ctx grep search-engine) Build one regex from several patterns, any of which selects a
  * line, as grep's -e and -f give them. `basic` and `extended` are GNU
  * grep's dialects, matched leftmost-longest as POSIX has it; `fixed` is
  * matched the same way; `perl` is leftmost-first.
@@ -213,7 +213,7 @@ export function buildPatterns(
   let wordEnd = false;
   const sources = patterns.map((pattern, index) => {
     if (options.pcre) {
-      // (1ctx grep-pcre) quotes, code points and (?x) first, then PCRE2's syntax
+      // (1ctx grep) quotes, code points and (?x) first, then PCRE2's syntax
       const source = handleInlineModifiers(
         handleUnicodeCodePoints(handleQuoteMetachars(pattern)),
       );
@@ -292,11 +292,11 @@ export function buildPatterns(
       : sources.map((source) => `(?:${source})`).join("|");
 
   if (options.wholeWord && options.multiline) {
-    // (1ctx search-words) a multiline search cannot check words in code
+    // (1ctx search-engine) a multiline search cannot check words in code
     regexPattern = `\\b(?:${regexPattern})\\b`;
   }
   if (options.multiline && (wordStart || wordEnd)) {
-    // (1ctx rg-regex) nor edges: RE2's ASCII \b in their place
+    // (1ctx rg) nor edges: RE2's ASCII \b in their place
     regexPattern = `${wordStart ? "\\b" : ""}(?:${regexPattern})${wordEnd ? "\\b" : ""}`;
     wordStart = false;
     wordEnd = false;
@@ -390,7 +390,7 @@ function extractPreFilter(
   }
 
   if (needles.length === 0) return null;
-  // (1ctx rg-prefilter) lowercasing is not case folding beyond ASCII: σ, ς and Σ are one
+  // (1ctx rg) lowercasing is not case folding beyond ASCII: σ, ς and Σ are one
   // letter to the regex, and toLowerCase keeps ς apart
   if (ignoreCase && needles.some((n) => /[^\x00-\x7f]/.test(n))) return null;
 
@@ -467,7 +467,7 @@ function literalFromAlternative(alt: string): string | null {
       // \n, \t, \r are literal whitespace — fine. \d, \w, \s, \b, \B etc.
       // match character classes or zero-width assertions — reject.
       if (/[dDwWsSbBAZzGQE0-9ckpPNXRxuU]/.test(next)) return null;
-      // (1ctx rg-prefilter) any other letter escape (\a is BEL, \e ESC) is not the letter
+      // (1ctx rg) any other letter escape (\a is BEL, \e ESC) is not the letter
       if (/[A-Za-z]/.test(next) && !"ntrfv".includes(next)) return null;
       // Translate common escape sequences to their literal char.
       if (next === "n") out += "\n";
@@ -543,7 +543,7 @@ function handleUnicodeCodePoints(pattern: string): string {
 }
 
 /**
- * (1ctx search-inline-flags) Inline flags reach RE2 as written: `(?i)`, `(?s)`, `(?m)`, `(?U)`
+ * (1ctx search-engine) Inline flags reach RE2 as written: `(?i)`, `(?s)`, `(?m)`, `(?U)`
  * and their scoped and negated forms are RE2's own. `x` is not, so its
  * scope loses its whitespace and `#` comments here and the flag is dropped.
  */

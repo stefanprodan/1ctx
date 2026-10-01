@@ -78,7 +78,7 @@ export const awkCommand2: RuntimeCommand = {
       return showHelp(awkHelp);
     }
 
-    // (1ctx awk-options) -v and -F keep their order and are replayed through
+    // (1ctx awk) -v and -F keep their order and are replayed through
     // setVariable once the context exists; -f and -- are read as gawk does
     const parsed = parseOptions(args);
     if (!parsed.ok) {
@@ -125,7 +125,7 @@ export const awkCommand2: RuntimeCommand = {
     let ast: AwkProgram;
     try {
       ast = parser.parse(program);
-      // (1ctx awk-check) what gawk refuses before anything runs
+      // (1ctx awk) what gawk refuses before anything runs
       checkProgram(
         ast,
         options.assignments.map((a) => a.name),
@@ -141,7 +141,7 @@ export const awkCommand2: RuntimeCommand = {
     const awkFs: AwkFileSystem = {
       readFile: ctx.fs.readFile.bind(ctx.fs),
       writeFile: ctx.fs.writeFile.bind(ctx.fs),
-      // (1ctx awk-output-files) the filesystem's own append: it keeps the bytes (a BOM
+      // (1ctx awk) the filesystem's own append: it keeps the bytes (a BOM
       // included) and throws on a directory or a full filesystem, where
       // reading back and writing the whole replaced the file with the
       // text. A path through a link keeps the old way, since the
@@ -243,7 +243,7 @@ export const awkCommand2: RuntimeCommand = {
     runtimeCtx.mainInput = new MainInput(runtimeCtx, {
       readFile: async (file) => {
         const filePath = ctx.fs.resolvePath(ctx.cwd, file);
-        // (1ctx awk-output-files) an operand sees what the program wrote to its files so far
+        // (1ctx awk) an operand sees what the program wrote to its files so far
         await flushFiles(runtimeCtx);
         try {
           const stat = await withDefenseContext("input file stat", () =>
@@ -335,7 +335,7 @@ export const awkCommand2: RuntimeCommand = {
 
       // Execute END blocks (always run, even after exit - AWK semantics)
       await withDefenseContext("END execution", () => interp.executeEnd());
-      // (1ctx awk-pipes) the output pipes run last, as gawk closes them at exit
+      // (1ctx awk) the output pipes run last, as gawk closes them at exit
       await withDefenseContext("output close", () => closeOutputs(runtimeCtx));
 
       // awk emits text; the pipeline handles encoding.
@@ -349,7 +349,7 @@ export const awkCommand2: RuntimeCommand = {
         e instanceof SecurityViolationError ||
         e instanceof ExecutionAbortedError
       ) {
-        // (1ctx awk-output-files) what the files hold, as the writes before it had landed
+        // (1ctx awk) what the files hold, as the writes before it had landed
         try {
           await withDefenseContext("output flush", () =>
             flushFiles(runtimeCtx),
@@ -361,7 +361,7 @@ export const awkCommand2: RuntimeCommand = {
       const msg = e instanceof Error ? e.message : String(e);
       const exitCode =
         e instanceof ExecutionLimitError ? ExecutionLimitError.EXIT_CODE : 2;
-      // (1ctx awk-pipes awk-output-files) gawk's fatal exit still closes the pipes; a limit does not,
+      // (1ctx awk) gawk's fatal exit still closes the pipes; a limit does not,
       // but writes what the files hold, as the writes before it happened
       try {
         await withDefenseContext("output close", () =>

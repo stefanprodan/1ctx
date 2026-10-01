@@ -29,7 +29,7 @@ export interface RgOptions {
   noFilename: boolean;
   withFilename: boolean;
   nullSeparator: boolean;
-  /** (1ctx rg-parser) --null-data: NUL ends a line, and no file is binary */
+  /** (1ctx rg) --null-data: NUL ends a line, and no file is binary */
   nullData: boolean;
   byteOffset: boolean;
   column: boolean;
@@ -37,39 +37,39 @@ export interface RgOptions {
   replace: string | null;
   afterContext: number;
   beforeContext: number;
-  /** (1ctx rg-parser) null with --no-context-separator */
+  /** (1ctx rg) null with --no-context-separator */
   contextSeparator: string | null;
-  /** (1ctx rg-parser) after the name, number and column of a context line */
+  /** (1ctx rg) after the name, number and column of a context line */
   fieldContextSeparator: string;
-  /** (1ctx rg-parser) after the name, number and column of a matching line */
+  /** (1ctx rg) after the name, number and column of a matching line */
   fieldMatchSeparator: string;
   quiet: boolean;
   heading: boolean;
   passthru: boolean;
   includeZero: boolean;
   sort: SortKey;
-  /** (1ctx rg-parser) --sortr: the same keys, descending */
+  /** (1ctx rg) --sortr: the same keys, descending */
   sortReverse: boolean;
   json: boolean;
-  /** (1ctx rg-output) -M: longer lines are omitted, 0 for no limit */
+  /** (1ctx rg) -M: longer lines are omitted, 0 for no limit */
   maxColumns: number;
-  /** (1ctx rg-output) --max-columns-preview: their start is shown */
+  /** (1ctx rg) --max-columns-preview: their start is shown */
   maxColumnsPreview: boolean;
-  /** (1ctx rg-output) --trim: leading ASCII whitespace dropped from printed lines */
+  /** (1ctx rg) --trim: leading ASCII whitespace dropped from printed lines */
   trim: boolean;
-  /** (1ctx rg-output) --path-separator: written in place of / in printed paths */
+  /** (1ctx rg) --path-separator: written in place of / in printed paths */
   pathSeparator: string | null;
-  /** (1ctx rg-parser) --no-messages: no error lines, the exit code kept */
+  /** (1ctx rg) --no-messages: no error lines, the exit code kept */
   noMessages: boolean;
-  /** (1ctx rg-output) --crlf: a line's final \r is not matched */
+  /** (1ctx rg) --crlf: a line's final \r is not matched */
   crlf: boolean;
-  /** (1ctx rg-regex) -P, --pcre2, --engine pcre2: grep -P's layer on RE2 */
+  /** (1ctx rg) -P, --pcre2, --engine pcre2: grep -P's layer on RE2 */
   pcre: boolean;
-  /** (1ctx rg-regex) --no-unicode: \w, \d and \s are ASCII */
+  /** (1ctx rg) --no-unicode: \w, \d and \s are ASCII */
   unicode: boolean;
-  /** (1ctx rg-types) --type-list */
+  /** (1ctx rg) --type-list */
   typeList: boolean;
-  /** (1ctx rg-parser) -V and --version */
+  /** (1ctx rg) -V and --version */
   version: "short" | "long" | null;
 
   // File selection
@@ -78,17 +78,17 @@ export interface RgOptions {
   globCaseInsensitive: boolean; // make all globs case-insensitive
   types: string[];
   typesNot: string[];
-  /** (1ctx rg-types) --type-add and --type-clear in the order given */
+  /** (1ctx rg) --type-add and --type-clear in the order given */
   typeChanges: TypeChange[];
   hidden: boolean;
   noIgnore: boolean;
   noIgnoreDot: boolean;
   noIgnoreVcs: boolean;
-  /** (1ctx rg-parser) no ignore files from the directories above the search */
+  /** (1ctx rg) no ignore files from the directories above the search */
   noIgnoreParent: boolean;
-  /** (1ctx rg-parser) --no-ignore-files: --ignore-file is not read */
+  /** (1ctx rg) --no-ignore-files: --ignore-file is not read */
   noIgnoreFiles: boolean;
-  /** (1ctx rg-globs) .gitignore only inside a git repository */
+  /** (1ctx rg) .gitignore only inside a git repository */
   requireGit: boolean;
   ignoreFiles: string[]; // custom ignore files via --ignore-file
   maxDepth: number;
@@ -96,13 +96,13 @@ export interface RgOptions {
   followSymlinks: boolean;
   searchZip: boolean;
   searchBinary: boolean;
-  /** (1ctx rg-output) --binary and -uuu: binary files in a walk are searched too */
+  /** (1ctx rg) --binary and -uuu: binary files in a walk are searched too */
   binary: boolean;
   preprocessor: string | null; // --pre command
   preprocessorGlobs: string[]; // --pre-glob patterns
 }
 
-/** (1ctx rg-globs) ripgrep's sort keys; the times are all the file's mtime here */
+/** (1ctx rg) ripgrep's sort keys; the times are all the file's mtime here */
 export type SortKey = "path" | "none" | "modified" | "accessed" | "created";
 
 export interface TypeChange {
@@ -114,7 +114,7 @@ export function createDefaultOptions(): RgOptions {
   return {
     ignoreCase: false,
     caseSensitive: false,
-    // (1ctx rg-defaults) case-sensitive and no line numbers, as ripgrep when piped
+    // (1ctx rg) case-sensitive and no line numbers, as ripgrep when piped
     smartCase: false,
     fixedStrings: false,
     wordRegexp: false,
@@ -131,7 +131,7 @@ export function createDefaultOptions(): RgOptions {
     filesWithoutMatch: false,
     stats: false,
     onlyMatching: false,
-    // (1ctx search-counts) no limit; -m 0 selects nothing
+    // (1ctx search-engine) no limit; -m 0 selects nothing
     maxCount: -1,
     lineNumber: false,
     noFilename: false,

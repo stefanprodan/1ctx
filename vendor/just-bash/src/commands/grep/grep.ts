@@ -35,7 +35,7 @@ interface FileEntry {
    * second `-` of `grep pat - -` reads EOF and contributes nothing.
    */
   stdinAtEof?: boolean;
-  /** (1ctx search-read-errors) a read or a walk failed here: what to say */
+  /** (1ctx search-engine) a read or a walk failed here: what to say */
   error?: string;
 }
 
@@ -158,7 +158,7 @@ const grepHelp = {
   ],
 };
 
-/** (1ctx grep-options) What a version probe gets: GNU grep's words, as we answer as it. */
+/** (1ctx grep) What a version probe gets: GNU grep's words, as we answer as it. */
 const VERSION = `grep (GNU grep) 3.12
 Copyright (C) 2025 Free Software Foundation, Inc.
 License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
@@ -170,7 +170,7 @@ const USAGE =
   "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
   "Try 'grep --help' for more information.\n";
 
-/** (1ctx grep-options) An argument GNU grep refuses, exit 2. */
+/** (1ctx grep) An argument GNU grep refuses, exit 2. */
 class GrepUsageError extends Error {
   constructor(
     message: string,
@@ -180,7 +180,7 @@ class GrepUsageError extends Error {
   }
 }
 
-/** (1ctx grep-options) What the arguments ask for, in GNU grep's terms. */
+/** (1ctx grep) What the arguments ask for, in GNU grep's terms. */
 interface GrepOptions {
   matcher: "G" | "E" | "F" | "P" | null;
   /** -e values and -f files, in the order given */
@@ -257,7 +257,7 @@ function choice<T extends string>(
   );
 }
 
-/** (1ctx grep-options) Escapes never help a model, so only plain output is accepted. */
+/** (1ctx grep) Escapes never help a model, so only plain output is accepted. */
 function color(o: GrepOptions, value: string): void {
   if (["always", "yes", "force"].includes(value)) {
     throw new GrepUsageError(
@@ -438,7 +438,7 @@ const LONG: Record<string, OptionSpec> = {
 };
 
 /**
- * (1ctx grep-options) GNU grep's getopt_long: options may follow operands, `--` ends
+ * (1ctx grep) GNU grep's getopt_long: options may follow operands, `--` ends
  * them, a value follows in the same argument or the next, a value-taking
  * option may end a cluster, -NUM is -C NUM, and a long option may be
  * shortened to any unambiguous prefix.
@@ -568,7 +568,7 @@ function usageError(error: GrepUsageError): ExecResult {
 }
 
 /**
- * (1ctx grep-options) A name suffix, as GNU grep matches --include and --exclude against
+ * (1ctx grep) A name suffix, as GNU grep matches --include and --exclude against
  * a command-line file: the whole name, or any part after a slash.
  */
 function suffixMatches(name: string, patterns: string[]): boolean {
@@ -981,7 +981,7 @@ export const grepCommand: RuntimeCommand = {
         conditions,
         selectOnly: binary || quietMode || filesWithMatches || filesWithoutMatch,
         preFilter,
-        // (1ctx diff-engine) the limit diff shares, moved to limits.ts
+        // (1ctx diff) the limit diff shares, moved to limits.ts
         maxWork: commandWorkLimit(ctx.limits),
         maxMatches: ctx.limits.maxArrayElements,
         signal: ctx.signal,
@@ -1069,7 +1069,7 @@ export const grepCommand: RuntimeCommand = {
   },
 };
 
-/** (1ctx search-read-errors) What a failed read says: only a missing file is one. */
+/** (1ctx search-engine) What a failed read says: only a missing file is one. */
 function fileErrorWords(error: unknown): string {
   const code = (error as { code?: string } | null)?.code;
   const message = error instanceof Error ? error.message : String(error);
@@ -1107,7 +1107,7 @@ interface WalkFilters {
 }
 
 /**
- * (1ctx grep-options) The files under a directory, as GNU grep -r finds them: hidden
+ * (1ctx grep) The files under a directory, as GNU grep -r finds them: hidden
  * ones too, a subdirectory skipped when its name matches --exclude-dir, a
  * file when its name fails --include or matches --exclude, and symbolic
  * links followed only by -R. `shown` is how names start: the operand as

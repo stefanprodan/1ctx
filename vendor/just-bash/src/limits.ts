@@ -356,7 +356,7 @@ export function resolveLimits(
 }
 
 /**
- * (1ctx diff-engine) The synchronous work one command may do: grep's matcher and
+ * (1ctx diff) The synchronous work one command may do: grep's matcher and
  * diff's compare take it.
  */
 export function commandWorkLimit(

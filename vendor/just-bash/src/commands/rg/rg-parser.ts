@@ -1,7 +1,7 @@
 /**
  * Argument parsing for rg command
  *
- * (1ctx rg-parser) ripgrep's parser: `--` ends the options, a value-taking short
+ * (1ctx rg) ripgrep's parser: `--` ends the options, a value-taking short
  * option takes the rest of its cluster or the next argument, a long one
  * `=VALUE` or the next argument, options may follow operands, and every
  * refusal exits 2 in ripgrep's words.
@@ -169,7 +169,7 @@ const SPECS: Record<string, Spec> = {
     o.withFilename = false;
   }),
   null: flag((o) => (o.nullSeparator = true)),
-  // (1ctx rg-parser) ripgrep's NUL-terminated lines
+  // (1ctx rg) ripgrep's NUL-terminated lines
   "null-data": flag((o) => (o.nullData = true)),
   "byte-offset": flag((o) => (o.byteOffset = true)),
   column: flag((o) => {
@@ -201,7 +201,7 @@ const SPECS: Record<string, Spec> = {
     else if (o.noIgnore) o.hidden = true;
     else o.noIgnore = true;
   }),
-  // (1ctx rg-parser) the options ripgrep has that were refused
+  // (1ctx rg) the options ripgrep has that were refused
   "no-heading": flag((o) => (o.heading = false)),
   pretty: flag((o) => {
     o.heading = true;
@@ -453,7 +453,7 @@ export function parseArgs(args: string[]): ParseArgsResult {
   options.afterContext = state.after ?? state.context ?? 0;
   options.beforeContext = state.before ?? state.context ?? 0;
 
-  // (1ctx rg-output) ripgrep prints counts and names as they are under --json
+  // (1ctx rg) ripgrep prints counts and names as they are under --json
   if (
     options.count ||
     options.countMatches ||

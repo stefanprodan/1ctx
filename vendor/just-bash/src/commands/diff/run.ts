@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-dirs) What diff compares, as GNU diff 3.12's compare_files and
+ * (1ctx diff) What diff compares, as GNU diff 3.12's compare_files and
  * diff_dirs do: two files, a file and its namesake in a directory, or two
  * directories, their entries sorted and paired, `Only in`, `Common
  * subdirectories` and `File X is a T while file Y is a U`, recursing with
@@ -30,9 +30,9 @@ import {
 import { type DiffOptions, noDiffMeansNoOutput } from "./options.js";
 import { diffTexts, type Tests, text } from "./text.js";
 
-/** (1ctx diff-bytes) A NUL in this many first bytes makes a file binary, as GNU's first read. */
+/** (1ctx diff) A NUL in this many first bytes makes a file binary, as GNU's first read. */
 const BINARY_WINDOW = 4096;
-/** (1ctx diff-bytes) GNU reads this much of a pipe at first, so stdin looks further. */
+/** (1ctx diff) GNU reads this much of a pipe at first, so stdin looks further. */
 const PIPE_WINDOW = 65536;
 
 /** Trouble GNU stops for at once, exit 2. */

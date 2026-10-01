@@ -49,6 +49,7 @@ export class AwkInterpreter {
     this.assertDefenseContext("program initialization");
     this.program = program;
     this.ctx.output = "";
+    // (1ctx awk) the output's UTF-8 length, kept as it grows
     this.ctx.outputBytes = 0;
 
     // Register user-defined functions

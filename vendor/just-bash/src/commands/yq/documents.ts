@@ -1,5 +1,5 @@
 /**
- * Which document a yq result counts as read from (1ctx yq-documents)
+ * Which document a yq result counts as read from (1ctx yq)
  *
  * mikefarah's yq prints `---` before a result whose document index differs
  * from the last one printed. A node read from a document carries its index
@@ -193,7 +193,7 @@ function isMap(value: QueryValue): boolean {
   return asQueryRecord(value) !== null;
 }
 
-// scalar arithmetic replaces its left side, a null left side included,
+// scalar arithmetic replaces its left side, a null left side included, (1ctx query-dialect)
 // whose replacement mikefarah makes in its place; a merge of two maps
 // keeps the side that was read
 function arithmetic(op: string, left: Tagged, right: Tagged): State {
@@ -275,7 +275,7 @@ function walk(
         return found.length > 0 ? found : walk(ast.right, input, ctx, vars);
       }
       if (!ARITHMETIC.has(ast.op)) break;
-      // a missing key read as an operand drops the result, or in + leaves
+      // a missing key read as an operand drops the result, or in + leaves (1ctx query-dialect)
       // the other side, as the engine's own rule
       const yq = ctx.dialect === "yq";
       const leftMissing = yq && missingPath(input.value, ast.left);

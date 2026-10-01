@@ -266,7 +266,7 @@ describe("grep -f errors", () => {
     const env = new Bash({ files: { "/hay.txt": "apple pie\n" } });
     const result = await env.exec("grep -f");
     expect(result.stdout).toBe("");
-    // (1ctx grep-options) GNU's usage lines follow
+    // (1ctx grep) GNU's usage lines follow
     expect(result.stderr).toBe(
       "grep: option requires an argument -- 'f'\n" +
         "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +

@@ -61,7 +61,7 @@ describe("buildRegex preFilter — happy path", () => {
   });
 
   it("decodes \\n / \\t / \\r escapes to their literal characters", () => {
-    // (1ctx grep-gnu-regex) perl mode: in GNU's ERE \n is a stray backslash before n
+    // (1ctx grep) perl mode: in GNU's ERE \n is a stray backslash before n
     expect(buildRegex("foo\\nbar", { mode: "perl" }).preFilter).toEqual({
       needles: ["foo\nbar"],
       ignoreCase: false,
@@ -182,13 +182,13 @@ describe("buildRegex preFilter — safety (must NOT extract)", () => {
   });
 
   it("rejects \\x hex escape (would produce wrong needle, e.g. 'x41' for \\x41)", () => {
-    // (1ctx grep-gnu-regex) perl mode: in GNU's ERE \x is a stray backslash before x
+    // (1ctx grep) perl mode: in GNU's ERE \x is a stray backslash before x
     expect(buildRegex("\\x41", { mode: "perl" }).preFilter).toBeUndefined();
   });
 
   it("rejects \\u unicode escape (would produce wrong needle, e.g. 'u2764' for \\u2764)", () => {
     expect(
-      // (1ctx grep-gnu-regex) perl mode: in GNU's ERE \u is a stray backslash before u
+      // (1ctx grep) perl mode: in GNU's ERE \u is a stray backslash before u
       buildRegex("\\u2764", { mode: "perl" }).preFilter,
     ).toBeUndefined();
   });

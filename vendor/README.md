@@ -49,15 +49,18 @@ The trim keeps what the mount can run. Removed, with their tests:
 ## How a change is recorded
 
 A fix to a command goes into the vendored source, with a test, never
-around it in our code. Each change is one unit a sync would keep or drop
-together, and has:
+around it in our code. A change is the unit a sync keeps or drops
+together: most often one command or one area of the engine, so a new
+fix to a command joins that command's entry. A change has:
 
-- An id: a short kebab-case slug, unique and stable, such as `read-utf8`.
-  It never changes once on `main`, since markers and history name it.
-- Markers: every hunk of the change carries `(1ctx <id>)` in a comment;
-  a hunk that serves two changes lists both, `(1ctx read-utf8 fd-bytes)`.
-  A new file carries one marker at its head. This lists the hunks of
-  one change, wherever it sits in the list:
+- An id: a short kebab-case slug, unique and stable, such as `awk` or
+  `read-utf8`. It never changes once on `main`, since markers and
+  history name it.
+- Markers: every hunk of the change carries `(1ctx <id>)` in a
+  comment; a hunk that serves two changes lists both,
+  `(1ctx read-utf8 fd-bytes)`. A new file carries one marker at its
+  head. This lists the hunks of one change, wherever it sits in the
+  list:
 
   ```sh
   grep -rnE '\(1ctx ([a-z0-9-]+ )*read-utf8[ )]' vendor/just-bash/src scripts
@@ -67,7 +70,8 @@ together, and has:
 
   ```
   ### read-utf8: read and mapfile store UTF-8 text
-  Files: `src/interpreter/builtins/read.ts`, `mapfile.ts`
+  Files: `src/interpreter/builtins/read.ts`,
+    `src/interpreter/builtins/mapfile.ts`
   Upstream: not reported
   Tests: `test/vendor/just-bash/read-utf8.test.ts`
 
@@ -76,26 +80,30 @@ together, and has:
   Before: what it did before, and why that hurt.
   ```
 
-  `Files` are under `vendor/just-bash/`, a bare name in the directory of
-  the path before it. `Upstream` is one of `not reported`, `issue #N`,
-  `PR #N`, `ported from #N` (an upstream fix we took before the sync
-  that brings it) or `fixed in X.Y.Z`. `Tests` names files from the
-  repository root, a bare name beside the one before it, or says `none`
-  and why. A change with no marker (a pure deletion, a test or
-  `package.json` alone) adds `Markers: none` and why after `Tests`. A
-  long field goes on in lines indented by two spaces.
+  A change of several parts writes a bare `Now:` and `Before:`, each
+  followed by a list with one item per part, the same parts in the same
+  order, each led by its name in bold. `Files` are full paths from
+  `vendor/just-bash/`, or `scripts/` for our own scripts. `Upstream` is
+  one of `not reported`, `issue #N`, `PR #N`, `ported from #N` (an
+  upstream fix we took before the sync that brings it) or
+  `fixed in X.Y.Z`. `Tests` names files by full paths from the
+  repository root, or says `none` and why. A change with no marker (a
+  pure deletion, a test or `package.json` alone) adds `Markers: none`
+  and why after `Tests`. A long field goes on in lines indented by two
+  spaces.
 
-Our tests of the changes are in `test/vendor/just-bash/`, `fixes.test.ts`
-for those without a file of their own; a change to an upstream test
-names that test in `Files`. A difference from the tool a command follows
-that we keep goes in `vendor/differences.md`, in the same commit as the
-change that makes or closes it.
+Our tests of the changes are in `test/vendor/just-bash/`,
+`fixes.test.ts` for those without a file of their own; a change to an
+upstream test names that test in `Files`. A difference from the tool a
+command follows that we keep goes in `vendor/differences.md`, in the
+same commit as the change that makes or closes it.
 
 `test/vendor/just-bash/changes.test.ts`, part of `make test`, holds the
 two together: every id a marker names under `vendor/just-bash/src` and
 `scripts/` has an entry, every entry has a marker or `Markers: none`,
-every `Tests` path exists, the ids are unique kebab-case, every entry
-has its fields in order, and no bare `(1ctx)` marker is left.
+every `Files` and `Tests` path exists, the ids are unique kebab-case,
+every entry has its fields in order, and no bare `(1ctx)` marker is
+left.
 
 ## How the mount gives curl its network
 
@@ -193,19 +201,21 @@ tests of what we removed.
    to expect:
    - a file we removed that upstream changed is a modify/delete conflict;
    - a new file in a removed directory comes back;
-   - our changes are conflicts only where upstream edited the same lines,
-     and the marker in a conflict hunk names the entry to read before
-     resolving it.
+   - our changes are conflicts only where upstream edited the same
+     lines, and the marker in a conflict hunk names the entry to read
+     before resolving it.
 
 4. Trim again: `git rm -rf` every path in "What we removed" that came
    back, and remove any new loader for them from
    `src/commands/registry.ts`. Resolve the other conflicts, keeping each
    change unless step 1 found upstream fixed it. For a change upstream
    fixed, the grep in "How a change is recorded", with its id, lists
-   every hunk to drop for upstream's side; drop the id from a marker
-   that names another change too, then delete the entry and the tests
-   that pinned ours, and move what still differs into
-   `vendor/differences.md`.
+   every hunk to drop for upstream's side. A hunk whose marker also
+   names another change stays; remove only the id. Then delete the
+   entry and the tests that pinned ours, and move what still differs
+   into `vendor/differences.md`. When upstream fixes one part of a
+   change of several parts, the id lists the hunks to read, the part's
+   item says which of them to drop, and only that item goes.
 5. Match the packages: compare `vendor/just-bash/package.json`
    `dependencies` with our pins, and move each to the version upstream's
    range resolves to. A package new to upstream needs the user's go-ahead.

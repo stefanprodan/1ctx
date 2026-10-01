@@ -1,5 +1,5 @@
 /**
- * (1ctx rg-types) ripgrep's file types as `rg --type-list` of ripgrep 15.2.0 lists
+ * (1ctx rg) ripgrep's file types as `rg --type-list` of ripgrep 15.2.0 lists
  * them, aliases included. Written by scripts/rg-record.ts; not edited.
  */
 

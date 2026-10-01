@@ -1,5 +1,5 @@
 /**
- * (1ctx awk-records) AWK record reader.
+ * (1ctx awk) AWK record reader.
  *
  * Reads one record at a time under the RS in force at each call, as gawk
  * does: a newline or any single character separates literally, "" is

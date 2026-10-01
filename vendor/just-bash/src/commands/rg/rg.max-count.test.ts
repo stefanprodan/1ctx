@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg -m/--max-count basic functionality", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should stop after 1 match with -m1", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -20,7 +20,7 @@ describe("rg -m/--max-count basic functionality", () => {
     expect(result.stdout).toBe("file.txt:1:foo\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should stop after 2 matches with -m2", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -33,7 +33,7 @@ describe("rg -m/--max-count basic functionality", () => {
     expect(result.stdout).toBe("file.txt:1:foo\nfile.txt:3:foo\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should stop after 3 matches with -m 3", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -48,7 +48,7 @@ describe("rg -m/--max-count basic functionality", () => {
     );
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with --max-count=N syntax", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -61,7 +61,7 @@ describe("rg -m/--max-count basic functionality", () => {
     expect(result.stdout).toBe("file.txt:1:abc\nfile.txt:2:abc\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with --max-count N syntax", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -74,7 +74,7 @@ describe("rg -m/--max-count basic functionality", () => {
     expect(result.stdout).toBe("file.txt:1:xyz\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should show all matches when count exceeds matches", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -101,7 +101,7 @@ describe("rg -m/--max-count basic functionality", () => {
 });
 
 describe("rg -m with multiple files", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit matches per file independently", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -116,7 +116,7 @@ describe("rg -m with multiple files", () => {
     expect(result.stdout).toBe("a.txt:1:match\nb.txt:1:match\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit to 2 matches per file across multiple files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -132,7 +132,7 @@ describe("rg -m with multiple files", () => {
     );
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work when some files have fewer matches than limit", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -191,7 +191,7 @@ describe("rg -m with other flags", () => {
     expect(result.stdout).toBe("file.txt:5\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -v (invert match)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -205,7 +205,7 @@ describe("rg -m with other flags", () => {
     expect(result.stdout).toBe("file.txt:2:bar\nfile.txt:4:baz\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -i (case insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -218,7 +218,7 @@ describe("rg -m with other flags", () => {
     expect(result.stdout).toBe("file.txt:1:Foo\nfile.txt:2:FOO\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -w (word match)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -330,7 +330,7 @@ describe("rg -m with context lines", () => {
 });
 
 describe("rg -m edge cases", () => {
-  // (1ctx search-counts) ripgrep's -m0 selects nothing and exits 1
+  // (1ctx search-engine) ripgrep's -m0 selects nothing and exits 1
   it("should handle -m0 as selecting nothing", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -343,7 +343,7 @@ describe("rg -m edge cases", () => {
     expect(result.stdout).toBe("");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle large -m value", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -368,7 +368,7 @@ describe("rg -m edge cases", () => {
     expect(result.stdout).toBe("");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with file type filter", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -382,7 +382,7 @@ describe("rg -m edge cases", () => {
     expect(result.stdout).toBe("code.js:1:const x = 1;\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with glob filter", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -398,7 +398,7 @@ describe("rg -m edge cases", () => {
 });
 
 describe("rg -m with regex patterns", () => {
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit regex matches", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -411,7 +411,7 @@ describe("rg -m with regex patterns", () => {
     expect(result.stdout).toBe("file.txt:1:cat\nfile.txt:2:dog\n");
   });
 
-  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit matches with anchors", async () => {
     const bash = new Bash({
       cwd: "/home/user",

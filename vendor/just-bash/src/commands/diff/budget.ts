@@ -1,5 +1,5 @@
 /**
- * (1ctx diff-engine) diff's work: every step of splitting, folding, matching and
+ * (1ctx diff) diff's work: every step of splitting, folding, matching and
  * comparing is charged to the command's work limit, the one grep's matcher
  * takes, across every pair of files one command compares.
  */
