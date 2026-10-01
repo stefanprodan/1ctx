@@ -269,9 +269,7 @@ function matches(
   const found: Match[] = [];
   let position = 0;
   while (position <= input.length && matcher.find(position)) {
-    if (found.length >= limit) {
-      throw new Error(`query result element limit exceeded (${limit})`);
-    }
+    if (found.length >= limit) limitExceeded(limit);
     const start = matcher.start(0);
     const end = matcher.end(0);
     const groups: Group[] = [];
@@ -415,9 +413,7 @@ function regexBuiltin(
           }
         }
         if (next.length > ctx.limits.maxArrayElements) {
-          throw new Error(
-            `query result element limit exceeded (${ctx.limits.maxArrayElements})`,
-          );
+          limitExceeded(ctx.limits.maxArrayElements);
         }
         results = next;
         last = m.end;
@@ -806,11 +802,17 @@ export function evalDialectBuiltin(
       }
       // map over a map is [.[] | f], which upstream answered null
       if (name === "map" && map) {
-        return [
-          Object.values(map).flatMap((item) =>
-            evaluate(item as QueryValue, args[0], ctx),
-          ),
-        ];
+        // held to the element limit as upstream's map over a list is
+        const limit = ctx.limits.maxArrayElements;
+        const items = Object.values(map) as QueryValue[];
+        if (items.length > limit) limitExceeded(limit);
+        const out: QueryValue[] = [];
+        for (const item of items) {
+          const mapped = evaluate(item, args[0], ctx);
+          if (out.length > limit - mapped.length) limitExceeded(limit);
+          for (const v of mapped) out.push(v);
+        }
+        return [out];
       }
       return null;
     }

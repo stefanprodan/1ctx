@@ -541,3 +541,39 @@ describe("an array's entries", () => {
     expect(run("to_entries", null, "yq")).toEqual([]);
   });
 });
+
+describe("the dialect's builtins hold to the element limit", () => {
+  // a limit error is the shell's 126, never the filter's own failure
+  const exec = (command: string) =>
+    new Bash({ executionLimits: { maxQueryElements: 3 } }).exec(command);
+  const tools = {
+    jq: (filter: string) => `jq -n -c '${filter}'`,
+    yq: (filter: string) => `yq -n -o json -I0 '${filter}'`,
+  };
+
+  for (const [name, command] of Object.entries(tools)) {
+    test(`${name}: map over a map`, async () => {
+      const at = await exec(command("{a:1,b:2,c:3} | map(.) | length"));
+      expect(at).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const fanned = await exec(command("{a:1} | map(.,.,.) | length"));
+      expect(fanned).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const over = await exec(command("{a:1,b:2,c:3} | map(.,.,.) | length"));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
+
+    test(`${name}: match past the limit`, async () => {
+      const at = await exec(command('"aaa" | [match("a"; "g")] | length'));
+      expect(at).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const over = await exec(command('"aaaa" | [match("a"; "g")] | length'));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
+  }
+
+  test("jq: sub's outputs past the limit", async () => {
+    const over = await exec(tools.jq('"aa" | [gsub("a"; "x", "y")] | length'));
+    expect(over.exitCode).toBe(126);
+    expect(over.stderr).toContain("query result element limit exceeded (3)");
+  });
+});
