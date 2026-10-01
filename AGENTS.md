@@ -286,9 +286,10 @@ violation, and every rule has a rejected fixture under
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state
   (a signal, `globalThis.fetch`) or counts events from the bus is
-  `test.serial`. CI runs the files in parallel, each in a fresh
-  global (`make test ARGS=--parallel`), so a test sets what it reads
-  itself. Locally the files run one by one, light on the CPU.
+  `test.serial`. The Linux CI job runs the files in parallel, each in a
+  fresh global (`make test ARGS=--parallel`), so a test sets what it
+  reads itself. The macOS job and local runs take the files one by one,
+  since the macOS runner is too small for parallel files.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - UI copy is short and plain. No em-dashes anywhere. A send is a turn
