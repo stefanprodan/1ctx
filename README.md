@@ -1,6 +1,8 @@
 # 1ctx
 
 [![test](https://github.com/stefanprodan/1ctx/actions/workflows/test.yml/badge.svg)](https://github.com/stefanprodan/1ctx/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/stefanprodan/1ctx?include_prereleases&sort=semver)](https://github.com/stefanprodan/1ctx/releases)
+[![built with Bun](https://img.shields.io/badge/built%20with-Bun-000?logo=bun)](https://bun.com)
 
 One continuous context for agents.
 
