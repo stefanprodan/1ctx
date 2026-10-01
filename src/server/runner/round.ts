@@ -144,7 +144,14 @@ export function buildRequest(
   lookups: ContextLookups,
   now: number,
 ): ChatRequest {
-  const messages = history(rows, send.policy, lookups, now, send.mcpNote);
+  const messages = history(
+    rows,
+    send.policy,
+    lookups,
+    now,
+    send.mcpNote,
+    send.repos ?? undefined,
+  );
   if (send.summarizing) {
     return summaryRequest(send.policy, send.sessionId, messages, send.used);
   }

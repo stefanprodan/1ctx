@@ -441,6 +441,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     tools,
     knowledge,
     bash,
+    repos: {
+      prepare: (projectId, options) => repos.prepare(projectId, options),
+      switchable: (projectId) => repos.switchable(projectId),
+    },
     uploads: {
       checkUploads: (userId, projectId, ids) =>
         knowledge.checkUploads(userId, projectId, ids),

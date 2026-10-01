@@ -36,6 +36,7 @@ import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { dispatcher } from "./queue.ts";
 import { regenerateUsers } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
+import { mountRepos } from "./repos.ts";
 import { ProviderRefusal, type RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
@@ -122,6 +123,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
       void terminate(send, "failure", error);
     },
   };
+  const reposDeps = {
+    repos: deps.repos,
+    sessions: deps.sessions,
+    fileBytes: () => deps.limits.current().repoFileBytes,
+  };
   const phaseDeps = {
     db: deps.db,
     clock: deps.clock,
@@ -143,6 +149,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
     try {
       try {
+        await mountRepos(reposDeps, send);
         const end = await toolLoop(loopDeps, send);
         void terminate(send, end.cause, end.error);
       } catch (error) {
@@ -161,6 +168,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
       );
     } finally {
       if (send.tools !== null) await send.tools.catch(() => {});
+      // no command runs past here, so the trees may go
+      send.repos?.release();
       send.letGo();
       const freed = finalized && registry.free(send);
       if (freed && send.terminal !== "shutdown") deps.wake();

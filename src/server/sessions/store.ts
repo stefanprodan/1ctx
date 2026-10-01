@@ -45,6 +45,7 @@ import {
   finishReply,
   finishToolRow,
   type MountedRepos,
+  mountedBefore,
   nextSeq,
   readMountedRepos,
   setMountedRepos,
@@ -230,6 +231,16 @@ export class SessionStore {
 
   mountedRepos(messageId: string): MountedRepos | null {
     return readMountedRepos(this.db, messageId);
+  }
+
+  // what the chat's turns before this send mounted, newest first; -1
+  // reads every one
+  mountedBefore(
+    sessionId: string,
+    sendId: string,
+    limit: number,
+  ): MountedRepos[] {
+    return mountedBefore(this.db, sessionId, sendId, limit);
   }
 
   touch(

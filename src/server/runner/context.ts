@@ -28,7 +28,7 @@ import type {
   ToolCall,
 } from "../providers/index.ts";
 import type { SendPolicy } from "./policy.ts";
-import { systemPrompt } from "./prompt.ts";
+import { NO_REPO_LINES, type RepoLines, systemPrompt } from "./prompt.ts";
 import { trace, traceCalls, type Yours, yoursOf } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far so that it can continue from the summary alone: the messages before this point are dropped and only the summary is kept. Write Markdown with these sections, terse bullets, no prose:
@@ -250,9 +250,10 @@ export function history(
   lookups: ContextLookups,
   now: number,
   mcpNote = "",
+  repos: RepoLines = NO_REPO_LINES,
 ): ChatMessageIn[] {
   return [
-    { role: "system", content: systemPrompt(policy, now, mcpNote) },
+    { role: "system", content: systemPrompt(policy, now, mcpNote, repos) },
     ...historyMessages(rows, policy, lookups),
   ];
 }

@@ -204,7 +204,8 @@ that agent answers the one turn (see Summons).
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, MCP, skills), and last the MCP change note (`docs/mcp.md`).
+  memory, MCP, skills, repositories), the moved branches
+  (`docs/repos.md`), and last the MCP change note (`docs/mcp.md`).
   What is fixed per agent and project comes first; the user's line
   follows because it changes with a team chat's author.
 

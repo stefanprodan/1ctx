@@ -29,6 +29,7 @@ import type { ToolsPort } from "./policy.ts";
 import type { PreparedRun } from "./prepare.ts";
 import type { Dispatcher } from "./queue.ts";
 import type { Registry } from "./registry.ts";
+import type { ReposPort } from "./repos.ts";
 import type { RoundDeps } from "./round.ts";
 import type { live } from "./send.ts";
 import type { DrainResult, ShutdownResult } from "./shutdown.ts";
@@ -59,6 +60,8 @@ export type RunnerDeps = {
   >;
   knowledge: Pick<KnowledgeCapability, "snapshot">;
   bash: Pick<BashCapability, "startKept">;
+  // a send's repositories, looked up at its start
+  repos: ReposPort;
   uploads: WriterDeps["uploads"] & {
     checkUploads(
       userId: string,

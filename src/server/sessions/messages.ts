@@ -211,3 +211,23 @@ export function readMountedRepos(
     ? (JSON.parse(row.mounted_repos) as MountedRepos)
     : null;
 }
+
+// each earlier send's mounted commits, newest first, from its first
+// message: the sends of a chat are few where its messages are many
+export function mountedBefore(
+  db: Db,
+  sessionId: string,
+  sendId: string,
+  limit: number,
+): MountedRepos[] {
+  return db
+    .query<{ mounted_repos: string }, [string, string, number]>(
+      `select messages.mounted_repos from sends
+       join messages on messages.id = sends.first_message_id
+       where sends.session_id = ? and sends.id != ?
+         and messages.mounted_repos is not null
+       order by sends.started_at desc, sends.rowid desc limit ?`,
+    )
+    .all(sessionId, sendId, limit)
+    .map((row) => JSON.parse(row.mounted_repos) as MountedRepos);
+}

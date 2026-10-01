@@ -191,6 +191,30 @@ start answers `{ mounts, notices, release }`:
 - **Every mounted folder is held** until `release()`, which the caller
   runs when the turn ends.
 
+## The send
+
+- **A send that offers bash calls `prepare()` before its first round**
+  (`runner/repos.ts`), before any of its commands takes a process
+  slot, with `off` from the session's `repo:` keys and the send's
+  signal. A stop or a deadline ends the wait with `fetching`.
+- **The runner releases the trees when the send ends,** in `run()`'s
+  `finally` after the round's tools let go: finish, stop, failure,
+  deadline and shutdown alike.
+- **The commits go on the send's first message** (`mounted_repos`,
+  repository id to commit) when something was mounted or a regenerate
+  replaced a stored map. A fork copies the column.
+- **Regenerate pins what the turn it replaces stored;** a fork's first
+  turn is a new message, so it looks up afresh.
+- **The model is told.** The bash description ends with a line per
+  mounted repository (`repoLine()`), `, some paths ignored` when the
+  rules kept a file out. A branch at another commit than the chat's
+  last turn that mounted it gets `repo <name>: <ref> moved from <a> to
+  <b>` in the system prompt, that send only. A repository off that an
+  earlier turn of the chat mounted gets `reposOffLine()`; one never
+  mounted is not named.
+- **A project with no repositories costs one indexed query a send** and
+  writes nothing.
+
 ## Logs
 
 The area logs `repo fetched`, `repo fetch failed` and `repo cache

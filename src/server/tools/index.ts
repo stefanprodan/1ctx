@@ -86,6 +86,7 @@ export type {
   KeepPort,
   MemoryScope,
   Offered,
+  SendRepos,
   ToolBudget,
   ToolCaps,
   ToolContext,

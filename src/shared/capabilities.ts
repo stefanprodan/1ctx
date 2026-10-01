@@ -179,3 +179,9 @@ export function mcpOffLine(names: readonly string[]): string {
 export function skillsOffLine(names: readonly string[]): string {
   return `The user turned these skills off for this chat: ${[...names].sort().join(", ")}. Do not load or follow them.`;
 }
+
+// the line after that while a chat has repositories off that an earlier
+// turn read: what it read is in the history
+export function reposOffLine(names: readonly string[]): string {
+  return `The user turned these repositories off for this chat: ${[...names].sort().join(", ")}. Do not use what you read from them.`;
+}
