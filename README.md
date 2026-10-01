@@ -4,89 +4,55 @@
 
 One continuous context for agents.
 
-## Provision an instance
+## Quick Start
 
-Stop the server, put the secret files in its secrets directory, then apply:
+You need Docker and an [OpenRouter](https://openrouter.ai) API key.
+
+From a clone of this repository, write the secrets:
 
 ```sh
-1ctx provision -f instance.yaml -f config/ --db ./1ctx.sqlite --secrets ./secrets
-cat instance.yaml | 1ctx provision -f - --db ./1ctx.sqlite --secrets ./secrets
+cd deploy/docker
+mkdir -p secrets provision
+openssl rand -hex 16 > secrets/user-admin.key
+printf '%s' '<your OpenRouter key>' > secrets/provider-openrouter.key
+chmod 644 secrets/*.key
 ```
 
-A server started with `--provision <file|dir>` applies the same way before
-it listens, at every start; a missing path or a directory with no YAML
-applies nothing, and a failure stops the start.
+`user-admin.key` holds the password of the `admin` user.
 
-`-f` is repeatable. A directory contributes only its `.yaml` and `.yml`
-files, sorted by name, without descending into subdirectories. Every
-document has `apiVersion: config.1ctx.dev/v1`, a `kind`, `metadata.name`
-and `spec`. Names identify objects; changing a name creates another object.
+Add a provider and an agent in `provision/instance.yaml`:
 
 ```yaml
 apiVersion: config.1ctx.dev/v1
-kind: User
+kind: Provider
 metadata:
-  name: admin
+  name: openrouter
 spec:
-  role: admin
-  tz: UTC
+  wire: openrouter
+  baseUrl: https://openrouter.ai/api/v1
+  keyFrom: provider-openrouter
 ---
 apiVersion: config.1ctx.dev/v1
-kind: Project
+kind: Agent
 metadata:
-  name: example-team
+  name: assistant
 spec:
-  description: Shared work.
-  members: [admin]
+  provider: openrouter
+  model: openrouter/free
+  prompt: You are a helpful teammate. Answer directly.
 ```
 
-| Kind | Spec fields |
-|---|---|
-| `User` | `role` (required), `fullName`, `email`, `tz`, `about`, `disabled`, `passwordFrom`, `mustChangePassword` |
-| `Project` | `description`, `members` (usernames); team projects only |
-| `Provider` | `wire`, `baseUrl`, `keyFrom` |
-| `Decider` | `provider`, `model`, `default` (only `true`) |
-| `Skill` | `url`, `fromIndex`, `path` (archives only) |
-| `McpServer` | `url`, `keyFrom`, `read`, `write`, `instructionsOn`, `timeoutMs`, `readPatterns`, `writePatterns`, `excludedPatterns` |
-| `Agent` | `provider`, `model`, `avatar`, `thinking`, `effort`, `prompt`, `skills`, `servers`, `mcpMode` |
-| `Tool` | `enabled`; `provider` only for `websearch`, `hosts` only for `visualize` |
+Build the image and start it:
 
-A new user requires `fullName`, `email`, `tz` and `passwordFrom`. A new
-project requires `description`.
-`passwordFrom` names a `user-<name>.key` file without the extension;
-passwords and `mustChangePassword` are applied only at creation. The flag
-defaults to true and `disabled` defaults to false. The first admin is
-bootstrapped from `user-admin.key`; provision uses that file to sign in as
-`admin` on every run, so it must match the account's current password.
+```sh
+ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
 
-A new provider requires `wire` and `baseUrl`; a new skill or MCP server
-requires `url`; a new agent or decider requires `provider` and
-`model`. `keyFrom` names a `provider-` or `mcp-` key file without
-`.key`, or is null.
-Providers and skill sources cannot be changed. Skills are fetched on
-creation: `metadata.name` must match the fetched name, or select an entry
-when `fromIndex: true`. MCP servers are discovered on creation and endpoint
-changes. A new MCP server enables read and instructions, with write off,
-no patterns and the default timeout unless set.
+Open <http://localhost:11236> and sign in as `admin`.
 
-An agent references providers, skills and MCP servers by name. Its
-`servers` entries have `name`, `read` (default true) and `write` (default
-false); at least one side must be on. New agents default to `avatar: bot`,
-`thinking: null`, `effort: null`, `mcpMode: auto`, an empty prompt and no
-skills or servers. Model catalogs and per-wire effort levels are checked
-at apply time; a decider's model against its provider's decisions
-catalog, on an `openrouter` or `openai-compatible` provider.
+The YAML in `provision/` is applied at every start; run `docker compose
+restart` after editing it. To run a release, drop the dev file:
 
-Omitted fields are preserved on existing objects, except `User.disabled`,
-which defaults to false. Supplied lists replace the whole membership;
-omitted lists leave it alone. Objects absent from the input are not deleted.
-Only `webfetch`, `websearch` and `visualize` are Tool objects. Limits and
-automations are not provisioned.
-
-All documents and references are validated offline before the instance is
-changed. Apply runs in the table's kind order and stops on the first
-refusal, keeping earlier writes. A project's description and each
-membership change are separate route transactions. A skill-name mismatch
-is detected after its create route has saved the fetched skill. Reapplying
-is safe: each object reports `created`, `updated` or `unchanged`, followed
-by counts. No secret values are printed.
+```sh
+ONECTX_VERSION=v1.2.3 docker compose up -d
+```

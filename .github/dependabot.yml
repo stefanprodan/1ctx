@@ -24,3 +24,15 @@ updates:
       dev:
         patterns:
           - "*"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 6 1,15 * *"
+    cooldown:
+      default-days: 1
+    groups:
+      images:
+        patterns:
+          - "*"

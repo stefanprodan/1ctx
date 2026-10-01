@@ -227,11 +227,20 @@ in `docs/views.md` and `docs/ui.md`.
   plus 15: `stop_grace_period: 25s` against the default `--drain 10`,
   and `docker run --stop-timeout 25` for a plain run, since Docker's 10
   s default would kill the shutdown after the drain. The bash tool and
-  the workers need no writable `/tmp`. `deploy/docker/compose.yaml` runs
-  a release by `ONECTX_VERSION`, since there is no `latest` tag, and
-  mounts `${ONECTX_PROVISION:-./provision}` read-only on `/provision`.
-  `compose.dev.yaml` beside it builds the image from the checkout and
-  never pulls: `ONECTX_VERSION=dev docker compose -f compose.yaml -f
-  compose.dev.yaml up -d --build`. `LICENSE` and
+  the workers need no writable `/tmp`. A `v*` tag's release refuses a
+  commit not on `main`, whose CI already linted and tested it, then on
+  one Linux runner builds the linux amd64 and arm64 and darwin arm64
+  archives (Bun cross-compiles, and a darwin build comes out ad-hoc
+  signed), smokes the amd64 binary, pushes
+  `ghcr.io/stefanprodan/1ctx:<tag>` for amd64 and arm64 with its OCI
+  labels and a provenance attestation, and never a `latest`. The
+  Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the one Bun
+  version: `scripts/bun-version.sh` hands it to `setup-bun` in every
+  workflow, and Dependabot's `docker` ecosystem bumps it.
+  `deploy/docker/compose.yaml` runs a release by `ONECTX_VERSION` (the
+  tag, `v1.2.3`) and mounts `${ONECTX_PROVISION:-./provision}` read-only
+  on `/provision`. `compose.dev.yaml` beside it builds the image from
+  the checkout and never pulls: `ONECTX_VERSION=dev docker compose -f
+  compose.yaml -f compose.dev.yaml up -d --build`. `LICENSE` and
   `THIRD_PARTY_LICENSES.md` are in `/usr/share/doc/1ctx/`, as in the
   release archive.

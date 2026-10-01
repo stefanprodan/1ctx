@@ -619,15 +619,20 @@ describe("visualize skill", () => {
     ) as {
       jobs: { release: { steps: { name: string; run?: string }[] } };
     };
-    const steps = workflow.jobs.release.steps.filter(
-      (step) => step.name === "Build release archive",
+    const archived = workflow.jobs.release.steps.flatMap((step) =>
+      [...(step.run ?? "").matchAll(/^\s*scripts\/archive\.sh (\S+)$/gm)].map(
+        (match) => match[1],
+      ),
     );
-    expect(steps).toHaveLength(1);
-    check(steps[0].run, "release archive step has no commands");
-    const commands = steps[0].run
-      .trim()
+    expect(archived.sort()).toEqual(
+      ["darwin_arm64", "linux_amd64", "linux_arm64"].sort(),
+    );
+    const script = readFileSync(join(root, "scripts/archive.sh"), "utf8");
+    const commands = script
       .split("\n")
-      .map((line) => line.trim().split(/\s+/));
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !line.startsWith("#"))
+      .map((line) => line.split(/\s+/));
     expect(commands).toContainEqual(["set", "-euo", "pipefail"]);
     const copy = commands.find((command) => command[0] === "cp");
     const archive = commands.find(
@@ -653,7 +658,7 @@ describe("visualize skill", () => {
     check(listing.includes("|"), "release archive listing is not checked");
     expect(listing.slice(listing.indexOf("|") + 1)).toEqual([
       "grep",
-      "-Fx",
+      "-Fxq",
       notice,
     ]);
     expect(commands.indexOf(copy)).toBeLessThan(commands.indexOf(archive));
