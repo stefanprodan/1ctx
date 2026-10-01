@@ -291,8 +291,9 @@ findutils 4.11.0 answered. Where they part:
 
 ## Where a write into a read-only mount still differs from Linux
 
-`test/vendor/just-bash/readonly-errors.test.ts` holds the words; these
-differ from bash and GNU coreutils 9.11 on a read-only Linux mount:
+`test/vendor/just-bash/readonly-errors.test.ts` and
+`overlay-mount.test.ts` hold the words; these differ from bash and GNU
+coreutils 9.11 on a read-only Linux mount:
 
 - A write into a missing folder there says `Read-only file system`
   where Linux says `No such file or directory`, and `rmdir` of a folder

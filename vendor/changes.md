@@ -211,7 +211,8 @@ depth 8 and 25 s at 64; ls rescanned its whole output on every append.
 ### overlay-trusted: OverlayFs reads the disk under the box
 Files: `src/fs/overlay-fs/overlay-fs.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/overlay-trusted.test.ts`
+Tests: `test/vendor/just-bash/overlay-trusted.test.ts`,
+  `test/vendor/just-bash/overlay-mount.test.ts`
 
 Now: each of OverlayFs's own disk calls (`lstat`, `readlink`, `readdir`
 and the open, read and close of a file) runs in
@@ -294,7 +295,8 @@ Files: `src/fs/error-words.ts` (new), `src/fs/overlay-fs/overlay-fs.ts`,
   `src/commands/curl/curl.ts`, `src/commands/find/find.ts`,
   `src/commands/time/time.ts`, `src/commands/awk/interpreter/statements.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/readonly-errors.test.ts`
+Tests: `test/vendor/just-bash/readonly-errors.test.ts`,
+  `test/vendor/just-bash/overlay-mount.test.ts`
 
 Now:
 
@@ -776,7 +778,8 @@ Files: `src/commands/find/find.ts`,
   `src/commands/grep/grep.ts`, `src/shell/glob.ts`, `src/fs/traversal.ts`,
   `src/interpreter/helpers/file-tests.ts`
 Upstream: PR #451
-Tests: `test/vendor/just-bash/find-batch.test.ts`
+Tests: `test/vendor/just-bash/find-batch.test.ts`,
+  `test/vendor/just-bash/overlay-mount.test.ts`
 
 Now:
 
