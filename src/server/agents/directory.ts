@@ -7,8 +7,8 @@
 // row, so the page adds only
 // what a user cannot see elsewhere: the provider's name, the skills
 // with when they were fetched and how many files they hold, the
-// built-in tools a send would offer it now with their descriptions and
-// websearch's provider, and token counts.
+// built-in tools a send would offer it now with their descriptions'
+// first sentences and websearch's provider, and token counts.
 // The tools are the tools area's answer at this moment, none when the
 // model does not accept tools. The list is built-ins alone, memory_edit
 // as a chat is offered it; skill and MCP schemas still count because the
@@ -21,6 +21,7 @@ import type {
   DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
+import { firstSentence } from "../../shared/mcp.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
 import { parseNoQuery } from "../access/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -186,7 +187,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             .filter((tool) => LISTED.has(tool.name))
             .map((tool) => ({
               name: tool.name,
-              description: tool.description,
+              description: firstSentence(tool.description),
               provider: tool.name === "websearch" ? offered.search : null,
             }))
             .sort(byName),

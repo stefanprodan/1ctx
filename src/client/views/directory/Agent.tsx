@@ -24,7 +24,7 @@ import {
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
 import { AvatarIcon } from "../../lib/avatars.tsx";
-import { ago, firstSentence, longDate } from "../../lib/format.ts";
+import { ago, longDate } from "../../lib/format.ts";
 import {
   configAgentHref,
   DIRECTORY_AGENTS_HREF,
@@ -162,11 +162,7 @@ function ToolsTab({ shown }: { shown: DirectoryAgentResponse }) {
           <RowsAvatar>
             <Icon name="tools" size={14} />
           </RowsAvatar>
-          <RowsTitle
-            name={tool.name}
-            sub={firstSentence(tool.description)}
-            mono
-          />
+          <RowsTitle name={tool.name} sub={tool.description} mono />
           {tool.provider !== null && <RowsMeta>{tool.provider}</RowsMeta>}
         </RowsLine>
       ))}
