@@ -97,7 +97,9 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
 scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 host in the gitignored scripts/staging.env), smoke.sh
                 (what `make smoke` runs), smoke-http.sh (its HTTP checks,
-                shared with image-smoke.sh), image.sh, vendor-test.sh, brand.py
+                shared with image-smoke.sh), image.sh, bun-version.sh (the
+                Bun version CI and the release read from the Dockerfile),
+                archive.sh (a release archive), vendor-test.sh, brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, six of them over record-cases.ts
