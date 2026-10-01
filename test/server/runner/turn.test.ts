@@ -13,7 +13,7 @@ import {
   MAX_TURN_MESSAGES,
   type TurnMessage,
 } from "../../../src/server/runner/index.ts";
-import { envelopeRow } from "../../../src/server/sessions/stream.ts";
+import { envelopeRow } from "../../../src/server/sessions/feed.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import type { Wire } from "../../../src/shared/words.ts";
 import {

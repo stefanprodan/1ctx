@@ -17,7 +17,7 @@ import {
   type UsagePort,
 } from "../../src/server/sessions/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
-import type { StreamRow } from "../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../src/shared/api/sessions.ts";
 import { fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -155,13 +155,13 @@ describe("GET /api/sessions", () => {
     const searched = await (
       await chat.member.call("GET", "/api/sessions?q=pHa")
     ).json();
-    expect(searched.rows.map((row: StreamRow) => row.session.id)).toEqual([
+    expect(searched.rows.map((row: FeedRow) => row.session.id)).toEqual([
       personal.sessionId,
     ]);
     const narrowed = await (
       await chat.member.call("GET", "/api/sessions?project=sessions-team")
     ).json();
-    expect(narrowed.rows.map((row: StreamRow) => row.session.id)).toEqual([
+    expect(narrowed.rows.map((row: FeedRow) => row.session.id)).toEqual([
       team.sessionId,
     ]);
     expect(narrowed.next).toBeNull();
@@ -253,8 +253,8 @@ describe("GET /api/sessions", () => {
     store.touch(failed.id, { status: "failed", now: chat.app.now.value });
 
     const body = await (await chat.member.call("GET", "/api/sessions")).json();
-    const rows = new Map<string, StreamRow>(
-      body.rows.map((row: StreamRow) => [row.session.id, row]),
+    const rows = new Map<string, FeedRow>(
+      body.rows.map((row: FeedRow) => [row.session.id, row]),
     );
     expect(rows.get(completed.sessionId)).toMatchObject({
       send: { id: completed.detail.send.id },

@@ -50,8 +50,8 @@ export type RepairedSession = {
   send: SendSummary | null;
 };
 
-// a page of the stream and of an automation's runs
-export const STREAM_LIMIT = 50;
+// a page of the feed and of an automation's runs
+export const FEED_LIMIT = 50;
 export const RESULT_DISPLAY_CHARS = 20_000;
 
 export type RawSession = {

@@ -56,10 +56,10 @@ open row's body or a meta. The shared shapes are below.
   The head, end and controls (`RowsTitle`, `RowsMeta`, `RowsEnd`,
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
-  row (`stream/Row.tsx`) is the one row outside Rows.
+  row (`feed/Row.tsx`) is the one row outside Rows.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
-- **A paged list ends in `ShowMore`** from `stream/Stream.tsx` while
+- **A paged list ends in `ShowMore`** from `feed/FeedCard.tsx` while
   `next` is set. No infinite scroll.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`

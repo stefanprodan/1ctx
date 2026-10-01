@@ -9,8 +9,8 @@
 import { useSignal } from "@preact/signals";
 import type { KnowledgeSearchLine } from "../../../shared/contracts/knowledge.ts";
 import { loadMoreSearch, searchOf } from "../../data/knowledge-search.ts";
+import { ShowMore } from "../../feed/FeedCard.tsx";
 import { ago, plural } from "../../lib/format.ts";
-import { ShowMore } from "../../stream/Stream.tsx";
 import {
   RowsButton,
   RowsFailed,

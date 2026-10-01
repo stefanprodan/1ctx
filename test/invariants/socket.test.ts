@@ -15,7 +15,7 @@ import {
   type ConnData,
   socketArea,
 } from "../../src/server/web/socket.ts";
-import type { StreamRow } from "../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../src/shared/api/sessions.ts";
 import { PROTOCOL, type SocketEvent } from "../../src/shared/socket.ts";
 import {
   collectLogs,
@@ -153,7 +153,7 @@ describe("the socket", () => {
       "GET",
       `/api/sessions?project=${chat.projectId}`,
     );
-    const { rows } = (await listed.json()) as { rows: StreamRow[] };
+    const { rows } = (await listed.json()) as { rows: FeedRow[] };
     const { runs: _runs, ...row } = rows.find(
       (row) => row.session.id === sessionId,
     )!;

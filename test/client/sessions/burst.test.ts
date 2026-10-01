@@ -7,14 +7,14 @@
 // server's first page.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
-import { TRAIL_MS } from "../../../src/client/data/flight.ts";
-import { me } from "../../../src/client/data/me.ts";
 import {
   applyEnvelope,
   list,
   loadList,
-} from "../../../src/client/data/stream.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+} from "../../../src/client/data/feed.ts";
+import { TRAIL_MS } from "../../../src/client/data/flight.ts";
+import { me } from "../../../src/client/data/me.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 const LATENCY = 25;
@@ -45,7 +45,7 @@ function summary(changes: Partial<SessionSummary>): SessionSummary {
   };
 }
 
-const rowOf = (session: SessionSummary): StreamRow => ({
+const rowOf = (session: SessionSummary): FeedRow => ({
   session,
   agent: "assistant",
   agentRetired: false,
@@ -60,7 +60,7 @@ const rowOf = (session: SessionSummary): StreamRow => ({
   runs: session.automationId === null ? null : 1,
 });
 
-const order = (a: StreamRow, b: StreamRow) => {
+const order = (a: FeedRow, b: FeedRow) => {
   const ra = a.session.status === "running" ? 1 : 0;
   const rb = b.session.status === "running" ? 1 : 0;
   if (ra !== rb) return rb - ra;
@@ -103,7 +103,7 @@ type Shape = "chats" | "chats without rows" | "runs with no line held";
 // every session of the server, the first page as it reads now, and the
 // reloads it served
 async function burst(shape: Shape) {
-  const server = new Map<string, StreamRow>();
+  const server = new Map<string, FeedRow>();
   for (let i = 0; i < 60; i++) {
     const id = `old${String(i).padStart(9, "0")}`;
     server.set(id, rowOf(summary({ id, lastActivityAt: 100 + i })));

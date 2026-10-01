@@ -7,19 +7,19 @@
 // Stop while it runs.
 
 import { useSignal } from "@preact/signals";
-import type { StreamRow } from "../../../shared/api/sessions.ts";
+import type { FeedRow } from "../../../shared/api/sessions.ts";
 import { DEFERRED_BY_RESTART } from "../../../shared/words.ts";
 import { stopSession } from "../../data/sessions.ts";
-import { says, stamp } from "../../lib/format.ts";
-import { runHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
 import {
   ATTENTION_WORDS,
   authorGone,
   needsAttention,
   stateLine,
   whenText,
-} from "../../stream/Row.model.ts";
+} from "../../feed/Row.model.ts";
+import { says, stamp } from "../../lib/format.ts";
+import { runHref } from "../../lib/hrefs.ts";
+import { Icon } from "../../lib/icons.tsx";
 import {
   RowsBad,
   RowsEnd,
@@ -43,7 +43,7 @@ export function RunRow({
   now,
   deferred = false,
 }: {
-  row: StreamRow;
+  row: FeedRow;
   deadlineMs: number;
   now: number;
   // the automation's last run, which a restart deferred

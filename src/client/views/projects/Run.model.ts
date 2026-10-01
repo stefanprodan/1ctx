@@ -4,7 +4,7 @@
 // What a run's line says without a DOM: what started it, how long it
 // took and against which deadline.
 
-import type { StreamRow } from "../../../shared/api/sessions.ts";
+import type { FeedRow } from "../../../shared/api/sessions.ts";
 import type { SessionSummary } from "../../../shared/contracts/session.ts";
 import { pad } from "./Schedule.model.ts";
 
@@ -16,7 +16,7 @@ export const RESTARTED_LINE = "Restarted after the server stopped";
 // now, or "Restarted", the run icon's title; the name is the server's,
 // so an admin outside the project is named too. A run from before
 // sources were kept says nothing
-export function sourceText(row: StreamRow): string {
+export function sourceText(row: FeedRow): string {
   const { session } = row;
   if (session.runSource === "schedule") return "Scheduled";
   if (session.runSource === "restart") return RESTART_WORDS;
@@ -35,7 +35,7 @@ export function sourceIcon(
 
 // how long the run has taken, while it runs up to now; null before its
 // send is on the row
-export function durationOf(row: StreamRow, now: number): number | null {
+export function durationOf(row: FeedRow, now: number): number | null {
   const { send } = row;
   if (send === null) return null;
   return Math.max(0, (send.finishedAt ?? now) - send.startedAt);

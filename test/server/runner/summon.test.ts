@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { SUMMARY_LEAD } from "../../../src/server/runner/context.ts";
 import { summonedLine } from "../../../src/server/runner/prompt.ts";
 import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
-import { envelopeRow } from "../../../src/server/sessions/stream.ts";
+import { envelopeRow } from "../../../src/server/sessions/feed.ts";
 import { settleRun } from "../../helpers/automations.ts";
 import {
   type ChatApp,

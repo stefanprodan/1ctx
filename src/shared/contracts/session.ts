@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A session as the wire exposes it: the row in the stream and the
+// A session as the wire exposes it: the row in the feed and the
 // project's list, its messages, the send in flight and its live tail.
 // The revision counts the session's transactions; a client applies an
 // event only when its revision is above the one it holds.
@@ -171,7 +171,7 @@ export type Message = {
   finishedAt: number | null;
 };
 
-// the last row a person or the agent wrote to a chat, as the stream
+// the last row a person or the agent wrote to a chat, as the feed
 // shows it: a user message, or an answer reply that is done. The
 // author is the username or the agent's name; the text is the first
 // non-empty line of the content with its leading markers stripped,

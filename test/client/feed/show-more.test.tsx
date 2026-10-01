@@ -3,9 +3,9 @@
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { ShowMore } from "../../../src/client/stream/Stream.tsx";
+import { ShowMore } from "../../../src/client/feed/FeedCard.tsx";
 
-const ghosts = (html: string) => html.split("stream-ghost ").length - 1;
+const ghosts = (html: string) => html.split("feed-ghost ").length - 1;
 
 describe("Show more", () => {
   test("is not there at the end of the list", () => {

@@ -7,7 +7,7 @@
 
 import type { AutomationSummary } from "../contracts/automation.ts";
 import type { SessionStatus } from "../words.ts";
-import type { StreamRow } from "./sessions.ts";
+import type { FeedRow } from "./sessions.ts";
 
 // GET /api/projects/:id/automations: the project's rows, by name, and
 // the run deadline limit, the deadline a row with none runs under
@@ -42,12 +42,12 @@ export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 
 // GET /api/automations/:id/runs?filter=failed|manual&before=: a page of
 // its sessions, newest first, narrowed by the filter, with next as for
-// the stream; the tally counts every kept run by status, whatever the
+// the feed; the tally counts every kept run by status, whatever the
 // filter, on every page.
 // POST /api/automations/:id/run answers 201 with the run's
 // SessionResponse
 export type AutomationRunsResponse = {
-  rows: StreamRow[];
+  rows: FeedRow[];
   tally: RunTally;
   next: string | null;
 };

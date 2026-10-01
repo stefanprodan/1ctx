@@ -64,7 +64,7 @@ export type SocketDeps = {
   sessionProject(principal: Principal, sessionId: string): string | null;
   // the runner's snapshot of the send in flight
   live(sessionId: string): LiveSend | null;
-  // the stream row a session envelope carries, null for a session gone
+  // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chat's queued rows as the queue frame carries them
   queue(sessionId: string): QueueFrame;

@@ -26,7 +26,7 @@ export function runAnswer(
   return row?.content ?? null;
 }
 
-// the mark is not activity, so the stream's order and cursor stay; false
+// the mark is not activity, so the feed's order and cursor stay; false
 // when the session is gone
 export function markAttention(
   db: Db,

@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The mark a finished run wears when the default decider judged it to
-// need a person: on the stream's line and on the task's Runs list, at
+// need a person: on the feed's line and on the task's Runs list, at
 // the threshold and above, and nothing under it or when not asked.
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { needsAttention } from "../../../src/client/stream/Row.model.ts";
-import { Row } from "../../../src/client/stream/Row.tsx";
+import { needsAttention } from "../../../src/client/feed/Row.model.ts";
+import { Row } from "../../../src/client/feed/Row.tsx";
 import { RunRow } from "../../../src/client/views/projects/RunRow.tsx";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import { ATTENTION_AT } from "../../../src/shared/contracts/decision.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 const now = new Date(2026, 8, 27, 12).getTime();
 
-const run = (attention: number | null): StreamRow => {
+const run = (attention: number | null): FeedRow => {
   const session: SessionSummary = {
     archived: null,
     attention,
@@ -59,12 +59,12 @@ describe("needs attention", () => {
     expect(needsAttention({ attention: 1 })).toBe(true);
   });
 
-  test("the stream's line says so after the agent, its icon orange", () => {
+  test("the feed's line says so after the agent, its icon orange", () => {
     const html = render(
       <Row row={run(0.91)} projectName="platform" now={now} />,
     );
     expect(html).toMatch(
-      /@\w+ <\/span><span class="stream-attention">needs attention<\/span> · /,
+      /@\w+ <\/span><span class="feed-attention">needs attention<\/span> · /,
     );
     expect(html).toContain("status-attention");
     for (const quiet of [null, 0.2, 0.499]) {

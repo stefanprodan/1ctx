@@ -32,6 +32,7 @@ import {
 } from "./activity.ts";
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
+import { envelopeRow } from "./feed.ts";
 import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
 import {
@@ -43,7 +44,6 @@ import {
 } from "./routes.ts";
 import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
-import { envelopeRow } from "./stream.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
 export { refuseArchived } from "./archive.ts";
@@ -77,11 +77,11 @@ export {
 } from "./queued.ts";
 export { queueAnswer } from "./queued-routes.ts";
 export {
+  FEED_LIMIT,
   offWire,
   RESULT_DISPLAY_CHARS,
   type ReplyFinish,
   type SessionRow,
-  STREAM_LIMIT,
   type UsagePort,
 } from "./rows.ts";
 export { lastPrompt, sendTurns } from "./sends.ts";
@@ -115,7 +115,7 @@ export type Sessions = {
   visible(principal: Principal, id: string): SessionRow;
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
-  // the stream row a session envelope carries, null for a session gone
+  // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chats an agent's delete archives and the sends it stops
   agentImpact(agentId: string): { chats: number; running: number };

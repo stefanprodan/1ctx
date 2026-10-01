@@ -211,7 +211,7 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/home/Home.tsx").then((m) => m.Home)),
     title: () => "Home",
     role: "authenticated",
-    // the stream for the query, the user's messages that were not sent,
+    // the feed for the query, the user's messages that were not sent,
     // the week for the aside, and the agents of the composer's project,
     // the picked one or the personal; it comes from the rail's list,
     // waited for only when none is held

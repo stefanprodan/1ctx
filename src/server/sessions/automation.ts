@@ -10,9 +10,9 @@ import { SESSION_STATUSES } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { type RunsCursor, runsAfter, runsCursor } from "./cursor.ts";
+import { feedRows } from "./feed.ts";
 import type { RawSession, SessionRow, UsagePort } from "./rows.ts";
-import { STREAM_LIMIT, session } from "./rows.ts";
-import { streamRows } from "./stream.ts";
+import { FEED_LIMIT, session } from "./rows.ts";
 
 export type RunsArgs = [
   automationId: string,
@@ -24,12 +24,7 @@ export type RunsArgs = [
 export function automationRuns(
   db: Db,
   usage: UsagePort,
-  ...[
-    automationId,
-    filter = null,
-    before = null,
-    limit = STREAM_LIMIT,
-  ]: RunsArgs
+  ...[automationId, filter = null, before = null, limit = FEED_LIMIT]: RunsArgs
 ): AutomationRunsResponse {
   const condition =
     filter === "failed"
@@ -59,7 +54,7 @@ export function automationRuns(
     tally[row.status] = row.n;
   }
   return {
-    rows: streamRows(db, rows, usage.latestFor(rows.map((row) => row.id))),
+    rows: feedRows(db, rows, usage.latestFor(rows.map((row) => row.id))),
     tally,
     next: read.length > limit && last !== undefined ? runsCursor(last) : null,
   };

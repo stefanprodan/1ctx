@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words on a stream row, from what the server said: the state
+// The words on a feed row, from what the server said: the state
 // line under the title and the time on the right. Nothing here reads
 // a transcript; the send's counters, its cause and the last line come
 // on the row.
 
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow } from "../../shared/api/sessions.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import type { SessionSummary } from "../../shared/contracts/session.ts";
 import { ago, elapsed } from "../lib/format.ts";
@@ -23,13 +23,13 @@ const plain = (text: string): StateLine => ({ author: null, text });
 
 // the row's icon: the clock for an automation's run, the bubble for a
 // chat, the box for an archived chat
-export function iconOf(row: StreamRow): "clock" | "chat" | "archive" {
+export function iconOf(row: FeedRow): "clock" | "chat" | "archive" {
   if (row.session.archived !== null) return "archive";
   return row.session.origin === "automation" ? "clock" : "chat";
 }
 
 // the quiet word before the line: an archived chat, or a restart run
-export function markOf(row: StreamRow): string | null {
+export function markOf(row: FeedRow): string | null {
   if (row.session.archived !== null) return "archived";
   return row.session.runSource === "restart" ? "restarted" : null;
 }
@@ -43,7 +43,7 @@ export const needsAttention = (
 
 // whether the line's author is the session's agent or the last send's,
 // since deleted: the name is greyed, with no tag, since rows are dense
-export function authorGone(row: StreamRow, line: StateLine): boolean {
+export function authorGone(row: FeedRow, line: StateLine): boolean {
   if (line.author === null) return false;
   // a live retire sets agentRetired alone, so the send's flag only adds
   if (row.sendAgent?.retired && line.author === row.sendAgent.name) {
@@ -52,7 +52,7 @@ export function authorGone(row: StreamRow, line: StateLine): boolean {
   return row.agentRetired && line.author === row.agent;
 }
 
-export function stateLine(row: StreamRow): StateLine {
+export function stateLine(row: FeedRow): StateLine {
   const { session, send, last } = row;
   // a send that did not finish is its agent's, the summoned one's for a
   // summoned turn, so its state is credited to the agent the way a last
@@ -86,7 +86,7 @@ export function stateLine(row: StreamRow): StateLine {
 
 // the send's elapsed time while it runs, else how long ago the last
 // activity was
-export function whenText(row: StreamRow, now: number): string {
+export function whenText(row: FeedRow, now: number): string {
   const { session, send } = row;
   if (session.status === "running") {
     return elapsed(now - (send?.startedAt ?? session.lastActivityAt));
@@ -96,6 +96,6 @@ export function whenText(row: StreamRow, now: number): string {
 
 // the running row's clock moves every second; the rest every half
 // minute, the coarseness of ago()
-export function tickMs(rows: StreamRow[] | null): number {
+export function tickMs(rows: FeedRow[] | null): number {
   return rows?.some((row) => row.session.status === "running") ? 1000 : 30_000;
 }

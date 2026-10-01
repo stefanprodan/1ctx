@@ -1,14 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The stream's card, a Rows card: the search and the filters in its
+// The feed's card, a Rows card: the search and the filters in its
 // head, then the session rows, or the note that says why there are
 // none, and Show more while a later page is left. The session row is
 // the one row outside Rows: a denser feed line. Home and the project
 // page both draw it over the entity's list; the clock that moves the
 // times is the page's.
 
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import type { Failure } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
@@ -21,7 +21,7 @@ import {
 } from "../ui/Rows.tsx";
 import { Search } from "../ui/Search.tsx";
 import { Row } from "./Row.tsx";
-import "./stream.css";
+import "./feed.css";
 
 const FILTERS: {
   value: SessionOrigin | null;
@@ -40,7 +40,7 @@ export type MoreState = {
   error: Failure | null;
 };
 
-export function Stream({
+export function FeedCard({
   rows,
   // the name of each row's project, or null on a page that is the
   // project already
@@ -52,7 +52,7 @@ export function Stream({
   more,
   onMore,
 }: {
-  rows: StreamRow[] | null;
+  rows: FeedRow[] | null;
   projectName: (projectId: string) => string | null;
   // the query as the address has it, and where a new one goes
   search: { value: string; onChange: (q: string) => void };
@@ -133,25 +133,25 @@ export function ShowMore({
 // the rows land where the shapes were
 function Ghosts({ count }: { count: number }) {
   return (
-    <div class="stream-ghosts" role="status" aria-label="Loading sessions">
+    <div class="feed-ghosts" role="status" aria-label="Loading sessions">
       {Array.from({ length: count }, (_, i) => (
         <div
           key={i}
-          class={`stream-row stream-ghost stream-ghost-${"abc"[i % 3]}`}
+          class={`feed-row feed-ghost feed-ghost-${"abc"[i % 3]}`}
           style={{ "--ghost": i }}
           aria-hidden="true"
         >
-          <span class="stream-bone stream-bone-icon" />
-          <span class="stream-text">
-            <span class="stream-title">
-              <span class="stream-bone stream-bone-title" />
+          <span class="feed-bone feed-bone-icon" />
+          <span class="feed-text">
+            <span class="feed-title">
+              <span class="feed-bone feed-bone-title" />
             </span>
-            <span class="stream-line">
-              <span class="stream-bone stream-bone-line" />
+            <span class="feed-line">
+              <span class="feed-bone feed-bone-line" />
             </span>
           </span>
-          <span class="stream-when">
-            <span class="stream-bone stream-bone-when" />
+          <span class="feed-when">
+            <span class="feed-bone feed-bone-when" />
           </span>
         </div>
       ))}

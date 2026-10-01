@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words on a stream row, from the send and the last line the
+// The words on a feed row, from the send and the last line the
 // server put on it.
 
 import { describe, expect, test } from "bun:test";
@@ -12,7 +12,7 @@ import {
   stateLine,
   tickMs,
   whenText,
-} from "../../../src/client/stream/Row.model.ts";
+} from "../../../src/client/feed/Row.model.ts";
 import {
   composeProjectOf,
   emptyLine,
@@ -20,7 +20,7 @@ import {
   searchHref,
   searchOf,
 } from "../../../src/client/views/home/Home.model.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type {
   SendSummary,
   SessionSummary,
@@ -73,7 +73,7 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
   ...changes,
 });
 
-const row = (changes: Partial<StreamRow> = {}): StreamRow => ({
+const row = (changes: Partial<FeedRow> = {}): FeedRow => ({
   agentRetired: false,
   session: session(),
   agent: "assistant",

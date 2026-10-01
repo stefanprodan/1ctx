@@ -38,7 +38,7 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
-  /* as the stream names an author */
+  /* as the feed names an author */
   .who-handle {
     color: var(--brand);
   }

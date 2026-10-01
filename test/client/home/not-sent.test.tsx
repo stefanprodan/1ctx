@@ -91,7 +91,7 @@ describe("Home's Not sent card", () => {
       expect(html).toContain('href="/chat/s1"');
       expect(html).toContain("and the logs too");
       expect(html).toMatch(
-        /#personal<\/span> · <span class="stream-author">@assistant<\/span> · <span class="stream-bad">waited too long</,
+        /#personal<\/span> · <span class="feed-author">@assistant<\/span> · <span class="feed-bad">waited too long</,
       );
       expect(html).toContain("1m ago");
       // a message of files alone is named by its chat

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The session request parsers: a new chat, a message, a rename, and the
-// stream's filters. A message is any text up to the byte cap, not
+// feed's filters. A message is any text up to the byte cap, not
 // blank; a title is one line up to the title cap.
 
 import type {
@@ -250,7 +250,7 @@ export function titleFrom(text: string): string {
     : line;
 }
 
-// the stream's last line: the first non-empty line, its Markdown
+// the feed's last line: the first non-empty line, its Markdown
 // markers stripped so a reply that opens with a heading reads as
 // words and one with bold reads without the stars, cut as a title is
 export function lineFrom(text: string): string {

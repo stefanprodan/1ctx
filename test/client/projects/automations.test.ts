@@ -13,6 +13,7 @@ import {
   upsertAutomation,
   upsertRun,
 } from "../../../src/client/data/automations.ts";
+import { IDLE } from "../../../src/client/data/feed.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   closeRuns,
@@ -21,7 +22,6 @@ import {
   relabelRuns,
   runs,
 } from "../../../src/client/data/runs.ts";
-import { IDLE } from "../../../src/client/data/stream.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
@@ -55,7 +55,7 @@ import {
   sourceIcon,
   sourceText,
 } from "../../../src/client/views/projects/Run.model.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 import type { RunFilter } from "../../../src/shared/words.ts";
@@ -120,7 +120,7 @@ const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   ...changes,
 });
 
-const run = (changes: Partial<SessionSummary> = {}): StreamRow => ({
+const run = (changes: Partial<SessionSummary> = {}): FeedRow => ({
   agentRetired: false,
   session: session(changes),
   agent: "assistant",
@@ -871,7 +871,7 @@ describe("the revision rule", () => {
       run({ id: "s2", createdAt: now + 2, lastActivityAt: now }),
       run({ id: "s1", createdAt: now + 1, lastActivityAt: now }),
     ];
-    const rows = [late, ...tied].reduce(upsertRun, [] as StreamRow[]);
+    const rows = [late, ...tied].reduce(upsertRun, [] as FeedRow[]);
     expect(rows.map((r) => r.session.id)).toEqual(["s9", "s1", "s2"]);
     const running = run({
       id: "s3",

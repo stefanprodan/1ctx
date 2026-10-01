@@ -10,25 +10,25 @@ import { ago } from "../lib/format.ts";
 import { chatHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { reasonShort } from "../transcript/Queued.words.ts";
-import "./stream.css";
+import "./feed.css";
 
 export function NotSentRow({ row, now }: { row: Row; now: number }) {
   return (
-    <a class="stream-row" href={chatHref(row.sessionId)}>
-      <Icon name="chat" class="stream-icon status-failed" size={16} />
-      <span class="stream-text">
-        <span class="stream-title cut">
+    <a class="feed-row" href={chatHref(row.sessionId)}>
+      <Icon name="chat" class="feed-icon status-failed" size={16} />
+      <span class="feed-text">
+        <span class="feed-title cut">
           {row.line === "" ? row.title : row.line}
         </span>
-        <span class="stream-line cut">
-          <span class="stream-project">#{row.project}</span>
+        <span class="feed-line cut">
+          <span class="feed-project">#{row.project}</span>
           {" · "}
-          <span class="stream-author">@{row.agent}</span>
+          <span class="feed-author">@{row.agent}</span>
           {" · "}
-          <span class="stream-bad">{reasonShort(row.reason)}</span>
+          <span class="feed-bad">{reasonShort(row.reason)}</span>
         </span>
       </span>
-      <span class="stream-when">{ago(row.changedAt, now)}</span>
+      <span class="feed-when">{ago(row.changedAt, now)}</span>
     </a>
   );
 }

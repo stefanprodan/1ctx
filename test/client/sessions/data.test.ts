@@ -10,6 +10,11 @@ import {
   flip,
   switchable,
 } from "../../../src/client/data/capabilities.ts";
+import {
+  applyAutomationFrame,
+  type FeedList,
+  IDLE,
+} from "../../../src/client/data/feed.ts";
 import { forking, forkSession } from "../../../src/client/data/fork.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
@@ -39,12 +44,7 @@ import {
   sessionError,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
-import {
-  applyAutomationFrame,
-  IDLE,
-  type StreamList,
-} from "../../../src/client/data/stream.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import { WEB } from "../../../src/shared/capabilities.ts";
 import type {
   Message,
@@ -76,7 +76,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   };
 }
 
-function row(changes: Partial<SessionSummary> = {}): StreamRow {
+function row(changes: Partial<SessionSummary> = {}): FeedRow {
   return {
     agentRetired: false,
     session: summary(changes),
@@ -90,10 +90,10 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
   };
 }
 
-const ids = (rows: StreamRow[] | StreamList | null | undefined) =>
+const ids = (rows: FeedRow[] | FeedList | null | undefined) =>
   (Array.isArray(rows) ? rows : rows?.rows)?.map((r) => r.session.id);
 
-const page = (rows: StreamRow[], next: string | null = null): StreamList => ({
+const page = (rows: FeedRow[], next: string | null = null): FeedList => ({
   rows,
   next,
   more: IDLE,
@@ -327,7 +327,7 @@ describe("the sessions entity", () => {
     expect(ids(list.value)).toEqual(["running", "new", "old"]);
   });
 
-  test("the stream's filter is the query, and a new filter drops the rows", async () => {
+  test("the feed's filter is the query, and a new filter drops the rows", async () => {
     const urls: string[] = [];
     answer = (url) => {
       urls.push(url);
@@ -335,7 +335,7 @@ describe("the sessions entity", () => {
     };
     await loadList({ project: null, q: "" });
     expect(list.value?.rows).toHaveLength(1);
-    let seen: StreamList | null | undefined;
+    let seen: FeedList | null | undefined;
     answer = (url) => {
       urls.push(url);
       seen = list.value;
@@ -1315,7 +1315,7 @@ describe("the sessions entity", () => {
     expect(session.value).toBeNull();
   });
 
-  test("revoking a project drops its rows from the stream", async () => {
+  test("revoking a project drops its rows from the feed", async () => {
     answer = () =>
       Response.json({
         rows: [row({ id: "s1" }), row({ id: "s2", projectId: "p2" })],
@@ -1554,7 +1554,7 @@ describe("answers held for the way back", () => {
         });
       await loadList({ project: "p1", q: "" });
       await loadList({ project: null, q: "" });
-      let seen: StreamList | null | undefined;
+      let seen: FeedList | null | undefined;
       answer = () => {
         seen = list.value;
         return Response.json({ rows: [row({ id: "a" }), row({ id: "b" })] });
@@ -1576,7 +1576,7 @@ describe("answers held for the way back", () => {
     await loadList({ project: "p2", q: "" });
     await loadList({ project: "p1", q: "" });
     onSocket({ type: "revoked", projectId: "p2" });
-    const seen: (StreamList | null)[] = [];
+    const seen: (FeedList | null)[] = [];
     answer = () => {
       seen.push(list.value);
       return Response.json({ rows: [] });
@@ -1591,7 +1591,7 @@ describe("answers held for the way back", () => {
     await loadList({ project: null, q: "" });
     await loadList({ project: "p1", q: "" });
     onSocket({ type: "deleted", sessionId: "a", projectId: "p1" });
-    let seen: StreamList | null | undefined;
+    let seen: FeedList | null | undefined;
     answer = () => {
       seen = list.value;
       return Response.json({ rows: [] });
@@ -1725,7 +1725,7 @@ describe("answers held for the way back", () => {
   });
 });
 
-describe("the stream's pages", () => {
+describe("the feed's pages", () => {
   const first = () => [
     row({ id: "a", lastActivityAt: 50 }),
     row({ id: "b", lastActivityAt: 40 }),
@@ -1927,7 +1927,7 @@ describe("the stream's pages", () => {
   });
 
   test.serial("a page read before a rename carries the new name", async () => {
-    const run = (id: string, at: number): StreamRow => ({
+    const run = (id: string, at: number): FeedRow => ({
       ...row({
         id,
         lastActivityAt: at,
@@ -2013,7 +2013,7 @@ describe("the stream's pages", () => {
   test.serial(
     "a rename is kept only over answers asked before it",
     async () => {
-      const run = (id: string, at: number, name: string): StreamRow => ({
+      const run = (id: string, at: number, name: string): FeedRow => ({
         ...row({
           id,
           lastActivityAt: at,
@@ -2082,7 +2082,7 @@ describe("the stream's pages", () => {
     await twoPages();
     answer = () => Response.json({ rows: [], next: null });
     await loadList({ project: "p1", q: "" });
-    let seen: StreamList | null | undefined;
+    let seen: FeedList | null | undefined;
     answer = () => {
       seen = list.value;
       return Response.json({ rows: first(), next: "after-b" });
@@ -2116,7 +2116,7 @@ describe("runs grouped in All", () => {
     at: number,
     runs: number,
     changes: Partial<SessionSummary> = {},
-  ): StreamRow => ({
+  ): FeedRow => ({
     ...row({
       id,
       origin: "automation",

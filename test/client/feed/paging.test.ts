@@ -7,10 +7,10 @@ import {
   refreshHead,
   runOrder,
 } from "../../../src/client/data/sessions-rows.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
-function row(changes: Partial<SessionSummary> = {}): StreamRow {
+function row(changes: Partial<SessionSummary> = {}): FeedRow {
   return {
     agentRetired: false,
     session: {
@@ -43,7 +43,7 @@ function row(changes: Partial<SessionSummary> = {}): StreamRow {
   };
 }
 
-const ids = (rows: StreamRow[]) => rows.map((r) => r.session.id);
+const ids = (rows: FeedRow[]) => rows.map((r) => r.session.id);
 const at = (id: string, lastActivityAt: number, revision = 1) =>
   row({ id, lastActivityAt, revision });
 

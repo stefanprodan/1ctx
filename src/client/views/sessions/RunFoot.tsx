@@ -3,19 +3,19 @@
 //
 // A run's foot, in the composer's place: nobody writes into a run, so
 // it holds the run's state, with its clock and Stop while it runs, for
-// anyone who sees it. The words are the stream row's. Once the run is
+// anyone who sees it. The words are the feed row's. Once the run is
 // done or stopped the foot offers Fork, the turn's button, which lists
 // the project's agents over it and makes a chat from the whole run. An
 // archived chat's foot is the same: the archive icon, why it was
 // archived and until when, and Fork from its last turn.
 
 import { useSignal } from "@preact/signals";
-import type { StreamRow } from "../../../shared/api/sessions.ts";
+import type { FeedRow } from "../../../shared/api/sessions.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import { stateLine, whenText } from "../../feed/Row.model.ts";
 import { count, says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
-import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { ForkButton, type OnFork } from "../../transcript/Fork.tsx";
 import { durationOf, durationText } from "../projects/Run.model.ts";
 
@@ -25,7 +25,7 @@ export function RunFoot({
   onStop,
   fork,
 }: {
-  row: StreamRow;
+  row: FeedRow;
   // an archived chat's line, in place of the run's state
   archived?: string;
   onStop: () => Promise<void>;
