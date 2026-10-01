@@ -10,6 +10,7 @@
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import { archivedEvent } from "./archive.ts";
@@ -18,8 +19,6 @@ import type { SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 
 export const CHATS_PER_STEP = 500;
-
-const DAY_MS = 86_400_000;
 
 // the scratch the sweep frees, and the sessions a command holds now,
 // which it leaves be as the bash sweep does

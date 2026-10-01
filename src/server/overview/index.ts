@@ -11,7 +11,7 @@ import {
   type UsageResponse,
 } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, DAY_MS } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type SendCaps, scheduledShare } from "../limits/index.ts";
@@ -91,8 +91,6 @@ export type Overview = {
   start(): void;
   close(): void;
 };
-
-const DAY_MS = 86_400_000;
 
 function inlineScanner(db: Db): Scanner {
   return {

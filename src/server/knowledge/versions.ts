@@ -12,6 +12,7 @@ import type {
   KnowledgeVersionDetail,
 } from "../../shared/contracts/knowledge.ts";
 import type { Db } from "../db/index.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import {
@@ -146,6 +147,6 @@ export class KnowledgeVersions {
          select 1 from knowledge_files where id = knowledge_versions.file_id
        )`,
       )
-      .run(now - days * 86_400_000).changes;
+      .run(now - days * DAY_MS).changes;
   }
 }

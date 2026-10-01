@@ -8,6 +8,7 @@
 // An occurrence missed while waiting is replaced by the newest past one.
 
 import { type Db, transact } from "../db/index.ts";
+import { MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { nextFire } from "./schedule.ts";
 import type { AutomationStore } from "./store.ts";
@@ -102,7 +103,7 @@ export function newestPast(
   if (newest > now) return null;
   let low = newest;
   let high = now;
-  while (high - low > 60_000) {
+  while (high - low > MINUTE_MS) {
     const mid = low + Math.floor((high - low) / 2);
     const next = after(schedule, tz, mid);
     if (next <= now) {

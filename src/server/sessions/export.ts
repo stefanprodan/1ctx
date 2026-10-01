@@ -8,6 +8,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { Avatar } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import type { ExportRow } from "./markdown.ts";
 import { messageUploads } from "./rows.ts";
 
@@ -93,6 +94,6 @@ export function archive(
       row.id === null || row.username === null
         ? null
         : { id: row.id, username: row.username },
-    keptUntil: row.at + keptDays * 86_400_000,
+    keptUntil: row.at + keptDays * DAY_MS,
   };
 }

@@ -6,6 +6,7 @@
 // the scratch it mounted. Rows go with the session, or idle, by sweep.
 
 import type { Db } from "../db/index.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
 import { heldSessions } from "./queue.ts";
 
@@ -146,7 +147,7 @@ export class ScratchStore {
       .query<{ session_id: string }, [number]>(
         "select session_id from session_scratch where used_at < ?",
       )
-      .all(now - idleDays * 86_400_000);
+      .all(now - idleDays * DAY_MS);
     let count = 0;
     for (const row of expired) {
       if (held.has(row.session_id)) continue;

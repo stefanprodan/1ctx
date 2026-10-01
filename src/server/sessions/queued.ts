@@ -15,6 +15,7 @@ import {
 import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import { notSentOf } from "./not-sent.ts";
 
@@ -22,7 +23,7 @@ import { notSentOf } from "./not-sent.ts";
 // opens with
 export const MAX_QUEUED_PER_CHAT = 16;
 // the hourly sweep deletes a not-sent message this long after it turned
-export const NOT_SENT_KEPT_MS = 7 * 86_400_000;
+export const NOT_SENT_KEPT_MS = 7 * DAY_MS;
 
 export type QueuedRow = {
   id: string;

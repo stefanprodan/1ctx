@@ -7,9 +7,10 @@
 // sign-in says little about a day; a signed-in request does.
 
 import type { Db } from "../db/index.ts";
+import { DAY_MS } from "../lib/clock.ts";
 
 // past the widest window, so a heatmap never loses a visit it shows
-export const VISIT_RETENTION_MS = 400 * 24 * 60 * 60 * 1000;
+export const VISIT_RETENTION_MS = 400 * DAY_MS;
 
 export class VisitStore {
   constructor(private readonly db: Db) {}

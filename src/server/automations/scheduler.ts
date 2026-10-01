@@ -7,7 +7,7 @@ import { DEFERRED_BY_RESTART, type EventSource } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, HOUR_MS, MINUTE_MS } from "../lib/clock.ts";
 import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
@@ -19,8 +19,8 @@ import { nextFire } from "./schedule.ts";
 import { type AutomationStore, RETIRED } from "./store.ts";
 import { deferDue, replaceMissed, type Waiting, Waits } from "./waits.ts";
 
-const PASS_MS = 60_000;
-const SWEEP_MS = 3_600_000;
+const PASS_MS = MINUTE_MS;
+const SWEEP_MS = HOUR_MS;
 
 type Deps = {
   db: Db;

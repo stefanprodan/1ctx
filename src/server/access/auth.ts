@@ -8,7 +8,7 @@
 // with a full Max-Age, so the browser's copy slides with it.
 
 import { type Db, transact } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
@@ -19,8 +19,8 @@ import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
 
 export const COOKIE = "login";
-export const LOGIN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-export const TOUCH_AFTER_MS = 60 * 60 * 1000;
+export const LOGIN_TTL_MS = 30 * DAY_MS;
+export const TOUCH_AFTER_MS = HOUR_MS;
 
 export type UsersPort = {
   byId(id: string): UserRow | null;

@@ -9,6 +9,7 @@
 // the caller passes, so a test hands it recorded frames and the suite
 // never reaches a network.
 
+import { MINUTE_MS } from "../lib/clock.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
 import type {
@@ -21,7 +22,7 @@ import type {
 
 // Gemini holds the headers while it thinks on a long prompt
 export const CHAT_HEADERS_TIMEOUT_MS = 120_000;
-const CHAT_SILENCE_TIMEOUT_MS = 5 * 60_000;
+const CHAT_SILENCE_TIMEOUT_MS = 5 * MINUTE_MS;
 export const MAX_SSE_FRAME_BYTES = 1024 * 1024;
 const CHAT_ERROR_BODY_MAX_BYTES = 4 * 1024;
 const CHAT_ERROR_BODY_TIMEOUT_MS = 10_000;

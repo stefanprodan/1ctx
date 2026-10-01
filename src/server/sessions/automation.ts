@@ -8,6 +8,7 @@ import type {
 import type { RunFilter } from "../../shared/words.ts";
 import { SESSION_STATUSES } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import { type RunsCursor, runsAfter, runsCursor } from "./cursor.ts";
 import type { RawSession, SessionRow, UsagePort } from "./rows.ts";
 import { STREAM_LIMIT, session } from "./rows.ts";
@@ -87,7 +88,7 @@ export function expiredAutomationRuns(
        cross join sessions on sessions.automation_id = automations.id
        where sessions.status != 'running'
          and sessions.last_activity_at <
-           ? - automations.retention_days * 86400000
+           ? - automations.retention_days * ${DAY_MS}
        order by sessions.last_activity_at, sessions.id`,
     )
     .all(now);

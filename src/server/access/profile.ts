@@ -13,7 +13,7 @@
 import type { ProfileResponse } from "../../shared/api/profile.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
@@ -23,7 +23,7 @@ import { RateLimit } from "./ratelimit.ts";
 import type { LoginStore } from "./store.ts";
 
 export const PASSWORD_LIMIT = 5;
-export const PASSWORD_WINDOW_MS = 60 * 1000;
+export const PASSWORD_WINDOW_MS = MINUTE_MS;
 
 export type UsersPort = {
   byId(id: string): UserRow | null;
