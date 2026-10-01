@@ -217,7 +217,7 @@ export const lsCommand: RuntimeCommand = {
       paths.push(".");
     }
 
-    const stdout = new LsText(ctx.limits.maxOutputSize);
+    const stdout = new LsText(ctx.limits.maxOutputSize); // (1ctx fs-children)
     const stderr = new LsText(ctx.limits.maxOutputSize);
     let exitCode = 0;
     const traversalBudget = new FileTraversalBudget({
@@ -254,6 +254,7 @@ export const lsCommand: RuntimeCommand = {
               : String(size).padStart(5);
             const mtime = stat.mtime ?? new Date(0);
             const dateStr = formatDate(mtime);
+            // (1ctx fs-children)
             stdout.add(
               `${mode} 1 user user ${sizeStr} ${dateStr} ${path}${suffix}\n`,
             );
@@ -261,15 +262,17 @@ export const lsCommand: RuntimeCommand = {
             const suffix = classifyFiles
               ? classifySuffix(await ctx.fs.lstat(fullPath))
               : "";
-            stdout.add(`${path}${suffix}\n`);
+            stdout.add(`${path}${suffix}\n`); // (1ctx fs-children)
           }
         } catch {
+          // (1ctx fs-children)
           stderr.add(
             `ls: cannot access '${path}': No such file or directory\n`,
           );
           exitCode = 2;
         }
       }
+      // (1ctx fs-children)
       return { stdout: stdout.text, stderr: stderr.text, exitCode };
     }
 
@@ -299,6 +302,7 @@ export const lsCommand: RuntimeCommand = {
           fileOperands.push(path);
         }
       } catch {
+        // (1ctx fs-children)
         stderr.add(`ls: ${path}: No such file or directory\n`);
         exitCode = 2;
       }
@@ -351,10 +355,11 @@ export const lsCommand: RuntimeCommand = {
       reverse,
       traversalBudget,
     )) {
-      if (stdout.text) stdout.add("\n");
+      if (stdout.text) stdout.add("\n"); // (1ctx fs-children)
       await listOperand(path, labelDirectories);
     }
 
+    // (1ctx fs-children)
     return { stdout: stdout.text, stderr: stderr.text, exitCode };
   },
 };
@@ -475,6 +480,7 @@ async function listPath(
   ancestorIdentities: Set<string> = new Set(),
   visitAlreadyCharged = false,
 ): Promise<LsResult> {
+  // (1ctx fs-children) the counts ride on the result
   const showHidden = showAll || showAlmostAll;
   const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
 
@@ -552,7 +558,7 @@ async function listPath(
       entries.reverse();
     }
 
-    const stdout = new LsText(ctx.limits.maxOutputSize);
+    const stdout = new LsText(ctx.limits.maxOutputSize); // (1ctx fs-children)
     const stderr = new LsText(ctx.limits.maxOutputSize);
     let exitCode = 0;
 
@@ -562,11 +568,11 @@ async function listPath(
     // - Subdirectories use './subdir:' format when starting from '.'
     // - When starting from other path, subdirs use '{path}/subdir:' format
     if (recursive || showHeader) {
-      stdout.add(`${path}:\n`);
+      stdout.add(`${path}:\n`); // (1ctx fs-children)
     }
 
     if (longFormat) {
-      stdout.add(`total ${entries.length}\n`);
+      stdout.add(`total ${entries.length}\n`); // (1ctx fs-children)
 
       // Separate special entries (. and ..) from regular entries
       const specialEntries = entries.filter((e) => e === "." || e === "..");
@@ -574,6 +580,7 @@ async function listPath(
 
       // Add special entries first
       for (const entry of specialEntries) {
+        // (1ctx fs-children)
         stdout.add(`drwxr-xr-x 1 user user     0 Jan  1 00:00 ${entry}\n`);
       }
 
@@ -623,7 +630,7 @@ async function listPath(
       );
 
       for (const { line } of entryStats) {
-        stdout.add(line);
+        stdout.add(line); // (1ctx fs-children)
       }
     } else if (classifyFiles) {
       // Classify each entry with type suffix
@@ -652,9 +659,9 @@ async function listPath(
         classified.push(...batchResults);
       }
 
-      stdout.add(joinLsLines(ctx, classified));
+      stdout.add(joinLsLines(ctx, classified)); // (1ctx fs-children)
     } else {
-      stdout.add(joinLsLines(ctx, entries));
+      stdout.add(joinLsLines(ctx, entries)); // (1ctx fs-children)
     }
 
     // Handle recursive - parallel processing for better performance
@@ -718,6 +725,7 @@ async function listPath(
       // by the batch width. Entries within a single directory are still
       // statted in parallel batches; that work runs over an already-admitted,
       // bounded list.
+      // (1ctx fs-children)
       const subResults: { name: string; result: LsResult }[] = [];
 
       for (const dir of dirEntries) {
