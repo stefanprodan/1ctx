@@ -53,6 +53,56 @@ import {
   validateRootDirectory,
 } from "../real-fs-utils.js";
 
+// (1ctx overlay-read) reads a regular file through one descriptor: its type
+// and size are checked on what was opened, and at most max + 1 bytes read
+function readRegularFile(
+  canonical: string,
+  path: string,
+  max: number,
+): Uint8Array {
+  const fd = fs.openSync(
+    canonical,
+    fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+  );
+  try {
+    const stat = fs.fstatSync(fd);
+    if (stat.isDirectory()) {
+      throw Object.assign(new Error(`EISDIR: read '${path}'`), {
+        code: "EISDIR",
+      });
+    }
+    if (!stat.isFile()) {
+      throw Object.assign(new Error(`EINVAL: read '${path}'`), {
+        code: "EINVAL",
+      });
+    }
+    const tooLarge = () =>
+      new Error(`EFBIG: file too large, read '${path}' (max ${max} bytes)`);
+    if (max > 0 && stat.size > max) throw tooLarge();
+    const cap = max > 0 ? max + 1 : Number.MAX_SAFE_INTEGER;
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (total < cap) {
+      const chunk = new Uint8Array(Math.min(cap - total, 1 << 20));
+      const read = fs.readSync(fd, chunk, 0, chunk.byteLength, null);
+      if (read === 0) break;
+      chunks.push(read === chunk.byteLength ? chunk : chunk.subarray(0, read));
+      total += read;
+    }
+    if (max > 0 && total > max) throw tooLarge();
+    if (chunks.length === 1) return chunks[0];
+    const content = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      content.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return content;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /** Error patterns that are safe to pass through (contain virtual paths, not real ones). */
 const OVERLAY_PASSTHROUGH_ERRORS = ["ELOOP", "EFBIG", "EPERM"] as const;
 
@@ -223,6 +273,28 @@ export class OverlayFs implements IFileSystem {
     if (this.readOnly) {
       throw new Error(`EROFS: read-only file system, ${operation}`);
     }
+  }
+
+  /**
+   * (1ctx readonly-errors) On a read-only overlay, a path that could not be
+   * made anyway answers as Linux does before EROFS: a missing parent is
+   * ENOENT, a file as parent ENOTDIR, a folder written to EISDIR.
+   */
+  private async assertCreatable(path: string, operation: string) {
+    if (!this.readOnly) return;
+    const normalized = normalizePath(path);
+    const parent = await this.stat(dirname(normalized)).catch(() => undefined);
+    if (parent === undefined) {
+      throw new Error(`ENOENT: no such file or directory, ${operation}`);
+    }
+    if (!parent.isDirectory) {
+      throw new Error(`ENOTDIR: not a directory, ${operation}`);
+    }
+    const own = await this.stat(normalized).catch(() => undefined);
+    if (own?.isDirectory) {
+      throw new Error(`EISDIR: illegal operation on a directory, ${operation}`);
+    }
+    this.assertWritable(operation);
   }
 
   /**
@@ -537,19 +609,11 @@ export class OverlayFs implements IFileSystem {
           `EFBIG: file too large, read '${path}' (${stat.size} bytes, max ${this.maxFileReadSize})`,
         );
       }
-      // Use O_NOFOLLOW (when symlinks disabled) to prevent TOCTOU: if the
-      // file at `canonical` is swapped for a symlink between lstat and read,
-      // O_NOFOLLOW makes the open fail instead of following the symlink.
-      const flags = this.allowSymlinks
-        ? fs.constants.O_RDONLY
-        : fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW;
-      const fh = await fs.promises.open(canonical, flags);
-      try {
-        const content = await fh.readFile();
-        return new Uint8Array(content);
-      } finally {
-        await fh.close();
-      }
+      // (1ctx overlay-read) Bun's fs.promises.open makes a FinalizationRegistry,
+      // which the defense-in-depth box refuses, so the file is read through a
+      // descriptor. O_NOFOLLOW always: a link was resolved through the virtual
+      // layer above, so one found here was swapped in after the check.
+      return readRegularFile(canonical, path, this.maxFileReadSize);
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
       if (code === "ENOENT") {
@@ -569,7 +633,7 @@ export class OverlayFs implements IFileSystem {
     options?: WriteFileOptions | BufferEncoding,
   ): Promise<void> {
     validatePath(path, "write");
-    this.assertWritable(`write '${path}'`);
+    await this.assertCreatable(path, `write '${path}'`); // (1ctx readonly-errors)
     const normalized = normalizePath(path);
     this.ensureParentDirs(normalized);
 
@@ -591,7 +655,7 @@ export class OverlayFs implements IFileSystem {
     options?: WriteFileOptions | BufferEncoding,
   ): Promise<void> {
     validatePath(path, "append");
-    this.assertWritable(`append '${path}'`);
+    await this.assertCreatable(path, `append '${path}'`); // (1ctx readonly-errors)
     const normalized = normalizePath(path);
     const encoding = getEncoding(options);
     const newBuffer = toBuffer(content, encoding);
@@ -824,7 +888,7 @@ export class OverlayFs implements IFileSystem {
 
   async mkdir(path: string, options?: MkdirOptions): Promise<void> {
     validatePath(path, "mkdir");
-    this.assertWritable(`mkdir '${path}'`);
+    // (1ctx readonly-errors) the read-only check is below, last
     const normalized = normalizePath(path);
 
     // Check if it exists (in memory or real fs)
@@ -849,6 +913,9 @@ export class OverlayFs implements IFileSystem {
       }
     }
 
+    // (1ctx readonly-errors) checked last, so an existing folder or a
+    // missing parent answers as on Linux and `mkdir -p` of a folder works
+    await this.assertCreatable(path, `mkdir '${path}'`);
     this.setMemoryEntry(normalized, {
       type: "directory",
       mode: DEFAULT_DIR_MODE,
@@ -1040,7 +1107,7 @@ export class OverlayFs implements IFileSystem {
   ): Promise<void> {
     const syscall = options.directory ? "mkdir" : "open";
     validatePath(path, syscall);
-    this.assertWritable(`${syscall} '${path}'`);
+    await this.assertCreatable(path, `${syscall} '${path}'`); // (1ctx readonly-errors)
     const normalized = normalizePath(path);
 
     if (await this.existsInOverlay(normalized)) {
@@ -1329,7 +1396,7 @@ export class OverlayFs implements IFileSystem {
       throw new Error(`EPERM: operation not permitted, symlink '${linkPath}'`);
     }
     validatePath(linkPath, "symlink");
-    this.assertWritable(`symlink '${linkPath}'`);
+    await this.assertCreatable(linkPath, `symlink '${linkPath}'`); // (1ctx readonly-errors)
     const normalized = normalizePath(linkPath);
 
     const exists = await this.existsInOverlay(normalized);
@@ -1350,7 +1417,7 @@ export class OverlayFs implements IFileSystem {
   async link(existingPath: string, newPath: string): Promise<void> {
     validatePath(existingPath, "link");
     validatePath(newPath, "link");
-    this.assertWritable(`link '${newPath}'`);
+    await this.assertCreatable(newPath, `link '${newPath}'`); // (1ctx readonly-errors)
     const existingNorm = normalizePath(existingPath);
     const newNorm = normalizePath(newPath);
 
@@ -1455,13 +1522,15 @@ export class OverlayFs implements IFileSystem {
     validatePath(path, "realpath");
     const normalized = normalizePath(path);
     const seen = new Set<string>();
+    // (1ctx overlay-read) links on disk followed, counted as Linux does
+    let diskLinks = 0;
 
     // Helper to resolve symlinks iteratively
     const resolveAll = async (p: string): Promise<string> => {
       const parts = p === "/" ? [] : p.slice(1).split("/");
       let resolved = "";
 
-      for (const part of parts) {
+      for (const [index, part] of parts.entries()) { // (1ctx overlay-read)
         resolved = `${resolved}/${part}`;
 
         // Check for loops
@@ -1515,25 +1584,39 @@ export class OverlayFs implements IFileSystem {
           const realPath = this.toRealPath(resolved);
           const canonical = this.resolveRealPath_(realPath);
           if (canonical) {
+            // (1ctx overlay-read) the link itself: canonical is where the
+            // host already resolved it, so a link was never seen
+            const linkPath =
+              (this.allowSymlinks && this.resolveRealPathParent_(realPath)) ||
+              canonical;
             try {
-              const stat = await fs.promises.lstat(canonical);
+              const stat = await fs.promises.lstat(linkPath); // (1ctx overlay-read)
               if (stat.isSymbolicLink()) {
                 if (!this.allowSymlinks) {
                   throw new Error(
                     `ENOENT: no such file or directory, realpath '${path}'`,
                   );
                 }
-                const rawTarget = await fs.promises.readlink(canonical);
+                const rawTarget = await fs.promises.readlink(linkPath); // (1ctx overlay-read)
                 const virtualTarget = this.realTargetToVirtual(
                   resolved,
                   rawTarget,
                 );
-                seen.add(resolved);
+                // (1ctx overlay-read) the rest of the path goes on from the
+                // link's target, and a count, not the links seen, finds a
+                // loop, so `a -> .` resolves `a/a`
+                if (++diskLinks > MAX_SYMLINK_DEPTH) {
+                  throw new Error(
+                    `ELOOP: too many levels of symbolic links, realpath '${path}'`,
+                  );
+                }
                 resolved = this.resolveSymlink(resolved, virtualTarget);
-
-                // Continue resolving from the new path
-                // We need to restart from this point to handle nested symlinks
-                return resolveAll(resolved);
+                const rest = parts.slice(index + 1).join("/"); // (1ctx overlay-read)
+                return resolveAll(
+                  rest === ""
+                    ? resolved
+                    : `${resolved === "/" ? "" : resolved}/${rest}`,
+                );
               }
             } catch (e) {
               if ((e as NodeJS.ErrnoException).code === "ENOENT") {

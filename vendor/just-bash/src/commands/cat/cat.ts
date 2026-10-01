@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { latin1FromBytes, readBytesFrom } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -134,7 +136,8 @@ export const catCommand: RuntimeCommand = {
         stream += rawContent;
       } catch (error) {
         rethrowFatalExecutionError(error);
-        stderr += `cat: ${file}: No such file or directory\n`;
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr += `cat: ${file}: ${readErrorWords(error)}\n`;
         exitCode = 1;
       }
     }

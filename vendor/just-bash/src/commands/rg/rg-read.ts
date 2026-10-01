@@ -3,6 +3,8 @@
  * standard input, a file, a gzip file under -z, and --pre's output.
  */
 
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../../fs/error-words.js";
 import { gunzipSync } from "node:zlib";
 import {
   decodeBytesToUtf8,
@@ -226,6 +228,8 @@ export async function readFileContent(
   } catch (error) {
     lease?.release();
     rethrowFatalExecutionError(error);
+    // (1ctx readonly-errors) a file over the read limit is reported
+    if (fsErrorCode(error) === "EFBIG") throw error;
     return null;
   }
 }

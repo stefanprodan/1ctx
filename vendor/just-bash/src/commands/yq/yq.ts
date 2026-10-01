@@ -10,6 +10,8 @@
 
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { writeRefusalWords, readErrorWords } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -570,7 +572,8 @@ export const yqCommand: RuntimeCommand = {
         }
         return {
           stdout: "",
-          stderr: `yq: ${files[0]}: No such file or directory\n`,
+          // (1ctx readonly-errors) a file over the read limit says so
+          stderr: `yq: ${files[0]}: ${readErrorWords(e)}\n`,
           exitCode: 2,
         };
       }
@@ -734,8 +737,11 @@ export const yqCommand: RuntimeCommand = {
             "output_size",
           );
         }
-        await withDefenseContext("in-place write", () =>
-          ctx.fs.writeFile(filePath, text),
+        // (1ctx readonly-errors)
+        await writeInPlace(files[0], () =>
+          withDefenseContext("in-place write", () =>
+            ctx.fs.writeFile(filePath, text),
+          ),
         );
         return {
           stdout: "",
@@ -765,8 +771,11 @@ export const yqCommand: RuntimeCommand = {
             exitCode: 1,
           };
         }
-        await withDefenseContext("in-place write", () =>
-          ctx.fs.writeFile(filePath, finalOutput),
+        // (1ctx readonly-errors)
+        await writeInPlace(files[0], () =>
+          withDefenseContext("in-place write", () =>
+            ctx.fs.writeFile(filePath, finalOutput),
+          ),
         );
         return {
           stdout: "",
@@ -927,7 +936,8 @@ async function runEvalAll(
           if (e instanceof SecurityViolationError) throw e;
           return {
             stdout: "",
-            stderr: `yq: ${name}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `yq: ${name}: ${readErrorWords(e)}\n`,
             exitCode: 2,
           };
         }
@@ -1048,8 +1058,11 @@ async function runEvalAll(
           "output_size",
         );
       }
-      await withDefenseContext("in-place write", () =>
-        ctx.fs.writeFile(source.path, text),
+      // (1ctx readonly-errors)
+      await writeInPlace(names[file], () =>
+        withDefenseContext("in-place write", () =>
+          ctx.fs.writeFile(source.path, text),
+        ),
       );
     }
     return {
@@ -1062,10 +1075,30 @@ async function runEvalAll(
   }
 }
 
+// (1ctx readonly-errors) a file -i cannot write, named as typed
+class InPlaceRefusal extends Error {}
+
+async function writeInPlace(
+  name: string,
+  write: () => Promise<void>,
+): Promise<void> {
+  try {
+    await write();
+  } catch (e) {
+    const words = writeRefusalWords(e);
+    if (words === undefined) throw e;
+    throw new InPlaceRefusal(`${name}: ${words}`);
+  }
+}
+
 /** The answer for an error the run stopped on. */
 function failed(e: unknown): ExecResult {
   if (e instanceof SecurityViolationError) {
     throw e;
+  }
+  // (1ctx readonly-errors)
+  if (e instanceof InPlaceRefusal) {
+    return { stdout: "", stderr: `yq: ${e.message}\n`, exitCode: 1 };
   }
   if (e instanceof ExecutionLimitError) {
     const message = sanitizeErrorMessage(e.message);

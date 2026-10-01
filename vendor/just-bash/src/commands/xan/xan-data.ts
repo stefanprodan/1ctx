@@ -3,6 +3,8 @@
  * Commands that exist in real xan
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
@@ -185,7 +187,8 @@ export async function cmdFixlengths(
       rethrowFatalExecutionError(error);
       return {
         stdout: "",
-        stderr: `xan fixlengths: ${file}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `xan fixlengths: ${file}: ${readErrorWords(error)}\n`,
         exitCode: 1,
       };
     }
@@ -605,7 +608,8 @@ async function cmdFromJson(
       rethrowFatalExecutionError(error);
       return {
         stdout: "",
-        stderr: `xan from: ${file}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `xan from: ${file}: ${readErrorWords(error)}\n`,
         exitCode: 1,
       };
     }

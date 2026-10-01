@@ -12,6 +12,8 @@ import {
   normalizePath,
 } from "./path-utils.js";
 import { sanitizeErrorMessage } from "./sanitize-error.js";
+// (1ctx find-batch)
+import { settleAll } from "../utils/settle.js";
 
 declare const canonicalPathBrand: unique symbol;
 
@@ -83,6 +85,21 @@ function isMissingPathError(error: unknown): boolean {
 }
 
 /**
+ * (1ctx walk-links) A folder's key for a walk's cycle check: its real path,
+ * since a mount's root has one identity in memory and another on disk.
+ */
+export async function directoryKey(
+  fs: IFileSystem,
+  path: string,
+): Promise<string | undefined> {
+  try {
+    return normalizePath(await fs.realpath(path));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Resolve an existing path to both its canonical spelling and, where the
  * backend supports it, an alias-resistant identity. For a path that does not
  * exist, canonicalize the nearest existing parent and append all missing
@@ -150,7 +167,8 @@ export async function compareFileIdentity(
   left: string,
   right: string,
 ): Promise<SameFileResult> {
-  const [leftIdentity, rightIdentity] = await Promise.all([
+  // (1ctx find-batch)
+  const [leftIdentity, rightIdentity] = await settleAll([
     resolveFileIdentity(fs, left),
     resolveFileIdentity(fs, right),
   ]);
@@ -198,7 +216,8 @@ export async function compareCanonicalContainment(
   destination: string,
   budget?: FileTraversalBudget,
 ): Promise<PathContainmentResult> {
-  const [source, candidate] = await Promise.all([
+  // (1ctx find-batch)
+  const [source, candidate] = await settleAll([
     resolveFileIdentity(fs, sourceDirectory, budget),
     resolveFileIdentity(fs, destination, budget),
   ]);

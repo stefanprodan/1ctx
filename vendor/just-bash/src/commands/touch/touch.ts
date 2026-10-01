@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { writeRefusalWords } from "../../fs/error-words.js";
 import { getErrorMessage } from "../../interpreter/helpers/errors.js";
 import type {
   ExecResult,
@@ -178,7 +180,9 @@ export const touchCommand: RuntimeCommand = {
         const mtime = targetTime ?? new Date();
         await ctx.fs.utimes(fullPath, mtime, mtime);
       } catch (error) {
-        stderr += `touch: cannot touch '${file}': ${getErrorMessage(error)}\n`;
+        // (1ctx readonly-errors) the words, never the backend's own path
+        const words = writeRefusalWords(error) ?? getErrorMessage(error);
+        stderr += `touch: cannot touch '${file}': ${words}\n`;
         exitCode = 1;
       }
     }

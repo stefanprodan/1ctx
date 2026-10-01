@@ -6,6 +6,8 @@
  * Writes each FILE to standard output, last line first.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { latin1FromBytes } from "../../encoding.js";
 import type {
   ExecResult,
@@ -34,10 +36,11 @@ async function tacExecute(
         stderr: "",
         exitCode: 0,
       };
-    } catch {
+    } catch (error) { // (1ctx readonly-errors)
       return {
         stdout: "",
-        stderr: `tac: ${args[0]}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `tac: ${args[0]}: ${readErrorWords(error)}\n`,
         exitCode: 1,
       };
     }

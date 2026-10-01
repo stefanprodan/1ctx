@@ -75,6 +75,9 @@ export function errorWords(error: unknown): string {
       return "Is a directory";
     case "ELOOP":
       return "Too many levels of symbolic links";
+    // (1ctx readonly-errors) a file over the read limit
+    case "EFBIG":
+      return "File too large";
     default:
       return error instanceof Error ? error.message : String(error);
   }

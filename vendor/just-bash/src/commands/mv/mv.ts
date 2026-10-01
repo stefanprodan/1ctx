@@ -1,3 +1,10 @@
+// (1ctx readonly-errors)
+import {
+  fsErrorCode,
+  fsErrorSyscall,
+  fsErrorWords,
+  writeRefusalWords,
+} from "../../fs/error-words.js";
 import { isSameOrDescendantPath } from "../../fs/path-utils.js";
 import {
   compareCanonicalContainment,
@@ -104,9 +111,11 @@ export const mvCommand: RuntimeCommand = {
     }
 
     for (const src of sources) {
+      let srcIsDirectory = false; // (1ctx readonly-errors)
       try {
         const srcPath = ctx.fs.resolvePath(ctx.cwd, src);
         const srcStat = await ctx.fs.stat(srcPath);
+        srcIsDirectory = srcStat.isDirectory; // (1ctx readonly-errors)
 
         let targetPath = destPath;
         if (destIsDir) {
@@ -187,8 +196,29 @@ export const mvCommand: RuntimeCommand = {
           throw error;
         }
         const message = getErrorMessage(error);
-        if (message.includes("ENOENT") || message.includes("no such file")) {
+        // (1ctx readonly-errors) a mount point is busy, as Linux says
+        const busy = fsErrorCode(error) === "EBUSY";
+        const words = busy ? fsErrorWords(error) : writeRefusalWords(error);
+        if (
+          words === undefined &&
+          (message.includes("ENOENT") || message.includes("no such file"))
+        ) {
           stderr += `mv: cannot stat '${src}': No such file or directory\n`;
+        } else if (words !== undefined) {
+          // (1ctx readonly-errors) GNU's words for the step that failed: a
+          // move across file systems copies, then removes the source
+          const target = destIsDir
+            ? `${dest.replace(/\/+$/, "")}/${src.split("/").pop() || src}`
+            : dest;
+          const syscall = busy ? "mv" : fsErrorSyscall(error);
+          stderr +=
+            syscall === "rm"
+              ? `mv: cannot remove '${src}': ${words}\n`
+              : syscall === "mv" || syscall === "rename"
+                ? `mv: cannot move '${src}' to '${target}': ${words}\n`
+                : syscall === "mkdir" || srcIsDirectory
+                  ? `mv: cannot create directory '${target}': ${words}\n`
+                  : `mv: cannot create regular file '${target}': ${words}\n`;
         } else {
           stderr += `mv: cannot move '${src}': ${message}\n`;
         }

@@ -5,6 +5,8 @@
  * including parallel batch reading for performance.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../fs/error-words.js";
 import { type ByteString, EMPTY_BYTES, readBytesFrom } from "../encoding.js";
 import { ExecutionLimitError } from "../interpreter/errors.js";
 import type { ExecResult, RuntimeCommandContext } from "../types.js";
@@ -120,11 +122,12 @@ export async function readFiles(
           // on the content before regex / parsing.
           const content = await readBytesFrom(ctx.fs, filePath);
           return { filename: file, content, error: null as string | null };
-        } catch {
+        } catch (error) { // (1ctx readonly-errors)
           return {
             filename: file,
             content: EMPTY_BYTES,
-            error: `${cmdName}: ${file}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            error: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
           };
         }
       }),

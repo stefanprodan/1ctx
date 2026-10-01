@@ -2,6 +2,8 @@
  * CSV parsing and formatting utilities for xan command
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import Papa from "papaparse";
 import {
   BoundedStringBuilder,
@@ -363,7 +365,8 @@ export async function readCsvInput(
         data: [],
         error: {
           stdout: "",
-          stderr: `xan: ${file}: No such file or directory\n`,
+          // (1ctx readonly-errors) a file over the read limit says so
+          stderr: `xan: ${file}: ${readErrorWords(error)}\n`,
           exitCode: 1,
         },
       };

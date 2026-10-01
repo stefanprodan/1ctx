@@ -1,6 +1,8 @@
 import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
+// (1ctx readonly-errors)
+import { fsErrorCode, isReadOnlyError } from "../../fs/error-words.js";
 import type { DirentEntry } from "../../fs/interface.js";
 // (1ctx find-links) keep host paths out of unfamiliar link errors
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
@@ -17,6 +19,28 @@ import { formatMode } from "../format-mode.js";
 
 // Use a larger batch size for find to maximize parallel I/O
 const FIND_BATCH_SIZE = 500;
+
+/**
+ * Wait for every node in a batch before failing on any of them.
+ *
+ * `Promise.all` rejects on the first failure and leaves the rest of the batch
+ * running. Those siblings finish after `find` has returned, once the command's
+ * execution has been deactivated, and the defense-in-depth box blocks the
+ * rejection handler `Promise.all` attached to each of them and re-raises the
+ * error on a promise nothing holds: one unhandled rejection per sibling, which
+ * ends a Node process that has no handler. Waiting keeps every continuation
+ * inside the execution that started it. The failure reported is the first in
+ * traversal order. Upstream #451. (1ctx find-batch)
+ */
+async function settleBatch<T>(work: readonly Promise<T>[]): Promise<T[]> {
+  const settled = await Promise.allSettled(work);
+  const values: T[] = [];
+  for (const result of settled) {
+    if (result.status === "rejected") throw result.reason;
+    values.push(result.value);
+  }
+  return values;
+}
 
 // Tracing helpers
 interface TraceCounters {
@@ -891,7 +915,8 @@ export const findCommand: RuntimeCommand = {
             );
             const batch = workQueue.slice(workCursor, batchEnd);
             workCursor = batchEnd;
-            const nodes = await Promise.all(
+            // (1ctx find-batch)
+            const nodes = await settleBatch(
               batch.map((q) => processNode(q.item)),
             );
             traceCounters.batchCount++;
@@ -994,7 +1019,8 @@ export const findCommand: RuntimeCommand = {
             );
             const batch = workQueue.slice(workCursor, batchEnd);
             workCursor = batchEnd;
-            const processed: Array<NodeWithOrder | null> = await Promise.all(
+            // (1ctx find-batch)
+            const processed: Array<NodeWithOrder | null> = await settleBatch(
               batch.map(async ({ item, orderIndex }) => {
                 const node = await processNode(item);
                 return node ? { node, orderIndex } : null;
@@ -1093,7 +1119,14 @@ export const findCommand: RuntimeCommand = {
           try {
             await ctx.fs.rm(fullPath, { recursive: false });
           } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
+            // (1ctx readonly-errors) the words, never the backend's own path
+            const msg = isReadOnlyError(e)
+              ? "Read-only file system"
+              : fsErrorCode(e) === "EBUSY"
+                ? "Device or resource busy"
+                : e instanceof Error
+                ? e.message
+                : String(e);
             appendStderr(`find: cannot delete '${file}': ${msg}\n`);
             exitCode = 1;
           }

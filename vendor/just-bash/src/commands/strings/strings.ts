@@ -7,6 +7,8 @@
  * MIN characters long. If no FILE is specified, standard input is read.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import {
   ExecutionAbortedError,
   ExecutionLimitError,
@@ -337,11 +339,12 @@ export const strings: RuntimeCommand = {
           const filePath = ctx.fs.resolvePath(ctx.cwd, file);
           try {
             buffer = await ctx.fs.readFileBuffer(filePath);
-          } catch {
+          } catch (error) { // (1ctx readonly-errors)
             return {
               exitCode: 1,
               stdout: output,
-              stderr: `strings: ${file}: No such file or directory\n`,
+              // (1ctx readonly-errors) a file over the read limit says so
+              stderr: `strings: ${file}: ${readErrorWords(error)}\n`,
             };
           }
         }

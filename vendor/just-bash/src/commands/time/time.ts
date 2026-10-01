@@ -1,4 +1,6 @@
 import { latin1FromBytes } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { writeRefusalWords } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { mapToRecord } from "../../helpers/env.js";
 import { shellJoinArgs } from "../../helpers/shell-quote.js";
@@ -180,7 +182,10 @@ export const timeCommand: RuntimeCommand = {
           await ctx.fs.writeFile(filePath, timingOutput);
         }
       } catch (error) {
-        const message = sanitizeErrorMessage((error as Error).message);
+        // (1ctx readonly-errors) the words, never the backend's own path
+        const message =
+          writeRefusalWords(error) ??
+          sanitizeErrorMessage((error as Error).message);
         return {
           stdout: result.stdout,
           stderr:

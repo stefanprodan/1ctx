@@ -3,6 +3,8 @@
  * Uses WebCrypto API for SHA algorithms, pure JS for MD5
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { decodeBytesToUtf8, latin1FromBytes } from "../../encoding.js";
 import type {
   ExecResult,
@@ -180,6 +182,8 @@ export function createChecksumCommand(
 
       // Helper to read file as binary. md5sum hashes raw bytes — pass them
       // through without decoding.
+      // (1ctx readonly-errors) why the last read failed
+      let readFailure: unknown;
       const readBinary = async (file: string): Promise<Uint8Array | null> => {
         if (file === "-") {
           return Uint8Array.from(latin1FromBytes(ctx.stdin), (c) =>
@@ -188,7 +192,8 @@ export function createChecksumCommand(
         }
         try {
           return await ctx.fs.readFileBuffer(ctx.fs.resolvePath(ctx.cwd, file));
-        } catch {
+        } catch (error) { // (1ctx readonly-errors)
+          readFailure = error;
           return null;
         }
       };
@@ -205,11 +210,15 @@ export function createChecksumCommand(
               ? decodeBytesToUtf8(ctx.stdin)
               : await ctx.fs
                   .readFile(ctx.fs.resolvePath(ctx.cwd, file))
-                  .catch(() => null);
+                  .catch((error) => { // (1ctx readonly-errors)
+                    readFailure = error;
+                    return null;
+                  });
           if (content === null)
             return {
               stdout: "",
-              stderr: `${name}: ${file}: No such file or directory\n`,
+              // (1ctx readonly-errors) a file over the read limit says so
+              stderr: `${name}: ${file}: ${readErrorWords(readFailure)}\n`,
               exitCode: 1,
             };
 
@@ -243,7 +252,8 @@ export function createChecksumCommand(
       for (const file of files) {
         const content = await readBinary(file);
         if (content === null) {
-          output += `${name}: ${file}: No such file or directory\n`;
+          // (1ctx readonly-errors) a file over the read limit says so
+          output += `${name}: ${file}: ${readErrorWords(readFailure)}\n`;
           exitCode = 1;
           continue;
         }

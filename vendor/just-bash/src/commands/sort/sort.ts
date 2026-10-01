@@ -1,4 +1,6 @@
 import { decodeBytesToUtf8 } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { writeRefusalWords } from "../../fs/error-words.js";
 import type {
   ExecResult,
   RuntimeCommand,
@@ -215,7 +217,18 @@ export const sortCommand: RuntimeCommand = {
     // sort emits text; the pipeline handles encoding.
     if (options.outputFile) {
       const outPath = ctx.fs.resolvePath(ctx.cwd, options.outputFile);
-      await ctx.fs.writeFile(outPath, output);
+      try {
+        await ctx.fs.writeFile(outPath, output);
+      } catch (error) {
+        // (1ctx readonly-errors) GNU sort's words for an output it cannot open
+        const words = writeRefusalWords(error);
+        if (words === undefined) throw error;
+        return {
+          stdout: "",
+          stderr: `sort: open failed: ${options.outputFile}: ${words}\n`,
+          exitCode: 2,
+        };
+      }
       return { stdout: "", stderr: "", exitCode: 0 };
     }
 

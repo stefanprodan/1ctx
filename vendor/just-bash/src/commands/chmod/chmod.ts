@@ -1,5 +1,7 @@
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+// (1ctx readonly-errors)
+import { fsErrorCode, fsErrorWords } from "../../fs/error-words.js";
 import { FileTraversalBudget, traverseFileTree } from "../../fs/traversal.js";
 import type {
   ExecResult,
@@ -145,7 +147,12 @@ export const chmodCommand: RuntimeCommand = {
         }
       } catch (error) {
         rethrowFatalExecutionError(error);
-        stderr += `chmod: cannot access '${file}': No such file or directory\n`;
+        // (1ctx readonly-errors) a file that exists but refuses the change
+        const words = fsErrorWords(error);
+        stderr +=
+          words === undefined || fsErrorCode(error) === "ENOENT"
+            ? `chmod: cannot access '${file}': No such file or directory\n`
+            : `chmod: changing permissions of '${file}': ${words}\n`;
         anyError = true;
       }
     }

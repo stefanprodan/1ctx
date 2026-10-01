@@ -314,7 +314,7 @@ describe("awk output files and speed", () => {
       "/w/d/x": "",
     });
     expect(r.stdout).toBe("");
-    expect(r.stderr).toContain("EISDIR");
+    expect(r.stderr).toBe("awk: cannot redirect to `d': Is a directory\n");
     expect(r.exitCode).toBe(2);
   });
 

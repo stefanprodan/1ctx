@@ -289,6 +289,32 @@ findutils 4.11.0 answered. Where they part:
   from reading it. When both `-empty` and the descent fail on a folder,
   ours reports it once and GNU twice.
 
+## Where a read-only mount still differs from Linux
+
+`test/vendor/just-bash/readonly-errors.test.ts`,
+`overlay-mount.test.ts` and `walk-links.test.ts` hold the words; these
+differ from bash, GNU coreutils 9.11, GNU grep, tree 2 and ripgrep 15 on
+a read-only Linux mount:
+
+- `rmdir` of a folder with files says `Directory not empty` where Linux
+  refuses it as read-only first.
+- `sed -i` names its temporary file `sedXXXXXX`, where GNU sed names
+  the random one it tried; a refused `w` file is named by its full path
+  and reported after the input is read, where GNU sed fails at the open.
+- `mkdir -p` names the operand, where GNU names the first folder it
+  could not make; `chmod -R` stops at the operand and `mv` of a folder
+  out of the mount reports the folder once, where GNU reports each
+  entry.
+- `tar` leaves out GNU's closing `Exiting with failure status` line.
+- `cp -r` out of the mount stops at the first file over the read limit,
+  naming it, where GNU cp reports it and copies the rest.
+- `md5sum` says a file it cannot read on stdout, as upstream's test
+  holds, where GNU says it on stderr.
+- `rg -L` passes over a link back into a folder above without a word,
+  where ripgrep says `File system loop found`.
+- The glob walk counts toward `maxGlobOperations`, not the traversal
+  limits.
+
 ## Where our mktemp and yes still differ from GNU coreutils
 
 - GNU's unique-prefix abbreviations of long options (`--vers`, `--dry`,

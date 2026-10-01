@@ -7,6 +7,9 @@
  * If no FILE is specified, standard input is read.
  */
 
+// (1ctx readonly-errors)
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../../fs/error-words.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import type {
   ExecResult,
@@ -259,7 +262,18 @@ export const fold: RuntimeCommand = {
       // Process each file
       for (const file of files) {
         const filePath = ctx.fs.resolvePath(ctx.cwd, file);
-        const content = await ctx.fs.readFile(filePath);
+        // (1ctx readonly-errors) a file over the read limit says so
+        let content: string;
+        try {
+          content = await ctx.fs.readFile(filePath);
+        } catch (error) {
+          if (fsErrorCode(error) !== "EFBIG") throw error;
+          return {
+            exitCode: 1,
+            stdout: output,
+            stderr: `fold: ${file}: File too large\n`,
+          };
+        }
         if (content === null) {
           return {
             exitCode: 1,

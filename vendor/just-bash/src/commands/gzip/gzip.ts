@@ -9,6 +9,8 @@ import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { latin1FromBytes } from "../../encoding.js";
 import type { ResourceLease } from "../../execution-scope.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+// (1ctx readonly-errors)
+import { writeRefusalWords, readErrorWords } from "../../fs/error-words.js";
 import { traverseFileTree } from "../../fs/traversal.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type {
@@ -433,6 +435,32 @@ interface GzipResult {
   exitCode: number;
 }
 
+// (1ctx readonly-errors) GNU gzip's words for an output it cannot write or
+// an input it cannot remove, by the name that failed
+async function refusedWrite(
+  cmdName: string,
+  outputPath: string,
+  file: string,
+  write: () => Promise<void>,
+  remove: () => Promise<void> | undefined,
+): Promise<ExecResult | undefined> {
+  let name = outputPath;
+  try {
+    await write();
+    name = file;
+    await remove();
+  } catch (error) {
+    const words = writeRefusalWords(error);
+    if (words === undefined) throw error;
+    return {
+      stdout: "",
+      stderr: `${cmdName}: ${name}: ${words}\n`,
+      exitCode: 1,
+    };
+  }
+  return undefined;
+}
+
 async function processFile(
   ctx: RuntimeCommandContext,
   file: string,
@@ -545,10 +573,11 @@ async function processFile(
       }
       return { stdout: "", stderr: "", exitCode: 1 };
     }
-  } catch {
+  } catch (error) { // (1ctx readonly-errors)
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -564,7 +593,8 @@ async function processFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -654,12 +684,15 @@ async function processFile(
       }
 
       // Write decompressed file
-      await ctx.fs.writeFile(outputPath, decompressed);
-
-      // Remove original unless -k
-      if (!flags.keep && !toStdout) {
-        await ctx.fs.rm(inputPath);
-      }
+      // (1ctx readonly-errors)
+      const refused = await refusedWrite(
+        cmdName,
+        outputPath,
+        file,
+        () => ctx.fs.writeFile(outputPath, decompressed),
+        () => (flags.keep || toStdout ? undefined : ctx.fs.rm(inputPath)),
+      );
+      if (refused) return refused;
 
       if (flags.verbose) {
         const ratio =
@@ -730,12 +763,15 @@ async function processFile(
       }
 
       // Write compressed file
-      await ctx.fs.writeFile(outputPath, compressed);
-
-      // Remove original unless -k
-      if (!flags.keep && !toStdout) {
-        await ctx.fs.rm(inputPath);
-      }
+      // (1ctx readonly-errors)
+      const refused = await refusedWrite(
+        cmdName,
+        outputPath,
+        file,
+        () => ctx.fs.writeFile(outputPath, compressed),
+        () => (flags.keep || toStdout ? undefined : ctx.fs.rm(inputPath)),
+      );
+      if (refused) return refused;
 
       if (flags.verbose) {
         const ratio =
@@ -830,7 +866,8 @@ async function listFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -884,7 +921,8 @@ async function testFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }

@@ -1,4 +1,10 @@
 import { decodeBytesToUtf8 } from "../../encoding.js";
+// (1ctx readonly-errors)
+import {
+  fsErrorWords,
+  readErrorWords,
+  writeRefusalWords,
+} from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { ExecutionLimits } from "../../limits.js";
@@ -322,7 +328,16 @@ async function processContent(
         if (e instanceof SecurityViolationError) {
           throw e;
         }
-        // Write error - silently ignore for now
+        // (1ctx readonly-errors) a refused w file fails as GNU sed's open
+        // does; any other write error is still ignored
+        const words = writeRefusalWords(e);
+        if (words !== undefined) {
+          return {
+            output: "",
+            exitCode: 4,
+            errorMessage: `sed: couldn't open file ${filePath}: ${words}`,
+          };
+        }
       }
     }
   }
@@ -527,9 +542,24 @@ export const sedCommand: RuntimeCommand = {
               exitCode: result.exitCode ?? 1,
             };
           }
-          await withDefenseContext("in-place output write", () =>
-            ctx.fs.writeFile(filePath, result.output),
-          );
+          try {
+            await withDefenseContext("in-place output write", () =>
+              ctx.fs.writeFile(filePath, result.output),
+            );
+          } catch (e) {
+            // (1ctx readonly-errors) GNU sed writes a temporary file beside
+            // the file, and names it when that fails
+            const words = fsErrorWords(e);
+            if (words === undefined || e instanceof SecurityViolationError)
+              throw e;
+            const slash = file.lastIndexOf("/");
+            const dir = slash < 0 ? "." : file.slice(0, slash) || "";
+            return {
+              stdout: "",
+              stderr: `sed: couldn't open temporary file ${dir}/sedXXXXXX: ${words}\n`,
+              exitCode: 4,
+            };
+          }
         } catch (e) {
           if (e instanceof SecurityViolationError) {
             throw e;
@@ -544,7 +574,8 @@ export const sedCommand: RuntimeCommand = {
           }
           return {
             stdout: "",
-            stderr: `sed: ${file}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `sed: ${file}: ${readErrorWords(e)}\n`,
             exitCode: 1,
           };
         }
@@ -624,7 +655,8 @@ export const sedCommand: RuntimeCommand = {
           }
           return {
             stdout: "",
-            stderr: `sed: ${file}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `sed: ${file}: ${readErrorWords(e)}\n`,
             exitCode: 1,
           };
         }

@@ -1,4 +1,6 @@
 import type { InterpreterContext } from "../types.js";
+// (1ctx find-batch)
+import { settleAll } from "../../utils/settle.js";
 
 /**
  * Resolve a path relative to the current working directory.
@@ -266,13 +268,15 @@ export async function evaluateBinaryFileTest(
     case "-ef": {
       // Same file (same device and inode)
       try {
-        const [leftReal, rightReal] = await Promise.all([
+        // (1ctx find-batch)
+        const [leftReal, rightReal] = await settleAll([
           ctx.fs.realpath(leftPath),
           ctx.fs.realpath(rightPath),
         ]);
         if (leftReal === rightReal) return true;
 
-        const [leftStat, rightStat] = await Promise.all([
+        // (1ctx find-batch)
+        const [leftStat, rightStat] = await settleAll([
           ctx.fs.stat(leftPath),
           ctx.fs.stat(rightPath),
         ]);

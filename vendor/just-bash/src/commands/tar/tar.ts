@@ -6,6 +6,11 @@
  */
 
 import { latin1FromBytes } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { fsErrorCode, writeRefusalWords } from "../../fs/error-words.js";
+// (1ctx walk-links)
+import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+import { FileTraversalBudget } from "../../fs/traversal.js";
 import { createUserRegex } from "../../regex/index.js";
 import type {
   ExecResult,
@@ -234,6 +239,13 @@ async function collectFiles(
   basePath: string,
   relativePath: string,
   exclude: string[],
+  // (1ctx walk-links) the whole archive's share of the traversal limits
+  budget = new FileTraversalBudget({
+    limits: ctx.limits,
+    signal: ctx.signal,
+    executionScope: ctx.executionScope,
+    site: "tar",
+  }),
 ): Promise<{ entries: TarCreateEntry[]; errors: string[] }> {
   const entries: TarCreateEntry[] = [];
   const errors: string[] = [];
@@ -244,7 +256,10 @@ async function collectFiles(
   }
 
   try {
-    const stat = await ctx.fs.stat(fullPath);
+    // (1ctx walk-links) a link is archived as a link, never walked through,
+    // as GNU tar does without -h
+    budget.visit(relativePath.split("/").length);
+    const stat = await ctx.fs.lstat(fullPath);
     if (isAborted(ctx)) return { entries, errors: ["tar: operation aborted"] };
 
     if (matchesExclude(relativePath, exclude)) {
@@ -277,6 +292,7 @@ async function collectFiles(
               basePath,
               relativePath ? `${relativePath}/${item}` : item,
               exclude,
+              budget, // (1ctx walk-links)
             ),
           ),
         );
@@ -310,7 +326,14 @@ async function collectFiles(
       });
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
+    rethrowFatalExecutionError(e); // (1ctx walk-links)
+    // (1ctx readonly-errors) a file over the read limit, in GNU tar's words
+    const msg =
+      fsErrorCode(e) === "EFBIG"
+        ? "Cannot open: File too large"
+        : e instanceof Error
+          ? e.message
+          : "unknown error";
     errors.push(`tar: ${relativePath}: ${msg}`);
   }
 
@@ -410,7 +433,8 @@ async function createTarArchive(
     try {
       await ctx.fs.writeFile(archivePath, archiveData);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "unknown error";
+      // (1ctx readonly-errors)
+      const msg = archiveWriteError(e);
       return {
         stdout: "",
         stderr: `tar: ${options.file}: ${msg}\n`,
@@ -546,7 +570,8 @@ async function appendTarArchive(
   try {
     await ctx.fs.writeFile(archivePath, archiveData);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
+    // (1ctx readonly-errors)
+    const msg = archiveWriteError(e);
     return {
       stdout: "",
       stderr: `tar: ${options.file}: ${msg}\n`,
@@ -693,7 +718,8 @@ async function updateTarArchive(
   try {
     await ctx.fs.writeFile(archivePath, archiveData);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
+    // (1ctx readonly-errors)
+    const msg = archiveWriteError(e);
     return {
       stdout: "",
       stderr: `tar: ${options.file}: ${msg}\n`,
@@ -950,7 +976,13 @@ async function extractTarArchive(
       }
     } catch (e) {
       if (isAborted(ctx)) return abortedResult();
-      const msg = e instanceof Error ? e.message : "unknown error";
+      // (1ctx readonly-errors) GNU tar's words for an entry it cannot write
+      const refused = writeRefusalWords(e);
+      const msg = refused
+        ? `Cannot ${entry.type === "directory" ? "mkdir" : "open"}: ${refused}`
+        : e instanceof Error
+          ? e.message
+          : "unknown error";
       errors.push(`tar: ${safeName}: ${msg}`);
     }
   }
@@ -1078,6 +1110,13 @@ async function listTarArchive(
   }
 
   return { stdout, stderr: "", exitCode: 0 };
+}
+
+// (1ctx readonly-errors) GNU tar's words for an archive it cannot write
+function archiveWriteError(e: unknown): string {
+  const refused = writeRefusalWords(e);
+  if (refused) return `Cannot open: ${refused}`;
+  return e instanceof Error ? e.message : "unknown error";
 }
 
 export const tarCommand: RuntimeCommand = {
