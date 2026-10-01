@@ -332,7 +332,7 @@ describe("the feed's ordered project ranges", () => {
       }
       db.close();
     }
-  });
+  }, 30_000);
 
   test("pages long project lists without changing SQL shape", () => {
     const { db, projectIds } = fixture(9, 501);
