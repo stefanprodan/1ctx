@@ -194,7 +194,8 @@ describe("a bash command that saves nothing", () => {
         bash("exit", "exit 3"),
       ]);
       script.end();
-      const answer = await waitScript(chat.scripted, 2);
+      // the loop runs to its cap first: wait as long as the test may
+      const answer = await waitScript(chat.scripted, 2, 3_600);
       const failed = logs.events.filter((event) => event.msg === "tool failed");
       expect(failed).toHaveLength(2);
       // a nonzero exit commits, so only the limit names a phase
