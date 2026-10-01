@@ -6,7 +6,7 @@
 
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import pkg from "../../package.json";
 import page from "../client/index.html";
 import type { SecretKind } from "../shared/words.ts";
@@ -107,7 +107,7 @@ if (cli.kind === "provision") {
   process.exit(0);
 }
 
-const { hostname, port, dbPath, secretsDir, provision } = cli.options;
+const { hostname, port, dbPath, secretsDir, cacheDir, provision } = cli.options;
 const { secureCookie, trustProxy, drain } = cli.options;
 
 const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
@@ -164,6 +164,9 @@ const app = await compose({
   secureCookie,
   trustProxy,
   drainMs: drain * 1000,
+  // an in-memory database keeps no cache either
+  cacheDir:
+    cacheDir ?? (dbPath === ":memory:" ? null : join(dirname(dbPath), "repos")),
 });
 app.sweep();
 app.mcpStart();
@@ -187,6 +190,9 @@ log.info("startup", {
   listen: `http://${server.hostname}:${server.port}`,
   db: displayPath(dbPath),
   secrets: displayPath(store.dir),
+  cache: app.repoCache === null ? "none" : displayPath(app.repoCache.dir),
+  cache_trees: app.repoCache?.trees,
+  cache_bytes: app.repoCache?.bytes,
   migrations: migrations.length > 0 ? migrations.join(",") : "current",
   provision:
     provision.length > 0 ? provision.map(displayPath).join(",") : undefined,

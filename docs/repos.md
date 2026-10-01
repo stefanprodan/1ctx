@@ -70,6 +70,116 @@ call them are in `docs/access.md`.
   not one of a send's credentials and its `credential:` switch does not
   govern it.
 
+## The lookup
+
+- **A turn resolves each repository's ref to a commit** through
+  `prepare()` (below). A full commit id needs no lookup.
+- **One lookup per repository a minute** (`REPO_LOOKUP_MS`), shared by
+  URL, ref and credential, and by project when signed, since a
+  credential is bound per project. Never shared between a signed and an
+  unsigned lookup. A failure is shared the same minute, and the cache
+  never mounts a tree past a failed lookup. A refresh or a change to
+  what is fetched drops the repository's lookup.
+- **Signed: the API.** `repoAuth()` again, then the adapter's lookup
+  with the last ETag; a 304 keeps the row's commit. The tarball then
+  comes from the API at that commit.
+- **Public: the archive.** A `GET` of the archive by ref is the lookup.
+  It carries `If-None-Match` only when that ETag's commit is cached
+  under the current ignore rules, so a 304 always has a tree to mount.
+  A 200 is the tarball, and the commit is read from its first member;
+  an archive naming none falls back to the API lookup, unsigned.
+- **The ETag on the row is scoped** to the lookup it came from (a short
+  hash of URL, ref and credential before it), so a changed ref never
+  sends an old one.
+
+## The fetch
+
+- **A fetch runs whole in `repos/fetch.worker.ts`**: the request, the
+  gunzip, the tar and the writes, through `streamTar()` in
+  `lib/archive.ts`. The job holds the URL, the credential's header and
+  prefix, the ignore text and the caps; the worker writes no SQLite and
+  answers counts or a closed word, never a host's text or a name.
+- **Redirects are followed by hand** (`repos/redirect.ts`): https only,
+  no userinfo, at most 3 hops, the header sent only under its prefix
+  (`covers()`) and never again after the first hop off it.
+- **A job is bounded:** `REPO_FETCH_MS` in all and `REPO_STALL_MS`
+  without a byte. The main thread terminates the worker at the deadline
+  and at the drain, since the unpack's loops are synchronous; the
+  worker also checks its time between members.
+- **One fetch per tree folder at a time**, each in one of
+  `REPO_FETCHES_IN_FLIGHT` slots and a process slot (`acquireProcess()`),
+  so commands keep the rest. A tree that failed is not fetched again for
+  a minute, one over the caps for `REPO_REFUSED_MS`, until a refresh.
+- **The row follows the fetch:** `pending`, `fetching` while one runs,
+  `ready` or `failed` with its word. A create, a refresh and a change
+  to what is fetched start a lookup and a fetch at once, so the admin
+  page shows the outcome. At startup `fetching` goes back to `pending`
+  and every `pending` row is fetched the same way, so no row waits.
+- **Caps:** `repoBytes` and `repoFiles` count what the ignore rules
+  keep; the worker also stops at 4 times `repoBytes` compressed or 4
+  times `repoFiles` members. Past any: `over the size cap`. Past a kept
+  cap the rest is counted and never written, up to those bounds, and
+  the failed row's `files` and `bytes` hold the counts, for the admin
+  page to set against the caps. A file past `repoFileBytes` is kept and
+  counted (`large`); the mount refuses to read it.
+
+## The tree
+
+- **A member loses the tarball's top folder,** then must pass
+  `validPath()` (`lib/paths.ts`, the skills' rule): no leading `/`, no
+  `.`, `..` or empty segment, no backslash or control character. A bad
+  name, a duplicate or a member under a file or a link fails the fetch.
+- **The commit is the first member's pax `comment=`,** 40 or 64 hex.
+  When the job knows the commit, a different one fails it `not found`.
+- **Files keep their mode with the owner's read bit,** and every file
+  and folder gets the commit's time. A symlink whose target stays
+  inside the tree is kept; one out of it, a hard link to nothing kept
+  and any other member is dropped and counted (`dropped`). A hard link
+  to a kept file is a copy.
+- **The ignore rules apply while unpacking,** per path and its parents
+  (`ignored()`), so an ignored file is never written; it counts toward
+  the members' bound.
+
+## The cache
+
+- **`--cache <dir>`, by default `repos/` beside the database.** It can
+  be lost: a tree missing is fetched again. Backups leave it out.
+- **`trees/<source>/<commit>-<ignore>/`** holds `tree.json` and
+  `files/`. `<source>` is a hash of the URL and `<ignore>` of the
+  effective rules (`ignoreKey()`), so no path part comes from a host, a
+  repository or a tarball. Two projects at one commit with the same
+  rules share a folder, each after its own lookup.
+- **A tree is published whole:** a job unpacks into `tmp/<job id>/`
+  and renames it into `trees/`; when that exists, a concurrent job won
+  and the loser removes its own. Startup removes `tmp/` and indexes the
+  trees; a folder without `tree.json` is removed.
+- **Eviction by last mount, never under a turn.** The index keeps when
+  each tree was last mounted (and the folder's time, moved at most
+  hourly). Past `repoCacheBytes` the least recent go, each renamed out
+  at once and removed in the background. A mounted folder is held until
+  its turn releases it. A fetch first checks the volume (`statfs`) for
+  `repoBytes` plus 1 GiB free, else `cache full`, then evicts. The
+  hourly sweep evicts and clears what a job left in `tmp/`.
+
+## The port
+
+`repos.prepare(projectId, { off, pinned, waitMs, signal })` at a turn's
+start answers `{ mounts, notices, release }`:
+
+- **One query for the project's rows,** none for a project with none;
+  nothing per command.
+- **A repository in `off`** (the session's `repo:` keys) is neither
+  looked up nor mounted.
+- **Each mount** names the repository, its commit, `folder` (the tree's
+  `files/`, absolute) and the counts. A cold tree is waited for at most
+  `waitMs` (`REPO_WAIT_MS`); past it the notice says `fetching` and
+  the fetch goes on. A failed lookup or fetch is a notice with its word.
+- **`pinned`** (a regenerate) mounts that commit when it is cached
+  after a lookup that passes, else the lookup's commit with
+  `missedPin` set.
+- **Every mounted folder is held** until `release()`, which the caller
+  runs when the turn ends.
+
 ## Logs
 
 The area logs `repo fetched`, `repo fetch failed` and `repo cache

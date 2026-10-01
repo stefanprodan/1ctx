@@ -15,6 +15,7 @@ import {
   type LogLevel,
   silent,
 } from "../../src/server/lib/log.ts";
+import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import {
   ADMIN_SECRET,
@@ -253,6 +254,9 @@ export async function testApp(
     db?: Db;
     // the shutdown's drain, on the fake clock
     drainMs?: number;
+    // the repositories' cache and their fetches; none fetches nothing
+    cacheDir?: string;
+    repoJobs?: JobRunner;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -314,6 +318,8 @@ export async function testApp(
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
     activate: options.activate,
     drainMs: options.drainMs,
+    cacheDir: options.cacheDir,
+    repoJobs: options.repoJobs,
   });
   return {
     ...app,

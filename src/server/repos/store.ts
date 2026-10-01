@@ -255,6 +255,14 @@ export class ReposStore {
       .run().changes;
   }
 
+  // at startup: the rows that wait for a fetch
+  pending(): string[] {
+    return this.db
+      .query<{ id: string }, []>("select id from repos where state = 'pending'")
+      .all()
+      .map((found) => found.id);
+  }
+
   delete(id: string): boolean {
     return this.db.query("delete from repos where id = ?").run(id).changes > 0;
   }

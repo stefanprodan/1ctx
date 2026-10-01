@@ -34,7 +34,11 @@ supported today.
 - **The log rotates only on install.** launchd holds it open while the
   service runs, so it moves to `.1` between the stop and the start.
 - **`uninstall --purge` removes the database and the log, never the
-  secrets.**
+  secrets.** The repositories' cache stays; it is only a cache.
+- **`--cache <dir>` is the repositories' cache,** `repos/` beside the
+  database by default (`~/.1ctx/repos` on staging). It can be lost, so
+  it may be a volume of its own that is neither durable nor snapshotted
+  (`docs/repos.md`); the deploy's `.backup` copies the database only.
 
 ## Staging
 
@@ -75,6 +79,8 @@ never written in a tracked file.
 - **Every file in `/secrets` must be readable by 65532.** It is
   mounted read-only. An unreadable key throws where it is read, and an
   unreadable `user-admin.key` fails the first start.
+- **The cache is `/data/repos` unless `--cache` names another
+  mount,** which must be writable by 65532.
 - **`/data` is a named volume, never a bind mount on Docker Desktop
   or OrbStack.** Their VirtioFS breaks the POSIX locks SQLite's WAL
   needs, which hangs or corrupts the database. A named volume takes

@@ -18,6 +18,8 @@ export type RunOptions = {
   dbPath: string;
   // null is the default directory, which depends on where the binary is
   secretsDir: string | null;
+  // the repositories' cache; null is repos/ beside the database
+  cacheDir: string | null;
   // files or folders applied before the server opens the db
   provision: string[];
   secureCookie: boolean;
@@ -68,6 +70,8 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
                          ":memory:" keeps nothing)
   --secrets <dir>        the secrets directory (default: ../secrets next to
                          the binary; .preview/secrets from source)
+  --cache <dir>          the repositories' cache, refetched when lost
+                         (default: repos/ beside the database)
   --provision <path>     YAML file or directory applied at every start, as
                          provision -f does; a missing path or one with no
                          YAML applies nothing, a failure exits; repeatable
@@ -122,6 +126,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
   let listen = DEFAULT_LISTEN;
   let dbPath = defaultDb(home);
   let secretsDir: string | null = null;
+  let cacheDir: string | null = null;
   let secureCookie = false;
   let trustProxy = false;
   let drain = DEFAULT_DRAIN;
@@ -138,6 +143,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       "--listen",
       "--db",
       "--secrets",
+      "--cache",
       "--provision",
       "--drain",
     ];
@@ -165,6 +171,10 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
         break;
       case "--secrets":
         secretsDir = value;
+        break;
+      case "--cache":
+        if (value === "") return { kind: "error", message: "--cache is empty" };
+        cacheDir = value;
         break;
       case "--provision":
         if (value === "" || value === "-") {
@@ -216,6 +226,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       ...address,
       dbPath,
       secretsDir,
+      cacheDir,
       provision,
       secureCookie,
       trustProxy,
@@ -230,6 +241,7 @@ export function optionsToArgs(options: RunOptions): string[] {
   const host = options.hostname;
   const args = ["--listen", `${host}:${options.port}`, "--db", options.dbPath];
   if (options.secretsDir !== null) args.push("--secrets", options.secretsDir);
+  if (options.cacheDir !== null) args.push("--cache", options.cacheDir);
   for (const path of options.provision) args.push("--provision", path);
   if (options.secureCookie) args.push("--secure-cookie");
   if (options.trustProxy) args.push("--trust-proxy");

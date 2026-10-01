@@ -53,6 +53,8 @@ export type RoutesDeps = {
   projects: ProjectsPort;
   credentials: Pick<CredentialsPort, "byId">;
   capabilities: CapabilitiesPort;
+  // after the commit: what is fetched changed, so fetch it now
+  changed(repoId: string): void;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -82,8 +84,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
   };
 
-  const create = (project: RepoProject, change: CreateRepoRequest) =>
-    transact(deps.db, () => {
+  const create = (project: RepoProject, change: CreateRepoRequest) => {
+    const made = transact(deps.db, () => {
       const fields = desired(null, change);
       checkRepo(project, fields, deps.credentials);
       if (deps.store.count(project.id) >= MAX_REPOS_PER_PROJECT) {
@@ -96,20 +98,27 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         result: answer(deps.store.create(project.id, fields, deps.clock())),
       };
     });
-  const patch = (project: RepoProject, id: string, change: PatchRepoRequest) =>
-    transact(deps.db, () => {
+    deps.changed(made.repo.id);
+    return made;
+  };
+  const patch = (
+    project: RepoProject,
+    id: string,
+    change: PatchRepoRequest,
+  ) => {
+    let refetch = false;
+    const patched = transact(deps.db, () => {
       const before = find(project, id);
       const fields = desired(before, change);
       checkRepo(project, fields, deps.credentials);
       nameFree(project, fields.name, before.id);
-      const after = deps.store.update(
-        before.id,
-        fields,
-        refetches(before, fields),
-        deps.clock(),
-      );
+      refetch = refetches(before, fields);
+      const after = deps.store.update(before.id, fields, refetch, deps.clock());
       return { result: answer(after!) };
     });
+    if (refetch) deps.changed(patched.repo.id);
+    return patched;
+  };
   const remove = (project: RepoProject, id: string) => {
     transact(deps.db, () => {
       const row = find(project, id);
@@ -119,11 +128,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     });
     return new Response(null, { status: 204 });
   };
-  const refresh = (project: RepoProject, id: string) =>
-    transact(deps.db, () => {
+  const refresh = (project: RepoProject, id: string) => {
+    const marked = transact(deps.db, () => {
       const row = find(project, id);
       return { result: answer(deps.store.markPending(row.id, deps.clock())!) };
     });
+    deps.changed(marked.repo.id);
+    return marked;
+  };
 
   return [
     {
