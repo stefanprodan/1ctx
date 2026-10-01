@@ -35,6 +35,8 @@ import {
 } from "./rg-patterns.js";
 import { readFileContent, readStdin } from "./rg-read.js";
 import { compileReplacement } from "./replace.js";
+// (1ctx find-batch)
+import { settleAll } from "../../utils/settle.js";
 
 export interface SearchContext {
   ctx: RuntimeCommandContext;
@@ -405,7 +407,8 @@ async function searchFiles(
   const BATCH_SIZE = options.searchZip ? 2 : 50;
   outer: for (let i = 0; i < haystacks.length; i += BATCH_SIZE) {
     const batch = haystacks.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(searchOne));
+    // (1ctx find-batch)
+    const results = await settleAll(batch.map(searchOne));
 
     for (const res of results) {
       if (!res) continue;

@@ -769,6 +769,35 @@ knowing the left result. That skipped the read `-empty` needed, left
 empty directories out of `-print`, hid some read errors and lost
 descendants when a metadata predicate made the left branch true.
 
+### find-batch: a walker waits for its batch before failing
+Files: `src/commands/find/find.ts`,
+  `src/commands/find/find.inflight.test.ts` (new),
+  `src/utils/settle.ts` (new), `src/commands/rg/rg-search.ts`,
+  `src/commands/grep/grep.ts`, `src/shell/glob.ts`, `src/fs/traversal.ts`,
+  `src/interpreter/helpers/file-tests.ts`
+Upstream: PR #451
+Tests: `test/vendor/just-bash/find-batch.test.ts`
+
+Now:
+
+- **find.** upstream's PR #451 as written, its test included:
+  `settleBatch` waits for every node of a batch, then fails on the first
+  in traversal order.
+- **The other walkers.** every other batch whose reads can reject waits
+  for all of them through `settleAll`: rg's and grep's file reads, the
+  glob walks, `test -ef`'s two sides, and the identity checks cp and mv
+  make. ls, tree, tar, xargs and the file reader of cat and its kin
+  catch each read, so their batches never reject.
+
+Before:
+
+- **find.** a find that hit the traversal limit over a disk returned
+  while up to a batch of directory reads was still in flight. Each
+  rejected afterwards, and the box turned it into an unhandled
+  rejection, which can end the worker: 15 refused finds over a
+  repository left 440.
+- **The other walkers.** `[ a -ef b ]` with both missing left one.
+
 ## grep
 
 ### grep: grep's options, BRE, ERE and -P as GNU grep 3.12

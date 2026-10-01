@@ -19,6 +19,8 @@ import {
   splitExtglobAlternatives,
   splitGlobignorePatterns,
 } from "./glob-to-regex.js";
+// (1ctx find-batch)
+import { settleAll } from "../utils/settle.js";
 
 export interface GlobOptions {
   globstar?: boolean;
@@ -188,7 +190,8 @@ export class GlobExpander {
     );
 
     // Run all glob expansions in parallel
-    const expandedResults = await Promise.all(
+    // (1ctx find-batch)
+    const expandedResults = await settleAll(
       expansionPromises.map((p) => (p ? p : Promise.resolve(null))),
     );
 
@@ -452,7 +455,8 @@ export class GlobExpander {
           }
         }
 
-        const allResults = await Promise.all(matchPromises);
+        // (1ctx find-batch)
+        const allResults = await settleAll(matchPromises);
         for (const pathList of allResults) {
           results.push(...pathList);
         }
@@ -534,7 +538,8 @@ export class GlobExpander {
           }
         }
 
-        const allResults = await Promise.all(matchPromises);
+        // (1ctx find-batch)
+        const allResults = await settleAll(matchPromises);
         for (const pathList of allResults) {
           results.push(...pathList);
         }
@@ -624,7 +629,8 @@ export class GlobExpander {
         // Also recurse into subdirectories (because the first ** can match multiple levels)
         for (let i = 0; i < dirs.length; i += DEFAULT_BATCH_SIZE) {
           const batch = dirs.slice(i, i + DEFAULT_BATCH_SIZE);
-          await Promise.all(
+          // (1ctx find-batch)
+          await settleAll(
             batch.map((dirPath) =>
               this.walkDirectoryMultiGlobstar(dirPath, subPattern, results),
             ),
@@ -663,7 +669,8 @@ export class GlobExpander {
         // Recurse into subdirectories
         for (let i = 0; i < dirs.length; i += DEFAULT_BATCH_SIZE) {
           const batch = dirs.slice(i, i + DEFAULT_BATCH_SIZE);
-          await Promise.all(
+          // (1ctx find-batch)
+          await settleAll(
             batch.map((dirPath) =>
               this.walkDirectoryMultiGlobstar(dirPath, subPattern, results),
             ),
@@ -720,7 +727,8 @@ export class GlobExpander {
         // Process directories in parallel batches
         for (let i = 0; i < dirs.length; i += DEFAULT_BATCH_SIZE) {
           const batch = dirs.slice(i, i + DEFAULT_BATCH_SIZE);
-          await Promise.all(
+          // (1ctx find-batch)
+          await settleAll(
             batch.map((dirPath) =>
               this.walkDirectory(dirPath, filePattern, results),
             ),
@@ -741,7 +749,8 @@ export class GlobExpander {
 
         for (let i = 0; i < entries.length; i += DEFAULT_BATCH_SIZE) {
           const batch = entries.slice(i, i + DEFAULT_BATCH_SIZE);
-          const batchResults = await Promise.all(
+          // (1ctx find-batch)
+          const batchResults = await settleAll(
             batch.map(async (entry) => {
               const entryPath = dir === "." ? entry : `${dir}/${entry}`;
               const fullEntryPath = this.fs.resolvePath(this.cwd, entryPath);
@@ -780,7 +789,8 @@ export class GlobExpander {
         const dirs = entryInfos.filter((e) => e.isDirectory);
         for (let i = 0; i < dirs.length; i += DEFAULT_BATCH_SIZE) {
           const batch = dirs.slice(i, i + DEFAULT_BATCH_SIZE);
-          await Promise.all(
+          // (1ctx find-batch)
+          await settleAll(
             batch.map((entry) =>
               this.walkDirectory(entry.path, filePattern, results),
             ),

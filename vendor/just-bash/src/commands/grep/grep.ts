@@ -994,7 +994,8 @@ export const grepCommand: RuntimeCommand = {
     const BATCH_SIZE = 50;
     for (let i = 0; i < filesToSearch.length; i += BATCH_SIZE) {
       const batch = filesToSearch.slice(i, i + BATCH_SIZE);
-      const contents = await Promise.all(
+      // (1ctx find-batch)
+      const contents = await settleAll(
         batch.map(async (entry): Promise<string | { error: string }> => {
           if (entry.error !== undefined) return { error: entry.error };
           if (entry.isStdin) {
@@ -1358,6 +1359,8 @@ export const egrepCommand: RuntimeCommand = {
 };
 
 import type { CommandFuzzInfo } from "../fuzz-flags-types.js";
+// (1ctx find-batch)
+import { settleAll } from "../../utils/settle.js";
 
 export const flagsForFuzzing: CommandFuzzInfo = {
   name: "grep",
