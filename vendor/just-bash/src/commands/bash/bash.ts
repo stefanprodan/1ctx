@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { decodeBytesToUtf8, latin1FromBytes } from "../../encoding.js";
 import { mergeToNullPrototype } from "../../helpers/env.js";
 import type {
@@ -62,10 +64,11 @@ export const bashCommand: RuntimeCommand = {
       const fullPath = ctx.fs.resolvePath(ctx.cwd, scriptPath);
       const scriptContent = await ctx.fs.readFile(fullPath);
       return executeScript(scriptContent, scriptPath, scriptArgs, ctx);
-    } catch {
+    } catch (error) { // (1ctx readonly-errors)
       return {
         stdout: "",
-        stderr: `bash: ${scriptPath}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `bash: ${scriptPath}: ${readErrorWords(error)}\n`,
         exitCode: 127,
       };
     }
@@ -116,10 +119,11 @@ export const shCommand: RuntimeCommand = {
       const fullPath = ctx.fs.resolvePath(ctx.cwd, scriptPath);
       const scriptContent = await ctx.fs.readFile(fullPath);
       return executeScript(scriptContent, scriptPath, scriptArgs, ctx);
-    } catch {
+    } catch (error) { // (1ctx readonly-errors)
       return {
         stdout: "",
-        stderr: `sh: ${scriptPath}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `sh: ${scriptPath}: ${readErrorWords(error)}\n`,
         exitCode: 127,
       };
     }

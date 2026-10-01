@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
@@ -145,7 +147,8 @@ export const pasteCommand: RuntimeCommand = {
           rethrowFatalExecutionError(error);
           return {
             stdout: "",
-            stderr: `paste: ${file}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `paste: ${file}: ${readErrorWords(error)}\n`,
             exitCode: 1,
           };
         }

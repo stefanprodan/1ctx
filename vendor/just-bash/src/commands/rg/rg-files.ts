@@ -6,7 +6,8 @@
  */
 
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
-import { FileTraversalBudget } from "../../fs/traversal.js";
+// (1ctx walk-links) directoryKey
+import { directoryKey, FileTraversalBudget } from "../../fs/traversal.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { RuntimeCommandContext } from "../../types.js";
 import type { FileTypeRegistry } from "./file-types.js";
@@ -192,13 +193,10 @@ async function walkDirectory(
   let directoryIdentity: string | undefined;
   if (options.followSymlinks) {
     try {
-      const stat = await ctx.fs.stat(absolutePath);
-      directoryIdentity =
-        stat.identity !== undefined
-          ? `identity:${stat.identity}`
-          : stat.dev !== undefined && stat.ino !== undefined
-            ? `inode:${String(stat.dev)}:${String(stat.ino)}`
-            : `path:${await ctx.fs.realpath(absolutePath)}`;
+      // (1ctx walk-links) by real path: a mount's root has one identity in
+      // memory and another on disk, so a link back to it was walked again
+      directoryIdentity = await directoryKey(ctx.fs, absolutePath);
+      if (directoryIdentity === undefined) return;
       if (activeDirectories.has(directoryIdentity)) return;
       activeDirectories.add(directoryIdentity);
     } catch (error) {

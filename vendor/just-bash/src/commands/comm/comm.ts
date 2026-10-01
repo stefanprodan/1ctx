@@ -7,6 +7,8 @@
  * - Column 3: lines in both files
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { decodeBytesToUtf8 } from "../../encoding.js";
 import type {
   ExecResult,
@@ -90,6 +92,8 @@ export const commCommand: RuntimeCommand = {
     // file path go through different decoding paths (latin1 byte buffer vs
     // utf8 string). Normalize both sides to UTF-8 text so identical input
     // compares equal regardless of which leg it came from.
+    // (1ctx readonly-errors) why the last read failed
+    let readFailure: unknown;
     const readFile = async (file: string): Promise<string | null> => {
       if (file === "-") {
         return decodeBytesToUtf8(ctx.stdin);
@@ -97,7 +101,8 @@ export const commCommand: RuntimeCommand = {
       try {
         const path = ctx.fs.resolvePath(ctx.cwd, file);
         return await ctx.fs.readFile(path);
-      } catch {
+      } catch (error) { // (1ctx readonly-errors)
+        readFailure = error;
         return null;
       }
     };
@@ -106,7 +111,8 @@ export const commCommand: RuntimeCommand = {
     if (content1 === null) {
       return {
         stdout: "",
-        stderr: `comm: ${files[0]}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `comm: ${files[0]}: ${readErrorWords(readFailure)}\n`,
         exitCode: 1,
       };
     }
@@ -115,7 +121,8 @@ export const commCommand: RuntimeCommand = {
     if (content2 === null) {
       return {
         stdout: "",
-        stderr: `comm: ${files[1]}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `comm: ${files[1]}: ${readErrorWords(readFailure)}\n`,
         exitCode: 1,
       };
     }

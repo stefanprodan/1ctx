@@ -94,6 +94,13 @@ describe("a redirect into a read-only mount", () => {
     });
   });
 
+  test("<> on a writable file leaves its time alone", async () => {
+    const fs = new InMemoryFs({ "/f": "x\n" });
+    await fs.utimes("/f", new Date(0), new Date(0));
+    await new Bash({ fs }).exec("cat 0<> /f");
+    expect((await fs.stat("/f")).mtime.getTime()).toBe(0);
+  });
+
   test("<> on a writable file writes at its start", async () => {
     expect(
       await shell().exec("echo hello > /tmp/f; echo HE 1<> /tmp/f; cat /tmp/f"),

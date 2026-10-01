@@ -7,6 +7,8 @@
  * of FILE to standard output.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { latin1FromBytes, readBytesFrom } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
@@ -74,7 +76,8 @@ async function odExecute(
       rethrowFatalExecutionError(error);
       return {
         stdout: "",
-        stderr: `od: ${operand}: No such file or directory\n`,
+        // (1ctx readonly-errors) a file over the read limit says so
+        stderr: `od: ${operand}: ${readErrorWords(error)}\n`,
         exitCode: 1,
       };
     }

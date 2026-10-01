@@ -10,7 +10,7 @@ import { latin1FromBytes } from "../../encoding.js";
 import type { ResourceLease } from "../../execution-scope.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 // (1ctx readonly-errors)
-import { isReadOnlyError } from "../../fs/error-words.js";
+import { writeRefusalWords, readErrorWords } from "../../fs/error-words.js";
 import { traverseFileTree } from "../../fs/traversal.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type {
@@ -450,10 +450,11 @@ async function refusedWrite(
     name = file;
     await remove();
   } catch (error) {
-    if (!isReadOnlyError(error)) throw error;
+    const words = writeRefusalWords(error);
+    if (words === undefined) throw error;
     return {
       stdout: "",
-      stderr: `${cmdName}: ${name}: Read-only file system\n`,
+      stderr: `${cmdName}: ${name}: ${words}\n`,
       exitCode: 1,
     };
   }
@@ -572,10 +573,11 @@ async function processFile(
       }
       return { stdout: "", stderr: "", exitCode: 1 };
     }
-  } catch {
+  } catch (error) { // (1ctx readonly-errors)
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -591,7 +593,8 @@ async function processFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -863,7 +866,8 @@ async function listFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }
@@ -917,7 +921,8 @@ async function testFile(
     rethrowFatalExecutionError(error);
     return {
       stdout: "",
-      stderr: `${cmdName}: ${file}: No such file or directory\n`,
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
       exitCode: 1,
     };
   }

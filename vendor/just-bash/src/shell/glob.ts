@@ -647,7 +647,8 @@ export class GlobExpander {
           const fullEntryPath = this.fs.resolvePath(this.cwd, entryPath);
           try {
             this.checkOpsLimit(); // Count stat operation
-            const stat = await this.fs.stat(fullEntryPath);
+            // (1ctx walk-links) ** never descends through a link, as bash 5 does
+            const stat = await this.fs.lstat(fullEntryPath);
             if (stat.isDirectory) {
               dirs.push(entryPath);
             }
@@ -756,7 +757,8 @@ export class GlobExpander {
               const fullEntryPath = this.fs.resolvePath(this.cwd, entryPath);
               try {
                 this.checkOpsLimit(); // Count stat operation
-                const stat = await this.fs.stat(fullEntryPath);
+                // (1ctx walk-links) ** never descends through a link, as bash 5 does
+                const stat = await this.fs.lstat(fullEntryPath);
                 return {
                   name: entry,
                   path: entryPath,

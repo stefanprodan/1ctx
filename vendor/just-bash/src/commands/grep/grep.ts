@@ -1,5 +1,7 @@
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+// (1ctx walk-links)
+import { directoryKey, FileTraversalBudget } from "../../fs/traversal.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import { commandWorkLimit } from "../../limits.js";
 import type { UserRegex } from "../../regex/index.js";
@@ -37,9 +39,13 @@ interface FileEntry {
   stdinAtEof?: boolean;
   /** (1ctx search-engine) a read or a walk failed here: what to say */
   error?: string;
+  /** (1ctx walk-links) the error is GNU's warning, which fails nothing */
+  warning?: boolean;
 }
 
 interface GrepTraversalBudget {
+  /** (1ctx walk-links) the command's share of the traversal limits */
+  walk?: FileTraversalBudget;
   operations: number;
   results: number;
   maxOperations: number;
@@ -819,6 +825,13 @@ export const grepCommand: RuntimeCommand = {
     // FileEntry includes type info when available to skip stat calls
     const filesToSearch: FileEntry[] = [];
     const traversalBudget: GrepTraversalBudget = {
+      // (1ctx walk-links)
+      walk: new FileTraversalBudget({
+        limits: ctx.limits,
+        signal: ctx.signal,
+        executionScope: ctx.executionScope,
+        site: "grep",
+      }),
       operations: 0,
       results: 0,
       maxOperations: ctx.limits.maxGlobOperations,
@@ -1021,6 +1034,13 @@ export const grepCommand: RuntimeCommand = {
         const entry = batch[j];
         const content = contents[j];
         if (typeof content !== "string") {
+          // (1ctx walk-links) a loop -R found is a warning
+          if (entry.warning) {
+            if (!noMessages) {
+              stderr += `grep: ${entry.path}: warning: ${content.error}\n`;
+            }
+            continue;
+          }
           anyError = true;
           if (!noMessages) stderr += `grep: ${entry.path}: ${content.error}\n`;
           continue;
@@ -1078,6 +1098,8 @@ function fileErrorWords(error: unknown): string {
     return "No such file or directory";
   }
   if (code === "EISDIR" || /^EISDIR\b/.test(message)) return "Is a directory";
+  // (1ctx readonly-errors) a file over the read limit
+  if (code === "EFBIG" || /^EFBIG\b/.test(message)) return "File too large";
   if (code === "EACCES" || /^EACCES\b/.test(message)) {
     return "Permission denied";
   }
@@ -1122,9 +1144,18 @@ async function walkDirectory(
   budget: GrepTraversalBudget,
   result: FileEntry[] = [],
   depth = 0,
+  ancestors: ReadonlySet<string> = new Set(), // (1ctx walk-links)
 ): Promise<FileEntry[]> {
   if (depth >= MAX_GREP_DEPTH) return result;
   const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
+  // (1ctx walk-links) every folder counts toward the traversal limits, and
+  // -R keeps the folders it is inside to stop at a link back into one
+  budget.walk?.visit(depth);
+  let inside = ancestors;
+  if (filters.dereference) {
+    const key = await directoryKey(ctx.fs, fullPath);
+    if (key !== undefined) inside = new Set([...ancestors, key]);
+  }
   let entries: { name: string; isFile?: boolean; isDirectory?: boolean }[];
   try {
     useTraversalOperation(budget);
@@ -1138,6 +1169,7 @@ async function walkDirectory(
     } else {
       entries = (await ctx.fs.readdir(fullPath)).map((name) => ({ name }));
     }
+    budget.walk?.discover(entries.length); // (1ctx walk-links)
   } catch (error) {
     rethrowFatalExecutionError(error);
     result.push({ path: shown || path, error: fileErrorWords(error) });
@@ -1158,7 +1190,15 @@ async function walkDirectory(
     let isDirectory = entry.isDirectory ?? false;
     if (isFile === undefined) {
       try {
-        const stat = await ctx.fs.stat(ctx.fs.resolvePath(ctx.cwd, childPath));
+        // (1ctx walk-links) -r passes over a link below an operand
+        const childFull = ctx.fs.resolvePath(ctx.cwd, childPath);
+        if (
+          !filters.dereference &&
+          (await ctx.fs.lstat(childFull)).isSymbolicLink
+        ) {
+          continue;
+        }
+        const stat = await ctx.fs.stat(childFull);
         isFile = stat.isFile;
         isDirectory = stat.isDirectory;
       } catch (error) {
@@ -1174,6 +1214,21 @@ async function walkDirectory(
       ) {
         continue;
       }
+      // (1ctx walk-links) a link back into a folder above is GNU's warning
+      if (filters.dereference) {
+        const key = await directoryKey(
+          ctx.fs,
+          ctx.fs.resolvePath(ctx.cwd, childPath),
+        );
+        if (key !== undefined && inside.has(key)) {
+          result.push({
+            path: childShown,
+            error: "recursive directory loop",
+            warning: true,
+          });
+          continue;
+        }
+      }
       await walkDirectory(
         childPath,
         childShown,
@@ -1182,6 +1237,7 @@ async function walkDirectory(
         budget,
         result,
         depth + 1,
+        inside, // (1ctx walk-links)
       );
       continue;
     }

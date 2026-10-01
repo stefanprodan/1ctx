@@ -6,6 +6,9 @@
  * Columnate input. Fill rows first by default, or create a table with -t.
  */
 
+// (1ctx readonly-errors)
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -241,7 +244,18 @@ export const column: RuntimeCommand = {
           parts.push(part);
         } else {
           const filePath = ctx.fs.resolvePath(ctx.cwd, file);
-          const fileContent = await ctx.fs.readFile(filePath);
+          // (1ctx readonly-errors) a file over the read limit says so
+          let fileContent: string;
+          try {
+            fileContent = await ctx.fs.readFile(filePath);
+          } catch (error) {
+            if (fsErrorCode(error) !== "EFBIG") throw error;
+            return {
+              exitCode: 1,
+              stdout: "",
+              stderr: `column: ${file}: File too large\n`,
+            };
+          }
           if (fileContent === null) {
             return {
               exitCode: 1,

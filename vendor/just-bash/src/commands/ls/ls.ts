@@ -691,7 +691,8 @@ async function listPath(
               const entryPath =
                 fullPath === "/" ? `/${entry}` : `${fullPath}/${entry}`;
               try {
-                const entryStat = await ctx.fs.stat(entryPath);
+                // (1ctx walk-links) -R never descends through a link
+                const entryStat = await ctx.fs.lstat(entryPath);
                 return { name: entry, isDirectory: entryStat.isDirectory };
               } catch {
                 return { name: entry, isDirectory: false };

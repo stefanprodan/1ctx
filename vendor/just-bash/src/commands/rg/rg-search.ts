@@ -2,6 +2,8 @@
  * Core search logic for rg command
  */
 
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { latin1FromBytes, utf8ByteLength } from "../../encoding.js";
 import type { ResourceLease } from "../../execution-scope.js";
@@ -292,16 +294,25 @@ async function searchFiles(
   let filesWithMatch = 0;
   let bytesSearched = 0;
 
+  // (1ctx readonly-errors) files too large to read, reported as ripgrep does
+  const readErrors: string[] = [];
   const searchOne = async (haystack: Haystack): Promise<Searched | null> => {
     const file = haystack.path;
-    const fileData = haystack.stdin
-      ? readStdin(ctx)
-      : await readFileContent(
-          ctx,
-          ctx.fs.resolvePath(ctx.cwd, file),
-          file,
-          options,
-        );
+    let fileData: Awaited<ReturnType<typeof readFileContent>>; // (1ctx readonly-errors)
+    try {
+      fileData = haystack.stdin
+        ? readStdin(ctx)
+        : await readFileContent(
+            ctx,
+            ctx.fs.resolvePath(ctx.cwd, file),
+            file,
+            options,
+          );
+    } catch (error) {
+      if (fsErrorCode(error) !== "EFBIG") throw error;
+      readErrors.push(`rg: ${file}: File too large (os error 27)`);
+      return null;
+    }
     if (!fileData) return null;
 
     const { content, isBinary, lease } = fileData;
@@ -516,5 +527,10 @@ async function searchFiles(
   }
 
   // rg emits text; the pipeline handles encoding.
-  return { stdout: finalStdout, stderr: "", exitCode };
+  // (1ctx readonly-errors)
+  return withErrors(
+    { stdout: finalStdout, stderr: "", exitCode },
+    readErrors,
+    options,
+  );
 }

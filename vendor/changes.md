@@ -208,26 +208,38 @@ prefix of a path, so `rm -rf`, `find` and `ls -R` cost the entries times
 the folders: 1000 files, one folder chain each, took 0.3 s to remove at
 depth 8 and 25 s at 64; ls rescanned its whole output on every append.
 
-### overlay-trusted: OverlayFs reads the disk under the box
+### overlay-read: OverlayFs reads the disk under the box
 Files: `src/fs/overlay-fs/overlay-fs.ts`
-Upstream: not reported
-Tests: `test/vendor/just-bash/overlay-trusted.test.ts`,
-  `test/vendor/just-bash/overlay-mount.test.ts`
+Upstream: issue #406
+Tests: `test/vendor/just-bash/overlay-read.test.ts`,
+  `test/vendor/just-bash/overlay-mount.test.ts`,
+  `test/vendor/just-bash/walk-links.test.ts`
 
-Now: each of OverlayFs's own disk calls (`lstat`, `readlink`, `readdir`
-and the open, read and close of a file) runs in
-`DefenseInDepthBox.runTrustedAsync`, the call alone, so a read works
-with `defenseInDepth: true` and a command after it stays blocked. The
-synchronous calls (`realpathSync`, `lstatSync`, `readdirSync`) allocate
-nothing the box blocks and are left as they were. Path checks,
-symlinks and `readOnly` are unchanged. It follows upstream's #397 for
-lazy files; upstream's open issue #406 is the same refusal for any host
-filesystem.
+Now:
 
-Before: under the box every file read failed, since Bun's
-`fs.promises.open` makes a `FinalizationRegistry`, which the box
-refuses: `cat` said `No such file or directory`, `rg` found nothing and
-`cp` out of the mount was `EIO`.
+- **Reads.** a file is read through one descriptor: `openSync` with
+  `O_NOFOLLOW` always, since a link was already resolved through the
+  virtual layer, `fstatSync` checks on what was opened that it is a
+  regular file within `maxFileReadSize`, and at most that plus one byte
+  is read. Nothing in OverlayFs runs trusted, so the box stays on while a
+  read is in flight, and a file swapped for a link on disk after the path
+  check is not followed. Path checks, `..` and `readOnly` are unchanged.
+- **realpath.** a link on disk is seen and followed, the rest of the path
+  goes on from its target, and a count of links followed, not the links
+  seen, finds a loop, so `a -> .` resolves `a/a`.
+
+Before:
+
+- **Reads.** under the box every file read failed, since Bun's
+  `fs.promises.open` makes a `FinalizationRegistry`, which the box
+  refuses: `cat` said `No such file or directory`, `rg` found nothing and
+  `cp` out of the mount was `EIO`. With `allowSymlinks` the open followed
+  links, so a file swapped for one between the check and the open was
+  read through it.
+- **realpath.** it checked the path the host had already resolved, so it
+  never saw a link on disk: `cd -P`, `find -L` and `rg -L` took
+  `/repos/r/a` for a folder of its own. A link in the middle of a path
+  dropped the components after it.
 
 ## Every command
 
@@ -282,58 +294,110 @@ Before: these refused `--` as an unknown option or read it as a file, a
 duration or a mode, where GNU and jq take it as the end of the options;
 a model writes `cmd -- "$f"` for a name it did not choose.
 
-### readonly-errors: a write into a read-only mount fails as Linux does
+### readonly-errors: a refused write or an oversized read fails as Linux does
 Files: `src/fs/error-words.ts` (new), `src/fs/overlay-fs/overlay-fs.ts`,
-  `src/interpreter/redirections.ts`, `src/interpreter/builtin-dispatch.ts`,
-  `src/commands/sed/sed.ts`, `src/commands/chmod/chmod.ts`,
-  `src/commands/mkdir/mkdir.ts`, `src/commands/mv/mv.ts`,
-  `src/commands/cp/cp.ts`, `src/commands/touch/touch.ts`,
-  `src/commands/ln/ln.ts`, `src/commands/rmdir/rmdir.ts`,
-  `src/commands/tee/tee.ts`, `src/commands/split/split.ts`,
-  `src/commands/sort/sort.ts`, `src/commands/tar/tar.ts`,
-  `src/commands/gzip/gzip.ts`, `src/commands/yq/yq.ts`,
-  `src/commands/curl/curl.ts`, `src/commands/find/find.ts`,
-  `src/commands/time/time.ts`, `src/commands/awk/interpreter/statements.ts`
+  `src/interpreter/redirections.ts`,
+  `src/interpreter/builtin-dispatch.ts`, `src/utils/file-reader.ts`,
+  `src/commands/awk/awk2.ts`,
+  `src/commands/awk/interpreter/statements.ts`,
+  `src/commands/base64/base64.ts`, `src/commands/bash/bash.ts`,
+  `src/commands/cat/cat.ts`, `src/commands/chmod/chmod.ts`,
+  `src/commands/column/column.ts`, `src/commands/comm/comm.ts`,
+  `src/commands/cp/cp.ts`, `src/commands/curl/curl.ts`,
+  `src/commands/diff/run.ts`, `src/commands/expand/expand.ts`,
+  `src/commands/expand/unexpand.ts`, `src/commands/find/find.ts`,
+  `src/commands/fold/fold.ts`, `src/commands/grep/grep.ts`,
+  `src/commands/gzip/gzip.ts`, `src/commands/head/head-tail-shared.ts`,
+  `src/commands/html-to-markdown/html-to-markdown.ts`,
+  `src/commands/join/join.ts`, `src/commands/ln/ln.ts`,
+  `src/commands/md5sum/checksum.ts`, `src/commands/mkdir/mkdir.ts`,
+  `src/commands/mv/mv.ts`, `src/commands/nl/nl.ts`,
+  `src/commands/od/od.ts`, `src/commands/paste/paste.ts`,
+  `src/commands/rev/rev.ts`, `src/commands/rg/rg-read.ts`,
+  `src/commands/rg/rg-search.ts`, `src/commands/rmdir/rmdir.ts`,
+  `src/commands/sed/sed.ts`, `src/commands/sort/sort.ts`,
+  `src/commands/split/split.ts`, `src/commands/strings/strings.ts`,
+  `src/commands/tac/tac.ts`, `src/commands/tar/tar.ts`,
+  `src/commands/tee/tee.ts`, `src/commands/time/time.ts`,
+  `src/commands/touch/touch.ts`, `src/commands/xan/csv.ts`,
+  `src/commands/xan/xan-data.ts`, `src/commands/yq/yq.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/readonly-errors.test.ts`,
-  `test/vendor/just-bash/overlay-mount.test.ts`
+  `test/vendor/just-bash/overlay-mount.test.ts`,
+  `test/vendor/just-bash/awk.test.ts`
 
 Now:
 
 - **Redirects.** a refused open (`>`, `>>`, `>|`, `&>`, `&>>`, `N>`,
-  `>&file`, `<>`, `exec N>`) answers `bash: <target as typed>:
-  Read-only file system`, or `Permission denied`, `Is a directory`,
-  `No such file or directory` and the like, with exit 1 and the
-  command not run, as upstream's open PR #127 does. `<>` opens for
-  writing too, as `>>` does. A refused write after the open is
-  `bash: <command>: write error: <words>`. A full file system (ENOSPC)
-  and an unknown error still throw, so a full mount still ends the job.
-- **Commands.** each names the path as typed with GNU's words for the
-  errno, never the backend's message and its mount-relative path: `sed
-  -i` (`couldn't open temporary file <dir>/sedXXXXXX`, exit 4),
-  `chmod` (`changing permissions of`), `mkdir`, `mv` (`cannot remove`
-  the source after a copy across mounts, `cannot create regular file`,
-  `cannot move ... to`), `cp` (`cannot create regular file` or
-  `directory`), `touch`, `ln` (`failed to create symbolic link`, `hard
-  link ... =>`, `Invalid cross-device link`), `rmdir`, `tee`, `split`,
-  `sort -o` (`open failed:`), `tar` (`Cannot open:`, `Cannot mkdir:`),
-  `gzip` and `gunzip`, `yq -i`, `curl` (`(23) Failure writing output
-  to destination`), `find -delete`, `time -o` and awk's `print >`
-  (`cannot redirect to`). A command that lets a read-only error through
-  says `<command>: Read-only file system`.
-- **mkdir.** a read-only `OverlayFs` checks for the folder and its parent
-  before refusing, so `mkdir -p` of a folder there succeeds and `mkdir`
-  of one says `File exists`.
+  `>&file`, `<>`, `exec N>`) answers `bash: <target as typed>: <words>`
+  (`Read-only file system`, `Not a directory`, `Is a directory`, `No such
+  file or directory`, ...) with exit 1 and the command not run, as
+  upstream's open PR #127 does. `<>` refuses a read-only file by setting
+  the time it already has, which changes nothing elsewhere. A refused
+  write after the open is `bash: <command>: write error: <words>`. A
+  full file system (ENOSPC) and an unknown error still throw, so a full
+  mount still ends the job.
+- **Writing commands.** each names the path as typed with GNU's words,
+  never the backend's message and its mount-relative path: `sed -i`
+  (`couldn't open temporary file <dir>/sedXXXXXX`, exit 4), sed's `w`
+  file (`couldn't open file F`, exit 4, where it wrote nothing before),
+  `chmod` (`changing permissions of`), `mkdir`, `mv` (`cannot remove` the
+  source after a copy across mounts, `cannot create regular file` or
+  `directory`, `cannot move ... to`, a mount point `Device or resource
+  busy`), `cp` (`cannot create regular file` or `directory`), `touch`,
+  `ln`, `rmdir`, `tee`, `split`, `sort -o` (`open failed:`), `tar`
+  (`Cannot open:`, `Cannot mkdir:`), `gzip`, `yq -i`, `curl` (`(23)`),
+  `find -delete`, `time -o` and awk's `print >` (`cannot redirect to`).
+- **Reads.** a file over the read limit (EFBIG) is `<cmd>: <path>: File
+  too large` in every command that reads files, `rg: <path>: File too
+  large (os error 27)` and exit 2 in rg, which skipped it silently.
+- **The fallback.** a command that lets a read-only refusal or EFBIG
+  through says `<command>: Read-only file system` or `File too large`.
+- **OverlayFs.** a read-only overlay checks a path before refusing it: an
+  existing folder for `mkdir -p`, then a missing parent (ENOENT), a file
+  as parent (ENOTDIR) and a folder written to (EISDIR), as Linux answers
+  before EROFS.
 
 Before:
 
 - **Redirects.** `echo x > /ro/f` threw `EROFS: read-only file system,
   write '/f'` out of `exec()`, which fails the whole job in the worker.
-- **Commands.** `sed -i`, `chmod` and `tee` said `No such file or
-  directory`; the others printed the raw `EROFS: ..., mkdir '/d'`, whose
-  path is the mount's, not the agent's; `split` said only `failed to
-  write output`.
-- **mkdir.** `mkdir -p` of a folder in a read-only mount failed.
+- **Writing commands.** `sed -i`, `chmod` and `tee` said `No such file
+  or directory`; the others printed the raw `EROFS: ..., mkdir '/d'`,
+  whose path is the mount's, not the agent's; `split` said only `failed
+  to write output`; sed's `w` failed silently with exit 0.
+- **Reads.** cat, head, md5sum, sed, awk and jq said `No such file or
+  directory`, grep, cp and tar printed the raw `EFBIG` with the mount's
+  path, and rg skipped the file.
+- **The fallback.** the backend's message went through as it was.
+- **OverlayFs.** `mkdir -p` of a folder failed, and every refusal was
+  `Read-only file system`.
+
+### walk-links: a walker follows a link only when asked, and stops at a loop
+Files: `src/commands/tree/tree.ts`, `src/commands/grep/grep.ts`,
+  `src/commands/ls/ls.ts`, `src/commands/tar/tar.ts`,
+  `src/commands/rg/rg-files.ts`, `src/shell/glob.ts`, `src/fs/traversal.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/walk-links.test.ts`
+
+Now: each walker treats a link below its operand as its GNU tool does,
+and counts toward the traversal limits. `tree` lists a link as `name ->
+target` and enters it only under its new `-l`, then not one back into a
+folder it is inside (`[recursive, not followed]`). `grep -r` passes over
+every link below an operand; `grep -R` follows them and at a link back
+into a folder above says `grep: <path>: warning: recursive directory
+loop`. `ls -R` and globstar's `**` never enter a link, and `tar -c`
+archives a link as a link. `rg -L` and the cycle checks key a folder by
+its real path (`directoryKey`), since a mount's root has one identity in
+memory and another on disk.
+
+Before: over a MountableFs, which has no `readdirWithFileTypes`, the
+walkers stat each entry and so followed every link: a repository with a
+few `.` links grew exponentially, past `maxTraversalEntries`, which tree,
+grep and glob never counted. `tree` over a checkout with a
+`node_modules/node_modules` loop listed 306,022 files from 17,105
+entries in 14.6 s; three `.` links took `grep -rl` to the 10 s deadline.
+`tar -c` read through links with `stat`, so it never stored one.
 
 ## awk
 
@@ -799,7 +863,9 @@ Before:
   rejected afterwards, and the box turned it into an unhandled
   rejection, which can end the worker: 15 refused finds over a
   repository left 440.
-- **The other walkers.** `[ a -ef b ]` with both missing left one.
+- **The other walkers.** `[ a -ef b ]` with both sides missing left one.
+  rg, grep, the glob walks and the identity checks did not reproduce a
+  leak, so their settle is defensive.
 
 ## grep
 

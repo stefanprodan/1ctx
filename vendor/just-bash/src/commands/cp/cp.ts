@@ -1,5 +1,5 @@
 // (1ctx readonly-errors)
-import { fsErrorSyscall, isReadOnlyError } from "../../fs/error-words.js";
+import { fsErrorCode, writeRefusalWords } from "../../fs/error-words.js";
 import { isSameOrDescendantPath } from "../../fs/path-utils.js";
 import {
   compareCanonicalContainment,
@@ -103,9 +103,11 @@ export const cpCommand: RuntimeCommand = {
     }
 
     for (const src of sources) {
+      let srcIsDirectory = false; // (1ctx readonly-errors)
       try {
         const srcPath = ctx.fs.resolvePath(ctx.cwd, src);
         const srcStat = await ctx.fs.stat(srcPath);
+        srcIsDirectory = srcStat.isDirectory; // (1ctx readonly-errors)
 
         let targetPath = destPath;
         if (destIsDir) {
@@ -199,16 +201,22 @@ export const cpCommand: RuntimeCommand = {
           throw error;
         }
         const message = getErrorMessage(error);
-        if (message.includes("ENOENT") || message.includes("no such file")) {
-          stderr += `cp: cannot stat '${src}': No such file or directory\n`;
-        } else if (isReadOnlyError(error)) {
-          // (1ctx readonly-errors) GNU names the copy it could not create
+        // (1ctx readonly-errors) a copy that could not be made, by its name
+        const refused = writeRefusalWords(error);
+        if (refused !== undefined) {
           const target = destIsDir
             ? `${dest.replace(/\/+$/, "")}/${src.split("/").pop() || src}`
             : dest;
-          const kind =
-            fsErrorSyscall(error) === "mkdir" ? "directory" : "regular file";
-          stderr += `cp: cannot create ${kind} '${target}': Read-only file system\n`;
+          const kind = srcIsDirectory ? "directory" : "regular file";
+          stderr += `cp: cannot create ${kind} '${target}': ${refused}\n`;
+        } else if (
+          message.includes("ENOENT") ||
+          message.includes("no such file")
+        ) {
+          stderr += `cp: cannot stat '${src}': No such file or directory\n`;
+        } else if (fsErrorCode(error) === "EFBIG") {
+          // (1ctx readonly-errors) a file over the read limit
+          stderr += `cp: cannot open '${src}' for reading: File too large\n`;
         } else {
           stderr += `cp: cannot copy '${src}': ${message}\n`;
         }

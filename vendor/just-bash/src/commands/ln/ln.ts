@@ -3,6 +3,7 @@ import {
   fsErrorCode,
   fsErrorWords,
   isReadOnlyError,
+  writeRefusalWords,
 } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import type {
@@ -100,7 +101,7 @@ export const lnCommand: RuntimeCommand = {
             : "Permission denied";
           return {
             stdout: "",
-            stderr: `ln: cannot remove '${linkName}': ${words}\n`,
+            stderr: `ln: cannot remove '${linkName}': ${words}\n`, // (1ctx readonly-errors)
             exitCode: 1,
           };
         }
@@ -146,14 +147,16 @@ export const lnCommand: RuntimeCommand = {
         };
       }
       // (1ctx readonly-errors) GNU's words for a refused link, by its name
-      const code = fsErrorCode(e);
-      if (code === "EROFS" || code === "EXDEV") {
+      const refused =
+        writeRefusalWords(e) ??
+        (fsErrorCode(e) === "EXDEV" ? fsErrorWords(e) : undefined);
+      if (refused !== undefined) {
         const what = symbolic
           ? `symbolic link '${linkName}'`
           : `hard link '${linkName}' => '${target}'`;
         return {
           stdout: "",
-          stderr: `ln: failed to create ${what}: ${fsErrorWords(e)}\n`,
+          stderr: `ln: failed to create ${what}: ${refused}\n`,
           exitCode: 1,
         };
       }

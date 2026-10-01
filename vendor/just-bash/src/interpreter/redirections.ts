@@ -68,6 +68,19 @@ const REFUSALS = new Set([
   "ENOTDIR",
 ]);
 
+// a read that fails for the file itself, not for its absence: a file over
+// the read limit, or a folder opened for writing too
+function readErrorWords(
+  error: unknown,
+  readwrite: boolean,
+): string | undefined {
+  rethrowFatalExecutionError(error);
+  const code = fsErrorCode(error);
+  return code === "EFBIG" || (readwrite && code === "EISDIR")
+    ? fsErrorWords(error)
+    : undefined;
+}
+
 function writeErrorWords(error: unknown): string | undefined {
   rethrowFatalExecutionError(error);
   if (error instanceof ControlFlowError) return undefined;
@@ -276,35 +289,45 @@ async function readInputEntry(
   readwrite: boolean,
 ): Promise<{ entry?: FdEntry; error?: ExecResult }> {
   const filePath = ctx.fs.resolvePath(ctx.state.cwd, target);
-  // (1ctx readonly-errors) `<>` opens for writing too, as `>>` does, so a
-  // refused write fails here and the command does not run
+  // (1ctx readonly-errors) `<>` opens for writing too, so a read-only
+  // file fails here and the command does not run
   let content: string | undefined;
+  let readError: unknown;
   try {
     // (1ctx fd-bytes) a descriptor carries the file's bytes, as `< file` does
     content = latin1FromBytes(await readBytesFrom(ctx.fs, filePath));
-  } catch {
-    if (!readwrite) {
+  } catch (error) {
+    // (1ctx readonly-errors)
+    readError = error;
+    const words = readErrorWords(error, readwrite);
+    if (!readwrite || words !== undefined) {
       return {
         error: makeResult(
           "",
-          `bash: ${target}: No such file or directory\n`,
+          `bash: ${target}: ${words ?? "No such file or directory"}\n`, // (1ctx readonly-errors)
           1,
         ),
       };
     }
-  }
+  } // (1ctx readonly-errors)
   if (!readwrite) return { entry: { kind: "input", content: content ?? "" } };
   try {
-    if (content === undefined) await ctx.fs.writeFile(filePath, "", "binary");
-    else await ctx.fs.appendFile(filePath, "", "binary");
-  } catch (error) {
+    if (content === undefined) {
+      await ctx.fs.writeFile(filePath, "", "binary");
+    } else { // (1ctx readonly-errors)
+      // setting the time it has refuses on a read-only file system and
+      // changes nothing on any other
+      const { mtime } = await ctx.fs.stat(filePath);
+      await ctx.fs.utimes(filePath, mtime, mtime);
+    }
+  } catch (error) { // (1ctx readonly-errors)
     const words =
       writeErrorWords(error) ??
-      (content === undefined ? "No such file or directory" : undefined);
+      (readError !== undefined ? "No such file or directory" : undefined);
     if (!words) throw error;
     return { error: makeResult("", `bash: ${target}: ${words}\n`, 1) };
   }
-  return {
+  return { // (1ctx readonly-errors)
     entry: {
       kind: "readwrite",
       path: filePath,
@@ -972,9 +995,12 @@ async function prepareRedirectionsWithState(
         stdin = (await readBytesFrom(ctx.fs, filePath)) as unknown as string;
         stdinSourceFd = -1;
         persistStandard(effectiveFd, { kind: "input", content: stdin });
-      } catch {
+      } catch (error) {
+        // (1ctx readonly-errors)
+        const words =
+          readErrorWords(error, false) ?? "No such file or directory";
         return fail(
-          makeResult("", `bash: ${target}: No such file or directory\n`, 1),
+          makeResult("", `bash: ${target}: ${words}\n`, 1), // (1ctx readonly-errors)
           index,
         );
       }
@@ -1375,7 +1401,7 @@ export async function applyRedirections(
       sink: { path: string; append: boolean },
       content: string,
       encoding: "binary" | "utf8",
-    ) =>
+    ) => // (1ctx readonly-errors)
       refusable(() =>
         sink.append
           ? ctx.fs.appendFile(sink.path, content, encoding)

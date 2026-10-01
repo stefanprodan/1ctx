@@ -4,6 +4,8 @@
  * This is a non-standard command that converts HTML from stdin to Markdown.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import TurndownService from "turndown";
 import {
   decodeBytesToUtf8,
@@ -143,7 +145,8 @@ export const htmlToMarkdownCommand: RuntimeCommand = {
         rethrowFatalExecutionError(error);
         return {
           stdout: "",
-          stderr: `html-to-markdown: ${files[0]}: No such file or directory\n`,
+          // (1ctx readonly-errors) a file over the read limit says so
+          stderr: `html-to-markdown: ${files[0]}: ${readErrorWords(error)}\n`,
           exitCode: 1,
         };
       }

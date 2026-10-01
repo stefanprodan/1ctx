@@ -85,6 +85,21 @@ function isMissingPathError(error: unknown): boolean {
 }
 
 /**
+ * (1ctx walk-links) A folder's key for a walk's cycle check: its real path,
+ * since a mount's root has one identity in memory and another on disk.
+ */
+export async function directoryKey(
+  fs: IFileSystem,
+  path: string,
+): Promise<string | undefined> {
+  try {
+    return normalizePath(await fs.realpath(path));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Resolve an existing path to both its canonical spelling and, where the
  * backend supports it, an alias-resistant identity. For a path that does not
  * exist, canonicalize the nearest existing parent and append all missing

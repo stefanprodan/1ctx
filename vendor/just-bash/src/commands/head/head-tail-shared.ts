@@ -2,6 +2,8 @@
  * Shared utilities for head and tail commands.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import {
   encodeUtf8ToBytes,
@@ -201,7 +203,8 @@ export async function processHeadTailFiles(
       filesProcessed++;
     } catch (error) {
       rethrowFatalExecutionError(error);
-      stderr.append(`${cmdName}: ${file}: No such file or directory\n`);
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr.append(`${cmdName}: ${file}: ${readErrorWords(error)}\n`);
       exitCode = 1;
     }
   }

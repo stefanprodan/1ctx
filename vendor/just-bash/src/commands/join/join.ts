@@ -7,6 +7,9 @@
  * standard output. The default join field is the first, delimited by blanks.
  */
 
+// (1ctx readonly-errors)
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../../fs/error-words.js";
 import {
   decodeBytesToUtf8,
   encodeUtf8ToBytes,
@@ -306,7 +309,18 @@ export const join: RuntimeCommand = {
         contents.push(decodeBytesToUtf8(ctx.stdin) ?? "");
       } else {
         const filePath = ctx.fs.resolvePath(ctx.cwd, file);
-        const content = await ctx.fs.readFile(filePath);
+        // (1ctx readonly-errors) a file over the read limit says so
+        let content: string;
+        try {
+          content = await ctx.fs.readFile(filePath);
+        } catch (error) {
+          if (fsErrorCode(error) !== "EFBIG") throw error;
+          return {
+            exitCode: 1,
+            stdout: "",
+            stderr: `join: ${file}: File too large\n`,
+          };
+        }
         if (content === null) {
           return {
             exitCode: 1,

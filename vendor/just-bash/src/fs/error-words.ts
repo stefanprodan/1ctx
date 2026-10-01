@@ -15,6 +15,7 @@ const WORDS: Record<string, string> = Object.assign(Object.create(null), {
   ENOTEMPTY: "Directory not empty",
   EXDEV: "Invalid cross-device link",
   ENOSPC: "No space left on device",
+  EFBIG: "File too large",
   EBUSY: "Device or resource busy",
 });
 
@@ -42,4 +43,32 @@ export function isReadOnlyError(error: unknown): boolean {
 export function fsErrorSyscall(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
   return /^E[A-Z]+: [^,]*, ([a-z]+)\b/.exec(error.message)?.[1];
+}
+
+/**
+ * Why a file could not be read, in GNU's words: too large for the read
+ * limit, or else missing, which is what the commands said before.
+ */
+export function readErrorWords(error: unknown): string {
+  return fsErrorCode(error) === "EFBIG"
+    ? "File too large"
+    : "No such file or directory";
+}
+
+const CREATING = new Set(["write", "append", "open", "mkdir", "symlink", "link"]);
+
+/**
+ * GNU's words for a write a file system refused: read-only, or a path that
+ * cannot be made (a missing or file parent, a folder written to), as a
+ * read-only overlay reports before EROFS. Undefined for anything else.
+ */
+export function writeRefusalWords(error: unknown): string | undefined {
+  const code = fsErrorCode(error);
+  if (code === "EROFS" || code === "ENOTDIR" || code === "EISDIR") {
+    return fsErrorWords(error);
+  }
+  if (code === "ENOENT" && CREATING.has(fsErrorSyscall(error) ?? "")) {
+    return fsErrorWords(error);
+  }
+  return undefined;
 }

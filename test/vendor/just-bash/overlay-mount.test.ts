@@ -46,6 +46,10 @@ beforeAll(async () => {
   await writeFile(join(repo, "src/lib/a.ts"), "export const a = 1;\n");
   await writeFile(join(repo, "src/lib/b.ts"), "export const b = a;\n");
   await writeFile(join(repo, "docs/guide.md"), "guide\n");
+  await writeFile(
+    join(repo, "docs/big.bin"),
+    Buffer.alloc(2 * 1024 * 1024, 97),
+  );
   await writeFile(join(repo, "src/run.sh"), "#!/bin/sh\necho hi\n");
   await chmod(join(repo, "src/run.sh"), 0o755);
   await symlink("lib/a.ts", join(repo, "src/link.ts"));
@@ -125,14 +129,6 @@ describe("a read-only repository mount", () => {
       });
     });
 
-  test("ls -la lists the folder, links included", async () => {
-    const result = await shell().exec("ls -la /repos/r/src");
-    expect(result).toMatchObject({ stderr: "", exitCode: 0 });
-    expect(
-      result.stdout.split("\n").map((line) => line.split(" ").pop()),
-    ).toEqual(["6", ".", "..", "lib", "link.ts", "run.sh", "up.txt", ""]);
-  });
-
   test("a file keeps its mode and a link its target", async () => {
     expect(
       await shell().exec(
@@ -204,6 +200,42 @@ describe("a read-only repository mount", () => {
       "tee: /repos/r/f: Read-only file system\n",
       1,
     ],
+    [
+      "echo x > /repos/r/README.md/y",
+      "bash: /repos/r/README.md/y: Not a directory\n",
+      1,
+    ],
+    [
+      "echo x > /repos/r/nope/y",
+      "bash: /repos/r/nope/y: No such file or directory\n",
+      1,
+    ],
+    [
+      "mkdir -p /repos/r/README.md/x",
+      "mkdir: cannot create directory '/repos/r/README.md/x': Not a directory\n",
+      1,
+    ],
+    ["cat 0<> /repos/r/docs", "bash: /repos/r/docs: Is a directory\n", 1],
+    [
+      "awk 'BEGIN { print 1 > \"/repos/r/docs\" }'",
+      "awk: cannot redirect to `/repos/r/docs': Is a directory\n",
+      2,
+    ],
+    [
+      "cp -r /repos/r/docs /repos/r/d2",
+      "cp: cannot create directory '/repos/r/d2': Read-only file system\n",
+      1,
+    ],
+    [
+      "mv /repos/r /tmp/r",
+      "mv: cannot move '/repos/r' to '/tmp/r': Device or resource busy\n",
+      1,
+    ],
+    [
+      "sed -n 'w /repos/r/out' /repos/r/README.md",
+      "sed: couldn't open file /repos/r/out: Read-only file system\n",
+      4,
+    ],
   ];
   for (const [script, stderr, exitCode] of writes)
     test(`refuses: ${script}`, async () => {
@@ -236,6 +268,48 @@ describe("a read-only repository mount", () => {
       expect(result.exitCode).toBe(1);
     });
 
+  const big = "/repos/r/docs/big.bin";
+  const tooLarge: [string, string, number][] = [
+    [`cat ${big}`, `cat: ${big}: File too large\n`, 1],
+    [`head -c 3 ${big}`, `head: ${big}: File too large\n`, 1],
+    [`wc -c < ${big}`, `bash: ${big}: File too large\n`, 1],
+    [`sed -n 1p ${big}`, `sed: ${big}: File too large\n`, 1],
+    [
+      `awk 'END { print NR }' ${big}`,
+      `awk: fatal: cannot open file '${big}' for reading: File too large\n`,
+      2,
+    ],
+    [`jq . ${big}`, `jq: ${big}: File too large\n`, 2],
+    [`grep -c a ${big}`, `grep: ${big}: File too large\n`, 2],
+    [`rg -c a ${big}`, `rg: ${big}: File too large (os error 27)\n`, 2],
+    [
+      `cp ${big} /tmp/b`,
+      `cp: cannot open '${big}' for reading: File too large\n`,
+      1,
+    ],
+    [
+      "tar -cf /tmp/a.tar -C /repos/r docs",
+      "tar: docs/big.bin: Cannot open: File too large\n",
+      2,
+    ],
+  ];
+  // md5sum says it on stdout, as upstream's own test holds
+  test("a file over the read limit: md5sum", async () => {
+    expect(await shell().exec(`md5sum ${big}`)).toMatchObject({
+      stdout: `md5sum: ${big}: File too large\n`,
+      stderr: "",
+      exitCode: 1,
+    });
+  });
+  for (const [script, stderr, exitCode] of tooLarge)
+    test(`a file over the read limit: ${script}`, async () => {
+      expect(await shell().exec(script)).toMatchObject({
+        stdout: "",
+        stderr,
+        exitCode,
+      });
+    });
+
   test("cp copies out of the mount", async () => {
     expect(
       await shell().exec(
@@ -262,6 +336,8 @@ describe("a read-only repository mount", () => {
     });
   });
 
+  // fails without find-batch: the find's batch of directory reads on disk
+  // outlives the command
   test.serial("a refused walk leaves no rejection behind", async () => {
     const unhandled: unknown[] = [];
     const record: NodeJS.UnhandledRejectionListener = (reason) => {

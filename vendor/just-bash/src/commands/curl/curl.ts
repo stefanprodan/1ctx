@@ -12,7 +12,7 @@ import {
   utf8ByteLength,
 } from "../../encoding.js";
 // (1ctx readonly-errors)
-import { isReadOnlyError } from "../../fs/error-words.js";
+import { writeRefusalWords } from "../../fs/error-words.js";
 import { fromBuffer, toBuffer } from "../../fs/encoding.js";
 import { getErrorMessage } from "../../interpreter/helpers/errors.js";
 import { _Headers } from "../../security/trusted-globals.js";
@@ -482,7 +482,7 @@ export const curlCommand: RuntimeCommand = {
       // Determine exit code based on error type
       let exitCode = 1;
       // (1ctx readonly-errors) curl's error for a file it cannot write
-      if (isReadOnlyError(error)) {
+      if (writeRefusalWords(error) !== undefined) {
         exitCode = 23; // CURLE_WRITE_ERROR
         const showErr = !options.silent || options.showError;
         return {

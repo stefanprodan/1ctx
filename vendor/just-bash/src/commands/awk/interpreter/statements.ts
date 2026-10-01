@@ -5,7 +5,7 @@
  */
 
 // (1ctx readonly-errors)
-import { isReadOnlyError } from "../../../fs/error-words.js";
+import { writeRefusalWords } from "../../../fs/error-words.js";
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import {
   assertDefenseContext,
@@ -324,10 +324,9 @@ async function writeToFile(
     await writeFile(ctx, fs.resolvePath(ctx.cwd, filename), redirect, text);
   } catch (error) {
     // (1ctx readonly-errors) gawk's fatal error for a file it cannot open
-    if (!isReadOnlyError(error)) throw error;
-    throw new Error(
-      `cannot redirect to \`${filename}': Read-only file system`,
-    );
+    const words = writeRefusalWords(error);
+    if (words === undefined) throw error;
+    throw new Error(`cannot redirect to \`${filename}': ${words}`);
   }
 }
 

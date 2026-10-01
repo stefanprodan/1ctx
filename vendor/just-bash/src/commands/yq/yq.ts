@@ -11,7 +11,7 @@
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 // (1ctx readonly-errors)
-import { isReadOnlyError } from "../../fs/error-words.js";
+import { writeRefusalWords, readErrorWords } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -572,7 +572,8 @@ export const yqCommand: RuntimeCommand = {
         }
         return {
           stdout: "",
-          stderr: `yq: ${files[0]}: No such file or directory\n`,
+          // (1ctx readonly-errors) a file over the read limit says so
+          stderr: `yq: ${files[0]}: ${readErrorWords(e)}\n`,
           exitCode: 2,
         };
       }
@@ -935,7 +936,8 @@ async function runEvalAll(
           if (e instanceof SecurityViolationError) throw e;
           return {
             stdout: "",
-            stderr: `yq: ${name}: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `yq: ${name}: ${readErrorWords(e)}\n`,
             exitCode: 2,
           };
         }
@@ -1083,8 +1085,9 @@ async function writeInPlace(
   try {
     await write();
   } catch (e) {
-    if (!isReadOnlyError(e)) throw e;
-    throw new InPlaceRefusal(`${name}: Read-only file system`);
+    const words = writeRefusalWords(e);
+    if (words === undefined) throw e;
+    throw new InPlaceRefusal(`${name}: ${words}`);
   }
 }
 

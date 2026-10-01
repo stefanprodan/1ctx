@@ -2,6 +2,8 @@
  * base64 - Encode or decode base64
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { latin1FromBytes } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -128,7 +130,8 @@ async function readBinary(
         ok: false,
         error: {
           stdout: "",
-          stderr: `${cmdName}: ${file}: No such file or directory\n`,
+          // (1ctx readonly-errors) a file over the read limit says so
+          stderr: `${cmdName}: ${file}: ${readErrorWords(error)}\n`,
           exitCode: 1,
         },
       };

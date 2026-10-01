@@ -12,7 +12,7 @@ import {
 } from "../execution-scope.js";
 import { getFileSystemIdentity, isFileSystemIdentity } from "../fs/identity.js";
 // (1ctx readonly-errors)
-import { isReadOnlyError } from "../fs/error-words.js";
+import { fsErrorCode, isReadOnlyError } from "../fs/error-words.js";
 import { sanitizeErrorMessage } from "../fs/sanitize-error.js";
 import { awaitWithDefenseContext } from "../security/defense-context.js";
 import {
@@ -991,10 +991,14 @@ export async function executeExternalCommand(
     if (error instanceof SecurityViolationError) {
       throw error;
     }
-    // (1ctx readonly-errors) a read-only refusal names the mount's path,
-    // not the agent's, so a command that let it through says the words only
+    // (1ctx readonly-errors) a read-only refusal or a file over the read
+    // limit names the mount's path, not the agent's, so a command that let
+    // it through says the words only
     if (isReadOnlyError(error)) {
       return failure(`${commandName}: Read-only file system\n`);
+    }
+    if (fsErrorCode(error) === "EFBIG") {
+      return failure(`${commandName}: File too large\n`);
     }
     return failure(
       `${commandName}: ${sanitizeErrorMessage(getErrorMessage(error))}\n`,

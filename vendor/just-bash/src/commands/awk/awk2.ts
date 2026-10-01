@@ -4,6 +4,8 @@
  * This is the new implementation using proper lexer/parser/interpreter architecture.
  */
 
+// (1ctx readonly-errors)
+import { readErrorWords } from "../../fs/error-words.js";
 import { decodeBytesToUtf8 } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { mapToRecord, processEnv } from "../../helpers/env.js";
@@ -107,7 +109,8 @@ export const awkCommand2: RuntimeCommand = {
           rethrowFatalExecutionError(e);
           return {
             stdout: "",
-            stderr: `awk: fatal: cannot open source file '${file}' for reading: No such file or directory\n`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            stderr: `awk: fatal: cannot open source file '${file}' for reading: ${readErrorWords(e)}\n`,
             exitCode: 2,
           };
         }
@@ -267,7 +270,8 @@ export const awkCommand2: RuntimeCommand = {
           }
           rethrowFatalExecutionError(e);
           throw new Error(
-            `fatal: cannot open file '${file}' for reading: No such file or directory`,
+            // (1ctx readonly-errors) a file over the read limit says so
+            `fatal: cannot open file '${file}' for reading: ${readErrorWords(e)}`,
           );
         }
       },
