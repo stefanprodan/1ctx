@@ -4,7 +4,6 @@
  * Provides types and utilities for registering user-provided TypeScript commands.
  */
 
-// (1ctx cancel-load) ported from upstream #506
 import { raceCancellation } from "./abort-signals.js";
 import { type ByteString, EMPTY_BYTES } from "./encoding.js";
 import { getFileSystemIdentity } from "./fs/identity.js";
@@ -14,7 +13,6 @@ import {
   type ExecutionLimits,
   resolveLimits,
 } from "./limits.js";
-// (1ctx cancel-load) ported from upstream #506
 import { _promiseThen } from "./security/trusted-globals.js";
 import type {
   Command,
@@ -107,7 +105,6 @@ export function defineCommand(
   return { name, trusted: options.trusted !== false, execute };
 }
 
-// (1ctx cancel-load) ported from upstream #506, to the end of createLazyCustomCommand
 /** A caller waiting for a shared lazy load to settle. */
 type LoadWaiter = {
   resolve(command: Command): void;
