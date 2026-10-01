@@ -221,7 +221,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return prepareSend({
       db: deps.db,
       registry,
-      startedBy: event?.source === "schedule" ? null : user.id,
+      // a run no one pressed takes the scheduled share of the caps
+      startedBy: event === null || event.source === "manual" ? user.id : null,
       wake: deps.wake,
       writer,
       sessions: deps.sessions,

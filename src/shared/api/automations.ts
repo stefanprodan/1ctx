@@ -35,6 +35,8 @@ export type SaveAutomationRequest = {
   // the whole set, empty when absent on create
   disabledCapabilities?: string[];
   memoryGuidance?: string;
+  // false when absent on create
+  rerunOnRestart?: boolean;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 

@@ -28,6 +28,12 @@ export function iconOf(row: StreamRow): "clock" | "chat" | "archive" {
   return row.session.origin === "automation" ? "clock" : "chat";
 }
 
+// the quiet word before the line: an archived chat, or a restart run
+export function markOf(row: StreamRow): string | null {
+  if (row.session.archived !== null) return "archived";
+  return row.session.runSource === "restart" ? "restarted" : null;
+}
+
 // a finished run the default decider judged to need a person; a run
 // not asked, a chat and a chance under the mark say nothing
 export const ATTENTION_WORDS = "needs attention";

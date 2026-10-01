@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import {
   authorGone,
   iconOf,
+  markOf,
   stateLine,
   tickMs,
   whenText,
@@ -291,6 +292,15 @@ describe("a run's row", () => {
       runBy: null,
     });
     expect(iconOf(ran)).toBe("clock");
+    expect(markOf(ran)).toBeNull();
+    const again = {
+      ...ran,
+      session: session({ origin: "automation", runSource: "restart" }),
+    };
+    expect(iconOf(again)).toBe("clock");
+    expect(markOf(again)).toBe("restarted");
+    const archived = session({ archived: { at: now, reason: "agent" } });
+    expect(markOf(row({ session: archived }))).toBe("archived");
     // the title is the automation already, so the line names the agent
     expect(stateLine(ran)).toEqual({
       author: "assistant",

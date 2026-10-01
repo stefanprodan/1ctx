@@ -32,8 +32,9 @@ import {
   deadlineShare,
   durationOf,
   durationText,
+  sourceIcon,
   sourceText,
-} from "./Automations.model.ts";
+} from "./Run.model.ts";
 import "./automations.css";
 
 export function RunRow({
@@ -83,13 +84,19 @@ export function RunRow({
       <span
         class="automations-run-icon"
         title={
-          [sourceText(row), deferred ? DEFERRED_BY_RESTART : ""]
+          [
+            sourceText(row),
+            // a restart run says so alone
+            deferred && session.runSource !== "restart"
+              ? DEFERRED_BY_RESTART
+              : "",
+          ]
             .filter((part) => part !== "")
             .join(", ") || undefined
         }
       >
         <Icon
-          name={session.runSource === "manual" ? "bolt" : "clock"}
+          name={sourceIcon(session)}
           size={15}
           class={attention ? "status-attention" : `status-${session.status}`}
         />

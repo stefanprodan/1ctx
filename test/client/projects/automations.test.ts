@@ -31,12 +31,8 @@ import {
   automationPageOf,
   canChange,
   type Draft,
-  deadlineShare,
-  deadlineText,
   dirtyOf,
   draftOf,
-  durationOf,
-  durationText,
   eventNote,
   followDeadlineLimit,
   nextLine,
@@ -48,10 +44,17 @@ import {
   rowState,
   scheduleTitle,
   scheduleWords,
-  sourceText,
   suspendedText,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
+import {
+  deadlineShare,
+  deadlineText,
+  durationOf,
+  durationText,
+  sourceIcon,
+  sourceText,
+} from "../../../src/client/views/projects/Run.model.ts";
 import type { StreamRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
@@ -78,6 +81,7 @@ const automation = (
   retentionDays: 30,
   ownMemory: false,
   memoryGuidance: "",
+  rerunOnRestart: false,
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -406,6 +410,7 @@ describe("the form", () => {
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      rerunOnRestart: false,
       web: true,
       visuals: true,
       knowledge: true,
@@ -429,6 +434,7 @@ describe("the form", () => {
         retentionDays: 30,
         ownMemory: true,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
+        rerunOnRestart: false,
         disabledCapabilities: [],
       },
     });
@@ -439,6 +445,16 @@ describe("the form", () => {
     expect("body" in atLimit && atLimit.body.deadlineMs).toBeNull();
     const part = requestOf(filled({ deadline: "1.5" }), LIMIT);
     expect("body" in part && part.body.deadlineMs).toBe(90_000);
+  });
+
+  test("starting again after a restart is off for a new task and saved as drafted", () => {
+    const on = requestOf(filled({ rerunOnRestart: true }), LIMIT);
+    expect("body" in on && on.body.rerunOnRestart).toBe(true);
+    const row = automation({ rerunOnRestart: true });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.rerunOnRestart).toBe(true);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {
@@ -764,6 +780,15 @@ describe("the run log", () => {
     expect(sourceText(run({ runSource: null }))).toBe("");
   });
 
+  test("each source has its icon, a restart its own arrow and words", () => {
+    expect(sourceIcon(run().session)).toBe("clock");
+    expect(sourceIcon(run({ runSource: "manual" }).session)).toBe("bolt");
+    expect(sourceIcon(run({ runSource: null }).session)).toBe("clock");
+    const restarted = run({ runSource: "restart" });
+    expect(sourceIcon(restarted.session)).toBe("redo");
+    expect(sourceText(restarted)).toBe("Restarted");
+  });
+
   test("a run's length, to the second, against its deadline", () => {
     const send = {
       id: "d1",
@@ -810,6 +835,7 @@ describe("the run log", () => {
     expect(matchesFilter(run({ status: "stopped" }), "failed")).toBe(false);
     expect(matchesFilter(run({ runSource: "manual" }), "manual")).toBe(true);
     expect(matchesFilter(run(), "manual")).toBe(false);
+    expect(matchesFilter(run({ runSource: "restart" }), "manual")).toBe(false);
   });
 });
 

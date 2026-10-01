@@ -26,6 +26,7 @@ type Raw = {
   own_memory: number;
   memory_guidance: string;
   disabled_capabilities: string;
+  rerun_on_restart: number;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -76,6 +77,7 @@ const row = (raw: Raw): AutomationSummary => ({
   ownMemory: raw.own_memory === 1,
   memoryGuidance: raw.memory_guidance,
   disabledCapabilities: JSON.parse(raw.disabled_capabilities),
+  rerunOnRestart: raw.rerun_on_restart === 1,
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -108,6 +110,7 @@ export type AutomationFields = Pick<
   | "ownMemory"
   | "memoryGuidance"
   | "disabledCapabilities"
+  | "rerunOnRestart"
 >;
 
 export class AutomationStore {
@@ -208,9 +211,9 @@ export class AutomationStore {
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, own_memory,
-           memory_guidance, disabled_capabilities,
+           memory_guidance, disabled_capabilities, rerun_on_restart,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -226,6 +229,7 @@ export class AutomationStore {
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
         JSON.stringify(fields.disabledCapabilities),
+        fields.rerunOnRestart ? 1 : 0,
         fields.nextAt,
         fields.now,
         fields.now,
@@ -248,6 +252,7 @@ export class AutomationStore {
       | "ownMemory"
       | "memoryGuidance"
       | "disabledCapabilities"
+      | "rerunOnRestart"
     > & { now: number },
   ): AutomationSummary | null {
     this.db
@@ -255,7 +260,7 @@ export class AutomationStore {
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, own_memory = ?, memory_guidance = ?,
-           disabled_capabilities = ?,
+           disabled_capabilities = ?, rerun_on_restart = ?,
            revision = revision + 1, updated_at = ? where id = ?`,
       )
       .run(
@@ -270,6 +275,7 @@ export class AutomationStore {
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
         JSON.stringify(fields.disabledCapabilities),
+        fields.rerunOnRestart ? 1 : 0,
         fields.now,
         id,
       );

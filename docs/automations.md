@@ -13,6 +13,8 @@ editor are in `docs/views.md`.
   retention in days. Its `disabledCapabilities` is a whole sorted set
   on create and PATCH, empty on an omitted create and kept on an omitted
   PATCH. Each run snapshots it and stores a copy on its session.
+  `rerunOnRestart` is a boolean, false on an omitted create and kept on
+  an omitted PATCH; a PATCH of it alone leaves `next_at`.
 - **Who may do what.** Anyone who sees the project creates it, runs it
   now, suspends, resumes and stops a run; the owner or, in a team
   project, an admin edits and deletes it, else 403. At most
@@ -87,7 +89,24 @@ editor are in `docs/views.md`.
   `DEFERRED_BY_RESTART` ("deferred by a restart", `shared/words.ts`),
   decided in the fire's transaction, so the lateness outlives the
   deferral; the automation page's note and the run's icon title in the
-  Runs log say it. Run now during the drain is the registry's 503.
+  Runs log say it, a restart run's title alone excepted. Run now during
+  the drain is the registry's 503.
+- **A run a restart cut starts again when asked.** `start()` lists,
+  after `reconcile()` and in memory only (`cutRuns()` in
+  `automations/refire.ts`), the rows with `rerunOnRestart` whose last
+  run's last send ended with cause `shutdown` (the drain's end) or
+  `restart` (repair after a crash). A pass fires them after its due
+  rows, as due at the listing, with source `restart`: the scheduled
+  fire's checks (suspended, the owner's access, still running, a skip
+  recorded with source `restart`) and its cap waits, acting as the owner
+  with the scheduled share of the caps (`startedBy` null, the prompt's
+  "scheduled run"). A listed row whose `next_at` is due fires once, as
+  the restart run, and moves `next_at`; one not due keeps it. A suspend,
+  the flag turned off, or a later run whatever its end, drops it from
+  the list (`stillCut()`), so a second restart before it fires lists the
+  cut run again. The new run starts from the task; the cut one stays
+  `stopped` or `failed` in the log. `?filter=manual` never holds a
+  restart run.
 - **A run is a session of kind `run`.** A run is a session with
   origin `automation`, its `automationId`, the automation's name as
   title and a send of kind `run`; the runner refuses `send`,

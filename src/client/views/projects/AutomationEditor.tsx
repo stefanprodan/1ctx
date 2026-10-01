@@ -3,10 +3,11 @@
 //
 // The automation editor, a page for a new automation and for one that
 // exists, in steps: its name, the task (the composer's box with its
-// agent chip, since a run is that message to that agent), when it runs
-// and its limits. The owner, or an admin in a team project, saves and
-// deletes; anyone else reads the fields. The deadline starts at the
-// server's limit, the value a run is held to when none is set.
+// agent chip, since a run is that message to that agent), what it may
+// use, whether a restart starts it again, when it runs and its limits.
+// The owner, or an admin in a team project, saves and deletes; anyone
+// else reads the fields. The deadline starts at the server's limit, the
+// value a run is held to when none is set.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -63,6 +64,7 @@ import {
   retiredPick,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
+import { RestartSection } from "./RestartSection.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";
 import "./automations.css";
 
@@ -272,6 +274,7 @@ function Editor({
         }
         disabled={off}
       />
+      <RestartSection on={d.rerunOnRestart} set={set} disabled={off} />
       <Section title="When" text="In the time zone you pick">
         <ScheduleField
           projectId={projectId}

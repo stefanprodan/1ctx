@@ -7,8 +7,8 @@
 // automation, so its line is the agent's answer like a chat's. In All
 // a run stands for its automation's runs and counts them with the
 // bolt. An archived chat wears the box, quiet, and says so before its
-// line, as a run that needs attention does. The whole row is the link
-// to the chat.
+// line, as a run that needs attention does and a run a restart started
+// again. The whole row is the link to the chat.
 
 import { type ComponentChild, Fragment } from "preact";
 import type { StreamRow } from "../../shared/api/sessions.ts";
@@ -19,6 +19,7 @@ import {
   ATTENTION_WORDS,
   authorGone,
   iconOf,
+  markOf,
   needsAttention,
   stateLine,
   whenText,
@@ -50,6 +51,7 @@ export function Row({
   const { session } = row;
   const line = stateLine(row);
   const archived = session.archived !== null;
+  const mark = markOf(row);
   const attention = needsAttention(session);
   return (
     <a class="stream-row" href={sessionHref(session)}>
@@ -61,9 +63,9 @@ export function Row({
       <span class="stream-text">
         <span class="stream-title cut">{session.title}</span>
         <span class="stream-line cut">
-          {archived && (
+          {mark !== null && (
             <>
-              <span class="stream-archived">archived</span>
+              <span class="stream-mark">{mark}</span>
               {" · "}
             </>
           )}

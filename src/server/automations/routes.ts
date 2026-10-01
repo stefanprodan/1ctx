@@ -263,6 +263,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             ownMemory: next.ownMemory,
             memoryGuidance: next.memoryGuidance,
             disabledCapabilities: next.disabledCapabilities,
+            rerunOnRestart: next.rerunOnRestart,
             now,
           })!;
           return { result: updated, events: [changed(updated)] };

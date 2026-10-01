@@ -53,12 +53,12 @@ import { AutomationActions } from "./AutomationActions.tsx";
 import {
   automationPageOf,
   canChange,
-  deadlineText,
   eventNote,
   nextLine,
   scheduleTitle,
   suspendedText,
 } from "./Automations.model.ts";
+import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
 import { fireLabel } from "./Schedule.model.ts";
 import "./automations.css";
@@ -240,6 +240,11 @@ export function Automation({ params }: { params: Params }) {
                   {deadlineText(deadlineMs)}
                 </AsideLine>
                 <AccessLines row={row} />
+                {row.rerunOnRestart && (
+                  <div class="split-line">
+                    Restarts a run the server stopped
+                  </div>
+                )}
                 <AsideLine label="Owner" href={userHref(row.ownerName)}>
                   @{row.ownerName}
                 </AsideLine>

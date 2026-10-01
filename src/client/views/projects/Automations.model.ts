@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation pages say and check without a DOM: a schedule
-// in words for the shapes people write most, the list row's state, a
-// run's source and duration, who may change a row, and the editor's
-// fields to a request. The server parses the schedule and the zone;
-// the words here only read them, and the expression itself stands in
-// for any shape they do not know.
+// in words for the shapes people write most, the list row's state, who
+// may change a row, and the editor's fields to a request; a run's words
+// are in Run.model.ts. The server parses the schedule and the zone; the
+// words here only read them, and the expression itself stands in for
+// any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import type {
-  StreamRow,
   SwitchableCredential,
   SwitchableServer,
   SwitchableSkill,
@@ -182,47 +181,6 @@ export function retiredPick(
   return `Its agent ${a.agentName} was deleted. Pick another to save.`;
 }
 
-// what started a run: "Scheduled", or "@bogdan" for whoever pressed Run
-// now, the run icon's title; the name is the server's, so an admin
-// outside the project is named too. A run from before sources were kept
-// says nothing
-export function sourceText(row: StreamRow): string {
-  const { session } = row;
-  if (session.runSource === "schedule") return "Scheduled";
-  if (session.runSource !== "manual" || row.runBy === null) return "";
-  return `@${row.runBy.username}`;
-}
-
-// how long the run has taken, while it runs up to now; null before its
-// send is on the row
-export function durationOf(row: StreamRow, now: number): number | null {
-  const { send } = row;
-  if (send === null) return null;
-  return Math.max(0, (send.finishedAt ?? now) - send.startedAt);
-}
-
-// "4m 10s", "38s", "1h 2m": a run's length to the second, since runs
-// are minutes long and the list's one letter would say 4m for both
-export function durationText(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
-  return `${Math.floor(s / 3600)}h ${pad(Math.floor(s / 60) % 60)}m`;
-}
-
-// a deadline as the setup says it: "10 min", "90 s"
-export function deadlineText(ms: number): string {
-  return ms % 60_000 === 0
-    ? `${ms / 60_000} min`
-    : `${Math.round(ms / 1000)} s`;
-}
-
-// the part of the deadline a run took, 0 to 1
-export function deadlineShare(ms: number, deadlineMs: number): number {
-  if (deadlineMs <= 0) return 0;
-  return Math.min(1, ms / deadlineMs);
-}
-
 // a skipped or deferred event, and a run a restart deferred or that ran
 // a minute or more past the fire that was meant, for the automation page
 export function eventNote(a: AutomationSummary, now: number): string | null {
@@ -328,6 +286,7 @@ export type Draft = {
   memory: MemoryMode;
   // what the run's own note keeps, as typed
   memoryGuidance: string;
+  rerunOnRestart: boolean;
 } & AccessDraft;
 
 const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -352,6 +311,7 @@ export function draftOf(
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      rerunOnRestart: false,
       web: true,
       visuals: true,
       knowledge: true,
@@ -370,6 +330,7 @@ export function draftOf(
     retention: String(a.retentionDays),
     memory: modeOf(a),
     memoryGuidance: a.memoryGuidance,
+    rerunOnRestart: a.rerunOnRestart,
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
@@ -472,6 +433,7 @@ export function requestOf(
       retentionDays: Number(days),
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
+      rerunOnRestart: d.rerunOnRestart,
       disabledCapabilities: disabledOf(d, servers, skills, credentials),
     },
   };

@@ -72,7 +72,7 @@ function automationLine(
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
   const at = `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
-  const kind = automation.source === "schedule" ? "scheduled" : "manual";
+  const kind = automation.source === "manual" ? "manual" : "scheduled";
   return `This is a ${kind} run of the ${automation.name} automation, started at ${at} ${automation.tz}. You run autonomously. Do not ask questions. Do the task and stop.`;
 }
 

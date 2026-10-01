@@ -17,7 +17,7 @@ import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { stateLine, whenText } from "../../stream/Row.model.ts";
 import { ForkButton, type OnFork } from "../../transcript/Fork.tsx";
-import { durationOf, durationText } from "../projects/Automations.model.ts";
+import { durationOf, durationText } from "../projects/Run.model.ts";
 
 export function RunFoot({
   row,
