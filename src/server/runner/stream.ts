@@ -13,7 +13,18 @@ import type { SessionsPort } from "./writer-port.ts";
 
 export const WRITE_EVERY_MS = 250;
 export const WRITE_EVERY_BYTES = 2048;
+// the client draws text past the last render raw, so a short reply
+// renders often; each render goes whole to every watcher, so the gap
+// grows with the html, capped at HTML_CHARS_PER_MS and once a second
 export const HTML_EVERY_MS = 1000;
+export const HTML_MIN_MS = 100;
+export const HTML_CHARS_PER_MS = 32;
+
+export const htmlEvery = (htmlLength: number): number =>
+  Math.min(
+    HTML_EVERY_MS,
+    Math.max(HTML_MIN_MS, Math.ceil(htmlLength / HTML_CHARS_PER_MS)),
+  );
 
 export type StreamDeps = {
   clock: Clock;
@@ -122,7 +133,7 @@ export function streamDelta(
   if (
     event.kind === "content" &&
     round.content.length > round.htmlAt &&
-    now - round.lastHtmlAt >= HTML_EVERY_MS
+    now - round.lastHtmlAt >= htmlEvery(round.html.length)
   ) {
     round.lastHtmlAt = now;
     round.htmlAt = round.content.length;
