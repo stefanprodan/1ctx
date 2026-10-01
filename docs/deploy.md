@@ -4,7 +4,7 @@ Governs `src/server/service/`, `scripts/staging.sh` and the staging
 targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
 `.github/workflows/`.
 
-## The service
+## The OS service (`1ctx service`)
 
 - **`service/` is CLI only.** It imports only `lib/` and opens no
   database. `service.ts` knows no platform; a new service manager is a
@@ -54,8 +54,8 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
   `make image-smoke` runs the image that way and requires a clean exit
   on SIGTERM.
 - **`CMD` holds the server flags; arguments replace it whole.** A
-  compose `command:` or `docker run` arguments repeat every flag they
-  keep.
+  Docker Compose `command:` or `docker run` arguments repeat every
+  flag they keep.
 - **Every file in `/secrets` must be readable by 65532.** It is
   mounted read-only. An unreadable key throws where it is read, and an
   unreadable `user-admin.key` fails the first start.
@@ -65,10 +65,10 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
-  would kill the shutdown after the drain. Compose sets
+  would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.
 
-## Compose
+## Docker Compose
 
 - **`compose.yaml` runs a release by `ONECTX_VERSION`, the tag.**
   `compose.dev.yaml`, layered over it with `ONECTX_VERSION=dev`, builds

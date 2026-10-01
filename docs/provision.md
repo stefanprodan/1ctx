@@ -16,7 +16,7 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
   that admin first when the database has none, and reports it apart
   from the counted objects.
 - **`--provision` runs at every server start, before the database
-  opens.** Compose and Kubernetes restart the server to apply a
+  opens.** Docker Compose and Kubernetes restart the server to apply a
   change. A one-shot or init container would fail on `up -d` and on an
   upgrade, since the old server still holds the database.
 - **At start a missing path or a folder without YAML is not an

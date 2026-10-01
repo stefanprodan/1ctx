@@ -77,7 +77,7 @@ site/         1ctx.dev and the brand files, its own project.
 vendor/       just-bash/ (a git subtree, outside Biome and the structure
               rules) and its three docs.
 docs/         the rules of each area (see Docs).
-deploy/       compose files for the container image (docs/deploy.md).
+deploy/       Docker Compose files for the container image (docs/deploy.md).
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
