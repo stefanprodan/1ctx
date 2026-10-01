@@ -35,6 +35,8 @@ class LsText {
   }
 }
 
+// (1ctx fs-children) a listing hands its byte counts up, so -R never
+// re-measures them
 type LsResult = ExecResult & { stdoutBytes?: number; stderrBytes?: number };
 
 /**
@@ -324,6 +326,7 @@ export const lsCommand: RuntimeCommand = {
         new Set(),
         true,
       );
+      // (1ctx fs-children) the counted bytes, not a rescan
       stdout.add(result.stdout, result.stdoutBytes);
       stderr.add(result.stderr, result.stderrBytes);
       if (result.exitCode !== 0) exitCode = result.exitCode;
@@ -750,6 +753,7 @@ async function listPath(
       // Append results
       for (const { result } of subResults) {
         stdout.add("\n");
+        // (1ctx fs-children) the counted bytes, not a rescan
         stdout.add(result.stdout, result.stdoutBytes);
         stderr.add(result.stderr, result.stderrBytes);
         if (result.exitCode !== 0) exitCode = result.exitCode;
@@ -760,6 +764,7 @@ async function listPath(
       stdout: stdout.text,
       stderr: stderr.text,
       exitCode,
+      // (1ctx fs-children) the counts the caller adds without a rescan
       stdoutBytes: stdout.bytes,
       stderrBytes: stderr.bytes,
     };
