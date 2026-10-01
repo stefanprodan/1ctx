@@ -19,6 +19,7 @@ const definition: ServiceDefinition = {
   home: HOME,
   workingDirectory: "/home/u/.1ctx",
   logPath: LOG,
+  exitTimeout: 25,
 };
 
 function result(code = 0, stdout = "", stderr = "") {
@@ -120,6 +121,9 @@ describe("launchd backend", () => {
     expect(held.get(PLIST)).toContain("<string>dev.1ctx.server</string>");
     expect(held.get(PLIST)).toContain(`<string>${LOG}</string>`);
     expect(held.get(PLIST)).toContain("<key>HOME</key>");
+    expect(held.get(PLIST)).toContain(
+      "<key>ExitTimeOut</key>\n  <integer>25</integer>",
+    );
   });
 
   test("a staged plist that reads back wrong stops nothing", async () => {

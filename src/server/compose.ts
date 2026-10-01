@@ -45,6 +45,7 @@ import {
 } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
 import {
+  type DrainResult,
   type Runner,
   runnerArea,
   type ShutdownResult,
@@ -63,7 +64,7 @@ import {
   type Users,
   usersArea,
 } from "./users/index.ts";
-import { healthRoute } from "./web/health.ts";
+import { healthRoutes } from "./web/health.ts";
 import { type Router, router } from "./web/router.ts";
 import { type Socket, socketArea } from "./web/socket.ts";
 
@@ -81,6 +82,8 @@ export type ComposeOptions = {
   version: string;
   secureCookie: boolean;
   trustProxy: boolean;
+  // how long a shutdown waits for running sends to end on their own
+  drainMs?: number;
   // a test seam for the runner's tool state machine
   tools?: Tools;
   // a test's command worker entry; the real one by default
@@ -123,8 +126,9 @@ export type App = {
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
-  // terminate every send and close every socket, in that order
-  shutdown(): Promise<ShutdownResult>;
+  // drain, terminate what is left and close every socket, in that
+  // order; cut ends the drain's wait
+  shutdown(cut?: Promise<void>): Promise<ShutdownResult & DrainResult>;
 };
 
 const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
@@ -476,6 +480,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   });
   let repaired = 0;
   let reconciled = 0;
+  // from the first signal to the exit
+  let draining = false;
   if (options.activate !== false) {
     await users.bootstrap();
     repaired = sessions.repair();
@@ -503,7 +509,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...automations.routes,
     ...overview.routes,
     socket.route,
-    healthRoute(options.version),
+    ...healthRoutes(options.version, () => draining),
   ];
   const handle = router({
     routes,
@@ -593,21 +599,26 @@ export async function compose(options: ComposeOptions): Promise<App> {
       }
     },
     mcpStart: () => mcp.start(),
-    // the runner first, whose ending calls may still ask for a refresh
-    // that the MCP close then refuses, then any command it left running;
-    // nothing touches the db after
-    async shutdown() {
-      // first: a start refused while closing leaves its rows queued
+    // the drain first, while the listener still serves; then the runner,
+    // whose ending calls may still ask for a refresh that the MCP close
+    // then refuses, then any command it left running, both within the
+    // runner's wait; nothing touches the db after
+    async shutdown(cut) {
+      draining = true;
+      // first: from here every message is queued for the next start
       runner.queue.close();
+      automations.drain();
+      const { drained } = await runner.drain(options.drainMs ?? 0, cut);
       skills.close();
+      const result = await runner.shutdown(async () => {
+        bash.close();
+        await mcp.close();
+      });
       automations.stop();
-      const result = await runner.shutdown();
-      bash.close();
-      await mcp.close();
       automations.dispose();
       overview.close();
       socket.dispose();
-      return result;
+      return { ...result, drained };
     },
   };
 }

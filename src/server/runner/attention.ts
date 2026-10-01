@@ -61,6 +61,8 @@ export type Attention = {
   ask(send: ActiveSend): void;
   // every ask queued or in flight has ended
   settled(): Promise<void>;
+  // the asks queued or in flight
+  pending(): number;
   // aborts every ask and waits for them; nothing is asked after
   close(): Promise<void>;
 };
@@ -183,6 +185,7 @@ export function attention(port: AttentionPort, log: Log): Attention {
       }
     },
     settled,
+    pending: () => asks.size,
     close() {
       closing.abort();
       for (const job of queue.splice(0)) job.start(true);

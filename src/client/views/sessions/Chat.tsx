@@ -53,6 +53,7 @@ import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
 import { Page } from "../../ui/Page.tsx";
+import { RESTARTED_LINE } from "../projects/Run.model.ts";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
@@ -204,6 +205,12 @@ function SessionPage({
                   {automation.name}
                 </a>
               )}
+            </p>
+          )}
+          {run && shown.session.runSource === "restart" && (
+            <p class="chat-run">
+              <Icon name="redo" size={12} />
+              <span class="chat-run-label">{RESTARTED_LINE}</span>
             </p>
           )}
           <Transcript

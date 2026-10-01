@@ -74,8 +74,22 @@ export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
     if (migration.rebuild) db.exec("pragma foreign_keys = off");
     try {
       db.transaction(() => {
+        const before = (migration.rebuilds ?? []).map((table) =>
+          rowCount(db, table),
+        );
         migration.up(db);
-        if (migration.rebuild) {
+        if (migration.rebuilds !== undefined) {
+          // every row copied keeps its key, so inbound references resolve
+          migration.rebuilds.forEach((table, i) => {
+            if (rowCount(db, table) !== before[i]) {
+              throw new Error("rebuild row count changed");
+            }
+            const broken = db
+              .query(`pragma foreign_key_check(${quoted(table)})`)
+              .get();
+            if (broken !== null) throw new Error("foreign key check failed");
+          });
+        } else if (migration.rebuild) {
           const broken = db.query("pragma foreign_key_check").get();
           if (broken !== null) throw new Error("foreign key check failed");
         }
@@ -91,6 +105,13 @@ export function migrate(db: Db, list: readonly Migration[] = MIGRATIONS) {
   }
   return ran;
 }
+
+const quoted = (table: string) => `"${table.replaceAll('"', '""')}"`;
+
+const rowCount = (db: Db, table: string): number =>
+  db
+    .query<{ n: number }, []>(`select count(*) as n from ${quoted(table)}`)
+    .get()!.n;
 
 // A body that throws truncates back to where it started, so a savepoint
 // that rolled back leaves no event behind, even when a body above it

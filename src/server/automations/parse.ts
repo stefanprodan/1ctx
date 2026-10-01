@@ -99,6 +99,15 @@ function parseValues(
     }
     out.ownMemory = body.ownMemory;
   }
+  if (take("rerunOnRestart")) {
+    const value = Object.hasOwn(body, "rerunOnRestart")
+      ? body.rerunOnRestart
+      : false;
+    if (typeof value !== "boolean") {
+      throw new BadRequest("rerunOnRestart must be boolean");
+    }
+    out.rerunOnRestart = value;
+  }
   if (take("memoryGuidance")) {
     const value = Object.hasOwn(body, "memoryGuidance")
       ? body.memoryGuidance
@@ -134,6 +143,7 @@ export function parseSaveAutomation(
     ...KEYS,
     "memoryGuidance",
     "disabledCapabilities",
+    "rerunOnRestart",
   ]);
   for (const key of KEYS) {
     if (!Object.hasOwn(parsed, key))
@@ -147,6 +157,7 @@ export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
     ...KEYS,
     "memoryGuidance",
     "disabledCapabilities",
+    "rerunOnRestart",
   ]);
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
   return parseValues(parsed, false);

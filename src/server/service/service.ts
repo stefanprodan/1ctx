@@ -11,7 +11,12 @@ import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
 const HEALTH_ATTEMPTS = 60;
-const VALUED = ["--listen", "--db", "--secrets", "--secrets-mode"];
+const VALUED = ["--listen", "--db", "--secrets", "--secrets-mode", "--drain"];
+// the manager's kill timeout over the drain: the runner's five-second
+// wait and room to close; the sum stays under the stop's own wait
+// (WAIT_MS in launchd.ts)
+const EXIT_MARGIN = 15;
+const MAX_SERVICE_DRAIN = 40;
 const USAGE = "usage: 1ctx service install|status|start|stop|restart|uninstall";
 
 export class ServiceError extends Error {}
@@ -141,6 +146,9 @@ async function install(argv: string[], r: Resolved): Promise<void> {
     secretsDir:
       cli.options.secretsDir === null ? null : pin(cli.options.secretsDir),
   };
+  if (options.drain > MAX_SERVICE_DRAIN) {
+    throw new ServiceError("drain must leave the service manager time to stop");
+  }
   if ((await r.backend.loaded()) && !restart) {
     throw new ServiceError("service is running; use install --restart");
   }
@@ -149,6 +157,7 @@ async function install(argv: string[], r: Resolved): Promise<void> {
     home: r.home,
     workingDirectory: join(r.home, ".1ctx"),
     logPath: logPath(r.home),
+    exitTimeout: options.drain + EXIT_MARGIN,
   });
   await waitForHealth(urlOf(options), r);
 }
@@ -185,6 +194,7 @@ async function status(r: Resolved): Promise<void> {
       `binary: ${state?.program ?? args?.[0] ?? "-"}`,
       `version: ${version ?? "-"}`,
       `url: ${url ?? "-"}`,
+      `drain: ${options === null ? "-" : `${options.drain}s`}`,
     ].join("\n"),
   );
 }

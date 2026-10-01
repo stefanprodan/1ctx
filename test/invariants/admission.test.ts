@@ -296,6 +296,6 @@ describe("admission", () => {
     const res = await chat.member.call("POST", "/api/sessions", {
       body: { projectId: chat.projectId, agentId: chat.agentId, message: "x" },
     });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(503);
   });
 });

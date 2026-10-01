@@ -821,4 +821,10 @@ export const AUTH_CASES: AuthCase[] = [
     path: "/api/health",
     expect: { anonymous: 200, member: 200, admin: 200 },
   },
+  {
+    // 503 from the first signal; the matrix runs before any
+    method: "GET",
+    path: "/api/ready",
+    expect: { anonymous: 200, member: 200, admin: 200 },
+  },
 ];

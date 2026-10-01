@@ -3,6 +3,7 @@
 # service (`1ctx service`), with its data under ~/.1ctx.
 #
 #   staging.sh deploy                     build, back the db up, swap the binary, restart
+#                                         (DRAIN=<s> for a drain longer than the default)
 #   staging.sh provision <file|dir> [secrets-dir]
 #                                         stop, apply the YAML objects, start
 #   staging.sh status                     what the service says
@@ -20,6 +21,8 @@ HOST=$STAGING_SSH
 LISTEN=${STAGING_LISTEN:-0.0.0.0:11236}
 # more server flags for the install, such as --trust-proxy behind a tunnel
 FLAGS=${STAGING_FLAGS:-}
+# the server's own default unless a deploy asks for another
+DRAIN_FLAG=${DRAIN:+--drain $DRAIN}
 KEEP_BACKUPS=3
 
 # BatchMode fails fast instead of prompting
@@ -74,7 +77,7 @@ REMOTE
   # leave the service manager restarting a truncated executable.
   scp -q bin/1ctx "$HOST:~/.1ctx/bin/1ctx.new"
   ssh_ "mv -f ~/.1ctx/bin/1ctx.new ~/.1ctx/bin/1ctx &&
-    ~/.1ctx/bin/1ctx service install --restart --listen $LISTEN $FLAGS"
+    ~/.1ctx/bin/1ctx service install --restart --listen $LISTEN $FLAGS $DRAIN_FLAG"
 }
 
 provision() {

@@ -3,7 +3,7 @@
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
-import type { EventSource } from "../../shared/words.ts";
+import { DEFERRED_BY_RESTART, type EventSource } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
@@ -14,9 +14,10 @@ import { type ProjectRow, visible } from "../projects/index.ts";
 import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { type Cut, cutRuns, stillCut, withCut } from "./refire.ts";
 import { nextFire } from "./schedule.ts";
 import { type AutomationStore, RETIRED } from "./store.ts";
-import { replaceMissed, type Waiting, Waits } from "./waits.ts";
+import { deferDue, replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = 60_000;
 const SWEEP_MS = 3_600_000;
@@ -38,6 +39,8 @@ type Deps = {
 
 export type Scheduler = {
   start(): number;
+  // from the first signal: nothing fires, what comes due is deferred
+  drain(): void;
   stop(): void;
   wake(): void;
   pass(): Promise<void>;
@@ -50,11 +53,14 @@ export type Scheduler = {
 
 export function scheduler(deps: Deps): Scheduler {
   let running = false;
+  let draining = false;
   let wakeWait: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
   let lastSweep = deps.clock();
   const waits = new Waits(deps.log);
   let passAt = 0;
+  // the runs a restart cut, listed at start and fired by the pass
+  let cut = new Map<string, Cut>();
 
   const wake = () => {
     waits.wake();
@@ -154,11 +160,16 @@ export function scheduler(deps: Deps): Scheduler {
           return { result: null };
         }
         const now = deps.clock();
-        const dueAt = source === "schedule" ? row.nextAt : now;
+        const listed = source === "restart" ? cut.get(id) : undefined;
+        const dueAt =
+          source === "schedule" ? row.nextAt : (listed?.listedAt ?? now);
         if (
           source === "schedule" &&
           (row.suspendedAt !== null || dueAt === null || dueAt > now)
         ) {
+          return { result: null };
+        }
+        if (source === "restart" && !stillCut(row, listed)) {
           return { result: null };
         }
         // a manual start takes a fire left waiting for a place
@@ -170,7 +181,7 @@ export function scheduler(deps: Deps): Scheduler {
             : undefined;
         try {
           const resolved =
-            source === "schedule" ? ownerFor(row) : manualFor(row, actor);
+            source === "manual" ? manualFor(row, actor) : ownerFor(row);
           if (deps.sessions.runningAutomation(row.id)) {
             throw new Conflict("still running");
           }
@@ -191,7 +202,13 @@ export function scheduler(deps: Deps): Scheduler {
             dueAt: dueAt!,
             source,
             outcome: "run",
-            reason: null,
+            reason:
+              source !== "manual" &&
+              waiting &&
+              row.lastEventOutcome === "deferred" &&
+              row.lastEventDueAt === row.nextAt
+                ? DEFERRED_BY_RESTART
+                : null,
             nextAt,
             runSessionId: prepared.detail.session.id,
           })!;
@@ -272,19 +289,26 @@ export function scheduler(deps: Deps): Scheduler {
   };
 
   const fire = async (id: string): Promise<SessionDetail | null> => {
+    if (draining) {
+      deferDue(deps, id, deps.clock());
+      return null;
+    }
     const seen = waits.generation;
+    const source = cut.has(id) ? "restart" : "schedule";
     try {
-      const result = start(id, "schedule", null);
-      if (result === null) return null;
-      if ("wait" in result) {
+      const result = start(id, source, null);
+      if (result !== null && "wait" in result) {
         waits.block(id, result, seen, deps.clock());
         return null;
       }
+      cut.delete(id);
+      if (result === null) return null;
       waits.started(id);
       result.launch();
       return result.detail;
     } catch (err) {
-      recordUnexpected(id, err);
+      // a restart run's failure leaves a due fire to the next pass
+      if (!cut.delete(id)) recordUnexpected(id, err);
       deps.log.error("fire failed", {
         automation: id,
         ...errorFields(err),
@@ -366,14 +390,21 @@ export function scheduler(deps: Deps): Scheduler {
     const now = deps.clock();
     passAt = now;
     const due = deps.store.due(now);
-    waits.prune(new Set(due.map((row) => row.id)));
+    if (draining) {
+      for (const row of due) {
+        if (!keepGoing()) return;
+        deferDue(deps, row.id, now);
+      }
+      return;
+    }
+    waits.prune(new Set([...due.map((row) => row.id), ...cut.keys()]));
     for (const row of due) {
       if (!keepGoing()) return;
       replaceMissed(deps, row.id, now);
     }
-    // oldest first, due and waiting alike; a full project passes over
-    // that project's rows, a full process ends the fires
-    for (const row of deps.store.due(now)) {
+    // oldest first, due and waiting alike, then the cut runs; a full
+    // project passes over its rows, a full process ends the fires
+    for (const row of withCut(deps.store.due(now), cut, deps.store)) {
       if (!keepGoing() || waits.processFull) break;
       if (waits.projectFull(row.projectId)) continue;
       await fire(row.id);
@@ -393,7 +424,7 @@ export function scheduler(deps: Deps): Scheduler {
     if (waits.generation !== seen) return;
     const now = deps.clock();
     // while a cap is full the rows left due are waits, not wakes
-    const earliest = deps.store.earliest(waits.any ? passAt : null);
+    const earliest = deps.store.earliest(waits.any || draining ? passAt : null);
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;
     const sleeper =
@@ -420,11 +451,18 @@ export function scheduler(deps: Deps): Scheduler {
       if (running) return 0;
       running = true;
       const reconciled = reconcile();
+      cut = cutRuns(deps, deps.clock());
       unsubscribe ??= subscribe(onSession, deps.log);
       void loop().catch((err) =>
         deps.log.error("scheduler stopped", errorFields(err)),
       );
       return reconciled;
+    },
+    drain() {
+      draining = true;
+      // the cap waits go: a waiting row is deferred like a due one
+      waits.retry();
+      wake();
     },
     stop() {
       running = false;

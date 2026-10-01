@@ -186,18 +186,21 @@ function requestFields(
   };
 }
 
+// a probe asks every few seconds and never says anything in the log
+const PROBES = new Set(["/api/health", "/api/ready"]);
+
 function recordRequest(
   log: Log,
   method: string,
   route: string,
-  health: boolean,
+  probe: boolean,
   status: number,
   started: number,
   address: string,
   principal: Principal | null | undefined,
   error?: unknown,
 ): void {
-  if (health) return;
+  if (probe) return;
   // a 5xx is our bug whoever asked; below that only a signed-in user's
   // requests say anything, since our client never calls a missing route
   // or writes cross-origin, and a scanner's 4xx would fill the disk
@@ -241,7 +244,7 @@ export function router(deps: RouterDeps): Router {
           deps.log,
           method,
           route.path,
-          url.pathname === "/api/health",
+          PROBES.has(url.pathname),
           res.status,
           started,
           address,
@@ -261,7 +264,7 @@ export function router(deps: RouterDeps): Router {
           deps.log,
           method,
           route.path,
-          url.pathname === "/api/health",
+          PROBES.has(url.pathname),
           res.status,
           started,
           address,
@@ -303,7 +306,7 @@ export function router(deps: RouterDeps): Router {
         deps.log,
         method,
         route.path,
-        url.pathname === "/api/health",
+        PROBES.has(url.pathname),
         res.status,
         started,
         address,
@@ -320,7 +323,7 @@ export function router(deps: RouterDeps): Router {
       deps.log,
       method,
       "unmatched",
-      url.pathname === "/api/health",
+      PROBES.has(url.pathname),
       res.status,
       started,
       address,

@@ -212,8 +212,8 @@ violation, and every rule has a rejected fixture under
   window per address with a cap on addresses, constant memory per key.
   Every new route gets a row in
   `test/helpers/auth-cases.ts` or the access suite fails; the matrix is
-  checked against the composed route list, health included. Logins,
-  users and projects are in `docs/access.md`.
+  checked against the composed route list, health and ready included.
+  Logins, users and projects are in `docs/access.md`.
 - **Routes do not overlap:** two patterns of one method that could match
   one path fail the router at start (`conflicts()` in `web/router.ts`)
   and the route table test.
@@ -231,11 +231,14 @@ violation, and every rule has a rejected fixture under
   keeps the rows. A migration on `main` is never edited and no database
   is wiped, since staging holds real data; one not yet on `main` may
   still grow in its own file, unless it ran on staging. A migration that
-  rebuilds a table other tables reference sets `rebuild: true`:
-  `migrate()` turns foreign keys off before its transaction, runs
-  `pragma foreign_key_check` after `up()` and throws on a row, and turns
-  them on again in a `finally`, since the pragma cannot change inside a
-  transaction and a drop would cascade.
+  rebuilds a table other tables reference sets `rebuild: true` and names
+  the tables it rebuilds in `rebuilds`, copying every row with its key
+  unchanged: `migrate()` turns foreign keys off before its transaction,
+  after `up()` throws when a named table's row count changed or `pragma
+  foreign_key_check(<table>)` finds a row, and turns them on again in a
+  `finally`, since the pragma cannot change inside a transaction and a
+  drop would cascade. The older rebuilds name no tables and check the
+  whole database.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
   secrets directory, the kind one of `SECRET_KINDS` in
   `shared/words.ts`, read through the secrets port bound to the
@@ -244,30 +247,31 @@ violation, and every rule has a rejected fixture under
 - **Session is the domain noun** and never means a cookie; the cookie
   is a login.
 - **A log line is slog text,** one event on stderr through the `Log`
-  methods `info`, `warn` and `error` from `logger(area)` in `lib/log.ts`.
-  Its fields are flat and ordered after UTC `time`, `level`, `msg` and
-  `area`; `duration` is whole milliseconds. Messages are fixed lowercase
-  phrases. Fields hold only ids, usernames, configured names and models,
-  route patterns, counts, statuses, closed words, durations, client
-  addresses, error fields, and startup paths. Never a secret, message,
-  prompt, description, tool input or output, query string, raw request
-  path, a knowledge or upload file's name or text, email, attempted
-  login name, body or socket reason. `errorFields()` keeps the first
-  line, which `format()` cuts at 200 characters after `compose.ts` has
-  scrubbed the current provider, search and MCP keys from it, and the
-  source frames as `stack`; the build passes `--sourcemap` so a binary's
-  frames name source files. A `ToolError` (`lib/errors.ts`) logs its
-  fixed `logged` phrase in place of its message. The router logs a
-  `request` for a signed-in user's writes and 4xx answers and for any
-  5xx, never an anonymous 4xx or health, and answers an unexpected
-  throw with a renewed JSON 500.
+  methods `info`, `warn` and `error` from `logger(area)` in
+  `lib/log.ts`. Its fields are flat and ordered after UTC `time`,
+  `level`, `msg` and `area`; `duration` is whole milliseconds. Messages
+  are fixed lowercase phrases. Fields hold only ids, usernames,
+  configured names and models, route patterns, counts, statuses, closed
+  words, durations, client addresses, error fields, and startup paths.
+  Never a secret, message, prompt, description, tool input or output,
+  query string, raw request path, a knowledge or upload file's name or
+  text, email, attempted login name, body or socket reason.
+  `errorFields()` keeps the first line, which `format()` cuts at 200
+  characters after `compose.ts` has scrubbed the current provider,
+  search and MCP keys from it, and the source frames as `stack`; the
+  build passes `--sourcemap` so a binary's frames name source files. A
+  `ToolError` (`lib/errors.ts`) logs its fixed `logged` phrase in place
+  of its message. The router logs a `request` for a signed-in user's
+  writes and 4xx answers and for any 5xx, never an anonymous 4xx, health
+  or ready, and answers an unexpected throw with a renewed JSON 500.
   `login limited` is logged once when an address's window closes, not
   per refusal. Startup is one event with paths, migrations, flags,
-  inventory and repair counts; shutdown reports ended sends and drain
-  timing. Catalog and MCP refreshes and hourly sweeps log only work done
-  or a failure. `subscribe()` on the bus takes the subscriber's `Log`; a
-  test collects events with `collectLogs()` from `test/helpers/app.ts`,
-  passing its `logFactory` to `testApp()`.
+  inventory and repair counts; the drain logs `draining`, then `drained`
+  or `drain over`, with counts; shutdown reports drained and ended sends
+  and timing. Catalog and MCP refreshes and hourly sweeps log only work
+  done or a failure. `subscribe()` on the bus takes the subscriber's
+  `Log`; a test collects events with `collectLogs()` from
+  `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

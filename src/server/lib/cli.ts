@@ -8,6 +8,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_LISTEN = "127.0.0.1:1235";
+// seconds a shutdown waits for running chats and runs to end on their own
+export const DEFAULT_DRAIN = 10;
+export const MAX_DRAIN = 3600;
 
 export type RunOptions = {
   hostname: string;
@@ -18,6 +21,8 @@ export type RunOptions = {
   secretsMode: "local" | "mounted";
   secureCookie: boolean;
   trustProxy: boolean;
+  // whole seconds; 0 terminates at once
+  drain: number;
 };
 
 export type ProvisionOptions = {
@@ -68,6 +73,9 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
                          served over TLS
   --trust-proxy          take the client address and scheme from the
                          X-Forwarded-* headers of a proxy in front
+  --drain <seconds>      on stop, how long running chats and runs may
+                         take to end on their own; 0 stops them at once
+                         (default: ${DEFAULT_DRAIN})
   -v, --version          show version
   -h, --help             show this help
 
@@ -115,6 +123,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
   let secretsMode: RunOptions["secretsMode"] = "local";
   let secureCookie = false;
   let trustProxy = false;
+  let drain = DEFAULT_DRAIN;
   const files: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -122,7 +131,14 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
     if (provisioning && !PROVISION_FLAGS.includes(arg)) {
       return { kind: "error", message: `unknown provision option ${arg}` };
     }
-    const valued = ["-f", "--listen", "--db", "--secrets", "--secrets-mode"];
+    const valued = [
+      "-f",
+      "--listen",
+      "--db",
+      "--secrets",
+      "--secrets-mode",
+      "--drain",
+    ];
     let value = "";
     if (valued.includes(arg)) {
       const next = args[++i];
@@ -160,6 +176,15 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       case "--trust-proxy":
         trustProxy = true;
         break;
+      case "--drain":
+        if (!/^\d+$/.test(value) || Number(value) > MAX_DRAIN) {
+          return {
+            kind: "error",
+            message: `--drain must be whole seconds, 0 to ${MAX_DRAIN}`,
+          };
+        }
+        drain = Number(value);
+        break;
       case "-v":
       case "--version":
         return { kind: "version" };
@@ -189,6 +214,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       secretsMode,
       secureCookie,
       trustProxy,
+      drain,
     },
   };
 }
@@ -204,5 +230,6 @@ export function optionsToArgs(options: RunOptions): string[] {
   }
   if (options.secureCookie) args.push("--secure-cookie");
   if (options.trustProxy) args.push("--trust-proxy");
+  args.push("--drain", String(options.drain));
   return args;
 }

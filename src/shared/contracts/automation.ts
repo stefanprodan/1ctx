@@ -34,6 +34,8 @@ export type AutomationSummary = {
   // what its runs have turned off, sorted keys of shared/capabilities.ts
   disabledCapabilities: string[];
   memoryGuidance: string;
+  // a run a restart cut starts again at the next start
+  rerunOnRestart: boolean;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
   // who suspended it, an admin outside the project included; null while

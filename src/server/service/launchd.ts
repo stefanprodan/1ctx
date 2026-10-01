@@ -202,6 +202,7 @@ export function launchdBackend(deps: LaunchdDeps): ServiceBackend {
       runAtLoad: true,
       keepAlive: true,
       throttleInterval: 5,
+      exitTimeOut: definition.exitTimeout,
       standardOutPath: definition.logPath,
       standardErrorPath: definition.logPath,
     };

@@ -56,6 +56,7 @@ export type Automations = {
   // of its automations, so a run held on a feed learns the agent is gone
   suspendAgent(agentId: string, by: string, now: number): BusEvent[];
   start(): number;
+  drain(): void;
   stop(): void;
   dispose(): void;
   routes: RouteDescriptor[];
@@ -74,6 +75,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
         data: { projectId: row.projectId, automation: row },
       })),
     start: scheduled.start,
+    drain: scheduled.drain,
     stop: scheduled.stop,
     dispose: scheduled.dispose,
     routes: routes({ ...deps, store, scheduler: scheduled }),

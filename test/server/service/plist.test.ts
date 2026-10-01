@@ -17,6 +17,7 @@ const spec: PlistSpec = {
   runAtLoad: true,
   keepAlive: true,
   throttleInterval: 5,
+  exitTimeOut: 35,
   standardOutPath: "/tmp/1ctx.log",
   standardErrorPath: "/tmp/1ctx.log",
 };
@@ -31,6 +32,7 @@ describe("renderPlist", () => {
     expect(xml).toContain("<key>EnvironmentVariables</key>");
     expect(xml).toContain("<key>WorkingDirectory</key>");
     expect(xml).toContain("<integer>5</integer>");
+    expect(xml).toContain("<key>ExitTimeOut</key>\n  <integer>35</integer>");
     expect(xml.match(/<key>Standard(?:Out|Error)Path<\/key>/g)).toHaveLength(2);
   });
 

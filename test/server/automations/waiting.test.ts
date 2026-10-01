@@ -720,7 +720,13 @@ describe("a fire waiting for a free place", () => {
     for (let i = 0; i < 5; i++) await tick();
     expect(chat.scripted.scripts).toHaveLength(4);
     expect(chat.app.sessions.byId(held.sessionId)?.status).not.toBe("running");
-    expect(row(chat, waiting.id)).toEqual(before);
+    // the wait is dropped for a deferral that keeps the due time
+    expect(row(chat, waiting.id)).toMatchObject({
+      nextAt: before.nextAt,
+      lastEventOutcome: "deferred",
+      lastEventDueAt: due,
+      lastRunSessionId: null,
+    });
     expect(logs.events.some((event) => event.msg === "skip")).toBe(false);
   });
 });

@@ -66,11 +66,11 @@
     color: var(--faint);
   }
   /* an archived row keeps its place, its icon quiet and the word
-     before its line */
+     before its line, as a restart run does */
   .stream-icon-archived {
     color: var(--faint);
   }
-  .stream-archived {
+  .stream-mark {
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--dim);

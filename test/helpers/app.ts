@@ -251,6 +251,8 @@ export async function testApp(
     activate?: boolean;
     // another app's database, for a restart over the same rows
     db?: Db;
+    // the shutdown's drain, on the fake clock
+    drainMs?: number;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -311,6 +313,7 @@ export async function testApp(
     tools: options.tools,
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
     activate: options.activate,
+    drainMs: options.drainMs,
   });
   return {
     ...app,

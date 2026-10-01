@@ -16,7 +16,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import type { RunFilter } from "../../../shared/words.ts";
+import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
 import {
@@ -53,12 +53,12 @@ import { AutomationActions } from "./AutomationActions.tsx";
 import {
   automationPageOf,
   canChange,
-  deadlineText,
   eventNote,
   nextLine,
   scheduleTitle,
   suspendedText,
 } from "./Automations.model.ts";
+import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
 import { fireLabel } from "./Schedule.model.ts";
 import "./automations.css";
@@ -240,6 +240,11 @@ export function Automation({ params }: { params: Params }) {
                   {deadlineText(deadlineMs)}
                 </AsideLine>
                 <AccessLines row={row} />
+                {row.rerunOnRestart && (
+                  <div class="split-line">
+                    Restarts a run the server stopped
+                  </div>
+                )}
                 <AsideLine label="Owner" href={userHref(row.ownerName)}>
                   @{row.ownerName}
                 </AsideLine>
@@ -365,6 +370,10 @@ export function Automation({ params }: { params: Params }) {
                       row={r}
                       deadlineMs={deadlineMs}
                       now={now}
+                      deferred={
+                        row?.lastRunSessionId === r.session.id &&
+                        row.lastEventReason === DEFERRED_BY_RESTART
+                      }
                     />
                   ))}
                   <ShowMore

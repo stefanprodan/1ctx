@@ -56,7 +56,8 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   messages. The envelope's `last` is the last message's.
 - **A message to a busy chat waits in the queue.** `POST
   /api/sessions/:id/messages` on a chat whose lock is held (a turn
-  running or still stopping) writes a `queued_messages` row, never a
+  running or still stopping), or on any chat once the dispatcher is
+  closed by a drain, writes a `queued_messages` row, never a
   `messages` row, and answers 202 `{ queued }`; on a free chat it first
   starts the chat's own queue, then sends as before (201, or the 429 of
   a full cap). Regenerate, compact, Run now and a new chat never queue.
@@ -96,53 +97,53 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   then `rowid`, which an edit never moves.
 - **The dispatcher starts a chat's queue as one turn.**
   `runner/queue.ts`, started in `compose.ts` after `sessions.repair()`
-  and before the scheduler, closed first at shutdown. The `wake` port
-  runs a pass before the scheduler hears it, so a freed place goes to a
-  waiting message before a due run; a pass inside a transaction, and
-  what is left after four passes of one wake, is put off to a timer (a
-  macrotask, never a microtask, so the process goes on), and a wake
-  during a pass runs one more. A pass walks the chats with queued rows
-  whose lock is free, oldest first, in keyset pages of `WAITING_PAGE`
-  queued rows over `queued_waiting` (one indexed read when none waits,
-  each queued row read once), passing over a chat whose authors or
-  project are at their cap and ending only at a full process. For each chat it sorts the rows: an author who no longer sees
-  the chat loses theirs (deleted); an archived chat (`archived`), a
-  retired agent (`agent-deleted`), a row past `queuedMinutes` from
-  `queued_at` (`expired`), a gone, disabled or must-change-password
-  author or a staged upload that no longer checks (`failed`) turn not
-  sent, and so does a queued summon whose agent was retired since
-  (`agent-deleted`). The rest start through the runner's turn in order
-  up to the first summon, which starts alone once they end, the rows
-  after it waiting for the next turn; each with
-  its own author, counted against the oldest author with room under
-  `sendsPerUser`, whose policy the turn runs under; with none, they
-  wait. The start carries a claim: `startSend`'s transaction deletes
-  the rows by id and revision, and one that lost (edited or removed)
-  throws `ClaimLost`, so the start writes nothing and its freed lock
-  wakes again. Only a full cap (`CapFull`, `RunCapacity`), the lock's
-  own refusals (`LockHeld`: held, stopping, shutting down) and
-  `ClaimLost` leave the rows queued, matched by class. Any other
-  refusal (an upload that clashes with the chat's files, the tree's
-  totals, an agent that cannot read files, capability changes that
-  overflow together) finds its rows: each row is tried after those
-  that passed, in a start rolled back with its transaction and not
-  admitted, the ones that fail turn not sent (`failed`, logged with the
-  status alone) and the rest start. A trial writes only SQLite rows,
-  which its rollback takes with their envelopes; its registry entry is
-  freed before it returns and launches nothing. When the real start
-  still fails after its trial passed, its rows turn not sent too, so a
-  chat never loops. A failed start never asks for
-  another pass of its chat. One timer, on the clock port, is set to the
-  oldest queued row's expiry and reset when the limit moves, so an idle
-  process expires rows too; a restart expires at start. An archive, the
-  hourly sweep when it archived a chat and an agent's delete wake the
-  dispatcher, so their chats' rows turn not
-  sent at once. A queue's start builds no session detail; a POST's
-  answer reads it.
-  start. Removing a member drops their rows in its transaction. `PATCH`
-  and `DELETE /api/sessions/:id/queued/:queuedId` are the author's
-  alone, an admin's included (403), each naming the revision seen: a
-  row that started or changed is a 409, and an edit takes only a
+  and before the scheduler, closed at the first signal: no pass after, a
+  turn that ends included, and its rows wait for the next start. The
+  `wake` port runs a pass before the scheduler hears it, so a freed
+  place goes to a waiting message before a due run; a pass inside a
+  transaction, and what is left after four passes of one wake, is put
+  off to a timer (a macrotask, never a microtask, so the process goes
+  on), and a wake during a pass runs one more. A pass walks the chats
+  with queued rows whose lock is free, oldest first, in keyset pages of
+  `WAITING_PAGE` queued rows over `queued_waiting` (one indexed read
+  when none waits, each queued row read once), passing over a chat whose
+  authors or project are at their cap and ending only at a full process.
+  For each chat it sorts the rows: an author who no longer sees the chat
+  loses theirs (deleted); an archived chat (`archived`), a retired agent
+  (`agent-deleted`), a row past `queuedMinutes` from `queued_at`
+  (`expired`), a gone, disabled or must-change-password author or a
+  staged upload that no longer checks (`failed`) turn not sent, and so
+  does a queued summon whose agent was retired since (`agent-deleted`).
+  The rest start through the runner's turn in order up to the first
+  summon, which starts alone once they end, the rows after it waiting
+  for the next turn; each with its own author, counted against the
+  oldest author with room under `sendsPerUser`, whose policy the turn
+  runs under; with none, they wait. The start carries a claim:
+  `startSend`'s transaction deletes the rows by id and revision, and one
+  that lost (edited or removed) throws `ClaimLost`, so the start writes
+  nothing and its freed lock wakes again. Only a full cap (`CapFull`,
+  `RunCapacity`), the lock's own refusals (`LockHeld`: held, stopping),
+  the drain's `Restarting` and `ClaimLost` leave the rows queued,
+  matched by class. Any other refusal (an upload that clashes with the
+  chat's files, the tree's totals, an agent that cannot read files,
+  capability changes that overflow together) finds its rows: each row is
+  tried after those that passed, in a start rolled back with its
+  transaction and not admitted, the ones that fail turn not sent
+  (`failed`, logged with the status alone) and the rest start. A trial
+  writes only SQLite rows, which its rollback takes with their
+  envelopes; its registry entry is freed before it returns and launches
+  nothing. When the real start still fails after its trial passed, its
+  rows turn not sent too, so a chat never loops. A failed start never
+  asks for another pass of its chat. One timer, on the clock port, is
+  set to the oldest queued row's expiry and reset when the limit moves,
+  so an idle process expires rows too; a restart expires at start. An
+  archive, the hourly sweep when it archived a chat and an agent's
+  delete wake the dispatcher, so their chats' rows turn not sent at
+  once. A queue's start builds no session detail; a POST's answer reads
+  it. Removing a member drops their rows in its transaction.
+  `PATCH` and `DELETE /api/sessions/:id/queued/:queuedId` are the
+  author's alone, an admin's included (403), each naming the revision
+  seen: a row that started or changed is a 409, and an edit takes only a
   queued row. `GET /api/me/not-sent` is Home's list, the caller's
   not-sent rows in projects they see, and `DELETE /api/me/not-sent`
   discards the ones its `ids` name that are the caller's, not sent, and
@@ -277,11 +278,29 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   A `finalizeSend` that fails after
   its retries keeps the lock, so the session answers 409 until a
   restart. At start `sessions.repair()` ends whatever a crash left
-  running with cause `restart`. Shutdown terminates every send, aborts
-  the attention asks and waits for them with the streams within the
-  same drain deadline, sends or none, closes the
-  sockets with 1012, then stops the listener; runner and app shutdown
-  return the ended count and whether the drain timed out.
+  running with cause `restart`.
+- **A shutdown drains, then terminates.** `app.shutdown(cut)` from the
+  first signal (`runner/shutdown.ts`): health says `draining`, ready
+  answers 503, the dispatcher closes, the scheduler drains
+  (`docs/automations.md`) and the registry refuses every admission
+  with `Restarting`, a 503 "the server is restarting" (a new chat,
+  regenerate, compact, Run now, a queue's start). `runner.drain()`
+  then waits up to `--drain` (`drainMs`, 0 by default in `compose()`)
+  for the sends running at the signal to end on their own, a run's
+  memory phase included, and for the attention asks pending or started
+  by those that finish; `cut`, the second signal, ends the wait. The
+  listener serves throughout, so a watched turn streams to its end. A
+  drain of 0, or nothing running and no ask, skips the wait and its
+  log lines; otherwise it logs `draining` (`sends`, `asks`, `bound`),
+  then `drained` (`sends`, `duration`) when all ended, or `drain over`
+  (`drained`, `terminated`, `duration`) at the bound or the cut.
+  `runner.shutdown(close)` terminates what is left with cause
+  `shutdown`, aborts the asks, and waits within `SHUTDOWN_DRAIN_MS`
+  (5 s) for the streams, the asks and then `close` (`bash.close()`,
+  `mcp.close()`); past it `close` still starts, unwaited. The app
+  then closes the sockets with 1012 and `main.ts` stops the listener;
+  the result is the drained and ended counts and whether the wait
+  timed out, on the `shutdown` line.
 - **A finished run is asked whether it needs attention.**
   `runner/attention.ts`, started from `endSend()` once `finalizeSend`
   has committed, so the run is `done` and its frames are out: only a run

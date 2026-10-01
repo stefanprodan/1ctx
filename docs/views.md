@@ -48,7 +48,8 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   transcript; a working, failed or stopped line names the send's
   agent (`sendAgent`, the summoned one for a summoned turn), else the
   chat's. An archived chat's row wears the archive icon, quiet,
-  and "archived ·" before its line; a retired agent's name, the chat's
+  and "archived ·" before its line, as a run of source `restart` says
+  "restarted ·" (`markOf()`); a retired agent's name, the chat's
   or the send's, is greyed (`authorGone()`), with no tag. A live retire
   marks only the chat's agent, so a summoned agent retired live is
   greyed from the row's next envelope. A run whose `attention` is at
@@ -101,11 +102,12 @@ The primitives and the rules every view follows are in `docs/ui.md`.
 - **A run's page.** A chat is at `/chat/:id` and a run at `/run/:id`,
   one view titled Chat or Run; each shows the other origin as not
   found, so every link picks its page by origin. A run's page names its
-  automation over the transcript and has no composer, no Regenerate
-  and no `/compact`; its foot is the state with Stop while it runs
-  (`RunFoot.tsx`), and a done run's length and its send's `tokens`
-  (prompt plus completion over its counted rounds, summed from `usage`
-  by the send queries).
+  automation over the transcript, and under it "Restarted after the
+  server stopped" with the restart arrow for a run of source `restart`,
+  and has no composer, no Regenerate and no `/compact`; its foot is the
+  state with Stop while it runs (`RunFoot.tsx`), and a done run's
+  length and its send's `tokens` (prompt plus completion over its
+  counted rounds, summed from `usage` by the send queries).
 - **An archived chat.** An archived chat has the run's foot in the
   composer's place and no Regenerate: the archive icon, why it was
   archived and the day the delete limit removes it (`archivedLine()` in
@@ -471,14 +473,15 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   where the rail marks its project through `automationProject`.
 - **The automation page.** The page is the brief (schedule, zone, agent,
   the instructions cut to six lines with Show all, and at its foot the
-  next run, or "Waiting since 09:00" while the row is not suspended
-  and its `nextAt` is past the page's clock by `WAIT_GRACE_MS`, which
-  the Automations tab's row says first as "waiting"; no field carries
-  it), then Suspend or Resume, Edit and Run
-  now over two tabs: Runs, a log of `RunRow.tsx` rows with the source as
-  a bare icon in the state's colour, no avatar disc (who pressed Run now
-  its title), and the feed's line, the attention mark by the stream
-  row's rule, length
+  next run, or "Waiting since 09:00" while the row is not suspended and
+  its `nextAt` is past the page's clock by `WAIT_GRACE_MS`, which the
+  Automations tab's row says first as "waiting"; no field carries it),
+  then Suspend or Resume, Edit and Run now over two tabs: Runs, a log of
+  `RunRow.tsx` rows with the source as a bare icon in the state's
+  colour, no avatar disc: the clock for the schedule, the bolt for Run
+  now (who pressed it its title) and the restart arrow titled
+  "Restarted" (`sourceIcon()` and `sourceText()` in `Run.model.ts`), and
+  the feed's line, the attention mark by the stream row's rule, length
   against the deadline and Stop, filtered by `?runs=` and counted by the
   tally, paged with Show more (`loadMoreRuns()` in `data/runs.ts`, under
   the runs' turn, so `closeRuns()`, a filter change, a revocation and a
@@ -488,8 +491,10 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   with `ownMemory`, Memory, `/automations/:id/memory`, the own note
   counted by its entries (both routes name one view, so a tab change
   keeps the page mounted); and the aside of next fires, the tally and
-  the setup. `data/automations.ts` keeps the list, and `data/runs.ts`
-  the runs and the tally, current from the frames.
+  the setup, which says "Restarts a run the server stopped" after the
+  access lines with `rerunOnRestart` and nothing without.
+  `data/automations.ts` keeps the list, and `data/runs.ts` the runs and
+  the tally, current from the frames.
 - **The editor.** The editor is a page of
   `ui/Section.tsx` steps, `/projects/:id/automations/new` and
   `/automations/:id/edit` (read-only for whoever may not edit): the task
@@ -499,7 +504,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   the next run, the
   zone is `ui/ZoneSelect.tsx`, and the deadline starts at the
   limit, which `GET /api/projects/:id/automations` answers beside the
-  rows.
+  rows. Between Access and When, After a restart (`RestartSection.tsx`)
+  is one switch row drawn as Access's, "Restart the run", off for a
+  new task, with its hint under the list.
 - **The editor's Access section.** The editor's Access section
   (`AccessSection.tsx`) is one `RowsList` of switches, each row an icon,
   a name, a meta saying what it is ("12 MCP tools" for a server) and
