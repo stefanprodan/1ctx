@@ -1,0 +1,10 @@
+# Builds the image from this checkout over compose.yaml:
+# ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+services:
+  1ctx:
+    # never pull a dev tag from the registry
+    pull_policy: build
+    build:
+      context: ../..
+      args:
+        VERSION: ${ONECTX_VERSION}

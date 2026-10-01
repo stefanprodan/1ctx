@@ -1,7 +1,8 @@
-# Admin: overview, provision, service and staging
+# Admin: overview, provision, service, staging and the image
 
 Governs `src/server/overview/`, `provision/`, `service/`,
-`scripts/staging.sh` and the staging targets. The Monitor's pages are
+`scripts/staging.sh`, the staging targets, `Dockerfile`,
+`.dockerignore` and `deploy/`. The Monitor's pages are
 in `docs/views.md` and `docs/ui.md`.
 
 - **`overview/` is what an admin reads about the instance.** `overview/`
@@ -188,3 +189,32 @@ in `docs/views.md` and `docs/ui.md`.
   .backup` there before the swap and keeps the last three. It installs
   with the default drain; `DRAIN=<s>` passes `--drain` for one deploy.
   A migration that ran on staging is frozen as if merged.
+- **The image runs the binary as 65532 on a read-only root.** The
+  `Dockerfile` builds on `$BUILDPLATFORM` and cross-compiles with `bun
+  build --compile --target` (`TARGET` in the `build` script), so `docker
+  buildx build --platform linux/amd64,linux/arm64 --build-arg
+  VERSION=v1.2.3 .` needs no emulation; the build turns off the binary's
+  `.env` and `bunfig.toml` autoload, since its working directory is the
+  data volume. `.dockerignore` is an allowlist: the tree holds secrets.
+  The binary is `/usr/local/bin/1ctx`, the `ENTRYPOINT`; `CMD` is
+  `--listen 0.0.0.0:11236 --db /data/1ctx.sqlite --secrets /secrets`,
+  and a compose `command:` or `docker run` arguments replace it whole,
+  so they repeat what they keep. `/secrets` is mounted read-only and
+  holds `user-admin.key` for the first admin and the `<kind>-<name>.key`
+  files, each readable by 65532 (`chown 65532` or mode 644: an
+  unreadable key throws where it is read, and `user-admin.key` fails the
+  first start); the server only reads it. `/data` is a named volume,
+  which takes the image's `/data` with its owner 65532. Never a bind
+  mount on Docker Desktop or OrbStack: their VirtioFS breaks the POSIX
+  locks the SQLite WAL needs, which hangs or corrupts the database. On a
+  Linux host a bind mount works once the folder is `chown 65532:65532`.
+  Stop grace is the drain plus 15: `stop_grace_period: 25s` against the
+  default `--drain 10`, and `docker run --stop-timeout 25` for a plain
+  run, since Docker's 10 s default would kill the shutdown after the
+  drain. The bash tool and the workers need no writable `/tmp`.
+  `deploy/docker/compose.yaml` runs a release by `ONECTX_VERSION`, since
+  there is no `latest` tag. `compose.dev.yaml` beside it builds the
+  image from the checkout and never pulls: `ONECTX_VERSION=dev docker
+  compose -f compose.yaml -f compose.dev.yaml up -d --build`. `LICENSE`
+  and `THIRD_PARTY_LICENSES.md` are in `/usr/share/doc/1ctx/`, as in the
+  release archive.

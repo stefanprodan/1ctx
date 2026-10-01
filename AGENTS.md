@@ -113,6 +113,11 @@ vendor/         just-bash/, the vendored source (a git subtree, outside
                 from the tools they follow) and just-bash-failures.txt,
                 what `make vendor-test` expects.
 docs/           the rules of each area, one file per topic (see Docs).
+deploy/         docker/compose.yaml, the image as one service, and
+                compose.dev.yaml, which builds it from the checkout
+                (docs/admin.md).
+Dockerfile      the image: cross-compiles the binary on the build platform
+                into distroless cc, nonroot; .dockerignore is an allowlist.
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
@@ -147,7 +152,7 @@ name. Read the one that covers a change before making it.
 | `docs/mcp.md` | before changing `src/server/mcp/`, MCP tools in a send or the files under `/mcp` |
 | `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
 | `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
-| `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
+| `docs/admin.md` | before changing `overview/`, `provision/`, `service/`, the staging scripts, the `Dockerfile` or `deploy/` |
 | `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
 | `vendor/changes.md` | before changing a hunk of `vendor/just-bash/`: the entry its `(1ctx <id>)` marker names, kept in the same commit |
 | `vendor/differences.md` | before changing what a vendored command answers: where it still parts from the tool it follows |
