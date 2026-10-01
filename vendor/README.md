@@ -415,6 +415,24 @@ the work units each costs. Where they part:
 - `Symbolic links` names its files in `‘’` whatever the locale, and a
   name GNU would escape in them is printed as it is.
 
+### Where our read and mapfile still differ from bash
+
+`test/vendor/just-bash/read-utf8.test.ts` holds them to bash 5.3 in a
+UTF-8 locale. Where they part:
+
+- A byte that starts no UTF-8 sequence is held as one character, U+0080
+  to U+00FF, and written back out as that character's two bytes; bash
+  writes the byte.
+- `read -n` counts such a byte as one character; bash folds the byte
+  after it in, an ASCII letter included.
+- Under `-n`, a backslash before a multibyte delimiter escapes its first
+  byte only, so the escape counts as two characters toward the limit.
+- An `IFS` character outside the BMP, an emoji, never splits.
+- Without `-r`, a backslash at the end of the input is kept in the
+  variable; bash drops it.
+- `mapfile -u N` reads stdin, not descriptor N, and `-C` never calls
+  its callback.
+
 ### Where our yq still differs from mikefarah's
 
 `test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on

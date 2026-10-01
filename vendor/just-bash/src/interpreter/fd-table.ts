@@ -5,6 +5,7 @@
  * table. The table itself stays a `Map<number, string>` because it is part
  * of the public `CommandContext` surface — extensions read fd values as
  * content — so this module owns the string encoding instead.
+ * (1ctx) Content is bytes, one char each, as stdin is, never decoded text.
  *
  * Entry kinds:
  * - `input`      readable content (`N< file`, `N<<EOF`, `N<<<word`). Reading
