@@ -125,6 +125,14 @@ describe("the row a change asks for", () => {
         desired(null, { url: "https://git.example.test/acme/widgets" }),
       ),
     ).toBe("kind is required for git.example.test");
+    // a personal project's form never asks the kind: the host rule speaks
+    expect(
+      words(() =>
+        desired(null, { url: "https://git.example.test/acme/widgets" }, true),
+      ),
+    ).toBe(
+      "a personal project's repository must be on github.com or gitlab.com",
+    );
     const held = desired(null, {
       url: "https://git.example.test/acme/widgets",
       kind: "gitlab",

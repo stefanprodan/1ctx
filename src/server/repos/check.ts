@@ -35,17 +35,23 @@ export type CredentialsPort = {
 
 export type RepoProject = { id: string; kind: "personal" | "team" };
 
+const PERSONAL_HOST =
+  "a personal project's repository must be on github.com or gitlab.com";
+
 // the row a create or a change asks for, the held one under it; the
 // kind follows from a public host and is asked for on any other
 export function desired(
   current: RepoFields | null,
   change: CreateRepoRequest | PatchRepoRequest,
+  personal = false,
 ): RepoFields {
   const url = change.url ?? current?.url;
   if (url === undefined) throw new BadRequest("url is required");
   const parsed = normalizeUrl(url);
   if (!parsed.ok) throw new BadRequest(parsed.error);
   const fixed = parsed.value.kind;
+  // before the kind, which a personal project's form never asks
+  if (personal && fixed === null) throw new BadRequest(PERSONAL_HOST);
   if (fixed !== null && change.kind !== undefined && change.kind !== fixed) {
     throw new BadRequest(`kind must be ${fixed} for ${parsed.value.host}`);
   }
@@ -109,9 +115,7 @@ export function checkRepo(
 ): void {
   if (project.kind === "personal") {
     if (!publicHost(fields.url)) {
-      throw new BadRequest(
-        "a personal project's repository must be on github.com or gitlab.com",
-      );
+      throw new BadRequest(PERSONAL_HOST);
     }
     if (fields.credentialId !== null) {
       throw new BadRequest(

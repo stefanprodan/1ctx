@@ -238,16 +238,27 @@ export function RepoForm({
   // the row the poll last brought, so a change is measured against it
   const latest = useRef(row);
   latest.current = row;
-  const save = useSave(async () => {
-    const was = latest.current;
-    if (was === null) {
-      await addRepo(target, createBody(draft.value, target.personal));
-    } else {
-      const body = patchBody(draft.value, was, target.personal);
-      if (body !== null) await changeRepo(target, was.id, body);
-    }
-    onClose();
-  }, repoFieldOf);
+  const save = useSave(
+    async () => {
+      const was = latest.current;
+      if (was === null) {
+        await addRepo(target, createBody(draft.value, target.personal));
+      } else {
+        const body = patchBody(draft.value, was, target.personal);
+        if (body !== null) await changeRepo(target, was.id, body);
+      }
+      onClose();
+    },
+    // a refusal of a field this form does not show goes to its notice
+    (message) => {
+      const field = repoFieldOf(message);
+      if (field === "kind" && !asksKind(draft.value.url, target.personal)) {
+        return undefined;
+      }
+      if (field === "credentialId" && target.personal) return undefined;
+      return field;
+    },
+  );
   useFocusField(save, form);
   useArrivalFocus(form, "url");
   const d = draft.value;

@@ -86,7 +86,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
 
   const create = (project: RepoProject, change: CreateRepoRequest) => {
     const made = transact(deps.db, () => {
-      const fields = desired(null, change);
+      const fields = desired(null, change, project.kind === "personal");
       checkRepo(project, fields, deps.credentials);
       if (deps.store.count(project.id) >= MAX_REPOS_PER_PROJECT) {
         throw new Conflict(
@@ -109,7 +109,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     let refetch = false;
     const patched = transact(deps.db, () => {
       const before = find(project, id);
-      const fields = desired(before, change);
+      const fields = desired(before, change, project.kind === "personal");
       checkRepo(project, fields, deps.credentials);
       nameFree(project, fields.name, before.id);
       refetch = refetches(before, fields);
