@@ -2,21 +2,19 @@
 
 One continuous context for agents. Domain: 1ctx.dev.
 
-- **Runtime:** Bun only, TypeScript run directly, one standalone binary.
-  No Node. Packages are devDependencies bundled at build time, exact
-  pins, official npm only, `bun install --ignore-scripts`. A new package
-  needs the user's explicit go-ahead. The one exception is just-bash,
-  whose TypeScript source lives in `vendor/just-bash/` and is ours to
-  change: `vendor/README.md` says how a change to it is recorded and
-  how to sync it, `vendor/changes.md` what we changed.
-  In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
-  and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
-  the vendored tar command uses modern-tar too. The modern-tar patch
-  retains the raw header `typeflag` to distinguish GNU sparse and
-  unknown types from regular files.
-- **Status:** alpha. No backwards compatibility and no shims for the API
-  and the socket, which may change freely. Stored data is kept (see the
-  migration rule below).
+- **Runtime:** Bun only, TypeScript run directly, one standalone
+  binary. No Node.
+- **Packages** are devDependencies bundled at build time: exact pins,
+  official npm only, `bun install --ignore-scripts`. A new package needs
+  the user's explicit go-ahead. In `src/`, only `server/lib/archive.ts`
+  imports `@zip.js/zip.js` and `modern-tar`, and only `client/ui/Plot.tsx`
+  imports `uplot`. `patches/` holds our modern-tar patch: it keeps the
+  raw header `typeflag`, so GNU sparse and unknown types are not read as
+  regular files.
+- **just-bash is ours.** Its source lives in `vendor/just-bash/` and we
+  change it; `vendor/README.md` says how.
+- **Status:** alpha. The API and the socket change freely, with no
+  shims. Stored data is kept (see migrations below).
 
 ## The dev loop
 
@@ -34,8 +32,8 @@ make start ARGS="..."  # run the source in the foreground with the server's flag
 make dev ARGS="..."    # the same with ONECTX_DEV=1 and a restart on server changes
 make clean          # preview-clean, then remove bin/ and Bun's build leftovers
 make lint           # biome check --write, then tsc; run after any code change
-make test           # bun test, concurrent; run after any code change, before finishing
-make vendor-test    # just-bash's own suite on vendor/just-bash, against its expected failures
+make test           # bun test; run after any code change, before finishing
+make vendor-test    # just-bash's own suite, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
@@ -45,255 +43,183 @@ make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
 ```
 
-The preview runs the source with `ONECTX_DEV=1` (Bun's dev server: a
-CSS edit hot-reloads, a client edit reloads the page, a server edit
-restarts the process) against `.preview/1ctx.sqlite`, with the secrets
-directory `.preview/secrets/`. The first start writes `user-admin.key` there
-with the password `admin-preview`. Look at a change in Chrome through the
-DevTools MCP at 1440 wide and 390 wide; the console must stay empty.
-Report what was verified and how. Do not commit unless asked.
+The preview runs the source with `ONECTX_DEV=1` against
+`.preview/1ctx.sqlite` and the secrets in `.preview/secrets/`. A CSS
+edit hot-reloads, a client edit reloads the page, a server edit restarts
+the process. The first start writes `user-admin.key` with the password
+`admin-preview`. Check a UI change in Chrome through the DevTools MCP at
+1440 and 390 wide; the console must stay empty. Report what was verified
+and how. Do not commit unless asked.
 
 ## Layout
 
 ```
-src/shared/     environment-neutral contracts and guards: contracts/<noun>.ts,
-                api/<area>.ts, socket.ts, words.ts. No bun:, node:, DOM or
-                package imports. Only what crosses the wire, never a row.
-src/server/     the binary. main.ts parses the flags, opens the db and the
-                secrets and calls compose.ts, the composition root: the
-                areas in layer order with the ports they declare, the
-                complete route list, the router. The test helper calls
-                compose() too, so a test runs the binary's wiring. lib/
-                (http.ts: Principal, Policy, RouteDescriptor; body.ts:
-                readBody, jsonBody, fields; errors, log, clock, ids, bus),
-                db/ (open, transact, migrations/), then one directory per
-                area. A *.worker.ts (overview/scan, bash/command) is
-                an entry of `bun build --compile` in package.json's build
-                script, its URL built in compose.ts.
-src/client/     the Preact app, bundled by Bun from client/index.html.
-                app/ (routes.ts, router.ts, lazy.ts, App, Rail), data/
-                (api, the entity cache), lib/, ui/ (the primitives, each
-                with its stylesheet), transcript/, composer/, stream/ (the
-                session row Home and the project page draw), agents/ (the
-                agent rows and aside the admin and project pages draw),
-                views/<area>/, style/ (tokens.css, base.css only).
-test/           by invariant: invariants/<name>.test.ts for the cross-
-                cutting suites, server/<area>/, client/<area>/ and
-                shared/ for unit tests (a few server suites sit loose in
-                server/), vendor/just-bash/ for our tests of the vendored
-                shell, structure.ts and structure.test.ts (the layout
-                rules), helpers/ (app.ts wires the server over a test db
-                with a fake clock, the least argon2id cost (its
-                `hashPassword` hashes a test's users at it), a
-                cookie jar and a fake fetch that
-                answers the recorded catalog for `PROVIDER_URL`, the
-                NIM and Groq recordings for `NIM_URL` and `GROQ_URL`,
-                the recorded decisions (systemone.ts) for `PROVIDER_URL`
-                and `KEV_URL`, and fails every other host; chat.ts
-                drives a chat with a scripted provider stream;
-                auth-cases.ts is the
-                authorization matrix), fixtures/ (recorded bodies,
-                structure/ holds one violating root per layout rule).
-scripts/        preview.sh, staging.sh (the staging instance over ssh, its
-                host in the gitignored scripts/staging.env), smoke.sh
-                (what `make smoke` runs), smoke-http.sh (its HTTP checks,
-                shared with image-smoke.sh), image.sh, bun-version.sh (the
-                Bun version CI and the release read from the Dockerfile),
-                archive.sh (a release archive), vendor-test.sh, brand.py
-                which regenerates the brand SVGs in site/ from the brand
-                book (`uv run scripts/brand.py`), and the recorders
-                run by hand, *-record.ts, six of them over record-cases.ts
-                (diff-record.ts among them, with diff-patch-check.ts
-                beside it; vendor/differences.md) and deciders-record.ts
-                (docs/providers.md).
-skills/         installable agent skills; visualize/ holds SKILL.md,
-                references/ and its upstream license. Added by URL, not seeded.
-site/           1ctx.dev and the brand files; its own project, untouched
-                by the app. site/README.md is the brand book.
-vendor/         just-bash/, the vendored source (a git subtree, outside
-                Biome and the structure rules), README.md (the fork, how
-                a change is recorded, the upstream sync), changes.md (one
-                entry per change, its id in the source's `(1ctx <id>)`
-                markers), differences.md (where our commands still part
-                from the tools they follow) and just-bash-failures.txt,
-                what `make vendor-test` expects.
-docs/           the rules of each area, one file per topic (see Docs).
-deploy/         docker/compose.yaml, the image as one service, and
-                compose.dev.yaml, which builds it from the checkout
-                (docs/admin.md).
-Dockerfile      the image: cross-compiles the binary on the build platform
-                into distroless cc, nonroot; .dockerignore is an allowlist.
+src/shared/   wire contracts and guards: contracts/, api/<area>.ts,
+              socket.ts, words.ts. No bun:, node:, DOM or package
+              imports. Only what crosses the wire, never a row.
+src/server/   the binary. main.ts (flags, db, secrets) calls compose.ts,
+              the composition root: areas in layer order, their ports,
+              the route list, the router. lib/ (http, body, errors, log,
+              clock, ids, bus), db/ (open, transact, migrations/), then
+              one directory per area.
+src/client/   the Preact app from client/index.html: app/ (routes,
+              router, shell), data/ (api, entity cache), lib/, ui/
+              (primitives, each with its stylesheet), transcript/,
+              composer/, stream/, agents/, views/<area>/, style/.
+test/         invariants/ (cross-cutting suites), server/, client/,
+              shared/, vendor/just-bash/, structure.ts (the layout
+              rules), helpers/, fixtures/.
+scripts/      preview, staging, smoke, image, release and vendor-test
+              scripts; brand.py; the *-record.ts recorders, run by hand.
+skills/       installable agent skills, added by URL, never seeded.
+site/         1ctx.dev and the brand files, its own project.
+              site/README.md is the brand book.
+vendor/       just-bash/ (a git subtree, outside Biome and the structure
+              rules) and its three docs.
+docs/         the rules of each area (see Docs).
+deploy/       compose files for the image (docs/deploy.md).
 ```
 
-An area under `src/server/<area>/` has `index.ts` (what others may
-import, and the factory `<area>Area(deps)`: the one place its store is
-built, returning the store, the routes and the capability other areas
-call), `store.ts` (`<Noun>Store` over the tables the migrations
-created), `routes.ts` (`routes(deps)` returning `RouteDescriptor[]`),
-`parse.ts` (the request parsers), and named files for logic. A module
-declares the port it needs as its own small interface; `compose.ts`
-passes the capability of the area that answers it, so it is a list of
-factories in layer order. A port to an area built later in the list is
-a closure called only after the list is complete. An edge the layer
-order forbids is a port, never an import. A test that needs one area
-builds it with its factory and fakes for its ports.
+**Server areas.** `src/server/<area>/` has `index.ts` (what others may
+import, and the factory `<area>Area(deps)`, the one place its store is
+built), `store.ts` (`<Noun>Store`), `routes.ts`, `parse.ts` (the request
+parsers) and named files for logic. A module declares each port it needs
+as its own small interface; `compose.ts` passes the capability of the
+area that answers it. A port to an area built later is a closure called
+only after the list is complete. An edge the layer order forbids is a
+port, never an import. A test of one area builds it with its factory and
+fakes for its ports; `test/helpers/app.ts` calls `compose()`, so the
+integration tests run the binary's wiring.
+
+**Workers.** A `*.worker.ts` is an extra entry of `bun build --compile`
+in `package.json`'s build script. Its URL is built in `compose.ts`,
+since a relative URL inside the binary resolves against `src/server`.
+
+**Test helpers.** `test/helpers/app.ts` wires the server over a test db
+with a fake clock, the least argon2id cost, a cookie jar and a fake
+fetch that answers only the recorded hosts (`PROVIDER_URL`, `NIM_URL`,
+`GROQ_URL`, `KEV_URL`) and fails every other. `chat.ts` drives a chat
+with a scripted provider stream. `auth-cases.ts` is the authorization
+matrix.
 
 ## Docs
 
-The files under `docs/` and the three under `vendor/` are rules with
-the same force as this file; each governs the code its first lines
-name. Read the one that covers a change before making it.
+The files under `docs/` and `vendor/` are rules with the same force as
+this file. Read the one that covers a change before making it, and
+change it in the same commit as the code that changes a rule.
 
-| Doc | Read it |
+| Doc | Governs |
 |---|---|
-| `docs/ui.md` | before any change under `src/client/`: the data layer, the primitives, forms, the shell, themes, the shared helpers |
-| `docs/views.md` | before changing what a page draws: a view under `src/client/views/`, the composer, the stream, the admin pages |
-| `docs/access.md` | before changing logins, users, names, projects' visibility, secrets or the socket server (`access/`, `users/`, `projects/`, `secrets/`, `web/`) |
-| `docs/providers.md` | before changing `src/server/providers/`, `deciders/` or an agent's provider, model and thinking fields |
-| `docs/sessions.md` | before changing `src/server/sessions/` or the runner's sends: the writer, capabilities, regenerate, fork, rename, compaction |
-| `docs/memory.md` | before changing `src/server/memory/`, `memory_edit` or a run's memory phase |
-| `docs/automations.md` | before changing `src/server/automations/`, the scheduler or runs |
-| `docs/tools.md` | before changing `src/server/tools/`, `credentials/`, `skills/`, `limits/`, the tool loop in `runner/` or the visual frame |
-| `docs/mcp.md` | before changing `src/server/mcp/`, MCP tools in a send or the files under `/mcp` |
-| `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
-| `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
-| `docs/admin.md` | before changing `overview/`, `provision/`, `service/`, the staging scripts, the `Dockerfile` or `deploy/` |
-| `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
-| `vendor/changes.md` | before changing a hunk of `vendor/just-bash/`: the entry its `(1ctx <id>)` marker names, kept in the same commit |
-| `vendor/differences.md` | before changing what a vendored command answers: where it still parts from the tool it follows |
-
-AGENTS.md and `docs/` change in the same commit as the code that changes
-a rule.
+| `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
+| `docs/views.md` | what a page draws: `views/`, the composer, the stream, the admin pages |
+| `docs/access.md` | logins, users, names, project visibility, secrets, the socket server |
+| `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
+| `docs/sessions.md` | `sessions/` and the runner's sends: caps, writer, queue, compaction |
+| `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
+| `docs/automations.md` | `automations/`, the scheduler, runs |
+| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
+| `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
+| `docs/knowledge.md` | `knowledge/`, uploads |
+| `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept files, curl signing |
+| `docs/overview.md` | `overview/`, the usage windows |
+| `docs/provision.md` | `provision/`, `--provision` |
+| `docs/deploy.md` | `service/`, staging, the image, `deploy/`, release and CI |
+| `vendor/README.md` | changing or syncing `vendor/just-bash/` |
+| `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
+| `vendor/differences.md` | where a vendored command still differs from its tool |
 
 ## Rules the structure test enforces
 
-`test/structure.ts` is the source of truth; `make test` fails on a
-violation, and every rule has a rejected fixture under
-`test/fixtures/structure/`.
+`test/structure.ts` is the source of truth; every rule has a rejected
+fixture under `test/fixtures/structure/`.
 
 - `shared/` imports only `shared/`. `client/` imports `client/` and
-  `shared/`, never `server/`. `server/` imports `client/` only in
-  `main.ts`, for the page.
-- Server areas are in a layer order (the `LAYERS` list in the test); an
-  area imports only areas above it, through their `index.ts` or
-  `rules.ts`. `web/` imports only `access` and `lib`; no area imports
-  `web/`, `main.ts` or `compose.ts`. The server root holds `main.ts` and
-  `compose.ts` and nothing else; those two may import every area. Moving
-  an area in the order is a deliberate change to the test in the same
-  commit.
-- An area's `rules.ts` is its pure rules, for workers: a `rules.ts` or
-  `*.worker.ts` never loads `db/` or an area's `index.ts`, so a worker
-  stays small (`WORKER_EXEMPTIONS` lists the exceptions).
-- No import cycles between files, type-only imports included, comments
-  between the clause and `from` included. Dynamic imports are string
-  literals, on one line or several; a template with `${}` is not.
+  `shared/`. `server/` imports `client/` only in `main.ts`, for the page.
+- Server areas have a layer order (`LAYERS` in the test). An area
+  imports only areas above it, through their `index.ts` or `rules.ts`.
+  `web/` imports only `access` and `lib`, and nothing imports `web/`,
+  `main.ts` or `compose.ts`. The server root holds only `main.ts` and
+  `compose.ts`, which may import every area. Moving an area is a change
+  to `LAYERS` in the same commit.
+- A `rules.ts` (an area's pure rules) or a `*.worker.ts` never loads
+  `db/` or an area's `index.ts`, so workers stay small
+  (`WORKER_EXEMPTIONS` lists the exceptions).
+- No import cycles between files, type-only imports included. Dynamic
+  imports are string literals, never a template with `${}`. Every
+  import carries its extension.
 - A production file over 500 lines fails unless listed in
   `LINE_EXEMPTIONS` with a reason.
-- Every import carries its extension.
-- CSS: every stylesheet opens with `@layer tokens, base, owners;`.
-  `style/tokens.css` and `style/base.css` are the only files with those
-  names. Every other stylesheet has a unique name and owns that prefix
-  (`rail.css` styles `.rail-*`); it may style a `base.css` primitive
-  only inside its own selector, and no compound of its selectors is an
-  element, attribute, id or `*`, at any depth, inside `:is()`, `:has()`,
-  `:where()` and `:not()` included. Colour (by any syntax or name), font
-  family, font size, the `font` shorthand and radius come from
-  `tokens.css` and appear nowhere else, CSS or TSX, a `var()` fallback
-  included; `index.html` and `favicon.svg` are the two files in
-  `LITERAL_EXEMPTIONS`. Every rule sits inside a layer (a font face
-  is not a rule and may sit outside), except in a sheet listed in
-  `UNLAYERED` with its reason: `ui/chart.css`, whose
-  overrides of uPlot's unlayered sheet must be unlayered to win, and
-  whose unlayered rules may name uPlot's classes inside its own.
+- Every stylesheet opens with `@layer tokens, base, owners;` and puts
+  every rule in a layer (`UNLAYERED` lists the exceptions, with
+  reasons). `style/tokens.css` and `style/base.css` are unique names.
+  Any other sheet has a unique name and owns that class prefix
+  (`rail.css` styles `.rail-*`). It styles a `base.css` primitive only
+  inside its own selector, and never selects by element, attribute, id
+  or `*` at any depth, inside `:is()`, `:has()`, `:where()` and `:not()`
+  too.
+- Colour, font family, font size, the `font` shorthand and radius come
+  only from `tokens.css`: never a literal anywhere else, CSS or TSX, a
+  `var()` fallback included (`LITERAL_EXEMPTIONS` lists the exceptions).
 - No test names a real provider host; the suite never reaches a network.
 
 ## Rules the code follows
 
 - **Access is enforced in the router and nowhere else.** Every route
-  descriptor carries a policy: `public`, `authenticated`, `admin` or
-  `webhook`. A handler receives a typed `Principal` and never reads a
-  header. Every non-GET must be same-origin: same host, and the scheme
-  never downgraded (`--trust-proxy` reads the scheme and the client
-  address from the proxy's `X-Forwarded-*`). Every request body and
-  parameter goes through a hand-written parser that throws a 400 on
-  anything unexpected; a body is read through `readBody()` or
-  `readBytes()` with a cap, never `req.json()`. The listener ceiling is
-  32 MiB; each route keeps its own cap. The login rate limit is a fixed
-  window per address with a cap on addresses, constant memory per key.
-  Every new route gets a row in
-  `test/helpers/auth-cases.ts` or the access suite fails; the matrix is
-  checked against the composed route list, health and ready included.
-  Logins, users and projects are in `docs/access.md`.
-- **Routes do not overlap:** two patterns of one method that could match
-  one path fail the router at start (`conflicts()` in `web/router.ts`)
-  and the route table test.
-- **Writes that belong together go through `transact()`.** A transaction
-  body returns its result and the bus events to publish; they are
-  published after the outermost commit and never on a throw, so a
-  nested transact() is safe. Bus events are hints; a subscriber reads
-  rows for the truth.
-- **A schema change is a new migration.** `db/migrations/` is the
-  ordered list and a store never creates a table. Adding a table, a
-  column or an index is a file appended to the list, and so is renaming
-  or retyping what exists: SQLite's rename where it is enough, a table
-  rebuild otherwise. Widening a table check is an appended migration
-  that rebuilds the table in place (create, copy, drop, rename) and
-  keeps the rows. A migration on `main` is never edited and no database
-  is wiped, since staging holds real data; one not yet on `main` may
-  still grow in its own file, unless it ran on staging. A migration that
-  rebuilds a table other tables reference sets `rebuild: true` and names
-  the tables it rebuilds in `rebuilds`, copying every row with its key
-  unchanged: `migrate()` turns foreign keys off before its transaction,
-  after `up()` throws when a named table's row count changed or `pragma
-  foreign_key_check(<table>)` finds a row, and turns them on again in a
-  `finally`, since the pragma cannot change inside a transaction and a
-  drop would cascade. The older rebuilds name no tables and check the
-  whole database.
-- **Secrets are files.** One bare value per `<kind>-<name>.key` in the
-  secrets directory, the kind one of `SECRET_KINDS` in
-  `shared/words.ts`, read through the secrets port bound to the
-  caller's kind. A value is never logged, returned by a route or stored
-  in the database. The whole rule is in `docs/access.md`.
+  carries a policy: `public`, `authenticated`, `admin` or `webhook`. A
+  handler gets a typed `Principal` and never reads a header. Every new
+  route gets a row in `test/helpers/auth-cases.ts`, or the access suite
+  fails. The rest of the rule (same origin, parsers, body caps, login
+  limits) is in `docs/access.md`.
+- **Routes never overlap.** Two patterns of one method that could match
+  one path fail the router at start (`conflicts()` in `web/router.ts`).
+- **Writes that belong together go through `transact()`.** The body
+  returns its result and the bus events, published after the outermost
+  commit and never on a throw, so nesting is safe. Bus events are
+  hints; a subscriber reads rows for the truth.
+- **A schema change is an appended migration**, renames and retypes
+  included; a store never creates a table. A migration on `main`, or
+  one that ran on staging, is never edited, and no database is wiped:
+  staging holds real data. Widening a check rebuilds the table in place
+  (create, copy, drop, rename) and keeps the rows.
+- **A rebuild of a referenced table sets `rebuild: true`** and names
+  its tables in `rebuilds`, copying every row with its key unchanged.
+  `migrate()` turns foreign keys off around the transaction, since the
+  pragma cannot change inside one and a drop would cascade, then throws
+  when a named table's row count changed or `foreign_key_check` finds a
+  row.
+- **Secrets are files**, one bare value per `<kind>-<name>.key`, read
+  through the secrets port bound to the caller's kind. A value is never
+  logged, returned by a route or stored in the database
+  (`docs/access.md`).
 - **Session is the domain noun** and never means a cookie; the cookie
   is a login.
-- **A log line is slog text,** one event on stderr through the `Log`
-  methods `info`, `warn` and `error` from `logger(area)` in
-  `lib/log.ts`. Its fields are flat and ordered after UTC `time`,
-  `level`, `msg` and `area`; `duration` is whole milliseconds. Messages
-  are fixed lowercase phrases. Fields hold only ids, usernames,
+- **A log line is one slog text event** on stderr, from `logger(area)`
+  in `lib/log.ts`. Messages are fixed lowercase phrases; fields are flat
+  and `duration` is whole milliseconds. Fields hold only ids, usernames,
   configured names and models, route patterns, counts, statuses, closed
-  words, durations, client addresses, error fields, and startup paths.
+  words, durations, client addresses, error fields and startup paths.
   Never a secret, message, prompt, description, tool input or output,
-  query string, raw request path, a knowledge or upload file's name or
-  text, email, attempted login name, body or socket reason.
-  `errorFields()` keeps the first line, which `format()` cuts at 200
-  characters after `compose.ts` has scrubbed the current provider,
-  search and MCP keys from it, and the source frames as `stack`; the
-  build passes `--sourcemap` so a binary's frames name source files. A
-  `ToolError` (`lib/errors.ts`) logs its fixed `logged` phrase in place
-  of its message. The router logs a `request` for a signed-in user's
-  writes and 4xx answers and for any 5xx, never an anonymous 4xx, health
-  or ready, and answers an unexpected throw with a renewed JSON 500.
-  `login limited` is logged once when an address's window closes, not
-  per refusal. Startup is one event with paths, migrations, flags,
-  provision, inventory and repair counts; the drain logs `draining`,
-  then `drained` or `drain over`, with counts; shutdown reports drained
-  and ended sends and timing. Catalog and MCP refreshes and hourly
-  sweeps log only work done or a failure. `subscribe()` on the bus takes
-  the subscriber's `Log`; a test collects events with `collectLogs()`
-  from `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
+  query string, raw path, file name or text, email, attempted login
+  name, body or socket reason.
+- **Errors are logged through `errorFields()`**, which keeps the first
+  line (cut at 200 characters, with live keys scrubbed) and the source
+  frames. A `ToolError` logs its fixed `logged` phrase, never its
+  message.
+- **The router logs a `request`** for a signed-in user's writes and 4xx
+  answers and for any 5xx; never an anonymous 4xx, health or ready.
+  Refreshes and sweeps log only work done or a failure. A test collects
+  events with `collectLogs()`, passing its `logFactory` to `testApp()`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state
-  (a signal, `globalThis.fetch`) or counts events from the bus is
-  `test.serial`. The Linux CI job runs the files in parallel, each in a
-  fresh global (`make test ARGS=--parallel`), so a test sets what it
-  reads itself. The macOS job and local runs take the files one by one,
-  since the macOS runner is too small for parallel files.
+  (a signal, `globalThis.fetch`) or counts bus events is `test.serial`.
+  Linux CI runs the files in parallel, each in a fresh global, so a
+  test sets what it reads itself. Local runs take the files one by one.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
-- UI copy is short and plain. No em-dashes anywhere. A send is a turn
-  in a chat and a run in a task; the page never says send. `perl -i -pe` for
-  global replaces, `uv run` for ad hoc Python, never pip.
-- Do not edit the brand SVGs and PNGs in `site/` by hand; change
+- **UI copy is short and plain.** No em-dashes anywhere. A send is a
+  turn in a chat and a run in a task; the page never says send.
+- `perl -i -pe` for global replaces, `uv run` for ad hoc Python, never
+  pip.
+- The brand SVGs and PNGs in `site/` are generated: change
   `scripts/brand.py` or the numbers in `site/README.md` and regenerate.

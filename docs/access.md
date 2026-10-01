@@ -3,6 +3,18 @@
 Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 `web/` (the router and the socket).
 
+## Requests
+
+- **Every non-GET is same-origin:** the same host, and the scheme never
+  downgraded. `--trust-proxy` reads the scheme and the client address
+  from the last value of the proxy's `X-Forwarded-*`.
+- **Every body and parameter goes through a hand-written parser** that
+  throws a 400 on anything unexpected. A body is read through
+  `readBody()` or `readBytes()` with the route's own cap, never
+  `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
+- **The access matrix is checked against the composed route list,**
+  health and ready included.
+
 ## Logins
 
 - **A login is a row behind the `login` cookie.** The cookie holds a
@@ -19,6 +31,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   opens no login.
 - **Login is rate limited per address, a password change per user.**
   A wrong current password is a 403, since a 401 signs the tab out.
+  The limit is a fixed window per key with a cap on keys, so memory
+  stays constant. `login limited` is logged once when an address's
+  window closes, not per refusal.
 - **Every way a login ends publishes `login.revoked`.** Logout, expiry,
   disable, reset and a password change all do, so the socket closes
   those connections. A password change keeps its own tab's login and
