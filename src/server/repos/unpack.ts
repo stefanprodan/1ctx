@@ -146,11 +146,12 @@ function linkTarget(path: string, target: string): string | null {
   if (resolved === ".." || resolved.startsWith("../") || resolved === ".") {
     return null;
   }
-  return posix.relative(posix.dirname(path), resolved);
+  return posix.relative(posix.dirname(path), resolved) || ".";
 }
 
 export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
-  const started = performance.now();
+  // the deadline starts again at the go: a wait for slots is not the host's
+  let started = performance.now();
   const deadline = new AbortController();
   const stall = new AbortController();
   const signal = AbortSignal.any([
@@ -158,7 +159,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
     stall.signal,
     ...(io.signal ? [io.signal] : []),
   ]);
-  const ends = setTimeout(() => deadline.abort(), job.deadlineMs);
+  let ends = setTimeout(() => deadline.abort(), job.deadlineMs);
   let stallTimer = setTimeout(() => stall.abort(), job.stallMs);
   // while the caller takes its slots, a quiet stream is no stall
   let paused = false;
@@ -303,8 +304,11 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
         const published = existsSync(join(target, "tree.json"));
         paused = true;
         clearTimeout(stallTimer);
+        clearTimeout(ends);
         const go = await io.emit({ commit, etag, published });
         paused = false;
+        started = performance.now();
+        ends = setTimeout(() => deadline.abort(), job.deadlineMs);
         stallTimer = setTimeout(() => stall.abort(), job.stallMs);
         if (published) throw new Published();
         if (!go) throw new Refused("host unreachable");
@@ -323,7 +327,13 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           throw new Refused("host unreachable");
         }
         named.add(path);
-        if (!ignored(rules, path, true) && !over) folder(path);
+        if (ignored(rules, path, true) || over) return;
+        try {
+          folder(path);
+        } catch (error) {
+          if (!clash(error)) throw error;
+          meta.dropped++;
+        }
         return;
       }
       if (named.has(path)) throw new Refused("host unreachable");

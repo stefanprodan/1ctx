@@ -462,3 +462,28 @@ test("names one volume cannot hold apart are dropped, not a failed fetch", async
   expect(meta.files + meta.dropped).toBe(4);
   expect(readdirSync(files).length).toBe(meta.dropped === 0 ? 4 : 2);
 });
+
+test("a link to its own folder or the one above is kept", async () => {
+  const { result, files } = await run([
+    { name: "a/f", body: "x" },
+    { name: "a/self", type: "symlink", linkname: "." },
+    { name: "a/b/up", type: "symlink", linkname: ".." },
+  ]);
+  expect(result).toMatchObject({ ok: true, meta: { dropped: 0 } });
+  expect(readlinkSync(join(files, "a/self"))).toBe(".");
+  expect(readlinkSync(join(files, "a/b/up"))).toBe("..");
+  expect(readFileSync(join(files, "a/self/f"), "utf8")).toBe("x");
+});
+
+test("a folder the volume merges with a link is dropped, not a failed fetch", async () => {
+  const { result } = await run([
+    { name: "A", type: "symlink", linkname: "sub" },
+    { name: "sub/f", body: "x" },
+    { name: "a", type: "dir" },
+    { name: "a/x", body: "y" },
+  ]);
+  expect(result).toMatchObject({ ok: true });
+  const meta = (result as { meta: { files: number; dropped: number } }).meta;
+  // a case-insensitive volume drops the folder and its file
+  expect(meta.dropped === 0 ? meta.files : meta.files + 1).toBe(2);
+});

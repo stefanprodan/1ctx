@@ -14,6 +14,7 @@ import type { CacheEntry, RepoCache } from "./cache.ts";
 import type { RepoAuth, RepoHeader } from "./check.ts";
 import {
   type Failure,
+  type Fetched,
   Fetches,
   fail,
   hash,
@@ -338,6 +339,11 @@ export class Mounts {
         : null;
     return new Promise<Lookup>((resolve) => {
       let settled = false;
+      // the job's answer, whenever its event comes
+      let answered: (done: Fetched) => void = () => {};
+      const finished = new Promise<Fetched>((then) => {
+        answered = then;
+      });
       const onEvent = (event: JobEvent): boolean => {
         if (settled) return false;
         settled = true;
@@ -348,18 +354,18 @@ export class Mounts {
           // a tree refused a while ago or being fetched is not unpacked
           // twice: the job stops at the commit and the turn asks for it
           if (
-            this.fetches!.refusal(folder) !== null ||
+            this.fetches!.refusal(folder, row) !== null ||
             this.fetches!.busy(folder)
           ) {
             go = false;
           } else {
             // the job unpacks on: it is this commit's fetch now
-            const tree = job.then((done) =>
+            const tree = finished.then((done) =>
               done.ok || done.error !== "no commit"
                 ? (done as Tree)
                 : fail("host unreachable"),
             );
-            this.fetches!.track(folder, tree);
+            this.fetches!.track(folder, tree, row);
           }
         }
         resolve({ ok: true, commit, etag: event.etag, header: null });
@@ -376,6 +382,7 @@ export class Mounts {
         },
         onEvent,
       );
+      void job.then(answered);
       void job.then(async (done) => {
         if (settled) return;
         settled = true;

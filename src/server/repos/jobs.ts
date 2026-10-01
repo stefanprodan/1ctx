@@ -38,12 +38,17 @@ export function workerJobs(url: URL): JobRunner {
       };
       const stop = () => finish(ended);
       // the worker's own deadline cannot cut a synchronous loop
-      const timer = setTimeout(stop, job.deadlineMs);
+      let timer = setTimeout(stop, job.deadlineMs);
       signal.addEventListener("abort", stop, { once: true });
       worker.onmessage = (message: MessageEvent<FetchMessage>) => {
         if (message.data.type === "done") return finish(message.data.result);
+        // the deadline waits while the caller takes its slots, then
+        // starts again, as the worker's does
+        clearTimeout(timer);
         void Promise.resolve(onEvent(message.data.event)).then((go) => {
-          if (!done) worker.postMessage({ type: "go", go } satisfies GoMessage);
+          if (done) return;
+          timer = setTimeout(stop, job.deadlineMs);
+          worker.postMessage({ type: "go", go } satisfies GoMessage);
         });
       };
       worker.onerror = stop;

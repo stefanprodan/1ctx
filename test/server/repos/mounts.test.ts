@@ -544,3 +544,72 @@ test("the drain ends every fetch and writes no row after", async () => {
   ]);
   expect(repos.byId(row.id)?.state).toBe("pending");
 });
+
+test("a job that ends while it waits for its slots gives them back, unremembered", async () => {
+  const five = "https://git.test/acme/five";
+  let held = 0;
+  let grant = () => {};
+  const granted = new Promise<void>((resolve) => {
+    grant = resolve;
+  });
+  let late = true;
+  // a process slot granted only after the job ended
+  const acquire = async () => {
+    if (late) await granted;
+    held++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      held--;
+    };
+  };
+  let stuck = 0;
+  const { repos, add } = setup({
+    answers: { [`${five}/archive/HEAD.tar.gz`]: tarResponse(tree()) },
+    acquire,
+    jobs: (base) => (job, onEvent, signal) => {
+      if (!job.url.includes("/stuck")) return base(job, onEvent, signal);
+      stuck++;
+      // like the worker at its deadline: ended, never waiting on the go
+      void onEvent({ commit: COMMIT, etag: null, published: false });
+      return new Promise((resolve) =>
+        setTimeout(
+          () => resolve({ ok: false, error: "host unreachable", status: null }),
+          20,
+        ),
+      );
+    },
+  });
+  add("p1", { name: "one", url: "https://git.test/acme/stuck1" });
+  add("p2", { name: "two", url: "https://git.test/acme/stuck2" });
+  await repos.prepare("p1", { waitMs: 200 });
+  await repos.prepare("p2", { waitMs: 200 });
+  late = false;
+  grant();
+  await Bun.sleep(10);
+  expect(held).toBe(0);
+  // both fetch slots came back too
+  add("p3", { name: "five", url: five });
+  const fresh = await repos.prepare("p3", { waitMs: 1_000 });
+  expect(fresh.mounts.map((mount) => mount.name)).toEqual(["five"]);
+  expect(held).toBe(0);
+  // a death in the queue says nothing of the host: tried again at once
+  const before = stuck;
+  await repos.prepare("p1", { waitMs: 200 });
+  expect(stuck).toBe(before + 1);
+});
+
+test("a failure of one signer's is never another's", async () => {
+  const atCommit = `${PAGE}/archive/${COMMIT}.tar.gz`;
+  const answers: Record<string, HostAnswer> = {
+    [`${API}commits/main`]: new Response(COMMIT),
+    [`${API}tarball/${COMMIT}`]: new Response("no", { status: 403 }),
+    [atCommit]: tarResponse(tree()),
+  };
+  const { repos, add } = setup({ answers });
+  add("p1", { ref: "main", credentialId: "c1" });
+  expect((await repos.prepare("p1")).notices[0]?.reason).toBe("no access");
+  add("p2", { ref: COMMIT });
+  expect((await repos.prepare("p2")).mounts[0]?.commit).toBe(COMMIT);
+});

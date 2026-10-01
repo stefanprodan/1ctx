@@ -114,10 +114,15 @@ call them are in `docs/access.md`.
   and a process slot (`acquireProcess()`) only for an unpack, so a
   lookup never waits behind other fetches and commands keep the rest.
   `prepare()` itself takes no slot, so a caller holding one cannot
-  deadlock it; a fetch waiting for a slot is past the turn's wait.
+  deadlock it; a fetch waiting for a slot is past the turn's wait. A
+  job waits at most `REPO_SLOT_WAIT_MS`, and its deadline starts again
+  at the go. A slot granted after its job ended is given back.
 - **A tree that failed is not unpacked again** for a minute, one over
-  the caps for `REPO_REFUSED_MS`, until a refresh. A public lookup that
-  names such a commit, or one being fetched, stops at the commit.
+  the caps for `REPO_REFUSED_MS`, until a refresh. It is remembered per
+  credential and project, so one signer's failure is never another's,
+  and a job that ended waiting for its slots is not remembered. A
+  public lookup that names such a commit, or one being fetched, stops
+  at the commit.
 - **The row follows the fetch:** `pending`, `fetching` while one runs,
   `ready` or `failed` with its word. A create, a refresh and a change
   to what is fetched start a lookup and a fetch at once, so the admin
@@ -144,7 +149,8 @@ call them are in `docs/access.md`.
 - **Files keep their mode with the owner's read bit,** and every file
   and folder gets the commit's time. A symlink whose target stays
   inside the tree is kept, its target written normalized from its
-  folder (only leading `..`), so no target walks through another link; one out of it, a hard link to nothing kept
+  folder, so only leading `..` climb, through real folders, and no
+  target leaves the tree. One out of it, a hard link to nothing kept
   and any other member is dropped and counted (`dropped`). A hard link
   to a kept file is a copy.
 - **The ignore rules apply while unpacking,** per path and its parents

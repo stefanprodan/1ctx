@@ -20,6 +20,7 @@ import {
   REPO_FETCHES_IN_FLIGHT,
   REPO_LOOKUP_MS,
   REPO_REFUSED_MS,
+  REPO_SLOT_WAIT_MS,
   REPO_STALL_MS,
 } from "./limits.ts";
 import { logCacheSwept, logFetched } from "./log.ts";
@@ -38,6 +39,8 @@ export type Failure = {
   status: number | null;
   // over the size cap: what was counted, for the admin page
   seen?: { files: number; bytes: number };
+  // the job ended waiting for its slots: no word on the host
+  queued?: true;
 };
 export type Tree = { ok: true; entry: CacheEntry } | Failure;
 export type Fetched =
@@ -56,6 +59,11 @@ export const hash = (text: string, length: number) =>
 // the cache's folder name for a repository: no disk path part comes
 // from a host, a repository or a tarball
 export const sourceOf = (url: string) => hash(url, 16);
+
+// who fetches: a failure of one credential's, or of a project's, is
+// never another's
+const signerOf = (row: RepoRow) =>
+  row.credentialId === null ? "" : `${row.credentialId}/${row.projectId}`;
 
 export type FetchesDeps = {
   cache: RepoCache;
@@ -115,9 +123,10 @@ export class Fetches {
     return this.inFlight.has(folder);
   }
 
-  // a tree whose fetch failed a while ago, under the caps in force
-  refusal(folder: string): Failure | null {
-    const key = this.refusedKey(folder);
+  // a tree whose fetch failed a while ago for this signer, under the
+  // caps in force
+  refusal(folder: string, row: RepoRow): Failure | null {
+    const key = this.refusedKey(folder, row);
     const refused = this.refused.get(key);
     if (refused === undefined) return null;
     if (this.deps.clock() < refused.until) return refused.tree;
@@ -125,9 +134,9 @@ export class Fetches {
     return null;
   }
 
-  private refusedKey(folder: string): string {
+  private refusedKey(folder: string, row: RepoRow): string {
     const limits = this.deps.limits();
-    return `${folder}:${limits.repoBytes}:${limits.repoFiles}`;
+    return `${folder}:${limits.repoBytes}:${limits.repoFiles}:${signerOf(row)}`;
   }
 
   // a tree by commit: joined when in flight, else fetched
@@ -136,7 +145,7 @@ export class Fetches {
     const folder = this.deps.cache.folder(sourceOf(row.url), commit, ignore);
     const running = this.inFlight.get(folder);
     if (running !== undefined) return running;
-    const refused = this.refusal(folder);
+    const refused = this.refusal(folder, row);
     if (refused !== null) return Promise.resolve(refused);
     const host = adapter(row.url, row.kind);
     const url =
@@ -150,17 +159,17 @@ export class Fetches {
       if (done.ok || done.error !== "no commit") return done as Tree;
       return fail("host unreachable");
     });
-    return this.track(folder, tree);
+    return this.track(folder, tree, row);
   }
 
   // a tree's fetch, joined by the turns that need it; a failure is
   // not tried again for a while, one over the caps for longer
-  track(folder: string, tree: Promise<Tree>): Promise<Tree> {
+  track(folder: string, tree: Promise<Tree>, row: RepoRow): Promise<Tree> {
     this.inFlight.set(folder, tree);
-    const key = this.refusedKey(folder);
+    const key = this.refusedKey(folder, row);
     void tree.then((done) => {
       if (this.inFlight.get(folder) === tree) this.inFlight.delete(folder);
-      if (done.ok || this.deps.signal.aborted) return;
+      if (done.ok || done.queued || this.deps.signal.aborted) return;
       const hold =
         done.error === "over the size cap" ? REPO_REFUSED_MS : REPO_LOOKUP_MS;
       this.refused.set(key, { until: this.deps.clock() + hold, tree: done });
@@ -180,6 +189,26 @@ export class Fetches {
     let releaseSlot: (() => void) | undefined;
     let releaseProcess: (() => void) | undefined;
     let full = false;
+    // waiting for its slots, or ended there
+    let queued = false;
+    // ended with the job, so a slot granted after it is given back
+    const ended = new AbortController();
+    const take = async (
+      acquire: (signal: AbortSignal) => Promise<() => void>,
+    ): Promise<() => void> => {
+      const release = await acquire(
+        AbortSignal.any([
+          signal,
+          ended.signal,
+          AbortSignal.timeout(REPO_SLOT_WAIT_MS),
+        ]),
+      );
+      if (ended.signal.aborted) {
+        release();
+        throw new Error("the job ended");
+      }
+      return release;
+    };
     const id = newId();
     const limits = this.deps.limits();
     // the request, a 304 and a cached commit take no slot; only an
@@ -187,12 +216,14 @@ export class Fetches {
     const unpack = async (event: JobEvent): Promise<boolean> => {
       if (!onEvent(event)) return false;
       if (event.commit === null || event.published) return true;
+      queued = true;
       try {
-        releaseSlot = await this.slots.acquire(signal);
-        releaseProcess = await this.deps.acquire(signal);
+        releaseSlot = await take((both) => this.slots.acquire(both));
+        releaseProcess = await take((both) => this.deps.acquire(both));
       } catch {
         return false;
       }
+      queued = false;
       if (!cache.roomFor(limits.repoBytes)) {
         full = true;
         return false;
@@ -230,6 +261,7 @@ export class Fetches {
         signal,
       );
       if (full) return fail("cache full");
+      if (queued) return { ...fail("host unreachable"), queued: true };
       if (!done.ok) return done;
       if (done.kind === "unchanged") {
         const entry = cache.get(source, row.commit ?? "", ignore);
@@ -252,6 +284,7 @@ export class Fetches {
     } catch {
       return fail("host unreachable");
     } finally {
+      ended.abort();
       this.running.delete(id);
       releaseProcess?.();
       releaseSlot?.();

@@ -14,6 +14,8 @@ export const REPO_LOOKUP_MS = 60 * 1000;
 export const REPO_LOOKUP_DEADLINE_MS = 20 * 1000;
 // a tree over the caps is not fetched again for this long
 export const REPO_REFUSED_MS = 60 * 60 * 1000;
+// the longest a fetch waits for its slots with the host's answer open
+export const REPO_SLOT_WAIT_MS = 2 * 60 * 1000;
 // fetches at once, each in a process slot, so commands keep the rest
 export const REPO_FETCHES_IN_FLIGHT = 2;
 // the most an API lookup's body is read
