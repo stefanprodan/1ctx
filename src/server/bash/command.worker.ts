@@ -224,6 +224,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
           knowledgeFileBytes: job.knowledgeFileBytes,
           visuals: job.visuals,
           knowledge: job.docs,
+          repoFileBytes: job.repoFileBytes,
         },
         opened,
       ),

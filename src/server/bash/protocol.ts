@@ -27,6 +27,7 @@ export type JobRepo = {
   folder: string;
   // what the ignore rules kept, which the walk and read caps grow by
   files: number;
+  dirs: number;
   bytes: number;
 };
 

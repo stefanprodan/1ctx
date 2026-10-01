@@ -41,6 +41,7 @@ export type RepoMount = {
   // the tree's files/ folder, absolute
   folder: string;
   files: number;
+  dirs: number;
   bytes: number;
   // files past repoFileBytes, listed and unreadable
   large: number;
@@ -191,6 +192,7 @@ export class Mounts {
           commit: meta.commit,
           folder: `${out.entry.folder}/files`,
           files: meta.files,
+          dirs: meta.dirs,
           bytes: meta.bytes,
           large: meta.large,
           ignored: meta.ignored,

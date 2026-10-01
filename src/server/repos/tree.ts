@@ -13,6 +13,8 @@ export type TreeMeta = {
   // the commit's time, seconds since the epoch
   time: number;
   files: number;
+  // the folders under files/, which a walk visits as it does files
+  dirs: number;
   bytes: number;
   // files past fileBytes, kept and unreadable
   large: number;
@@ -41,6 +43,7 @@ export function readMeta(folder: string): TreeMeta | null {
       ![
         meta.time,
         meta.files,
+        meta.dirs,
         meta.bytes,
         meta.large,
         meta.ignored,

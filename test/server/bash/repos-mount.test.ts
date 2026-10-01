@@ -18,8 +18,12 @@ const DIRS = 30;
 const PER_DIR = 40;
 const SMALL = `${"x".repeat(99)}\n`;
 
+// a folder per file, as many as the walk's floor and more
+const FOLDERS = 1500;
+
 let base = "";
 let tree: JobRepo;
+let folders: JobRepo;
 
 beforeAll(async () => {
   base = await mkdtemp(join(tmpdir(), "repos-mount-"));
@@ -38,7 +42,20 @@ beforeAll(async () => {
     name: "widgets",
     folder: root,
     files: 4 + DIRS * PER_DIR,
+    dirs: 2 + DIRS,
     bytes: 4096 + 37 + DIRS * PER_DIR * SMALL.length,
+  };
+  const wide = join(base, "wide");
+  for (let d = 0; d < FOLDERS; d++) {
+    await mkdir(join(wide, `d${d}`), { recursive: true });
+    await writeFile(join(wide, `d${d}/f`), "x\n");
+  }
+  folders = {
+    name: "wide",
+    folder: wide,
+    files: FOLDERS,
+    dirs: FOLDERS,
+    bytes: 2 * FOLDERS,
   };
 });
 
@@ -135,12 +152,15 @@ describe("a repository mounted beside scratch", () => {
     expect(await output(s, "ls -l /repos/widgets/big.bin")).toContain("4096");
   });
 
-  test("open shows a repository file", async () => {
+  test("open shows a repository file and refuses one past the read limit by name", async () => {
     const s = setup();
     const result = await run(s, "open /repos/widgets/README.md", withRepos());
     expect(result.opened?.map((file) => file.path)).toEqual([
       "/repos/widgets/README.md",
     ]);
+    expect(await output(s, "open /repos/widgets/big.bin")).toContain(
+      "open: /repos/widgets/big.bin: over 2 KB, open a smaller part",
+    );
   });
 
   test("the next command starts where a command left it in a repository", async () => {
@@ -150,6 +170,13 @@ describe("a repository mounted beside scratch", () => {
     expect(await output(s, "pwd", callCaps)).toBe(
       "started in /knowledge: /repos/widgets/src no longer exists\n/knowledge\n\nexit 0",
     );
+  });
+
+  test("a cwd at /repos itself makes no discard notice", async () => {
+    const s = setup();
+    await run(s, "cd /repos/widgets; cd ..", withRepos());
+    expect(await output(s, "pwd")).toBe("/repos\n\nexit 0");
+    expect(await output(s, "cd /repos && ls")).toBe("widgets\n\nexit 0");
   });
 
   test("the result opens with the send's notice", async () => {
@@ -172,6 +199,30 @@ describe("a repository mounted beside scratch", () => {
 });
 
 describe("the caps grow with the mount", () => {
+  test("a walk of a tree of many folders fits once its folders count", async () => {
+    const s = setup();
+    const mount = (dirs: number): CommandCaps => ({
+      ...callCaps,
+      repos: {
+        mounts: [{ ...folders, dirs }],
+        fileBytes: 2048,
+        notice: "",
+      },
+    });
+    const walks: [string, string][] = [
+      ["find /repos/wide -type f | wc -l", `${FOLDERS}`],
+      ["rg -c x /repos/wide | wc -l", `${FOLDERS}`],
+      ["du -s /repos/wide | cut -f2", "/repos/wide"],
+      ["ls -R /repos/wide | grep -c '^f$'", `${FOLDERS}`],
+    ];
+    for (const [walk, out] of walks) {
+      expect((await run(s, walk, mount(0))).content).toContain("exit 126");
+      expect((await run(s, walk, mount(FOLDERS))).content).toBe(
+        `${out}\n\nexit 0`,
+      );
+    }
+  });
+
   test("a walk of the whole tree fits once its files count", async () => {
     const s = setup();
     const walk = "find /repos/widgets | wc -l";

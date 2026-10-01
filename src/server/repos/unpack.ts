@@ -172,6 +172,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
     commit: "",
     time: 0,
     files: 0,
+    dirs: 0,
     bytes: 0,
     large: 0,
     ignored: 0,
@@ -452,8 +453,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
       return { ok: false, error: "host unreachable", status };
     if (over) throw new Refused("over the size cap");
     inTime();
-    meta.commit = commit;
-    meta.time = time;
+    Object.assign(meta, { commit, time, dirs: dirs.length });
     // deepest first, since writing a folder's children moved its time
     for (const dir of dirs.reverse()) utimesSync(join(files, dir), time, time);
     utimesSync(files, time, time);

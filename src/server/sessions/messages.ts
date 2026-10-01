@@ -218,16 +218,15 @@ export function mountedBefore(
   db: Db,
   sessionId: string,
   sendId: string,
-  limit: number,
 ): MountedRepos[] {
   return db
-    .query<{ mounted_repos: string }, [string, string, number]>(
+    .query<{ mounted_repos: string }, [string, string]>(
       `select messages.mounted_repos from sends
        join messages on messages.id = sends.first_message_id
        where sends.session_id = ? and sends.id != ?
          and messages.mounted_repos is not null
-       order by sends.started_at desc, sends.rowid desc limit ?`,
+       order by sends.started_at desc, sends.rowid desc`,
     )
-    .all(sessionId, sendId, limit)
+    .all(sessionId, sendId)
     .map((row) => JSON.parse(row.mounted_repos) as MountedRepos);
 }

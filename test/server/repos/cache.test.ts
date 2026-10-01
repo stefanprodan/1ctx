@@ -24,6 +24,7 @@ const meta = (commit: string, bytes: number): TreeMeta => ({
   commit,
   time: 1,
   files: 1,
+  dirs: 0,
   bytes,
   large: 0,
   ignored: 0,

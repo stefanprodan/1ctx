@@ -251,6 +251,50 @@ describe("a send's repositories", () => {
     }
   });
 
+  test("a moved branch is said though the last turn left it out", async () => {
+    const counted = await repoChat();
+    const { chat, answers } = counted;
+    try {
+      const other = "https://github.com/acme/gadgets";
+      const otherArchive = adapter(other, "github").archiveUrl("");
+      answers[otherArchive] = tarResponse(tree(), '"g1"');
+      const gadgets = chat.app.repos.store.create(
+        chat.projectId,
+        {
+          name: "gadgets",
+          url: other,
+          kind: "github",
+          ref: "",
+          credentialId: null,
+          ignore: "",
+        },
+        chat.app.now.value,
+      ).id;
+      const { script, sessionId } = await startChat(chat);
+      script.reply("first");
+      await settled(chat, sessionId);
+      // a turn with gadgets off stores widgets alone
+      const second = await message(chat, sessionId, "again", {
+        disable: [repoKey(gadgets)],
+      });
+      second.reply("second");
+      await settled(chat, sessionId);
+      chat.app.now.value += 61_000;
+      answers[otherArchive] = tarResponse(tree(NEXT_COMMIT), '"g2"');
+      const third = await message(chat, sessionId, "once more", {
+        enable: [repoKey(gadgets)],
+      });
+      expect(systemOf(third)).toContain(
+        "repo gadgets: default branch moved from 3e0ff8a to 8d01e44",
+      );
+      expect(systemOf(third)).not.toContain("repo widgets:");
+      third.reply("third");
+      await settled(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a repository turned off after a turn read it gets the line", async () => {
     const counted = await repoChat();
     const { chat } = counted;

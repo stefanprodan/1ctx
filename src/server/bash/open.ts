@@ -167,7 +167,13 @@ export function checkOpened(
 }
 
 export function makeOpenCommand(
-  caps: { knowledgeFileBytes: number; visuals: boolean; knowledge: boolean },
+  caps: {
+    knowledgeFileBytes: number;
+    visuals: boolean;
+    knowledge: boolean;
+    // a repository file past it reads as File too large
+    repoFileBytes?: number;
+  },
   collect: OpenedRecord[],
 ) {
   return defineCommand(
@@ -209,15 +215,18 @@ export function makeOpenCommand(
         return refusal(arg, "no such file");
       }
       if (!final?.isFile) return refusal(arg, "not a regular file");
-      // sized before the read, so a large repository file is never read
+      // sized before the read, so a large repository file is refused
+      // by name and never read
+      const limit =
+        caps.repoFileBytes !== undefined && path.startsWith("/repos/")
+          ? Math.min(caps.knowledgeFileBytes, caps.repoFileBytes)
+          : caps.knowledgeFileBytes;
       const bytes =
-        final.size > caps.knowledgeFileBytes
-          ? null
-          : await ctx.fs.readFileBuffer(path);
-      if (bytes === null || bytes.byteLength > caps.knowledgeFileBytes) {
+        final.size > limit ? null : await ctx.fs.readFileBuffer(path);
+      if (bytes === null || bytes.byteLength > limit) {
         return refusal(
           arg,
-          `over ${bytesWords(caps.knowledgeFileBytes)}, open a smaller part (sed -n '1,200p' f > /tmp/part.md)`,
+          `over ${bytesWords(limit)}, open a smaller part (sed -n '1,200p' f > /tmp/part.md)`,
         );
       }
       const existing = collect.findIndex((file) => file.path === path);

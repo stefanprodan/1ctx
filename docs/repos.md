@@ -213,9 +213,9 @@ start answers `{ mounts, notices, release }`:
   turn is a new message, so it looks up afresh.
 - **The model is told.** The bash description ends with a line per
   mounted repository (`repoLine()`), `, some paths ignored` when the
-  rules kept a file out. A branch at another commit than the chat's
-  last turn that mounted it gets `repo <name>: <ref> moved from <a> to
-  <b>` in the system prompt, that send only. A repository off that an
+  rules kept a file out. A repository at another commit than the
+  newest earlier turn of the chat that mounted it gets `repo <name>:
+  <ref> moved from <a> to <b>` in the system prompt, that send only. A repository off that an
   earlier turn of the chat mounted gets `reposOffLine()`; one never
   mounted is not named.
 - **A project with no repositories costs one indexed query a send** and

@@ -163,7 +163,7 @@ of that shell that shows a file on the chat page.
 - **A send's repositories come in its caps.** The runner looks them up
   once before the first round (`docs/repos.md`) and hands every command
   of the send the same list: name, the tree's folder, kept files and
-  bytes. The worker takes a folder only from the job, never from a
+  bytes and folders. The worker takes a folder only from the job, never from a
   command.
 - **Each is a read-only `OverlayFs` at `/repos/<name>`** over the
   command's `InMemoryFs`, through a `MountableFs`, `allowSymlinks` on,
@@ -173,14 +173,17 @@ of that shell that shows a file on the chat page.
 - **`/repos` never reaches a commit.** `tree.ts` reads the base only.
   A write under `/repos` fails at the command with Read-only file
   system; one beside the mounts lands in the base and is discarded
-  with a notice. `cp` out works; `mv` out leaves the copy and fails at
-  the remove.
+  with a notice, a folder alone silently, since the shell makes its
+  cwd's. `cp` out works, but a folder holding a link cannot be copied
+  into scratch, which keeps no links; `mv` out leaves the copy and
+  fails at the remove.
 - **The caps grow with the mount.** `maxTraversalEntries` adds the
-  kept files and `maxInputBytes` the kept bytes, so one `find` or `rg`
-  covers a whole tree.
+  kept files and folders (`dirs` in `tree.json`) and `maxInputBytes`
+  the kept bytes, so one `find` or `rg` covers a whole tree.
 - **A cwd or an opened path may be under `/repos`.** The next command
   starts there while the repository is mounted, else at home with the
-  start notice. `open` sizes a file before reading it.
+  start notice. `open` sizes a file before reading it, a repository's
+  against the lesser of `knowledgeFileBytes` and `repoFileBytes`.
 - **The first command of a send says what was left out:** `repo <name>
   is unavailable: <reason>`, and a regenerate's pinned commit no longer
   cached. A folder gone from the cache is left out with a notice.

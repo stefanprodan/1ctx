@@ -26,11 +26,7 @@ export type ReposPort = {
 export type MountedPort = {
   mountedRepos(messageId: string): MountedRepos | null;
   setMountedRepos(messageId: string, mounted: MountedRepos): void;
-  mountedBefore(
-    sessionId: string,
-    sendId: string,
-    limit: number,
-  ): MountedRepos[];
+  mountedBefore(sessionId: string, sendId: string): MountedRepos[];
 };
 
 const short = (commit: string) => commit.slice(0, 7);
@@ -96,10 +92,11 @@ export async function mountRepos(
   let pending = noticeOf(prepared);
   send.repos = {
     tool: {
-      mounts: prepared.mounts.map(({ name, folder, files, bytes }) => ({
+      mounts: prepared.mounts.map(({ name, folder, files, dirs, bytes }) => ({
         name,
         folder,
         files,
+        dirs,
         bytes,
       })),
       fileBytes: prepared.mounts.length > 0 ? deps.fileBytes() : 0,
@@ -121,10 +118,20 @@ export async function mountRepos(
       ),
     );
   }
+  // every earlier turn's commits, newest first, read once and only when
+  // a line may need them
+  let earlier: MountedRepos[] | undefined;
+  const before = () =>
+    (earlier ??= deps.sessions.mountedBefore(send.sessionId, send.id));
   if (prepared.mounts.length > 0) {
-    const [last] = deps.sessions.mountedBefore(send.sessionId, send.id, 1);
+    // the newest commit each repository was mounted at, though the last
+    // turn may have left it out
+    const last = new Map<string, string>();
+    for (const mounted of before())
+      for (const [repoId, commit] of Object.entries(mounted))
+        if (!last.has(repoId)) last.set(repoId, commit);
     send.repos.moved = prepared.mounts.flatMap((mount) => {
-      const before = last?.[mount.repoId];
+      const before = last.get(mount.repoId);
       return before === undefined || before === mount.commit
         ? []
         : [
@@ -149,11 +156,7 @@ export async function mountRepos(
       .switchable(send.projectId)
       .filter((repo) => off.has(repo.id));
     if (names.length > 0) {
-      const read = new Set(
-        deps.sessions
-          .mountedBefore(send.sessionId, send.id, -1)
-          .flatMap((mounted) => Object.keys(mounted)),
-      );
+      const read = new Set(before().flatMap((mounted) => Object.keys(mounted)));
       send.repos.off = names
         .filter((repo) => read.has(repo.id))
         .map((repo) => repo.name)

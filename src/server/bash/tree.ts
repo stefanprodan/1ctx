@@ -152,16 +152,19 @@ function keptChanged(fs: InMemoryFs, kept: readonly string[]): boolean {
   return seen !== expected.size;
 }
 
-// a write beside the mounted repositories lands in the base, and goes
-const reposWritten = (fs: InMemoryFs) =>
-  fs
-    .getAllPaths()
-    .some((path) => path === "/repos" || path.startsWith("/repos/"));
+// a write beside the mounted repositories lands in the base, and goes;
+// a folder alone is no write, as the shell makes its cwd's
+async function reposWritten(fs: InMemoryFs): Promise<boolean> {
+  for (const path of fs.getAllPaths())
+    if (path.startsWith("/repos/") && !(await fs.lstat(path)).isDirectory)
+      return true;
+  return false;
+}
 
 // the discard notices, before the start notice
 export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
   let notice = "";
-  if (reposWritten(fs)) {
+  if (await reposWritten(fs)) {
     notice =
       "changes under /repos were discarded: copy a file to /tmp to change it\n";
   }
@@ -215,7 +218,10 @@ export function executionLimits(
   remainingMs: number,
 ): NonNullable<BashOptions["executionLimits"]> {
   // a whole repository fits one walk and one rg over it
-  const repoFiles = job.repos.reduce((sum, repo) => sum + repo.files, 0);
+  const repoEntries = job.repos.reduce(
+    (sum, repo) => sum + repo.files + repo.dirs,
+    0,
+  );
   const repoBytes = job.repos.reduce((sum, repo) => sum + repo.bytes, 0);
   return {
     maxExecutionTimeMs: Math.max(1, remainingMs),
@@ -234,6 +240,6 @@ export function executionLimits(
     maxArchiveCompressedBytes: 4 * job.mountBytes,
     maxArchiveEntryBytes: 4 * job.mountBytes,
     maxTraversalEntries:
-      Math.max(1000, fs.getAllPaths().length * 4) + repoFiles,
+      Math.max(1000, fs.getAllPaths().length * 4) + repoEntries,
   };
 }
