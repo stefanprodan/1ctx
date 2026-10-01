@@ -231,11 +231,13 @@ violation, and every rule has a rejected fixture under
   keeps the rows. A migration on `main` is never edited and no database
   is wiped, since staging holds real data; one not yet on `main` may
   still grow in its own file, unless it ran on staging. A migration that
-  rebuilds a table other tables reference sets `rebuild: true`:
-  `migrate()` turns foreign keys off before its transaction, runs
-  `pragma foreign_key_check` after `up()` and throws on a row, and turns
-  them on again in a `finally`, since the pragma cannot change inside a
-  transaction and a drop would cascade.
+  rebuilds a table other tables reference sets `rebuild: true` and names
+  the tables it rebuilds in `rebuilds`: `migrate()` turns foreign keys
+  off before its transaction, after `up()` throws when a named table's
+  row count changed or `pragma foreign_key_check(<table>)` finds a row,
+  and turns them on again in a `finally`, since the pragma cannot change
+  inside a transaction and a drop would cascade. The older rebuilds name
+  no tables and check the whole database.
 - **Secrets are files.** One bare value per `<kind>-<name>.key` in the
   secrets directory, the kind one of `SECRET_KINDS` in
   `shared/words.ts`, read through the secrets port bound to the

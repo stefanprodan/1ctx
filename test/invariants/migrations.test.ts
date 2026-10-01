@@ -1591,6 +1591,98 @@ describe("rebuild migrations", () => {
     ).toEqual({ n: 0 });
     db.close();
   });
+
+  // a parent with two rows and a child pointing at the first, then a
+  // migration that rebuilds the parent in place by up
+  const rebuildOf = (id: string, up: string) => {
+    const db = new Database(":memory:");
+    db.exec(`
+      pragma foreign_keys = on;
+      create table rebuild_owner (id text primary key);
+      insert into rebuild_owner values ('o1');
+      create table rebuild_parent (
+        id text primary key,
+        owner_id text references rebuild_owner(id)
+      );
+      insert into rebuild_parent values ('p1', 'o1'), ('p2', 'o1');
+      create table rebuild_child (
+        parent_id text references rebuild_parent(id)
+      );
+      insert into rebuild_child values ('p1');
+    `);
+    const run = () =>
+      migrate(db, [
+        {
+          id,
+          rebuild: true,
+          rebuilds: ["rebuild_parent"],
+          up(d) {
+            d.exec(`
+              create table rebuild_parent_new (
+                id text primary key,
+                owner_id text references rebuild_owner(id)
+              );
+              ${up}
+              drop table rebuild_parent;
+              alter table rebuild_parent_new rename to rebuild_parent;
+            `);
+          },
+        },
+      ]);
+    return { db, run };
+  };
+
+  test("a named rebuild that keeps every row passes", () => {
+    const { db, run } = rebuildOf(
+      "9999-good-rebuild",
+      "insert into rebuild_parent_new select * from rebuild_parent;",
+    );
+    expect(run()).toEqual(["9999-good-rebuild"]);
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    expect(db.query("pragma foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    db.close();
+  });
+
+  test("a named rebuild that loses a row fails", () => {
+    const { db, run } = rebuildOf(
+      "9999-lossy-rebuild",
+      `insert into rebuild_parent_new
+        select * from rebuild_parent where id = 'p1';`,
+    );
+    expect(run).toThrow("rebuild row count changed");
+    expect(db.query("select count(*) as n from rebuild_parent").get()).toEqual({
+      n: 2,
+    });
+    expect(db.query("pragma foreign_keys").get()).toEqual({ foreign_keys: 1 });
+    db.close();
+  });
+
+  test("a named rebuild that breaks its own reference fails", () => {
+    const { db, run } = rebuildOf(
+      "9999-dangling-rebuild",
+      `insert into rebuild_parent_new
+        select id, 'missing' from rebuild_parent;`,
+    );
+    expect(run).toThrow("foreign key check failed");
+    expect(
+      db.query("select owner_id from rebuild_parent where id = 'p1'").get(),
+    ).toEqual({ owner_id: "o1" });
+    db.close();
+  });
+
+  test("a named rebuild checks only the tables it names", () => {
+    const { db, run } = rebuildOf(
+      "9999-narrow-rebuild",
+      "insert into rebuild_parent_new select * from rebuild_parent;",
+    );
+    db.exec(`
+      pragma foreign_keys = off;
+      insert into rebuild_child values ('elsewhere');
+      pragma foreign_keys = on;
+    `);
+    expect(run()).toEqual(["9999-narrow-rebuild"]);
+    db.close();
+  });
 });
 
 describe("0006 skills migration", () => {
