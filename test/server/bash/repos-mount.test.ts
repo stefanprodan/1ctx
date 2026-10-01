@@ -199,29 +199,30 @@ describe("a repository mounted beside scratch", () => {
 });
 
 describe("the caps grow with the mount", () => {
-  test("a walk of a tree of many folders fits once its folders count", async () => {
-    const s = setup();
-    const mount = (dirs: number): CommandCaps => ({
-      ...callCaps,
-      repos: {
-        mounts: [{ ...folders, dirs }],
-        fileBytes: 2048,
-        notice: "",
-      },
-    });
-    const walks: [string, string][] = [
-      ["find /repos/wide -type f | wc -l", `${FOLDERS}`],
-      ["rg -c x /repos/wide | wc -l", `${FOLDERS}`],
-      ["du -s /repos/wide | cut -f2", "/repos/wide"],
-      ["ls -R /repos/wide | grep -c '^f$'", `${FOLDERS}`],
-    ];
-    for (const [walk, out] of walks) {
+  const mount = (dirs: number): CommandCaps => ({
+    ...callCaps,
+    repos: {
+      mounts: [{ ...folders, dirs }],
+      fileBytes: 2048,
+      notice: "",
+    },
+  });
+  const walks: [string, string][] = [
+    ["find /repos/wide -type f | wc -l", `${FOLDERS}`],
+    ["rg -c x /repos/wide | wc -l", `${FOLDERS}`],
+    ["du -s /repos/wide | cut -f2", "/repos/wide"],
+    ["ls -R /repos/wide | grep -c '^f$'", `${FOLDERS}`],
+  ];
+  for (const [walk, out] of walks) {
+    // two walks of 1,500 folders through the worker: seconds on a loaded runner
+    test(`a walk of many folders fits once they count: ${walk}`, async () => {
+      const s = setup();
       expect((await run(s, walk, mount(0))).content).toContain("exit 126");
       expect((await run(s, walk, mount(FOLDERS))).content).toBe(
         `${out}\n\nexit 0`,
       );
-    }
-  });
+    }, 30_000);
+  }
 
   test("a walk of the whole tree fits once its files count", async () => {
     const s = setup();
