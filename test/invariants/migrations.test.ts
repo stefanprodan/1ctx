@@ -50,6 +50,7 @@ const EXPECTED_IDS = [
   "0036-skip-4bit",
   "0037-summoned",
   "0038-saved-paths",
+  "0039-restart-runs",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1221,12 +1222,145 @@ describe("the schema", () => {
   test("0038 leaves every existing row without saved paths", () => {
     const db = seed(MIGRATIONS.slice(0, 37));
     try {
-      expect(migrate(db)).toEqual(["0038-saved-paths"]);
+      expect(migrate(db)).toEqual(expectedFrom("0038-saved-paths"));
       const rows = db
         .query<{ saved: string | null }, []>("select saved from messages")
         .all();
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((row) => row.saved === null)).toBe(true);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0039 widens the run source and event checks and keeps every row", () => {
+    const db = seed(MIGRATIONS.slice(0, 38));
+    const tables = [
+      "sessions",
+      "automations",
+      "sends",
+      "messages",
+      "usage",
+      "memory_notes",
+      "queued_messages",
+    ];
+    const rows = () =>
+      tables.map((table) =>
+        db
+          .query<Record<string, unknown>, []>(
+            `select * from ${table} order by rowid`,
+          )
+          .all()
+          .map(({ rerun_on_restart: _, ...rest }) => rest),
+      );
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string | null }, []>(
+          `select name, sql from sqlite_schema where type = 'index'
+             and tbl_name in ('sessions', 'automations') order by name`,
+        )
+        .all();
+    try {
+      db.exec(`
+        insert into automations (id, project_id, owner_id, agent_id, name,
+            instructions, schedule, tz, retention_days, next_at,
+            last_event_at, last_event_due_at, last_event_source,
+            last_event_outcome, last_event_reason, last_run_session_id,
+            last_run_status, created_at, updated_at, own_memory,
+            suspended_at, suspended_by)
+          values ('au', 'p', 'u', 'a', 'daily', 'do', '0 9 * * *', 'UTC', 7,
+            100, 50, 40, 'schedule', 'run', null, null, null, 0, 0, 1, null,
+            null),
+          ('au2', 'p', 'u', 'a', 'paused', 'do', '0 9 * * *', 'UTC', 7,
+            null, 60, 60, 'manual', 'skipped', 'still running', null, null,
+            0, 0, 0, 70, 'u');
+        insert into sessions (id, project_id, owner_id, agent_id, origin,
+            automation_id, title, status, created_at, last_activity_at,
+            run_source)
+          values ('run1', 'p', 'u', 'a', 'automation', 'au', 'daily',
+            'stopped', 1, 2, 'schedule'),
+          ('run2', 'p', 'u', 'a', 'automation', 'au', 'daily', 'done', 3, 4,
+            'manual');
+        update automations set last_run_session_id = 'run2',
+          last_run_status = 'done' where id = 'au';
+        insert into sessions (id, project_id, owner_id, agent_id, origin,
+            title, status, created_at, last_activity_at,
+            forked_from_session_id, forked_from_message_id, archived_at,
+            archived_by, archived_reason, attention, attention_by)
+          values ('fork', 'p', 'u', 'a', 'chat', 'fork', 'done', 5, 6,
+            'sess', 'm2', 7, 'u', 'manual', 0.5, 'decider');
+        insert into memory_notes (project_id, automation_id, entries,
+            revision, updated_at, session_id)
+          values ('p', 'au', '[]', 1, 0, 'run1');
+        insert into queued_messages (id, session_id, author_id, content,
+            queued_at, changed_at)
+          values ('q', 'sess', 'u', 'later', 0, 0);
+      `);
+      const before = rows();
+      // a multi-statement exec stops quietly at a failing insert
+      expect(before.map((table) => table.length)).toEqual([
+        4, 2, 2, 3, 1, 1, 1,
+      ]);
+      const existing = indexes();
+      expect(MIGRATIONS[38]?.rebuilds).toEqual(["sessions", "automations"]);
+      expect(migrate(db)).toEqual(expectedFrom("0039-restart-runs"));
+      expect(rows()).toEqual(before);
+      expect(indexes()).toEqual(existing);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(
+        db
+          .query<{ id: string; rerun_on_restart: number }, []>(
+            "select id, rerun_on_restart from automations order by id",
+          )
+          .all(),
+      ).toEqual([
+        { id: "au", rerun_on_restart: 0 },
+        { id: "au2", rerun_on_restart: 0 },
+      ]);
+      db.exec(`
+        update sessions set run_source = 'restart' where id = 'run1';
+        update automations set last_event_source = 'restart',
+          last_event_outcome = 'deferred', rerun_on_restart = 1
+          where id = 'au';
+      `);
+      expect(() =>
+        db.exec("update sessions set run_source = 'x' where id = 'run1'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update automations set last_event_outcome = 'x'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update automations set rerun_on_restart = 2"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update sessions set archived_reason = null where id = 'fork'"),
+      ).toThrow(/CHECK/);
+      // the references still hold both ways
+      db.exec("delete from sessions where id = 'run2'");
+      expect(
+        db
+          .query(
+            "select last_run_session_id as id from automations where id = 'au'",
+          )
+          .get(),
+      ).toEqual({ id: null });
+      db.exec("delete from automations where id = 'au'");
+      expect(
+        db
+          .query("select automation_id as id from sessions where id = 'run1'")
+          .get(),
+      ).toEqual({ id: null });
+      expect(db.query("select count(*) as n from memory_notes").get()).toEqual({
+        n: 0,
+      });
+      db.exec("delete from sessions where id = 'sess'");
+      expect(db.query("select count(*) as n from sends").get()).toEqual({
+        n: 0,
+      });
+      expect(
+        db.query("select count(*) as n from queued_messages").get(),
+      ).toEqual({ n: 0 });
+      expect(migrate(db)).toEqual([]);
     } finally {
       db.close();
     }
