@@ -45,11 +45,13 @@ export function workerJobs(url: URL): JobRunner {
         // the deadline waits while the caller takes its slots, then
         // starts again, as the worker's does
         clearTimeout(timer);
-        void Promise.resolve(onEvent(message.data.event)).then((go) => {
-          if (done) return;
-          timer = setTimeout(stop, job.deadlineMs);
-          worker.postMessage({ type: "go", go } satisfies GoMessage);
-        });
+        void Promise.resolve(onEvent(message.data.event))
+          .catch(() => false)
+          .then((go) => {
+            if (done) return;
+            timer = setTimeout(stop, job.deadlineMs);
+            worker.postMessage({ type: "go", go } satisfies GoMessage);
+          });
       };
       worker.onerror = stop;
       worker.postMessage(job);

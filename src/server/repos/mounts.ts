@@ -459,6 +459,8 @@ export class Mounts {
 
   // a row's first failure with this word is written and logged
   private failed(row: RepoRow, failure: Failure): Failure {
+    // a fetch that only waited too long for a slot: the host was fine
+    if (failure.queued) return { ...failure, error: "fetching" };
     if (
       !this.closing.signal.aborted &&
       (row.state !== "failed" || row.error !== failure.error)

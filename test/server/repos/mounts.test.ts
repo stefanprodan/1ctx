@@ -589,6 +589,12 @@ test("a job that ends while it waits for its slots gives them back, unremembered
   grant();
   await Bun.sleep(10);
   expect(held).toBe(0);
+  // and their rows never blamed the host
+  for (const project of ["p1", "p2"]) {
+    expect(repos.store.forProject(project)[0]?.error).not.toBe(
+      "host unreachable",
+    );
+  }
   // both fetch slots came back too
   add("p3", { name: "five", url: five });
   const fresh = await repos.prepare("p3", { waitMs: 1_000 });
