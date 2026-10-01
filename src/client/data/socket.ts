@@ -9,7 +9,11 @@
 // go to whoever registered for them, so this module knows no entity.
 
 import { effect } from "@preact/signals";
-import { PROTOCOL, type SocketEvent } from "../../shared/socket.ts";
+import {
+  PROTOCOL,
+  type SocketCommand,
+  type SocketEvent,
+} from "../../shared/socket.ts";
 import { me, setMe } from "./me.ts";
 
 // the connection's access is gone: no reconnect
@@ -75,7 +79,7 @@ const isEvent = (value: unknown): value is SocketEvent =>
   value !== null &&
   typeof (value as { type?: unknown }).type === "string";
 
-function send(command: object): void {
+function send(command: SocketCommand): void {
   if (wire !== null && wire.readyState === OPEN) {
     wire.send(JSON.stringify(command));
   }
