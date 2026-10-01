@@ -223,8 +223,9 @@ Commands with their own parser for it (awk, curl, diff, grep, rg, jq,
 yq, xargs) have their own entries. mktemp and yes answer it in their own
 parsers, in getopt order, with coreutils 9.11's first line, so
 `--version` given as `-p`'s value, after `--`, or after a bad option is
-not asked; yes refuses a value on `--version` or `--help` as getopt
-does.
+not asked; mktemp also takes GNU's undocumented `-V`, alone or in a
+cluster (`-dV`); yes refuses a value on `--version` or `--help` as
+getopt does.
 
 Before: each was an unknown option, a missing file or an argument, where
 the tool it follows answers.

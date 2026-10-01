@@ -54,6 +54,9 @@ from jq 1.8.2 for the dialect rules. Where they part:
   yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
   skips the documents without the key, where jq stops with an error.
   Iterating a number, a string or a boolean is still jq's error.
+- Regular expressions are RE2's, not Oniguruma's: the one-letter class
+  `\pN` matches digits where jq 1.8 matches nothing; write `\p{N}` for
+  both.
 - The value evaluator keeps some of upstream's leniencies:
   `map_values(f)` keeps every output of `f`, `walk` never reaches
   scalars, `?` covers the whole path before it (`.a.b?`) rather than
@@ -245,7 +248,6 @@ findutils 4.11.0 answered. Where they part:
   `--suf=.t`, `yes --h`) are refused, as in our other coreutils
   commands.
 - yes's refusals leave out GNU's `Try 'yes --help'` line.
-- mktemp lacks GNU's undocumented `-V`.
 - mktemp names a missing `-p` folder by the template alone
   (`'tmp.XXXXXXXXXX'`), where GNU names the joined path.
 
