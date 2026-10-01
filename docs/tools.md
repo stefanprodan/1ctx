@@ -137,6 +137,9 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
   a key; `readKey()` reads it at the moment of use and answers
   `missing` or `unusable` by `isUsableKey()`. Routes answer key state,
   never a value.
+- **A credential's header is an RFC token, never a transport header
+  or `proxy-*`** (`check.ts`, case folded). The template is printable
+  ASCII with `{key}` exactly once.
 - **A prefix is `normalizePrefix()`'s form.** Https, no userinfo, query
   or fragment, and accepted by just-bash's `validateAllowList`, since
   it becomes an allow-list entry.

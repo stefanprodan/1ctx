@@ -55,6 +55,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   always; only the profile's password change clears it.
 - **An admin cannot demote, disable or reset their own row.** Demoting
   or disabling the last enabled admin is a 409 too.
+- **A user PATCH never takes a password.** A reset is its own route.
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
@@ -64,7 +65,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   Without it the socket keeps the old set.
 - **`UserSummary` never holds the email or the flags.** It is what
   lists show of other users; `Me` adds only `mustChangePassword`.
-- **A user's directory page lists only team projects the reader may
+- **A user's directory page lists only team projects both users may
   open.** Its day counts use the subject's zone, never the reader's, so
   a reader cannot move the boundary to learn what was done each hour.
 - **A visit is one row per user per local day.** A map in memory holds
@@ -93,8 +94,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   the chats and keeps their usage.
 - **Removing a member drops their waiting messages in the same
   transaction.**
-- **Anyone who may open a chat may archive it.** Rename and delete stay
-  with its owner or an admin.
+- **Anyone who may open a chat may archive it.** Rename and delete are
+  in `docs/sessions.md`.
 
 ## Secrets
 

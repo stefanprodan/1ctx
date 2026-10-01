@@ -57,9 +57,6 @@ Monitor's pages are in `docs/views.md`.
   their own read-only connection, ended when they answer, after
   `SCAN_DEADLINE_MS`, or at shutdown. A memory database runs them
   inline.
-- **`compose.ts` builds the worker's URL.** The worker is an entry of
-  `bun build --compile`, where a relative URL resolves against the
-  compile root, `src/server`.
 - **The worker sums by quarter hour of UTC, never by zone.** Every
   zone's midnight falls on a quarter hour, so one read serves any zone
   and the days are laid on in `overview.ts` and `storage.ts`.

@@ -245,4 +245,4 @@ reporting.
   `watchUsage()` and `watchAccessBoard()` stop while the tab is hidden
   (`lib/poll.ts`) and ask every 30 seconds, just over the server's 25
   second keep. Usage asks again only for the current month. The Monitor
-  shows no money. The routes are in `docs/overview.md`.
+  shows no money.

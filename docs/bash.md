@@ -38,7 +38,7 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
 - **The interpreter's deadline wins.** The deadline starts before the
   queues. The interpreter stops at the call timeout with exit 124 and
   its own output; the worker is ended `BACKSTOP_MS` later, and the
-  registry waits half a second more (`graceMs`).
+  registry waits half a second past that (`graceMs`).
 - **An abort posts a cancel first.** Unanswered within
   `CANCEL_GRACE_MS`, the worker is ended. Shutdown ends every worker.
 - **A result is the output, then its tail.** stdout then stderr, cut to

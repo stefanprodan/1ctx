@@ -99,6 +99,3 @@ scheduled share and the attention ask are in `docs/sessions.md`.
   sweep.** The scheduler deletes runs past `retention_days` through
   the sessions area's one delete. A run whose automation is gone is
   deleted `archivedDeleteDays` after its last activity.
-- **Usage outlives runs.** Usage rows survive retention, the sweep and
-  an automation's delete, so the overview's tokens and cost never
-  fall; turn and run counts read `sends` and do.

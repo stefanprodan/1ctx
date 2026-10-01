@@ -21,8 +21,6 @@ Governs `src/server/sessions/` and the runner's sends in
 - **A full cap refuses with a 429.** A user's send gets `CapFull`
   naming the narrowest cap. A scheduled run gets `RunCapacity` with
   `cap` (`project` or `process`).
-- **A limits write keeps `sendsPerUser <= sendsPerProject <=
-  sendsRunning`.** Anything else is a 400 (`ordered()` in `limits/`).
 - **Every freed place calls the `wake` port.** That is every
   `registry.free()` that freed a send (finalize, a rolled-back
   `startSend` or `startCompact`, an abandoned run), except at shutdown,
@@ -98,7 +96,6 @@ Governs `src/server/sessions/` and the runner's sends in
 - **Queue order is `queued_at`, then `rowid`.** An edit never moves a
   row.
 - **The hourly sweep deletes not-sent rows after `NOT_SENT_KEPT_MS`.**
-  Removing a member drops their rows in the same transaction.
 
 ## The dispatcher
 
@@ -152,8 +149,6 @@ Governs `src/server/sessions/` and the runner's sends in
 - **A failed `finalizeSend` keeps the lock.** The session answers 409
   until a restart, where `sessions.repair()` ends what a crash left
   running with cause `restart`.
-- **Logs carry no arguments or results.** A send's start and end are
-  one event each; a failed round or tool is a warning.
 
 ## Shutdown
 
@@ -183,7 +178,7 @@ Governs `src/server/sessions/` and the runner's sends in
 - **The mark never moves the chat's activity.** `markAttention()`
   stores `attention` and `attention_by` in one transaction that bumps
   `revision` alone, never `last_activity_at`, with one rows-free
-  envelope. A gone session is a no-op. A fork does not copy the mark.
+  envelope. A gone session is a no-op.
 - **A failure stores nothing and is never retried.** It logs `run
   attention failed`, never the answer. There is no repair at start.
 - **Asks are bounded.** `ASKS_AT_ONCE` run, at most `MAX_QUEUED` wait
@@ -221,7 +216,9 @@ Governs `src/server/sessions/` and the runner's sends in
 - **Where a summon is refused.** A new chat's first message cannot
   summon. A multi-message turn holds a summon alone. A run never
   summons. The send is refused, "the chat is too long for <name>", when
-  `lastPrompt()` reaches the summoned model's `compactsAt()`.
+  `lastPrompt()` reaches the summoned model's `compactsAt()`. A queued
+  one refused so turns not sent with reason `failed`: the reason check
+  is fixed in its table, and a new reason needs a rebuild migration.
 - **A summoned send never compacts,** and `SessionSummary.usage` reads
   the chat agent's rounds only. Compaction and the meter are the chat
   agent's.
@@ -233,12 +230,11 @@ Governs `src/server/sessions/` and the runner's sends in
   loaded.
 - **A turn is the building agent's own** when neither send is summoned,
   or both are summoned sends of the same agent.
-- **The trace never leaks a tool's content.** One line a call, cut to
-  200 characters, at most 30 lines. `memory_edit` shows only `action=`
-  and `topic=`. A saving bash call always keeps a ` saved` mark however
-  it is cut. A tool the reader is not offered ends ` (not your tool)`;
-  every builtin counts as the reader's, since the chat's switches hold
-  for every agent.
+- **The trace never leaks a tool's content.** `memory_edit` shows
+  only `action=` and `topic=`. A saving bash call always keeps a
+  ` saved` mark however it is cut. A tool the reader is not offered
+  ends ` (not your tool)`; every builtin counts as the reader's, since
+  the chat's switches hold for every agent.
 - **The writer drops a leading `[its name]` mark** from a stored answer
   (`unmarked`). Live frames may still show it.
 - **A summoned send's cache key is `<chat>:<agent>`,** so agents share
@@ -273,17 +269,14 @@ Governs `src/server/sessions/` and the runner's sends in
   fresh lease outside staging quotas.
 - **Reasoning stays with its provider and model,** tool call
   signatures with their model.
-- **Rename and delete are the owner's or a team admin's;** anyone else
+- **Rename and delete are the owner's or an admin's;** anyone else
   gets 403. A rename is allowed while the chat runs, since a send never
   writes the title. A delete waits for the end.
 - **Every delete goes through `deleteSession()`**
   (`sessions/delete.ts`): the route, a task's retention and the sweep.
   The foreign keys take the dependents.
-- **Usage outlives what it measured.** No delete removes a `usage` row
-  and the table has no foreign keys, so past cost never reads lower.
-  `latest()` counts only rows of sends still there.
-- **The Markdown download is pure** (`sessions/markdown.ts`): user
-  messages and answers only, title and errors escaped.
+- **Usage outlives every delete** (`docs/overview.md`). `latest()`
+  counts only rows of sends still there.
 
 ## Archive and agent retirement
 
@@ -301,6 +294,9 @@ Governs `src/server/sessions/` and the runner's sends in
   through `SessionStore.archive()` and suspends its automations. After
   the commit the scheduler wakes and the runner stops every send whose
   policy names the agent. Every `AgentStore` read skips a retired agent.
+  The same transaction nulls its provider and default mark and deletes
+  its skill and server links and users' picks of it; a new per-agent
+  table joins that list.
 
 ## Packing and the sweep
 

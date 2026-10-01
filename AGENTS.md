@@ -6,11 +6,11 @@ One continuous context for agents. Domain: 1ctx.dev.
   binary. No Node.
 - **Packages** are devDependencies bundled at build time: exact pins,
   official npm only, `bun install --ignore-scripts`. A new package needs
-  the user's explicit go-ahead. In `src/`, only `server/lib/archive.ts`
-  imports `@zip.js/zip.js` and `modern-tar`, and only `client/ui/Plot.tsx`
-  imports `uplot`. `patches/` holds our modern-tar patch: it keeps the
-  raw header `typeflag`, so GNU sparse and unknown types are not read as
-  regular files.
+  the user's explicit go-ahead. In `src/`, only
+  `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
+  and only `client/ui/Plot.tsx` imports `uplot`. `patches/` holds our
+  modern-tar patch: it keeps the raw header `typeflag`, so GNU sparse
+  and unknown types are not read as regular files.
 - **just-bash is ours.** Its source lives in `vendor/just-bash/` and we
   change it; `vendor/README.md` says how.
 - **Status:** alpha. The API and the socket change freely, with no
@@ -112,7 +112,7 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
 | `docs/views.md` | what a page draws: `views/`, the composer, the stream, the admin pages |
-| `docs/access.md` | logins, users, names, project visibility, secrets, the socket server |
+| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/sessions.md` | `sessions/` and the runner's sends: caps, writer, queue, compaction |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
@@ -134,7 +134,8 @@ change it in the same commit as the code that changes a rule.
 fixture under `test/fixtures/structure/`.
 
 - `shared/` imports only `shared/`. `client/` imports `client/` and
-  `shared/`. `server/` imports `client/` only in `main.ts`, for the page.
+  `shared/`. `server/` imports `client/` only in `main.ts`, for the
+  page.
 - Server areas have a layer order (`LAYERS` in the test). An area
   imports only areas above it, through their `index.ts` or `rules.ts`.
   `web/` imports only `access` and `lib`, and nothing imports `web/`,
