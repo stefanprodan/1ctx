@@ -90,7 +90,8 @@ describe("atomic knowledge and scratch commits", () => {
     },
   );
 
-  // the loop limit counts iterations, so a slow runner needs the time
+  // the 100,000-command cap ends the loop, which takes seconds on a loaded
+  // runner, so neither the call nor the test may time out first
   test("loop limit saves neither tree, cwd nor last use", async () => {
     const s = prepared();
     try {
@@ -104,7 +105,7 @@ describe("atomic knowledge and scratch commits", () => {
     } finally {
       s.db.close();
     }
-  });
+  }, 20_000);
 
   test("an abort after mounting saves nothing", async () => {
     const s = prepared();
