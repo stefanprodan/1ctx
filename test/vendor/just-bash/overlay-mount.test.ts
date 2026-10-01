@@ -288,6 +288,11 @@ describe("a read-only repository mount", () => {
       1,
     ],
     [
+      "cd /repos/r && cp -r docs /tmp/d",
+      "cp: cannot open 'docs/big.bin' for reading: File too large\n",
+      1,
+    ],
+    [
       "tar -cf /tmp/a.tar -C /repos/r docs",
       "tar: docs/big.bin: Cannot open: File too large\n",
       2,

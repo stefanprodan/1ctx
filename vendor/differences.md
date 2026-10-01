@@ -306,6 +306,8 @@ a read-only Linux mount:
   out of the mount reports the folder once, where GNU reports each
   entry.
 - `tar` leaves out GNU's closing `Exiting with failure status` line.
+- `cp -r` out of the mount stops at the first file over the read limit,
+  naming it, where GNU cp reports it and copies the rest.
 - `md5sum` says a file it cannot read on stdout, as upstream's test
   holds, where GNU says it on stderr.
 - `rg -L` passes over a link back into a folder above without a word,

@@ -1,5 +1,7 @@
 import { type ByteString, readBytesFrom } from "../../encoding.js";
 import { ExclusiveCreateUnsupportedError } from "../create-exclusive.js";
+// (1ctx readonly-errors)
+import { fsErrorCode } from "../error-words.js";
 import { InMemoryFs } from "../in-memory-fs/in-memory-fs.js";
 import type {
   BufferEncoding,
@@ -685,7 +687,14 @@ export class MountableFs implements IFileSystem {
     const srcStat = await this.lstat(src);
 
     if (srcStat.isFile) {
-      const content = await this.readFileBuffer(src);
+      // (1ctx readonly-errors) a file over the read limit is named by its
+      // full path here, since the mount's own error names its inner path
+      const content = await this.readFileBuffer(src).catch((e: unknown) => {
+        if (fsErrorCode(e) !== "EFBIG") throw e;
+        throw Object.assign(new Error(`EFBIG: file too large, read '${src}'`), {
+          code: "EFBIG",
+        });
+      });
       await this.writeFile(dest, content);
       await this.chmod(dest, srcStat.mode);
     } else if (srcStat.isDirectory) {

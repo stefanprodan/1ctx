@@ -215,8 +215,15 @@ export const cpCommand: RuntimeCommand = {
         ) {
           stderr += `cp: cannot stat '${src}': No such file or directory\n`;
         } else if (fsErrorCode(error) === "EFBIG") {
-          // (1ctx readonly-errors) a file over the read limit
-          stderr += `cp: cannot open '${src}' for reading: File too large\n`;
+          // (1ctx readonly-errors) a file over the read limit, by the operand
+          // and its path under it when the copy names one
+          const inner = /read '([^']*)'/.exec(message)?.[1];
+          const srcPath = ctx.fs.resolvePath(ctx.cwd, src);
+          const file =
+            inner?.startsWith(`${srcPath}/`) === true
+              ? `${src.replace(/\/+$/, "")}${inner.slice(srcPath.length)}`
+              : src;
+          stderr += `cp: cannot open '${file}' for reading: File too large\n`;
         } else {
           stderr += `cp: cannot copy '${src}': ${message}\n`;
         }
