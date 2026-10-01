@@ -147,7 +147,7 @@ describe("the search results", () => {
       }),
     );
     expect(loading).not.toContain("Show more");
-    expect(loading).toContain("stream-ghost");
+    expect(loading).toContain("feed-ghost");
     const failed = draw(
       search({
         files,

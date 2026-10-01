@@ -19,7 +19,7 @@ import {
 } from "../../../src/client/views/home/Home.model.ts";
 import { Home } from "../../../src/client/views/home/Home.tsx";
 import { Login } from "../../../src/client/views/home/Login.tsx";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 
 describe("Home.model", () => {
   test("greets by the hour", () => {
@@ -35,7 +35,7 @@ describe("Home.model", () => {
   });
 });
 
-const chatRow = (): StreamRow => ({
+const chatRow = (): FeedRow => ({
   agentRetired: false,
   session: {
     archived: null,
@@ -160,9 +160,9 @@ describe("Home", () => {
     expect(html).toContain('href="/chat/s1"');
     expect(html).toContain("status-done");
     expect(html).toContain("Which pods restarted");
-    expect(html).toContain('<span class="stream-project">#personal</span>');
+    expect(html).toContain('<span class="feed-project">#personal</span>');
     expect(html).toContain(
-      '<span class="stream-author">@assistant </span>nine pods',
+      '<span class="feed-author">@assistant </span>nine pods',
     );
     expect(html).toContain("2m ago");
   });
@@ -188,12 +188,12 @@ describe("Home", () => {
     };
     const html = render(<Home />);
     expect(html).toMatch(
-      /#personal<\/span><span> · <\/span><span class="stream-runs">24 <svg.*?<\/svg><\/span><span> · <\/span><span class="stream-author">@assistant <\/span>nine pods/,
+      /#personal<\/span><span> · <\/span><span class="feed-runs">24 <svg.*?<\/svg><\/span><span> · <\/span><span class="feed-author">@assistant <\/span>nine pods/,
     );
     // a count in the thousands reads as the rest of the app writes it
     const [line] = list.value.rows;
     list.value = { ...list.value, rows: [{ ...line!, runs: 1240 }] };
-    expect(render(<Home />)).toContain('class="stream-runs">1.24K <svg');
+    expect(render(<Home />)).toContain('class="feed-runs">1.24K <svg');
   });
 
   test("the search box carries the address's query and the empty line says so", () => {

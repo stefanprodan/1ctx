@@ -1,12 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The stream list reconciles from envelopes and reloads one page at a
+// The feed reconciles from envelopes and reloads one page at a
 // time: the races between the socket and a first page out.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
-import { TRAIL_MS } from "../../../src/client/data/flight.ts";
-import { me } from "../../../src/client/data/me.ts";
 import {
   applyAutomationFrame,
   applyEnvelope,
@@ -16,11 +14,10 @@ import {
   loadList,
   loadMore,
   revokeRows,
-} from "../../../src/client/data/stream.ts";
-import type {
-  EnvelopeRow,
-  StreamRow,
-} from "../../../src/shared/api/sessions.ts";
+} from "../../../src/client/data/feed.ts";
+import { TRAIL_MS } from "../../../src/client/data/flight.ts";
+import { me } from "../../../src/client/data/me.ts";
+import type { EnvelopeRow, FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
@@ -61,7 +58,7 @@ const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
     ...changes,
   });
 
-function rowOf(session: SessionSummary, runs: number | null = null): StreamRow {
+function rowOf(session: SessionSummary, runs: number | null = null): FeedRow {
   return {
     session,
     agent: "assistant",
@@ -108,7 +105,7 @@ function gated(): void {
 
 // the oldest answer out lands with that page
 async function release(
-  rows: StreamRow[],
+  rows: FeedRow[],
   next: string | null = null,
 ): Promise<void> {
   const gate = gates.shift();
@@ -125,7 +122,7 @@ async function settle(): Promise<void> {
 
 async function loaded(
   filter: Parameters<typeof loadList>[0],
-  rows: StreamRow[],
+  rows: FeedRow[],
   next: string | null = null,
 ) {
   const done = loadList(filter);

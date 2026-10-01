@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One session in the stream: the icon in the status colour, a chat
+// One session in the feed: the icon in the status colour, a chat
 // bubble for a chat and the clock for an automation's run, the title,
 // the project and the state line, the time. A run's title is its
 // automation, so its line is the agent's answer like a chat's. In All
@@ -11,7 +11,7 @@
 // again. The whole row is the link to the chat.
 
 import { type ComponentChild, Fragment } from "preact";
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow } from "../../shared/api/sessions.ts";
 import { count } from "../lib/format.ts";
 import { sessionHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
@@ -42,7 +42,7 @@ export function Row({
   projectName,
   now,
 }: {
-  row: StreamRow;
+  row: FeedRow;
   // the project's name, when the page knows it; on the project page
   // the row is under the name already
   projectName: string | null;
@@ -54,48 +54,48 @@ export function Row({
   const mark = markOf(row);
   const attention = needsAttention(session);
   return (
-    <a class="stream-row" href={sessionHref(session)}>
+    <a class="feed-row" href={sessionHref(session)}>
       <Icon
         name={iconOf(row)}
-        class={`stream-icon ${archived ? "stream-icon-archived" : attention ? "status-attention" : `status-${session.status}`}`}
+        class={`feed-icon ${archived ? "feed-icon-archived" : attention ? "status-attention" : `status-${session.status}`}`}
         size={16}
       />
-      <span class="stream-text">
-        <span class="stream-title cut">{session.title}</span>
-        <span class="stream-line cut">
+      <span class="feed-text">
+        <span class="feed-title cut">{session.title}</span>
+        <span class="feed-line cut">
           {mark !== null && (
             <>
-              <span class="stream-mark">{mark}</span>
+              <span class="feed-mark">{mark}</span>
               {" · "}
             </>
           )}
           {joined([
             projectName !== null && (
-              <span class="stream-project">#{projectName}</span>
+              <span class="feed-project">#{projectName}</span>
             ),
             row.runs !== null && (
-              <span class="stream-runs">
+              <span class="feed-runs">
                 {count(row.runs)}{" "}
-                <Icon name="bolt" class="stream-runs-icon" size={12} />
+                <Icon name="bolt" class="feed-runs-icon" size={12} />
               </span>
             ),
             (line.author !== null || line.text !== "") && (
               <>
                 {line.author !== null && (
                   <span
-                    class={`stream-author${authorGone(row, line) ? " stream-author-gone" : ""}`}
+                    class={`feed-author${authorGone(row, line) ? " feed-author-gone" : ""}`}
                   >
                     @{line.author}{" "}
                   </span>
                 )}
                 {attention && (
                   <>
-                    <span class="stream-attention">{ATTENTION_WORDS}</span>
+                    <span class="feed-attention">{ATTENTION_WORDS}</span>
                     {line.text !== "" && " · "}
                   </>
                 )}
                 {session.status === "failed" ? (
-                  <span class="stream-bad">{line.text}</span>
+                  <span class="feed-bad">{line.text}</span>
                 ) : (
                   line.text
                 )}
@@ -104,7 +104,7 @@ export function Row({
           ])}
         </span>
       </span>
-      <span class="stream-when">{whenText(row, now)}</span>
+      <span class="feed-when">{whenText(row, now)}</span>
     </a>
   );
 }

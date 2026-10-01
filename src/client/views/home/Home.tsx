@@ -4,7 +4,7 @@
 // Home: the greeting, the composer that starts a chat in the project
 // the user picks, the personal one at first, the messages of the user's
 // that were not sent, then every session the user may see as one
-// stream, with the search in its head. At the right, the agents the
+// feed, with the search in its head. At the right, the agents the
 // composer can pick and what the week spent. The query is the address;
 // the route's load fetches the rows, and a clock moves the times without
 // a fetch.

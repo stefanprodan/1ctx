@@ -7,8 +7,8 @@
 
 import { useEffect } from "preact/hooks";
 import { discardNotSent, notSent, watchNotSent } from "../../data/not-sent.ts";
+import { NotSentRow } from "../../feed/NotSentRow.tsx";
 import { useAction } from "../../lib/save.ts";
-import { NotSentRow } from "../../stream/NotSentRow.tsx";
 import { RowsAction, RowsBlock, RowsCard } from "../../ui/Rows.tsx";
 
 export function NotSent({ now }: { now: number }) {

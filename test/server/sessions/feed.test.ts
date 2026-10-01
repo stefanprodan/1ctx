@@ -11,9 +11,9 @@ import {
   feedCursor,
   parseFeedCursor,
 } from "../../../src/server/sessions/cursor.ts";
+import { feedRows } from "../../../src/server/sessions/feed.ts";
 import { feedRead, listSessions } from "../../../src/server/sessions/list.ts";
 import type { RawSession } from "../../../src/server/sessions/rows.ts";
-import { streamRows } from "../../../src/server/sessions/stream.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 type Origin = "chat" | "automation" | null;
@@ -242,7 +242,7 @@ function compare(
       .map((row) => [row.id, row.n]),
   );
   const expected = {
-    rows: streamRows(
+    rows: feedRows(
       db,
       want.slice(0, limit),
       new Map(),

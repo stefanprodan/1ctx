@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The stream's rows for one filter at a time: Home's, every project
+// The feed's rows for one filter at a time: Home's, every project
 // the user may see with a query, or one project's. The rows come from
 // the route a page at a time; the socket keeps them current through
 // the sessions entity, which hands the frames here. An answer is kept
@@ -19,7 +19,7 @@
 // them. One first page is out at a time (flight.ts).
 
 import { effect, signal } from "@preact/signals";
-import type { SessionsResponse, StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow, SessionsResponse } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
@@ -30,23 +30,23 @@ import { me } from "./me.ts";
 import {
   type Change,
   cursorPlace,
+  feedOrder,
   mergeNextPage,
   ordered,
   reconcile,
   refreshHead,
   replay,
   type Shown,
-  streamOrder,
 } from "./sessions-rows.ts";
 
 // a later page's own state: the rows stay whatever it does
 export type More = { loading: boolean; error: Failure | null };
 // next is the cursor of the page after the rows, null at the end
-export type StreamList = { rows: StreamRow[]; next: string | null; more: More };
+export type FeedList = { rows: FeedRow[]; next: string | null; more: More };
 
 export const IDLE: More = { loading: false, error: null };
 
-export const list = signal<StreamList | null>(null);
+export const list = signal<FeedList | null>(null);
 // origin narrows the rows to chats or to runs; null lists both
 export type ListFilter = {
   project: string | null;
@@ -79,15 +79,12 @@ let changes: Change[] = [];
 let pages = 0;
 // the automations' names as their frames said, each with the frame's
 // number, applied only over an answer asked before the frame
-const labels = new Map<
-  string,
-  { label: StreamRow["automation"]; at: number }
->();
+const labels = new Map<string, { label: FeedRow["automation"]; at: number }>();
 // the agents an automation frame said were retired; retiring is for
 // good, so it holds over any answer
 const retired = new Set<string>();
 let frames = 0;
-const kept = new Held<{ rows: StreamRow[]; next: string | null }>();
+const kept = new Held<{ rows: FeedRow[]; next: string | null }>();
 
 const keyOf = (f: ListFilter) =>
   JSON.stringify([f.project, f.q, f.origin ?? null]);
@@ -122,7 +119,7 @@ effect(() => {
 
 // a row of an automation the frames renamed or deleted since the answer
 // was read carries the frame's word, and a retired agent's row says so
-function relabel(rows: StreamRow[], asked: number): StreamRow[] {
+function relabel(rows: FeedRow[], asked: number): FeedRow[] {
   if (labels.size === 0 && retired.size === 0) return rows;
   return rows.map((row) => {
     const out = retired.has(row.session.agentId ?? "")
@@ -160,7 +157,7 @@ const shown = (): Shown => ({ origin: listFor.origin, q: listFor.q });
 // a cold answer over the rows held: a held row that moved past the
 // answer's copy while it was in flight keeps its newer word, and
 // nothing past the answer stays
-function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
+function merge(held: FeedRow[] | null, answer: FeedRow[]): FeedRow[] {
   if (held === null) return ordered(answer);
   const newer = new Map(held.map((row) => [row.session.id, row]));
   return ordered(
@@ -175,8 +172,8 @@ function merge(held: StreamRow[] | null, answer: StreamRow[]): StreamRow[] {
 
 // the first page of what is on screen, as a held filter keeps it: the
 // rows up to its cursor, rows inserted above it included
-function firstPage(rows: StreamRow[]): {
-  rows: StreamRow[];
+function firstPage(rows: FeedRow[]): {
+  rows: FeedRow[];
   next: string | null;
 } {
   if (head.next === null) return { rows, next: null };
@@ -185,7 +182,7 @@ function firstPage(rows: StreamRow[]): {
     rows:
       edge === null
         ? rows.slice(0, head.size)
-        : rows.filter((row) => streamOrder(row.session, edge) <= 0),
+        : rows.filter((row) => feedOrder(row.session, edge) <= 0),
     next: head.next,
   };
 }
@@ -295,15 +292,15 @@ export async function loadMore(): Promise<void> {
   }
 }
 
-const without = (rows: StreamRow[], keep: (row: StreamRow) => boolean) => {
+const without = (rows: FeedRow[], keep: (row: FeedRow) => boolean) => {
   const out = rows.filter(keep);
   return out.length === rows.length ? rows : out;
 };
 
 // rows went: from every held list, from the rows on screen, and from
 // the answer of a first page out, which may have read them before
-function drop(projectId: string, gone: (row: StreamRow) => boolean): void {
-  const keep = (row: StreamRow) => !gone(row);
+function drop(projectId: string, gone: (row: FeedRow) => boolean): void {
+  const keep = (row: FeedRow) => !gone(row);
   if (covers(projectId)) {
     pages++;
     if (loading) changes.push({ drop: gone });
@@ -330,7 +327,7 @@ function dropRuns(automationId: string, projectId: string): void {
 // since it may still hold rows of that project. What is left loads
 // cold, so no row of it stays in a tail
 export function revokeRows(projectId: string): void {
-  const keep = (row: StreamRow) => row.session.projectId !== projectId;
+  const keep = (row: FeedRow) => row.session.projectId !== projectId;
   kept.update((held, key) =>
     JSON.parse(key)[0] === projectId
       ? null

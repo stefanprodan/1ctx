@@ -8,7 +8,7 @@ import {
   refreshHead,
   swapRun,
 } from "../../../src/client/data/sessions-rows.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
@@ -34,7 +34,7 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   };
 }
 
-const chat = (id: string, at: number): StreamRow => ({
+const chat = (id: string, at: number): FeedRow => ({
   agentRetired: false,
   session: summary({ id, lastActivityAt: at }),
   agent: "assistant",
@@ -52,7 +52,7 @@ const line = (
   at: number,
   runs: number,
   changes: Partial<SessionSummary> = {},
-): StreamRow => ({
+): FeedRow => ({
   agentRetired: false,
   session: summary({
     id,
@@ -72,7 +72,7 @@ const line = (
   runs,
 });
 
-const ids = (rows: StreamRow[]) => rows.map((r) => r.session.id);
+const ids = (rows: FeedRow[]) => rows.map((r) => r.session.id);
 
 describe("swapRun", () => {
   const held = () => [chat("c1", 50), line("r1", 40, 7), chat("c2", 30)];

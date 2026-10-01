@@ -10,10 +10,7 @@ import {
   type Shown,
   searched,
 } from "../../../src/client/data/sessions-rows.ts";
-import type {
-  EnvelopeRow,
-  StreamRow,
-} from "../../../src/shared/api/sessions.ts";
+import type { EnvelopeRow, FeedRow } from "../../../src/shared/api/sessions.ts";
 import type {
   SendSummary,
   SessionSummary,
@@ -56,7 +53,7 @@ const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
     ...changes,
   });
 
-function rowOf(session: SessionSummary, changes: Partial<StreamRow> = {}) {
+function rowOf(session: SessionSummary, changes: Partial<FeedRow> = {}) {
   return {
     session,
     agent: "assistant",
@@ -71,7 +68,7 @@ function rowOf(session: SessionSummary, changes: Partial<StreamRow> = {}) {
     runBy: null,
     runs: null,
     ...changes,
-  } satisfies StreamRow;
+  } satisfies FeedRow;
 }
 
 const sent = { id: "send9", status: "running" } as SendSummary;
@@ -111,14 +108,14 @@ const TASKS: Shown = { origin: "automation", q: "" };
 // the rows as they were
 function reconcile(
   ...args: Parameters<typeof reconciled>
-): StreamRow[] | "reload" {
+): FeedRow[] | "reload" {
   const out = reconciled(...args);
   if (!out.reload) return out.rows;
   if (out.rows !== args[0]) throw new Error("rows changed on a reload");
   return "reload";
 }
 
-const ids = (rows: StreamRow[] | "reload") =>
+const ids = (rows: FeedRow[] | "reload") =>
   rows === "reload" ? rows : rows.map((r) => r.session.id);
 
 const held = () => [rowOf(chat("b", 50)), rowOf(chat("c", 40))];
@@ -128,7 +125,7 @@ describe("a row not held", () => {
     for (const shown of [ALL, CHATS]) {
       const out = reconcile(held(), null, shown, env(chat("n", 45)));
       expect(ids(out)).toEqual(["b", "n", "c"]);
-      const n = (out as StreamRow[])[1]!;
+      const n = (out as FeedRow[])[1]!;
       expect(n.agent).toBe("writer");
       expect(n.send).toBe(sent);
       expect(n.last?.text).toBe("done");
@@ -155,8 +152,8 @@ describe("a row not held", () => {
   test("a run is inserted in Tasks, on its own", () => {
     const out = reconcile(held(), null, TASKS, env(run("r", 60)));
     expect(ids(out)).toEqual(["r", "b", "c"]);
-    expect((out as StreamRow[])[0]!.runs).toBeNull();
-    expect((out as StreamRow[])[0]!.automation?.name).toBe("digest");
+    expect((out as FeedRow[])[0]!.runs).toBeNull();
+    expect((out as FeedRow[])[0]!.automation?.name).toBe("digest");
   });
 
   test("a run in All whose line is not held asks for a reload", () => {
@@ -261,7 +258,7 @@ describe("a row held", () => {
       env(chat("c", 60, { revision: 2 }), { agentRetired: true }),
     );
     expect(ids(out)).toEqual(["c", "b"]);
-    const c = (out as StreamRow[])[0]!;
+    const c = (out as FeedRow[])[0]!;
     expect(c.agentRetired).toBe(true);
     expect(c.send).toBe(sent);
   });
@@ -283,7 +280,7 @@ describe("a row held", () => {
       ...env(chat("b", 60, { revision: 2, title: "Renamed" }), null),
       send: sent,
     });
-    const b = (out as StreamRow[])[0]!;
+    const b = (out as FeedRow[])[0]!;
     expect(b.session.title).toBe("Renamed");
     expect(b.send).toBe(sent);
     expect(b.last).toBe(last);
@@ -316,7 +313,7 @@ describe("a run in All with its line held", () => {
       }),
     );
     expect(ids(out)).toEqual(["r2", "c"]);
-    const r2 = (out as StreamRow[])[0]!;
+    const r2 = (out as FeedRow[])[0]!;
     expect(r2.runs).toBe(4);
     expect(r2.agent).toBe("sre");
     expect(r2.runBy?.username).toBe("ana");
@@ -329,7 +326,7 @@ describe("a run in All with its line held", () => {
       ALL,
       env(run("r1", 9, { revision: 2 }), { last: null }),
     );
-    const r1 = (out as StreamRow[])[0]!;
+    const r1 = (out as FeedRow[])[0]!;
     expect(r1.runs).toBe(3);
     expect(r1.session.revision).toBe(2);
     expect(r1.last).toBeNull();

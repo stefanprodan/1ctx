@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Request and response bodies of the session routes: the stream, one
+// Request and response bodies of the session routes: the feed, one
 // session, a new chat, a message into it, a rename, a stop.
 
 import type { CapabilityChange } from "../capabilities.ts";
@@ -18,11 +18,11 @@ import type { NotSentReason } from "../words.ts";
 
 // GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
 // the caller may see, running first, then by last activity, each with
-// what its row in the stream shows. next is the cursor a later page
+// what its row in the feed shows. next is the cursor a later page
 // passes as before, null when no row is left
-export type SessionsResponse = { rows: StreamRow[]; next: string | null };
+export type SessionsResponse = { rows: FeedRow[]; next: string | null };
 
-// one row of the stream: the session, its last send (the counters,
+// one row of the feed: the session, its last send (the counters,
 // the cause and the error while it is not running) and the last line
 // the row shows for a session that is done, and the automation a run
 // belongs to, drawn in the author's place; null for a chat. runBy is
@@ -35,7 +35,7 @@ export type SessionsResponse = { rows: StreamRow[]; next: string | null };
 // stands for them all. sendAgent is the agent of the last send, the
 // summoned one's for a summoned turn, which a working or failed line
 // names; null before the first send
-export type StreamRow = {
+export type FeedRow = {
   session: SessionSummary;
   agent: string | null;
   agentRetired: boolean;
@@ -47,10 +47,10 @@ export type StreamRow = {
   runs: number | null;
 };
 
-// what a session envelope carries of the stream row beside its
+// what a session envelope carries of the feed row beside its
 // session: the fields that read the same for every viewer. runs hangs
 // on the list's filter and search, so only a list read answers it
-export type EnvelopeRow = Omit<StreamRow, "session" | "runs">;
+export type EnvelopeRow = Omit<FeedRow, "session" | "runs">;
 
 // GET /api/sessions/:id, and the answer of POST /api/sessions
 export type SessionResponse = SessionDetail;

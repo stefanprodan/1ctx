@@ -1,13 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a stream row carries beyond the session: its last send and the
+// What a feed row carries beyond the session: its last send and the
 // last line a person or the agent wrote, both read for every listed
 // id in one query each, so the list costs a few queries however long
 // it is. The line is cut in SQL before it reaches the process, so a
 // reply of a megabyte weighs nothing here.
 
-import type { EnvelopeRow, StreamRow } from "../../shared/api/sessions.ts";
+import type { EnvelopeRow, FeedRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import { lineFrom } from "./parse.ts";
@@ -60,7 +60,7 @@ function lastSends(db: Db, sessionIds: string[]) {
 }
 
 // a user message or a finished answer reply, never a work reply, a
-// summary or a tool row: what the stream calls the last line. Kind and
+// summary or a tool row: what the feed calls the last line. Kind and
 // slot are tested first: status sits past content in the row, so a
 // large tool row tested on status first has its overflow pages read
 const lineRow = (table: string) =>
@@ -91,7 +91,7 @@ function lastLines(db: Db, sessionIds: string[]) {
   const out = new Map<string, LastLine>();
   for (const raw of rows) {
     const text = lineFrom(raw.content);
-    // a row of markers alone says nothing; the stream shows no line
+    // a row of markers alone says nothing; the feed shows no line
     if (text !== "") {
       out.set(raw.session_id, { seq: raw.seq, author: raw.author, text });
     }
@@ -148,13 +148,13 @@ function runners(db: Db, raws: RawSession[]) {
   return new Map(rows.map((raw) => [raw.id, raw.username]));
 }
 
-export function streamRows(
+export function feedRows(
   db: Db,
   raws: RawSession[],
   usage: Map<string, RoundUsage>,
   // by automation, how many runs its grouped line stands for
   counts?: Map<string, number>,
-): StreamRow[] {
+): FeedRow[] {
   if (raws.length === 0) return [];
   const ids = raws.map((raw) => raw.id);
   const sends = lastSends(db, ids);
@@ -226,7 +226,7 @@ type RawEnvelopeRow = {
   tokens: number;
 } & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
 
-// The same last send and last line streamRows() reads, for one session,
+// The same last send and last line feedRows() reads, for one session,
 // as one statement of point lookups: an event fires many times a turn,
 // and the list's not-exists scans walk a long chat's every message.
 export const ENVELOPE_ROW = `select agents.name as agent,
@@ -256,7 +256,7 @@ export const ENVELOPE_ROW = `select agents.name as agent,
   left join agents turn on turn.id = last.agent_id
   where sessions.id = ?`;
 
-/** What a session envelope carries of its stream row, or null when gone. */
+/** What a session envelope carries of its feed row, or null when gone. */
 export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
   const raw = db.query<RawEnvelopeRow, [string]>(ENVELOPE_ROW).get(sessionId);
   if (raw === null) return null;

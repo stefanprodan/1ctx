@@ -4,9 +4,9 @@
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";
 import { type FeedCursor, feedAfter, feedCursor } from "./cursor.ts";
+import { feedRows } from "./feed.ts";
 import type { RawSession, UsagePort } from "./rows.ts";
-import { STREAM_LIMIT } from "./rows.ts";
-import { streamRows } from "./stream.ts";
+import { FEED_LIMIT } from "./rows.ts";
 
 export type ListArgs = [
   projectIds: string[],
@@ -83,13 +83,7 @@ function feedOrder(a: RawSession, b: RawSession): number {
 /** The feed's first limit+1 rows after the cursor, in the feed order. */
 export function feedRead(
   db: Db,
-  ...[
-    projectIds,
-    q,
-    origin = null,
-    before = null,
-    limit = STREAM_LIMIT,
-  ]: ListArgs
+  ...[projectIds, q, origin = null, before = null, limit = FEED_LIMIT]: ListArgs
 ): RawSession[] {
   if (projectIds.length === 0) return [];
   const projects = JSON.stringify(projectIds);
@@ -132,13 +126,13 @@ export function listSessions(
   usagePort: UsagePort,
   ...args: ListArgs
 ): SessionsResponse {
-  const [, , origin = null, , limit = STREAM_LIMIT] = args;
+  const [, , origin = null, , limit = FEED_LIMIT] = args;
   const read = feedRead(db, ...args);
   const rows = read.slice(0, limit);
   const last = rows.at(-1);
   const usage = usagePort.latestFor(rows.map((row) => row.id));
   return {
-    rows: streamRows(
+    rows: feedRows(
       db,
       rows,
       usage,

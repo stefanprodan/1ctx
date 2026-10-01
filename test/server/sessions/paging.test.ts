@@ -4,13 +4,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
 import {
+  FEED_LIMIT,
   parseFeedCursor,
   parseRunsCursor,
   SessionStore,
-  STREAM_LIMIT,
   type UsagePort,
 } from "../../../src/server/sessions/index.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionStatus } from "../../../src/shared/words.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -66,11 +66,11 @@ function seeded() {
   return { db, store, add };
 }
 
-const ids = (rows: StreamRow[]) => rows.map((row) => row.session.id);
+const ids = (rows: FeedRow[]) => rows.map((row) => row.session.id);
 
 // every page of a listing, following next until it is null
 function pages(
-  read: (before: string | null) => { rows: StreamRow[]; next: string | null },
+  read: (before: string | null) => { rows: FeedRow[]; next: string | null },
 ): string[][] {
   const out: string[][] = [];
   let before: string | null = null;
@@ -88,7 +88,7 @@ const touch = (db: Db, id: string, status: SessionStatus, at: number) =>
     .query("update sessions set status = ?, last_activity_at = ? where id = ?")
     .run(status, at, id);
 
-describe("the stream's pages", () => {
+describe("the feed's pages", () => {
   test("page 120 rows with tied activity into 50, 50 and 20", () => {
     const { store, add } = seeded();
     for (let i = 0; i < 120; i++) add({ now: Math.floor(i / 4) });
@@ -101,7 +101,7 @@ describe("the stream's pages", () => {
         before === null ? null : parseFeedCursor(before),
       ),
     );
-    expect(STREAM_LIMIT).toBe(50);
+    expect(FEED_LIMIT).toBe(50);
     expect(got.map((page) => page.length)).toEqual([50, 50, 20]);
     expect(got.flat()).toEqual(all);
     expect(new Set(got.flat()).size).toBe(120);

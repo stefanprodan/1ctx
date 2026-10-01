@@ -3,13 +3,13 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
-import type { RawSession } from "../../../src/server/sessions/rows.ts";
 import {
   ENVELOPE_ROW,
   envelopeRow,
+  feedRows,
   lastLinesSql,
-  streamRows,
-} from "../../../src/server/sessions/stream.ts";
+} from "../../../src/server/sessions/feed.ts";
+import type { RawSession } from "../../../src/server/sessions/rows.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 function seeded() {
@@ -196,7 +196,7 @@ describe("the envelope row", () => {
     const raws = db
       .query<RawSession, []>("select * from sessions order by id")
       .all();
-    const listed = streamRows(db, raws, new Map());
+    const listed = feedRows(db, raws, new Map());
     expect(raws).toHaveLength(10);
     for (const row of listed) {
       const { session: _session, runs: _runs, ...shared } = row;

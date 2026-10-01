@@ -4,7 +4,7 @@
 // The automations entity's pure row rules: where a row goes in a list
 // and which runs a filter shows.
 
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { RunFilter } from "../../shared/words.ts";
 import { ordered, runOrder } from "./sessions-rows.ts";
@@ -25,7 +25,7 @@ export function upsertAutomation(
 
 // whether a run belongs under a filter
 export function matchesFilter(
-  row: Pick<StreamRow, "session">,
+  row: Pick<FeedRow, "session">,
   filter: RunFilter | null,
 ): boolean {
   if (filter === "failed") return row.session.status === "failed";
@@ -35,7 +35,7 @@ export function matchesFilter(
 
 // a run's envelope into the held runs: a held row moves when the
 // revision is above its own, in the server's order of the runs
-export function upsertRun(rows: StreamRow[], next: StreamRow): StreamRow[] {
+export function upsertRun(rows: FeedRow[], next: FeedRow): FeedRow[] {
   const held = rows.find((r) => r.session.id === next.session.id);
   if (held !== undefined && held.session.revision >= next.session.revision) {
     return rows;

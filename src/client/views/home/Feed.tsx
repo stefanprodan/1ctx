@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What Home and a project's Feed tab share: the composer's send, which
-// starts a chat in the project, and the stream under it, searched and
+// starts a chat in the project, and the feed under it, searched and
 // filtered through the address at `path`, a page at a time.
 
 import { navigate, query } from "../../app/router.ts";
 import { createSession, list, loadMore } from "../../data/sessions.ts";
+import { FeedCard } from "../../feed/FeedCard.tsx";
+import { tickMs } from "../../feed/Row.model.ts";
 import { useNow } from "../../lib/now.ts";
-import { tickMs } from "../../stream/Row.model.ts";
-import { Stream } from "../../stream/Stream.tsx";
 import { emptyLine, originOf, searchHref, searchOf } from "./Home.model.ts";
 
 export const startChat =
@@ -36,7 +36,7 @@ export function Feed({
   const q = searchOf(query.value);
   const origin = originOf(query.value);
   return (
-    <Stream
+    <FeedCard
       rows={rows}
       projectName={projectName}
       search={{

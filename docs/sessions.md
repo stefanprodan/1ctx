@@ -57,10 +57,10 @@ that agent answers the one turn (see Summons).
 - **The reply in flight is checkpointed without a revision.** Every
   250 ms or 2 KB (`runner/stream.ts`).
 - **An envelope's row is read after the commit, in one statement.**
-  `envelopeRow()` (`sessions/stream.ts`) seeks one session and walks
+  `envelopeRow()` (`sessions/feed.ts`) seeks one session and walks
   its messages and sends newest first, stopping at the first match,
   since `session.changed` fires many times a turn. It must stay equal
-  to what `streamRows()` answers for that session;
+  to what `feedRows()` answers for that session;
   `test/server/sessions/envelope-row.test.ts` holds it to that.
 - **`lineRow()` tests kind and slot before status and content.**
   Status sits past content in the row, so testing it first reads every

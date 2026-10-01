@@ -47,7 +47,7 @@ export function searchOf(search: string): string {
   return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
 
-// the stream's filter as the address carries it: chats, task runs, or
+// the feed's filter as the address carries it: chats, task runs, or
 // null for both
 export function originOf(search: string): SessionOrigin | null {
   const origin = new URLSearchParams(search).get("origin");
@@ -68,7 +68,7 @@ export function searchHref(
   return `${pathname}${search === "" ? "" : `?${search}`}`;
 }
 
-// what the stream says with no rows
+// what the feed says with no rows
 export function emptyLine(q: string, origin: SessionOrigin | null): string {
   if (q !== "") return "No sessions match";
   if (origin === "chat") return "No chats yet";

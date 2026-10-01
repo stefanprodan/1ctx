@@ -16,7 +16,7 @@ import type {
   SaveAutomationRequest,
   SchedulePreviewResponse,
 } from "../../shared/api/automations.ts";
-import type { SessionResponse, StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow, SessionResponse } from "../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
@@ -31,6 +31,7 @@ import {
 
 export { matchesFilter, upsertAutomation, upsertRun };
 
+import { applyAutomationFrame } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { keyOf, loadMemory } from "./memory.ts";
@@ -46,7 +47,6 @@ import {
 } from "./runs.ts";
 import { loadProjectAgents } from "./sessions.ts";
 import { onSocketEvent } from "./socket.ts";
-import { applyAutomationFrame } from "./stream.ts";
 
 export const automations = signal<AutomationSummary[] | null>(null);
 export const automationsError = signal<Failure | null>(null);
@@ -108,8 +108,8 @@ export function automationCount(projectId: string): number | null {
 
 const path = (id: string) => `/api/automations/${encodeURIComponent(id)}`;
 
-// the stream row's label for a run of a held automation
-const labelOf = (id: string): StreamRow["automation"] => {
+// the feed row's label for a run of a held automation
+const labelOf = (id: string): FeedRow["automation"] => {
   const row = automations.value?.find((a) => a.id === id);
   return row === undefined ? null : { id: row.id, name: row.name };
 };

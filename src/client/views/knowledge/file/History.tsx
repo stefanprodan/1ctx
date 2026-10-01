@@ -8,8 +8,8 @@
 import { useSignal } from "@preact/signals";
 import type { KnowledgeFileView } from "../../../../shared/contracts/knowledge.ts";
 import type { DocHistory } from "../../../data/knowledge-history.ts";
+import { ShowMore } from "../../../feed/FeedCard.tsx";
 import { ago, plural, sentence } from "../../../lib/format.ts";
-import { ShowMore } from "../../../stream/Stream.tsx";
 import { RowsGo, RowsMeta, RowsNote, RowsTitle } from "../../../ui/Rows.tsx";
 import { AuthorText } from "../Author.tsx";
 import { authorOf, revisionHref } from "../Knowledge.model.ts";

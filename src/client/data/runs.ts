@@ -15,22 +15,22 @@ import type {
   AutomationRunsResponse,
   RunTally,
 } from "../../shared/api/automations.ts";
-import type { StreamRow } from "../../shared/api/sessions.ts";
+import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { RunFilter } from "../../shared/words.ts";
 import { failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { matchesFilter, upsertRun } from "./automations-rows.ts";
+import { IDLE, type More } from "./feed.ts";
 import { me } from "./me.ts";
 import { mergeNextPage, refreshHead, runOrder } from "./sessions-rows.ts";
-import { IDLE, type More } from "./stream.ts";
 
 // newest first; rows and tally are null while they load. next is the
 // cursor of the page after the rows, and more a later page's own state
 export type Runs = {
   id: string;
   filter: RunFilter | null;
-  rows: StreamRow[] | null;
+  rows: FeedRow[] | null;
   tally: RunTally | null;
   next: string | null;
   more: More;
@@ -44,13 +44,13 @@ let runsTurn = 0;
 // counts, so the runs are asked again, once per status a run is seen in
 const seen = new Map<string, string>();
 // the runs frames moved since the last first page was asked
-const moved = new Map<string, StreamRow>();
+const moved = new Map<string, FeedRow>();
 // the automation's name as its frame last said, with the frame's
 // number, applied only over an answer asked before the frame
 let renamed: { id: string; name: string; at: number } | null = null;
 let frames = 0;
 
-function named(rows: StreamRow[], asked: number): StreamRow[] {
+function named(rows: FeedRow[], asked: number): FeedRow[] {
   if (renamed === null || renamed.at <= asked) return rows;
   const label = { id: renamed.id, name: renamed.name };
   return rows.map((r) =>
@@ -81,7 +81,7 @@ function address(id: string, filter: RunFilter | null, before: string | null) {
 
 // a frame that moved a run while an answer was in flight keeps its
 // word, by the revision rule
-function replayMoved(rows: StreamRow[], filter: RunFilter | null) {
+function replayMoved(rows: FeedRow[], filter: RunFilter | null) {
   for (const row of moved.values()) {
     rows = matchesFilter(row, filter)
       ? upsertRun(rows, row)
@@ -202,7 +202,7 @@ export function closeRuns(): void {
 // a run's newest word into the held runs. The row moves at once, in or
 // out of the filter, and the first page is asked again warm when the
 // tally moved
-export function applyRun(held: Runs, next: StreamRow): void {
+export function applyRun(held: Runs, next: FeedRow): void {
   if (held.rows === null) {
     void loadRuns(held.id, held.filter, true);
     return;
@@ -230,7 +230,7 @@ export function applyRun(held: Runs, next: StreamRow): void {
 // automation on a row not held
 export function applyRunEnvelope(
   ev: Extract<SocketEvent, { type: "session" }>,
-  label: (id: string) => StreamRow["automation"],
+  label: (id: string) => FeedRow["automation"],
 ): void {
   const held = runs.value;
   if (held === null || ev.session.automationId !== held.id) return;

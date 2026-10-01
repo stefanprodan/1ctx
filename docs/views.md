@@ -1,29 +1,29 @@
 # Views
 
-Governs what pages draw: `src/client/views/`, `stream/`, `composer/`,
+Governs what pages draw: `src/client/views/`, `feed/`, `composer/`,
 `transcript/` and the `data/` entities behind them. The primitives,
 forms and the data layer's general rules are in `docs/ui.md`.
 
-## The stream
+## The feed
 
-The stream is the session list on Home and on a project's Feed: chats
+The feed is the session list on Home and on a project's Feed tab: chats
 and runs, one row each, under the filters All, Chats and Tasks (runs).
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
-  to the stream lands on both.
+  to the feed lands on both.
 - **The Not sent card reads its own route, never the feed.** `GET
   /api/me/not-sent` runs on Home's load and after Discard all. While the
   card is mounted (`watchNotSent()`), the user's `notSent` event, a
   listed chat's delete and a revocation read it again through one
   `Flight`. Discard all sends the ids the card shows, so a row that
   became not sent since is never discarded unseen.
-- **A row is drawn from the server's row alone.** `stream/Row.model.ts`
+- **A row is drawn from the server's row alone.** `feed/Row.model.ts`
   never reads a transcript. A working, failed or stopped line names
   `sendAgent` (the summoned agent on a summoned turn), else the chat's.
 - **The attention mark is a hint, never a filter or a sort.**
   `needsAttention()` decides it; All shows only the latest run's mark.
 - **The feed reconciles envelopes instead of reloading.**
-  `data/stream.ts` inserts an envelope's row where the server would
+  `data/feed.ts` inserts an envelope's row where the server would
   list it: the origin filter, the search and above the paging cursor.
   `searched()` matches the route's `LIKE` exactly, so a row the server
   would miss is never inserted. Only a row the client cannot place (a

@@ -8,12 +8,12 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { Icon, type IconName } from "../../../src/client/lib/icons.tsx";
 import { RunRow } from "../../../src/client/views/projects/RunRow.tsx";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 const now = Date.UTC(2026, 9, 1, 12);
 
-const row = (changes: Partial<SessionSummary>): StreamRow => ({
+const row = (changes: Partial<SessionSummary>): FeedRow => ({
   agentRetired: false,
   session: {
     archived: null,

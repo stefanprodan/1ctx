@@ -31,6 +31,7 @@ import {
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
+import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { session } from "./session-held.ts";
@@ -39,8 +40,8 @@ import { sending } from "./session-start.ts";
 import { resetValues, retrying, syncValues } from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
-import { applyEnvelope, dropRow, grantRows, revokeRows } from "./stream.ts";
 
+export { type ListFilter, list, loadList, loadMore } from "./feed.ts";
 export {
   homeProjectId,
   loadProjectAgents,
@@ -56,7 +57,6 @@ export {
   toolResults,
   toolVisuals,
 } from "./session-values.ts";
-export { type ListFilter, list, loadList, loadMore } from "./stream.ts";
 
 // frames kept while the watch is being answered; past this the
 // snapshot is refetched instead

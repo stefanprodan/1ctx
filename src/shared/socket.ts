@@ -51,8 +51,8 @@ export type SocketEvent =
   | VisualFrame
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
-  // the stream's last line when the transaction wrote one. row is the
-  // stream row as it stands after the commit, read once per event;
+  // the feed's last line when the transaction wrote one. row is the
+  // feed row as it stands after the commit, read once per event;
   // null when the session was gone by then or the read failed, which
   // the list treats alike. messagesCut: the rows written were too large
   // to carry, so a tab showing the chat reads its detail

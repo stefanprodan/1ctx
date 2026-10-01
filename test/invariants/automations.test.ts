@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { nextFire, nextFires } from "../../src/server/automations/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
-import type { StreamRow } from "../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../src/shared/api/sessions.ts";
 import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp, tick } from "../helpers/chat.ts";
@@ -94,14 +94,14 @@ describe("automations", () => {
       automation: { id: automation.id, name: automation.name },
       session: { id: detail.session.id, origin: "automation" },
     });
-    const stream = await (
+    const feed = await (
       await chat.member.call("GET", "/api/sessions?origin=automation")
     ).json();
-    expect(stream.rows.map((row: StreamRow) => row.session.id)).toEqual([
+    expect(feed.rows.map((row: FeedRow) => row.session.id)).toEqual([
       detail.session.id,
     ]);
     // the row names its agent, credited on a line of a send that ended
-    expect(stream.rows[0].agent).toBe("coder");
+    expect(feed.rows[0].agent).toBe("coder");
     expect(
       (await chat.member.call("GET", "/api/sessions?origin=chat")).json(),
     ).resolves.toMatchObject({ rows: [] });
@@ -204,13 +204,12 @@ describe("automations", () => {
         ).json();
         expect(
           runs.rows.find(
-            (row: StreamRow) => row.session.id === scheduled!.session.id,
+            (row: FeedRow) => row.session.id === scheduled!.session.id,
           ).session.runSource,
         ).toBe("schedule");
         expect(
-          runs.rows.find(
-            (row: StreamRow) => row.session.id === manual.session.id,
-          ).session.runSource,
+          runs.rows.find((row: FeedRow) => row.session.id === manual.session.id)
+            .session.runSource,
         ).toBe("manual");
         expect(
           seen.find((event) => event.session.id === scheduled!.session.id)
@@ -260,7 +259,7 @@ describe("automations", () => {
         `/api/automations/${automation.id}/runs?filter=failed`,
       )
     ).json();
-    expect(failed.rows.map((row: StreamRow) => row.session.id).sort()).toEqual([
+    expect(failed.rows.map((row: FeedRow) => row.session.id).sort()).toEqual([
       "run-failed-manual",
       "run-failed-schedule",
     ]);
@@ -277,7 +276,7 @@ describe("automations", () => {
         `/api/automations/${automation.id}/runs?filter=manual`,
       )
     ).json();
-    expect(manual.rows.map((row: StreamRow) => row.session.id).sort()).toEqual([
+    expect(manual.rows.map((row: FeedRow) => row.session.id).sort()).toEqual([
       "run-done",
       "run-failed-manual",
     ]);
@@ -501,7 +500,7 @@ describe("automation rights", () => {
     ).json();
     expect(
       listed.rows
-        .map((r: StreamRow) => [r.session.ownerId, r.runBy])
+        .map((r: FeedRow) => [r.session.ownerId, r.runBy])
         .sort((a: [string], b: [string]) => a[0].localeCompare(b[0])),
     ).toEqual(
       [

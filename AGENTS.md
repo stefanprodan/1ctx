@@ -71,7 +71,7 @@ src/server/   the binary. main.ts (flags, db, secrets) calls compose.ts,
 src/client/   the Preact app from client/index.html: app/ (routes,
               router, shell), data/ (api, entity cache), lib/, ui/
               (primitives, each with its stylesheet), transcript/,
-              composer/, stream/, agents/, views/<area>/, style/.
+              composer/, feed/, agents/, views/<area>/, style/.
 test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
@@ -118,7 +118,7 @@ change it in the same commit as the code that changes a rule.
 | Doc | Governs |
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
-| `docs/views.md` | what a page draws: `views/`, the composer, the session list (stream), the admin pages |
+| `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed), the admin pages |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue, compaction |

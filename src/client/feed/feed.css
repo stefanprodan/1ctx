@@ -1,10 +1,10 @@
-/* The stream's session row: the one row outside Rows, a denser feed
+/* The feed's session row: the one row outside Rows, a denser feed
    line with a hairline under it inside the Rows card. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .stream-row {
+  .feed-row {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -13,20 +13,20 @@
     color: var(--dim);
     text-decoration: none;
   }
-  .stream-row:last-child {
+  .feed-row:last-child {
     border-bottom: 0;
   }
-  .stream-row:hover {
+  .feed-row:hover {
     background: var(--hover);
     color: var(--fg);
   }
 
   /* the icon says chat or run; its colour says the status, from base */
-  .stream-icon {
+  .feed-icon {
     flex-shrink: 0;
   }
 
-  .stream-text {
+  .feed-text {
     display: flex;
     flex-direction: column;
     gap: 1px;
@@ -34,57 +34,57 @@
     min-width: 0;
   }
 
-  .stream-title {
+  .feed-title {
     font-size: var(--text-input);
   }
 
-  .stream-line {
+  .feed-line {
     font-size: var(--text-small);
     color: var(--faint);
   }
 
-  .stream-project {
+  .feed-project {
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--dim);
   }
 
   /* how many runs an automation line stands for */
-  .stream-runs {
+  .feed-runs {
     font-size: var(--text-label);
     white-space: nowrap;
   }
-  .stream-runs-icon {
+  .feed-runs-icon {
     vertical-align: -2px;
   }
 
-  .stream-author {
+  .feed-author {
     color: var(--brand);
   }
   /* a deleted agent loses the brand colour */
-  .stream-author-gone {
+  .feed-author-gone {
     color: var(--faint);
   }
   /* an archived row keeps its place, its icon quiet and the word
      before its line, as a restart run does */
-  .stream-icon-archived {
+  .feed-icon-archived {
     color: var(--faint);
   }
-  .stream-mark {
+  .feed-mark {
     font-family: var(--mono);
     font-size: var(--text-label);
     color: var(--dim);
   }
   /* after the agent, where a failure's word goes */
-  .stream-attention {
+  .feed-attention {
     color: var(--attention);
   }
   /* a failure's words, the author keeping its colour */
-  .stream-bad {
+  .feed-bad {
     color: var(--failed);
   }
 
-  .stream-when {
+  .feed-when {
     width: 64px;
     flex-shrink: 0;
     text-align: right;
@@ -95,10 +95,10 @@
 
   /* the placeholder rows: bars at the text's size, so a ghost is as
      tall as a row, pulsing slowly one after another */
-  .stream-ghost {
+  .feed-ghost {
     pointer-events: none;
   }
-  .stream-bone {
+  .feed-bone {
     display: inline-block;
     height: 0.7em;
     vertical-align: middle;
@@ -107,35 +107,35 @@
     animation: pulse 1.6s ease-in-out infinite;
     animation-delay: calc(var(--ghost) * 0.1s);
   }
-  .stream-bone-icon {
+  .feed-bone-icon {
     flex-shrink: 0;
     width: 16px;
     height: 16px;
     border-radius: var(--radius);
   }
-  .stream-bone-title {
+  .feed-bone-title {
     width: 62%;
   }
-  .stream-bone-line {
+  .feed-bone-line {
     width: 44%;
   }
-  .stream-bone-when {
+  .feed-bone-when {
     width: 36px;
   }
-  .stream-ghost-b .stream-bone-title {
+  .feed-ghost-b .feed-bone-title {
     width: 48%;
   }
-  .stream-ghost-b .stream-bone-line {
+  .feed-ghost-b .feed-bone-line {
     width: 56%;
   }
-  .stream-ghost-c .stream-bone-title {
+  .feed-ghost-c .feed-bone-title {
     width: 70%;
   }
-  .stream-ghost-c .stream-bone-line {
+  .feed-ghost-c .feed-bone-line {
     width: 34%;
   }
   @media (prefers-reduced-motion: reduce) {
-    .stream-bone {
+    .feed-bone {
       animation: none;
     }
   }

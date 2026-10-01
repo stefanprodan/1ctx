@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A project's Feed tab: the composer that starts a chat in it, then
-// its sessions as the stream, searched like Home's. The rows drop the
+// its sessions as the feed, searched like Home's. The rows drop the
 // project name, since the page is the project.
 
 import type { Params } from "../../app/params.ts";

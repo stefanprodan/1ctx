@@ -7,7 +7,7 @@ import {
   SessionStore,
   type UsagePort,
 } from "../../../src/server/sessions/index.ts";
-import type { StreamRow } from "../../../src/shared/api/sessions.ts";
+import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import type { SessionStatus } from "../../../src/shared/words.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -74,8 +74,8 @@ function seeded() {
   return { db, store, chat, run };
 }
 
-const ids = (rows: StreamRow[]) => rows.map((row) => row.session.id);
-const counts = (rows: StreamRow[]) => rows.map((row) => row.runs);
+const ids = (rows: FeedRow[]) => rows.map((row) => row.session.id);
+const counts = (rows: FeedRow[]) => rows.map((row) => row.runs);
 
 describe("runs grouped in All", () => {
   test("list each automation once, as its newest run, with its count", () => {
