@@ -58,13 +58,17 @@ export function evaluateExpressionWithPrune(
           !seg.includes("?") &&
           !seg.includes("[")
         ) {
+          // (1ctx find-path) a relative path's first segment has no slash
+          // before it: `-path t/a` from `find t` must still reach the glob
           const requiredSegment = `/${seg}/`;
           if (expr.ignoreCase) {
-            if (!path.toLowerCase().includes(requiredSegment.toLowerCase())) {
+            if (
+              !`/${path}`.toLowerCase().includes(requiredSegment.toLowerCase())
+            ) {
               return { matches: false, pruned: false, printed: false };
             }
           } else {
-            if (!path.includes(requiredSegment)) {
+            if (!`/${path}`.includes(requiredSegment)) {
               return { matches: false, pruned: false, printed: false };
             }
           }
@@ -410,17 +414,19 @@ export function evaluateSimpleExpression(
           !seg.includes("?") &&
           !seg.includes("[")
         ) {
+          // (1ctx find-path) a relative path's first segment has no slash
+          // before it: `-path t/a` from `find t` must still reach the glob
           const requiredSegment = `/${seg}/`;
           if (expr.ignoreCase) {
             if (
-              !relativePath
+              !`/${relativePath}`
                 .toLowerCase()
                 .includes(requiredSegment.toLowerCase())
             ) {
               return { matches: false, pruned: false, printed: false };
             }
           } else {
-            if (!relativePath.includes(requiredSegment)) {
+            if (!`/${relativePath}`.includes(requiredSegment)) {
               return { matches: false, pruned: false, printed: false };
             }
           }
