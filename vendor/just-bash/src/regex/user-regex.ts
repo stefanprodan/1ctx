@@ -97,27 +97,10 @@ const COMPILED_CACHE_MAX_WEIGHT = 65_536;
 const compiledCache = new Map<string, { compiled: RE2JS; weight: number }>();
 let compiledCacheWeight = 0;
 
-// (1ctx regex-fold-class) RE2JS 1.4.0 reads a Unicode class's missing fold
-// table as undefined rather than null, so \pN and most other classes throw a
-// TypeError under case folding. Nothing else in a compile is a TypeError, and
-// one here becomes the syntax error the callers already report.
-function compileRe2(source: string, re2Flags: number): RE2JS {
-  try {
-    return RE2JS.compile(source, re2Flags);
-  } catch (e) {
-    if (e instanceof TypeError) {
-      throw new RE2JSSyntaxException(
-        "Unicode class not supported with case folding",
-      );
-    }
-    throw e;
-  }
-}
-
 // (1ctx search-engine regex-cache) The caller includes the longest-match bit.
 function compilePattern(pattern: string, re2Flags: number): RE2JS {
   if (pattern.length > COMPILED_CACHE_MAX_PATTERN_LENGTH) {
-    return compileRe2(translatePattern(pattern), re2Flags);
+    return RE2JS.compile(translatePattern(pattern), re2Flags);
   }
   const key = `${re2Flags} ${pattern}`;
   const cached = compiledCache.get(key);
@@ -125,8 +108,7 @@ function compilePattern(pattern: string, re2Flags: number): RE2JS {
     // (1ctx regex-cache) The weight travels with the program for FIFO removal.
     return cached.compiled;
   }
-  // (1ctx regex-fold-class) As above, a fold TypeError is a syntax error.
-  const compiled = compileRe2(translatePattern(pattern), re2Flags);
+  const compiled = RE2JS.compile(translatePattern(pattern), re2Flags);
   // (1ctx regex-cache) Repetition can expand a short source into a large program.
   if (compiled.programSize() > COMPILED_CACHE_MAX_PROGRAM_SIZE) {
     return compiled;

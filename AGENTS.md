@@ -10,9 +10,11 @@ them on schedules (automations), with shared knowledge and memory.
   official npm only, `bun install --ignore-scripts`. A new package needs
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
-  and only `client/ui/Plot.tsx` imports `uplot`. `patches/` holds our
-  modern-tar patch: it keeps the raw header `typeflag`, so GNU sparse
-  and unknown types are not read as regular files.
+  and only `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
+  patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
+  and unknown types are not read as regular files; re2js's matches a
+  Unicode class with no fold table as itself under `(?i)`, where 1.4.0
+  threw.
 - **just-bash is ours.** Its source lives in `vendor/just-bash/` and we
   change it; `vendor/README.md` says how.
 - **Status:** alpha. The API and the socket change freely, with no

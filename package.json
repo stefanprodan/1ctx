@@ -65,6 +65,7 @@
     "yaml": "2.9.1"
   },
   "patchedDependencies": {
-    "modern-tar@0.8.5": "patches/modern-tar@0.8.5.patch"
+    "modern-tar@0.8.5": "patches/modern-tar@0.8.5.patch",
+    "re2js@1.4.0": "patches/re2js@1.4.0.patch"
   }
 }

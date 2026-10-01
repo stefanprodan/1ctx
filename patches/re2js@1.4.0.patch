@@ -1,0 +1,39 @@
+diff --git a/build/index.cjs.cjs b/build/index.cjs.cjs
+index 4ddef4203e36dcd5241252c106d8f4dc8ce07c13..5c27fcdb625a33f317f2ec787abc00132816429d 100644
+--- a/build/index.cjs.cjs
++++ b/build/index.cjs.cjs
+@@ -5240,7 +5240,7 @@ class Parser {
+     const tab = pair.first;
+     const fold = pair.second; // fold-equivalent table
+     // Variation of CharClass.appendGroup() for tables.
+-    if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold === null) {
++    if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold == null) {
+       cc.appendTableWithSign(tab, sign);
+     } else {
+       // Merge and clean tab and fold in a temporary buffer.
+diff --git a/build/index.esm.js b/build/index.esm.js
+index 22c384e9a5898367925f9c43673947721f8535d4..811fc563cf982cff85e1249354691cad2f8317a5 100644
+--- a/build/index.esm.js
++++ b/build/index.esm.js
+@@ -5238,7 +5238,7 @@ class Parser {
+     const tab = pair.first;
+     const fold = pair.second; // fold-equivalent table
+     // Variation of CharClass.appendGroup() for tables.
+-    if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold === null) {
++    if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold == null) {
+       cc.appendTableWithSign(tab, sign);
+     } else {
+       // Merge and clean tab and fold in a temporary buffer.
+diff --git a/build/index.umd.js b/build/index.umd.js
+index 77941b492202955b47b418a4964a39e072e0f615..1050335ed3092cb00addd3735fc4b602a57143a4 100644
+--- a/build/index.umd.js
++++ b/build/index.umd.js
+@@ -5244,7 +5244,7 @@
+       const tab = pair.first;
+       const fold = pair.second; // fold-equivalent table
+       // Variation of CharClass.appendGroup() for tables.
+-      if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold === null) {
++      if ((this.flags & RE2Flags.FOLD_CASE) === 0 || fold == null) {
+         cc.appendTableWithSign(tab, sign);
+       } else {
+         // Merge and clean tab and fold in a temporary buffer.
