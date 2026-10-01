@@ -6,7 +6,7 @@
 // ends under a reader and an output cap without spinning.
 
 import { describe, expect, test } from "bun:test";
-import { Bash, InMemoryFs } from "just-bash";
+import { Bash, defineCommand, InMemoryFs } from "just-bash";
 
 const version = (name: string) =>
   `${name} (GNU coreutils) 9.11 (just-bash, compatible)\n` +
@@ -200,15 +200,24 @@ describe("yes ends", () => {
 
   test("a cancel stops a loop of it", async () => {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 10);
-    // yes runs to its end in one step, so the cancel lands between
-    // statements; the sleep lets the timer fire, the cap bounds a miss
-    const bash = new Bash({ executionLimits: { maxLoopIterations: 200 } });
+    let calls = 0;
+    // cancels on its third call, so the loop is stopped mid-run, never
+    // before it starts, and the cap bounds a miss
+    const trip = defineCommand("trip", async () => {
+      if (++calls === 3) controller.abort();
+      return { stdout: "", stderr: "", exitCode: 0 };
+    });
+    const bash = new Bash({
+      files: { "/w/.keep": "" },
+      customCommands: [trip],
+      executionLimits: { maxLoopIterations: 200 },
+    });
     const result = await bash.exec(
-      "while true; do yes | head -n 1; sleep 0.001; done",
+      "while true; do yes | head -n 1 >> /w/runs; trip; done",
       { signal: controller.signal },
     );
     expect(result.exitCode).toBe(124);
-    expect(result.stdout.split("\n").length).toBeLessThan(200);
+    expect(calls).toBe(3);
+    expect(await bash.fs.readFile("/w/runs")).toBe("y\ny\ny\n");
   });
 });
