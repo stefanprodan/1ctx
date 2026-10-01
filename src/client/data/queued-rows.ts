@@ -23,12 +23,18 @@ export type QueuePart = {
 
 const waits = (row: QueuedMessage) => row.state === "queued";
 
-// both parts as the server orders them, by when each was queued
+// both parts as the server orders them, by when each was queued. A row
+// never goes back from not sent, so the author's event, which the
+// server sends before the watchers' frame of the same revision, takes
+// it out of the queued part at once: drawn once, never gone between
 function joined(
   shared: readonly QueuedMessage[],
   mine: readonly QueuedMessage[],
 ): QueuedMessage[] {
-  return [...shared, ...mine].sort((a, b) => a.queuedAt - b.queuedAt);
+  const turned = new Set(mine.map((row) => row.id));
+  return [...shared.filter((row) => !turned.has(row.id)), ...mine].sort(
+    (a, b) => a.queuedAt - b.queuedAt,
+  );
 }
 
 // a whole queue, a detail's or an answer's, as its two parts

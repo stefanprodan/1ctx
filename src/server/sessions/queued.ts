@@ -167,7 +167,9 @@ export function queueChanged(
   );
   const chat = chatOf(db, sessionId);
   if (chat === null) return [];
-  const events = shared ? queueFrameEvent(db, sessionId, false) : [];
+  // each author's rows go before the watchers' frame, so the author's
+  // tab takes a row's not-sent state before the row leaves the queue
+  const events: BusEvent[] = [];
   for (const userId of new Set(authors)) {
     events.push({
       type: "queue.mine",
@@ -180,6 +182,7 @@ export function queueChanged(
       },
     });
   }
+  if (shared) events.push(...queueFrameEvent(db, sessionId, false));
   return events;
 }
 

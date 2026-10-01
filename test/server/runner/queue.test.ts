@@ -581,11 +581,13 @@ describe("the queue behind a busy chat", () => {
         await tick();
         unsubscribe();
         const revision = chat.app.sessions.byId(sessionId)!.revision;
+        // the author's own frame first, so their tab never draws the
+        // row gone between the two
         expect(events.map((event) => event.type)).toEqual([
-          "queue.changed",
           "queue.mine",
+          "queue.changed",
         ]);
-        const [shared, mine] = events;
+        const [mine, shared] = events;
         // the watchers' frame names no not-sent row
         expect(shared?.type === "queue.changed" && shared.data.rows).toEqual(
           [],
