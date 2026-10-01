@@ -386,7 +386,10 @@ function regexBuiltin(
       // mikefarah's replacement is text, with ${name} and $1 for groups
       if (yq) {
         const replacement = firstString(value, args[1], ctx, evaluate, "");
-        return [createUserRegex(pattern, flags).replace(value, replacement)];
+        const regex = createUserRegex(pattern, flags);
+        // the match count holds to the element limit, as jq's does
+        matches(regex, value, true, ctx.limits.maxArrayElements);
+        return [regex.replace(value, replacement)];
       }
       const regex = createUserRegex(pattern, flags.replaceAll("g", ""));
       const found = matches(

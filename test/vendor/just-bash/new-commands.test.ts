@@ -18,6 +18,12 @@ describe("version flag", () => {
     "mktemp -p /w --version",
     "mktemp -p /w x.XXX --version",
     "mktemp --version --help",
+    "mktemp -V",
+    "mktemp -dV",
+    "mktemp -qV x.XXX",
+    "mktemp -dVp",
+    "mktemp -V --bad",
+    "mktemp x.XXX -V",
   ];
   for (const command of answers) {
     test(command, async () => {
@@ -59,6 +65,17 @@ describe("version flag", () => {
     const value = await bash.exec("mktemp -p --version");
     expect(value.stderr).toContain("No such file or directory");
     expect(value.exitCode).toBe(1);
+    const short = await bash.exec("mktemp -x -V");
+    expect(short.stderr).toContain("invalid option -- 'x'");
+    expect(short.exitCode).toBe(1);
+    for (const command of ["mktemp -p -V", "mktemp -pV"]) {
+      const taken = await bash.exec(command);
+      expect(taken.stderr).toContain("No such file or directory");
+      expect(taken.exitCode).toBe(1);
+    }
+    const ended = await bash.exec("mktemp -p /w -- -V");
+    expect(ended.stderr).toBe("mktemp: too few X's in template '-V'\n");
+    expect(ended.exitCode).toBe(1);
     const yes = await bash.exec("yes -x --version");
     expect(yes.stderr).toContain("invalid option -- 'x'");
     expect(yes.exitCode).toBe(1);

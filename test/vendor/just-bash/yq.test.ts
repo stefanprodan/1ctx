@@ -569,6 +569,14 @@ describe("the dialect's builtins hold to the element limit", () => {
       expect(over.exitCode).toBe(126);
       expect(over.stderr).toContain("query result element limit exceeded (3)");
     });
+
+    test(`${name}: sub's matches past the limit`, async () => {
+      const at = await exec(command('"aaa" | sub("a"; "x"; "g")'));
+      expect(at).toMatchObject({ stdout: '"xxx"\n', exitCode: 0 });
+      const over = await exec(command('"aaaa" | sub("a"; "x"; "g")'));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
   }
 
   test("jq: sub's outputs past the limit", async () => {

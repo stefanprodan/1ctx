@@ -171,6 +171,11 @@ function reachedHelpOrVersion(args: string[]): MetaFlag | null {
         result = "help";
         return;
       }
+      // (1ctx version-flags) gmktemp takes an undocumented -V, in clusters too
+      if (char === "V") {
+        result = "version";
+        return;
+      }
       if (!shorts.has(char)) {
         stopped = true;
         return;
