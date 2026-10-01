@@ -498,3 +498,90 @@ describe("the document walker", () => {
     }
   });
 });
+
+describe("an array's entries", () => {
+  const limits = { maxArrayElements: 2 };
+  // two entries out of each, under keys jq takes
+  const WIDEN = "with_entries(.key |= tostring | (., .))";
+  const run = (filter: string, input: unknown, dialect?: "yq") =>
+    evaluateQuery(input as never, parseQuery(filter), { limits, dialect });
+
+  for (const dialect of [undefined, "yq"] as const) {
+    const name = dialect ?? "jq";
+
+    test(`${name}: to_entries holds to the element limit`, () => {
+      expect(run("to_entries", ["a", "b"], dialect)).toEqual([
+        [
+          { key: 0, value: "a" },
+          { key: 1, value: "b" },
+        ],
+      ]);
+      expect(() => run("to_entries", ["a", "b", "c"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+    });
+
+    test(`${name}: with_entries holds to the element limit`, () => {
+      expect(run(WIDEN, ["a"], dialect)).toEqual([{ 0: "a" }]);
+      expect(() => run("with_entries(.)", ["a", "b", "c"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+      expect(() => run(WIDEN, ["a", "b"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+    });
+  }
+
+  test("yq: with_entries keys a list by index, null has none", () => {
+    expect(run("with_entries(.)", ["a", "b"], "yq")).toEqual([
+      { 0: "a", 1: "b" },
+    ]);
+    expect(run("with_entries(., .)", ["a"], "yq")).toEqual([{ 0: "a" }]);
+    expect(run("with_entries(.)", null, "yq")).toEqual([]);
+    expect(run("to_entries", null, "yq")).toEqual([]);
+  });
+});
+
+describe("the dialect's builtins hold to the element limit", () => {
+  // a limit error is the shell's 126, never the filter's own failure
+  const exec = (command: string) =>
+    new Bash({ executionLimits: { maxQueryElements: 3 } }).exec(command);
+  const tools = {
+    jq: (filter: string) => `jq -n -c '${filter}'`,
+    yq: (filter: string) => `yq -n -o json -I0 '${filter}'`,
+  };
+
+  for (const [name, command] of Object.entries(tools)) {
+    test(`${name}: map over a map`, async () => {
+      const at = await exec(command("{a:1,b:2,c:3} | map(.) | length"));
+      expect(at).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const fanned = await exec(command("{a:1} | map(.,.,.) | length"));
+      expect(fanned).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const over = await exec(command("{a:1,b:2,c:3} | map(.,.,.) | length"));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
+
+    test(`${name}: match past the limit`, async () => {
+      const at = await exec(command('"aaa" | [match("a"; "g")] | length'));
+      expect(at).toMatchObject({ stdout: "3\n", exitCode: 0 });
+      const over = await exec(command('"aaaa" | [match("a"; "g")] | length'));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
+
+    test(`${name}: sub's matches past the limit`, async () => {
+      const at = await exec(command('"aaa" | sub("a"; "x"; "g")'));
+      expect(at).toMatchObject({ stdout: '"xxx"\n', exitCode: 0 });
+      const over = await exec(command('"aaaa" | sub("a"; "x"; "g")'));
+      expect(over.exitCode).toBe(126);
+      expect(over.stderr).toContain("query result element limit exceeded (3)");
+    });
+  }
+
+  test("jq: sub's outputs past the limit", async () => {
+    const over = await exec(tools.jq('"aa" | [gsub("a"; "x", "y")] | length'));
+    expect(over.exitCode).toBe(126);
+    expect(over.stderr).toContain("query result element limit exceeded (3)");
+  });
+});

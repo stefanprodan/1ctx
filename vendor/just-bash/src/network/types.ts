@@ -133,15 +133,24 @@ export interface NetworkConfig {
 
   /**
    * @internal Override DNS resolution for testing.
-   * When set, used instead of the default `dns.lookup` for the
-   * denyPrivateRanges DNS rebinding check.
+   * @deprecated guarded-fetch resolves DNS internally; `createSecureFetch`
+   * throws when this is set rather than running a weaker policy silently.
    */
   _dnsResolve?: (hostname: string) => Promise<DnsLookupResult[]>;
 
   /**
    * @internal Override request-owned connection binding for testing.
+   * @deprecated guarded-fetch pins connections itself; `createSecureFetch`
+   * throws when this is set rather than running a weaker policy silently.
    */
   _createConnectionOwner?: PinnedConnectionOwnerFactory;
+
+  /**
+   * @internal Override the HTTP transport for testing. Required to intercept
+   * requests on the private-range-enforcing path, which ignores
+   * `globalThis.fetch`. DNS resolution and IP validation still run.
+   */
+  _fetch?: typeof fetch;
 }
 
 /**
@@ -154,6 +163,16 @@ export interface FetchResult {
   /** Raw response bytes (never decoded as UTF-8 text). */
   body: Uint8Array;
   url: string;
+  /**
+   * Intermediate redirect responses in hop order (excluding the final
+   * response). Populated when redirects were followed so callers like
+   * `curl -D` can dump every status/header block the way real curl does.
+   */
+  redirectChain?: Array<{
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+  }>;
 }
 
 /**

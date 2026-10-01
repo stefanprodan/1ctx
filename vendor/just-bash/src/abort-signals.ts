@@ -1,4 +1,3 @@
-// (1ctx cancel-load) ported from upstream #506
 import { ExecutionAbortedError } from "./interpreter/errors.js";
 
 export interface CombinedAbortSignal {
@@ -49,7 +48,6 @@ export function combineAbortSignals(
   };
 }
 
-// (1ctx cancel-load) ported from upstream #506
 /**
  * Wait for host work that cannot observe cancellation, giving up when `signal`
  * aborts.

@@ -5,9 +5,10 @@
 // it: require() and require.resolve are blocked inside a command and a
 // reassignment of Module._resolveFilename too, on the main thread and in a
 // Worker; trusted host work that settles after a cancel still reaches its
-// caller; timeout on a command still loading ends only that command. Each
-// case runs in its own bun process, since the box patches process globals
-// and the tests of a file run concurrently.
+// caller; a lazy file's provider runs trusted while an untrusted command
+// after it stays blocked; timeout on a command still loading ends only
+// that command. Each case runs in its own bun process, since the box
+// patches process globals and the tests of a file run concurrently.
 
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
@@ -120,6 +121,44 @@ describe("the defense-in-depth box on bun", () => {
   test("hands a late value of trusted work to its caller", async () => {
     const out = await runBun(late(`resolve("late")`));
     expect(JSON.parse(out)).toEqual({ outcome: "value late", unhandled: [] });
+  }, 20_000);
+
+  // a kept MCP file is a lazy file whose provider asks the server, and open
+  // is an untrusted command that may run right after it is read
+  test("a lazy file settles on a macrotask and an untrusted command stays blocked", async () => {
+    const out = await runBun(`
+      const { Bash, InMemoryFs, defineCommand } = await import(${JSON.stringify(INDEX)});
+      const probe = defineCommand(
+        "probe",
+        async () => {
+          try {
+            new Function("return 1");
+            return { stdout: "unblocked\\n", stderr: "", exitCode: 0 };
+          } catch (error) {
+            return { stdout: (error.violation?.type ?? "error") + "\\n", stderr: "", exitCode: 0 };
+          }
+        },
+        { trusted: false },
+      );
+      const fs = new InMemoryFs();
+      fs.writeFileLazy("/late.md", async () => {
+        await new Promise((done) => setTimeout(done, 5));
+        return "LATE\\n";
+      });
+      const bash = new Bash({ defenseInDepth: true, fs, customCommands: [probe] });
+      const result = await bash.exec("cat /late.md && probe");
+      console.log(JSON.stringify({
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+      }));
+      process.exit(0);
+    `);
+    expect(JSON.parse(out)).toEqual({
+      stdout: "LATE\nfunction_constructor\n",
+      stderr: "",
+      exitCode: 0,
+    });
   }, 20_000);
 
   test("timeout on a command still loading ends only that command", async () => {

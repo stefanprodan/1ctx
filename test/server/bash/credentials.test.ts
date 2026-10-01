@@ -332,8 +332,11 @@ test.serial(
         const thrown = await fetch("https://elsewhere.example.test/").catch(
           (error) => error,
         );
-        expect(thrown.name).toBe("TypeError");
-        expect(thrown.message).toBe("connection to [credential quotes] failed");
+        expect(thrown.name).toBe("GuardedFetchError");
+        expect(thrown.message).toBe(
+          'Network error connecting to "elsewhere.example.test": connection to [credential quotes] failed',
+        );
+        expect(thrown.cause).toBeUndefined();
         expect(thrown.stack ?? "").not.toContain(KEY);
       },
     );

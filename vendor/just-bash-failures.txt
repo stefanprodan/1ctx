@@ -1,3 +1,4 @@
+(fail) (unnamed)
 (fail) AGENTS.npm.md Bash examples > should execute bash examples without errors
 (fail) AGENTS.npm.md Bash examples > should have bash code blocks
 (fail) AGENTS.npm.md validation > command list completeness > should list all registered commands
@@ -5,6 +6,10 @@
 (fail) Additional Syntax Features - Prototype Pollution > AWK Output Redirection > should reject pipe output via variable (sandboxed)
 (fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
 (fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
+(fail) DNS rebinding SSRF protection > guarded-fetch error mapping > rejects a redirect to a private IP literal
+(fail) DNS rebinding integration (real DNS) > ENOTFOUND domain fails closed before fetch
+(fail) DNS rebinding integration (real DNS) > allows public domain through real DNS check (if DNS available)
+(fail) DNS rebinding integration (real DNS) > denyPrivateRanges + allow-list works with real DNS
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
 (fail) Documentation TypeScript examples > should have valid TypeScript syntax in all examples
 (fail) OverlayFs Security - Path Traversal Prevention > directory traversal via operations > should not allow mkdir outside root
@@ -14,6 +19,8 @@
 (fail) ReadWriteFs replacement mode and copy behavior > appends to a private write-only regular file
 (fail) ReadWriteFs replacement mode and copy behavior > changes metadata on a private mode-000 regular file
 (fail) ReadWriteFs special-file metadata operations > preserves a Unix socket during chmod and utimes
+(fail) allow-list e2e via BashEnv > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
+(fail) allow-list e2e via Sandbox > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
 (fail) awk built-in variables > FILENAME > should be empty for stdin
 (fail) awk command > error handling > should error on missing file
 (fail) awk command > printf formats > should format scientific with %e
@@ -42,20 +49,87 @@
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when xan is used but not available
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when yq is used but not available
 (fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
+(fail) consumes stdin once across ordered data references
+(fail) diff > error handling > should error on unknown option
+(fail) diff > error handling > should error on unknown short option
+(fail) diff > filename quoting in -u/-c headers > should escape a double quote, and quote in -c headers too
+(fail) diff > filename quoting in -u/-c headers > should escape a newline so it cannot forge patch lines
+(fail) diff > filename quoting in -u/-c headers > should leave an ordinary filename bare
+(fail) diff > filename quoting in -u/-c headers > should leave non-ASCII filenames bare
+(fail) diff > filename quoting in -u/-c headers > should quote a filename containing a space
+(fail) diff > multiline diffs > should show context around changes with -u
+(fail) diff > output style selection > should select context format with -c
+(fail) diff > version > should print the program name and exit 0 with --version
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a blank line as context
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a deletion at the start
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a line changed to a blank line
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a multi-line deletion
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a non-empty file against an empty one
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a pure deletion in the middle
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a pure insertion in the middle
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for a single changed line
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for an empty file against a non-empty one
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for an insertion and a deletion in one hunk
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for an insertion at the end
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for an insertion at the start
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for neither file ending in a newline
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for only the first file missing its final newline
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for only the second file missing its final newline
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for two changes close enough for GNU to merge them
+(fail) diff context format (-c) vs GNU diffutils 3.12 > context format (-c) > matches GNU for two hunks far enough apart to stay separate
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a blank line as context
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a deletion at the start
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a line changed to a blank line
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a multi-line deletion
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a non-empty file against an empty one
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a pure deletion in the middle
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a pure insertion in the middle
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for a single changed line
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for an empty file against a non-empty one
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for an insertion and a deletion in one hunk
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for an insertion at the end
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for an insertion at the start
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for neither file ending in a newline
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for only the first file missing its final newline
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for only the second file missing its final newline
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for two changes close enough for GNU to merge them
+(fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for two hunks far enough apart to stay separate
+(fail) file gzip > should not decompress gzip input
+(fail) file gzip > should report gzip compressed data
+(fail) file gzip > should report gzip compressed data for an archive member
+(fail) file gzip > should report the gzip MIME type with -i
+(fail) file gzip > should still consult file-type when the compression method is not deflate
+(fail) find basic > multiple search paths > should handle non-existent paths gracefully
+(fail) find basic > should return error for non-existent path
+(fail) find over an unreadable directory > does not call a directory it could not read empty
+(fail) find over an unreadable directory > keeps that order under -depth
+(fail) find over an unreadable directory > names the directory it could not read and keeps going
+(fail) find over an unreadable directory > reports a directory below -mindepth all the same
+(fail) find over an unreadable directory > reports every unreadable directory in traversal order
+(fail) fromBuffer without Buffer (browser fallback) > base64 matches Node output across chunk boundaries
+(fail) fromBuffer without Buffer (browser fallback) > base64 never passes more than 8192 arguments to String.fromCharCode
+(fail) fromBuffer without Buffer (browser fallback) > binary matches Node output across chunk boundaries
+(fail) fromBuffer without Buffer (browser fallback) > binary never passes more than 8192 arguments to String.fromCharCode
+(fail) fromBuffer without Buffer (browser fallback) > latin1 matches Node output across chunk boundaries
+(fail) fromBuffer without Buffer (browser fallback) > latin1 never passes more than 8192 arguments to String.fromCharCode
 (fail) jq > JSON stream parsing (concatenated JSON) > should handle concatenated pretty-printed JSON objects with -s
 (fail) js-exec exploit regressions > blocks breakout chains and command-injection attempts
 (fail) js-exec exploit regressions > keeps queued execution bounded after a concurrent timeout
-(fail) js-exec host runtime breakout probes > blocks nested js-exec when invoked through Symbol.for('jb:exec') bridge
 (fail) js-exec host runtime breakout probes > does not allow child_process.spawnSync('node', ...) to execute host Node.js
 (fail) js-exec host runtime breakout probes > does not allow path-qualified or wrapper-based host runtime execution from js-exec
+(fail) js-exec host runtime breakout probes > does not expose the legacy Symbol.for('jb:exec') bridge
 (fail) js-exec host runtime breakout probes > keeps Function-constructor blocked on host-bridged function objects
 (fail) js-exec recursion guard bypass probes > blocks delayed nested js-exec launched from background subshell
-(fail) js-exec recursion guard bypass probes > blocks nested js-exec from Promise microtask bridge callback
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec through timeout wrapper
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec via child_process.execSync
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec via spawnSync structured args
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec when backgrounded without wait
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec when launched in background through bash -c
+(fail) js-exec recursion guard bypass probes > does not expose an exec bridge to Promise microtasks
+(fail) lazy provider under defense-in-depth (#253) > keeps untrusted command execution blocked after materialization
+(fail) lazy provider under defense-in-depth (#253) > materializes a provider that reads process.env during exec
+(fail) lazy provider under defense-in-depth (#253) > materializes a provider that settles on a macrotask during exec
+(fail) preserves invalid UTF-8 bytes in binary stdin request bodies
 (fail) process substitution - read-only /dev/fd is not scratch space > behaves the same whether or not a substitution ran first
 (fail) process substitution - read-only /dev/fd is not scratch space > refuses a write even with a descriptor still live
 (fail) process substitution - read-only /dev/fd is not scratch space > refuses a write to an unallocated descriptor
@@ -74,9 +148,9 @@
 (fail) published package declarations > includes declaration trees referenced by public declarations
 (fail) query format builtins in browser mode > decodes browser base64 bytes using defined UTF-8 replacement
 (fail) query format builtins in browser mode > encodes Unicode as UTF-8 before browser base64 conversion
-(fail) request-owned DNS connector lookup > creates independent pools without patching process-global DNS
 (fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
 (fail) runtime error-forwarding leak probes > sqlite3 open-directory error does not expose host/internal markers
+(fail) supports text and binary stdin request bodies without Buffer
 (fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
 (fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension
 (fail) tar > xz compression (-J) > should preserve xz compression by default
@@ -107,11 +181,15 @@
 (fail) yq format strings > edge cases > @csv on non-array returns null
 (fail) yq format strings > edge cases > @csv with null values
 (fail) yq format strings > edge cases > @sh on non-string returns null
+error: Cannot find package 'esbuild' from 'src/worker-lifecycle.browser-build.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-sandbox.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/generators/grammar-generator.test.ts'
 error: Cannot find package 'tsx' from 'src/security/defense-in-depth-lifecycle.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-in-depth-trusted-settlement.test.ts'
 error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
+error: Cannot find package 'tsx' from 'src/security/module-accessor-descriptors.test.ts'
+error: Cannot find package 'tsx' from 'src/security/module-accessor-redefinition.test.ts'
 error: expect(received).toBe(expected)

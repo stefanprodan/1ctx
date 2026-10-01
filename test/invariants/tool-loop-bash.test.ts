@@ -178,6 +178,7 @@ describe("bash in the tool loop", () => {
 });
 
 describe("a bash command that saves nothing", () => {
+  // the 100,000-command cap ends the loop: seconds on a loaded runner
   test("logs the phase it ended in and why, and nothing of the command", async () => {
     const logs = collectLogs();
     const chat = await chatApp({ logFactory: logs.logFactory });
@@ -207,7 +208,7 @@ describe("a bash command that saves nothing", () => {
       await chat.app.shutdown();
       chat.app.db.close();
     }
-  });
+  }, 20_000);
 
   test("the command worker's own lines are the bash area's", async () => {
     const logs = collectLogs();

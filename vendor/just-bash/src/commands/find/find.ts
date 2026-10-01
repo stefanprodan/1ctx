@@ -2,6 +2,7 @@ import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
 import type { DirentEntry } from "../../fs/interface.js";
+// (1ctx find-links) keep host paths out of unfamiliar link errors
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { FileTraversalBudget } from "../../fs/traversal.js";
 import { shellJoinArgs } from "../../helpers/shell-quote.js";
@@ -115,9 +116,34 @@ function statWords(error: unknown): string {
   return sanitizeErrorMessage(message);
 }
 
+// (1ctx find-diagnostics) GNU find's C-locale quoting, not shell quoting.
+function diagnosticPath(path: string): string {
+  const escapes: Record<number, string> = {
+    7: "\\a",
+    8: "\\b",
+    9: "\\t",
+    10: "\\n",
+    11: "\\v",
+    12: "\\f",
+    13: "\\r",
+    39: "\\'",
+    92: "\\\\",
+  };
+  let quoted = "'";
+  for (const byte of new TextEncoder().encode(path)) {
+    quoted +=
+      escapes[byte] ??
+      (byte < 32 || byte >= 127
+        ? `\\${byte.toString(8).padStart(3, "0")}`
+        : String.fromCharCode(byte));
+  }
+  return `${quoted}'`;
+}
+
 const findHelp = {
   name: "find",
   summary: "search for files in a directory hierarchy",
+  // (1ctx find-links) advertise the supported link policies
   usage: "find [-H] [-L] [-P] [path...] [expression]",
   options: [
     "-P               never follow symbolic links (the default)",
@@ -265,8 +291,18 @@ export const findCommand: RuntimeCommand = {
       startingPoint: string;
     }
 
+    // A directory the traversal could not read, carried as an effect of its
+    // node so the message lands in traversal order beside the node's own
+    // output, rather than in whatever order the parallel batch settled.
+    // (1ctx find-diagnostics) a link find could not follow and a missing
+    // starting point travel the same way, so each lands in GNU's order
+    interface DiagnosticAction {
+      type: "diagnostic";
+      message: string;
+    }
+
     interface EvaluatedEffect {
-      action: FindAction;
+      action: FindAction | DiagnosticAction;
       path: string;
       printfData: FindResult;
     }
@@ -380,8 +416,25 @@ export const findCommand: RuntimeCommand = {
         if (slashed) await ctx.fs.stat(basePath);
         else await ctx.fs.lstat(basePath);
       } catch {
-        appendStderr(`find: ${searchPath}: No such file or directory\n`);
-        exitCode = 1;
+        // (1ctx find-diagnostics) after the starting points before it, not
+        // ahead of their -exec output
+        effects.push({
+          action: {
+            type: "diagnostic",
+            message: `find: ${diagnosticPath(searchPath)}: No such file or directory\n`,
+          },
+          path: searchPath,
+          printfData: {
+            path: searchPath,
+            name: searchPath,
+            size: 0,
+            mtime: 0,
+            mode: 0,
+            isDirectory: false,
+            depth: 0,
+            startingPoint: searchPath,
+          },
+        });
         continue;
       }
 
@@ -389,6 +442,7 @@ export const findCommand: RuntimeCommand = {
       interface WorkItem {
         path: string;
         depth: number;
+        // (1ctx find-links) a dirent's type describes the link, not its target
         typeInfo?: {
           isFile: boolean;
           isDirectory: boolean;
@@ -412,11 +466,15 @@ export const findCommand: RuntimeCommand = {
         depth: number;
         children: WorkItem[];
         pruned: boolean;
+        /** Why the directory could not be read, when it could not. */
+        unreadable?: string;
+        // (1ctx find-links find-diagnostics) GNU's words for what -L met: a
+        // loop, or a link that cannot be read through. The node is left out
+        // and only the message, in its place, remains; exit 1
+        problem?: string;
       }
 
-      // (1ctx find-links) GNU's words for what -L met: a loop, or a link that
-      // cannot be read through; each is left out, and exit 1
-      const problems: string[] = [];
+      // (1ctx find-links) link failures name the same path as a printed node
       const relativeOf = (currentPath: string) =>
         currentPath === basePath
           ? searchPath
@@ -433,6 +491,7 @@ export const findCommand: RuntimeCommand = {
         item: WorkItem,
       ): Promise<ProcessedNode | null> {
         const { path: currentPath, depth, typeInfo } = item;
+        // (1ctx find-links) -H applies to this depth only
         const followed = followsAt(depth);
         traversalBudget.visit(depth);
         traceCounters.nodeCount++;
@@ -447,6 +506,7 @@ export const findCommand: RuntimeCommand = {
         let isDirectory: boolean;
         let stat: Awaited<ReturnType<typeof ctx.fs.stat>> | undefined;
 
+        // (1ctx find-links) followed links need their target's type
         if (
           typeInfo &&
           !needsStatMetadata &&
@@ -469,10 +529,12 @@ export const findCommand: RuntimeCommand = {
             traceCounters.statCalls++;
             traceCounters.statTime += Date.now() - statStart;
           } catch (error) {
-            // (1ctx find-links) a link that loops is GNU's error, not a missing file
+            // (1ctx find-links find-diagnostics) a link that loops is GNU's
+            // quoted error, not a missing file
             if (followed && !isMissing(error)) {
-              problems.push(
-                `find: '${relativeOf(currentPath)}': ${statWords(error)}\n`,
+              return problemNode(
+                item,
+                `find: ${diagnosticPath(relativeOf(currentPath))}: ${statWords(error)}\n`,
               );
             }
             return null;
@@ -490,19 +552,20 @@ export const findCommand: RuntimeCommand = {
           name = currentPath.split("/").pop() || "";
         }
 
+        // (1ctx find-links) share the spelling with link failures
         const relativePath = relativeOf(currentPath);
 
-        // (1ctx find-links) under -L, a directory reached again through a link is
-        // GNU's file system loop: reported, left out, and exit 1
+        // (1ctx find-links find-diagnostics) under -L, a directory reached
+        // again through a link is GNU's quoted file system loop, exit 1
         let ancestors: string[] | undefined;
         if (follow === "L" && isDirectory) {
           const parent = item.ancestors ?? [];
           const real = await ctx.fs.realpath(currentPath);
           if (parent.includes(real)) {
-            problems.push(
-              `find: File system loop detected; the following directory is part of the cycle: '${relativePath}'\n`,
+            return problemNode(
+              item,
+              `find: File system loop detected; the following directory is part of the cycle: ${diagnosticPath(relativePath)}\n`,
             );
-            return null;
           }
           ancestors = [...parent, real];
         }
@@ -535,10 +598,28 @@ export const findCommand: RuntimeCommand = {
         const shouldReadDir =
           (shouldDescendIntoSubdirs || needsEmptyCheck) && !earlyPruned;
 
+        let unreadable: string | undefined;
         if (isDirectory && shouldReadDir) {
           const readdirStart = Date.now();
-          if (hasReaddirWithFileTypes && ctx.fs.readdirWithFileTypes) {
-            entriesWithTypes = await ctx.fs.readdirWithFileTypes(currentPath);
+          try {
+            if (hasReaddirWithFileTypes && ctx.fs.readdirWithFileTypes) {
+              entriesWithTypes = await ctx.fs.readdirWithFileTypes(currentPath);
+            } else {
+              entries = await ctx.fs.readdir(currentPath);
+            }
+          } catch (error) {
+            // GNU find names the directory it could not read and carries on,
+            // exiting 1 at the end. Throwing here instead turned one unreadable
+            // directory into an empty result for the whole search, and on a
+            // home directory there is always one. The message is emitted with
+            // the node's effects, in traversal order, not here in batch order.
+            const reason = describeUnreadableDirectory(error);
+            if (reason === null) throw error;
+            unreadable = reason;
+            traceCounters.readdirCalls++;
+            traceCounters.readdirTime += Date.now() - readdirStart;
+          }
+          if (entriesWithTypes !== null) {
             traversalBudget.checkpoint();
             traversalBudget.discover(entriesWithTypes.length);
             entries = [];
@@ -560,6 +641,7 @@ export const findCommand: RuntimeCommand = {
                   typeInfo: {
                     isFile: entry.isFile,
                     isDirectory: entry.isDirectory,
+                    // (1ctx find-links) -L must stat links, not trust dirents
                     isSymbolicLink: entry.isSymbolicLink,
                   },
                   ancestors,
@@ -567,8 +649,7 @@ export const findCommand: RuntimeCommand = {
                 });
               }
             }
-          } else {
-            entries = await ctx.fs.readdir(currentPath);
+          } else if (entries !== null) {
             traversalBudget.checkpoint();
             traversalBudget.discover(entries.length);
             traceCounters.readdirCalls++;
@@ -583,6 +664,7 @@ export const findCommand: RuntimeCommand = {
                       ? `/${entry}`
                       : `${currentPath}/${entry}`,
                   depth: depth + 1,
+                  // (1ctx find-links) track ancestors without typed readdir too
                   ancestors,
                   resultIndex: idx,
                 });
@@ -617,6 +699,9 @@ export const findCommand: RuntimeCommand = {
           traceCounters.evalCalls++;
           traceCounters.evalTime += Date.now() - evalStart;
         }
+        // (1ctx find-diagnostics) a read made only for the descent -prune
+        // stopped, which GNU never attempts; -empty's own read GNU reports
+        if (pruned && !needsEmptyCheck) unreadable = undefined;
 
         return {
           relativePath,
@@ -628,14 +713,76 @@ export const findCommand: RuntimeCommand = {
           depth,
           children: pruned ? [] : children,
           pruned,
+          unreadable,
+        };
+      }
+
+      // (1ctx find-links find-diagnostics) a node left out, holding only the
+      // message that takes its place in the output
+      function problemNode(item: WorkItem, problem: string): ProcessedNode {
+        const relativePath = relativeOf(item.path);
+        return {
+          relativePath,
+          name: item.path.split("/").pop() || relativePath,
+          isFile: false,
+          isDirectory: false,
+          isEmpty: false,
+          depth: item.depth,
+          children: [],
+          pruned: false,
+          problem,
         };
       }
 
       // Evaluate once in traversal order and retain only actions whose branch was
       // actually reached. Side effects themselves run after traversal is complete.
       function evaluateNode(node: ProcessedNode): EvaluatedEffect[] {
+        const printfData: FindResult = {
+          path: node.relativePath,
+          name: node.name,
+          size: node.stat?.size ?? 0,
+          mtime: node.stat?.mtime?.getTime() ?? Date.now(),
+          mode: node.stat?.mode ?? 0o644,
+          isDirectory: node.isDirectory,
+          depth: node.depth,
+          startingPoint: searchPath,
+        };
+        // (1ctx find-links find-diagnostics) a left-out node is its message,
+        // whatever -mindepth says, as GNU's
+        if (node.problem !== undefined) {
+          return [
+            {
+              action: { type: "diagnostic", message: node.problem },
+              path: node.relativePath,
+              printfData,
+            },
+          ];
+        }
+        // Reported whatever -mindepth says, as GNU does: the expression never
+        // ran on it, but the traversal did fail there. Before the node's own
+        // output under -depth, where GNU meets the failure on the way down and
+        // prints the directory on the way back up; after it otherwise.
+        const diagnostics: EvaluatedEffect[] =
+          node.unreadable === undefined
+            ? []
+            : [
+                {
+                  action: {
+                    type: "diagnostic",
+                    // (1ctx find-diagnostics) quote directory errors like links
+                    message: `find: ${diagnosticPath(node.relativePath)}: ${node.unreadable}\n`,
+                  },
+                  path: node.relativePath,
+                  printfData,
+                },
+              ];
+        const withDiagnostics = (evaluated: EvaluatedEffect[]) =>
+          depthFirst
+            ? [...diagnostics, ...evaluated]
+            : [...evaluated, ...diagnostics];
+
         const atOrBeyondMinDepth = minDepth === null || node.depth >= minDepth;
-        if (!atOrBeyondMinDepth) return [];
+        if (!atOrBeyondMinDepth) return diagnostics;
 
         let matches = true;
         let reachedActions: FindAction[] = [];
@@ -677,18 +824,8 @@ export const findCommand: RuntimeCommand = {
         if (!hasAnyAction && matches) {
           reachedActions = [{ type: "print" }];
         }
-        if (reachedActions.length === 0) return [];
+        if (reachedActions.length === 0) return diagnostics;
 
-        const printfData: FindResult = {
-          path: node.relativePath,
-          name: node.name,
-          size: node.stat?.size ?? 0,
-          mtime: node.stat?.mtime?.getTime() ?? Date.now(),
-          mode: node.stat?.mode ?? 0o644,
-          isDirectory: node.isDirectory,
-          depth: node.depth,
-          startingPoint: searchPath,
-        };
         traversalBudget.checkpoint(reachedActions.length);
         const evaluated: EvaluatedEffect[] = [];
         for (const action of reachedActions) {
@@ -698,7 +835,7 @@ export const findCommand: RuntimeCommand = {
             printfData,
           });
         }
-        return evaluated;
+        return withDiagnostics(evaluated);
       }
 
       // Result collection for ordered results
@@ -913,10 +1050,6 @@ export const findCommand: RuntimeCommand = {
 
       const searchResult = await findIterative();
       for (const effect of searchResult.effects) effects.push(effect);
-      for (const problem of problems) {
-        appendStderr(problem);
-        exitCode = 1;
-      }
 
       // Emit trace summary for this search path
       if (ctx.trace) {
@@ -928,7 +1061,9 @@ export const findCommand: RuntimeCommand = {
           durationMs: totalMs,
           details: {
             path: searchPath,
-            resultsFound: searchResult.effects.length,
+            resultsFound: searchResult.effects.filter(
+              (effect) => effect.action.type !== "diagnostic",
+            ).length,
           },
         });
       }
@@ -940,6 +1075,10 @@ export const findCommand: RuntimeCommand = {
     for (const effect of effects) {
       const { action, path: file } = effect;
       switch (action.type) {
+        case "diagnostic":
+          appendStderr(action.message);
+          exitCode = 1;
+          break;
         case "print":
           appendStdout(`${file}\n`);
           break;
@@ -1220,6 +1359,41 @@ function formatCtimeDate(date: Date): string {
   const year = date.getFullYear();
 
   return `${day} ${month} ${dayNum} ${hours}:${mins}:${secs} ${year}`;
+}
+
+/**
+ * (1ctx find-diagnostics) Recovery is by errno, not by cause: ReadWriteFs
+ * also uses EACCES for a sandbox refusal, which must not expose its message.
+ * Cancellations, limits and errors outside this table still end the search.
+ */
+const UNREADABLE_DIRECTORY_REASONS = new Map<string, string>([
+  ["EACCES", "Permission denied"],
+  ["EIO", "Input/output error"],
+  ["ELOOP", "Too many levels of symbolic links"],
+  ["ENAMETOOLONG", "File name too long"],
+  ["ENOENT", "No such file or directory"],
+  ["ENOTDIR", "Not a directory"],
+  ["EPERM", "Permission denied"],
+]);
+
+/**
+ * The phrase for a directory that could not be read, from the errno alone,
+ * or null when the failure is not one of those, in which case it propagates.
+ * The errno is read off `code` when the error carries one and off the
+ * `ECODE: ...` message prefix the virtual filesystems use otherwise.
+ */
+function describeUnreadableDirectory(error: unknown): string | null {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : error instanceof Error
+        ? /^(E[A-Z]+)\b/.exec(error.message)?.[1]
+        : undefined;
+  if (code === undefined) return null;
+  return UNREADABLE_DIRECTORY_REASONS.get(code) ?? null;
 }
 
 /**

@@ -4,14 +4,14 @@
  * jq and yq run one engine, and the two tools answer some builtins
  * differently. `ctx.dialect` says whose rules apply: "yq" for the yq
  * command, jq's otherwise. Where jq 1.8 and mikefarah agree and upstream
- * answered something else (null out of a function that should fail,
- * `to_entries` on an array, a capture without its name), both dialects
- * change here. These run before the other builtins and answer null to
- * leave a call to them.
+ * answered something else (null out of a function that should fail, a
+ * capture without its name), both dialects change here. These run
+ * before the other builtins and answer null to leave a call to them.
  */
 
 import type { RE2JS } from "re2js";
 import YAML from "yaml";
+import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import { createUserRegex, type UserRegex } from "../../../regex/index.js";
 import type { Dialect, EvalContext } from "../evaluator.js";
 import { type AstNode, parse } from "../parser.js";
@@ -269,9 +269,7 @@ function matches(
   const found: Match[] = [];
   let position = 0;
   while (position <= input.length && matcher.find(position)) {
-    if (found.length >= limit) {
-      throw new Error(`query result element limit exceeded (${limit})`);
-    }
+    if (found.length >= limit) limitExceeded(limit);
     const start = matcher.start(0);
     const end = matcher.end(0);
     const groups: Group[] = [];
@@ -388,7 +386,10 @@ function regexBuiltin(
       // mikefarah's replacement is text, with ${name} and $1 for groups
       if (yq) {
         const replacement = firstString(value, args[1], ctx, evaluate, "");
-        return [createUserRegex(pattern, flags).replace(value, replacement)];
+        const regex = createUserRegex(pattern, flags);
+        // the match count holds to the element limit, as jq's does
+        matches(regex, value, true, ctx.limits.maxArrayElements);
+        return [regex.replace(value, replacement)];
       }
       const regex = createUserRegex(pattern, flags.replaceAll("g", ""));
       const found = matches(
@@ -415,9 +416,7 @@ function regexBuiltin(
           }
         }
         if (next.length > ctx.limits.maxArrayElements) {
-          throw new Error(
-            `query result element limit exceeded (${ctx.limits.maxArrayElements})`,
-          );
+          limitExceeded(ctx.limits.maxArrayElements);
         }
         results = next;
         last = m.end;
@@ -436,7 +435,17 @@ function cannotIterate(value: QueryValue): never {
   throw new Error(`Cannot iterate over ${described(value)}`);
 }
 
-function entries(value: QueryValue[]): QueryValue[] {
+function limitExceeded(limit: number): never {
+  throw new ExecutionLimitError(
+    `query result element limit exceeded (${limit})`,
+    "array_elements",
+  );
+}
+
+// held to the element limit as upstream's to_entries holds an array's
+function entries(value: QueryValue[], ctx: EvalContext): QueryValue[] {
+  const limit = ctx.limits.maxArrayElements;
+  if (value.length > limit) limitExceeded(limit);
   return value.map((item, key) =>
     record([
       ["key", key],
@@ -759,7 +768,8 @@ export function evalDialectBuiltin(
       if (asQueryRecord(value)) return yq ? [Object.keys(value as object)] : null;
       return hasNoKeys(value);
     case "to_entries":
-      if (Array.isArray(value)) return [entries(value)];
+      // an array's entries are upstream's, bounded by the element limit
+      if (Array.isArray(value)) return null;
       if (value === null && yq) return [];
       if (asQueryRecord(value)) return null;
       return hasNoKeys(value);
@@ -769,8 +779,14 @@ export function evalDialectBuiltin(
       if (asQueryRecord(value)) return null;
       if (!Array.isArray(value)) return hasNoKeys(value);
       const out: Record<string, QueryValue> = Object.create(null);
-      for (const entry of entries(value)) {
-        for (const item of evaluate(entry, args[0], ctx)) {
+      const limit = ctx.limits.maxArrayElements;
+      let mapped = 0;
+      for (const entry of entries(value, ctx)) {
+        const items = evaluate(entry, args[0], ctx);
+        // the bound upstream's with_entries puts on a map's mapped entries
+        mapped += items.length;
+        if (mapped > limit) limitExceeded(limit);
+        for (const item of items) {
           const obj = asQueryRecord(item);
           if (!obj) continue;
           const key = obj.key ?? obj.k ?? obj.name ?? obj.Name ?? obj.K ?? obj.Key;
@@ -789,11 +805,17 @@ export function evalDialectBuiltin(
       }
       // map over a map is [.[] | f], which upstream answered null
       if (name === "map" && map) {
-        return [
-          Object.values(map).flatMap((item) =>
-            evaluate(item as QueryValue, args[0], ctx),
-          ),
-        ];
+        // held to the element limit as upstream's map over a list is
+        const limit = ctx.limits.maxArrayElements;
+        const items = Object.values(map) as QueryValue[];
+        if (items.length > limit) limitExceeded(limit);
+        const out: QueryValue[] = [];
+        for (const item of items) {
+          const mapped = evaluate(item, args[0], ctx);
+          if (out.length > limit - mapped.length) limitExceeded(limit);
+          for (const v of mapped) out.push(v);
+        }
+        return [out];
       }
       return null;
     }

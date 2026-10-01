@@ -28,12 +28,11 @@ keys the map by index; a string and a number or boolean concatenate
 with `+`, a null in `-`, `*`, `/` or `%` drops the result; a step
 into a string, number or boolean (`.name.x`) answers nothing.
 
-In both, toward jq 1.8: `to_entries` on a list numbers its entries,
-`capture` without a match answers nothing, `match` names its groups
-and gives their offsets, `sub` in jq takes the capture object
-(`"\(.name)"`) and each output of its replacement, an unbound
-variable is an error, `.a.[0]` and `.a.[]` parse, and `keys`,
-`join`, `sort`, `unique`, `group_by`, `flatten`, `test`, `sub`,
+In both, toward jq 1.8: `capture` without a match answers nothing,
+`match` names its groups and gives their offsets, `sub` in jq takes
+the capture object (`"\(.name)"`) and each output of its replacement,
+an unbound variable is an error, `.a.[0]` and `.a.[]` parse, and
+`keys`, `join`, `sort`, `unique`, `group_by`, `flatten`, `test`, `sub`,
 `trim`, `upcase` and `any` fail on null instead of answering null.
 jq keeps its own for `@base64` of a non-string (the text encoded) and
 `reverse` of null (`[]`), sorts `unique` and `group_by`, compares maps
@@ -55,6 +54,9 @@ from jq 1.8.2 for the dialect rules. Where they part:
   yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
   skips the documents without the key, where jq stops with an error.
   Iterating a number, a string or a boolean is still jq's error.
+- Regular expressions are RE2's, not Oniguruma's: the one-letter class
+  `\pN` matches digits where jq 1.8 matches nothing; write `\p{N}` for
+  both.
 - The value evaluator keeps some of upstream's leniencies:
   `map_values(f)` keeps every output of `f`, `walk` never reaches
   scalars, `?` covers the whole path before it (`.a.b?`) rather than
@@ -74,6 +76,60 @@ from jq 1.8.2 for the dialect rules. Where they part:
 - A `break` in the right side of an assignment outputs nothing, where jq
   outputs the results before it; the filter form of a `$x` parameter
   yields only the bound value (`def f($x): x`).
+- `tonumber`, and yq's `to_number`, take a number with blanks around it
+  (`" 42 "` is 42) and read `"0x10"` as 16 and `"Infinity"` as null;
+  jq 1.8 refuses the first two and gives the largest double for the
+  last.
+- `[1,2] | to_entries | from_entries` is `{"0":1,"1":2}`; jq fails.
+- A user `def` cannot override a builtin: `def length: 5; [1] | length`
+  is 1, where jq answers 5.
+
+## Where our curl still differs from curl
+
+`test/vendor/just-bash/curl.test.ts` pins write-out once across stdout,
+file and header-dump output, and ports upstream's three stdin-byte
+tests to Bun, whose vitest lacks `vi.stubGlobal` and
+`vi.unstubAllGlobals`. Where the command parts from curl:
+
+- `-V` and `--version` answer `curl 8.21.0 (just-bash, compatible)`,
+  the supported protocols and a sandbox description, not curl's build
+  and library details.
+- `-v` writes its trace to stdout, not stderr, and still echoes the
+  body there with `-o` or `-O`. A `-D -` header block precedes that
+  output; `-w` follows it once.
+- Cross-origin redirects strip caller-supplied `Authorization` and
+  `Cookie`, curl's default without `--location-trusted`, which we do
+  not support. Other caller headers remain. Managed credentials are
+  separate: every hop is signed only under its chosen prefix.
+- Once stripped, caller Authorization and Cookie stay stripped for the
+  rest of the chain; curl 8.21 sends them again on a return to the
+  first host.
+- `-d @file` reads UTF-8 text: invalid bytes such as `0xff`, `0xfe`
+  and `0x80` become U+FFFD, unchanged from 3.4.2. `-F f=@file` also
+  decodes UTF-8 before constructing its multipart body, replacing
+  invalid bytes but keeping NUL, CR and LF. Neither is binary-safe;
+  `--data-binary @file` preserves bytes.
+- A redirect to a URL containing `user:pass@` is followed with that
+  userinfo intact at fetch. These are server-selected credentials,
+  not a 1ctx managed secret.
+
+### Network under Bun
+
+The upstream 3.6.0 adapter loads guarded-fetch eagerly. 1ctx keeps
+`denyPrivateRanges: false`: every permitted request uses the current
+ambient fetch, and private/loopback destinations remain permitted when
+the web policy allows them. Non-HTTP redirects are refused before
+choosing a transport, including guarded-fetch's private-host bypass.
+
+Bun substitutes its built-in Undici module, whose fetch ignores the
+dispatcher. Private-range preflight checks are not a connect-time
+rebinding guarantee; 1ctx does not enable or promise that enforcement.
+Pinning npm Undici to guarded-fetch's version removes a duplicate
+package, not this runtime limitation.
+
+guarded-fetch wraps transport failures as `GuardedFetchError`, with the
+hostname in the message. The app still rebuilds only its first line,
+scrubs keys and discards the cause.
 
 ## Where our awk still differs from gawk
 
@@ -208,6 +264,39 @@ and `-t` lines the fixture does not compare. Where they part:
 - Under `-a` the first command gets all of xargs' stdin and the later
   ones none, as the first reader of GNU's shared stdin drains a pipe;
   a command that reads only part of it leaves nothing for the next.
+
+## Where our find still differs from GNU find
+
+`test/vendor/just-bash/find-diagnostics.test.ts`,
+`find-path.test.ts` and `find-prune.test.ts` hold our find to what GNU
+findutils 4.11.0 answered. Where they part:
+
+- `-size` reads a folder's size as 0, where GNU reads the size the
+  file system gives it.
+- `-prune` with `-mindepth` prunes a folder above the minimum depth,
+  where GNU does not evaluate the expression there:
+  `find . -mindepth 2 -prune` prints nothing, GNU what is at depth 2.
+- A missing starting point loses its trailing slash in the message
+  (`find: 'nope': No such file or directory` for `nope/`).
+- `find ''` walks the current folder, printing an empty line and each
+  path with a leading `/`, where GNU says `No such file or directory`.
+- `find file/` prints the file, where GNU says `Not a directory`.
+- `-newer` with a missing reference file is silent, exit 0; GNU fails.
+- An unknown predicate is quoted `'-x'`, where GNU writes `` `-x' ``.
+- The reads for `-empty` are planned from its presence anywhere in the
+  expression, not from whether evaluation reaches it, so an unreadable
+  folder can be reported where a short circuit or `-maxdepth` keeps GNU
+  from reading it. When both `-empty` and the descent fail on a folder,
+  ours reports it once and GNU twice.
+
+## Where our mktemp and yes still differ from GNU coreutils
+
+- GNU's unique-prefix abbreviations of long options (`--vers`, `--dry`,
+  `--suf=.t`, `yes --h`) are refused, as in our other coreutils
+  commands.
+- yes's refusals leave out GNU's `Try 'yes --help'` line.
+- mktemp names a missing `-p` folder by the template alone
+  (`'tmp.XXXXXXXXXX'`), where GNU names the joined path.
 
 ## Where our env still differs from GNU env
 

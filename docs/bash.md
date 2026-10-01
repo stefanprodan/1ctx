@@ -61,7 +61,13 @@ of that shell that shows a file on the chat page.
 - **Only the send's web snapshot opens the network.** No snapshot, no
   network. curl only, never wget. All mode allows the internet, listed
   mode `urlPrefixes()`. `denyPrivateRanges` is false since Bun cannot
-  pin DNS.
+  enforce guarded-fetch's connect-time dispatcher. The adapter loads
+  eagerly; permitted requests still use the current ambient fetch.
+- **Every redirect stays on HTTP or HTTPS**, private hosts included.
+  A body refused for its declared size or malformed redirect location
+  is cancelled without waiting for cleanup.
+- **Request bodies keep their bytes.** `--data-binary @file` and `@-`
+  cross the worker protocol as bytes, never decoded text.
 - **Downloads go to `/tmp`.** Non-text bytes in `/knowledge` fail the
   save.
 - **just-bash's curl is an HTTP client, not curl.** No timing, TLS
@@ -73,6 +79,10 @@ of that shell that shows a file on the chat page.
   `createSecureFetch`, its prefix the one allow-list entry, or else the
   web fetch. So a signed redirect off its prefix is refused, and an
   unsigned request redirected into a prefix stays unsigned.
+- **Caller credentials stop at an origin change.** Redirects strip
+  caller-supplied `Authorization` and `Cookie` across origins, curl's
+  default without `--location-trusted`. Other caller headers remain;
+  managed headers are still derived separately for each hop.
 - **Each credential is checked at every command.** A row gone, unbound
   or differing from the send's is refused, and its key is read through
   `readKey()` then, so a replaced file applies to the next command.
@@ -82,8 +92,11 @@ of that shell that shows a file on the chat page.
   sent. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
   JSON-escaped forms (`escapedForms()`), is replaced by `[credential
-  <name>]` in body, headers, status text, final URL and errors. The tool
-  scrubs the result again, the tail kept apart.
+  <name>]` in body, header values, status text, final URL and errors.
+  Header names containing a key, case-insensitively, are dropped.
+  Redirect history is kept, with the same rules on every hop's status
+  text and headers, even for an unsigned request with an unrelated key
+  loaded. The tool scrubs the result again, the tail kept apart.
 
 ## The writable trees
 

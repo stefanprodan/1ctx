@@ -82,7 +82,8 @@ describe("find -exec", () => {
       });
       const result = await env.exec("find /dir -type f -exec ls {} +");
       expect(result.exitCode).toBe(0);
-      // (1ctx ls-sort) file operands are one block, as GNU ls prints them
+      // One batch of file operands lists as one block: this is the shape that
+      // `find … -exec ls -l {} + | sort` downstream of it depends on.
       expect(result.stdout).toBe("/dir/file1.txt\n/dir/file2.txt\n");
       expect(result.stderr).toBe("");
     });
