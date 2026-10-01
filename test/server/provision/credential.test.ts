@@ -29,6 +29,7 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
   Project: ["finops", "research"],
   Credential: [],
+  Repository: [],
   Provider: [],
   Decider: [],
   Skill: [],
@@ -143,6 +144,7 @@ describe("credential preflight", () => {
         {
           name: "wide",
           prefix: "https://quotes.example.test/",
+          methods: ["GET", "HEAD"],
           projects: ["finops"],
         },
       ],

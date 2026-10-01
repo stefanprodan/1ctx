@@ -399,6 +399,10 @@ export const LIMIT_NAMES = [
   "queuedMinutes",
   "archiveIdleDays",
   "archivedDeleteDays",
+  "repoBytes",
+  "repoFiles",
+  "repoFileBytes",
+  "repoCacheBytes",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -421,6 +425,7 @@ export const LIMIT_SCOPES = [
   "sends",
   "visuals",
   "chats",
+  "repos",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

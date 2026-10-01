@@ -13,7 +13,7 @@ import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
 import { type BashArea, bashArea } from "./bash/index.ts";
-import { credentialsArea, httpKeys } from "./credentials/index.ts";
+import { credentialsArea, headerValue, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
 import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
@@ -44,6 +44,7 @@ import {
   provisionArea,
 } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
+import { type Repos, reposArea } from "./repos/index.ts";
 import {
   type DrainResult,
   type Runner,
@@ -104,6 +105,7 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  repos: Repos;
   bash: BashArea;
   sessions: SessionStore;
   automations: Automations["store"];
@@ -159,6 +161,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
+  let repos!: Repos;
   const users = usersArea({
     db,
     secret: (name) => secret("user-", name),
@@ -267,6 +270,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: projects.store,
     key: httpKeys(options),
     capabilities,
+    repos: {
+      usingCredential: (credentialId) => repos.usingCredential(credentialId),
+    },
   });
   const access: Access = accessArea({
     db,
@@ -290,6 +296,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills,
     mcp,
     credentials,
+    repos: { switchable: (projectId) => repos.switchable(projectId) },
     tools: {
       capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
@@ -314,6 +321,24 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
   const knowledge = knowledgeArea({ db, clock, limits, access });
+  repos = reposArea({
+    db,
+    clock,
+    access,
+    projects: projects.store,
+    credentials: {
+      byId: (id) => credentials.byId(id),
+      readKey: (keyName) => credentials.readKey(keyName),
+      headerValue,
+    },
+    // a deleted repository was its project's, so only its rows are read
+    capabilities: {
+      forget(key, projectId) {
+        sessions.store.forgetCapability(key, projectId);
+        automations.store.forgetCapability(key, projectId);
+      },
+    },
+  });
   const bash = bashArea({
     db,
     clock,
@@ -503,6 +528,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...agents.routes,
     ...memory.routes,
     ...knowledge.routes,
+    ...repos.routes,
     ...sessions.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
@@ -533,6 +559,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         users,
         projects: projects.store,
         credentials: credentials.store,
+        repos: repos.store,
         providers: providers.store,
         deciders: deciders.store,
         skills: skills.store,
@@ -551,6 +578,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    repos,
     bash,
     sessions: sessions.store,
     automations: automations.store,

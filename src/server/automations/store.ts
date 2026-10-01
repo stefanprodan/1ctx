@@ -293,17 +293,17 @@ export class AutomationStore {
     return this.byId(id);
   }
 
-  forgetCapability(key: string): void {
+  forgetCapability(key: string, projectId?: string): void {
     this.db
       .query(
         `update automations set disabled_capabilities = (
            select json_group_array(value order by value)
            from json_each(automations.disabled_capabilities) where value != ?
-         ) where exists (
+         ) where ${projectId === undefined ? "" : "project_id = ? and "}exists (
            select 1 from json_each(automations.disabled_capabilities) where value = ?
          )`,
       )
-      .run(key, key);
+      .run(key, ...(projectId === undefined ? [] : [projectId]), key);
   }
 
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {

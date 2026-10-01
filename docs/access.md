@@ -92,6 +92,13 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   personal project, through `PATCH /api/profile/project`.
 - **Deleting a team project is refused while a chat runs.** It takes
   the chats and keeps their usage.
+- **Repositories follow the same split** (`docs/repos.md`). Anyone who
+  sees a project lists them with `GET /api/projects/:id/repos`. A team
+  project's are written by admins with `POST`, `PATCH` and `DELETE` on
+  that path and `POST .../:repoId/refresh`, which answer 404 for a
+  personal project, an admin's own included. An owner writes their
+  personal project's under `/api/profile/project/repos`, so no route
+  lets a member write a team project's.
 - **Removing a member drops their waiting messages in the same
   transaction.**
 - **Anyone who may open a chat may archive it.** Rename and delete are

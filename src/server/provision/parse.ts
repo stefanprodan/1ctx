@@ -22,12 +22,20 @@ import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { object } from "./fields.ts";
+import {
+  type FinalCredentials,
+  repoKey,
+  repoName,
+  repositories,
+  repository,
+} from "./repository.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
   "User",
   "Project",
   "Credential",
+  "Repository",
   "Provider",
   "Decider",
   "Skill",
@@ -49,7 +57,12 @@ export type ProjectDocs = (project: string) => {
 // now, for the checks that span objects
 export type CredentialsView = {
   key(name: string): KeyState;
-  list(): { name: string; prefix: string; projects: string[] }[];
+  list(): {
+    name: string;
+    prefix: string;
+    methods: string[];
+    projects: string[];
+  }[];
 };
 
 // a project doc read from the folder spec.knowledge names; bytes are
@@ -64,6 +77,7 @@ export type Document = {
   } & (K extends "Project" ? { docs?: KnowledgeDoc[] } : unknown);
 }[Kind];
 
+export type { RepositorySpec } from "./repository.ts";
 export type {
   AgentSpec,
   CredentialSpec,
@@ -99,6 +113,7 @@ function document(value: unknown, source: string): Document {
       User: isUsername,
       Project: isName,
       Credential: isName,
+      Repository: isName,
       Provider: isName,
       Decider: isName,
       Skill: isSkillName,
@@ -122,6 +137,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.project(b.spec) };
       case "Credential":
         return { ...base, kind, spec: spec.credential(b.spec) };
+      case "Repository":
+        return { ...base, kind, spec: repository(b.spec) };
       case "Provider":
         return { ...base, kind, spec: spec.provider(b.spec) };
       case "Decider":
@@ -331,6 +348,15 @@ export function preflight(
         }
         break;
       }
+      case "Repository": {
+        const key = repoKey(doc.spec.project, repoName(doc));
+        if (!inventory.Repository.includes(key)) required(["url"]);
+        reference("project", "Project", doc.spec.project);
+        if (typeof doc.spec.credential === "string") {
+          reference("credential", "Credential", doc.spec.credential);
+        }
+        break;
+      }
       case "Provider":
         if (!exists) required(["wire", "baseUrl"]);
         if (doc.spec.keyFrom)
@@ -368,14 +394,27 @@ export function preflight(
         break;
     }
   }
-  bindings(documents, credentials);
+  const final = bindings(documents, credentials);
+  repositories(
+    documents.flatMap((doc) => (doc.kind === "Repository" ? [doc] : [])),
+    inventory.Repository,
+    final,
+  );
 }
 
 // the credentials each project would hold once applied: no more than the
 // cap, and no two whose prefixes overlap
-type Binding = { name: string; prefix: string; projects: string[] };
+type Binding = {
+  name: string;
+  prefix: string;
+  methods: string[];
+  projects: string[];
+};
 
-function bindings(documents: Document[], credentials: CredentialsView): void {
+function bindings(
+  documents: Document[],
+  credentials: CredentialsView,
+): FinalCredentials {
   const final = new Map<string, Binding & { source?: string }>(
     credentials.list().map((row) => [row.name, row]),
   );
@@ -385,6 +424,7 @@ function bindings(documents: Document[], credentials: CredentialsView): void {
     final.set(doc.name, {
       name: doc.name,
       prefix: doc.spec.url ?? held?.prefix ?? "",
+      methods: doc.spec.methods ?? held?.methods ?? ["GET", "HEAD"],
       projects: doc.spec.projects ?? held?.projects ?? [],
       source: doc.source,
     });
@@ -419,4 +459,5 @@ function bindings(documents: Document[], credentials: CredentialsView): void {
       byProject.set(project, list);
     }
   }
+  return final;
 }

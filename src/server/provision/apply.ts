@@ -26,6 +26,7 @@ import type { SecretKind } from "../../shared/words.ts";
 import { type Client, difference } from "./client.ts";
 import { decider } from "./decider.ts";
 import { type Document, KINDS } from "./parse.ts";
+import { applyRepository } from "./repository.ts";
 
 export type Action = "created" | "updated" | "unchanged";
 export type Counts = Record<Action, number>;
@@ -430,6 +431,9 @@ export async function apply(
           }
           case "Credential":
             action = await credential(api, doc);
+            break;
+          case "Repository":
+            action = await applyRepository(api, doc);
             break;
           case "Provider":
             action = await provider(api, doc);

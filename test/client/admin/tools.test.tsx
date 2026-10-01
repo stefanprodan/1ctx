@@ -561,6 +561,7 @@ describe("the Config board", () => {
       "Scratch",
       "Chats",
       "MCP results",
+      "Repositories",
     ]);
   });
 
@@ -694,7 +695,7 @@ describe("the Config board", () => {
     expect(html).toContain(">Turns<");
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
-    expect(html.match(/<form/g)).toHaveLength(7);
+    expect(html.match(/<form/g)).toHaveLength(8);
     expect(html).toContain(">Running<");
     expect(html).toContain("Per user");
     expect(html).toContain("Scheduled runs are not counted.");

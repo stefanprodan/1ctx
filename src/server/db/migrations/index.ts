@@ -45,6 +45,7 @@ import { m0036 } from "./0036-skip-4bit.ts";
 import { m0037 } from "./0037-summoned.ts";
 import { m0038 } from "./0038-saved-paths.ts";
 import { m0039 } from "./0039-restart-runs.ts";
+import { m0040 } from "./0040-repos.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -86,4 +87,5 @@ export const MIGRATIONS: Migration[] = [
   m0037,
   m0038,
   m0039,
+  m0040,
 ];

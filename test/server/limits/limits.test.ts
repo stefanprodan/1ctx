@@ -113,6 +113,38 @@ const budgetLimits = [
     unit: "count",
     scope: "knowledge",
   },
+  {
+    name: "repoBytes",
+    default: 256 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 2 * 1024 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
+  },
+  {
+    name: "repoFiles",
+    default: 50_000,
+    min: 100,
+    max: 500_000,
+    unit: "count",
+    scope: "repos",
+  },
+  {
+    name: "repoFileBytes",
+    default: 4 * 1024 * 1024,
+    min: 64 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
+  },
+  {
+    name: "repoCacheBytes",
+    default: 10 * 1024 * 1024 * 1024,
+    min: 1024 * 1024 * 1024,
+    max: 1024 * 1024 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
+  },
 ] as const;
 
 describe("limits area", () => {
@@ -182,14 +214,15 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100 }).rows();
-      expect(rows).toHaveLength(44);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(44);
+      expect(rows).toHaveLength(48);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(48);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "sends")).toHaveLength(5);
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
+      expect(rows.filter((row) => row.scope === "repos")).toHaveLength(4);
       expect(LOOP_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 1_000_000,
@@ -319,7 +352,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(44);
+      expect(body.limits).toHaveLength(48);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

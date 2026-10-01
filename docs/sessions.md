@@ -191,9 +191,9 @@ that agent answers the one turn (see Summons).
   is a part of what a send offers that a user may switch off for one
   chat or automation. Create, send and regenerate take a `capabilities`
   change of `disable` and `enable` keys (`web`, `visualize`,
-  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`).
-  The parser checks only an id's shape; unknown ids are kept and
-  ignored.
+  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`,
+  `repo:<id>`). The parser checks only an id's shape; unknown ids are
+  kept and ignored.
 - **The change is applied twice.** The policy resolves it before
   schemas are built, and `startSend` applies it again to the current
   row in its transaction, a turn's changes in message order, the later

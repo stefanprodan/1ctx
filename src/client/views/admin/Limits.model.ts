@@ -182,6 +182,22 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Delete archived chats",
     text: "Days an archived chat is kept.",
   },
+  repoBytes: {
+    label: "Repository size",
+    text: "The files one repository may keep.",
+  },
+  repoFiles: {
+    label: "Repository files",
+    text: "Files one repository may keep.",
+  },
+  repoFileBytes: {
+    label: "File size",
+    text: "The largest file bash reads from a repository.",
+  },
+  repoCacheBytes: {
+    label: "Cache size",
+    text: "Every repository tree on disk together.",
+  },
 };
 
 type Display = { word: string; factor: number };

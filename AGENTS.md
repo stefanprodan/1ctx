@@ -129,6 +129,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
+| `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

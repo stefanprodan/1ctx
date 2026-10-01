@@ -11,7 +11,12 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { type KeyPort, type KeyRead, keyState, readKey } from "./key.ts";
-import { type ProjectsPort, routes, teamName } from "./routes.ts";
+import {
+  type ProjectsPort,
+  type ReposPort,
+  routes,
+  teamName,
+} from "./routes.ts";
 import { type CredentialRow, CredentialStore } from "./store.ts";
 
 export {
@@ -39,6 +44,7 @@ export type CredentialsDeps = {
   // the http- key files: their names, sizes and values
   key: KeyPort;
   capabilities: { forget(key: string): void };
+  repos: ReposPort;
 };
 
 export type Credentials = {
@@ -52,7 +58,12 @@ export type Credentials = {
   keyState(keyName: string): KeyState;
   // every credential by name, its prefix and its projects' names, for
   // provisioning's checks
-  bindings(): { name: string; prefix: string; projects: string[] }[];
+  bindings(): {
+    name: string;
+    prefix: string;
+    methods: string[];
+    projects: string[];
+  }[];
 };
 
 export function credentialsArea(deps: CredentialsDeps): Credentials {
@@ -68,6 +79,7 @@ export function credentialsArea(deps: CredentialsDeps): Credentials {
       store.list().map((row) => ({
         name: row.name,
         prefix: row.prefix,
+        methods: row.methods,
         projects: row.projectIds.flatMap((id) => {
           const name = teamName(deps.projects, id);
           return name === null ? [] : [name];
@@ -81,6 +93,7 @@ export function credentialsArea(deps: CredentialsDeps): Credentials {
       keys: () => deps.key.names(),
       readKey: read,
       capabilities: deps.capabilities,
+      repos: deps.repos,
     }),
   };
 }

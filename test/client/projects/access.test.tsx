@@ -99,6 +99,7 @@ describe("the Setup aside", () => {
       servers: {},
       skills: {},
       credentials: [],
+      repos: [],
     });
   });
 
@@ -113,6 +114,7 @@ describe("the Setup aside", () => {
       servers: {},
       skills: {},
       credentials,
+      repos: [],
     });
     const html = render(
       <AccessLines row={row(["credential:c2", "credential:gone"])} />,
@@ -131,6 +133,7 @@ describe("the Setup aside", () => {
       servers: {},
       skills: {},
       credentials: [],
+      repos: [],
     });
     const html = render(<AccessLines row={row(["knowledge"])} />);
     expect(html).toContain("Knowledge");
@@ -148,6 +151,7 @@ describe("the Setup aside", () => {
       servers: {},
       skills: {},
       credentials,
+      repos: [],
     });
     const html = render(<AccessLines row={row(["credential:c2", "web"])} />);
     expect(html).toContain("Web access");

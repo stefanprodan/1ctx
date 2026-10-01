@@ -32,6 +32,7 @@ export const LAYERS = [
   "agents",
   "memory",
   "knowledge",
+  "repos",
   "bash",
   "sessions",
   "tools",

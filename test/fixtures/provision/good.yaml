@@ -33,6 +33,20 @@ spec:
   projects: [nebula]
 ---
 apiVersion: config.1ctx.dev/v1
+kind: Repository
+metadata:
+  name: nebula-widgets
+spec:
+  project: nebula
+  url: https://github.com/acme/widgets.git
+  name: widgets
+  ref: main
+  credential: null
+  ignore: |
+    /*
+    !/charts/
+---
+apiVersion: config.1ctx.dev/v1
 kind: Provider
 metadata:
   name: mock-provider

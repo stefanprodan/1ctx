@@ -32,6 +32,7 @@ export {
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
+  type RepoCaps,
   type SendCaps,
   scheduledShare,
   TOOL_CAPS,

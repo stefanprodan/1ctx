@@ -54,6 +54,7 @@ import { parseBaseUrl, parseKeyName } from "../providers/index.ts";
 import { MAX_SKILL_URL, validPath } from "../skills/index.ts";
 import { parseHosts, parseWebDomains } from "../tools/index.ts";
 import { at, boolean, guarded, names, object, optional } from "./fields.ts";
+import type { RepositorySpec } from "./repository.ts";
 
 export type UserSpec = {
   role: Role;
@@ -168,6 +169,7 @@ export type Specs = {
   User: UserSpec;
   Project: ProjectSpec;
   Credential: CredentialSpec;
+  Repository: RepositorySpec;
   Provider: ProviderSpec;
   Decider: DeciderSpec;
   Skill: SkillSpec;

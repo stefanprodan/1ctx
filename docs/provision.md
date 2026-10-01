@@ -4,8 +4,8 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
 `--provision`.
 
 Provisioning applies YAML documents, one object each (a `kind` from
-`KINDS`: users, projects, credentials, providers, deciders, skills, MCP
-servers, agents, tools), to an instance's database, creating or updating
+`KINDS`: users, projects, credentials, repositories, providers,
+deciders, skills, MCP servers, agents, tools), to an instance's database, creating or updating
 what they name.
 
 ## Running it
@@ -59,6 +59,13 @@ what they name.
   file must be present and usable. Its `projects` name team projects
   only. The per-project cap and prefix overlaps are checked over the
   held rows with the input laid on them.
+- **A `Repository` is a team project's, matched by `project` and
+  name.** The name is `spec.name`, else `metadata.name`, so two projects
+  may each hold one named alike. `credential` names a credential, null
+  takes it off; `ignore` is a block string. Preflight checks one per
+  project and name, the per-project cap, and that a named credential
+  will be bound to the project, allow GET and cover the repository's
+  API.
 - **A `Project`'s `knowledge` is a folder relative to its YAML file.**
   It is never read from stdin, may not leave the file's directory, and
   refuses a symlink. Docs are named by their path and checked with the
