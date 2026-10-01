@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 import { assertExecResultSafe } from "../fuzzing/oracles/assertions.js";
 
-// js-exec worker requires stripTypeScriptTypes (Node >= 22.6).
-const nodeMajor = Number(process.versions.node.split(".")[0]);
-
-describe.skipIf(nodeMajor < 22)("js-exec host runtime breakout probes", () => {
+describe("js-exec host runtime breakout probes", () => {
   it("keeps Function-constructor blocked on host-bridged function objects", async () => {
     const env = new Bash({ javascript: true });
 
@@ -40,7 +37,7 @@ for (const [name, fn] of checks) {
     expect(result.exitCode).toBe(0);
   });
 
-  it("blocks nested js-exec when invoked through Symbol.for('jb:exec') bridge", async () => {
+  it("does not expose the legacy Symbol.for('jb:exec') bridge", async () => {
     const env = new Bash({
       javascript: true,
       files: {
@@ -54,19 +51,12 @@ require('fs').writeFileSync('/tmp/jb_symbol_bridge_marker','1')
 const marker = '/tmp/jb_symbol_bridge_marker';
 fs.rmSync(marker, { force: true });
 const execBridge = globalThis[Symbol.for('jb:exec')];
-const r = execBridge('js-exec /tmp/symbol-nested.js');
-console.log('SYMBOL_EXIT=' + String(r.exitCode));
-console.log('SYMBOL_ERR=' + String(r.stderr).trim());
+console.log('SYMBOL_BRIDGE=' + typeof execBridge);
 console.log('SYMBOL_MARKER=' + String(fs.existsSync(marker)));
 "`);
 
     expect(result.stdout).toBe(
-      [
-        "SYMBOL_EXIT=1",
-        "SYMBOL_ERR=js-exec: recursive invocation is not supported",
-        "SYMBOL_MARKER=false",
-        "",
-      ].join("\n"),
+      ["SYMBOL_BRIDGE=undefined", "SYMBOL_MARKER=false", ""].join("\n"),
     );
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
@@ -119,7 +109,15 @@ const probes = [
   ['bun-alias', 'bun', ['-e', \\"require('fs').writeFileSync('/tmp/jb_host_node_exec_marker_paths','1')\\"]],
 ];
 for (const [name, cmd, args] of probes) {
-  const r = cp.spawnSync(cmd, args);
+  // A probe that throws must not swallow the ones after it: an aborted loop
+  // used to surface as silently missing lines, which says nothing about why.
+  let r;
+  try {
+    r = cp.spawnSync(cmd, args);
+  } catch (e) {
+    console.log(name + ':threw=' + String(e && e.message ? e.message : e));
+    continue;
+  }
   const err = String(r.stderr || '');
   console.log(name + ':status=' + String(r.status));
   console.log(name + ':blocked=' + String(err.includes('this sandbox uses js-exec instead of node')));
@@ -127,6 +125,12 @@ for (const [name, cmd, args] of probes) {
 }
 console.log('MARKER=' + String(fs.existsSync(marker)));
 "`);
+
+    // Check the transport before the payload: if js-exec itself failed (deadline
+    // exceeded, worker torn down), these name the cause, whereas a truncated
+    // stdout diff does not.
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
 
     expect(result.stdout).toBe(
       [
@@ -161,8 +165,6 @@ console.log('MARKER=' + String(fs.existsSync(marker)));
         "",
       ].join("\n"),
     );
-    expect(result.stderr).toBe("");
-    expect(result.exitCode).toBe(0);
     assertExecResultSafe(result);
   });
 });

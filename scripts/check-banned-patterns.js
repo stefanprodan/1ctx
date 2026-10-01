@@ -590,10 +590,30 @@ const BANNED_PATTERNS = [
     pattern: /(?<![.\w])fetch\s*\(/,
     filePattern: /src\/network\/fetch\.ts$/,
     message:
-      "A secured network request must use the request-owned reviewed-address\n" +
-      "connection owner whenever private-range enforcement is active.",
+      "A secured network request must use the guarded transport whenever\n" +
+      "private-range enforcement is active.",
     solutions: [
-      "Use the pinned connection owner's fetch method",
+      "Call guardedFetch so DNS validation and connect-time IP pinning apply",
+      "Annotate only the audited branch where private-range enforcement is disabled",
+    ],
+  },
+  {
+    name: "Ambient fetch reference in secured network path",
+    // Catches `globalThis.fetch` and friends, whether called directly or
+    // aliased/handed to guarded-fetch as its transport. The `.`-prefixed form
+    // is invisible to the raw-fetch rule above.
+    // Skip comment lines.
+    pattern:
+      /^(?!\s*(?:\/\/|\/?\*)).*(?<![.\w])(?:globalThis|global|window|self)\s*\.\s*fetch\b/,
+    filePattern: /src\/network\/fetch\.ts$/,
+    message:
+      "The ambient fetch is mutable host state: a wrapper installed by a\n" +
+      "framework, APM agent, or mocking library can rebuild the request init\n" +
+      "and drop guarded-fetch's non-standard `dispatcher`, silently disabling\n" +
+      "connect-time IP pinning.",
+    solutions: [
+      "Let guarded-fetch use its own undici transport on the pinned path",
+      "Inject a transport via NetworkConfig._fetch for tests",
       "Annotate only the audited branch where private-range enforcement is disabled",
     ],
   },
@@ -721,6 +741,19 @@ const BANNED_PATTERNS = [
     ],
   },
   {
+    name: "Host-specific code in shared worker lifecycle",
+    pattern:
+      /^(?!\s*(?:\/\/|\/?\*)).*(?:\bfrom\s*["']node:|\b(?:import|require)\s*(?:\(\s*)?["']node:|\bnew\s+(?:globalThis\.)?Worker\s*\(|\b(?:globalThis\.)?(?:process|Buffer)\s*\.)/,
+    filePattern: /src\/worker-lifecycle\.ts$/,
+    message:
+      "WorkerLifecycle is shared by Node and browser hosts and must not depend on\n" +
+      "Node-only APIs or create a host worker.",
+    solutions: [
+      "Keep Node imports, process/Buffer access, and worker creation in host-specific modules",
+      "Pass a worker-like object into WorkerLifecycle",
+    ],
+  },
+  {
     name: "Undocumented command-local MAX constant",
     pattern:
       /\bconst\s+MAX_(?!(?:SQLITE_HEAP_LIMIT|DATE_MILLISECONDS|DATE_SECONDS|GREP_DEPTH|SLEEP_MS|PRINTF_WIDTH|DU_DEPTH|ARCHIVE_SIZE|ENTRIES|DATABASE_LOCK_WAITERS|OUTPUT_FILES|ARRAY_INDEX)\b)[A-Z0-9_]+\s*(?::[^=]+)?=/,
@@ -784,7 +817,6 @@ const SKIP_PATTERNS = [
   /spec-tests/,
   /prototype-pollution\.test/, // These test the protection
   /src\/commands\/python3\/worker\.js$/, // Generated artifact, source is worker.ts
-  /src\/commands\/js-exec\/js-exec-worker\.js$/, // Generated artifact, source is js-exec-worker.ts
   /src\/commands\/sqlite3\/worker\.js$/, // Generated artifact, source is worker.ts
   /scripts\/check-banned-patterns\.js$/, // Self-lint script contains pattern definitions by design
 ];

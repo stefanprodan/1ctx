@@ -78,9 +78,9 @@ const result = await bash.exec("cat input.txt | grep pattern");
 
 **Data processing**: `jq` (JSON), `js-exec` (JavaScript/TypeScript via QuickJS), `python3`/`python` (Python via WASM/CPython), `sqlite3` (SQLite), `xan` (CSV), `yq` (YAML/XML/TOML/CSV)
 
-**File operations**: `basename`, `chmod`, `cp`, `dirname`, `du`, `file`, `find`, `ln`, `ls`, `mkdir`, `mv`, `od`, `pwd`, `readlink`, `rm`, `rmdir`, `split`, `stat`, `touch`, `tree`
+**File operations**: `basename`, `chmod`, `cp`, `dirname`, `du`, `file`, `find`, `ln`, `ls`, `mkdir`, `mktemp`, `mv`, `od`, `pwd`, `readlink`, `rm`, `rmdir`, `split`, `stat`, `touch`, `tree`
 
-**Utilities**: `alias`, `base64`, `bash`, `clear`, `curl`, `date`, `diff`, `echo`, `env`, `expr`, `false`, `gzip`, `gunzip`, `help`, `history`, `hostname`, `html-to-markdown`, `md5sum`, `printenv`, `printf`, `seq`, `sh`, `sha1sum`, `sha256sum`, `sleep`, `tar`, `tee`, `time`, `timeout`, `true`, `unalias`, `which`, `whoami`, `zcat`
+**Utilities**: `alias`, `base64`, `bash`, `clear`, `curl`, `date`, `diff`, `echo`, `env`, `expr`, `false`, `gzip`, `gunzip`, `help`, `history`, `hostname`, `html-to-markdown`, `md5sum`, `printenv`, `printf`, `seq`, `sh`, `sha1sum`, `sha256sum`, `sleep`, `tar`, `tee`, `time`, `timeout`, `true`, `unalias`, `which`, `whoami`, `yes`, `zcat`
 
 All commands support `--help` for usage details.
 
@@ -331,3 +331,59 @@ Key types to explore:
 - `BashOptions` - Constructor options for `new Bash()`
 - `ExecResult` - Return type of `bash.exec()`
 - `InitialFiles` - File specification format
+
+## Bundling just-bash
+
+just-bash ships pre-bundled (`dist/bundle/index.js`, `index.cjs`), but a handful
+of dependencies are deliberately left **external** — the bundle imports them by
+name instead of inlining them. Under plain Node this is invisible: they are
+declared dependencies, so the package manager installs them and the imports
+resolve at runtime.
+
+It matters when you run just-bash through **another** bundler (Next.js,
+webpack, esbuild, rollup) for a serverless or edge target. That bundler will try
+to inline these, and some of them cannot be inlined. Mark all six as external:
+
+| Package | What it is |
+| --- | --- |
+| `@mongodb-js/zstd` | native binding (`optionalDependencies`) |
+| `node-liblzma` | native binding (`optionalDependencies`) |
+| `sql.js` | ships a `.wasm` asset |
+| `run` | embeds the QuickJS WASM runtime |
+| `seek-bzip` | CommonJS-only bzip2 decoder |
+| `guarded-fetch` | imports `node:dns/promises`, `node:net`, `node:dns` |
+
+`guarded-fetch` is the one that bites bundlers targeting a non-Node context:
+inlining it pulls in Node builtins, and a bundler whose chunking context has no
+concept of them fails the build (Turbopack reports `the chunking context
+(unknown) does not support external modules (request: node:dns/promises)`).
+
+Next.js 15+:
+
+```ts
+// next.config.ts
+const nextConfig = {
+  serverExternalPackages: [
+    "just-bash",
+    "@mongodb-js/zstd",
+    "node-liblzma",
+    "seek-bzip",
+    "sql.js",
+    "run",
+    "guarded-fetch",
+  ],
+};
+```
+
+Older Next.js uses `experimental.serverComponentsExternalPackages`. webpack:
+add them to `externals` (or use `webpack-node-externals`). esbuild/rollup:
+`--external:<name>` / `external: [...]`.
+
+**Node version**: just-bash requires Node `>=20.19` (`guarded-fetch`'s floor).
+
+**Optional dependencies**: `@mongodb-js/zstd` and `node-liblzma` are declared
+in `optionalDependencies`, so an install that cannot build them still succeeds.
+Only the compression they provide is lost: `tar -J` then exits non-zero with
+`xz compression requires node-liblzma which failed to load`, rather than
+crashing the interpreter. The other four are regular dependencies and are
+required.

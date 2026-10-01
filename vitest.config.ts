@@ -13,6 +13,11 @@ export default defineConfig({
       "**/examples/**",
       "**/.pnpm-store/**",
     ],
+    // guarded-fetch must be processed by vite-node rather than externalized so
+    // `vi.mock("node:dns/promises")` reaches its resolver — that is how the
+    // DNS-rebinding tests drive resolution without touching real DNS.
+    // Keep in sync with vitest.unit.config.ts.
+    server: { deps: { inline: ["guarded-fetch"] } },
     pool: "threads",
     isolate: false,
     setupFiles: [resolve(__dirname, "src/vitest-setup.ts")],
@@ -30,6 +35,7 @@ export default defineConfig({
       ["forks", "**/python3.advanced.test.ts"],
       ["forks", "**/python3.env.test.ts"],
       ["forks", "**/python3.files.test.ts"],
+      ["forks", "**/python3.finalization.test.ts"],
       ["forks", "**/python3.http.test.ts"],
       ["forks", "**/python3.oop.test.ts"],
       ["forks", "**/python3.optin.test.ts"],
