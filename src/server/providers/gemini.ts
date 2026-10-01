@@ -11,6 +11,7 @@
 // under test/fixtures/providers/gemini/.
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import { canStopThinking } from "../../shared/thinking.ts";
 import { buildChatBody as buildOpenAiChatBody, chatEvents } from "./openai.ts";
 import { CatalogError, type ChatEvent, type ChatRequest } from "./types.ts";
 
@@ -122,7 +123,7 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   });
   const model = req.model.toLowerCase();
   const level = model.includes("gemini-3");
-  if (!req.thinking && !model.includes("pro")) {
+  if (!req.thinking && canStopThinking("gemini", req.model)) {
     body.reasoning_effort = "none";
     return body;
   }

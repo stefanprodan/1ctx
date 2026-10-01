@@ -47,6 +47,7 @@ import {
   effortApplies,
   effortChoices,
   PREFERRED_FOUR_BIT,
+  resetsThinking,
   SKIPPED,
   sentEffort,
   skip4BitLock,
@@ -274,6 +275,32 @@ describe("the words", () => {
       "thinking on · effort high",
     );
     expect(thinkingLine({ thinking: null, effort: "low" })).toBe("effort low");
+  });
+
+  test.serial("a model that cannot stop thinking offers no Off", () => {
+    const pro = { ...flash, id: "gemini-2.5-pro" };
+    expect(thinkingChoices(pro, "gemini").map((c) => c.value)).toEqual([
+      null,
+      "on",
+    ]);
+    expect(thinkingChoices(pro, "openrouter").map((c) => c.value)).toEqual([
+      null,
+      "on",
+      "off",
+    ]);
+    expect(resetsThinking(pro, "gemini", "off")).toBe(true);
+    expect(resetsThinking(pro, "gemini", "on")).toBe(false);
+    expect(resetsThinking(flash, "gemini", "off")).toBe(false);
+    expect(resetsThinking(pro, "gemini", null)).toBe(false);
+    expect(
+      resetsThinking({ ...pro, thinkingRequired: true }, "gemini", "on"),
+    ).toBe(true);
+    // a saved Off stays listed so the form shows what is stored
+    expect(thinkingChoices(pro, "gemini", "off").map((c) => c.value)).toEqual([
+      null,
+      "on",
+      "off",
+    ]);
   });
 
   test.serial("the effort sent follows the choices and the wire", () => {

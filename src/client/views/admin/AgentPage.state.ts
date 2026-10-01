@@ -176,11 +176,11 @@ export class AgentDrafts {
     this.changing.value = false;
   }
 
-  pick(model: CatalogMatch, fixed: boolean): void {
+  pick(model: CatalogMatch, resetThinking: boolean): void {
     this.model.value = model;
     if (model.id !== this.upstreamOf) this.upstream.value = null;
     this.upstreamOf = model.id;
-    if (fixed) this.thinking.value = null;
+    if (resetThinking) this.thinking.value = null;
     this.windowText.value = "";
     this.takesTools.value = false;
     this.before = null;

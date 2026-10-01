@@ -7,7 +7,7 @@ import type {
   Endpoint,
 } from "../../../shared/contracts/provider.ts";
 import { fourBitEndpoint, isFourBitTag } from "../../../shared/quantization.ts";
-import { fixedThinking } from "../../../shared/thinking.ts";
+import { canStopThinking, fixedThinking } from "../../../shared/thinking.ts";
 import {
   EFFORTS,
   type Effort,
@@ -45,12 +45,14 @@ type Choice<T> = { value: T; label: string };
 // default names no side
 export function thinkingChoices(
   model: CatalogMatch | null,
+  wire?: Wire,
+  saved: "on" | "off" | null = null,
 ): Choice<"on" | "off" | null>[] {
   const fixed = model === null ? null : fixedThinking(model);
   if (fixed !== null) {
     return [{ value: null, label: fixed === "on" ? "On" : "Off" }];
   }
-  return [
+  const choices: Choice<"on" | "off" | null>[] = [
     {
       value: null,
       label:
@@ -59,8 +61,22 @@ export function thinkingChoices(
           : `Default (${defaultThinking(model)})`,
     },
     { value: "on", label: "On" },
-    { value: "off", label: "Off" },
   ];
+  // a saved Off stays listed so the form shows what is stored
+  if (model === null || saved === "off" || canStopThinking(wire, model.id)) {
+    choices.push({ value: "off", label: "Off" });
+  }
+  return choices;
+}
+
+// a newly picked model drops a thinking word it cannot take
+export function resetsThinking(
+  model: CatalogMatch,
+  wire: Wire | undefined,
+  thinking: "on" | "off" | null,
+): boolean {
+  if (fixedThinking(model) !== null) return true;
+  return thinking === "off" && !canStopThinking(wire, model.id);
 }
 
 export function effortChoices(wire: Wire): Choice<Effort | null>[] {

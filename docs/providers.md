@@ -114,7 +114,11 @@ skip4Bit fields.
   models) lists without it. Then the agents API stores null for any
   thinking word, the form shows a single On or Off, and the policy
   ignores a word saved before. An agent saved before the flags learns
-  them when its model is picked again.
+  them when its model is picked again. `canStopThinking()` there says
+  which models always think whatever the word: a Pro on the Gemini
+  wire, whose Off the wire sends as the least thinking. The form offers
+  no Off for one unless the draft holds it, and picking one clears
+  an Off in the draft.
 - **An OpenRouter agent may prefer one upstream.** `GET
   /api/providers/:id/endpoints?model=` (OpenRouter wire only, a 400
   otherwise) reads `<base>/models/<id>/endpoints` on demand, uncached,
