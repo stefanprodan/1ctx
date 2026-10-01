@@ -149,8 +149,6 @@ export const shortCommit = (commit: string) => commit.slice(0, 7);
 // the URL as text, without the scheme every one carries
 export const urlText = (url: string) => url.replace(/^https:\/\//, "");
 
-export const refText = (ref: string) => (ref === "" ? "default branch" : ref);
-
 export type StateWords = { text: string; short: string; bad: boolean };
 
 export function stateWords(repo: RepoView): StateWords {

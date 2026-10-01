@@ -195,7 +195,7 @@ export function AccessSection({
         key,
         name: repo.name,
         icon: "code" as const,
-        meta: refWords(repo.ref),
+        meta: `repository, ${refWords(repo.ref)}`,
         mono: true,
         on: !reposOff.includes(key),
         blocked: false,

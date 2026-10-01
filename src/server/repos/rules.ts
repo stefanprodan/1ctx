@@ -11,8 +11,6 @@ import {
   MAX_REPO_IGNORE_LINES as MAX_IGNORE_LINES,
 } from "../../shared/contracts/repo.ts";
 
-export { DEFAULT_IGNORE };
-
 export interface IgnorePattern {
   /** the pattern as bytes, without its `!`, leading `/` and trailing `/` */
   readonly text: string;

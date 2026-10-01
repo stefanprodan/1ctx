@@ -184,7 +184,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   repoBytes: {
     label: "Size",
-    text: "The files one repository keeps together.",
+    text: "What one repository's files may total.",
   },
   repoFiles: {
     label: "Files",

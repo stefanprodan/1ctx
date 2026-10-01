@@ -107,7 +107,7 @@ describe("the Access section's repositories", () => {
     const html = section(web, true, repos);
     expect(html).toContain('aria-label="flux2 on"');
     expect(html).toContain('aria-label="podinfo off"');
-    expect(html).toContain(">main<");
+    expect(html).toContain(">repository, main<");
     expect(html).toContain("default branch");
     expect(html.indexOf("Knowledge")).toBeLessThan(html.indexOf("flux2"));
   });

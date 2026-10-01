@@ -3,13 +3,13 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  DEFAULT_IGNORE,
   effectiveIgnore,
   type IgnoreRules,
   ignored,
   ignoreKey,
   parseIgnore,
 } from "../../../src/server/repos/rules.ts";
+import { DEFAULT_REPO_IGNORE } from "../../../src/shared/contracts/repo.ts";
 import fixture from "../../fixtures/repos/ignore-cases.json";
 
 function rules(text: string): IgnoreRules {
@@ -32,7 +32,7 @@ describe("ignored matches git check-ignore", () => {
 });
 
 test("the default list is what an empty text applies", () => {
-  expect(DEFAULT_IGNORE).toEqual([
+  expect(DEFAULT_REPO_IGNORE).toEqual([
     "*.png",
     "*.jpg",
     "*.jpeg",
@@ -50,7 +50,7 @@ test("the default list is what an empty text applies", () => {
     "*.tgz",
     "*.jar",
   ]);
-  expect(effectiveIgnore("")).toBe(`${DEFAULT_IGNORE.join("\n")}\n`);
+  expect(effectiveIgnore("")).toBe(`${DEFAULT_REPO_IGNORE.join("\n")}\n`);
   expect(effectiveIgnore("  \n\n")).toBe(effectiveIgnore(""));
   expect(effectiveIgnore("*.md\n")).toBe("*.md\n");
   const recorded = fixture.cases.find((c) => c.name === "default list");

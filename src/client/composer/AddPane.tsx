@@ -4,8 +4,9 @@
 // The plus menu's second pane, in the menu's own box so it is placed as
 // the menu is: back to the menu, then a switch per MCP server or per
 // skill of the picked agent, per repository of the project, or Web
-// access and a switch per credential of the project. Flipping one leaves the pane open; one that cannot be
-// flipped says why under its name.
+// access and a switch per credential of the project. Flipping one
+// leaves the pane open; one that cannot be flipped says why under its
+// name.
 
 import { useEffect, useRef } from "preact/hooks";
 import { Icon, type IconName } from "../lib/icons.tsx";

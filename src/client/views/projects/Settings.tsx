@@ -3,8 +3,7 @@
 //
 // A personal project's Settings tab, laid out as the profile: its owner
 // describes it and adds public repositories, and its name is always
-// personal. A team project is an
-// admin's to change, on the admin page.
+// personal. A team project is an admin's to change, on the admin page.
 
 import { useSignal } from "@preact/signals";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";

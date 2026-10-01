@@ -5,7 +5,8 @@ import { type Signal, useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { RepoView } from "../../../shared/api/repos.ts";
-import { credentials } from "../../data/credentials.ts";
+import { refWords } from "../../composer/Add.model.ts";
+import { credentials, credentialsError } from "../../data/credentials.ts";
 import {
   addRepo,
   changeRepo,
@@ -58,7 +59,6 @@ import {
   PUBLIC_HINT,
   patchBody,
   type RepoDraft,
-  refText,
   repoFieldOf,
   stateWords,
   URL_PLACEHOLDER,
@@ -196,7 +196,7 @@ function RepoLine({
       <RowsTitle
         name={repo.name}
         mono
-        sub={`${urlText(repo.url)} · ${refText(repo.ref)}`}
+        sub={`${urlText(repo.url)} · ${refWords(repo.ref)}`}
       />
       <RowsMeta bad={state.bad} short={state.short}>
         {state.text}
@@ -444,9 +444,11 @@ function CredentialField({
       field="credentialId"
       save={save}
       hint={
-        options.length === 1
-          ? "No credential is bound to this project."
-          : undefined
+        credentialsError.value !== null
+          ? `Credentials did not load: ${credentialsError.value.words}`
+          : credentials.value !== null && options.length === 1
+            ? "No credential is bound to this project."
+            : undefined
       }
     >
       <Select

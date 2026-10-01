@@ -8,7 +8,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_IGNORE } from "../src/server/repos/rules.ts";
+import { DEFAULT_REPO_IGNORE as DEFAULT_IGNORE } from "../src/shared/contracts/repo.ts";
 
 const OUT = new URL("../test/fixtures/repos/ignore-cases.json", import.meta.url)
   .pathname;
