@@ -1,10 +1,16 @@
 # Deploy
 
-Governs `src/server/service/`, `scripts/staging.sh` and the staging
+How the binary runs outside the preview: as an OS service, on the
+staging instance, in a container, and how releases are built. Governs
+`src/server/service/`, `scripts/staging.sh` and the `make staging-*`
 targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
 `.github/workflows/`.
 
 ## The OS service (`1ctx service`)
+
+`1ctx service install|start|stop|restart|status|uninstall` runs the
+binary as a service of the signed-in user. Only macOS (launchd) is
+supported today.
 
 - **`service/` is CLI only.** It imports only `lib/` and opens no
   database. `service.ts` knows no platform; a new service manager is a
@@ -16,9 +22,10 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
 - **`--drain` is a flag, never a limit.** It bounds how long a stop
   lets running chats and runs end (`docs/sessions.md`), 10 seconds by
   default, 0 for no wait. The preview runs with `--drain 0`.
-- **The manager's kill timeout is the drain plus 15.** launchd's
-  `ExitTimeOut` is set so on install, and a drain over 40 is refused,
-  keeping it under the stop's own 60 second wait. A Kubernetes
+- **The service manager's kill timeout is the drain plus 15.**
+  launchd's `ExitTimeOut` is set so on install. A drain over 40 is
+  refused, so the timeout stays under the 60 seconds `1ctx service
+  stop` waits for the exit (`WAIT_MS` in `launchd.ts`). A Kubernetes
   `terminationGracePeriodSeconds` follows the same sum.
 - **Health stays up while draining, ready goes down.** From the first
   signal `/api/health` answers 200 with `draining: true`, for a
@@ -31,13 +38,22 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
 
 ## Staging
 
-- **Staging takes `main` only.** `staging-deploy` refuses another
+Staging is a 1ctx instance on a Mac, reached over ssh, used for real
+work: its database holds real data that is never wiped. It runs the
+binary through `1ctx service`, with its data under `~/.1ctx` on that
+Mac. `scripts/staging.sh` drives it, behind `make staging-deploy`,
+`staging-provision` and `staging-status`. The ssh host is in the
+gitignored `scripts/staging.env` (copy `staging.env.example`) and is
+never written in a tracked file.
+
+- **`make staging-deploy` takes `main` only.** It refuses another
   branch or a dirty checkout unless `ALLOW_BRANCH=1`. A migration that
-  ran on staging is frozen as if merged.
-- **A deploy backs up before it swaps.** It takes a `sqlite3 .backup`
-  on the box, checks its integrity, keeps the last three, then uploads
-  the binary beside the live one and renames it.
-- **`staging-provision` stops the service, applies and starts it
+  ran on staging is never edited again, like one merged to `main`.
+- **A deploy backs up the database before it swaps the binary.** It
+  takes a `sqlite3 .backup` on the staging Mac, checks its integrity,
+  keeps the last three, then uploads the new binary beside the live
+  one and renames it over.
+- **`make staging-provision` stops the service, applies and starts it
   again**, even when the apply fails. Only the `knowledge/` folder
   beside the YAML is copied, so a `knowledge` path elsewhere is
   refused.
@@ -79,15 +95,17 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the
   one Bun version.** `scripts/bun-version.sh` hands it to `setup-bun`
   in every workflow, and Dependabot's `docker` ecosystem bumps it.
-- **Only the macOS job lints and runs `make vendor-test`.** The Linux
-  job alone tests with `--parallel` and smokes the amd64 image. The
-  arm64 image is smoked on an arm64 dev machine.
-- **A `v*` tag releases only a commit on `main`.** CI has already
-  linted and tested it, so the release does not. The tag must be
-  `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a prerelease.
+- **CI (`test.yml`) has a macOS and a Linux job.** Only the macOS job
+  runs `make lint` and `make vendor-test`. Only the Linux job runs the
+  test files in parallel and `make image-smoke` for amd64. Nothing in
+  CI runs the arm64 image; it is smoked by hand on an arm64 machine.
+- **A `v*` tag releases (`release.yml`) only a commit on `main`.**
+  CI has already linted and tested it, so the release does not. The
+  tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a
+  prerelease.
 - **The release builds every archive on one Linux amd64 runner.** Bun
   cross-compiles linux arm64 and darwin arm64, the darwin build ad-hoc
-  signed. Only amd64 is smoked there.
+  signed. Only the amd64 binary is smoked there.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.
