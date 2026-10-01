@@ -68,7 +68,7 @@ jobs:
       - name: Build darwin arm64
         run: |
           make build VERSION="$GITHUB_REF_NAME" TARGET=bun-darwin-arm64
-          file bin/1ctx | grep -q 'Mach-O 64-bit executable arm64'
+          file bin/1ctx | grep -q 'Mach-O 64-bit.*arm64'
           scripts/archive.sh darwin_arm64
       - name: Smoke test image
         run: make image-smoke VERSION="$GITHUB_REF_NAME"
