@@ -38,7 +38,7 @@ async function writeTypes(env: Record<string, string>): Promise<void> {
     TYPES,
     [
       "/**",
-      ` * (1ctx) ripgrep's file types as \`rg --type-list\` of ${version} lists`,
+      ` * (1ctx rg) ripgrep's file types as \`rg --type-list\` of ${version} lists`,
       " * them, aliases included. Written by scripts/rg-record.ts; not edited.",
       " */",
       "",

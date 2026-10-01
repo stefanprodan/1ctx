@@ -173,7 +173,7 @@ async function executeStmt(
     case "exit":
       ctx.shouldExit = true;
       {
-        // (1ctx) a bare exit keeps the code an earlier exit set, as in gawk
+        // (1ctx awk) a bare exit keeps the code an earlier exit set, as in gawk
         const codeExpr = stmt.code;
         if (codeExpr) {
           ctx.exitCode = Math.floor(
@@ -222,7 +222,7 @@ async function executePrint(
     const val = await withDefenseContext(ctx, "print argument evaluation", () =>
       evalExpr(ctx, arg),
     );
-    // (1ctx) a whole number prints exactly, any other through OFMT
+    // (1ctx awk) a whole number prints exactly, any other through OFMT
     values.push(typeof val === "number" ? numberToString(val, ctx.OFMT) : val);
   }
   const text = values.join(ctx.OFS) + ctx.ORS;
@@ -300,14 +300,14 @@ async function writeToFile(
       evalExpr(ctx, fileExpr),
     ),
   );
-  // (1ctx) gawk's fatal error for an empty name, an unset variable's too
+  // (1ctx awk) gawk's fatal error for an empty name, an unset variable's too
   if (filename === "") throw nullRedirection(redirect);
-  // (1ctx) a pipe holds the text for its command
+  // (1ctx awk) a pipe holds the text for its command
   if (redirect === "|") {
     writePipe(ctx, filename, text);
     return;
   }
-  // (1ctx) the standard streams, as gawk names them
+  // (1ctx awk) the standard streams, as gawk names them
   if (filename === "/dev/stdout") {
     addOutput(ctx, text);
     checkAwkOutputSize(ctx);
@@ -500,7 +500,7 @@ async function executeForIn(
   stmt: { variable: string; array: string; body: AwkStmt },
 ): Promise<void> {
   assertAwkDefenseContext(ctx, "for-in execution");
-  // (1ctx) through an alias too, so a parameter holding an array iterates it
+  // (1ctx awk) through an alias too, so a parameter holding an array iterates it
   const array = ctx.arrays[resolveArrayName(ctx, stmt.array)];
   if (!array) return;
 

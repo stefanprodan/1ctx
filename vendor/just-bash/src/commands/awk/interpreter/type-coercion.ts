@@ -44,7 +44,7 @@ export function toNumber(val: AwkValue): number {
 
 /**
  * Convert an AWK value to a string.
- * (1ctx) A whole number is its exact integer, any other number goes
+ * (1ctx awk) A whole number is its exact integer, any other number goes
  * through CONVFMT, as gawk converts them.
  */
 export function toAwkString(val: AwkValue, convfmt = "%.6g"): string {
@@ -52,7 +52,7 @@ export function toAwkString(val: AwkValue, convfmt = "%.6g"): string {
   return numberToString(val, convfmt);
 }
 
-/** (1ctx) toAwkString under the running program's CONVFMT. */
+/** (1ctx awk) toAwkString under the running program's CONVFMT. */
 export function toStr(ctx: { CONVFMT: string }, val: AwkValue): string {
   return typeof val === "string" ? val : numberToString(val, ctx.CONVFMT);
 }

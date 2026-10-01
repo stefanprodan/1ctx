@@ -1,5 +1,5 @@
 /**
- * (1ctx) rg's patterns, moved out of rg-search.ts: -e and the pattern
+ * (1ctx rg) rg's patterns, moved out of rg-search.ts: -e and the pattern
  * files of -f, whose text stays leased until the regex is built, and
  * the regex.
  */
@@ -51,7 +51,7 @@ function appendPatternLines(
   let lineStart = 0;
   for (let index = 0; index <= content.length; index++) {
     if (index < content.length && content.charCodeAt(index) !== 10) continue;
-    // (1ctx) a blank line is the empty pattern; only the last newline ends
+    // (1ctx rg) a blank line is the empty pattern; only the last newline ends
     if (index < content.length || index > lineStart) {
       if (patterns.length >= ctx.limits.maxArrayElements) {
         throw new ExecutionLimitError(
@@ -168,7 +168,7 @@ Consider enabling multiline mode with the --multiline flag (or -U for short).
 When multiline mode is enabled, new line characters can be matched.
 `;
 
-/** (1ctx) A newline in the pattern, typed or as `\n`. */
+/** (1ctx rg) A newline in the pattern, typed or as `\n`. */
 export function hasNewline(pattern: string, fixed: boolean): boolean {
   if (pattern.includes("\n")) return true;
   if (fixed) return false;
@@ -211,7 +211,7 @@ export function buildSearchRegex(
     multiline: options.multiline,
     multilineDotall: options.multilineDotall,
   };
-  // (1ctx) -P through grep's -P layer: its rewrites and its refusals
+  // (1ctx rg) -P through grep's -P layer: its rewrites and its refusals
   if (options.pcre && !options.fixedStrings) {
     return buildPatterns(patterns, { ...common, mode: "perl", pcre: true });
   }
@@ -229,7 +229,7 @@ export function buildSearchRegex(
   return buildPatterns([combinedPattern], {
     ...common,
     mode: fixed ? "fixed" : "perl",
-    // (1ctx) Rust's syntax: Unicode classes, \< and \>
+    // (1ctx rg) Rust's syntax: Unicode classes, \< and \>
     rust: fixed ? undefined : { unicode: options.unicode },
   });
 }

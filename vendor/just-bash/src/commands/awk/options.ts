@@ -1,5 +1,5 @@
 /**
- * (1ctx) AWK command line: options, operand assignments and their names.
+ * (1ctx awk) AWK command line: options, operand assignments and their names.
  *
  * gawk keeps -v and -F in the order given and replays them before BEGIN,
  * reads -f program files, and treats a `name=value` operand as an

@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU diff's merged output: -D NAME and the line and group formats.
+ * (1ctx diff) GNU diff's merged output: -D NAME and the line and group formats.
  * The files are walked as groups of lines, unchanged, old, new or
  * changed, each printed by its group format, whose `%<`, `%>` and `%=`
  * print the group's lines by their line format. Every directive of GNU's

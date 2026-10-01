@@ -1,5 +1,5 @@
 /**
- * (1ctx) rg --json's messages, moved out of rg-search.ts: a file's begin,
+ * (1ctx rg) rg --json's messages, moved out of rg-search.ts: a file's begin,
  * match and end, and the run's summary.
  */
 

@@ -23,7 +23,7 @@ export interface AwkRuntimeContext {
   OFS: string;
   ORS: string;
   OFMT: string;
-  // (1ctx) the format of a number converted to a string
+  // (1ctx awk) the format of a number converted to a string
   CONVFMT: string;
   NR: number;
   NF: number;
@@ -32,7 +32,7 @@ export interface AwkRuntimeContext {
   RSTART: number;
   RLENGTH: number;
   SUBSEP: string;
-  // (1ctx) the record separator and the text that ended the last record
+  // (1ctx awk) the record separator and the text that ended the last record
   RS: string;
   RT: string;
 
@@ -42,7 +42,7 @@ export interface AwkRuntimeContext {
 
   // User variables and arrays
   vars: Record<string, AwkValue>;
-  // (1ctx) an element made by a reference holds undefined until it is
+  // (1ctx awk) an element made by a reference holds undefined until it is
   // assigned: it reads as "" and compares as gawk's uninitialized value
   arrays: Record<string, Record<string, AwkValue | undefined>>;
   // Array aliases for function parameter passing (parameter name → original name)
@@ -58,11 +58,11 @@ export interface AwkRuntimeContext {
   // User-defined functions (from AST)
   functions: Map<string, AwkFunctionDef>;
 
-  // (1ctx) the main input walk, read by the main loop and plain getline
+  // (1ctx awk) the main input walk, read by the main loop and plain getline
   mainInput?: { nextRecord(): Promise<string | null>; skipFile(): void };
-  // (1ctx) standard input, once; empty after the first read
+  // (1ctx awk) standard input, once; empty after the first read
   readStdin?: () => string;
-  // (1ctx) one input byte budget shared by every stream
+  // (1ctx awk) one input byte budget shared by every stream
   maxInputBytes: number;
   inputBytes: number;
   /** Internal getline streams, isolated from the AWK variable namespace. */
@@ -92,15 +92,15 @@ export interface AwkRuntimeContext {
 
   // Output buffer (stdout)
   output: string;
-  // (1ctx) what the program printed to /dev/stderr
+  // (1ctx awk) what the program printed to /dev/stderr
   errorOutput: string;
-  // (1ctx) the output pipes by command, in the order opened, each holding
+  // (1ctx awk) the output pipes by command, in the order opened, each holding
   // the text printed to it, run when closed or when the program ends;
   // flushedAt marks how much of the output a pipe's stdout must follow
   outputPipes: Map<string, string>;
   pipeBytes: number;
   flushedAt: number;
-  // (1ctx) the output's UTF-8 length, kept as it grows so printf never
+  // (1ctx awk) the output's UTF-8 length, kept as it grows so printf never
   // measures the whole output
   outputBytes: number;
 
@@ -108,16 +108,16 @@ export interface AwkRuntimeContext {
   fs?: AwkFileSystem;
   cwd?: string;
 
-  // (1ctx) the open output files by path, their text held until a flush
+  // (1ctx awk) the open output files by path, their text held until a flush
   openedFiles: Map<string, OutputFile>;
-  // (1ctx) the open files holding text, so a flush never walks them all
+  // (1ctx awk) the open files holding text, so a flush never walks them all
   heldFiles: Set<string>;
 
   // Random function override for testing
   random?: () => number;
 
   // Exec function for command pipe getline ("cmd" | getline)
-  // (1ctx) stdin carries an output pipe's text to its command
+  // (1ctx awk) stdin carries an output pipe's text to its command
   exec?: (
     cmd: string,
     stdin?: string,
@@ -126,9 +126,9 @@ export interface AwkRuntimeContext {
   // Feature coverage writer for fuzzing instrumentation
   coverage?: FeatureCoverageWriter;
 
-  // (1ctx) the command's abort signal, checked by the record reader
+  // (1ctx awk) the command's abort signal, checked by the record reader
   signal?: AbortSignal;
-  // (1ctx) the regex record separators this command compiled
+  // (1ctx awk) the regex record separators this command compiled
   separators: Map<string, UserRegex>;
 
   // Defense context invariant flag propagated from RuntimeCommandContext
@@ -144,7 +144,7 @@ export interface CreateContextOptions {
   maxInputBytes?: number;
   fs?: AwkFileSystem;
   cwd?: string;
-  // (1ctx) stdin carries an output pipe's text to its command
+  // (1ctx awk) stdin carries an output pipe's text to its command
   exec?: (
     cmd: string,
     stdin?: string,
@@ -172,7 +172,7 @@ export function createRuntimeContext(
     signal,
   } = options;
 
-  // (1ctx) ARGV and ENVIRON are ordinary arrays, so delete, in and for-in
+  // (1ctx awk) ARGV and ENVIRON are ordinary arrays, so delete, in and for-in
   // reach them; whoever fills them counts their elements.
   const ARGV = Object.create(null) as Record<string, string>;
   const ENVIRON = Object.create(null) as Record<string, string>;
@@ -253,7 +253,7 @@ export function createRuntimeContext(
 }
 
 /**
- * (1ctx) Adds text to the output and its UTF-8 length. A high surrogate
+ * (1ctx awk) Adds text to the output and its UTF-8 length. A high surrogate
  * at the end and a low one at the start are one code point once joined.
  */
 export function addOutput(ctx: AwkRuntimeContext, text: string): void {

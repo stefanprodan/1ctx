@@ -1,7 +1,7 @@
 /**
  * File types for rg's -t, -T, --type-add, --type-clear and --type-list.
  *
- * (1ctx) ripgrep 15's whole table, from file-types-data.ts, each type a
+ * (1ctx rg) ripgrep 15's whole table, from file-types-data.ts, each type a
  * list of globs matched case-sensitively against a file's name, as the
  * ignore crate matches them.
  */

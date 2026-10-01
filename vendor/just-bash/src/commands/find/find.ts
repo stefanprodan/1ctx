@@ -100,13 +100,13 @@ import type {
   FindAction,
 } from "./types.js";
 
-// (1ctx) a missing target: -L then reads the link itself, as GNU does
+// (1ctx find-links) a missing target: -L then reads the link itself, as GNU does
 function isMissing(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("ENOENT") || message.includes("no such file");
 }
 
-// (1ctx) GNU's words for a link -L cannot read through
+// (1ctx find-links) GNU's words for a link -L cannot read through
 function statWords(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("ELOOP")) return "Too many levels of symbolic links";
@@ -171,7 +171,7 @@ export const findCommand: RuntimeCommand = {
 
     // Starting points must precede the expression. Separating them first keeps
     // predicate operands and -exec command arguments from being mistaken for paths.
-    // (1ctx) GNU's leading options: -H, -L and -P, the last one winning,
+    // (1ctx find-links end-of-options) GNU's leading options: -H, -L and -P, the last one winning,
     // then an optional `--` ending them
     let follow: "H" | "L" | "P" = "P";
     let firstPath = 0;
@@ -361,20 +361,20 @@ export const findCommand: RuntimeCommand = {
 
     // Process each search path
     for (let searchPath of searchPaths) {
-      // (1ctx) a trailing slash resolves a symbolic link, as in any path
+      // (1ctx find-links) a trailing slash resolves a symbolic link, as in any path
       const slashed = searchPath.length > 1 && searchPath.endsWith("/");
       // Normalize trailing slashes (except for root "/")
       if (slashed) {
         searchPath = searchPath.slice(0, -1);
       }
       const basePath = ctx.fs.resolvePath(ctx.cwd, searchPath);
-      // (1ctx) whether a starting point, or anything under it, is read
+      // (1ctx find-links) whether a starting point, or anything under it, is read
       // through its symbolic link: -L everywhere, -H at the start only
       const followsAt = (depth: number) =>
         follow === "L" || (depth === 0 && (follow === "H" || slashed));
 
       // Check if path exists
-      // (1ctx) a starting point that is a link exists when the link does,
+      // (1ctx find-links) a starting point that is a link exists when the link does,
       // unless it is followed through a trailing slash
       try {
         if (slashed) await ctx.fs.stat(basePath);
@@ -394,7 +394,7 @@ export const findCommand: RuntimeCommand = {
           isDirectory: boolean;
           isSymbolicLink?: boolean;
         };
-        // (1ctx) under -L, the real paths of the directories above, to
+        // (1ctx find-links) under -L, the real paths of the directories above, to
         // find a link back into one of them
         ancestors?: string[];
         // For ordered results: index where this item's results go
@@ -414,7 +414,7 @@ export const findCommand: RuntimeCommand = {
         pruned: boolean;
       }
 
-      // (1ctx) GNU's words for what -L met: a loop, or a link that
+      // (1ctx find-links) GNU's words for what -L met: a loop, or a link that
       // cannot be read through; each is left out, and exit 1
       const problems: string[] = [];
       const relativeOf = (currentPath: string) =>
@@ -459,7 +459,7 @@ export const findCommand: RuntimeCommand = {
             const statStart = Date.now();
             // find defaults to the POSIX -P policy: inspect symlinks, never
             // follow them while deciding whether to descend.
-            // (1ctx) -L and -H read through a link; a broken one is itself
+            // (1ctx find-links) -L and -H read through a link; a broken one is itself
             stat = followed
               ? await ctx.fs.stat(currentPath).catch((error: unknown) => {
                   if (isMissing(error)) return ctx.fs.lstat(currentPath);
@@ -469,7 +469,7 @@ export const findCommand: RuntimeCommand = {
             traceCounters.statCalls++;
             traceCounters.statTime += Date.now() - statStart;
           } catch (error) {
-            // (1ctx) a link that loops is GNU's error, not a missing file
+            // (1ctx find-links) a link that loops is GNU's error, not a missing file
             if (followed && !isMissing(error)) {
               problems.push(
                 `find: '${relativeOf(currentPath)}': ${statWords(error)}\n`,
@@ -492,7 +492,7 @@ export const findCommand: RuntimeCommand = {
 
         const relativePath = relativeOf(currentPath);
 
-        // (1ctx) under -L, a directory reached again through a link is
+        // (1ctx find-links) under -L, a directory reached again through a link is
         // GNU's file system loop: reported, left out, and exit 1
         let ancestors: string[] | undefined;
         if (follow === "L" && isDirectory) {
@@ -978,7 +978,7 @@ export const findCommand: RuntimeCommand = {
             part === "{}" ? file : part,
           );
           const result = await ctx.exec(shellJoinArgs([cmdWithFile[0]]), {
-            // (1ctx) the command is a process: it sees the exported variables
+            // (1ctx exec-env) the command is a process: it sees the exported variables
             env: { ...ctx.exportedEnv },
             replaceEnv: true,
             cwd: ctx.cwd,
@@ -1004,7 +1004,7 @@ export const findCommand: RuntimeCommand = {
         else cmdWithFiles.push(part);
       }
       const result = await ctx.exec(shellJoinArgs([cmdWithFiles[0]]), {
-        // (1ctx) as above
+        // (1ctx exec-env) as above
         env: { ...ctx.exportedEnv },
         replaceEnv: true,
         cwd: ctx.cwd,

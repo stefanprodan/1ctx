@@ -296,6 +296,7 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
     } else if (arg === "-v" || arg === "--verbose") {
       options.verbose = true;
     } else if (arg === "-V" || arg === "--version") {
+      // (1ctx curl-version) -V and --version, answered before the URL check
       options.version = true;
     } else if (arg.startsWith("--") && arg !== "--") {
       return unknownOption("curl", arg);
@@ -330,6 +331,7 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
             options.verbose = true;
             break;
           case "V":
+            // (1ctx curl-version) -V, as curl takes it in a cluster
             options.version = true;
             break;
           case "G":

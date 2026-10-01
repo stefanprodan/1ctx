@@ -1,7 +1,7 @@
 // RuntimeCommand registry with statically analyzable lazy loading
 // Each command has an explicit loader function for bundler compatibility (Next.js, etc.)
 
-// (1ctx) ported from upstream #506
+// (1ctx cancel-load) ported from upstream #506
 import { raceCancellation } from "../abort-signals.js";
 import { DefenseInDepthBox } from "../security/defense-in-depth-box.js";
 import type {
@@ -228,7 +228,7 @@ const commandLoaders: LazyCommandDef<CommandName>[] = [
     name: "awk",
     load: async () => (await import("./awk/awk2.js")).awkCommand2,
   },
-  // (1ctx) the name models write for the awk of a Linux box
+  // (1ctx awk) the name models write for the awk of a Linux box
   {
     name: "gawk",
     load: async () => (await import("./awk/awk2.js")).awkCommand2,
@@ -503,7 +503,7 @@ if (typeof __BROWSER__ === "undefined" || !__BROWSER__) {
   });
 }
 
-// python3, js-exec and sqlite3 are removed from this copy (1ctx)
+// python3, js-exec and sqlite3 are removed from this copy (1ctx trim)
 
 // Python commands - only registered when python is explicitly enabled
 // These introduce additional security surface (arbitrary code execution)
@@ -534,7 +534,7 @@ function createLazyCommand(def: LazyCommandDef): RuntimeCommand {
       args: string[],
       ctx: RuntimeCommandContext,
     ): Promise<ExecResult> {
-      // (1ctx) answered before the command loads, as the tool it follows
+      // (1ctx version-flags) answered before the command loads, as the tool it follows
       const version = versionAnswer(def.name, args);
       if (version !== null) return { stdout: version, stderr: "", exitCode: 0 };
 
@@ -545,7 +545,7 @@ function createLazyCommand(def: LazyCommandDef): RuntimeCommand {
         // Module loading may access blocked globals (e.g., worker_threads
         // uses SharedArrayBuffer, sql.js uses WebAssembly), so we suspend
         // blocking during the import.
-        // (1ctx) ported from upstream #506
+        // (1ctx cancel-load) ported from upstream #506
         //
         // Loading is host work that cannot be cancelled, so give up on waiting
         // for it once this invocation is cancelled: holding the caller's cleanup
@@ -569,7 +569,7 @@ function createLazyCommand(def: LazyCommandDef): RuntimeCommand {
         ctx.coverage &&
         (typeof __BROWSER__ === "undefined" || !__BROWSER__)
       ) {
-        // (1ctx) ported from upstream #506
+        // (1ctx cancel-load) ported from upstream #506
         const { emitFlagCoverage } = await raceCancellation(
           import("./flag-coverage.js"),
           ctx.signal,

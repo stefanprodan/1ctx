@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg file type filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by type with -t", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -18,7 +18,7 @@ describe("rg file type filtering", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should exclude type with -T", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -45,7 +45,7 @@ describe("rg file type filtering", () => {
 });
 
 describe("rg glob filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter files with -g", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -60,7 +60,7 @@ describe("rg glob filtering", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should support negated globs", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -75,7 +75,7 @@ describe("rg glob filtering", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match multiple files with glob", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -93,7 +93,7 @@ describe("rg glob filtering", () => {
 });
 
 describe("rg hidden files", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip hidden files by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -108,7 +108,7 @@ describe("rg hidden files", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include hidden files with --hidden", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -125,7 +125,7 @@ describe("rg hidden files", () => {
 });
 
 describe("rg gitignore", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should respect .gitignore patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -141,7 +141,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include ignored files with --no-ignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -157,7 +157,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle negation patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -173,7 +173,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle directory patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -189,7 +189,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should apply parent gitignore to subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -206,7 +206,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle directory trailing slash vs similar prefix", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -222,7 +222,7 @@ describe("rg gitignore", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle double-star patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",

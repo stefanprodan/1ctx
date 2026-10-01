@@ -24,7 +24,7 @@ describe("xargs command", () => {
     it("should handle empty input", async () => {
       const env = new Bash();
       const result = await env.exec('echo "" | xargs');
-      // (1ctx) GNU xargs runs the command once when there is no item
+      // (1ctx xargs-gnu) GNU xargs runs the command once when there is no item
       expect(result.stdout).toBe("\n");
       expect(result.exitCode).toBe(0);
     });
@@ -91,7 +91,7 @@ describe("xargs command", () => {
     });
   });
 
-  // (1ctx) GNU xargs keeps echo's final newline in the last -d item
+  // (1ctx xargs-gnu) GNU xargs keeps echo's final newline in the last -d item
   describe("-d option (custom delimiter)", () => {
     it("should split on custom delimiter", async () => {
       const env = new Bash();
@@ -146,7 +146,7 @@ describe("xargs command", () => {
     it("should handle empty items", async () => {
       const env = new Bash();
       const result = await env.exec('echo "a::b" | xargs -d : echo');
-      // (1ctx) an empty item is an argument, as in GNU xargs
+      // (1ctx xargs-gnu) an empty item is an argument, as in GNU xargs
       expect(result.stdout).toBe("a  b\n\n");
       expect(result.exitCode).toBe(0);
     });
@@ -171,7 +171,7 @@ describe("xargs command", () => {
       const result = await env.exec(
         'echo "/data/file1.txt:/data/file2.txt:/data/file3.txt" | xargs -d : cat',
       );
-      // (1ctx) the last name keeps echo's newline, so cat misses it
+      // (1ctx xargs-gnu) the last name keeps echo's newline, so cat misses it
       expect(result.stdout).toBe("content1content2");
       expect(result.stderr).toContain("No such file");
       expect(result.exitCode).toBe(123);
@@ -340,7 +340,7 @@ describe("xargs command", () => {
     it("should propagate command failure exit code", async () => {
       const env = new Bash();
       const result = await env.exec('echo "missing.txt" | xargs cat');
-      // (1ctx) GNU xargs answers any failure from 1 to 254 with 123
+      // (1ctx xargs-gnu) GNU xargs answers any failure from 1 to 254 with 123
       expect(result.exitCode).toBe(123);
       expect(result.stderr).toContain("No such file");
     });

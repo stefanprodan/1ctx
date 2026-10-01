@@ -66,7 +66,7 @@ const IS_BROWSER = typeof __BROWSER__ !== "undefined" && __BROWSER__;
  * A data descriptor carrying `value`, never beside a `get` or `set`, which
  * makes defineProperty throw. A Module accessor is installed through its own
  * setter instead (upstream #443), since Bun's loader reads the slot only the
- * setter writes. (1ctx)
+ * setter writes. (1ctx defense-descriptor)
  */
 function withValue(
   descriptor: PropertyDescriptor | undefined,
@@ -304,7 +304,7 @@ export class DefenseInDepthBox {
     prop: string;
     descriptor: PropertyDescriptor | undefined;
   }> = [];
-  // (1ctx) ported from upstream #443
+  // (1ctx module-accessors) ported from upstream #443
   /**
    * Restores the native accessor backing slot for module methods patched via
    * their setter (see protectModuleMethod). Restoring the descriptor alone
@@ -644,7 +644,7 @@ export class DefenseInDepthBox {
         deactivated = true;
         this.activeExecutionIds.delete(executionId);
         this.contextCache.delete(executionId);
-        // (1ctx) ported from upstream #506
+        // (1ctx cancel-load) ported from upstream #506
         // A trusted scope can only be live while its execution is. Releasing it
         // here keeps a scope that was opened for abandoned work from outliving
         // the execution and leaking the entry.
@@ -784,7 +784,7 @@ export class DefenseInDepthBox {
     const current = executionContext.getStore();
     if (!current) return fn();
     const { executionId } = current;
-    // (1ctx) ported from upstream #503
+    // (1ctx trusted-async-value) ported from upstream #503
     // Return the value, not the promise: adopting it would go through the
     // patched Promise.prototype.then, which is blocked after deactivation.
     return await executionContext.run(
@@ -2210,7 +2210,7 @@ export class DefenseInDepthBox {
         throw new Error("method is non-configurable and non-writable");
       }
 
-      // (1ctx) ported from upstream #443, to the end of the accessor branch
+      // (1ctx module-accessors) ported from upstream #443, to the end of the accessor branch
       const wrap = (fn: (...args: unknown[]) => unknown) =>
         this.createBlockingProxy(fn, path, violationType);
       const proxy = wrap(original as (...args: unknown[]) => unknown);
@@ -2221,7 +2221,7 @@ export class DefenseInDepthBox {
       });
 
       if ("value" in descriptor) {
-        // (1ctx) withValue() where upstream spreads the descriptor
+        // (1ctx defense-descriptor) withValue() where upstream spreads the descriptor
         Object.defineProperty(ModuleClass, prop, withValue(descriptor, proxy));
 
         const installed = Object.getOwnPropertyDescriptor(ModuleClass, prop);
@@ -2375,7 +2375,7 @@ export class DefenseInDepthBox {
    * Restore all original values.
    */
   private restorePatches(): void {
-    // (1ctx) ported from upstream #443
+    // (1ctx module-accessors) ported from upstream #443
     for (let i = this.moduleAccessorResets.length - 1; i >= 0; i--) {
       try {
         this.moduleAccessorResets[i]();

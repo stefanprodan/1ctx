@@ -10,7 +10,7 @@ import { setFieldSeparator } from "./fields.js";
 import { toStr, toNumber } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
 
-// (1ctx) the names getVariable answers itself
+// (1ctx awk) the names getVariable answers itself
 const BUILTIN_VARIABLES = new Set([
   "FS",
   "OFS",
@@ -29,7 +29,7 @@ const BUILTIN_VARIABLES = new Set([
   "RT",
 ]);
 
-/** (1ctx) True for a scalar never assigned, which is both "" and 0. */
+/** (1ctx awk) True for a scalar never assigned, which is both "" and 0. */
 export function isUninitVariable(
   ctx: AwkRuntimeContext,
   name: string,
@@ -74,7 +74,7 @@ export function getVariable(ctx: AwkRuntimeContext, name: string): AwkValue {
       return ctx.RT;
   }
 
-  // (1ctx) an array is never a scalar
+  // (1ctx awk) an array is never a scalar
   assertScalar(ctx, name);
   return ctx.vars[name] ?? "";
 }
@@ -108,7 +108,7 @@ export function setVariable(
       return;
     case "NF": {
       const newNF = Math.floor(toNumber(value));
-      // (1ctx) fields are bounded like array elements
+      // (1ctx awk) fields are bounded like array elements
       if (newNF > ctx.maxArrayElements) {
         throw new ExecutionLimitError(
           `field limit exceeded (${ctx.maxArrayElements})`,
@@ -143,11 +143,11 @@ export function setVariable(
       ctx.SUBSEP = toStr(ctx, value);
       return;
     case "ARGC":
-      // (1ctx) the input walk reads ARGC as it stands
+      // (1ctx awk) the input walk reads ARGC as it stands
       ctx.ARGC = toNumber(value);
       return;
     case "RS":
-      // (1ctx) read by the record reader at each record
+      // (1ctx awk) read by the record reader at each record
       ctx.RS = toStr(ctx, value);
       return;
     case "RT":
@@ -192,7 +192,7 @@ export function getArrayElement(
 }
 
 /**
- * (1ctx) Read an array element as an expression does, creating it with the
+ * (1ctx awk) Read an array element as an expression does, creating it with the
  * empty value when it is missing, as gawk does.
  */
 export function readArrayElement(
@@ -206,7 +206,7 @@ export function readArrayElement(
   return "";
 }
 
-/** (1ctx) True for an element that is missing or was never assigned. */
+/** (1ctx awk) True for an element that is missing or was never assigned. */
 export function isUninitElement(
   ctx: AwkRuntimeContext,
   array: string,
@@ -215,12 +215,12 @@ export function isUninitElement(
   return ctx.arrays[resolveArrayName(ctx, array)]?.[key] === undefined;
 }
 
-/** (1ctx) True when the name, through any alias, is an array. */
+/** (1ctx awk) True when the name, through any alias, is an array. */
 export function isArrayName(ctx: AwkRuntimeContext, name: string): boolean {
   return ctx.arrays[resolveArrayName(ctx, name)] !== undefined;
 }
 
-/** (1ctx) gawk's fatal error for a scalar used as an array. */
+/** (1ctx awk) gawk's fatal error for a scalar used as an array. */
 export function assertArray(ctx: AwkRuntimeContext, resolved: string): void {
   if (ctx.vars[resolved] !== undefined) {
     throw new Error(`attempt to use scalar '${resolved}' as an array`);
@@ -301,7 +301,7 @@ export function deleteArray(ctx: AwkRuntimeContext, array: string): void {
   if (!elements) return;
   ctx.arrayElementCount -= Object.keys(elements).length;
   if (resolvedArray === "ARGV" || resolvedArray === "ENVIRON") {
-    // (1ctx) ARGV and ENVIRON stay the same objects the context holds
+    // (1ctx awk) ARGV and ENVIRON stay the same objects the context holds
     for (const key of Object.keys(elements)) delete elements[key];
     return;
   }

@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU diff's normal format: `LaR`, `FcT` and `RdL` over each change,
+ * (1ctx diff) GNU diff's normal format: `LaR`, `FcT` and `RdL` over each change,
  * the first file's lines after `< `, `---`, the second's after `> `.
  */
 

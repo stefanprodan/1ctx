@@ -211,7 +211,7 @@ describe("grep", () => {
     const env = new Bash();
     const result = await env.exec("grep");
     expect(result.stdout).toBe("");
-    // (1ctx) GNU prints its usage lines
+    // (1ctx grep) GNU prints its usage lines
     expect(result.stderr).toBe(
       "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
         "Try 'grep --help' for more information.\n",

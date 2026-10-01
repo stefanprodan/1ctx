@@ -34,7 +34,7 @@ export const sleepCommand: RuntimeCommand = {
     if (hasHelpFlag(args)) {
       return showHelp(sleepHelp);
     }
-    // (1ctx) `--` ends the options, as in GNU sleep
+    // (1ctx end-of-options) `--` ends the options, as in GNU sleep
     const dashes = args.indexOf("--");
     if (dashes !== -1) args = args.toSpliced(dashes, 1);
 

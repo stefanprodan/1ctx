@@ -154,7 +154,7 @@ describe("searchContentMultiline — file-level preFilter", () => {
       showLineNumbers: true,
     });
     expect(result.matched).toBe(true);
-    // (1ctx) no -- without context, as ripgrep -U
+    // (1ctx rg) no -- without context, as ripgrep -U
     expect(result.output).toBe("1:class Foo:\n3:def bar():\n");
   });
 
@@ -185,7 +185,7 @@ describe("searchContentMultiline — file-level preFilter", () => {
   });
 
   it("counts the union of lines touched by overlapping multiline spans", () => {
-    // (1ctx) perl mode: in GNU's ERE \n is a stray backslash before n
+    // (1ctx grep) perl mode: in GNU's ERE \n is a stray backslash before n
     const { regex } = buildRegex("a\\nb", {
       mode: "perl",
       multiline: true,

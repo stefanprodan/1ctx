@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../index.js";
 
 describe("rg -L (follow symlinks)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept -L/--follow flag without error", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -21,7 +21,7 @@ describe("rg -L (follow symlinks)", () => {
     expect(result.stdout).toBe("file.txt:1:hello world\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept --follow flag without error", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -34,7 +34,7 @@ describe("rg -L (follow symlinks)", () => {
     expect(result.stdout).toBe("file.txt:1:hello world\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip symlinks by default in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -49,7 +49,7 @@ describe("rg -L (follow symlinks)", () => {
     expect(result.stdout).toBe("real.txt:1:hello\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should follow symlinks with -L in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -64,7 +64,7 @@ describe("rg -L (follow symlinks)", () => {
     expect(result.stdout).toBe("link.txt:1:hello\nreal.txt:1:hello\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should follow symlinks to directories with -L", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -89,7 +89,7 @@ describe("rg -L (follow symlinks)", () => {
 });
 
 describe("rg -u (unrestricted)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should ignore gitignore with -u", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -108,7 +108,7 @@ describe("rg -u (unrestricted)", () => {
     expect(result.stdout).toBe("ignored.txt:1:hello\nvisible.txt:1:hello\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search hidden files with -uu", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -153,7 +153,7 @@ describe("rg -u (unrestricted)", () => {
 });
 
 describe("rg -a (text/binary)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search binary files as text with -a", async () => {
     const bash = new Bash({
       cwd: "/home/user",

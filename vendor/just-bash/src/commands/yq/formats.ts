@@ -21,7 +21,7 @@ import {
 } from "../query-engine/safe-object.js";
 
 export type InputFormat = "yaml" | "xml" | "json" | "ini" | "csv" | "toml";
-// tsv and props are mikefarah's (1ctx)
+// tsv and props are mikefarah's (1ctx yq)
 export type OutputFormat =
   | "yaml"
   | "json"
@@ -84,9 +84,9 @@ export interface FormatOptions {
   prettyPrint: boolean;
   /** Indentation level */
   indent: number;
-  /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx) */
+  /** quote strings a YAML 1.1 reader would retype, for an in-place write (1ctx yq) */
   yaml11?: boolean;
-  /** a top-level string printed as YAML without quotes, as mikefarah's --unwrapScalar (1ctx) */
+  /** a top-level string printed as YAML without quotes, as mikefarah's --unwrapScalar (1ctx yq) */
   unwrapScalar?: boolean;
   /** XML attribute prefix (default: +@) */
   xmlAttributePrefix: string;
@@ -177,7 +177,7 @@ function formatCsv(value: unknown, delimiter: string): string {
     value = [value];
   }
   // a list of scalars is one row, as mikefarah writes it; Papa refused it,
-  // and a null is written as null, not an empty cell (1ctx)
+  // and a null is written as null, not an empty cell (1ctx yq query-dialect)
   const named = (cell: unknown) => (cell === null ? "null" : cell);
   const rows = (value as unknown[]).map((row) =>
     Array.isArray(row)
@@ -192,7 +192,7 @@ function formatCsv(value: unknown, delimiter: string): string {
   // Use comma as default for output (empty means auto-detect for input only)
   return Papa.unparse(value as unknown[], {
     delimiter: delimiter || ",",
-    // mikefarah ends a row with a newline, not CRLF (1ctx)
+    // mikefarah ends a row with a newline, not CRLF (1ctx yq)
     newline: "\n",
   });
 }
@@ -267,7 +267,7 @@ export function parseInput(
 export function parseAllYamlDocuments(
   input: string,
   limits: SanitizeParsedDataLimits = {},
-  // the parsed documents, for a write that keeps their comments (1ctx)
+  // the parsed documents, for a write that keeps their comments (1ctx yq)
   parsed?: YAML.Document[],
 ): QueryValue[] {
   const maxDocuments = limits.maxElements ?? 1_000_000;
@@ -299,7 +299,7 @@ export function parseAllYamlDocuments(
     lineStart = lineEnd + 1;
   }
   // merge keys (<<: *base) are merged on read, as mikefarah reads them
-  // (1ctx)
+  // (1ctx yq)
   const docs = YAML.parseAllDocuments(input, { merge: true });
   if (!Array.isArray(docs)) return [];
   if (docs.length > maxDocuments) {
@@ -312,13 +312,13 @@ export function parseAllYamlDocuments(
   const values: QueryValue[] = [];
   if (parsed) {
     // each document again as text alone, for a write that keeps every
-    // untouched scalar as written (1ctx)
+    // untouched scalar as written (1ctx yq)
     const text = YAML.parseAllDocuments(input, { schema: "failsafe" });
     if (Array.isArray(text)) parsed.push(...text);
   }
   for (const [index, doc] of docs.entries()) {
     // toJS keeps going past a syntax error; a broken document fails the
-    // whole stream, so -i never writes a half-read file (1ctx)
+    // whole stream, so -i never writes a half-read file (1ctx yq)
     const problem = doc.errors[0];
     if (problem) {
       throw new Error(
@@ -339,7 +339,7 @@ export function parseAllYamlDocuments(
  * The documents of a YAML stream parsed with the failsafe schema, every
  * scalar its source text, for a write or a print that keeps every
  * untouched node as written. Parsed only when a result needs it, since
- * the values were read already. (1ctx)
+ * the values were read already. (1ctx yq)
  */
 export function parseFailsafeDocuments(input: string): YAML.Document[] {
   const docs = YAML.parseAllDocuments(input, { schema: "failsafe" });
@@ -416,7 +416,7 @@ export function formatOutput(
   if (value === undefined) return "";
 
   // the string itself, its spaces and newlines kept, as mikefarah prints a
-  // top-level scalar (1ctx)
+  // top-level scalar (1ctx yq)
   if (
     options.outputFormat === "yaml" &&
     typeof value === "string" &&
@@ -443,14 +443,14 @@ export function formatOutput(
     case "yaml":
       serialized = YAML.stringify(value, {
         ...(options.yaml11 ? { compat: "yaml-1.1" as const } : {}),
-        // mikefarah's -I0 and -I1 print with 4 and 2 (1ctx)
+        // mikefarah's -I0 and -I1 print with 4 and 2 (1ctx yq)
         indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
       }).trimEnd();
       break;
 
     case "json": {
       return formatJsonValue(value, maxBytes, {
-        // -I0 is one line, as mikefarah's -o json -I0 (1ctx)
+        // -I0 is one line, as mikefarah's -o json -I0 (1ctx yq)
         compact: options.compact || options.indent === 0,
         raw: options.raw,
         indent: options.indent,

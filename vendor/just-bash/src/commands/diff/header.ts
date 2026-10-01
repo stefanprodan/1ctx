@@ -1,5 +1,5 @@
 /**
- * (1ctx) How GNU diff 3.12 names files: in a context or unified header a
+ * (1ctx diff) How GNU diff 3.12 names files: in a context or unified header a
  * name holding a space, a double quote or a control character is quoted
  * C-style, and in its messages a name is quoted for the shell as coreutils
  * does. A header's time is the file's in the sandbox's TZ.

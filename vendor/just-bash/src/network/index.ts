@@ -4,7 +4,7 @@
  * Provides secure network access with URL allow-list enforcement.
  */
 
-// the allow-list rules, for 1ctx's credential prefixes (1ctx)
+// the allow-list rules, for 1ctx's credential prefixes (1ctx network-exports)
 export {
   matchesAllowListEntry,
   validateAllowList,

@@ -1,5 +1,5 @@
 /**
- * (1ctx) What each command answers to its version flag, as the tool it
+ * (1ctx version-flags) What each command answers to its version flag, as the tool it
  * follows answers it, so a script reading the version from the first line
  * works. Commands with their own parser for it (awk, grep, rg, jq, yq,
  * curl, xargs, diff) and bash's builtins, which take no version flag,

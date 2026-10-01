@@ -1,5 +1,5 @@
 /**
- * (1ctx) xargs' arguments read as GNU xargs 4.11 reads them through getopt:
+ * (1ctx xargs-gnu) xargs' arguments read as GNU xargs 4.11 reads them through getopt:
  * a short option's value attached or apart, booleans clustered with a
  * value option last, long options with `=` or apart and by any unique
  * prefix, `--` ending the options and the first operand starting the
@@ -370,7 +370,7 @@ export function parseXargsArgs(args: string[]): ParsedArgs {
             "failed to unset environment variable : Invalid argument",
           );
         }
-        // (1ctx) the slot reaches the command as an assignment before
+        // (1ctx xargs-gnu) the slot reaches the command as an assignment before
         // its name, which takes a shell name only
         if (!SHELL_NAME.test(value as string)) {
           return plainError(

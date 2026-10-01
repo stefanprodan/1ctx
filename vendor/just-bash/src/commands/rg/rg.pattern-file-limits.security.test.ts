@@ -102,7 +102,7 @@ describe("rg pattern-file resource limits", () => {
     );
     const fromStdin = await bash.exec("printf 'gamma\\n' | rg -f - /data.txt");
 
-    // (1ctx) the blank line is the empty pattern, which matches every line
+    // (1ctx rg) the blank line is the empty pattern, which matches every line
     expect(fromFiles).toMatchObject({
       exitCode: 0,
       stdout: "alpha\nbeta\ngamma\n",

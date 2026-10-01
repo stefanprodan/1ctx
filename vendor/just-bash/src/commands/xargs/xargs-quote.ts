@@ -1,5 +1,5 @@
 /**
- * (1ctx) An argument quoted for -t as GNU xargs prints it: bare when the
+ * (1ctx xargs-gnu) An argument quoted for -t as GNU xargs prints it: bare when the
  * shell would read it as it is, in double quotes when a single quote is
  * the only trouble, else in single quotes, a control character written
  * as $'\n' outside them.

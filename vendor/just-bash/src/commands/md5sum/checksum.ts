@@ -158,7 +158,7 @@ export function createChecksumCommand(
       const files: string[] = [];
 
       for (const [i, arg] of args.entries()) {
-        // (1ctx) `--` ends the options, as in GNU coreutils
+        // (1ctx end-of-options) `--` ends the options, as in GNU coreutils
         if (arg === "--") {
           files.push(...args.slice(i + 1));
           break;

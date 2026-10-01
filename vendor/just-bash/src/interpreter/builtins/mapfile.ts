@@ -40,7 +40,7 @@ export function handleMapfile(
     const arg = args[i];
     if (arg === "-d" && i + 1 < args.length) {
       // In bash, -d '' means use NUL byte as delimiter
-      // (1ctx) stdin is bytes and bash delimits on the first byte of -d
+      // (1ctx read-utf8) stdin is bytes and bash delimits on the first byte of -d
       delimiter = delimiterByte(args[i + 1]);
       i += 2;
     } else if (arg === "-n" && i + 1 < args.length) {
@@ -89,7 +89,7 @@ export function handleMapfile(
   let skipped = 0;
   const maxArrayElements = ctx.limits.maxArrayElements;
 
-  // (1ctx) a line is collected as bytes and stored as text
+  // (1ctx read-utf8) a line is collected as bytes and stored as text
   const pushLine = (bytes: string): void => {
     const line = decodeInput(bytes);
     if (utf8ByteLength(line) > ctx.limits.maxStringLength) {

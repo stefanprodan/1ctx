@@ -172,15 +172,15 @@ interface YqOptions extends FormatOptions {
   exitStatus: boolean;
   slurp: boolean;
   nullInput: boolean;
-  /** no --- between documents, mikefarah's -N (1ctx) */
+  /** no --- between documents, mikefarah's -N (1ctx yq) */
   noDoc: boolean;
-  /** -j, mikefarah's deprecated --tojson (1ctx) */
+  /** -j, mikefarah's deprecated --tojson (1ctx yq) */
   tojson: boolean;
-  /** -0: a NUL after each result, mikefarah's --nul-output (1ctx) */
+  /** -0: a NUL after each result, mikefarah's --nul-output (1ctx yq) */
   nulOutput: boolean;
   inplace: boolean;
   frontMatter: boolean;
-  /** ea: the filter runs once over every document (1ctx) */
+  /** ea: the filter runs once over every document (1ctx yq) */
   evalAll: boolean;
 }
 
@@ -188,13 +188,13 @@ interface ParsedArgs {
   options: YqOptions;
   filter: string;
   files: string[];
-  /** where each file sits in args, to run one file at a time (1ctx) */
+  /** where each file sits in args, to run one file at a time (1ctx yq) */
   fileAt: number[];
   inputFormatExplicit: boolean;
   outputFormatExplicit: boolean;
 }
 
-// mikefarah's one-letter formats: -oj, -o y (1ctx)
+// mikefarah's one-letter formats: -oj, -o y (1ctx yq)
 const SHORT_FORMATS: Record<string, string> = Object.assign(Object.create(null), {
   y: "yaml",
   j: "json",
@@ -229,7 +229,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
   let command = false;
   const files: string[] = [];
   const fileAt: number[] = [];
-  // after --, the filter and files only, as mikefarah reads them (1ctx)
+  // after --, the filter and files only, as mikefarah reads them (1ctx yq)
   let positional = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -310,7 +310,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     } else if (a === "-n" || a === "--null-input") {
       options.nullInput = true;
     } else if (a === "-j" || a === "--tojson") {
-      // mikefarah's -j is JSON output, not jq's join (1ctx)
+      // mikefarah's -j is JSON output, not jq's join (1ctx yq)
       options.tojson = true;
     } else if (a === "-N" || a === "--no-doc") {
       options.noDoc = true;
@@ -332,12 +332,12 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       a === "--no-colors" ||
       a === "--colors"
     ) {
-      // colours are for a terminal, and the mount has none (1ctx)
+      // colours are for a terminal, and the mount has none (1ctx yq)
     } else if (a === "-") {
       files.push("-");
       fileAt.push(i);
     } else if (a === "--version" || a === "-V") {
-      // models check the version to pick mikefarah's syntax (1ctx)
+      // models check the version to pick mikefarah's syntax (1ctx yq)
       return {
         stdout:
           "yq (https://github.com/mikefarah/yq/) version v4.53.3 (just-bash, compatible)\n" +
@@ -349,7 +349,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       return unknownOption("yq", a);
     } else if (/^-[opI]=?./.test(a)) {
       // a value joined to its flag, as mikefarah's accepts: -ojson, -I0,
-      // -o=json (1ctx)
+      // -o=json (1ctx yq)
       const joined = a.slice(a[2] === "=" ? 3 : 2);
       const value = a[1] === "I" ? joined : (formatName(joined) as string);
       if (a[1] === "I") {
@@ -383,11 +383,11 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
         else return unknownOption("yq", `-${c}`);
       }
     } else if (!filterSet && !command && (a === "eval" || a === "e")) {
-      // mikefarah's `yq eval <filter> <file>` (1ctx)
+      // mikefarah's `yq eval <filter> <file>` (1ctx yq)
       command = true;
     } else if (!filterSet && !command && (a === "eval-all" || a === "ea")) {
       // mikefarah's eval-all: every document of every file as one list
-      // (1ctx)
+      // (1ctx yq)
       command = true;
       options.evalAll = true;
     } else if (!filterSet) {
@@ -420,7 +420,7 @@ export const yqCommand: RuntimeCommand = {
   async execute(
     args: string[],
     ctx: RuntimeCommandContext,
-    // the file's place among several, for the --- between files (1ctx)
+    // the file's place among several, for the --- between files (1ctx yq)
     file = 0,
   ): Promise<ExecResult> {
     assertDefenseContext(ctx.requireDefenseContext, "yq", "execution entry");
@@ -434,7 +434,7 @@ export const yqCommand: RuntimeCommand = {
 
     const parsed = parseArgs(args);
     if ("exitCode" in parsed) return parsed;
-    // mikefarah's words for -j, said once for every file (1ctx)
+    // mikefarah's words for -j, said once for every file (1ctx yq)
     const warning = parsed.options.tojson ? TOJSON_WARNING : "";
 
     const {
@@ -451,7 +451,7 @@ export const yqCommand: RuntimeCommand = {
     }
 
     // mikefarah's yq reads every file in turn; this one read the first and
-    // dropped the rest without a word (1ctx)
+    // dropped the rest without a word (1ctx yq)
     if (files.length > 1) {
       if (options.slurp || options.nullInput) {
         return {
@@ -524,13 +524,13 @@ export const yqCommand: RuntimeCommand = {
         options.inputFormat = detected;
       }
       // a .json file prints JSON unless -p or -o was given, as mikefarah's
-      // (1ctx)
+      // (1ctx yq)
       if (detected === "json" && !outputFormatExplicit) {
         options.outputFormat = "json";
       }
     }
     // an in-place edit writes the file's own format back, as mikefarah's
-    // does, not YAML into a .json file (1ctx)
+    // does, not YAML into a .json file (1ctx yq)
     if (
       options.inplace &&
       !outputFormatExplicit &&
@@ -577,10 +577,10 @@ export const yqCommand: RuntimeCommand = {
     }
 
     // results are records, so an empty string is a result and the document
-    // it came from travels with it (1ctx)
+    // it came from travels with it (1ctx yq)
     const records: Result[] = [];
     // an error in a later document fails the run after the earlier
-    // documents' results, as mikefarah's streams them (1ctx)
+    // documents' results, as mikefarah's streams them (1ctx yq)
     let failure: unknown = null;
     try {
       const ast = parse(filter, {
@@ -589,7 +589,7 @@ export const yqCommand: RuntimeCommand = {
         maxSourceLength: ctx.limits.maxStringLength,
       });
       // the documents as written, parsed once and only when a result
-      // prints through them or -i writes them (1ctx)
+      // prints through them or -i writes them (1ctx yq)
       let parsed: YAML.Document[] | null = null;
       const documentsOf = (): YAML.Document[] => {
         parsed ??= parseFailsafeDocuments(input);
@@ -607,19 +607,19 @@ export const yqCommand: RuntimeCommand = {
               maxDepth: ctx.limits.maxQueryDepth,
             }
           : undefined,
-        // (1ctx) $ENV, env and strenv read the exported variables only
+        // (1ctx exported-env) $ENV, env and strenv read the exported variables only
         env: processEnv(ctx),
         coverage: ctx.coverage,
         requireDefenseContext: ctx.requireDefenseContext,
         budget: { operations: 0, callDepth: 0 },
-        // mikefarah's rules where they part from jq's (1ctx)
+        // mikefarah's rules where they part from jq's (1ctx query-dialect)
         dialect: "yq",
       };
       const dataLimits = {
         maxDepth: ctx.limits.maxQueryDepth,
         maxElements: ctx.limits.maxQueryElements,
       };
-      // load() reads its files before the run, which cannot wait (1ctx)
+      // load() reads its files before the run, which cannot wait (1ctx query-dialect)
       const loads = await readLoads(ast, ctx, withDefenseContext);
       // mikefarah names stdin "-" when no file was given, and "" for -
       const filename = options.nullInput
@@ -672,7 +672,7 @@ export const yqCommand: RuntimeCommand = {
         run(items, 0);
       } else {
         // mikefarah's yq runs the filter on each document of a YAML stream,
-        // where this one refused a stream it was not told to slurp (1ctx)
+        // where this one refused a stream it was not told to slurp (1ctx yq)
         // every YAML file is read this way, so a result that is a node of
         // it prints with its comments, and -i writes them back
         if (options.inputFormat === "yaml") {
@@ -704,9 +704,9 @@ export const yqCommand: RuntimeCommand = {
           ctx.limits.maxStringLength,
           ctx.limits.maxOutputSize,
         );
-        // nothing, or with -e only null and false: no write (1ctx)
+        // nothing, or with -e only null and false: no write (1ctx yq)
         if (records.length === 0 || (options.exitStatus && missed(records))) {
-          // mikefarah's answer, and no emptied file (1ctx)
+          // mikefarah's answer, and no emptied file (1ctx yq)
           return {
             stdout: "",
             stderr: "yq: no matches found, the file is left as it was\n",
@@ -757,7 +757,7 @@ export const yqCommand: RuntimeCommand = {
 
       // Handle inplace mode
       if (options.inplace && filePath) {
-        // nothing, or with -e only null and false: no write (1ctx)
+        // nothing, or with -e only null and false: no write (1ctx yq)
         if (records.length === 0 || (options.exitStatus && missed(records))) {
           return {
             stdout: "",
@@ -796,7 +796,7 @@ export const yqCommand: RuntimeCommand = {
   },
 };
 
-/** Whether a node of the filter satisfies `test`. (1ctx) */
+/** Whether a node of the filter satisfies `test`. (1ctx query-dialect) */
 function hasNode(ast: AstNode, test: (node: AstNode) => boolean): boolean {
   const visit = (node: unknown): boolean => {
     if (Array.isArray(node)) return node.some(visit);
@@ -809,7 +809,7 @@ function hasNode(ast: AstNode, test: (node: AstNode) => boolean): boolean {
 
 /**
  * The files the filter's load() and load_str() name, read through the
- * mount from the working directory under its string limit. (1ctx)
+ * mount from the working directory under its string limit. (1ctx query-dialect)
  */
 async function readLoads(
   ast: AstNode,
@@ -861,7 +861,7 @@ async function readLoads(
 /**
  * mikefarah's eval-all: every document of every file read first, the
  * filter run once over the list, and -i writing each file its own
- * documents' results. (1ctx)
+ * documents' results. (1ctx yq)
  */
 async function runEvalAll(
   parsed: ParsedArgs,
@@ -966,7 +966,7 @@ async function runEvalAll(
         maxArrayElements: ctx.limits.maxQueryElements,
         maxDepth: ctx.limits.maxQueryDepth,
       },
-      // (1ctx) the exported variables only
+      // (1ctx exported-env) the exported variables only
       env: processEnv(ctx),
       coverage: ctx.coverage,
       requireDefenseContext: ctx.requireDefenseContext,
@@ -1075,7 +1075,7 @@ function failed(e: unknown): ExecResult {
       exitCode: ExecutionLimitError.EXIT_CODE,
     };
   }
-  // mikefarah's yq exits 1 on any error (1ctx)
+  // mikefarah's yq exits 1 on any error (1ctx yq)
   const msg = sanitizeErrorMessage((e as Error).message);
   if (msg.includes("Unknown function")) {
     return {
@@ -1093,7 +1093,7 @@ function failed(e: unknown): ExecResult {
 
 /**
  * A result, the document its input was, and whether a function computed
- * it, which makes it count as read from document 0. (1ctx)
+ * it, which makes it count as read from document 0. (1ctx yq)
  */
 interface Result {
   value: QueryValue;
@@ -1107,7 +1107,7 @@ interface Result {
   source?: (string | number)[];
 }
 
-/** The parsed document a record was read from, and its value. (1ctx) */
+/** The parsed document a record was read from, and its value. (1ctx yq) */
 interface Node {
   document: YAML.Document;
   value: QueryValue;
@@ -1133,7 +1133,7 @@ function valueAt(value: QueryValue, path: (string | number)[]): QueryValue {
  * comments and style, as mikefarah prints it and as -i writes it: the
  * change from the node's value to the result is applied to the node.
  * Null where the result is not a map or list, has no node, or does not
- * read back exactly, and the caller prints it plainly. (1ctx)
+ * read back exactly, and the caller prints it plainly. (1ctx yq)
  */
 function keptText(
   record: Result,
@@ -1167,7 +1167,7 @@ function keptText(
   );
 }
 
-/** The file and the document a result counts as read from. (1ctx) */
+/** The file and the document a result counts as read from. (1ctx yq) */
 type Key = [file: number, document: number];
 
 // both 0 for a computed value
@@ -1187,7 +1187,7 @@ function moved(last: Key | null, next: Key | null): boolean {
 /**
  * The text of the results: one per line, or each ended by a NUL with -0,
  * --- where the document moves in YAML output unless -N, a top-level
- * string raw. (1ctx)
+ * string raw. (1ctx yq)
  */
 function printRecords(
   records: Result[],
@@ -1311,7 +1311,7 @@ export const flagsForFuzzing: CommandFuzzInfo = {
  * The file an in-place edit writes: each document's results, a single
  * container result applied onto the parsed document so its comments stay,
  * --- between documents as they print, none before the first, a document
- * dropped when its filter output nothing. (1ctx)
+ * dropped when its filter output nothing. (1ctx yq)
  */
 function inPlaceText(
   records: Result[],

@@ -276,7 +276,7 @@ describe("rg feature: issue #89 - files with matches", () => {
 });
 
 describe("rg feature: issue #109 - max depth", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit search depth with --max-depth", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -290,7 +290,7 @@ describe("rg feature: issue #109 - max depth", () => {
     expect(result.stdout).toBe("one/pass:1:far\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept -d as alias for --max-depth", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -304,7 +304,7 @@ describe("rg feature: issue #109 - max depth", () => {
     expect(result.stdout).toBe("one/pass:1:far\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search only current directory with -d 1", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -318,7 +318,7 @@ describe("rg feature: issue #109 - max depth", () => {
     expect(result.stdout).toBe("top.txt:1:match\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search deeper with higher -d value", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -331,7 +331,7 @@ describe("rg feature: issue #109 - max depth", () => {
     expect(result.stdout).toBe("a/b/c/deep.txt:1:found\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should combine -d with type filter", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -372,7 +372,7 @@ describe("rg feature: issue #124 - case-sensitive override", () => {
 });
 
 describe("rg feature: issue #159 - max count", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should stop after N matches with -m", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -385,7 +385,7 @@ describe("rg feature: issue #159 - max count", () => {
     expect(result.stdout).toBe("foo:1:test\n");
   });
 
-  // (1ctx) ripgrep 15's -m0 selects nothing and exits 1
+  // (1ctx search-engine) ripgrep 15's -m0 selects nothing and exits 1
   it("should treat -m0 as selecting nothing", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -476,7 +476,7 @@ describe("rg feature: context separator", () => {
 });
 
 describe("rg feature: multiple patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match multiple patterns with -e", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -491,7 +491,7 @@ describe("rg feature: multiple patterns", () => {
 });
 
 describe("rg feature: gitignore handling", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should respect .gitignore by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -506,7 +506,7 @@ describe("rg feature: gitignore handling", () => {
     expect(result.stdout).toBe("visible.txt:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with --no-ignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -523,7 +523,7 @@ describe("rg feature: gitignore handling", () => {
 });
 
 describe("rg feature: hidden files", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip hidden files by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -537,7 +537,7 @@ describe("rg feature: hidden files", () => {
     expect(result.stdout).toBe("visible:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include hidden files with --hidden", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -553,7 +553,7 @@ describe("rg feature: hidden files", () => {
 });
 
 describe("rg feature: type filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by type with -t", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -568,7 +568,7 @@ describe("rg feature: type filtering", () => {
     expect(result.stdout).toBe("code.js:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should exclude type with -T", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -582,7 +582,7 @@ describe("rg feature: type filtering", () => {
     expect(result.stdout).toBe("code.py:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should accept markdown as type alias", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -596,7 +596,7 @@ describe("rg feature: type filtering", () => {
     expect(result.stdout).toBe("README.md:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match .markdown extension with -t markdown", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -610,7 +610,7 @@ describe("rg feature: type filtering", () => {
     expect(result.stdout).toBe("doc.markdown:1:content\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match .mdown extension with -t markdown", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -637,7 +637,7 @@ describe("rg feature: type filtering", () => {
     expect(mdResult.stdout).toBe(markdownResult.stdout);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should exclude markdown with -T markdown", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -653,7 +653,7 @@ describe("rg feature: type filtering", () => {
 });
 
 describe("rg feature: glob filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by glob with -g", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -667,7 +667,7 @@ describe("rg feature: glob filtering", () => {
     expect(result.stdout).toBe("file.txt:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate glob with -g !", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -683,7 +683,7 @@ describe("rg feature: glob filtering", () => {
 });
 
 describe("rg feature: word and line matching", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match whole words with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -707,7 +707,7 @@ describe("rg feature: word and line matching", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match whole lines with -x", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -722,7 +722,7 @@ describe("rg feature: word and line matching", () => {
 });
 
 describe("rg feature: inverted match", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should invert match with -v", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -737,7 +737,7 @@ describe("rg feature: inverted match", () => {
 });
 
 describe("rg feature: fixed strings", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should treat pattern as literal with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -842,7 +842,7 @@ describe("rg feature: context lines", () => {
 });
 
 describe("rg feature: combined flags", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should combine -i and -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -926,7 +926,7 @@ describe("rg feature: --stats", () => {
     expect(result.stdout).toContain("1 files searched");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include search results before stats", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -953,7 +953,7 @@ describe("rg feature: --stats", () => {
   });
 });
 
-// (1ctx) -P goes through grep's -P layer, which refuses what RE2 cannot run
+// (1ctx rg) -P goes through grep's -P layer, which refuses what RE2 cannot run
 describe("rg feature: PCRE2 on RE2", () => {
   it("should search with -P", async () => {
     const bash = new Bash({
@@ -1044,7 +1044,7 @@ describe("rg feature: f45_ignore_file", () => {
 
 // f68 - --no-ignore-vcs
 describe("rg feature: f68_no_ignore_vcs", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip .gitignore with --no-ignore-vcs", async () => {
     const bash = new Bash({
       cwd: "/home/user",

@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU diff's ed script (-e), its forward form (-f) and the RCS
+ * (1ctx diff) GNU diff's ed script (-e), its forward form (-f) and the RCS
  * format (-n). An ed script runs from the last change to the first, so
  * its line numbers hold as it edits; a line that is only a dot is written
  * as two and fixed with `s/.//`. RCS says how many lines each command

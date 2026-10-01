@@ -18,12 +18,12 @@ const envHelp = {
   ],
 };
 
-// (1ctx) env's own failures exit 125, as GNU's do
+// (1ctx env-options) env's own failures exit 125, as GNU's do
 function envFailure(stderr: string): ExecResult {
   return { stdout: "", stderr, exitCode: 125 };
 }
 
-// (1ctx) a process sees the exported variables, never the shell's own
+// (1ctx exec-env) a process sees the exported variables, never the shell's own
 function exportedEnv(ctx: RuntimeCommandContext): Record<string, string> {
   return ctx.exportedEnv ?? mapToRecord(ctx.env);
 }
@@ -39,7 +39,7 @@ export const envCommand: RuntimeCommand = {
       return showHelp(envHelp);
     }
 
-    // (1ctx) GNU's parse: options up to the first operand or `--`, `-` is
+    // (1ctx env-options) GNU's parse: options up to the first operand or `--`, `-` is
     // -i, a cluster may end in -u's value, then NAME=VALUE, then the command
     let ignoreEnv = false;
     const unsetVars: string[] = [];
@@ -88,7 +88,7 @@ export const envCommand: RuntimeCommand = {
       setVars.set(args[i].slice(0, eqIdx), args[i].slice(eqIdx + 1));
     }
     const commandStart = i < args.length ? i : -1;
-    // (1ctx) glibc's unsetenv refuses an empty name or one with `=`
+    // (1ctx env-options) glibc's unsetenv refuses an empty name or one with `=`
     for (const name of unsetVars) {
       if (name === "" || name.includes("=")) {
         return envFailure(`env: cannot unset '${name}': Invalid argument\n`);
@@ -100,7 +100,7 @@ export const envCommand: RuntimeCommand = {
     if (ignoreEnv) {
       newEnv = new Map(setVars);
     } else {
-      // (1ctx) from the exported variables, as a process's environment is
+      // (1ctx exec-env) from the exported variables, as a process's environment is
       newEnv = new Map(Object.entries(exportedEnv(ctx)));
       // Unset variables
       for (const name of unsetVars) {
@@ -141,7 +141,7 @@ export const envCommand: RuntimeCommand = {
 
     // Execute with explicitly provided environment so untrusted values never
     // get reparsed as shell source via assignment prefixes.
-    // (1ctx) `--` so a command named like an option is not read as one
+    // (1ctx env-options) `--` so a command named like an option is not read as one
     return ctx.exec("command --", {
       cwd: ctx.cwd,
       env: mapToRecord(newEnv),
@@ -174,7 +174,7 @@ export const printenvCommand: RuntimeCommand = {
     }
 
     const vars = args.filter((arg) => !arg.startsWith("-"));
-    // (1ctx) the exported variables, as GNU printenv sees them
+    // (1ctx exec-env) the exported variables, as GNU printenv sees them
     const env = new Map(Object.entries(exportedEnv(ctx)));
 
     if (vars.length === 0) {

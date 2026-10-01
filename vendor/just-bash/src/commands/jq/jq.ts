@@ -322,7 +322,7 @@ export const jqCommand: RuntimeCommand = {
     let optionsEnded = false;
     for (let i = 0; i < args.length; i++) {
       const a = args[i];
-      // (1ctx) `--` ends the options, as in jq 1.8
+      // (1ctx end-of-options) `--` ends the options, as in jq 1.8
       if (optionsEnded || a === "--") {
         const error = optionsEnded ? operand(a) : undefined;
         if (error) return error;
@@ -402,7 +402,7 @@ export const jqCommand: RuntimeCommand = {
         // become positional args instead of input files.
         positionalMode = "jsonargs";
       } else if (a === "--version" || a === "-V") {
-        // (1ctx) jq's own line first, so a script reading it works
+        // (1ctx jq-version) jq's own line first, so a script reading it works
         return { stdout: JQ_VERSION, stderr: "", exitCode: 0 };
       } else if (a === "-") files.push("-");
       else if (a.startsWith("--")) return unknownOption("jq", a);
@@ -509,7 +509,7 @@ export const jqCommand: RuntimeCommand = {
               maxDepth: ctx.limits.maxQueryDepth,
             }
           : undefined,
-        // (1ctx) $ENV and env hold the exported variables only
+        // (1ctx exported-env) $ENV and env hold the exported variables only
         env: processEnv(ctx),
         namedArgs,
         positionalArgs,

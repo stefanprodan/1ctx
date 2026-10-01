@@ -7,7 +7,8 @@ One continuous context for agents. Domain: 1ctx.dev.
   pins, official npm only, `bun install --ignore-scripts`. A new package
   needs the user's explicit go-ahead. The one exception is just-bash,
   whose TypeScript source lives in `vendor/just-bash/` and is ours to
-  change: `vendor/README.md` says what we changed and how to sync it.
+  change: `vendor/README.md` says how a change to it is recorded and
+  how to sync it, `vendor/changes.md` what we changed.
   In `src/`, `src/server/lib/archive.ts` alone imports `@zip.js/zip.js`
   and `modern-tar`, and `src/client/ui/Plot.tsx` alone imports `uplot`;
   the vendored tar command uses modern-tar too. The modern-tar patch
@@ -98,15 +99,18 @@ scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, six of them over record-cases.ts
                 (diff-record.ts among them, with diff-patch-check.ts
-                beside it; vendor/README.md) and deciders-record.ts
+                beside it; vendor/differences.md) and deciders-record.ts
                 (docs/providers.md).
 skills/         installable agent skills; visualize/ holds SKILL.md,
                 references/ and its upstream license. Added by URL, not seeded.
 site/           1ctx.dev and the brand files; its own project, untouched
                 by the app. site/README.md is the brand book.
 vendor/         just-bash/, the vendored source (a git subtree, outside
-                Biome and the structure rules), README.md (the fork, our
-                changes, the upstream sync) and just-bash-failures.txt,
+                Biome and the structure rules), README.md (the fork, how
+                a change is recorded, the upstream sync), changes.md (one
+                entry per change, its id in the source's `(1ctx <id>)`
+                markers), differences.md (where our commands still part
+                from the tools they follow) and just-bash-failures.txt,
                 what `make vendor-test` expects.
 docs/           the rules of each area, one file per topic (see Docs).
 ```
@@ -126,9 +130,9 @@ builds it with its factory and fakes for its ports.
 
 ## Docs
 
-The files under `docs/` and `vendor/README.md` are rules with the same
-force as this file; each governs the code its first lines name. Read
-the one that covers a change before making it.
+The files under `docs/` and the three under `vendor/` are rules with
+the same force as this file; each governs the code its first lines
+name. Read the one that covers a change before making it.
 
 | Doc | Read it |
 |---|---|
@@ -145,6 +149,8 @@ the one that covers a change before making it.
 | `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
 | `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
 | `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
+| `vendor/changes.md` | before changing a hunk of `vendor/just-bash/`: the entry its `(1ctx <id>)` marker names, kept in the same commit |
+| `vendor/differences.md` | before changing what a vendored command answers: where it still parts from the tool it follows |
 
 AGENTS.md and `docs/` change in the same commit as the code that changes
 a rule.

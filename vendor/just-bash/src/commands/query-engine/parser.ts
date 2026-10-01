@@ -82,7 +82,7 @@ const KEYWORDS: Map<string, TokenType> = new Map([
 
 const KEYWORD_TOKEN_TYPES: Set<TokenType> = new Set(KEYWORDS.values());
 
-// the node setters of mikefarah's yq (1ctx)
+// the node setters of mikefarah's yq (1ctx query-dialect)
 const YQ_SETTERS = new Set([
   "style",
   "tag",
@@ -452,7 +452,7 @@ class Parser {
     return false;
   }
 
-  // a setter of mikefarah's yq after a path: `style=`, `line_comment=` (1ctx)
+  // a setter of mikefarah's yq after a path: `style=`, `line_comment=` (1ctx query-dialect)
   private isSetterAhead(): boolean {
     const at = this.check("DOT") ? 1 : 0;
     const name = this.peek(at);
@@ -639,7 +639,7 @@ class Parser {
       const pattern = this.parsePattern();
 
       // mikefarah's `EXPR as $x ireduce (INIT; UPDATE)`, a reduce the
-      // evaluator runs in the yq dialect and refuses in jq's (1ctx)
+      // evaluator runs in the yq dialect and refuses in jq's (1ctx yq)
       if (this.peek().type === "IDENT" && this.peek().value === "ireduce") {
         this.advance();
         this.expect("LPAREN", "Expected '(' after ireduce");
@@ -849,11 +849,11 @@ class Parser {
         this.peek(1).type === "LBRACKET" &&
         this.peek(1).pos === this.peek().pos + 1
       ) {
-        // .a.[0] and .a.[], which jq 1.8 and mikefarah's yq read (1ctx)
+        // .a.[0] and .a.[], which jq 1.8 and mikefarah's yq read (1ctx query-dialect)
         this.advance();
       } else if (this.isSetterAhead()) {
         // mikefarah's `.a style="double"` and `... comments=""`, a call the
-        // evaluator answers in the yq dialect and refuses in jq's (1ctx)
+        // evaluator answers in the yq dialect and refuses in jq's (1ctx query-dialect)
         if (this.check("DOT")) this.advance();
         const name = this.advance().value as string;
         this.advance();

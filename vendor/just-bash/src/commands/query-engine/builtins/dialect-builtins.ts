@@ -1,5 +1,5 @@
 /**
- * Where jq and mikefarah's yq part (1ctx)
+ * Where jq and mikefarah's yq part (1ctx query-dialect)
  *
  * jq and yq run one engine, and the two tools answer some builtins
  * differently. `ctx.dialect` says whose rules apply: "yq" for the yq
@@ -652,7 +652,7 @@ const NODE_TEXT = new Set([
 // as a call of the name and `=`: tag= retypes a scalar, a comment setter
 // with an empty string on `.` or `..` strips what the output never has,
 // and the rest are refused, since our values carry no style, comments or
-// anchors (1ctx)
+// anchors (1ctx query-dialect)
 const SETTERS = new Set([
   "style=",
   "tag=",

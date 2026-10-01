@@ -16,7 +16,7 @@ export const _performanceNow: () => number = performance.now.bind(performance);
 export const _Headers: typeof globalThis.Headers = globalThis.Headers;
 /** Internal capability revocation; never expose this constructor to commands. */
 export const _Proxy: ProxyConstructor = globalThis.Proxy;
-// (1ctx) ported from upstream #506
+// (1ctx cancel-load) ported from upstream #506
 /**
  * Intrinsic promise settlement for infrastructure that must keep observing a
  * promise after the execution that created it has ended. The patched

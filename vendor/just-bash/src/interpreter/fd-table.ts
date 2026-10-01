@@ -5,7 +5,7 @@
  * table. The table itself stays a `Map<number, string>` because it is part
  * of the public `CommandContext` surface — extensions read fd values as
  * content — so this module owns the string encoding instead.
- * (1ctx) Content is bytes, one char each, as stdin is, never decoded text.
+ * (1ctx fd-bytes) Content is bytes, one char each, as stdin is, never decoded text.
  *
  * Entry kinds:
  * - `input`      readable content (`N< file`, `N<<EOF`, `N<<<word`). Reading
@@ -384,7 +384,7 @@ export async function writeFdEntry(
   const writeEntry = liveEntry ?? entry;
   if (writeEntry.kind !== "readwrite") return false;
 
-  // (1ctx) the entry holds the file's bytes and its position counts them
+  // (1ctx fd-bytes) the entry holds the file's bytes and its position counts them
   const bytes =
     encoding === "utf8"
       ? latin1FromBytes(encodeUtf8ToBytes(content))

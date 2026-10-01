@@ -15,7 +15,7 @@ const BINARY_CONTENT = "hello\x00world\n";
 const TEXT_CONTENT = "hello world\n";
 
 describe("rg binary: basic detection", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip binary files by default in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -30,7 +30,7 @@ describe("rg binary: basic detection", () => {
     expect(result.stdout).toBe("text.txt:1:hello world\n");
   });
 
-  // (1ctx) ripgrep reports a match in a binary file given by name
+  // (1ctx search-engine) ripgrep reports a match in a binary file given by name
   it("should skip binary files when searching single explicit file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -55,7 +55,7 @@ describe("rg binary: basic detection", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should not detect binary if NUL after 8KB sample", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -101,7 +101,7 @@ describe("rg binary: with files-with-matches flag", () => {
 });
 
 describe("rg binary: mixed content", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should only search text files in mixed directory", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -118,7 +118,7 @@ describe("rg binary: mixed content", () => {
     );
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle multiple binary and text files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -182,7 +182,7 @@ describe("rg binary: edge cases", () => {
 });
 
 describe("rg binary: common binary file types", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip files with common binary signatures", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -204,7 +204,7 @@ describe("rg binary: common binary file types", () => {
 });
 
 describe("rg binary: with other flags", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -i flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -218,7 +218,7 @@ describe("rg binary: with other flags", () => {
     expect(result.stdout).toBe("text.txt:1:HELLO world\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -v flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -232,7 +232,7 @@ describe("rg binary: with other flags", () => {
     expect(result.stdout).toBe("text.txt:1:keep\ntext.txt:3:keep\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -w flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -246,7 +246,7 @@ describe("rg binary: with other flags", () => {
     expect(result.stdout).toBe("text.txt:1:foo bar\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with context flags", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -262,7 +262,7 @@ describe("rg binary: with other flags", () => {
     );
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -m flag", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -278,7 +278,7 @@ describe("rg binary: with other flags", () => {
 });
 
 describe("rg binary: subdirectories", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip binary files in subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",

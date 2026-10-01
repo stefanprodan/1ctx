@@ -1,5 +1,5 @@
 /**
- * (1ctx) How GNU diff 3.12 orders and filters the names of two directories:
+ * (1ctx diff) How GNU diff 3.12 orders and filters the names of two directories:
  * sorted by the locale's collation (byte order in the C locale), or
  * ignoring case under --ignore-file-name-case; -x and -X patterns matched
  * as fnmatch does without FNM_PATHNAME or FNM_PERIOD; and the words for a

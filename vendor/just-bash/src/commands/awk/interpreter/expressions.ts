@@ -181,7 +181,7 @@ async function evalArrayAccess(
       evalExpr(ctx, expr.key),
     ),
   );
-  // (1ctx) a reference creates the element, as in gawk
+  // (1ctx awk) a reference creates the element, as in gawk
   return readArrayElement(ctx, expr.array, key);
 }
 
@@ -266,7 +266,7 @@ async function evalBinaryOp(
     }
   }
 
-  // (1ctx) a comparison is numeric only when both sides are: a number, an
+  // (1ctx awk) a comparison is numeric only when both sides are: a number, an
   // uninitialized variable or element (both "" and 0, as gawk's), or a
   // string that looks like one and is not a string constant, a
   // concatenation or a string function's answer, which gawk compares as
@@ -304,7 +304,7 @@ async function evalBinaryOp(
   // Arithmetic operators
   const leftNum = toNumber(left);
   const rightNum = toNumber(right);
-  // (1ctx) gawk's fatal error, where JavaScript would answer Infinity or NaN
+  // (1ctx awk) gawk's fatal error, where JavaScript would answer Infinity or NaN
   if ((op === "/" || op === "%") && rightNum === 0) {
     throw new Error("division by zero attempted");
   }
@@ -316,7 +316,7 @@ interface Operand {
   numeric: boolean;
 }
 
-// (1ctx) a comparison's side, and whether it takes part as a number
+// (1ctx awk) a comparison's side, and whether it takes part as a number
 async function evalOperand(
   ctx: AwkRuntimeContext,
   expr: AwkExpr,
@@ -443,7 +443,7 @@ async function evalFunctionCall(
     return callUserFunction(ctx, userFunc, args);
   }
 
-  // (1ctx) gawk's fatal error, when the call runs
+  // (1ctx awk) gawk's fatal error, when the call runs
   throw new Error(`function '${name}' not defined`);
 }
 
@@ -464,7 +464,7 @@ async function callUserFunction(
     );
   }
 
-  // (1ctx) Arguments are evaluated in the caller's scope before any is
+  // (1ctx awk) Arguments are evaluated in the caller's scope before any is
   // bound. A variable is passed by reference, so an array stays shared and
   // an untyped variable can become one; a parameter without an argument is
   // untyped and may be a local array, which ends with the call.
@@ -600,7 +600,7 @@ async function evalAssignment(
         finalValue = currentNum * valueNum;
         break;
       case "/=":
-        // (1ctx) gawk's fatal error
+        // (1ctx awk) gawk's fatal error
         if (valueNum === 0) throw new Error("division by zero attempted");
         finalValue = currentNum / valueNum;
         break;
@@ -758,7 +758,7 @@ async function evalGetline(
     return evalGetlineFromFile(ctx, variable, file);
   }
 
-  // (1ctx) plain getline reads the main input walk, in BEGIN too
+  // (1ctx awk) plain getline reads the main input walk, in BEGIN too
   if (!ctx.mainInput) {
     return -1;
   }
@@ -800,12 +800,12 @@ async function evalGetlineFromCommand(
     ),
   );
 
-  // (1ctx) gawk's fatal error for an empty command
+  // (1ctx awk) gawk's fatal error for an empty command
   if (cmd === "") throw nullRedirection("|");
   let stream = ctx.getlineCommandStreams.get(cmd);
   if (!stream) {
     // First time running this command, or again after close()
-    // (1ctx) it sees what the program wrote to its files so far; a failed
+    // (1ctx awk) it sees what the program wrote to its files so far; a failed
     // write is fatal, not a failed command
     await flushFiles(ctx);
     let output: string;
@@ -823,12 +823,12 @@ async function evalGetlineFromCommand(
       rethrowFatalExecutionError(e);
       return -1; // Error running command
     }
-    // (1ctx) the output shares the command's input budget
+    // (1ctx awk) the output shares the command's input budget
     stream = openStream(ctx, output);
     ctx.getlineCommandStreams.set(cmd, stream);
   }
 
-  // (1ctx) one record under the current RS; NR and FNR stay
+  // (1ctx awk) one record under the current RS; NR and FNR stay
   const record = readRecord(ctx, stream);
   if (record === null) {
     return 0; // EOF
@@ -873,13 +873,13 @@ async function evalGetlineFromFile(
   if (filename === "") throw nullRedirection("<");
   let stream = ctx.getlineFileStreams.get(filePath);
   if (!stream && (filename === "-" || filename === "/dev/stdin")) {
-    // (1ctx) standard input, as gawk names it
+    // (1ctx awk) standard input, as gawk names it
     stream = openStream(ctx, ctx.readStdin?.() ?? "");
     ctx.getlineFileStreams.set(filePath, stream);
   }
   if (!stream) {
     // First time reading this file, or again after close()
-    // (1ctx) what this program wrote to its files so far
+    // (1ctx awk) what this program wrote to its files so far
     await flushFiles(ctx);
     let content: string;
     try {
@@ -893,12 +893,12 @@ async function evalGetlineFromFile(
       rethrowFatalExecutionError(e);
       return -1; // Error reading file
     }
-    // (1ctx) the file shares the command's input budget
+    // (1ctx awk) the file shares the command's input budget
     stream = openStream(ctx, content);
     ctx.getlineFileStreams.set(filePath, stream);
   }
 
-  // (1ctx) one record under the current RS; NR and FNR stay
+  // (1ctx awk) one record under the current RS; NR and FNR stay
   const record = readRecord(ctx, stream);
   if (record === null) {
     return 0; // EOF

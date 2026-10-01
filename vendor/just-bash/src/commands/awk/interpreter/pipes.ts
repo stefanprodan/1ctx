@@ -1,5 +1,5 @@
 /**
- * (1ctx) AWK output pipes: `print ... | "cmd"`.
+ * (1ctx awk) AWK output pipes: `print ... | "cmd"`.
  *
  * gawk keeps one pipe per distinct command string and hands the command
  * the text as it is written; its stdout shares ours. We hold the text and
@@ -72,7 +72,7 @@ async function runPipe(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   if (ctx.signal?.aborted) throw new ExecutionAbortedError();
   if (!ctx.exec) throw new Error("cannot run a command from this awk");
-  // (1ctx) the command sees what the program wrote to its files so far;
+  // (1ctx awk) the command sees what the program wrote to its files so far;
   // on a failed write the pipe stays open for the fatal exit to run
   await flushFiles(ctx);
   const text = ctx.outputPipes.get(command) ?? "";

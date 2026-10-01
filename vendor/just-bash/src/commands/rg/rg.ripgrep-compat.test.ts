@@ -32,7 +32,7 @@ describe("rg ripgrep-compat: basic search", () => {
     );
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should search directory with filename prefix", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -123,7 +123,7 @@ describe("rg ripgrep-compat: case sensitivity", () => {
     );
   });
 
-  // (1ctx) ripgrep is case-sensitive unless -i or -S, and numbers lines
+  // (1ctx rg) ripgrep is case-sensitive unless -i or -S, and numbers lines
   // only with -n when piped
   it("should use smart case with lowercase pattern", async () => {
     const bash = new Bash({
@@ -138,7 +138,7 @@ describe("rg ripgrep-compat: case sensitivity", () => {
     expect(result.stdout).toBe("foo:1:tEsT\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should use smart case with uppercase pattern (case-sensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -152,7 +152,7 @@ describe("rg ripgrep-compat: case sensitivity", () => {
     expect(result.stdout).toBe("foo:2:TEST\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should override smart case with -s", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -256,7 +256,7 @@ describe("rg ripgrep-compat: quiet mode", () => {
 });
 
 describe("rg ripgrep-compat: file type filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter by type with -t", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -271,7 +271,7 @@ describe("rg ripgrep-compat: file type filtering", () => {
     expect(result.stdout).toBe("file.rs:1:Sherlock\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate type with -T", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -287,7 +287,7 @@ describe("rg ripgrep-compat: file type filtering", () => {
 });
 
 describe("rg ripgrep-compat: glob filtering", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should filter files with -g", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -302,7 +302,7 @@ describe("rg ripgrep-compat: glob filtering", () => {
     expect(result.stdout).toBe("file.rs:1:Sherlock\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should negate glob with -g !", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -316,7 +316,7 @@ describe("rg ripgrep-compat: glob filtering", () => {
     expect(result.stdout).toBe("file.py:1:Sherlock\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should support case-insensitive glob matching scenario", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -426,11 +426,11 @@ describe("rg ripgrep-compat: hidden files", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should include hidden files with --hidden", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -456,11 +456,11 @@ describe("rg ripgrep-compat: gitignore", () => {
       },
     });
     const result = await bash.exec("rg Sherlock");
-    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should ignore .gitignore with --no-ignore", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -478,7 +478,7 @@ describe("rg ripgrep-compat: gitignore", () => {
 });
 
 describe("rg ripgrep-compat: max depth", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should limit depth with --max-depth", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -494,7 +494,7 @@ describe("rg ripgrep-compat: max depth", () => {
 });
 
 describe("rg ripgrep-compat: multiple patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match multiple patterns with -e", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -507,7 +507,7 @@ describe("rg ripgrep-compat: multiple patterns", () => {
     expect(result.stdout).toBe("file.txt:1:foo\nfile.txt:2:bar\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle -e with dash pattern", async () => {
     // Regression test from ripgrep #270
     const bash = new Bash({
@@ -537,7 +537,7 @@ describe("rg ripgrep-compat: only matching", () => {
 });
 
 describe("rg ripgrep-compat: regex patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match IP address pattern", async () => {
     // Regression test from ripgrep #93
     const bash = new Bash({
@@ -551,7 +551,7 @@ describe("rg ripgrep-compat: regex patterns", () => {
     expect(result.stdout).toBe("foo:1:192.168.1.1\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match alternation pattern", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -601,7 +601,7 @@ describe("rg ripgrep-compat: exit codes", () => {
 });
 
 describe("rg ripgrep-compat: binary files", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should skip binary files by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -628,11 +628,11 @@ describe("rg ripgrep-compat: gitignore patterns", () => {
       },
     });
     const result = await bash.exec("rg xyz");
-    // (1ctx) ripgrep says no files were searched when filters leave none, exit 2
+    // (1ctx rg) ripgrep says no files were searched when filters leave none, exit 2
     expect(result.exitCode).toBe(2);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle rooted pattern in gitignore", async () => {
     // Regression test from ripgrep #25
     const bash = new Bash({
@@ -647,7 +647,7 @@ describe("rg ripgrep-compat: gitignore patterns", () => {
     expect(result.stdout).toBe("src/llvm/foo:1:test\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle negation after double-star", async () => {
     // Regression test from ripgrep #30
     const bash = new Bash({
@@ -676,7 +676,7 @@ describe("rg ripgrep-compat: gitignore patterns", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should handle negation of hidden file", async () => {
     // Regression test from ripgrep #90
     const bash = new Bash({
@@ -693,7 +693,7 @@ describe("rg ripgrep-compat: gitignore patterns", () => {
 });
 
 describe("rg ripgrep-compat: unicode", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should match cyrillic with -i", async () => {
     // Regression test from ripgrep #251
     const bash = new Bash({
@@ -774,7 +774,7 @@ describe("rg ripgrep-compat: vimgrep format (--vimgrep)", () => {
     const result = await bash.exec("rg --vimgrep 'Sherlock|Watson' sherlock");
     expect(result.exitCode).toBe(0);
     // Each match on separate line (line 1 appears twice for Watson and Sherlock)
-    // (1ctx) --vimgrep always names the file, as ripgrep does
+    // (1ctx rg) --vimgrep always names the file, as ripgrep does
     expect(result.stdout).toBe(
       "sherlock:1:16:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:1:57:For the Doctor Watsons of this world, as opposed to the Sherlock\nsherlock:3:49:be, to a very large extent, the result of luck. Sherlock Holmes\nsherlock:5:12:but Doctor Watson has to have it taken out for him and dusted,\n",
     );
@@ -796,7 +796,7 @@ describe("rg ripgrep-compat: null separator (-0)", () => {
 });
 
 describe("rg ripgrep-compat: max count (-m)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should stop after N matches with -m", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -897,7 +897,7 @@ describe("rg ripgrep-compat: passthrough (--passthru)", () => {
 });
 
 describe("rg ripgrep-compat: sort (--sort)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should sort files with --sort path", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -918,7 +918,7 @@ describe("rg ripgrep-compat: sort (--sort)", () => {
 });
 
 describe("rg ripgrep-compat: no-filename (-I)", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with --no-filename", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -933,7 +933,7 @@ describe("rg ripgrep-compat: no-filename (-I)", () => {
     );
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with -I", async () => {
     const bash = new Bash({
       cwd: "/home/user",

@@ -1,5 +1,5 @@
 /**
- * (1ctx) diff's regular expressions, GNU basic ones as grep reads them on
+ * (1ctx diff) diff's regular expressions, GNU basic ones as grep reads them on
  * RE2: -I marks a change ignorable when every line of it matches, -B when
  * every line is blank, and -p and -F find the heading each hunk prints.
  */

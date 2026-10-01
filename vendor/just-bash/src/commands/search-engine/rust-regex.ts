@@ -1,5 +1,5 @@
 /**
- * (1ctx) rg's own syntax, Rust's regex crate, on RE2: \w, \d and \s are
+ * (1ctx rg) rg's own syntax, Rust's regex crate, on RE2: \w, \d and \s are
  * Unicode unless --no-unicode, and \< and \> (or \b{start} and \b{end})
  * are word edges. RE2's \b knows only ASCII, so an edge at the start or
  * the end of the pattern is checked in code, where it is exact, and one

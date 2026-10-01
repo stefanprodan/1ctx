@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg -I/--no-filename basic functionality", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with -I in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -20,7 +20,7 @@ describe("rg -I/--no-filename basic functionality", () => {
     expect(result.stdout).toBe("1:hello world\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with --no-filename in directory search", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -60,7 +60,7 @@ describe("rg -I/--no-filename basic functionality", () => {
 });
 
 describe("rg -I with multiple files", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filenames for all files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -75,7 +75,7 @@ describe("rg -I with multiple files", () => {
     expect(result.stdout).toBe("1:found\n1:found\n1:found\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should still show line numbers with multiple files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -89,7 +89,7 @@ describe("rg -I with multiple files", () => {
     expect(result.stdout).toBe("1:line one\n2:line two\n1:line three\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filenames in subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -145,7 +145,7 @@ describe("rg -I with other flags", () => {
     expect(result.stdout).toBe("123\n456\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -v (invert match)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -158,7 +158,7 @@ describe("rg -I with other flags", () => {
     expect(result.stdout).toBe("1:keep\n3:keep\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -i (case insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -171,7 +171,7 @@ describe("rg -I with other flags", () => {
     expect(result.stdout).toBe("1:Hello\n2:HELLO\n3:hello\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -w (word match)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -184,7 +184,7 @@ describe("rg -I with other flags", () => {
     expect(result.stdout).toBe("1:foo bar\n3:bar foo baz\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -m (max count)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -228,7 +228,7 @@ describe("rg -I with other flags", () => {
 });
 
 describe("rg -I with context lines", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with -A (after context)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -241,7 +241,7 @@ describe("rg -I with context lines", () => {
     expect(result.stdout).toBe("2:match\n3-after\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with -B (before context)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -254,7 +254,7 @@ describe("rg -I with context lines", () => {
     expect(result.stdout).toBe("1-before\n2:match\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename with -C (context)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -267,7 +267,7 @@ describe("rg -I with context lines", () => {
     expect(result.stdout).toBe("2-b\n3:match\n4-c\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should hide filename in context across multiple files", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -278,7 +278,7 @@ describe("rg -I with context lines", () => {
     });
     const result = await bash.exec("rg -n -I -C1 --sort path match");
     expect(result.exitCode).toBe(0);
-    // (1ctx) ripgrep parts the files with the context separator
+    // (1ctx search-engine) ripgrep parts the files with the context separator
     expect(result.stdout).toBe(
       "1-ctx\n2:match\n3-ctx\n--\n1-ctx\n2:match\n3-ctx\n",
     );
@@ -286,7 +286,7 @@ describe("rg -I with context lines", () => {
 });
 
 describe("rg -I with file filters", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -t (type filter)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -300,7 +300,7 @@ describe("rg -I with file filters", () => {
     expect(result.stdout).toBe("1:const x = 1;\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with -g (glob filter)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -328,7 +328,7 @@ describe("rg -I edge cases", () => {
     expect(result.stdout).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with special characters in output", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -341,7 +341,7 @@ describe("rg -I edge cases", () => {
     expect(result.stdout).toBe("1:path/to/file:line:content\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with hidden files when --hidden is used", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -381,7 +381,7 @@ describe("rg -I edge cases", () => {
 });
 
 describe("rg -I with regex patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with regex alternation", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -394,7 +394,7 @@ describe("rg -I with regex patterns", () => {
     expect(result.stdout).toBe("1:apple\n3:banana\n");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg) ripgrep numbers lines only with -n when piped
   it("should work with character classes", async () => {
     const bash = new Bash({
       cwd: "/home/user",

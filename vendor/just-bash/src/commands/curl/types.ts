@@ -63,7 +63,7 @@ export interface CurlOptions {
   followRedirects: boolean;
   writeOut?: string;
   verbose: boolean;
-  /** (1ctx) -V or --version */
+  /** (1ctx curl-version) -V or --version */
   version: boolean;
   timeoutMs?: number;
   maxRedirects?: number;

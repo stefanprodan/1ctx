@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU diff's side by side format (-y): each line of the first file
+ * (1ctx diff) GNU diff's side by side format (-y): each line of the first file
  * in the left column and of the second in the right, cut at half the
  * width, with GNU's column arithmetic for -W, tabs and -t, and its marks:
  * `|` changed, `<` only on the left, `>` only on the right, `/` and `\`

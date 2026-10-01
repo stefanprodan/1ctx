@@ -1,5 +1,5 @@
 /**
- * (1ctx) diff's changes and hunks: runs of deleted and inserted lines at
+ * (1ctx diff) diff's changes and hunks: runs of deleted and inserted lines at
  * one place are a change, and changes closer than twice the context are
  * one hunk. A hunk whose changes are all ignorable (-B, -I) is dropped.
  */

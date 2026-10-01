@@ -101,7 +101,7 @@ export function evalPathBuiltin(
   isTruthy: IsTruthyFn,
 ): QueryValue[] | null {
   // getpath, setpath, delpaths, path, del and pick go through
-  // path-expressions.ts, jq's own definitions (1ctx)
+  // path-expressions.ts, jq's own definitions (1ctx jq-paths)
   switch (name) {
     case "getpath": {
       if (args.length === 0) return [null];

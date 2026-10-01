@@ -55,7 +55,7 @@ import {
 
 export type { QueryValue } from "./value-operations.js";
 
-// exported for path-expressions.ts (1ctx)
+// exported for path-expressions.ts (1ctx jq-paths)
 export class BreakError extends Error {
   constructor(
     public readonly label: string,
@@ -149,15 +149,15 @@ export interface EvalContext {
   coverage?: FeatureCoverageWriter;
   /** Shared across every recursive evaluation and builtin invocation. */
   budget: QueryEvaluationBudget;
-  /** jq's rules, or mikefarah's yq where the two part (1ctx) */
+  /** jq's rules, or mikefarah's yq where the two part (1ctx query-dialect) */
   dialect?: Dialect;
-  /** the document and file a yq run reads, for di, fi, filename, load (1ctx) */
+  /** the document and file a yq run reads, for di, fi, filename, load (1ctx query-dialect) */
   source?: QuerySource;
-  /** a value the yq walker handed on, and its path from the root (1ctx) */
+  /** a value the yq walker handed on, and its path from the root (1ctx query-dialect) */
   sourceNode?: { value: QueryValue; path?: (string | number)[] };
 }
 
-/** Where a yq run's input comes from. (1ctx) */
+/** Where a yq run's input comes from. (1ctx query-dialect) */
 export interface QuerySource {
   document: number;
   file: number;
@@ -166,7 +166,7 @@ export interface QuerySource {
   loads: Map<string, { text: string } | { error: string }>;
 }
 
-/** Whose rules a builtin follows where jq and mikefarah's yq part. (1ctx) */
+/** Whose rules a builtin follows where jq and mikefarah's yq part. (1ctx query-dialect) */
 export type Dialect = "jq" | "yq";
 
 export interface QueryEvaluationBudget {
@@ -238,7 +238,7 @@ function boundedFlatMap(
   return results;
 }
 
-// exported for the yq walker in yq/documents.ts (1ctx)
+// exported for the yq walker in yq/documents.ts (1ctx yq)
 export function createContext(options?: EvaluateOptions): EvalContext {
   const vars = new Map<string, QueryValue>();
   if (options?.namedArgs) {
@@ -387,7 +387,7 @@ function getValueAtPath(
  * Returns null if the AST is not a simple path expression.
  * Handles Pipe nodes with parent/root to track path adjustments.
  */
-// exported for the yq walker in yq/documents.ts (1ctx)
+// exported for the yq walker in yq/documents.ts (1ctx yq)
 export function extractPathFromAst(
   ast: AstNode,
 ): (string | number)[] | null {
@@ -501,7 +501,7 @@ export interface EvaluateOptions {
   requireDefenseContext?: boolean;
   /** Reuse across multiple input documents to enforce one command budget. */
   budget?: QueryEvaluationBudget;
-  /** mikefarah's yq rules where they part from jq's (1ctx) */
+  /** mikefarah's yq rules where they part from jq's (1ctx query-dialect) */
   dialect?: Dialect;
   source?: QuerySource;
 }
@@ -617,7 +617,7 @@ function evaluateNode(
           return [null];
         }
         // mikefarah's yq answers nothing for a step into a scalar, so the
-        // other documents still print (1ctx)
+        // other documents still print (1ctx query-dialect)
         if (ctx.dialect === "yq" && !Array.isArray(v)) return [];
         // jq throws an error when accessing a field on non-objects (arrays, numbers, strings, booleans)
         // This allows Try (.foo?) to catch it and return empty
@@ -632,7 +632,7 @@ function evaluateNode(
         const indices = evaluate(v, ast.index, ctx);
         return boundedFlatMap(ctx, indices, (idx) => {
           // an index into a scalar: nothing in mikefarah's yq, jq's error
-          // (1ctx)
+          // (1ctx query-dialect)
           if (v !== null && typeof v !== "object") {
             if (ctx.dialect === "yq") return [];
             throw new Error(
@@ -935,7 +935,7 @@ function evaluateNode(
       }
       const v = ctx.vars.get(ast.name);
       if (v !== undefined) return [v];
-      // an unbound variable is jq's error, where a quiet null misled (1ctx)
+      // an unbound variable is jq's error, where a quiet null misled (1ctx query-dialect)
       if (ast.name === "$__loc__" && ctx.dialect !== "yq") {
         const loc: Record<string, QueryValue> = Object.create(null);
         loc.file = "<top-level>";
@@ -1026,7 +1026,7 @@ function evaluateNode(
     }
 
     case "UpdateOp": {
-      // jq semantics through path(): one output per value of the right side (1ctx)
+      // jq semantics through path(): one output per value of the right side (1ctx jq-paths)
       return applyAssignment(value, ast.path, ast.op, ast.value, ctx);
     }
 
@@ -1169,7 +1169,7 @@ export function evalBinaryOp(
 
   // mikefarah's yq reads an operand's path without creating what is
   // missing: a missing key drops the result, or in + leaves the other
-  // side (1ctx)
+  // side (1ctx query-dialect)
   if (ctx.dialect === "yq" && ARITHMETIC.has(op)) {
     const leftMissing = missingPath(value, left);
     const rightMissing = missingPath(value, right);
@@ -1188,7 +1188,7 @@ export function evalBinaryOp(
 
   return leftVals.flatMap((l) =>
     rightVals.flatMap((r): QueryValue[] => {
-      // mikefarah's concatenation and null rules, jq's errors (1ctx)
+      // mikefarah's concatenation and null rules, jq's errors (1ctx query-dialect)
       const mixed = mixedOperands(op, l, r, ctx.dialect);
       if (mixed !== undefined) return mixed;
       return [(() => {
@@ -1332,7 +1332,7 @@ function evalBuiltin(
   args: AstNode[],
   ctx: EvalContext,
 ): QueryValue[] {
-  // where jq and mikefarah's yq part, and jq 1.8's errors (1ctx)
+  // where jq and mikefarah's yq part, and jq 1.8's errors (1ctx query-dialect)
   const dialectResult = evalDialectBuiltin(value, name, args, ctx, evaluate);
   if (dialectResult !== null) return dialectResult;
 
@@ -1677,7 +1677,7 @@ function evalBuiltin(
         }
         const newCtx: EvalContext = { ...ctx, funcs: newFuncs };
         // `def f($x)` is `def f(x): x as $x`: the body runs once per value,
-        // with $x bound, which upstream left unbound (null) (1ctx)
+        // with $x bound, which upstream left unbound (null) (1ctx jq-paths)
         const dollars = userFunc.params.filter((p) => p.startsWith("$"));
         const bindDollars = (at: number, inner: EvalContext): QueryValue[] => {
           if (at === dollars.length) return evaluate(value, userFunc.body, inner);
