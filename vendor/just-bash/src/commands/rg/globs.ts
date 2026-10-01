@@ -1,5 +1,5 @@
 /**
- * (1ctx) ripgrep's globs: one compiler for -g, --iglob, the ignore files
+ * (1ctx rg-globs) ripgrep's globs: one compiler for -g, --iglob, the ignore files
  * and --type-add, with the rules of the ignore crate's gitignore matcher.
  */
 

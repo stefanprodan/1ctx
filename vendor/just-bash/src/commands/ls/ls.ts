@@ -16,7 +16,7 @@ import { parseArgs } from "../../utils/args.js";
 import { DEFAULT_BATCH_SIZE } from "../../utils/constants.js";
 import { hasHelpFlag, showHelp } from "../help.js";
 
-// (1ctx) output that keeps its byte count, so an append never rescans what
+// (1ctx fs-children) output that keeps its byte count, so an append never rescans what
 // came before; ls -R appends every subtree's output again at each level
 class LsText {
   text = "";
@@ -65,12 +65,12 @@ function formatHumanSize(bytes: number): string {
   return g < 10 ? `${g.toFixed(1)}G` : `${Math.round(g)}G`;
 }
 
-// (1ctx) -t was accepted and ignored, so a model looking for the newest
+// (1ctx ls-sort) -t was accepted and ignored, so a model looking for the newest
 // file got the names in order: it sorts newest first, a tie by name, as
 // GNU ls does
 type LsSort = "name" | "size" | "time";
 
-// (1ctx) GNU ls's operand order: what cannot be listed first, as given,
+// (1ctx ls-sort) GNU ls's operand order: what cannot be listed first, as given,
 // then the files as one block, then the directories, both in the
 // active sort; ls -t a b c listed each file alone in the order given
 async function orderOperands(
@@ -261,7 +261,7 @@ export const lsCommand: RuntimeCommand = {
     const reverse = parsed.result.flags.reverse;
     const classifyFiles = parsed.result.flags.classifyFiles;
     const directoryOnly = parsed.result.flags.directoryOnly;
-    // (1ctx) -t sorts too; of -S and -t the last given wins, as in GNU ls
+    // (1ctx ls-sort) -t sorts too; of -S and -t the last given wins, as in GNU ls
     const sort = lastSort(args);
     // Note: onePerLine is accepted but implicit in our output
     void parsed.result.flags.onePerLine;
@@ -292,7 +292,7 @@ export const lsCommand: RuntimeCommand = {
 
     for (let i = 0; i < ordered.list.length; i++) {
       const path = ordered.list[i];
-      // (1ctx) the file operands are one block, as GNU ls prints them
+      // (1ctx ls-sort) the file operands are one block, as GNU ls prints them
       const inFiles = i >= ordered.start && i < ordered.start + ordered.files;
 
       // Add blank line between directory listings
@@ -699,7 +699,7 @@ async function listPath(
 
       if (ctx.fs.readdirWithFileTypes) {
         const entriesWithTypes = await ctx.fs.readdirWithFileTypes(fullPath);
-        // (1ctx) a set, so a wide folder is not scanned once per entry
+        // (1ctx fs-children) a set, so a wide folder is not scanned once per entry
         const listed = new Set(filteredEntries);
         dirEntries = entriesWithTypes
           .filter((e) => e.isDirectory && listed.has(e.name))

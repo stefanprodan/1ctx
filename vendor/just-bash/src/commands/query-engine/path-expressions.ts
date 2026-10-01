@@ -1,5 +1,5 @@
 /**
- * Path expressions, as jq defines them (1ctx)
+ * Path expressions, as jq defines them (1ctx jq-paths)
  *
  * jq's assignments, `path()`, `del()`, `pick()` and `paths` all rest on one
  * idea: a filter run in path mode yields the location of each value it would

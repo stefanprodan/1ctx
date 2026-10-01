@@ -146,7 +146,7 @@ export const dateCommand: RuntimeCommand = {
 
     for (let i = 0; i < args.length; i++) {
       const a = args[i];
-      // (1ctx) `--` ends the options, as in GNU date
+      // (1ctx end-of-options) `--` ends the options, as in GNU date
       if (a === "--") {
         for (const o of args.slice(i + 1)) if (o.startsWith("+")) fmt = o.slice(1);
         break;
@@ -179,7 +179,7 @@ export const dateCommand: RuntimeCommand = {
     // parseTz keeps its raw value (undefined when unset) so timezone-naive -d
     // strings without $TZ fall through to JS `new Date(s)` — do NOT propagate
     // the UTC display default into parsing.
-    // (1ctx) TZ from the environment: an unexported one changes nothing
+    // (1ctx exported-env) TZ from the environment: an unexported one changes nothing
     let parseTz = processEnv(ctx).get("TZ");
     if (parseTz && !isValidTimezone(parseTz)) parseTz = undefined;
     const displayTz = utc ? "UTC" : (parseTz ?? "UTC");

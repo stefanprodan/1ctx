@@ -89,7 +89,7 @@ export type {
   SecureFetchOptions,
 } from "./network/index.js";
 // the allow-list rules, for 1ctx's credential prefixes, and the fetch
-// 1ctx wraps to sign them (1ctx)
+// 1ctx wraps to sign them (1ctx network-exports)
 export {
   createSecureFetch,
   matchesAllowListEntry,
@@ -148,7 +148,7 @@ export type {
   IFileSystem,
   ResolvedCommandContext,
 } from "./types.js";
-// the query engine and yq's document walker, for our tests of them (1ctx)
+// the query engine and yq's document walker, for our tests of them (1ctx yq-documents)
 export {
   evaluate as evaluateQuery,
   parse as parseQuery,

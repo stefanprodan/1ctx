@@ -50,7 +50,7 @@ export function mergeToNullPrototype<T extends object>(
 }
 
 /**
- * (1ctx) A process's environment: the exported variables, never the shell's
+ * (1ctx exported-env) A process's environment: the exported variables, never the shell's
  * own, as bash hands a child only what is exported. A context built without
  * them (a direct call in a test) falls back to every variable.
  */

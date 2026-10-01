@@ -375,7 +375,7 @@ export async function createCompressedArchive(
   });
 
   const compressedStream = stream.pipeThrough(
-    // modern-tar 0.8 dropped its gzip helpers (1ctx)
+    // modern-tar 0.8 dropped its gzip helpers (1ctx tar-gzip-streams)
     new CompressionStream("gzip"),
   );
   const reader = compressedStream.getReader();
@@ -559,7 +559,7 @@ export async function parseCompressedArchive(
     });
 
     const decompressedStream = stream.pipeThrough(
-      // modern-tar 0.8 dropped its gzip helpers (1ctx)
+      // modern-tar 0.8 dropped its gzip helpers (1ctx tar-gzip-streams)
       new DecompressionStream("gzip"),
     );
     const reader = decompressedStream.getReader();

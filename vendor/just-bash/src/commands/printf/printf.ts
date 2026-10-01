@@ -150,7 +150,7 @@ const printfHelp = {
   ],
 };
 
-// (1ctx) a zone the runtime resolves, as date checks it
+// (1ctx exported-env) a zone the runtime resolves, as date checks it
 function knownZone(tz: string): boolean {
   try {
     new Intl.DateTimeFormat(undefined, { timeZone: tz });
@@ -253,7 +253,7 @@ export const printfCommand: RuntimeCommand = {
       let errorMessage = "";
 
       // Get TZ from shell environment for strftime formatting
-      // (1ctx) the exported TZ only, as bash sets its zone from it; with
+      // (1ctx exported-env) the exported TZ only, as bash sets its zone from it; with
       // none, or one the runtime cannot resolve, UTC, as date does, so the
       // host's own zone never shows
       const exported = processEnv(ctx).get("TZ");

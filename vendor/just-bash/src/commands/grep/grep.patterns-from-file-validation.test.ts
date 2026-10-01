@@ -5,7 +5,7 @@ import { Bash } from "../../Bash.js";
  * Multi-pattern validation for `grep -f`. Alternatives are concatenated
  * textually, so a malformed pattern must be rejected rather than allowed to
  * absorb its neighbour. Expectations verified against GNU grep 3.12.
- * (1ctx) The words are GNU's, with the file and line of the pattern.
+ * (1ctx grep-gnu-regex) The words are GNU's, with the file and line of the pattern.
  */
 describe("grep -f invalid patterns", () => {
   const hay = { "/hay.txt": "apple pie\ncherry\nbanana split\n" };
@@ -156,7 +156,7 @@ describe("grep -f argument handling", () => {
     const env = new Bash({ files: hay });
     const result = await env.exec("grep --file");
     expect(result.stdout).toBe("");
-    // (1ctx) GNU's usage lines follow
+    // (1ctx grep-options) GNU's usage lines follow
     expect(result.stderr).toBe(
       "grep: option '--file' requires an argument\n" +
         "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +
@@ -169,7 +169,7 @@ describe("grep -f argument handling", () => {
     const env = new Bash({ files: hay });
     const result = await env.exec("grep -f");
     expect(result.stdout).toBe("");
-    // (1ctx) GNU's usage lines follow
+    // (1ctx grep-options) GNU's usage lines follow
     expect(result.stderr).toBe(
       "grep: option requires an argument -- 'f'\n" +
         "Usage: grep [OPTION]... PATTERNS [FILE]...\n" +

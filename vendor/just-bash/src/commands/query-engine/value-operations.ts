@@ -32,7 +32,7 @@ export function deepEqual(a: QueryValue, b: QueryValue): boolean {
 
 /**
  * One text per value, the same for two maps that differ only in key
- * order, as jq compares them. (1ctx)
+ * order, as jq compares them. (1ctx query-unique)
  */
 export function canonical(value: QueryValue): string {
   return JSON.stringify(value, (_key, v) => {

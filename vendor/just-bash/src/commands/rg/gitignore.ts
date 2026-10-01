@@ -17,7 +17,7 @@ import {
   matchGlobs,
 } from "./globs.js";
 
-/** (1ctx) Which ignore file a parser read: its rank, highest first. */
+/** (1ctx rg-globs) Which ignore file a parser read: its rank, highest first. */
 export type IgnoreKind = "rgignore" | "ignore" | "gitignore" | "explicit";
 
 const RANK: Record<IgnoreKind, number> = {
@@ -42,12 +42,12 @@ export class GitignoreParser {
    */
   parse(content: string): void {
     for (const line of content.split("\n")) {
-      // (1ctx) trailing spaces go unless escaped, and a CR with them
+      // (1ctx rg-globs) trailing spaces go unless escaped, and a CR with them
       let trimmed = line.replace(/\r$/, "");
       trimmed = trimmed.replace(/(^|[^\\])\s+$/, "$1");
       if (!trimmed || trimmed.startsWith("#")) continue;
       try {
-        // (1ctx) ripgrep's glob rules, braces included
+        // (1ctx rg-globs) ripgrep's glob rules, braces included
         this.patterns.push(compileIgnoreGlob(trimmed, false, true));
       } catch {
         // a line that is not a glob is skipped, as ripgrep skips it
@@ -55,7 +55,7 @@ export class GitignoreParser {
     }
   }
 
-  /** (1ctx) What the last matching line says of a path. */
+  /** (1ctx rg-globs) What the last matching line says of a path. */
   match(relativePath: string, isDirectory: boolean): GlobMatch {
     const path = relativePath.replace(/^\.\//, "").replace(/^\//, "");
     return matchGlobs(this.patterns, path, isDirectory);
@@ -101,7 +101,7 @@ export class GitignoreManager {
   private skipDotIgnore: boolean;
   private skipVcsIgnore: boolean;
   private loadedDirs = new Set<string>();
-  /** (1ctx) --require-git: .gitignore only inside a repository */
+  /** (1ctx rg-globs) --require-git: .gitignore only inside a repository */
   private requireGit: boolean;
   private repos = new Map<string, Promise<boolean>>();
 
@@ -118,7 +118,7 @@ export class GitignoreManager {
     this.requireGit = requireGit;
   }
 
-  /** (1ctx) A .git in the directory or one above it, as ripgrep looks. */
+  /** (1ctx rg-globs) A .git in the directory or one above it, as ripgrep looks. */
   private inRepo(dir: string): Promise<boolean> {
     let found = this.repos.get(dir);
     if (found === undefined) {
@@ -132,7 +132,7 @@ export class GitignoreManager {
     return found;
   }
 
-  /** (1ctx) The ignore files a directory's own may be. */
+  /** (1ctx rg-globs) The ignore files a directory's own may be. */
   private async namesFor(dir: string): Promise<string[]> {
     const names: string[] = [];
     if (
@@ -151,7 +151,7 @@ export class GitignoreManager {
   async load(targetPath: string, noParents = false): Promise<void> {
     // Build list of directories from filesystem root to target
     // ripgrep loads ignore files from all parent directories
-    // (1ctx) but for --no-ignore-parent
+    // (1ctx rg-globs) but for --no-ignore-parent
     const dirs: string[] = [];
     let current = targetPath;
 
@@ -215,7 +215,7 @@ export class GitignoreManager {
   }
 
   /**
-   * (1ctx) What the ignore files say of a path, as ripgrep weighs them:
+   * (1ctx rg-globs) What the ignore files say of a path, as ripgrep weighs them:
    * .rgignore over .ignore over .gitignore over --ignore-file, and within
    * each the deepest directory's file first.
    */
@@ -296,9 +296,9 @@ export async function loadGitignores(
     skipDotIgnore?: boolean;
     skipVcsIgnore?: boolean;
     customIgnoreFiles?: string[];
-    /** (1ctx) --no-ignore-parent */
+    /** (1ctx rg-globs) --no-ignore-parent */
     noParents?: boolean;
-    /** (1ctx) --require-git */
+    /** (1ctx rg-globs) --require-git */
     requireGit?: boolean;
   } = {},
 ): Promise<GitignoreManager> {

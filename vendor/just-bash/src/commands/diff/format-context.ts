@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU diff's context format: a row of stars over each hunk, the
+ * (1ctx diff-formats) GNU diff's context format: a row of stars over each hunk, the
  * first file's lines under `*** F,L ****` and the second's under
  * `--- F,L ----`, a side left out when it has no change; a line changed on
  * both sides is `! `, one only deleted `- `, one only inserted `+ `.

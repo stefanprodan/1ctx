@@ -61,7 +61,7 @@ describe("standalone command resource limits", () => {
     );
   });
 
-  // (1ctx) GNU xargs' words; it caps a huge -n instead of refusing it
+  // (1ctx xargs-gnu) GNU xargs' words; it caps a huge -n instead of refusing it
   it.each([
     ["0", "xargs: value 0 for -n option should be >= 1"],
     ["-1", "xargs: value -1 for -n option should be >= 1"],

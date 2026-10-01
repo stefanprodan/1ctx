@@ -170,7 +170,7 @@ export interface AwkExpressionStmt {
   expression: AwkExpr;
 }
 
-// (1ctx) "|" sends the text to a command, run when the pipe is closed
+// (1ctx awk-pipes) "|" sends the text to a command, run when the pipe is closed
 export interface AwkOutput {
   redirect: ">" | ">>" | "|";
   file: AwkExpr;

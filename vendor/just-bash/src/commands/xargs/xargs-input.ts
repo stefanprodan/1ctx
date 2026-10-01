@@ -1,5 +1,5 @@
 /**
- * (1ctx) xargs' input read as GNU xargs 4.11 reads it. By default blanks
+ * (1ctx xargs-gnu) xargs' input read as GNU xargs 4.11 reads it. By default blanks
  * and newlines separate items, single and double quotes and a backslash
  * protect them, and a line ending in a blank goes on to the next for -L;
  * -I reads whole lines, leading blanks dropped; -0 and -d take every

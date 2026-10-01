@@ -276,13 +276,13 @@ export function handleRead(
   }
 
   // Handle -d '' (empty delimiter) - reads until NUL byte
-  // (1ctx) stdin is bytes and bash delimits on the first byte of -d
+  // (1ctx read-utf8) stdin is bytes and bash delimits on the first byte of -d
   const effectiveDelimiter = delimiterByte(delimiter);
 
   // Get input
   let line = "";
   let lineBytes = 0;
-  // (1ctx) the input is bytes, one char each, so its length is its size
+  // (1ctx read-utf8) the input is bytes, one char each, so its length is its size
   const appendLine = (value: string): void => {
     const bytes = value.length;
     if (bytes > ctx.limits.maxStringLength - lineBytes) {
@@ -324,7 +324,7 @@ export function handleRead(
 
   if (ncharsExact >= 0) {
     // -N: Read exactly N characters (ignores delimiters, no IFS splitting)
-    // (1ctx) N counts characters, a UTF-8 sequence being one, and the
+    // (1ctx read-utf8) N counts characters, a UTF-8 sequence being one, and the
     // input advances by the bytes they took
     let charCount = 0;
     let toRead = 0;
@@ -354,11 +354,11 @@ export function handleRead(
     let charCount = 0;
     let inputPos = 0;
     let hitDelimiter = false;
-    // (1ctx) a character is a whole UTF-8 sequence, never split
+    // (1ctx read-utf8) a character is a whole UTF-8 sequence, never split
     const charAt = (pos: number): string =>
       effectiveStdin.substring(pos, pos + utf8CharBytes(effectiveStdin, pos));
     while (inputPos < effectiveStdin.length && charCount < nchars) {
-      // (1ctx) the delimiter is one byte, matched before the sequence
+      // (1ctx read-utf8) the delimiter is one byte, matched before the sequence
       if (effectiveStdin[inputPos] === effectiveDelimiter) {
         consumed = inputPos + 1;
         hitDelimiter = true;
@@ -472,7 +472,7 @@ export function handleRead(
     consumeInput(consumed);
   }
 
-  // (1ctx) the line was collected as bytes; split and store it as text
+  // (1ctx read-utf8) the line was collected as bytes; split and store it as text
   line = decodeInput(line);
 
   // Remove trailing newline if present and delimiter is newline

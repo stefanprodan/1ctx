@@ -302,7 +302,7 @@ describe("Filename Attack Prevention", () => {
         rm /tmp/broken_link
       `);
       // Should fail to read but not crash
-      // (1ctx) rm removes the broken link itself, as GNU rm does, so the
+      // (1ctx rm-links) rm removes the broken link itself, as GNU rm does, so the
       // only error is cat's, sent to stdout
       expect(result.stdout).toContain("No such file or directory");
       expect(result.stderr).toBe("");

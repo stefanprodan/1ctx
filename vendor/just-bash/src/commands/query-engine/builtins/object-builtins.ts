@@ -148,7 +148,7 @@ export function evalObjectBuiltin(
             const key = obj.key ?? obj.Key ?? obj.name ?? obj.Name ?? obj.k;
             // jq supports: value, Value, v for the value
             // null when none is there, as in jq; undefined dropped the key
-            // from a yq -i write (1ctx)
+            // from a yq -i write (1ctx jq-from-entries-null)
             const val = obj.value ?? obj.Value ?? obj.v ?? null;
             if (key !== undefined) {
               const strKey = String(key);
@@ -453,7 +453,7 @@ export function evalObjectBuiltin(
         // Navigate to parent and set value
         let current: QueryValue = result;
         for (let i = 0; i < path.length - 1; i++) {
-          const key: QueryValue = path[i]; // TS7022 under TypeScript 7 (1ctx)
+          const key: QueryValue = path[i]; // TS7022 under TypeScript 7 (1ctx ts7-key-type)
           const nextKey = path[i + 1];
           if (Array.isArray(current) && typeof key === "number") {
             // Extend array if needed

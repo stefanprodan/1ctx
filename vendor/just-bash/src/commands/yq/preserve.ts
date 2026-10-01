@@ -1,5 +1,5 @@
 /**
- * Comment-keeping output for yq (1ctx)
+ * Comment-keeping output for yq (1ctx yq-preserve yq-stdout-preserve)
  *
  * The query engine works on plain values, so a document printed from its
  * result loses every comment, and `yq -i` on a commented manifest deleted

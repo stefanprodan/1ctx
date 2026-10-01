@@ -771,7 +771,7 @@ export async function executeExternalCommand(
   );
   if (!resolved) {
     // A removed command is not found like any other: the browser-bundle
-    // words sent models looking for node. (1ctx)
+    // words sent models looking for node. (1ctx command-not-found)
     return failure(`bash: ${commandName}: command not found\n`, 127);
   }
   // Handle error cases from resolveCommand

@@ -247,7 +247,7 @@ async function readInputEntry(
 ): Promise<{ entry?: FdEntry; error?: ExecResult }> {
   const filePath = ctx.fs.resolvePath(ctx.state.cwd, target);
   try {
-    // (1ctx) a descriptor carries the file's bytes, as `< file` does
+    // (1ctx fd-bytes) a descriptor carries the file's bytes, as `< file` does
     const content = latin1FromBytes(await readBytesFrom(ctx.fs, filePath));
     return readwrite
       ? {
@@ -427,7 +427,7 @@ async function prepareRedirectionsWithState(
     const effectiveFd = effectiveRedirectFd(redir);
 
     if (redir.target.type === "HereDoc") {
-      // (1ctx) every descriptor carries bytes, as stdin does
+      // (1ctx fd-bytes) every descriptor carries bytes, as stdin does
       const content = latin1FromBytes(
         encodeUtf8ToBytes(await hereDocContent(ctx, redir.target)),
       );

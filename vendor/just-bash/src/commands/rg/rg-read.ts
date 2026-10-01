@@ -1,5 +1,5 @@
 /**
- * (1ctx) How rg reads what it searches, moved out of rg-search.ts:
+ * (1ctx rg-output) How rg reads what it searches, moved out of rg-search.ts:
  * standard input, a file, a gzip file under -z, and --pre's output.
  */
 
@@ -89,7 +89,7 @@ function matchesPreGlob(filename: string, preGlobs: string[]): boolean {
 /**
  * Read file content, handling preprocessing and gzip decompression if needed
  */
-/** (1ctx) Standard input, searched as a file named `<stdin>`. */
+/** (1ctx rg-output) Standard input, searched as a file named `<stdin>`. */
 export function readStdin(ctx: RuntimeCommandContext): {
   content: string;
   isBinary: boolean;
@@ -117,7 +117,7 @@ export async function readFileContent(
       if (matchesPreGlob(filename, options.preprocessorGlobs)) {
         // Run preprocessor on this file
         const result = await ctx.exec(shellJoinArgs([options.preprocessor]), {
-          // (1ctx) the preprocessor is a process: it sees the exported variables
+          // (1ctx exec-env) the preprocessor is a process: it sees the exported variables
           env: { ...ctx.exportedEnv },
           replaceEnv: true,
           cwd: ctx.cwd,

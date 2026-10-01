@@ -87,7 +87,7 @@ describe("rg output modes", () => {
 });
 
 describe("rg context lines", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should show lines after match with -A", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -101,7 +101,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should show lines before match with -B", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -115,7 +115,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should show context with -C", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -131,7 +131,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should handle context at start of file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -145,7 +145,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should handle context at end of file", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -159,7 +159,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should handle overlapping context from multiple matches", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -175,7 +175,7 @@ describe("rg context lines", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should support combined context format -A2", async () => {
     const bash = new Bash({
       cwd: "/home/user",

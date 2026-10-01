@@ -153,7 +153,7 @@ async function executeScript(
   scriptArgs.forEach((arg, i) => {
     positionalEnv[String(i + 1)] = arg;
   });
-  // (1ctx) a new shell never takes IFS from its environment, as bash does
+  // (1ctx exec-env) a new shell never takes IFS from its environment, as bash does
   if ("IFS" in positionalEnv) positionalEnv.IFS = " \t\n";
 
   // Skip shebang line if present
@@ -175,14 +175,14 @@ async function executeScript(
   const result = nestedExec
     ? await nestedExec(scriptToRun, {
         env: positionalEnv,
-        // (1ctx) a child shell sees the exported environment, not the first shell's
+        // (1ctx exec-env) a child shell sees the exported environment, not the first shell's
         replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
       })
     : await ctx.exec(scriptToRun, {
         env: positionalEnv,
-        // (1ctx) as above
+        // (1ctx exec-env) as above
         replaceEnv: true,
         cwd: ctx.cwd,
         stdin: latin1FromBytes(ctx.stdin),

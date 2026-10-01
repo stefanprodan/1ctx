@@ -1,5 +1,5 @@
 /**
- * (1ctx) The command lines xargs runs, built as GNU xargs 4.11 builds
+ * (1ctx xargs-gnu) The command lines xargs runs, built as GNU xargs 4.11 builds
  * them: items fill a line up to -s bytes, each argument counted with its
  * terminating NUL, then the next line starts; -n and -L cap a line
  * further and make an overflow an error; -I runs one line per input

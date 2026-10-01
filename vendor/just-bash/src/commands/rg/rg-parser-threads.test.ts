@@ -70,7 +70,7 @@ describe("rg --max-depth validation", () => {
       const result = parseArgs(["--max-depth", value, "pattern"]);
       expect("error" in result).toBe(true);
       if ("error" in result) {
-        // (1ctx) ripgrep's words
+        // (1ctx rg-parser) ripgrep's words
         expect(result.error.stderr).toContain("error parsing flag --max-depth");
       }
     });

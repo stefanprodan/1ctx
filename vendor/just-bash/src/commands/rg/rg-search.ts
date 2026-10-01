@@ -54,7 +54,7 @@ export async function executeSearch(
 ): Promise<ExecResult> {
   const { ctx, options, paths: inputPaths } = searchCtx;
 
-  // (1ctx) one compiler for -g and --iglob, refusing a broken glob
+  // (1ctx rg-globs) one compiler for -g and --iglob, refusing a broken glob
   const overrides = new Overrides();
   for (const [glob, caseInsensitive] of [
     ...options.globs.map((g) => [g, options.globCaseInsensitive] as const),
@@ -67,7 +67,7 @@ export async function executeSearch(
       return refused(`error parsing glob '${glob}': ${error.message}`);
     }
   }
-  // (1ctx) ripgrep's type table, the changes in order, a bad name refused
+  // (1ctx rg-types) ripgrep's type table, the changes in order, a bad name refused
   const types = new FileTypeRegistry();
   try {
     for (const change of options.typeChanges) {
@@ -107,7 +107,7 @@ export async function executeSearch(
       return refused("no pattern given");
     }
 
-    // (1ctx) ripgrep refuses a newline without -U rather than miss it
+    // (1ctx rg-output) ripgrep refuses a newline without -U rather than miss it
     if (
       !options.multiline &&
       patterns.some((p) => hasNewline(p, options.fixedStrings))
@@ -122,7 +122,7 @@ export async function executeSearch(
         determineIgnoreCase(options, patterns),
       );
     } catch (error) {
-      // (1ctx) -P's refusals name what RE2 cannot run
+      // (1ctx rg-regex) -P's refusals name what RE2 cannot run
       if (error instanceof GnuPatternError) return refused(error.message);
       return refused(`invalid regex: ${patterns.join(", ")}`);
     }
@@ -130,7 +130,7 @@ export async function executeSearch(
     for (const lease of leases) lease.release();
   }
 
-  // (1ctx) stdin when no path is given and something was piped, else the
+  // (1ctx rg-output) stdin when no path is given and something was piped, else the
   // directory; `-` is stdin among the paths
   const implicit = inputPaths.length === 0;
   const collected: Collected =
@@ -167,7 +167,7 @@ Running with --debug will show why files are being skipped.
 `;
 
 /**
- * (1ctx) A missing path is reported and the others searched; the run
+ * (1ctx rg-output) A missing path is reported and the others searched; the run
  * then exits 2, but for -q once a match was found. --no-messages keeps
  * the exit and drops the words.
  */
@@ -241,7 +241,7 @@ async function listFiles(
   );
 }
 
-/** (1ctx) Each file's own lines, before they are put together. */
+/** (1ctx rg-output) Each file's own lines, before they are put together. */
 interface Searched {
   file: string;
   output: string;
@@ -272,7 +272,7 @@ async function searchFiles(
   const display = lineDisplay(options);
   const counting = options.count || options.countMatches;
   const listing = options.filesWithMatches || options.filesWithoutMatch;
-  // (1ctx) a file's lines under its name, only where names are shown
+  // (1ctx rg-output) a file's lines under its name, only where names are shown
   const heading =
     options.heading &&
     showFilename &&
@@ -305,7 +305,7 @@ async function searchFiles(
     const { content, isBinary, lease } = fileData;
     bytesSearched += content.length;
 
-    // (1ctx) a binary file in a walk is skipped but under -a, --binary, -uuu
+    // (1ctx rg-output) a binary file in a walk is skipped but under -a, --binary, -uuu
     if (
       isBinary &&
       !options.nullData &&
@@ -318,7 +318,7 @@ async function searchFiles(
     }
 
     const name = shownPath(file, options);
-    // (1ctx) --vimgrep names the file whatever the defaults say
+    // (1ctx rg-output) --vimgrep names the file whatever the defaults say
     const filename =
       options.vimgrep || (showFilename && !heading) ? name : "";
     try {
@@ -333,7 +333,7 @@ async function searchFiles(
         afterContext: options.afterContext,
         maxCount: options.maxCount,
         contextSeparator: options.contextSeparator,
-        // (1ctx) ripgrep's field separators and replacement syntax
+        // (1ctx rg-parser rg-replace) ripgrep's field separators and replacement syntax
         fieldSeparators: {
           match: options.fieldMatchSeparator,
           context: options.fieldContextSeparator,
@@ -348,7 +348,7 @@ async function searchFiles(
         multiline: options.multiline,
         kResetGroup: built.kResetGroup,
         conditions: built.conditions,
-        // (1ctx) the word checks, -c -o and empty -o matches, as ripgrep
+        // (1ctx search-words search-counts search-empty-match) the word checks, -c -o and empty -o matches, as ripgrep
         wholeWord: options.wordRegexp,
         wordStart: built.wordStart,
         wordEnd: built.wordEnd,
@@ -359,7 +359,7 @@ async function searchFiles(
         invertedLines: true,
         contextWithOnlyMatching: true,
         lineTerminator: options.nullData ? "\0" : "\n",
-        // (1ctx) grep's shortcuts: a literal the pattern needs is looked
+        // (1ctx rg-prefilter) grep's shortcuts: a literal the pattern needs is looked
         // for first, and a listing stops at a file's first match
         preFilter: options.passthru ? undefined : built.preFilter,
         selectOnly:
@@ -374,7 +374,7 @@ async function searchFiles(
         signal: ctx.signal,
       });
 
-      // (1ctx) a binary file searched whole reports that it matched
+      // (1ctx search-binary) a binary file searched whole reports that it matched
       if (
         isBinary &&
         !options.nullData &&
@@ -436,11 +436,11 @@ async function searchFiles(
           stdout += `${name}${nameEnd}`;
         } else if (!options.filesWithoutMatch) {
           if (heading) {
-            // (1ctx) a blank line between files, ripgrep's heading
+            // (1ctx rg-output) a blank line between files, ripgrep's heading
             if (stdout !== "") stdout += "\n";
             stdout += `${name}${nameEnd}`;
           } else if (
-            // (1ctx) the context separator also parts files
+            // (1ctx search-context) the context separator also parts files
             stdout !== "" &&
             res.output !== "" &&
             options.contextSeparator !== null &&

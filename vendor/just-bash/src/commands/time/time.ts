@@ -122,7 +122,7 @@ export const timeCommand: RuntimeCommand = {
         };
       }
       result = await ctx.exec(shellJoinArgs([commandArgs[0]]), {
-        // (1ctx) the timed command is a process: it sees the exported variables
+        // (1ctx exec-env) the timed command is a process: it sees the exported variables
         env: ctx.exportedEnv ?? mapToRecord(ctx.env),
         replaceEnv: true,
         cwd: ctx.cwd,

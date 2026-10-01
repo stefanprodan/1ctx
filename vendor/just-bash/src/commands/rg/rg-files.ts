@@ -1,5 +1,5 @@
 /**
- * (1ctx) Which files rg searches, moved out of rg-search.ts: the paths in
+ * (1ctx rg-globs) Which files rg searches, moved out of rg-search.ts: the paths in
  * the order given, `-` as stdin, a path given by name searched whatever
  * the filters say, and a walk that weighs -g over the ignore files over
  * the types over hidden names, as ripgrep's walker does.
@@ -48,7 +48,7 @@ function byPath(a: Haystack, b: Haystack): number {
 }
 
 /**
- * (1ctx) --sort and --sortr: by path, or by time, which is the file's
+ * (1ctx rg-globs) --sort and --sortr: by path, or by time, which is the file's
  * mtime for every time key, since that is the one time a stat gives.
  */
 async function sorted(
@@ -229,7 +229,7 @@ async function walkDirectory(
         continue;
       }
 
-      // (1ctx) no ./ when no path was given, kept when "." was
+      // (1ctx rg-globs) no ./ when no path was given, kept when "." was
       const entryRelativePath =
         relativePath === ""
           ? name

@@ -19,7 +19,7 @@ export interface UserRegexLimits {
   maxResults?: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
-  /** (1ctx) POSIX leftmost-longest matching, as grep's BRE and ERE */
+  /** (1ctx search-leftmost-longest) POSIX leftmost-longest matching, as grep's BRE and ERE */
   longest?: boolean;
 }
 
@@ -262,7 +262,7 @@ export class UserRegex implements RegexLike {
 
     // For global regex, start from lastIndex
     const startPos = this._global ? this._lastIndex : 0;
-    // (1ctx) past the end is no match, as for RegExp; RE2JS throws there
+    // (1ctx search-empty-match) past the end is no match, as for RegExp; RE2JS throws there
     if (startPos > input.length || !matcher.find(startPos)) {
       if (this._global) {
         this._lastIndex = 0;
@@ -495,7 +495,7 @@ export class UserRegex implements RegexLike {
   }
 
   /**
-   * (1ctx) The first match at or after `from`, as offsets into the input,
+   * (1ctx awk-records) The first match at or after `from`, as offsets into the input,
    * for callers that walk a long text one match at a time.
    */
   scan(input: string, from = 0): { start: number; end: number } | null {
@@ -507,7 +507,7 @@ export class UserRegex implements RegexLike {
   }
 
   /**
-   * (1ctx) The first match at or after `from` with every group's offsets,
+   * (1ctx awk-match-groups) The first match at or after `from` with every group's offsets,
    * group 0 first; a group that did not take part is -1, -1.
    */
   groups(

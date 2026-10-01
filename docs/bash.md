@@ -3,8 +3,10 @@
 Governs `src/server/bash/`: the command, its worker, the mount, scratch
 `/tmp`, kept MCP files under `/mcp`, `open` and curl's fetch. The docs
 and uploads a command mounts are in `docs/knowledge.md`, kept files'
-budget and fork in `docs/mcp.md`, and the shell itself (just-bash, our
-changes to it, its recorders) in `vendor/README.md`.
+budget and fork in `docs/mcp.md`, and the shell itself in `vendor/`:
+just-bash and how a change to it is recorded in `vendor/README.md`, our
+changes in `vendor/changes.md`, and its recorders and what still differs
+in `vendor/differences.md`.
 
 ## The area
 

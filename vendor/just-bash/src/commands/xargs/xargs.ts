@@ -21,7 +21,7 @@ import { parseXargsArgs } from "./xargs-options.js";
 import { planCommands } from "./xargs-plan.js";
 import { quoteForTrace } from "./xargs-quote.js";
 
-// (1ctx) every option GNU xargs 4.11 has, in its words
+// (1ctx xargs-gnu) every option GNU xargs 4.11 has, in its words
 const xargsHelp = {
   name: "xargs",
   summary: "build and execute command lines from standard input",
@@ -61,20 +61,20 @@ const xargsHelp = {
   ],
 };
 
-/** (1ctx) The most commands -P runs at once in the sandbox. */
+/** (1ctx xargs-gnu) The most commands -P runs at once in the sandbox. */
 const MAX_PARALLEL = 16;
 
-/** (1ctx) GNU's default command-line buffer, 128 KiB. */
+/** (1ctx xargs-gnu) GNU's default command-line buffer, 128 KiB. */
 const DEFAULT_MAX_CHARS = 131072;
 
-/** (1ctx) The exec limit the sandbox answers as, Linux's 2 MiB. */
+/** (1ctx xargs-gnu) The exec limit the sandbox answers as, Linux's 2 MiB. */
 const ARG_MAX = 2097152;
 
 const XARGS_VERSION =
   "xargs (GNU findutils) 4.11.0 (just-bash, compatible)\n" +
   "A sandboxed xargs that answers as GNU xargs 4.11.0 does; see xargs --help.\n";
 
-/** (1ctx) An argument is a C string: it ends at a NUL, as GNU passes it. */
+/** (1ctx xargs-gnu) An argument is a C string: it ends at a NUL, as GNU passes it. */
 function cString(arg: string): string {
   const nul = arg.indexOf("\0");
   return nul === -1 ? arg : arg.slice(0, nul);
@@ -85,7 +85,7 @@ type Outcome =
   | { kind: "stop"; code: number; stderr: string; own: string };
 
 /**
- * (1ctx) What a command's end means to xargs, as GNU reads its child: a
+ * (1ctx xargs-gnu) What a command's end means to xargs, as GNU reads its child: a
  * name the shell could not find or run is 127 or 126 in GNU's words, 255
  * stops xargs with 124, any other failure makes the end 123. Only the
  * dispatcher's own words, whole, mark a command that never ran.
@@ -127,7 +127,7 @@ function commandOutcome(name: string, result: ExecResult): Outcome {
 }
 
 /**
- * (1ctx) A result with its stderr rewritten. The bytes the child charged
+ * (1ctx xargs-gnu) A result with its stderr rewritten. The bytes the child charged
  * stay charged; only as many as the new text holds are carried as already
  * counted, so the budget is never refunded nor charged twice.
  */
@@ -147,7 +147,7 @@ function withStderr(result: ExecResult, stderr: string): ExecResult {
   };
 }
 
-/** (1ctx) The bytes the environment takes, as GNU counts it for -s. */
+/** (1ctx xargs-gnu) The bytes the environment takes, as GNU counts it for -s. */
 function environmentSize(ctx: RuntimeCommandContext): number {
   let size = 0;
   for (const [key, value] of Object.entries(ctx.exportedEnv ?? {})) {
@@ -170,7 +170,7 @@ export const xargsCommand: RuntimeCommand = {
       return { stdout: XARGS_VERSION, stderr: "", exitCode: 0 };
     }
     const options = parsed.options;
-    // (1ctx) at most 16 at once, -P 0 included, each through ctx.exec
+    // (1ctx xargs-gnu) at most 16 at once, -P 0 included, each through ctx.exec
     const maxProcs = Math.min(
       options.maxProcs === 0 ? MAX_PARALLEL : options.maxProcs,
       MAX_PARALLEL,
@@ -186,7 +186,7 @@ export const xargsCommand: RuntimeCommand = {
     const maxIterations = ctx.limits.maxLoopIterations;
     const maxOutputSize = ctx.limits.maxOutputSize;
 
-    // (1ctx) -s is bounded by the sandbox's exec limit, less the
+    // (1ctx xargs-gnu) -s is bounded by the sandbox's exec limit, less the
     // environment, as GNU bounds it by the host's
     const envSize = environmentSize(ctx);
     const posixLimit = ARG_MAX - 2048 - envSize;
@@ -199,7 +199,7 @@ export const xargsCommand: RuntimeCommand = {
       maxChars = posixLimit;
     }
 
-    // (1ctx) -a reads the items from a file and leaves stdin to the
+    // (1ctx xargs-gnu) -a reads the items from a file and leaves stdin to the
     // command; - and /dev/stdin are stdin itself
     const fromFile =
       options.argFile !== null &&
@@ -336,7 +336,7 @@ export const xargsCommand: RuntimeCommand = {
       );
     }
 
-    // (1ctx) under -a the first command gets xargs' stdin, as it would
+    // (1ctx xargs-gnu) under -a the first command gets xargs' stdin, as it would
     // drain the inherited descriptor
     let stdinLeft = fromFile;
 
@@ -366,7 +366,7 @@ export const xargsCommand: RuntimeCommand = {
       // environment does
       const execOptions = {
         env: { ...ctx.exportedEnv },
-        // (1ctx) only them, not the first shell's variables
+        // (1ctx exec-env) only them, not the first shell's variables
         replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
@@ -385,7 +385,7 @@ export const xargsCommand: RuntimeCommand = {
       };
     };
 
-    // (1ctx) no terminal: -p and -o fail as GNU does without one
+    // (1ctx xargs-gnu) no terminal: -p and -o fail as GNU does without one
     if ((options.interactive || options.openTty) && commands.length > 0) {
       if (options.interactive) {
         appendStderr(`${commands[0].map(cString).map(quoteForTrace).join(" ")}\n`);
@@ -402,7 +402,7 @@ export const xargsCommand: RuntimeCommand = {
       );
     }
 
-    // (1ctx) up to -P commands at once, a slot taking the next command as
+    // (1ctx xargs-gnu) up to -P commands at once, a slot taking the next command as
     // soon as its own ends; output is kept in input order, and a command
     // that stops xargs lets the running ones finish and starts no more
     const results: (ExecResult | undefined)[] = [];
@@ -455,7 +455,7 @@ export const xargsCommand: RuntimeCommand = {
     emitReady();
 
     let exitCode = stopCode ?? (failed ? 123 : 0);
-    // (1ctx) an unbuilt command line or an unclosed quote ends xargs after
+    // (1ctx xargs-gnu) an unbuilt command line or an unclosed quote ends xargs after
     // what could run
     const error = plan.error ?? input.error;
     if (error !== null && stopCode === null) {

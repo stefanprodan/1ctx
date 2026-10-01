@@ -1,5 +1,5 @@
 /**
- * (1ctx) Checks gawk makes before a program runs.
+ * (1ctx awk-check) Checks gawk makes before a program runs.
  *
  * gawk refuses a builtin called with the wrong number of arguments, and a
  * function named after a builtin, before BEGIN, wherever the call stands.

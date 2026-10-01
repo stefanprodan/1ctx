@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg basic search", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should search for pattern in current directory", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -16,7 +16,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should search multiple files and sort output", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -31,7 +31,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should search in specified path", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -59,7 +59,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should show line numbers by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -86,7 +86,7 @@ describe("rg basic search", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should search in subdirectories", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -102,7 +102,7 @@ describe("rg basic search", () => {
 });
 
 describe("rg case sensitivity", () => {
-  // (1ctx) ripgrep is case-sensitive unless -i or -S, and numbers lines
+  // (1ctx rg-defaults) ripgrep is case-sensitive unless -i or -S, and numbers lines
   // only with -n when piped
   it("should use smart case with -S (lowercase = case-insensitive)", async () => {
     const bash = new Bash({
@@ -119,7 +119,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should use smart case (uppercase in pattern = case-sensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -133,7 +133,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should be case-insensitive with -i", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -149,7 +149,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should be case-sensitive with -s (override smart case)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -163,7 +163,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should override smart case with -i when pattern has uppercase", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -179,7 +179,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should use smart case with numbers only (case-insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -193,7 +193,7 @@ describe("rg case sensitivity", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should use smart case with symbols only (case-insensitive)", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -209,7 +209,7 @@ describe("rg case sensitivity", () => {
 });
 
 describe("rg binary files", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should skip binary files by default", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -226,7 +226,7 @@ describe("rg binary files", () => {
 });
 
 describe("rg max depth", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should limit search depth with --max-depth", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -254,7 +254,7 @@ describe("rg error handling", () => {
     expect(result.stderr).toBe("rg: no pattern given\n");
   });
 
-  // (1ctx) ripgrep's words and exit 2
+  // (1ctx rg-parser) ripgrep's words and exit 2
   it("should error on unknown option", async () => {
     const bash = new Bash();
     const result = await bash.exec("rg --unknown-option pattern");
@@ -263,7 +263,7 @@ describe("rg error handling", () => {
     expect(result.stderr).toBe("rg: unrecognized flag --unknown-option\n");
   });
 
-  // (1ctx) a type that selects no file leaves nothing searched, exit 2
+  // (1ctx rg-output) a type that selects no file leaves nothing searched, exit 2
   it("should return no matches for unknown type", async () => {
     // Unknown types don't produce an error - they just match no files
     // This allows --type-add to define custom types

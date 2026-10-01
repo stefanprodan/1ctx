@@ -74,7 +74,7 @@ export const chmodCommand: RuntimeCommand = {
 
     const modeArg = args[argIdx];
     let files = args.slice(argIdx + 1);
-    // (1ctx) `--` after the mode ends the options too, as GNU chmod permutes
+    // (1ctx end-of-options) `--` after the mode ends the options too, as GNU chmod permutes
     if (!optionsEnded && files.includes("--")) {
       files = files.toSpliced(files.indexOf("--"), 1);
       if (files.length === 0) {

@@ -392,7 +392,7 @@ export async function handleLocal(
     }
   }
 
-  // (1ctx) -x exports each local for the function's lifetime, as bash does
+  // (1ctx exec-env) -x exports each local for the function's lifetime, as bash does
   if (declareExport) {
     const scope = ctx.state.localScopes.at(-1);
     for (const arg of processedArgs) {

@@ -1,7 +1,7 @@
 /**
  * diff - Compare files line by line
  *
- * (1ctx) As GNU diffutils 3.12: files are compared as bytes with our own
+ * (1ctx diff-engine diff-bytes diff-options diff-formats) As GNU diffutils 3.12: files are compared as bytes with our own
  * bounded engine, GNU's options and exit codes (0 the same, 1 different,
  * 2 trouble), GNU's words for binary files and operands, every output
  * format, and directories compared as GNU compares them.

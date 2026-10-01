@@ -6,7 +6,7 @@
  * - Respects .gitignore
  * - Skips hidden files by default
  * - Skips binary files by default
- * - (1ctx) Case-sensitive, and line numbers only with -n, as ripgrep piped
+ * - (1ctx rg-defaults) Case-sensitive, and line numbers only with -n, as ripgrep piped
  */
 
 import type {
@@ -38,11 +38,11 @@ EXAMPLES:
     "-e, --regexp PATTERN    search for PATTERN (can be used multiple times)",
     "-f, --file FILE         read patterns from FILE, one per line",
     "-i, --ignore-case       case-insensitive search",
-    // (1ctx) case-sensitive and without line numbers by default
+    // (1ctx rg-defaults) case-sensitive and without line numbers by default
     "-s, --case-sensitive    case-sensitive search (default)",
     "-S, --smart-case        case-insensitive unless the pattern has uppercase",
     "-F, --fixed-strings     treat pattern as literal string",
-    // (1ctx) the options ripgrep has that were refused
+    // (1ctx rg-parser) the options ripgrep has that were refused
     "-P, --pcre2             Perl syntax on RE2; backreferences and negative lookaround refused",
     "-w, --word-regexp       match whole words only",
     "-x, --line-regexp       match whole lines only",
@@ -103,7 +103,7 @@ export const rgCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    // (1ctx) -h is ripgrep's short help
+    // (1ctx rg-parser) -h is ripgrep's short help
     if (hasHelpFlag(args) || args.includes("-h")) {
       return showHelp(rgHelp);
     }
@@ -112,7 +112,7 @@ export const rgCommand: RuntimeCommand = {
     if (!parseResult.success) {
       return parseResult.error;
     }
-    // (1ctx) ripgrep's version: -V its line, --version with the features
+    // (1ctx rg-parser) ripgrep's version: -V its line, --version with the features
     const { version } = parseResult.options;
     if (version !== null) {
       const more = version === "long" ? "\nfeatures:+pcre2\n" : "";

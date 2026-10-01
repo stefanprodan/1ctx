@@ -102,7 +102,7 @@ export const cutCommand: RuntimeCommand = {
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      // (1ctx) `--` ends the options, as in GNU cut
+      // (1ctx end-of-options) `--` ends the options, as in GNU cut
       if (arg === "--") {
         files.push(...args.slice(i + 1));
         break;

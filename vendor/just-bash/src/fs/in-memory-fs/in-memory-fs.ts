@@ -84,10 +84,10 @@ export class InMemoryFs implements IFileSystem {
   private retainedBytes = 0;
   /** Number of directory entries retaining each hard-link-compatible buffer. */
   private contentReferences = new WeakMap<Uint8Array, number>();
-  // (1ctx) each directory's child names, so a readdir reads its own
+  // (1ctx fs-children) each directory's child names, so a readdir reads its own
   // children instead of scanning every path in the tree
   private children = new Map<string, Set<string>>();
-  // (1ctx) with none, a path resolves to itself without a walk
+  // (1ctx fs-children) with none, a path resolves to itself without a walk
   private symlinks = 0;
 
   /** The one writer of `data`, keeping `children` and `symlinks` in step. */
@@ -578,7 +578,7 @@ export class InMemoryFs implements IFileSystem {
   }
 
   /**
-   * (1ctx) Resolve a path one component at a time, as the kernel does: a
+   * (1ctx rm-walk) Resolve a path one component at a time, as the kernel does: a
    * link's target goes in front of the components still to resolve, so a
    * target through another link resolves too, and `..` after a link climbs
    * from where the link led. One count of links for the whole path, as
@@ -591,7 +591,7 @@ export class InMemoryFs implements IFileSystem {
   ): string {
     const normalized = normalizePath(path);
     if (normalized === "/") return "/";
-    // (1ctx) no symlink in the tree, nothing to resolve
+    // (1ctx fs-children) no symlink in the tree, nothing to resolve
     if (this.symlinks === 0) return normalized;
 
     // the components still to resolve, the next one last
@@ -671,7 +671,7 @@ export class InMemoryFs implements IFileSystem {
 
   async readdirWithFileTypes(path: string): Promise<DirentEntry[]> {
     validatePath(path, "scandir");
-    // (1ctx) every link on the way, the last included, one component at
+    // (1ctx rm-links rm-walk) every link on the way, the last included, one component at
     // a time, so a folder under or behind a linked folder is read
     let normalized: string;
     try {
@@ -693,7 +693,7 @@ export class InMemoryFs implements IFileSystem {
     }
 
     const entries: DirentEntry[] = [];
-    // (1ctx) the directory's own children, not a scan of every path
+    // (1ctx fs-children) the directory's own children, not a scan of every path
     for (const name of this.children.get(normalized) ?? []) {
       const fsEntry = this.data.get(joinPath(normalized, name));
       if (!fsEntry) continue;
@@ -713,7 +713,7 @@ export class InMemoryFs implements IFileSystem {
 
   async rm(path: string, options?: RmOptions): Promise<void> {
     validatePath(path, "rm");
-    // (1ctx) through linked folders above, never the last name, as unlink
+    // (1ctx rm-links) through linked folders above, never the last name, as unlink
     const normalized = this.resolveIntermediateSymlinks(path);
     const entry = this.data.get(normalized);
 
@@ -728,7 +728,7 @@ export class InMemoryFs implements IFileSystem {
         if (!options?.recursive) {
           throw new Error(`ENOTEMPTY: directory not empty, rm '${path}'`);
         }
-        // (1ctx) an iterative post-order walk: a deep tree never grows
+        // (1ctx rm-walk) an iterative post-order walk: a deep tree never grows
         // the call stack, and a link inside is removed, never followed
         const stack = [{ path: normalized, listed: false }];
         while (stack.length > 0) {

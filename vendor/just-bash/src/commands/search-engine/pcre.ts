@@ -1,5 +1,5 @@
 /**
- * (1ctx) grep -P's Perl syntax on RE2, which runs in linear time. What RE2
+ * (1ctx grep-pcre) grep -P's Perl syntax on RE2, which runs in linear time. What RE2
  * can express is rewritten: a leading lookbehind becomes a prefix the
  * reported match leaves out, as \K does, a trailing lookahead a suffix it
  * leaves out, and \h, \v, \R, \s, \w and the POSIX classes the Unicode sets

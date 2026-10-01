@@ -172,7 +172,7 @@ export class WorkerDefenseInDepth {
     prop: string;
     descriptor: PropertyDescriptor | undefined;
   }> = [];
-  // (1ctx) ported from upstream #443
+  // (1ctx module-accessors) ported from upstream #443
   /**
    * Restores the native accessor backing slot for module methods patched via
    * their setter (see protectModuleMethod). Restoring the descriptor alone
@@ -1318,7 +1318,7 @@ export class WorkerDefenseInDepth {
         throw new Error("method is non-configurable and non-writable");
       }
 
-      // (1ctx) ported from upstream #443, to the end of the accessor branch
+      // (1ctx module-accessors) ported from upstream #443, to the end of the accessor branch
       const wrap = (fn: (...args: unknown[]) => unknown) =>
         // @banned-pattern-ignore: intentional Proxy usage for security blocking
         new self.originalProxy(fn, {
@@ -1490,7 +1490,7 @@ export class WorkerDefenseInDepth {
    * Restore all original values.
    */
   private restorePatches(): void {
-    // (1ctx) ported from upstream #443
+    // (1ctx module-accessors) ported from upstream #443
     for (let i = this.moduleAccessorResets.length - 1; i >= 0; i--) {
       try {
         this.moduleAccessorResets[i]();

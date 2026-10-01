@@ -1,5 +1,5 @@
 /**
- * (1ctx) AWK input: the main input walk over ARGV and the record streams.
+ * (1ctx awk-options) AWK input: the main input walk over ARGV and the record streams.
  *
  * As gawk does, the operands are read from ARGV[1] to ARGV[ARGC-1] as they
  * stand when the walk reaches them, so BEGIN may delete, rewrite or add

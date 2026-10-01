@@ -1,5 +1,5 @@
 /**
- * (1ctx) Input helpers for read and mapfile.
+ * (1ctx read-utf8) Input helpers for read and mapfile.
  *
  * Their stdin is a latin1-shaped byte buffer (one char per byte), while
  * variables hold Unicode text. These helpers scan the bytes as bash does

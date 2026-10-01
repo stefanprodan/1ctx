@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Bash } from "../../Bash.js";
 
 describe("rg pattern options", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match whole words with -w", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -16,7 +16,7 @@ describe("rg pattern options", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match whole lines with -x", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -30,7 +30,7 @@ describe("rg pattern options", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should treat pattern as literal with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -44,7 +44,7 @@ describe("rg pattern options", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match regex special chars literally with -F", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -58,7 +58,7 @@ describe("rg pattern options", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should invert match with -v", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -72,7 +72,7 @@ describe("rg pattern options", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should show all non-matching lines with -v", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -88,7 +88,7 @@ describe("rg pattern options", () => {
 });
 
 describe("rg multiple patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should search for multiple patterns with -e", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -102,7 +102,7 @@ describe("rg multiple patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should combine multiple -e patterns", async () => {
     // Note: When -e is used, all positional args are paths (ripgrep behavior)
     // Use multiple -e flags to search for multiple patterns
@@ -118,7 +118,7 @@ describe("rg multiple patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should use smart case across all patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -132,7 +132,7 @@ describe("rg multiple patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should support --regexp= syntax", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -146,7 +146,7 @@ describe("rg multiple patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match multiple patterns in same line", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -162,7 +162,7 @@ describe("rg multiple patterns", () => {
 });
 
 describe("rg regex patterns", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match regex patterns", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -176,7 +176,7 @@ describe("rg regex patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match start of line with ^", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -190,7 +190,7 @@ describe("rg regex patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match end of line with $", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -204,7 +204,7 @@ describe("rg regex patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match with alternation", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -218,7 +218,7 @@ describe("rg regex patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match with quantifiers", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -232,7 +232,7 @@ describe("rg regex patterns", () => {
     expect(result.stderr).toBe("");
   });
 
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should match with character classes", async () => {
     const bash = new Bash({
       cwd: "/home/user",
@@ -248,7 +248,7 @@ describe("rg regex patterns", () => {
 });
 
 describe("rg combined options", () => {
-  // (1ctx) ripgrep numbers lines only with -n when piped
+  // (1ctx rg-defaults) ripgrep numbers lines only with -n when piped
   it("should combine -w and -i", async () => {
     const bash = new Bash({
       cwd: "/home/user",

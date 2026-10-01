@@ -51,7 +51,7 @@ describe("grep Perl regex (-P)", () => {
           files: { "/test.txt": "prefix\n" },
         });
         const result = await env.exec("grep -oP 'prefix\\K' /test.txt");
-        // (1ctx) GNU grep -o prints no line for an empty match
+        // (1ctx search-empty-match) GNU grep -o prints no line for an empty match
         expect(result.stdout).toBe("");
         expect(result.exitCode).toBe(0);
       });

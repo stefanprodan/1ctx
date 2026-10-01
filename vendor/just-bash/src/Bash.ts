@@ -87,7 +87,7 @@ import type {
 
 export type { ExecutionLimitProfile, ExecutionLimits } from "./limits.js";
 
-// (1ctx) what a shell sets itself, so a shell started without an environment has them
+// (1ctx exec-env) what a shell sets itself, so a shell started without an environment has them
 const SHELL_VARIABLES: readonly [string, string][] = [
   ["IFS", " \t\n"],
   ["OSTYPE", "linux-gnu"],
@@ -97,7 +97,7 @@ const SHELL_VARIABLES: readonly [string, string][] = [
   ["OPTIND", "1"], // getopts option index
 ];
 
-// (1ctx) only a name can be exported, never a positional or special parameter
+// (1ctx exec-env) only a name can be exported, never a positional or special parameter
 const EXPORTABLE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
@@ -723,7 +723,7 @@ export class Bash {
       const execEnv = effectiveOptions.replaceEnv
         ? new Map<string, string>(SHELL_VARIABLES)
         : new Map(this.state.env);
-      // (1ctx) the given env is the new shell's environment, so it is exported
+      // (1ctx exec-env) the given env is the new shell's environment, so it is exported
       const exportedVars = new Set(
         effectiveOptions.replaceEnv ? [] : this.state.exportedVars,
       );
@@ -776,7 +776,7 @@ export class Bash {
         extraArgs: effectiveOptions.args,
       };
 
-      // (1ctx) a new shell sets these itself, whatever its environment
+      // (1ctx exec-env) a new shell sets these itself, whatever its environment
       if (effectiveOptions.replaceEnv) {
         execEnv.set("SHELLOPTS", buildShellopts(execState.options));
         execEnv.set("BASHOPTS", buildBashopts(execState.shoptOptions));

@@ -4,8 +4,13 @@ The agent's shell is [just-bash](https://github.com/vercel-labs/just-bash)
 (Apache-2.0), an emulated bash in TypeScript. We run it from source in
 `vendor/just-bash/`, not from npm, because the npm package ships only
 minified bundles and its commands need fixes we cannot wait for upstream
-to make. This file is the record of what we changed and how to take a
-new upstream release.
+to make. This file says where it comes from, what we removed, how a
+change to it is recorded and tested, and how to take a new upstream
+release. Two files beside it hold the rest:
+
+- `vendor/changes.md`: every change we made, one entry each, by area.
+- `vendor/differences.md`: where our commands still answer differently
+  from the tools they follow, and how jq and yq part in one engine.
 
 ## Where it comes from
 
@@ -32,7 +37,8 @@ The trim keeps what the mount can run. Removed, with their tests:
   and `src/commands/worker-bridge`: the Python, JavaScript and SQLite
   commands, their workers and the packages they load (`sql.js`,
   `quickjs-emscripten`). Their loaders in `src/commands/registry.ts` and
-  sqlite3's line in `src/commands/fuzz-flags.ts` are gone too.
+  sqlite3's line in `src/commands/fuzz-flags.ts` are gone too (the
+  `trim` entry).
 - `src/cli`: the `just-bash` and `just-bash-shell` executables.
 - `src/spec-tests`, `src/comparison-tests`, `src/agent-examples`: 20 MB
   of fixtures.
@@ -40,486 +46,58 @@ The trim keeps what the mount can run. Removed, with their tests:
   `AGENTS.npm.md`, `vitest.comparison.config.ts` and
   `vitest.wasm.config.ts`.
 
-## What we changed
+## How a change is recorded
 
-A fix to a command goes here, with a test, never around it in our
-code. Every change in the source carries `(1ctx)` in a comment, so
-`grep -rn "(1ctx)" vendor/just-bash/src` lists them. Our tests of them
-are in `test/vendor/just-bash/`, `fixes.test.ts` for the rows below
-without a file of their own.
+A fix to a command goes into the vendored source, with a test, never
+around it in our code. Each change is one unit a sync would keep or drop
+together, and has:
 
-| File | Change | Why |
-|---|---|---|
-| `src/security/defense-in-depth-box.ts` | `withValue()` installs a patched value as a data descriptor, never with a `get` or `set` beside `value`, where upstream spreads the descriptor | before #443 the accessor `Module._resolveFilename` went through it, and the spread made `defineProperty` throw, so every critical patch failed and `defenseInDepth: true` refused to run; on Bun 1.4.2 both callers now pass only data descriptors (the Module branch runs only for a `value`, the freeze branch patches `Reflect`, `JSON` and `Math`), so either side is safe at the 3.5.0 sync |
-| `src/security/defense-in-depth-box.ts`, `worker-defense-in-depth.ts`, upstream's `module-accessor-descriptors.bun.test.ts` | upstream #443, ported ahead of the sync: `Module._load` and `Module._resolveFilename` reported as accessors are installed through their own setter with a guarded get and set in front; a set during a command is blocked as a call is, a set in audit mode is recorded and wrapped, and teardown resets the native slot through the original setter before the descriptors are restored | on Bun 1.4.2 `_resolveFilename` is an accessor whose native slot only its setter writes, so our data property installed, reported no failure and blocked nothing: `require()` inside a command loaded anything. Now it throws `module_resolve_filename`, so a package a command initialises outside a registry load or `runTrustedAsync` throws in the binary, where Bun bundles CommonJS with a real `require`. The worker box, which we never start, failed its critical patch on Bun, so upstream's `WorkerDefenseInDepth` suite failed; it passes now. Take theirs at the 3.5.0 sync |
-| `src/security/defense-in-depth-box.ts` | upstream #503, ported ahead of the sync: `runTrustedAsync` returns the awaited value, not the promise (its other half is in the worker bridge we removed) | adopting the promise went through the box's patched `Promise.prototype.then`, which drops callbacks once the execution is deactivated, so host work settling after a cancel lost its value and left its rejection unhandled; take theirs at the 3.5.0 sync |
-| `src/abort-signals.ts`, `src/commands/registry.ts`, `src/custom-commands.ts`, `src/security/trusted-globals.ts`, `defense-in-depth-box.ts`, `src/test-utils/unhandled-rejections.ts` (new), upstream's `timeout.resolve-cancellation.test.ts`, `custom-command-lazy-load.test.ts`, `defense-in-depth-trusted-scope.test.ts` | upstream #506, ported ahead of the sync: a cancelled invocation stops waiting for its command's module load (`raceCancellation`), a custom command's lazy load is shared and its waiters detach, settled through the intrinsic `then` (`_promiseThen`), and deactivating an execution releases its trusted scope | `timeout` on a command still loading ended the whole script with `bash: execution aborted`, exit 124, since the load cannot be cancelled and held the invocation past the cleanup window; take theirs at the 3.5.0 sync |
-| `src/network/fetch.ts` | a redirect to anything but `http:` or `https:` is `RedirectNotAllowedError` | Bun's fetch reads `file:` URLs from the host's disk, and full internet access checks no scheme |
-| `src/network/fetch.ts` | a response refused for its `content-length` cancels its body | the connection was left open until the body was collected |
-| `src/commands/curl/curl.ts`, `parse.ts`, `types.ts`, `help.ts` | `-V` and `--version` answer `curl 8.21.0 (just-bash, compatible)`, the protocols and a line saying what this is, exit 0, before the URL check | `curl --version` was `unrecognized option`, exit 1, where every curl answers it |
-| `src/commands/jq/jq.ts` | `-V` and `--version` answer `jq-1.8.2 (just-bash, compatible)`, the version the fixture is recorded against, and a line saying what this is, exit 0 | `jq --version` was `unrecognized option`, exit 1 |
-| `src/commands/version.ts` (new), `registry.ts` | every other command whose tool has a version flag answers it before it loads, with that tool's first line marked `(just-bash, compatible)` and a line naming what it follows, exit 0: GNU coreutils 9.11, sed 4.10, findutils 4.11.0 (`find`), tar 1.35, gzip 1.15, bash 5.3.15 (`bash`, `sh`), file 5.48, util-linux 2.42.4 (`column`, `rev`), binutils 2.47 (`strings`), tree 2.3.2, which 2.25, inetutils 2.8 (`hostname`), xan 0.61.0. The tool's short flags ask as the first argument; `--version` asks anywhere before `--` where the tool reads options in any order, and first only for `env`, `timeout`, `expr`, `find`, `bash`, `sh` and `xan` | each was an unknown option, a missing file or an argument, where the tool it follows answers |
-| `src/commands/tar/archive.ts` | gzip through the platform's `CompressionStream` and `DecompressionStream` | modern-tar 0.8, the version we pin, dropped `createGzipEncoder` and `createGzipDecoder`, thin wrappers over the same streams |
-| `src/commands/query-engine/builtins/object-builtins.ts` | `key` typed as `QueryValue` | TypeScript 7 cannot infer it (TS7022) |
-| `src/commands/registry.ts`, `src/commands/fuzz-flags.ts` | the removed commands' entries | the trim |
-| `src/commands/find/find.perf.test.ts` | the pure evaluation benchmark takes 60 s, not Bun's default 5 | its 4.8M evaluations passed 5 s once on a busy CI runner; it asserts only that both paths match the same files |
-| `src/interpreter/builtin-dispatch.ts` | a name that does not resolve is `bash: <name>: command not found`, 127, the removed `python`, `python3` and `sqlite3` included; `browser-excluded.ts` stays for upstream's bundle test, whose four "helpful error" tests pinning the old words are expected failures | upstream answered those with its browser bundle's words, "not available in browser environments ... use the Node.js bundle", and models went looking for `node` |
-| `src/commands/query-engine/path-expressions.ts` (new), `evaluator.ts`, `builtins/path-builtins.ts` | jq and yq assignments (`=`, `\|=`, `+=` and the rest), `path`, `del`, `delpaths`, `setpath`, `getpath` and `pick` evaluate the left side as jq's path expression, then set or delete each path it yields; `path-operations.ts` and the old setter are gone | upstream guessed paths from the shape of the query: `select(.kind == "Deployment").spec.replicas = 3` set every document, a pipe or `,` on the left replaced the whole input, `del` with `select` deleted nothing, and each exited 0 |
-| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | a YAML input of several documents runs the filter on each, results of different documents printed apart by `---`, and `-i` writes them all back; a document that does not parse fails the whole input | upstream refused a stream unless `-s` was given, and mikefarah's yq, the one models know, runs per document: every Kubernetes manifest and Flux list is several |
-| `src/commands/yq/yq.ts` | the leading `eval` or `e` of mikefarah's `yq eval <filter> <file>` is taken as his, `--version` answers `yq (https://github.com/mikefarah/yq/) version v4.53.3 (just-bash, compatible)`, the version the fixture is recorded against, several files are read in turn with `-i` writing each, a value joined to `-o`, `-p` or `-I` (`-ojson`, `-I0`) is read, and JSON at `-I0` is one line | models write mikefarah's forms: `yq eval` failed on a file named after the filter, the files after the first were dropped without a word |
-| `src/commands/yq/preserve.ts` (new) | `yq -i` applies the change between each document and its result to the parsed document, so untouched nodes keep their comments, quoting and style; a result that does not read back exactly is printed plainly | the engine works on plain values, so every in-place edit deleted the file's comments |
-| `src/commands/awk/awk2.ts`, `options.ts` (new), `interpreter/input.ts` (new), `interpreter/variables.ts`, `interpreter/context.ts`, `lexer.ts` | `-v` and `-F` are one ordered list of assignments replayed before `BEGIN`, their values read with awk's string escapes; `-f` reads the program from files and `--` ends the options; after `BEGIN` the operands are read from `ARGV[1]` to `ARGV[ARGC-1]` as they stand, a `name=value` operand is an assignment done when reached, `-` is stdin, a missing file is fatal (exit 2) and stdin's `FILENAME` is `-`; `ARGV` and `ENVIRON` are ordinary arrays and `ARGC` can be set | `-v OFS='\t'` printed a space, `-F` lost to an earlier `-v FS`, `-f` was refused and `FS=,` among the operands was read as a file name; models write gawk's forms |
-| `src/commands/awk/interpreter/records.ts` (new), `input.ts`, `expressions.ts`, `fields.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `RS` and `RT` are built-ins: a record is read one at a time under the `RS` in force, a single character literally, `""` as paragraph mode (a newline also separates fields), two or more characters as a regular expression found through the new `UserRegex.scan()`, one that can match the empty string refused; every `getline` form reads records the same way and sets `RT`, plain `getline` moves `NR` and `FNR`, and the main input, `getline` files and commands share one byte budget; `close()` ends a `getline` file or command and an output file, answering 0 or -1; the abort signal stops the reader | the input was always split on newlines, so `RS="---"` over a kept YAML list gave one record per line with exit 0, and `close()` did nothing |
-| `src/commands/awk/chars.ts` (new), `format.ts` (new), `builtins.ts`, `interpreter/type-coercion.ts`, `statements.ts`, `expressions.ts`, `fields.ts`, `variables.ts`, `context.ts`, `parser2.ts`, `parser2-print.ts` | `length`, `substr`, `index`, `RSTART`, `RLENGTH`, an empty-`FS` split and `printf` widths, precisions and `%c` count code points; `printf` moved to `format.ts` and formats from the exact binary value, rounding half to even, with two exponent digits; a whole number prints as its exact integer, any other through `OFMT` in `print` and through `CONVFMT` (a new built-in) wherever it becomes a string, subscripts included; `int()` and `%d` truncate toward zero; infinities and NaN print as `+inf`, `-inf` and `+nan`; a comparison with a string constant or a concatenation compares strings; concatenation binds tighter than the comparisons | an emoji counted as two characters, `1e30` printed as `1e+30`, `0.1+0.2` became `0.30000000000000004` as a string, `%e` wrote `e+3`, `int(-3.5)` was -4, `%.1f` of 2.25 gave 2.3, and `x "" == "0.3"` compared `"" == "0.3"` |
-| `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `expressions.ts`, `statements.ts`, `context.ts`, `builtins.ts`, `src/regex/user-regex.ts` | `FS` and `split()` read their separator as gawk does: `" "` is runs of space, tab and newline, any other single character is that character, `""` each character, two or more a regex; one splitter serves records, `$0` assignment, `sub`/`gsub` and `split()`, whose fourth argument gets the separators; `length(arr)` counts elements; reading an element creates it; a scalar used as an array and the reverse are fatal; arguments are bound after all are evaluated, and a parameter without one is a local array; `match(s, re, arr)` fills `arr` with each group and its `start` and `length` in characters from the new `UserRegex.groups()`, and only a pattern that does not compile is a failed match | `-F.` split on every character and `-F'\|'` crashed, `length(arr)` was 0, `a["k"];` created nothing, `match(line, /re/, m)` left `m` empty, and a limit error inside `match` was swallowed |
-| `src/commands/awk/check.ts` (new), `awk2.ts`, `lexer.ts`, `parser2.ts`, `options.ts`, `interpreter/input.ts`, `interpreter/expressions.ts`, `builtins.ts` | a pass over the parsed program refuses a builtin called with a number of arguments outside gawk 5.4.1's bounds, and a function named after a builtin, exit 1, before `BEGIN`; `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`, `FIELDWIDTHS`, `@include`, `@load` and `@namespace` are refused the same way, exit 2, in the program, `-v` or an operand; a call to a function that does not exist and `sprintf()` are fatal when they run; `length` without parentheses is `length($0)`, and `do stmt; while (c)` parses | extra arguments were ignored (`match(s, re, m)` left `m` empty with exit 0), an unknown function answered the empty string, and `IGNORECASE=1` or `FIELDWIDTHS` changed nothing without a word |
-| `src/commands/awk/builtins.ts`, `check.ts` | `sub` and `gsub` change the array element, the built-in variable or the field their third argument names, assign nothing when nothing matched, count in a string constant without changing it, and refuse any other third argument before the program runs; the replacement follows gawk's backslash rules (`\\\&` gives `\&`, `\\\\` gives `\\`, `\\&` a backslash and the match, `\&` an ampersand, any other backslash stays) | `gsub(/a/, "b", arr[k])` and `gsub(/a/, "b", "aaa")` changed `$0` instead, and `\q` lost its backslash |
-| `src/commands/awk/interpreter/expressions.ts`, `variables.ts`, `context.ts` | a comparison is numeric when both sides are a number, an uninitialized variable or element (both `""` and `0`, an element made by a reference included) or a numeric-looking string that is not a constant, a concatenation or a string function's answer; division and modulo by zero are fatal | `x == 0` and `c[$1] == 0` were false for an unset `x` and `c[$1]`, `substr(s, 1, 2) > 5` compared numbers, and `1/0` printed `0` |
-| `src/commands/awk/parser2.ts` | `$` binds tighter than `^`, and an exponent may carry a sign | `$2^2` read `$4` and `2^-1` was a parse error |
-| `src/commands/awk/lexer.ts`, `parser2.ts`, `parser2-print.ts`, `check.ts`, `options.ts`, `awk2.ts`, `interpreter/input.ts` | a name followed by `(` with a space between is a call only for a gawk builtin, ours or one we lack; for any other name it is a concatenation, `x (y)` joining `x` and `y`; a user function's name used that way, as a variable, as an array, as its own parameter or in `-v` is refused before `BEGIN`, exit 1, and as an operand assignment is fatal when reached, exit 2; the file after `>` and `>>` is a concatenation, as after `\|` | `x (1 ? "b" : "c")` was `function 'x' not defined`, a form models write to join strings, and `print > "a" ".txt"` wrote to `a` |
-| `src/commands/awk/format.ts`, `interpreter/statements.ts`, `fields.ts`, `expressions.ts`, `awk2.ts` | `printf` with fewer arguments than conversions is fatal, a negative field is fatal, a bare `exit` keeps the code an earlier `exit` set, `print > "/dev/stdout"` prints and `print > "/dev/stderr"` reaches stderr, and `getline < "-"` or `getline < "/dev/stdin"` reads standard input | a missing argument printed empty or `0`, `$(-1)` was empty, `print > "/dev/stdout"` wrote a file that name and getline from stdin answered -1 |
-| `src/commands/awk/interpreter/fields.ts`, `variables.ts`, `input.ts`, `records.ts`, `context.ts`, `awk2.ts` | fields are capped like array elements, `ARGV` and `ENVIRON` elements count against the cap, a gap in `ARGV` is skipped whole, and the compiled record separators live with the command | `$100000000 = "x"` took gigabytes, `split(s, ARGV)` escaped the cap, `ARGC = 1e8` spun for ten seconds and a module-level cache kept each command's last input |
-| `src/commands/registry.ts`, `src/commands/awk/awk2.ts`, `options.ts` | `gawk` is a second name of awk, and `--version` or `-V` among the options answers `GNU Awk 5.4.1 (just-bash, compatible)` and a line saying what this is, exit 0 | a model asked for gawk found `gawk: command not found` and `awk --version` refused, and spent a chat looking for a gawk binary |
-| `src/commands/awk/builtins.ts`, `check.ts` | `asort(src [, dest [, how]])` and `asorti(...)` as gawk 5.4.1 orders them: the ten `@ind_`/`@val_` `_str`/`_num`/`_type` `_asc`/`_desc` orders, the default `@val_type_asc` for asort (an uninitialized value, then numbers, then strings) and `@ind_str_asc` for asorti, ties broken as gawk breaks them, both bounded by the element cap; a user comparison function is refused | both were functions not defined, and a model reaches for `asorti` first |
-| `src/commands/awk/interpreter/pipes.ts` (new), `statements.ts`, `context.ts`, `builtins.ts`, `awk2.ts`, `parser2-print.ts`, `lexer.ts`, `ast.ts` | `print ... \| "cmd"` and `printf ... \| "cmd"`: one pipe per command text holding what is printed to it, run through the shell with that text as stdin at `close("cmd")` (which answers its exit status) or at the end, in the order opened, its stdout placed as gawk places it (gawk flushes its own stdout when a pipe opens and closes, and closes every pipe before its last flush), its stderr on ours; pipes count against the output cap, at most 16 are open, the abort signal stops them, `fflush()` marks our output written, and `\|&` is refused | `print \| "sort"` was a parse error |
-| `src/commands/awk/parser2-print.ts` | `print (a, b)` prints every item, as gawk does | it printed the last one |
-| `src/commands/awk/interpreter/pipes.ts`, `statements.ts`, `expressions.ts` | a redirection or getline whose name is the empty string (an unset variable's too) is gawk's fatal error, `expression for \`|' redirection has null string value`, for `|`, `>`, `>>` and `<` | `print $0 \| constructor` and `getline < x` with `x` unset printed nothing and exited 0 |
-| `src/commands/awk/interpreter/files.ts` (new), `statements.ts`, `pipes.ts`, `context.ts`, `builtins.ts`, `expressions.ts`, `interpreter.ts`, `awk2.ts` | the first write to a `>` or `>>` file lands at once as before; later writes are held and appended when anything could see the file (a command, a `getline`, the next input operand, another file's open, `close()`, `fflush()`, 64 Ki UTF-16 units held, the end, and a limit, abort or security exit); an append is the filesystem's own, so `>>` to a directory and an append that does not fit are fatal and a BOM survives, except through a link, which keeps the read and rewrite; the output's UTF-8 length is kept as it grows, for `printf`'s limit | each `print > f` re-read and re-wrote the whole file, a failed append replaced the file with its text, and each `printf` measured the whole output, so 10k lines took over a second |
-| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | results are records of a value and the document it counts as read from; YAML output prints a top-level string raw, spaces and newlines kept, an empty string as an empty line, and `--unwrapScalar=false` quotes it again; an error in a later document fails the run after the earlier documents' results | mikefarah unwraps a top-level scalar: `[.a, .b] \| @tsv` printed `"x\ty"` with its escape, and an error in the last document dropped every earlier result |
-| `src/commands/yq/yq.ts` | `-i` groups the results by document, writes one `---` between documents and none before the first, and writes a document that is a string raw | a surviving second document started the file with `---`, and a bare string was written quoted |
-| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `-N` and `--no-doc` drop the `---` lines; `-j` and `--tojson` are `-o json` with mikefarah's deprecation line; a `.json` file prints JSON unless `-p` or `-o` was given, and several files print in the first one's format; YAML at `-I0` and `-I1` is indented 4 and 2 | mikefarah's meanings: `-j` joined the output here, and JSON input printed YAML |
-| `src/commands/yq/documents.ts` (new), `yq.ts`, `query-engine/evaluator.ts`, `src/index.ts` | a walker runs the top of a yq filter (`\|`, `,`, `//`, parentheses, `as`, `if`, arithmetic) and tags each result as the document, a node inside it, or computed from nothing, classifying every other node by what it is; `---` prints where the document index moves or a later file starts, a computed value counting as document 0, in stdout and in `-i`; the evaluator exports `createContext()` and `extractPathFromAst()` and the package exports the walker and the engine for our tests | mikefarah prints `---` only between values read from different documents: `length`, `keys` and `"\(.kind)"` print none, `.a // "none"` one where the index moves |
-| `src/commands/query-engine/builtins/dialect-builtins.ts` (new), `evaluator.ts`, `parser.ts`, `yq/yq.ts` | `dialect` on the options and the context, `yq` from the yq command; the builtins, arithmetic, `==` and field steps that part follow it, and jq 1.8's errors and answers where both tools agree and upstream answered null (see "The jq and yq dialects"); an unbound variable is an error; `.a.[0]` parses | where the tools part, a model got exit 0 with the wrong answer: `sub("-", "_")` and `select(.image == "nginx*")` answered null or nothing, `type` never matched `!!str`, `keys` sorted, `to_entries` of a list was null, and `.a * 2` printed null for every document without `a` |
-| `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts` | `--` ends the flags; `-o csv` writes a list of scalars as one row and every row with a newline, `-o tsv`, `-o props` and `-o p` are mikefarah's formats (`tags.0 = a`); `-M`, `-C` and `--colors` are accepted and ignored; `-0` and `--nul-output` end each result with a NUL, keeping `---`, and fail on a result holding one | mikefarah's flags failed as unknown options |
-| `src/commands/query-engine/builtins/dialect-builtins.ts`, `parser.ts`, `yq/yq.ts`, `yq/documents.ts` | mikefarah's functions: `documentIndex` and `di`, `fileIndex`, `fi` and `filename`, `to_number`, `to_string`, `@yaml`, `to_yaml`, `@yamld`, `from_yaml`, `@jsond`, `from_json`, `@props`, `sort_keys(f)`, `pick` and `omit` of a list of keys, `filter(f)`, `any_c`, `all_c`, `key` and bare `path` (from the paths the walker follows), `with(p; f)`, `splitDoc` and `split_doc` (each result its own document), `load` and `load_str` of a file named as a string (read before the run through the mount, under the string limit), `explode`; `anchor`, `alias`, `style` and the comment getters answer `""`, `line` and `column` 0; `tag = "!!str"` and the other four YAML tags retype a scalar whose value can take the tag, `... comments=""` strips the comments and keeps the style, and `style=`, `anchor=`, `alias=` and a comment set to text are refused, since our values carry none; jq refuses every setter | models write them from mikefarah's docs, and each failed as an unknown function or a parse error, then changed nothing |
-| `src/commands/query-engine/builtins/dialect-builtins.ts`, `evaluator.ts`, `yq/documents.ts` | in the yq dialect an arithmetic operand that is a path of steps is read as mikefarah reads it, without creating a missing key: `.n * 2` on a document without `n` answers nothing and `.n + 1` the other side, where `.n \| . * 2` fails on the null the pipe made, `null - x` and `null + x` are `x` in the node's place, `x * null` is `x`; a `key` or bare `path` the walker cannot follow (inside `map`, `with_entries` or `del`) is refused, and a replacement's path is its input's, so `to_entries \| .[] \| key` counts; `.a[0]` on a string answers nothing (jq's error) | `.spec.replicas \| . + 1` lost its `---`, `.n - 1` printed nothing where mikefarah prints 1, and `key` answered null inside a function |
-| `src/commands/query-engine/builtins/dialect-builtins.ts`, `yq/formats.ts`, `value-operations.ts` | `@csv` and `@tsv` in the yq dialect are mikefarah's (a scalar as it is, a list one row, a list of lists rows, a list of maps under a header, `null` written out, Go's quoting) and `-o csv` writes `null` too; `@sh` and `@uri` fail on anything but a string; `tostring` of a map or list is YAML; `map` over a map is `[.[] \| f]` in both dialects; `unique`, `unique_by` and `group_by` key a map by its text in linear time, and jq's `==`, `unique` and `group_by` treat two maps that differ only in key order as one, mikefarah's not; jq's `@csv` quotes every string, its `@tsv` escapes with backslashes and its `@sh` joins a list | `@sh` and `@uri` answered null for a list, `tostring` of a list was JSON, `map` over a map was null, `unique` compared every pair, and jq's `@csv` left strings bare |
-| `src/commands/yq/yq.ts` | an error exits 1, as mikefarah's yq does; a missing file still exits 2 | the jq-style 3 and 5 were ours alone |
-| `src/commands/yq/preserve.ts`, `yq.ts`, `documents.ts` | a YAML result made from a node of the document (the document itself, a node reached by a path, or a function's result on one: `=`, `del`, `with_entries`, `map`, `sort`, a merge or an append) prints through the parsed document as `-i` writes it, so comments, flow style, quoting and anchors stay: the walker records each result's source node, the documents as written are parsed once and only when such a result prints or `-i` writes (a scalar, a computed value or another output format costs no more than before), the change from the node's value to the result is applied to a clone of that node alone (to the document itself when it prints once), only the nodes the edit wrote are read back to check them unless an anchor or merge key is in play, a reorder of a list keeps its items' nodes, an edited quoted string keeps its quotes, a head comment stays when its key goes, `... comments=""` strips the comments and keeps the style (stdout and `-i`), `-I` and `-P` apply to the kept text; a result that does not read back exactly, a value the filter builds (`{...}`, `[...]`, a literal, `keys`) and every other output format print afresh as before | models preview an edit on stdout before `-i`, and stdout dropped every comment and wrote `[2, 3]` in block style, unlike the file `-i` would write |
-| `src/commands/yq/formats.ts`, `src/commands/yq/preserve.ts` | merge keys (`<<: *base`) merge on read, the explicit keys winning; `-i` keeps the key as written | `.web.image` through a merge key answered null and `-o json` showed a `<<` key |
-| `src/commands/yq/yq.ts`, `src/commands/yq/documents.ts`, `query-engine/parser.ts` | `ea` and `eval-all` read every document of every file (or stdin) first and run the filter once over the list: a pipe hands the whole list on, `[...]` at the top collects every result into one array, `EXPR as $x ireduce (INIT; UPDATE)` folds them, and every other node runs per document; `-i` writes each file its own documents' results; `ireduce` parses in both dialects and jq refuses it | the idioms that sort or count documents across a stream, or merge files, were refused with a pointer to `-s` |
-| `src/commands/search-engine/matcher.ts`, `src/regex/user-regex.ts`, `src/commands/rg/rg-search.ts`, `rg-options.ts` | the engine grep and rg share: a selected line inside an earlier line's context prints as a match, `--` separates groups that do not touch and files, `-A0` included; an empty match moves one code point on and never asks RE2JS past the line's end; only a missing file reads `No such file or directory`; `-m` stops at the NUM-th selected line in every mode and `-m 0` selects nothing; grep's `-c -o` counts lines, rg's matches; `-b`, `--column` and `--vimgrep` count UTF-8 bytes; `-w` is checked in code on Unicode letters, digits and `_`, a shorter match at the same start tried first, each retry charged to the work limit; a NUL makes input binary (grep's `binary file matches` on stderr, rg's line on stdout); `(?i)`, `(?s)`, `(?m)`, `(?U)` reach RE2 and `(?x)` is stripped; BRE and ERE match leftmost-longest | context lines hid matches, `-o` threw on empty matches, every read error was a missing file, `-m` was ignored beside `-c` and `-l`, offsets counted UTF-16 units, `-w café` and `-w '=42'` failed, and a binary file printed its lines |
-| `src/commands/search-engine/gnu-regex.ts` (new), `regex.ts` | grep's BRE and ERE are translated as GNU grep 3.12 reads them: `\+`, `\?`, `\\|`, `\{n,m\}`, `\<`, `\>`, `\b`, `\B`, `\w`, `\W`, `\s`, `\S`, `` \` `` and `\'`, `{,n}`, a leading `*` or `{1}` repeating nothing with GNU's warning, a lone `)`, `a**`, a stray backslash warned about, GNU's error words and exit 2; a backreference is refused naming it | the translation missed most of GNU's escapes and answered errors as matches |
-| `src/commands/grep/grep.ts`, upstream's grep tests | GNU's option parser: a value in the same argument or the next, a value-taking option ending a cluster, `-NUM`, options after operands, long-option prefixes, conflicting matchers refused; `-e` and `-f` accumulate; `-r` with no operand searches `.` without `./`, dotfiles included, a directory without `-r` is an error, `-s` silences and still exits 2, `-d`; and the options it refused: `-b`, `-H`, `-a`, `-I`, `--binary-files`, `-T` (padded as GNU pads to the file's size), `-Z`, `-z`, `-y`, `--no-ignore-case`, `--exclude-from`, `--label`, `--group-separator`, `--no-group-separator`, `-V`, `--color` (`always` refused), with `--line-buffered`, `-U`, `--binary` and `-D` accepted; the upstream tests that pinned the old answers now pin GNU's | models write GNU grep's forms, and the last `-e` won, `-C1` was refused, `-r` without a path read stdin and `-b`, `-H` and `-Z` were unknown |
-| `src/commands/search-engine/pcre.ts` (new), `regex.ts` | grep `-P` on RE2: a leading lookbehind is a prefix and a trailing lookahead a suffix the reported match leaves out, the next `-o` match starting where the kept part ends; `\K` is moved out of groups that neither repeat nor have alternatives; with `-x` the anchors sit around the kept part; `\h`, `\v`, `\R`, `\s`, `\w` and the POSIX classes are PCRE2's Unicode sets, the caseless categories spelled as ranges since RE2JS throws on `\p{N}` under `-i`; `\Q...\E`, `(?#...)`, `(?P<n>)` and `(?'n')` are read; lookaheads right after a leading `^`, negative ones included, are separate patterns the line must match there or must not; `{,n}` is `{0,n}`; backreferences, other negative lookaround, possessive quantifiers, atomic groups, recursion, conditionals, branch resets and verbs are refused naming them, exit 2 | `(?<=id=)\d+` and `\d+(?=\.)` failed to compile, and no pattern may run on a backtracking engine |
-| `src/commands/rg/rg-options.ts`, `rg.ts`, upstream's rg tests | case-sensitive unless `-i`, `-S` or `--smart-case`, line numbers only with `-n`, `--column` or `--vimgrep`, file names only for a directory or several paths; the upstream tests that assumed the old defaults ask for `-n` or `-S` | ripgrep turns on smart case and numbers only on a terminal, and a model's shell never is one, so it expects what ripgrep prints when piped |
-| `src/commands/rg/rg-parser.ts`, `rg-options.ts`, `rg.ts` | ripgrep's parser: `--` ends the options, a value-taking option ends a cluster or takes the next argument, long options take `=VALUE`, `--passthrough`, `--maxdepth` and `-.` are aliases, every refusal exits 2 in ripgrep's words; and the options it refused: `-M`, `--max-columns-preview`, `--trim`, `-E` (UTF-8 and `none`; another encoding refused), `-V`, `--version`, `-p`, `--no-heading`, `--color` (`always` refused), `--colors`, `--sort` and `--sortr` with every key, `--sort-files`, `--no-ignore-parent`, `--no-ignore-files`, `--require-git`, `--crlf`, `--binary`, `--no-messages`, `--null-data`, `--path-separator`, `--no-unicode`, `-P`, `--pcre2` and `--engine`, `-h` as the help, with `--no-config`, `--one-file-system`, `--line-buffered`, `--no-require-git`, `--auto-hybrid-regex`, `--no-pcre2-unicode` and `--debug` accepted | forty options were unknown, and every refusal exited 1, which a script reads as no match |
-| `src/commands/rg/globs.ts` (new), `gitignore.ts`, `rg-files.ts` (new, moved out of `rg-search.ts`) | one glob compiler for `-g`, `--iglob`, `--type-add` and the ignore files: braces, a glob without a slash at any depth and pruning a directory, a leading `/` anchoring, the last match deciding, `-g` over the ignore files, types and hidden names; `.rgignore` over `.ignore` over `.gitignore`, the deepest first; a path given by name searched whatever the filters say; `--require-git` honours `.gitignore` only under a `.git`; `--sort` by time orders by mtime | `-g '*.{ts,go}'` found nothing, `-g '!src'` searched `src`, and a glob never overrode a `.gitignore` |
-| `src/commands/rg/rg-search.ts`, `rg-patterns.ts`, `rg-read.ts`, `rg-json.ts` (the last three new, moved out of `rg-search.ts`), `rg-output.ts` (new) | a missing path is reported and the others searched before exit 2, `-q` and `--json` included; a search whose filters left no file is ripgrep's `No files were searched`; a newline in a pattern without `-U` is ripgrep's error; `-` is stdin, named `<stdin>`; a blank line in a pattern file is the empty pattern; binary files in a walk are searched under `--binary` and `-uuu`; `--heading` puts a blank line between files and no heading over one; `--vimgrep` always names the file; `-0` follows every name; `--path-separator`; `-M` and `--max-columns-preview` in ripgrep's words, counting the line's end, `--trim`, `--crlf`; `-o -v` prints the selected lines; `--json` gives way to `-c`, `-l` and `--files` | a missing file was silent with exit 0 beside a match, stdin was never `-`, and the heading and vimgrep shapes were not ripgrep's |
-| `src/commands/rg/replace.ts` (new), `src/commands/search-engine/matcher.ts` | ripgrep's replacement: `$N`, `${N}`, `$name`, `${name}` and `$$`, a bare name running as far as letters, digits and `_` go; applied with context, `--passthru`, `--vimgrep`, to empty matches, and under `-U` across the lines a match spans; `-U` separates groups only with context | `-r '${1}x'` was printed as written, `$$1` was the group, and a multiline replacement printed the lines unchanged |
-| `src/network/index.ts`, `src/index.ts` | the package exports `validateAllowList`, `matchesAllowListEntry`, `createSecureFetch` and the `FetchResult` and `SecureFetchOptions` types | a credential's URL prefix is checked and matched by the rules curl's allow-list uses, and the mount builds curl's fetch itself (see below) |
-| `src/commands/search-engine/rust-regex.ts` (new), `unicode-sets.ts` (new, moved out of `pcre.ts`), `regex.ts`, `matcher.ts` | rg's own syntax: `\w`, `\d` and `\s` are Unicode unless `--no-unicode`; `\<`, `\>`, `\b{start}` and `\b{end}` at a pattern's start or end are word edges checked in code, elsewhere RE2's `\b`; `-P` goes through grep's `-P` layer, its rewrites and its refusals, and refuses groups nested past 250 deep, as PCRE2 does | `-o '\w+'` cut `café` to `caf`, `\<foo\>` matched nothing, and `-P` was refused though ripgrep has PCRE2 |
-| `src/commands/rg/file-types.ts`, `file-types-data.ts` (new) | ripgrep 15's whole type table, written from `rg --type-list` by `scripts/rg-record.ts`, aliases included, each glob matched case-sensitively against the file's name; `--type-add` with `include:` and ripgrep's `invalid definition`, `--type-clear` in order with it, `--type-list` showing both, `-t all`, and `unrecognized file type` for an unknown `-t` or `-T` | 38 types of 224 with their own globs, `-t typescript` found nothing, `--type-add` was ignored and an unknown type searched nothing silently |
-| `src/commands/rg/rg-search.ts`, `src/commands/search-engine/regex.ts`, `matcher.ts` | rg looks for the literal a pattern needs before the regex runs, as grep does, except under `--passthru`, and `-l`, `--files-without-match` and `-q` stop at a file's first match, except under `--json`, `--stats` and `--passthru`; under `-i` a needle outside ASCII gives no shortcut and `ſ` is folded to `s`, and a letter escape other than `\n`, `\t`, `\r`, `\f`, `\v` gives none | `rg -il` over 150 docs took 170 ms against grep's 15, and grep's shortcut missed `ſ` for `-i s`, `ς` and `ΟΣ` for `-i σ`, and BEL for `-P '\a'` |
-| `src/commands/ls/ls.ts`, `find/find.exec.test.ts` | `-t` sorts by modification time, newest first and a tie by name, as GNU ls does, `-r` reversing it; of `-S` and `-t` the last given wins; a tie of either goes by name; `-t` and `-S` read a link's own time and size (lstat); operands are ordered as GNU ls orders them: what cannot be listed first, then the file operands as one block in the active sort, then the directories in it, and under `-d` every operand is in the one block (upstream's `find -exec ls {} +` test now expects the one block) | `-t` was accepted and ignored, and `ls -t *.md` listed each file alone in the order given, so a model looking for the newest doc got the names in order and concluded nothing had changed |
-| `src/commands/xargs/xargs.ts`, `xargs-options.ts`, `xargs-input.ts`, `xargs-plan.ts`, `xargs-quote.ts` (the last four new), upstream's xargs tests and `resource-limits.security.test.ts` | xargs as GNU xargs 4.11: getopt's syntax (a value attached or apart, a cluster ending in a value option, long options with `=` or apart and by unique prefix, `--`) and every option, with GNU's words for a bad number, delimiter or option and its warnings for conflicting ones; blanks and newlines separate items, any space character before one is skipped, quotes and a backslash protect them, a NUL cuts an argument with GNU's warning, and an unclosed quote is GNU's error after the items before it ran; `-I` reads whole lines without their leading blanks and leaves the command name alone, `-L` counts lines and carries one ending in a blank on, `-E` stops at its item, `-a` reads a file (`-` and `/dev/stdin` are stdin) and leaves stdin to the first command, `-0` and `-d` (a character or an escape) keep empty items and the final newline, the last of them winning; items fill a command line up to `-s` bytes, 128 KiB by default, `-n` and `-L` cap it, `-x` and `-L` make an overflow an error, and with no item the command runs once unless `-r`; `-P` runs up to 16 commands at once through `ctx.exec`, output in input order, `--process-slot-var` and the exported variables reaching each; a failure from 1 to 254 exits 123, 255 stops with 124, a name the shell cannot find or run stops with 127 or 126, each in GNU's words; `-t` quotes as GNU prints; `--show-limits` gives the sandbox's numbers; `-p` and `-o` fail as without a terminal; the upstream tests that pinned the old answers now pin GNU's | a model's `xargs -P 12 -I{} sh -c '...'` was refused as `invalid option -- 'I'` and ran nothing, `-n1`, `-L`, `-a` and every long option were refused too, quoted names split, `-d` dropped the final newline, a failure came back as the command's own code, and every item went on one command line |
-| `src/commands/diff/engine.ts`, `hunks.ts`, `lines.ts`, `output.ts`, `format-unified.ts` (all new), `diff.ts`, `src/limits.ts`, `grep/grep.ts`, `package.json` | diff compares with its own engine, written from Myers' 1986 paper and GNU's manual, never GNU's source: the common head and tail trimmed, lines found in one file only set aside, the middle-snake search in linear space, a search past a cost of the input's square root times its box, or a sixteenth of the budget left, settling for the point that reached furthest, and change groups slid as GNU slides them; every step is charged to the work limit grep's matcher takes (`commandWorkLimit()` in `limits.ts`, 64 steps a unit), a default compare takes the boxes left whole past a quarter of it, and `-d` past it fails with exit 2; jsdiff is gone from the command, from our `package.json` and from the vendored one | jsdiff's exhaustive search ran 41 s on two 20k-line files and 5.7 s on an RFC pair on the server's thread, and the deadline could not stop it |
-| `src/commands/diff/diff.ts`, `options.ts` (new), `header.ts` (new), `lines.ts`, upstream's diff tests | diff reads both operands and stdin as bytes, one character per byte, compares the bytes before any line is split and writes the lines' own bytes; a NUL in the first 4096 bytes of a file, or 65536 of stdin, is GNU's `Binary files A and B differ` (`-a` diffs them as lines); GNU's option parser (a value in the same argument or the next, options after operands, `--`, long-option prefixes, `-NUM` and GNU's rule for several context lengths, `-W` checked, conflicting styles refused), `-N` and `--unidirectional-new-file` reading an absent file as empty with GNU's epoch times, exactly two operands with GNU's `missing operand` and `extra operand`, a directory standing for the other file's namesake in it, every refusal and trouble exit 2 (upstream's two tests of an unknown option now expect 2), names in messages quoted for the shell as GNU quotes them; `-l` is refused, and every form of `--color` and `--palette` is accepted and prints plain text | both reads decoded UTF-8 first, so Latin-1 files differing in one byte were the same with exit 0, a BOM vanished, and every refused option exited 1, which a model reads as "the files differ" |
-| `src/commands/diff/format-normal.ts`, `format-context.ts`, `patterns.ts` (all new), `format-unified.ts`, `output.ts`, `lines.ts`, `engine.ts`, `diff.ts`, upstream's diff tests | GNU's formats: the normal format is the default (upstream's tests that read unified output ask for `-u`), unified and context with GNU's headers (a name quoted C-style when it holds a space, a quote or a control character, the file's time in the sandbox's `TZ`, stdin's the current time, `--label` and `-L` in their place), ranges and `\ No newline at end of file`; `-p` and `-F` print the nearest earlier line of the first file that matches, 40 bytes of it; `-i` folds case one character at a time over UTF-8 where a line decodes and over ASCII where it does not, `-E`, `-Z`, `-b`, `-w` and `--strip-trailing-cr` fold as GNU's manual says, an incomplete line matching a complete one only under the white space options; `-B` and `-I` drop a hunk whose every change is blank or matches, an ignorable change joining the hunk before it only within fewer lines than the context, `-I` and `-F` read GNU's basic regex through grep's translation; `-t` (by display width), `-T`, `--tabsize` and `--suppress-blank-empty`; folding, splitting and matching are charged to the work limit; the common head and tail are trimmed on the bytes before any folding, the search goes from the top diagonal down, the context shown is kept in the search as a horizon, and groups slide only within what the search saw, which picks among equal answers as GNU does | the command printed jsdiff's unified patch whatever was asked, with a `====` line, no times and `@@ -1,1 +1,1 @@`, and `-i` lowercased the whole files, so every case-only line showed as changed |
-| `src/commands/diff/run.ts`, `names.ts` (both new), `text.ts` and `budget.ts` (both new, moved out of `diff.ts`), `diff.ts`, `options.ts`, `header.ts` | diff compares directories as GNU's compare_files and diff_dirs do: a file against a directory takes its namesake there; two directories pair their entries in the locale's order (ICU's collation under a locale other than C or POSIX, bytes otherwise), print `Only in`, `Common subdirectories`, `File X is a T while file Y is a U` and, under `--no-dereference`, `Symbolic links ... differ`, and name each pair that prints with a `diff` line of the options as given; `-r` recurses and stops at a directory that loops back, `-N` and `--unidirectional-new-file` read an absent file or directory as empty, `-x` and `-X` match names as fnmatch does, `-S` starts at a name in the top directories, `--ignore-file-name-case` pairs names and matches patterns ignoring case, `--from-file` and `--to-file` compare one file with any number; trouble with one pair goes to stderr and the walk goes on, exit 2 at the end; the walk goes through the traversal budget `find` takes and every pair is charged to one work limit; names in messages are quoted by gnulib's rules, `=` included, `]` and a brace that is not alone left bare; `-h`, `-H`, `-P` and `--inhibit-hunk-merge` are GNU's | two directories were refused, `-r`, `-x`, `-X` and `-S` changed nothing, and `--from-file` and `--to-file` were refused |
-| `src/commands/diff/format-side.ts`, `format-ed.ts`, `format-ifdef.ts` (all new), `text.ts`, `lines.ts`, `options.ts`, `diff.ts`, `run.ts` | GNU's other formats: side by side (`-y`) with its column arithmetic for `-W`, tabs and `-t`, each character taking the columns a terminal gives it, `--left-column`, `--suppress-common-lines` and the `/` and `\` of a pair where one side lacks its newline; `-e` and `-f` ed scripts, a line that is only a dot written as two and fixed with `s/.//`, an incomplete last line completed and reported with exit 2; `-n` RCS scripts; `-D NAME`, `--line-format`, the `--LTYPE-line-format` and `--GTYPE-group-format` options with every directive GNU's help lists, a directive it cannot read printed as it is; a style that prints two files the same (`-y` without `--suppress-common-lines`, `-D`) prints them, one file named twice included; `-W` and `--tabsize` given twice differently are GNU's fatal error; the columns `-y` pads, the spaces `-t` and `-E` expand tabs to, `-x` and `-X` matching, each run of a format and what it writes, the lines a directory walk prints and the bytes of an identical check are charged to the work limit; an unreadable `-X` file is named with its errno's words; with `-N` two missing operands are both named | each was refused by name, exit 2 |
-| `src/Bash.ts`, `src/commands/env/env.ts`, `bash/bash.ts`, `time/time.ts`, `timeout/timeout.ts`, `find/find.ts`, `xargs/xargs.ts`, `rg/rg-read.ts`, `src/interpreter/builtins/local.ts` | an exec's `env` is the new shell's environment, its names exported, and with `replaceEnv` the only one, beside the variables a shell sets itself (`IFS`, `OSTYPE`, `SHELLOPTS` and the rest); a command another command runs (`sh -c`, `bash -c`, `env`, `time`, `timeout`, `find -exec`, `xargs`, rg's `--pre`) gets the caller's exported variables and nothing else, not the first shell's; a child shell resets `IFS` to space, tab and newline, as bash does; `env`, `printenv` and `time` read the exported variables, not every shell variable; `local -x` exports the local until the function returns; env parses as GNU's does: options up to the first operand or `--`, `-` as `-i`, `-u` and `--unset` with the name attached or apart, an empty name or one with `=` refused as glibc's `unsetenv` refuses it, its own errors exit 125, and the command runs after `command --` | `env SLOT=1 sh -c 'echo $SLOT'` printed nothing, `env -i` and `env -u` did not reach a child shell, which fell back to the first shell's variables, as did `timeout` and `find -exec`; `export -n` did not hide a variable from `time`; `local -x` exported nothing; `env` and `printenv` listed unexported variables and `0=sh`; and `env -- cmd` was an invalid option |
-| `src/commands/sort/sort.ts`, `head/head-tail-shared.ts`, `cut/cut.ts`, `sed/sed.ts`, `jq/jq.ts`, `comm/comm.ts`, `tac/tac.ts`, `md5sum/checksum.ts`, `file/file.ts`, `timeout/timeout.ts`, `expr/expr.ts`, `find/find.ts`, `date/date.ts`, `sleep/sleep.ts`, `basename/basename.ts`, `dirname/dirname.ts`, `chmod/chmod.ts` | `--` ends the options and what follows is operands, a name starting with `-` included: sort (where `-` is stdin too), head, tail, cut, sed (the first operand the script unless `-e` or `-f` gave one), jq (the filter, then files or `--args`), comm, tac, md5sum, sha1sum, sha256sum, file, timeout, date, sleep, basename, dirname, chmod after the mode; expr drops a leading `--`, find a leading one before its paths | these refused `--` as an unknown option or read it as a file, a duration or a mode, where GNU and jq take it as the end of the options; a model writes `cmd -- "$f"` for a name it did not choose |
-| `src/fs/in-memory-fs/in-memory-fs.ts`, `src/commands/ls/ls.ts` | the filesystem keeps each directory's child names beside its entries, written only through `store()` and `unstore()`, so `readdir` reads a directory's own children; with no symlink in the tree a path resolves to itself without a walk; ls keeps its output's byte count as it appends and checks `-R`'s subdirectories against a set | `readdir` scanned every path in the tree and `stat` rebuilt each prefix of a path, so `rm -rf`, `find` and `ls -R` cost the entries times the folders: 1000 files, one folder chain each, took 0.3 s to remove at depth 8 and 25 s at 64; ls rescanned its whole output on every append |
-| `src/commands/rm/rm.ts`, `src/fs/in-memory-fs/in-memory-fs.ts`, upstream's `filename-attacks.test.ts` | rm reads an operand with lstat, so a link is removed, never what it names, `-r` or not; a trailing slash resolves the link as GNU coreutils 9.11 does on Linux: `rm link/` is `Is a directory`, `rm -r link/` empties the folder the link names and then fails with `Not a directory`, which `-f` silences, and `rm file/` is `Not a directory`; the filesystem's `rm` and `readdir` resolve linked folders above the last name, as `lstat` did; upstream's broken link test now expects `rm` to remove the link | `rm link` to a folder refused with `Is a directory`; `ls link/sub` and `rm link/f` were `No such file or directory` |
-| `src/commands/find/find.ts` | `-H`, `-L` and `-P` before the paths, as GNU findutils 4.11: `-P` (the default) never follows a link, `-H` follows the starting points, `-L` follows every link, a broken one standing as itself, and reports a folder reached again through a link as GNU's file system loop, left out, exit 1; the last of the three wins and a `--` may follow them; a starting point is checked with lstat, so a broken link is found, and one with a trailing slash is followed | `find -L` was an unknown predicate, so a model could not search through linked folders, and `find broken-link` was `No such file or directory` |
-| `src/helpers/env.ts`, `src/commands/awk/awk2.ts`, `jq/jq.ts`, `yq/yq.ts`, `date/date.ts`, `diff/diff.ts`, `printf/printf.ts` | awk's `ENVIRON`, jq's `$ENV` and `env`, yq's `env`, `strenv`, `$ENV`, and the `TZ` that date, diff's headers and printf's `%()T` read come from the exported variables (`processEnv()`), as a process's environment is, printf's zone UTC without one, as date's is; a command awk runs through a pipe or `getline` gets `ENVIRON` as it stands, so an assignment or a delete there reaches it, as gawk does for strings | they held every shell variable, so `X=1; awk 'BEGIN{print ENVIRON["X"]}'` printed 1 where gawk prints nothing, an unexported `TZ` moved date, and printf without one showed the host's zone |
-| `src/commands/rm/rm.ts`, `src/fs/in-memory-fs/in-memory-fs.ts` | `rm -r` walks the tree with `traverseFileTree`, post-order and never through a link, under the command's traversal budget and cancellation, removing one entry at a time; an entry it cannot remove is reported by its own path, its folders are left, and `-v` names every removal (`removed directory` for a folder); `-f` forgives only a missing file and a file named with a trailing slash, while any other refusal keeps GNU's words (`Read-only file system`, `Permission denied`, ...) and exit 1, and a limit or a cancel ends the command; the filesystem resolves a path one component at a time, a link's target put before the rest, with one `MAX_SYMLINK_DEPTH` count, and its own recursive `rm` is an iterative walk | `rm -r` recursed in the backend outside every budget and could not be cancelled, `rm -f` hid a read-only refusal, and a link whose target ran through another link (`/outer -> /alias/dir`, `/alias -> /real`) could not be listed, followed or removed through |
-| `src/commands/find/find.ts` | under `-L` and `-H`, a link whose target is missing stands as itself, and one that cannot be read through (a loop of links) is GNU's `find: 'a': Too many levels of symbolic links`, left out, exit 1 | a loop of links was listed as a broken link |
-| `src/interpreter/builtins/read.ts`, `mapfile.ts`, `src/interpreter/helpers/read-input.ts` (new), `src/interpreter/redirections.ts`, `fd-table.ts` | read and mapfile scan their input as bytes and decode what they store as UTF-8 one well-formed sequence at a time (RFC 3629: no overlong form, surrogate or code point past U+10FFFF), a byte that starts none kept as one character, U+0080 to U+00FF, beside the characters that decode; `read -n` and `-N` count a sequence as one character and such a byte as one, where bash folds the byte after it in, and advance the input by the bytes taken; `-d` delimits on the first byte of its argument, as bash does, for read and mapfile alike, matched under `-n` before a sequence is taken; the string limit counts the bytes read; a descriptor opened on a file (`N<`, `N<>`), a here-string (`N<<<`) or a heredoc (`N<<`) holds bytes, as stdin does, and a write through `N<>` lands at its byte position | from a file, a pipe, a descriptor, a here-string or a heredoc, each byte of a multibyte character became a character of its own, so `read x` of `café` held five characters and wrote `cafÃ©` back out, and `read -n 1` split an emoji; `read -d ab` and `mapfile -d ab` never matched; a descriptor held decoded text, so `cat <&3` wrote `ţ` as one wrong byte |
+- An id: a short kebab-case slug, unique and stable, such as `read-utf8`.
+  It never changes once on `main`, since markers and history name it.
+- Markers: every hunk of the change carries `(1ctx <id>)` in a comment;
+  a hunk that serves two changes lists both, `(1ctx read-utf8 fd-bytes)`.
+  A new file carries one marker at its head. This lists the hunks of
+  one change, wherever it sits in the list:
 
-### The jq and yq dialects
+  ```sh
+  grep -rnE '\(1ctx ([a-z0-9-]+ )*read-utf8[ )]' vendor/just-bash/src scripts
+  ```
 
-jq and yq run one engine. `dialect` on its options and context is
-`yq` for the yq command and jq's otherwise, and the builtins that part
-read it in `query-engine/builtins/dialect-builtins.ts`, which runs before
-the others. In the yq dialect: `keys` keeps the document's order,
-`type` and `tag` answer `!!str`, `!!map` and the rest and `kind`
-answers `scalar`, `map` or `seq`; `sub`, `test`, `match`,
-`capture`, `split`, `splits` and `scan` take their arguments apart by
-a comma, `sub` replaces every match with Go's `${name}` and `$1`;
-`==` and `!=` read a `*` in a right-hand string as a wildcard;
-`tojson` is indented JSON and a newline; `unique`, `unique_by` and
-`group_by` keep the order things were first seen in; `map` and
-`map_values` of null are `[]`, `to_entries`, `with_entries`, `min`,
-`max` and `split` of null answer nothing, and `with_entries` on a list
-keys the map by index; a string and a number or boolean concatenate
-with `+`, a null in `-`, `*`, `/` or `%` drops the result; a step
-into a string, number or boolean (`.name.x`) answers nothing.
+- An entry in `vendor/changes.md`, under the heading of its area:
 
-In both, toward jq 1.8: `to_entries` on a list numbers its entries,
-`capture` without a match answers nothing, `match` names its groups
-and gives their offsets, `sub` in jq takes the capture object
-(`"\(.name)"`) and each output of its replacement, an unbound
-variable is an error, `.a.[0]` and `.a.[]` parse, and `keys`,
-`join`, `sort`, `unique`, `group_by`, `flatten`, `test`, `sub`,
-`trim`, `upcase` and `any` fail on null instead of answering null.
-jq keeps its own for `@base64` of a non-string (the text encoded) and
-`reverse` of null (`[]`), sorts `unique` and `group_by`, compares maps
-by key, quotes every string in `@csv`, escapes `@tsv` cells with
-backslashes, joins a list with `@sh`, and fails arithmetic on operands
-it does not take (null included) where upstream answered null. Both accept mikefarah's `upcase`, `downcase`,
-`env(NAME)` (the variable read as YAML, an unset one an error),
-`strenv(NAME)` (a string, an unset one empty), `to_json`, `tag` and
-`kind`, which jq 1.8 does not define.
+  ```
+  ### read-utf8: read and mapfile store UTF-8 text
+  Files: `src/interpreter/builtins/read.ts`, `mapfile.ts`
+  Upstream: not reported
+  Tests: `test/vendor/just-bash/read-utf8.test.ts`
 
-### Where our jq still differs from jq
+  Now: what the code does now, a short paragraph wrapped at 72.
 
-`test/vendor/just-bash/jq-paths.test.ts` pins path expressions against
-jq 1.8, and `jq-1.8.test.ts` the cases `scripts/jq-record.ts` recorded
-from jq 1.8.2 for the dialect rules. Where they part:
+  Before: what it did before, and why that hurt.
+  ```
 
-- Iterating null yields nothing, in path mode too, as in mikefarah's
-  yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
-  skips the documents without the key, where jq stops with an error.
-  Iterating a number, a string or a boolean is still jq's error.
-- The value evaluator keeps some of upstream's leniencies:
-  `map_values(f)` keeps every output of `f`, `walk` never reaches
-  scalars, `?` covers the whole path before it (`.a.b?`) rather than
-  its last step, `$__loc__` is always on line 1, and an error inside
-  one input drops that input's earlier outputs.
-- The regular expressions are RE2's: no `x` flag, no lookaround, no
-  backreferences.
-- mikefarah's names above are accepted.
-- `//` in path mode drops an error on its left (`(error("x") // .z) = 1`
-  writes `.z`); jq 1.8 raises it.
-- `last(f)`, `limit(n; f)` and `nth(n; f)` also work as paths, which
-  jq 1.8 refuses; `setpath` with several paths and values orders its
-  outputs path first.
-- Numbers are JavaScript's: integers past 2^53 lose precision.
-- A `\uXXXX` escape in a filter's string is read as `uXXXX`; `\t` and
-  `\n` work.
-- A `break` in the right side of an assignment outputs nothing, where jq
-  outputs the results before it; the filter form of a `$x` parameter
-  yields only the bound value (`def f($x): x`).
+  `Files` are under `vendor/just-bash/`, a bare name in the directory of
+  the path before it. `Upstream` is one of `not reported`, `issue #N`,
+  `PR #N`, `ported from #N` (an upstream fix we took before the sync
+  that brings it) or `fixed in X.Y.Z`. `Tests` names files from the
+  repository root, a bare name beside the one before it, or says `none`
+  and why. A change with no marker (a pure deletion, a test or
+  `package.json` alone) adds `Markers: none` and why after `Tests`. A
+  long field goes on in lines indented by two spaces.
 
-### Where our awk still differs from gawk
+Our tests of the changes are in `test/vendor/just-bash/`, `fixes.test.ts`
+for those without a file of their own; a change to an upstream test
+names that test in `Files`. A difference from the tool a command follows
+that we keep goes in `vendor/differences.md`, in the same commit as the
+change that makes or closes it.
 
-`test/fixtures/just-bash/awk-gawk.json` holds what gawk 5.4.1 answered,
-recorded by `scripts/gawk-record.ts`, and
-`test/vendor/just-bash/awk-gawk.test.ts` holds our awk to it. Where
-they part:
+`test/vendor/just-bash/changes.test.ts`, part of `make test`, holds the
+two together: every id a marker names under `vendor/just-bash/src` and
+`scripts/` has an entry, every entry has a marker or `Markers: none`,
+every `Tests` path exists, the ids are unique kebab-case, every entry
+has its fields in order, and no bare `(1ctx)` marker is left.
 
-- An `RS` that can match the empty string (`X*`) is refused; gawk's
-  records for one are erratic.
-- `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
-  `FIELDWIDTHS`, `@include`, `@load`, `@namespace` and `|&` are refused;
-  a call to a gawk builtin we lack (`strtonum`, `typeof`, `isarray`,
-  `mkbool`, `patsplit`, the bitwise `and`, `or`, `xor`, `compl`,
-  `lshift`, `rshift`, and the gettext functions) is refused before
-  anything runs, exit 2; `systime`, `mktime` and `strftime` fail when
-  called, `system` is refused, and `asort` and `asorti` refuse a user
-  comparison function.
-- `awk --version` answers `GNU Awk 5.4.1 (just-bash, compatible)` and a
-  line saying what this is, not gawk's copyright text.
-- An output pipe's command runs once, when the pipe is closed or the
-  program ends, with everything printed to it; `fflush()` runs nothing
-  early. Several pipes still open at the end run in the order opened,
-  where gawk's children print in the order the system schedules them.
-- `asort` and `asorti` class a numeric-looking string constant with the
-  numbers (the strnum rule above), where gawk sorts it with the strings.
-- A value is a string or a number, with no strnum: a variable holding a
-  string constant or a string function's answer compares as a number
-  when both sides look numeric, so `x = "10"; x > 9` is true where gawk
-  compares strings. Fields, `getline` variables, `split` elements,
-  `ARGV`, `ENVIRON`, `-v` values and uninitialized values compare as
-  gawk's do. `!"0"` is true, as for a field holding `0`, where gawk's
-  string constant is false. `+inf` and `+nan` in the input are 0.
-- A user function that returns without a value answers `""`, a string,
-  where gawk's answer is uninitialized.
-- A local array parameter and a global array of the same name share
-  storage during the call.
-- `for (k in a)` walks the elements in insertion order, gawk's order is
-  its own.
-- `srand(n)` answers `n`, not the previous seed, and `rand()` is not
-  gawk's sequence for a seed.
-- `0x1A` in a program is `0` followed by the variable `x1A`; gawk reads a
-  hexadecimal constant.
-- NaN prints as `+nan` whatever its sign.
-- Regular expressions are RE2's, without backreferences and without
-  gawk's `\<`, `\>` and `\y` word boundaries.
-
-### Where our grep still differs from GNU grep
-
-`test/fixtures/just-bash/grep-gnu.json` holds what GNU grep 3.12
-answered, recorded by `scripts/grep-record.ts`, and
-`test/vendor/just-bash/grep-gnu.test.ts` holds our grep to it; a case
-with `accept` pins ours. Where they part:
-
-- `\d` in BRE and ERE is a digit; GNU reads it as `d` with a warning.
-- Backreferences, negative lookaround, possessive quantifiers, atomic
-  groups, recursion and conditionals are refused in every mode, since
-  RE2 has none. A lookbehind anywhere but the start of a `-P` pattern, a
-  lookahead anywhere but its end or right after a leading `^`, and
-  either beside a top-level `|`, are refused too. Lookaheads after a
-  leading `^`, `(?!` included, are patterns the line must match there or
-  must not, which serves `^(?=.*a)(?!.*b)`.
-- A lookbehind is a prefix the match consumes, so `grep -oP '(?<=a)a'`
-  on `aaa` finds one match where GNU finds two. A lookbehind of any
-  length is accepted, where PCRE2 refuses an unbounded one.
-- `\b` under `-P` is ASCII; GNU's is Unicode, so `\bfoo` matches in
-  `éfoo`.
-- A file that is not valid UTF-8 is text; GNU calls it binary.
-- `--color=always` is refused.
-- `-T` pads numbers on standard input to 19 places, as GNU does on a
-  pipe, also when the shell redirected a file there.
-- `-i k` matches the Kelvin sign, which GNU folds to `k` only under
-  `-P`.
-
-### Where our rg still differs from ripgrep
-
-`test/fixtures/just-bash/rg-ripgrep.json` holds what ripgrep 15.2.0
-answered when piped, with `--no-require-git` in its config file, recorded
-by `scripts/rg-record.ts`, and `test/vendor/just-bash/rg-ripgrep.test.ts`
-holds our rg to it; a case with `accept` pins ours. Where they part:
-
-- `\b` and `\B` are ASCII, so `\bcole` matches in `école`. `\<` and
-  `\>` are exact only at the pattern's start and end; anywhere else
-  they are RE2's ASCII `\b` too.
-- Under `-P`, backreferences, negative lookaround, possessive quantifiers,
-  atomic groups, recursion and conditionals are refused, as for grep,
-  and a lookbehind is a prefix the match consumes.
-- `.gitignore` is honoured outside a git repository unless
-  `--require-git` is given, as ripgrep's `--no-require-git` has it.
-- `node_modules`, `.venv`, `__pycache__` and the other names in
-  `GitignoreManager.isCommonIgnored` are skipped in a walk unless
-  `--no-ignore`, with no ignore file saying so.
-- A file that is not valid UTF-8 is searched as text with its bad bytes
-  replaced, where ripgrep prints them as they are. `-E` takes UTF-8 and
-  `none` only.
-- `-p` and `--color=always` print no colour, the second refused.
-- `--stats` counts a matching line as one match, where ripgrep counts
-  every match on it.
-- The `accessed` and `created` sort keys order by mtime, the one time a
-  stat gives. `--json` reports `elapsed` as zero, `--debug` prints
-  nothing, and `--version` names no SIMD features.
-
-### Where our xargs still differs from GNU xargs
-
-`test/fixtures/just-bash/xargs-gnu.json` holds what GNU findutils
-4.11.0's xargs answered, recorded by `scripts/xargs-record.ts`, and
-`test/vendor/just-bash/xargs-gnu.test.ts` holds ours to it; a case with
-`accept` pins ours. `test/vendor/just-bash/xargs.test.ts` pins the words
-and `-t` lines the fixture does not compare. Where they part:
-
-- Under `-P` above 1 the output comes in input order; GNU's follows
-  which command ends first. The fixture compares it sorted.
-- `-P` runs at most 16 commands at once, `-P 0` included.
-- The sandbox has no signals, so no command is killed and 125 never
-  comes. A limit a command hits is that command's failure, exit 126
-  with the limit's words, and xargs carries on to 123; a limit xargs
-  itself hits ends the call.
-- Input bytes that are not UTF-8 reach the command as U+FFFD, since
-  arguments are text in the shell.
-- `--show-limits` and the bound on `-s` count an exec limit of 2 MiB
-  and the shell's exported variables, not the host's.
-- `-p` and `-o` fail as GNU does without a terminal, `failed to open
-  /dev/tty for reading`, exit 1.
-- `--version` answers GNU's first line with `(just-bash, compatible)`.
-- A shell function or builtin runs as a command would; GNU executes
-  only programs.
-- `--process-slot-var` takes a shell variable name only, since the slot
-  reaches the command as an assignment before its name; GNU sets any
-  name without `=`.
-- `-a` on a directory is refused as `Is a directory`; GNU on macOS
-  reads it as empty.
-- Under `-a` the first command gets all of xargs' stdin and the later
-  ones none, as the first reader of GNU's shared stdin drains a pipe;
-  a command that reads only part of it leaves nothing for the next.
-### Where our env still differs from GNU env
-
-- An assignment whose name a shell cannot hold (`0=x`, `'A B=1'`,
-  `=x`) is dropped, since the command runs through a shell that exports
-  only names; GNU puts it in the environment and `env` lists it.
-- `env -i env` prints `PWD`, which the shell running the command sets;
-  GNU prints nothing.
-- `-0`, `-C`, `-S`, `-v`, `--block-signal` and the other signal options
-  are refused as unknown.
-
-### Where our diff still differs from GNU diff
-
-`test/fixtures/just-bash/diff-gnu.json` holds what GNU diffutils 3.12
-answered, recorded by `scripts/diff-record.ts` with every file at one
-time, `TZ=UTC` and the symlinks the fixture names, and
-`test/vendor/just-bash/diff-gnu.test.ts` holds our diff to it; a case
-with `accept` pins ours.
-`scripts/diff-patch-check.ts` checks by hand that GNU patch 2.8 applies
-our unified and context output of every pair of text files the fixture
-compares. The large inputs are in `diff-engine.test.ts`, which counts
-the work units each costs. Where they part:
-
-- Where GNU's cost heuristics settle for a larger answer, ours may be
-  smaller: on RFC 7231 against RFC 9110 ours changes 12360 lines to
-  GNU's 12866, and on small inputs full of one repeated line GNU
-  sometimes gives up matches the search would find. Where GNU finds the
-  smallest answer, ours is the same, line for line. A search box spends
-  at most a sixteenth of the budget left before giving up, so on a
-  blank-heavy 20k-line pair ours changes 12758 lines to GNU's 12738.
-- Under `-d` lines found in one file only stay out of the search, which
-  keeps `-d` on the RFC pair under the work limit; among answers of the
-  same size ours then lines up differently from GNU's on some small
-  pairs.
-- A default compare that passes a quarter of the work limit takes what
-  is left as whole changes, and `-d` past the limit fails with exit 2;
-  GNU never stops.
-- A NUL in the first 4096 bytes of a file or 65536 of stdin makes it
-  binary, GNU's first reads of a file and of a pipe where the fixture was
-  recorded; GNU's window is its buffer, which varies, and stdin redirected
-  from a file is a pipe here.
-- A header's time has zeros past the milliseconds a mount keeps.
-- `-t`, `-E` and `-y` count display width from a table of the wide East
-  Asian ranges and the combining marks, where GNU asks the locale. `-i` folds
-  one character at a time with JavaScript's case tables.
-- `--color=always` and `--palette` print plain text where GNU colors:
-  escape codes say nothing to a model. `-l` is refused, and `--version`
-  names just-bash.
-- Linear passes are charged to the work limit too: a byte of splitting a
-  step, of folding or of a `-I` or `-F` match eight, a column `-y` pads,
-  a space `-t` or `-E` expands a tab to, a step of `-x` or `-X` matching,
-  a byte of a line or group format each time it runs one and each byte
-  it writes, a `%L` line and a printf width or precision included, a
-  byte of each line a directory walk prints and an eighth of a step a
-  byte of the check that two files are the same. So
-  `-i` on a file of some megabytes, `-y -W 1000000000`, `-t` with a huge
-  `--tabsize`, a long `--line-format` over many lines or thousands of
-  `-X` patterns of many stars fail with the limit's error, exit 2, where
-  GNU runs on.
-- A directory's names are sorted as GNU sorts them where the fixture
-  was recorded: under a locale other than C or POSIX (`LC_ALL`,
-  `LC_COLLATE`, `LANG`) by ICU's collation, which is macOS's strcoll,
-  and by bytes otherwise. GNU on glibc collates by its own tables, which
-  set punctuation aside.
-- A tree walk is held to the traversal budget `find` takes and every
-  pair to one work limit, so `diff -r` over a large tree fails with the
-  limit's error where GNU runs on. Past the traversal budget the whole
-  script ends with exit 126, as `find` does.
-- In the C locale, the sandbox's default, GNU gives a byte past ASCII no
-  width in `-y`, quotes a name holding one in octal (`$'\303\251'` in
-  messages, `"\303\251"` in headers) and matches `-x` and `-X` a byte at
-  a time (`caf??` matches `café`); ours counts a UTF-8 character's
-  columns, prints the name as it is and matches characters in every
-  locale. The printf `'` flag of the line and group formats groups
-  digits only under a locale other than C or POSIX, as GNU's does.
-- `diff -y d d` pairs each entry of `d` with itself and prints it; GNU
-  reads the directory once and answers `Only in d:` for every entry.
-- After a file compared with its namesake in a directory, GNU reads the
-  later `--from-file` or `--to-file` operands on that side inside that
-  directory; ours reads each operand where it is named.
-- `-` named more than once through `--from-file` or `--to-file` reads
-  all of stdin each time. GNU closes stdin after its first compare and
-  then fails with `Bad file descriptor` or reads nothing, depending on
-  the side; neither is an answer a script could rely on.
-- The locale is read as setlocale reads it, `LC_ALL`, then
-  `LC_COLLATE`, then `LANG`, but only for the order of names and the
-  printf `'` flag; quoting and widths are always UTF-8's.
-- `Symbolic links` names its files in `‘’` whatever the locale, and a
-  name GNU would escape in them is printed as it is.
-
-### Where our read and mapfile still differ from bash
-
-`test/vendor/just-bash/read-utf8.test.ts` holds them to bash 5.3 in a
-UTF-8 locale. Where they part:
-
-- A byte that starts no UTF-8 sequence is held as one character, U+0080
-  to U+00FF, and written back out as that character's two bytes; bash
-  writes the byte.
-- `read -n` counts such a byte as one character; bash folds the byte
-  after it in, an ASCII letter included.
-- Under `-n`, a backslash before a multibyte delimiter escapes its first
-  byte only, so the escape counts as two characters toward the limit.
-- An `IFS` character outside the BMP, an emoji, never splits.
-- Without `-r`, a backslash at the end of the input is kept in the
-  variable; bash drops it.
-- `mapfile -u N` reads stdin, not descriptor N, and `-C` never calls
-  its callback.
-
-### Where our yq still differs from mikefarah's
-
-`test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on
-the podinfo manifests the `-i` writes compared were mikefarah's byte
-for byte, or the same data with safer quoting.
-`yq-mikefarah.test.ts` runs the cases `scripts/yq-record.ts` recorded
-from mikefarah's yq v4.53.3; a case with `accept` pins ours instead,
-for one of the reasons below. Where they part:
-
-- An `-i` edit keeps every scalar it did not change as written (`0644`,
-  `yes`, `.5`), reading the document again with the failsafe schema. A
-  string it writes that a YAML 1.1 reader would take for something else
-  (`y`, `yes`, `on`, `0644`, `1_000`) is quoted, since Kubernetes reads
-  YAML 1.1; mikefarah writes some of them bare, on stdout too
-  (`"y": 2`).
-- On a stream, an edit through a path some documents lack leaves those
-  documents alone; mikefarah creates the missing parents in them.
-- Stdout keeps comments and style for a result made from a node of the
-  document, as `-i` does. A map or list the filter builds (`{"n":
-  .kind}`, `[.spec.replicas]`, `to_entries`) and a fold (`ea ...
-  ireduce`) print afresh, where mikefarah copies the nodes' comments and
-  quotes into them. A foot comment stays when the last key goes, an
-  item `map` wrote keeps its comment under `|=`, a renamed map
-  (`with_entries(.key |= ...)`) keeps its flow style, and `-P` leaves
-  the line comment of an opened flow map under it, mikefarah on the
-  next key. A result that does not read back exactly (a reordered map,
-  an alias whose anchor is outside the node, a `!!binary` value) prints
-  afresh, its comments lost; under `-i` such a write is refused, the
-  file left as it was, when a plain scalar of it reads differently for
-  YAML 1.1 and 1.2 (`0644`, `yes`), since the fresh spelling would
-  change what Kubernetes reads.
-- `!!binary` reads as an object of bytes. A merge key is written back
-  without the `!!merge` tag mikefarah adds.
-- `-i` over several files writes each as it goes, so a later file that
-  does not parse leaves the earlier ones written; mikefarah reads all
-  first. A file with a duplicate key does not parse here.
-- An alias is a copy: editing an anchor's target leaves the aliased
-  places at the old value, and a plain write re-emits anchors.
-- In `eval-all` a variable holds one document at a time, where
-  mikefarah's holds the whole list. `ireduce` counts as computed for
-  the `---` lines, where mikefarah keeps its accumulator's document.
-- An `-i` whose filter outputs nothing leaves the file and exits 1;
-  mikefarah empties it.
-- Our values carry no style, comments, tags or anchors: `style`,
-  `anchor`, `line_comment` and the like answer `""`, `line` and
-  `column` 0.
-- `load` takes its file name as a string literal, read before the run;
-  a loaded JSON file prints in block style, where mikefarah keeps its
-  flow style.
-- jq's forms mikefarah refuses work: `empty`, `if`, `reduce`, `first`,
-  `last`, `min_by`, `max_by`, `ltrimstr`, `paths`, `any(f)`, `all(f)`,
-  `keys_unsorted`, `ascii_upcase`, `gsub`, `splits`, `add`, `index`,
-  bare object keys (`{name: .a}`), `env.NAME` and `$ENV.NAME`, and jq's
-  regex flags (`i`, `x`), where mikefarah takes only `g`.
-- jq's precedence: `a | b, c` is `a | (b, c)`, `a | b and c` is
-  `a | (b and c)` and `.a // "" != "x"` is `.a // ("" != "x")`;
-  mikefarah binds the pipe tighter and `//` looser than `!=`. An
-  unbound variable (`$index`, `$__loc__`) is an error; mikefarah prints
-  nothing.
-- A document whose pipe produced nothing prints nothing: mikefarah's
-  literals, `"\(.a)"`, `[...]` and `{...}` still answer once there, so
-  `select(.kind == "Nope") | "x"` prints `x` per document and
-  `.spec.containers[] | [.name, .image] | @tsv` an empty line for a
-  document without containers.
-- `key` and bare `path` are answered where the walker follows the path
-  (`.[] | select(...) | key`, `[.. | path]`) and refused inside `map`,
-  `with_entries` and `del`, where mikefarah answers them; `parent` is
-  upstream's and answers nothing after `..` or `select`.
-- `-I 4` indents a map inside a sequence item by 4; mikefarah's by 2.
-- A setter of style, comments or anchors is refused, `tag =` retypes
-  the value (`mode: 644` where mikefarah keeps `"0644"` with an `!!int`
-  tag) and refuses a value the tag does not fit, where mikefarah
-  writes a tagged node (`!!int app`).
-- `sub("(w)eb", "$1x")` reads `$1x` as group 1 and `x`; Go reads a
-  group named `1x`, empty.
-- Map keys are strings: `with_entries` on a list prints `"0": a`, where
-  mikefarah's map has the integer key `0`.
-- `match` answers its fields in jq's order; `sub(re; repl; "g")`
-  replaces every match, as the other forms do; `@sh` quotes every
-  string; `length` of a number is its absolute value, not its digits;
-  a string printed afresh is double-quoted where mikefarah single-quotes
-  (`'!!str'`).
-- `-s` is slurp, not mikefarah's split into files; a missing file exits
-  2 where every other error exits 1 as his does; `--version` names
-  just-bash and the syntax.
-
-### How the mount gives curl its network
+## How the mount gives curl its network
 
 The mount passes `fetch`, never `network`: `commandFetch()` in
 `src/server/bash/credentials.ts` wraps one `createSecureFetch` for
@@ -534,7 +112,7 @@ before the redirects, and not at all under full internet access; and a
 credential left out for a missing key would let a matching request go
 out unsigned. The wrapper also replaces the keys in every result and
 error before curl sees them. Nothing in the vendored fetch changed for
-it.
+it beyond the exports of `network-exports`.
 
 ## Its tests
 
@@ -571,14 +149,18 @@ host-disk test now and then even alone; a regression differs every
 time and fails the run. After a change that fixes one, or a sync, check each
 difference, then record it with `scripts/vendor-test.sh --update`. The
 list, as it was when vendored, matched a pristine 3.4.2 run under Bun
-(with only the descriptor fix, without which nothing runs) except for
+(with only `defense-descriptor`, without which nothing runs) except for
 tests of what we removed.
 
 ## Syncing a new upstream release
 
-1. Read upstream's `CHANGELOG.md` for the new tag. For each row of
-   "What we changed", check whether upstream fixed it; if it did, plan to
-   take theirs and drop ours.
+1. Read upstream's `CHANGELOG.md` for the new tag. Walk the entries of
+   `vendor/changes.md` whose `Upstream` is neither `fixed in` nor
+   `ported from`, check whether the changelog fixes each, and update the
+   line: `fixed in X.Y.Z` where it does, `issue #N` or `PR #N` where one
+   is open. For an entry `ported from #N`, check that the release has
+   #N. Each `fixed in X.Y.Z` and each `ported from` the release has is
+   a change to drop for theirs in step 4.
 2. Recreate the split the last sync recorded. The squash commit names it
    in its `git-subtree-split:` line, but that commit lives only in the
    clone that made it, and `git subtree merge` needs it. Splitting the
@@ -606,17 +188,24 @@ tests of what we removed.
      -m "build: sync just-bash X.Y.Z"
    ```
 
-   The merge is three-way against the last squash, so our `(1ctx)`
+   The merge is three-way against the last squash, so our marked
    changes carry over where upstream did not touch the same lines. What
    to expect:
    - a file we removed that upstream changed is a modify/delete conflict;
    - a new file in a removed directory comes back;
-   - our changes are conflicts only where upstream edited the same lines.
+   - our changes are conflicts only where upstream edited the same lines,
+     and the marker in a conflict hunk names the entry to read before
+     resolving it.
 
 4. Trim again: `git rm -rf` every path in "What we removed" that came
    back, and remove any new loader for them from
    `src/commands/registry.ts`. Resolve the other conflicts, keeping each
-   `(1ctx)` change unless upstream fixed the problem.
+   change unless step 1 found upstream fixed it. For a change upstream
+   fixed, the grep in "How a change is recorded", with its id, lists
+   every hunk to drop for upstream's side; drop the id from a marker
+   that names another change too, then delete the entry and the tests
+   that pinned ours, and move what still differs into
+   `vendor/differences.md`.
 5. Match the packages: compare `vendor/just-bash/package.json`
    `dependencies` with our pins, and move each to the version upstream's
    range resolves to. A package new to upstream needs the user's go-ahead.
@@ -630,7 +219,10 @@ tests of what we removed.
 
    For every line `make vendor-test` reports, decide whether it is Bun,
    the trim or a real regression; fix a regression, then `--update`.
+   `make test` runs `changes.test.ts`, which fails on a marker left
+   without its entry or an entry left without its markers.
    A new command upstream added is off until `KNOWLEDGE_COMMANDS` in
    `src/server/bash/commands.ts` names it.
-7. Update the tag in this file, and each row of "What we changed" that
-   moved.
+7. Update the tag in this file, the `Files` of each entry whose files
+   moved, and each section of `vendor/differences.md` the release
+   changed.

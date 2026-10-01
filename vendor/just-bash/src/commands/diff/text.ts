@@ -1,5 +1,5 @@
 /**
- * (1ctx) diff's compare of two files it has read: the identical check on
+ * (1ctx diff-dirs) diff's compare of two files it has read: the identical check on
  * the bytes, GNU's binary check, the lines interned after folding, the
  * engine, the ignorable changes and the chosen format. Pure but for the
  * work budget it charges.

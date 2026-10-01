@@ -367,7 +367,7 @@ export const sedCommand: RuntimeCommand = {
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      // (1ctx) `--` ends the options, as in GNU sed
+      // (1ctx end-of-options) `--` ends the options, as in GNU sed
       if (arg === "--") {
         for (const operand of args.slice(i + 1)) {
           if (scripts.length === 0 && scriptFiles.length === 0) {

@@ -1,5 +1,5 @@
 /**
- * (1ctx) Characters as gawk counts them in a UTF-8 locale: code points,
+ * (1ctx awk-chars) Characters as gawk counts them in a UTF-8 locale: code points,
  * where JavaScript strings count UTF-16 units. Text without an astral
  * character takes the fast path, where the two agree.
  */

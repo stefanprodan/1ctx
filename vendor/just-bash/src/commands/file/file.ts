@@ -400,7 +400,7 @@ export const fileCommand: RuntimeCommand = {
     const files: string[] = [];
 
     for (const [i, arg] of args.entries()) {
-      // (1ctx) `--` ends the options, as in file 5
+      // (1ctx end-of-options) `--` ends the options, as in file 5
       if (arg === "--") {
         files.push(...args.slice(i + 1));
         break;

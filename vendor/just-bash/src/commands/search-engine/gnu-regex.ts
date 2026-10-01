@@ -1,5 +1,5 @@
 /**
- * (1ctx) GNU grep's basic and extended regular expressions, translated to
+ * (1ctx grep-gnu-regex) GNU grep's basic and extended regular expressions, translated to
  * RE2 syntax. RE2 stays the engine; this reads the dialect GNU grep 3.12
  * reads, with its escapes, its intervals, its literal `{` and `)`, its
  * warnings and its errors, and refuses what RE2 cannot run.

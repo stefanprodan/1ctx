@@ -1,5 +1,5 @@
 /**
- * (1ctx) AWK output files: `print > f` and `print >> f`.
+ * (1ctx awk-output-files) AWK output files: `print > f` and `print >> f`.
  *
  * The first write to a file lands at once, as before: `>` truncates and
  * `>>` appends, and a file that cannot be opened fails at that print, as

@@ -112,7 +112,7 @@ export function parsePrintStatement(p: PrintParserContext): AwkStmt {
     }
   }
 
-  // (1ctx) print (a, b) is print a, b, as in gawk; the tuple was read for
+  // (1ctx awk-print-parens) print (a, b) is print a, b, as in gawk; the tuple was read for
   // an `in` that did not follow
   if (args.length === 1 && args[0].type === "tuple") {
     return { type: "print", args: args[0].elements, output: parseOutput(p) };
@@ -125,7 +125,7 @@ export function parsePrintStatement(p: PrintParserContext): AwkStmt {
  * (not inside ternary) as redirection rather than comparison operators.
  * Supports assignment expressions like: print 9, a=10, 11
  */
-// The output redirection after the arguments; (1ctx) each takes a
+// The output redirection after the arguments; (1ctx awk-call-space) each takes a
 // concatenation, as gawk does (`print x | "sort " flags`, `> dir (name)`)
 function parseOutput(p: PrintParserContext): AwkOutput | undefined {
   if (p.check(TokenTypes.GT as TokenType)) {
@@ -272,7 +272,7 @@ function parsePrintAnd(p: PrintParserContext): AwkExpr {
   return left;
 }
 
-// (1ctx) awk binds concatenation tighter than the comparisons, which bind
+// (1ctx awk-concat-precedence) awk binds concatenation tighter than the comparisons, which bind
 // tighter than ~ and !~: `x "" == "0.3"` compares the concatenation
 function parsePrintIn(p: PrintParserContext): AwkExpr {
   const left = parsePrintMatch(p);

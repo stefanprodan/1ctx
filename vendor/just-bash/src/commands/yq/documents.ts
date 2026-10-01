@@ -1,5 +1,5 @@
 /**
- * Which document a yq result counts as read from (1ctx)
+ * Which document a yq result counts as read from (1ctx yq-documents)
  *
  * mikefarah's yq prints `---` before a result whose document index differs
  * from the last one printed. A node read from a document carries its index
