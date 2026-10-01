@@ -498,3 +498,46 @@ describe("the document walker", () => {
     }
   });
 });
+
+describe("an array's entries", () => {
+  const limits = { maxArrayElements: 2 };
+  // two entries out of each, under keys jq takes
+  const WIDEN = "with_entries(.key |= tostring | (., .))";
+  const run = (filter: string, input: unknown, dialect?: "yq") =>
+    evaluateQuery(input as never, parseQuery(filter), { limits, dialect });
+
+  for (const dialect of [undefined, "yq"] as const) {
+    const name = dialect ?? "jq";
+
+    test(`${name}: to_entries holds to the element limit`, () => {
+      expect(run("to_entries", ["a", "b"], dialect)).toEqual([
+        [
+          { key: 0, value: "a" },
+          { key: 1, value: "b" },
+        ],
+      ]);
+      expect(() => run("to_entries", ["a", "b", "c"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+    });
+
+    test(`${name}: with_entries holds to the element limit`, () => {
+      expect(run(WIDEN, ["a"], dialect)).toEqual([{ 0: "a" }]);
+      expect(() => run("with_entries(.)", ["a", "b", "c"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+      expect(() => run(WIDEN, ["a", "b"], dialect)).toThrow(
+        "query result element limit exceeded (2)",
+      );
+    });
+  }
+
+  test("yq: with_entries keys a list by index, null has none", () => {
+    expect(run("with_entries(.)", ["a", "b"], "yq")).toEqual([
+      { 0: "a", 1: "b" },
+    ]);
+    expect(run("with_entries(., .)", ["a"], "yq")).toEqual([{ 0: "a" }]);
+    expect(run("with_entries(.)", null, "yq")).toEqual([]);
+    expect(run("to_entries", null, "yq")).toEqual([]);
+  });
+});
