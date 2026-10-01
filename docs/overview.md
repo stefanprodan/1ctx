@@ -1,0 +1,71 @@
+# Overview
+
+Governs `src/server/overview/` and the usage windows in
+`src/server/usage/window.ts` (`lastDays()`, `monthWindow()`). The
+Monitor's pages are in `docs/views.md`.
+
+## The admin reads
+
+- **A personal project is counted and never named.** Its `id` and
+  `name` are null in every answer, with its owner given.
+- **Attention and load are read at each request, never cached.**
+  Load reads memory, save the queue's counts, one statement over its
+  partial indexes.
+- **Load's CPU and memory are the process's, not the machine's.** CPU
+  is over `availableParallelism()`, memory against
+  `process.constrainedMemory()`, so both follow a container's caps.
+  The first sample is a baseline that draws nothing, since startup
+  reads as 100%. Sampling starts only when `compose()` activates the
+  app.
+
+## Usage outlives every delete
+
+- **Tokens and cost read `usage` and `decision_usage` alone.** No
+  delete removes those rows (a chat, run, automation, project,
+  regenerated turn, decider or provider), so these totals never fall.
+  Turns, runs and turn lengths read `sends` and fall with a delete.
+- **A deleted object keeps its usage in the breakdowns.** Deleted
+  projects sum into one row. A retired agent keeps its own row and
+  name. A deleted provider's model keeps its row with no provider. A
+  decider is named by its latest row. One deleted without tokens in
+  the window is left out.
+- **Sends and tokens are summed apart and joined by key.** A send has
+  many usage rows, so a join before the sum counts it many times.
+- **A model's row is the model that answered** (`served_model`).
+- **`cost` is the rounds' alone.** Decisions are summed into their own
+  fields. A cost total is 0 with no rows and null when rows came and
+  none was priced.
+- **Nothing vacuums** (`docs/sessions.md`). The file stays at its peak
+  size and storage reports the pages a delete freed as free.
+
+## Windows
+
+- **Every window is half-open, `[since, until)`.** Queries read
+  `created_at >= ? and created_at < ?`, so adjacent windows never
+  count a row twice.
+- **An object's last 30 days is `lastDays()`.** Every per-object usage
+  route goes through it: 30 times 24 hours ending now, no zone, the
+  answer carrying `since` and `until`.
+- **The overview and the month are calendar days in the zone.** 30d
+  and 90d end today. `all` starts on the day of the first row. The
+  month is `monthWindow()`, cut at today.
+
+## The scan worker and the cache
+
+- **Reads run in a worker, one per job.** `bun:sqlite` is synchronous,
+  so storage, overview and month reads run in `scan.worker.ts` over
+  their own read-only connection, ended when they answer, after
+  `SCAN_DEADLINE_MS`, or at shutdown. A memory database runs them
+  inline.
+- **`compose.ts` builds the worker's URL.** The worker is an entry of
+  `bun build --compile`, where a relative URL resolves against the
+  compile root, `src/server`.
+- **The worker sums by quarter hour of UTC, never by zone.** Every
+  zone's midnight falls on a quarter hour, so one read serves any zone
+  and the days are laid on in `overview.ts` and `storage.ts`.
+- **A new table needs an entry in `STORAGE_TABLES`.** A test checks
+  the map against the schema both ways.
+- **`cache.ts` keeps one read in flight per key.** Storage keeps its
+  answer `KEEP_MS`, overview and month `BOARD_KEEP_MS`, under the
+  pages' 30 second poll. A failed read keeps nothing, logs a warning
+  and answers the router's 500.
