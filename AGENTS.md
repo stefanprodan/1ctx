@@ -38,6 +38,8 @@ make test           # bun test, concurrent; run after any code change, before fi
 make vendor-test    # just-bash's own suite on vendor/just-bash, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
+make image          # the container image, native and loaded; PLATFORMS=a,b only builds
+make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
@@ -94,7 +96,8 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 host in the gitignored scripts/staging.env), smoke.sh
-                (what `make smoke` runs), vendor-test.sh, brand.py
+                (what `make smoke` runs), smoke-http.sh (its HTTP checks,
+                shared with image-smoke.sh), image.sh, vendor-test.sh, brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, six of them over record-cases.ts

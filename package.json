@@ -14,6 +14,8 @@
     "lint": "bun biome check --write . && bun tsc --noEmit",
     "build": "mkdir -p bin && bun build src/server/main.ts src/server/overview/scan.worker.ts src/server/bash/command.worker.ts --compile ${TARGET:+--target=$TARGET} --no-compile-autoload-dotenv --no-compile-autoload-bunfig --sourcemap --define \"process.env.ONECTX_BUILD_VERSION=\\\"${VERSION:-}\\\"\" --outfile bin/1ctx && rm -f .*.bun-build",
     "smoke": "scripts/smoke.sh",
+    "image": "scripts/image.sh",
+    "image-smoke": "scripts/image-smoke.sh",
     "clean": "scripts/preview.sh clean && rm -rf bin .*.bun-build",
     "preview": "scripts/preview.sh restart",
     "preview-stop": "scripts/preview.sh stop",

@@ -72,3 +72,7 @@ jobs:
           test "$(./bin/1ctx --version)" = "$expected"
           ./bin/1ctx --help >/dev/null
           make smoke
+      - name: Smoke test image
+        run: |
+          expected="v$(bun -e 'console.log(require("./package.json").version)')"
+          make image-smoke VERSION="$expected"

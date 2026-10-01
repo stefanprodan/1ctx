@@ -5,10 +5,11 @@
 # actual commands live in package.json, edit them there.
 
 export VERSION
+export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke staging-deploy staging-provision staging-status
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke staging-deploy staging-provision staging-status
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -34,6 +35,12 @@ build: ## Compile a standalone binary into bin/ (release: VERSION=v1.2.3)
 
 smoke: ## Start the compiled binary, sign in and stop it
 	@bun run smoke
+
+image: ## Build the container image and load it (PLATFORMS=linux/amd64,linux/arm64 builds only)
+	@bun run image
+
+image-smoke: ## Build the image, run it as production does, sign in and stop it
+	@bun run image-smoke
 
 clean: ## Stop the preview, remove its db and log, and the build artifacts
 	@bun run clean
