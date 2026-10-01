@@ -2,22 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What a task keeps its runs from: the set its editor saves, from the
-// switches it shows, and the names its page's aside says.
+// switches it shows, and the names its page's aside says. The lists are
+// the picked agent's servers and skills and the project's credentials
+// and repositories; one left out is none.
 
-import type {
-  SwitchableCredential,
-  SwitchableServer,
-  SwitchableSkill,
-} from "../../../shared/api/sessions.ts";
 import {
   credentialKey,
   KNOWLEDGE,
   mcpKey,
+  repoKey,
   skillKey,
   VISUALIZE,
   WEB,
 } from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import type { Switchables } from "../../data/capabilities.ts";
+
+export type Shown = Partial<Switchables>;
 
 // the editor's switches, as its draft holds them
 export type AccessDraft = {
@@ -33,16 +34,15 @@ export type AccessDraft = {
   skillsOff: readonly string[];
   // the keys of the project's credentials its runs go without
   credentialsOff: readonly string[];
+  // the keys of the project's repositories its runs go without
+  reposOff: readonly string[];
 };
 
-// the saved set: a key of a server, a skill or a credential not shown
-// is dropped, since nothing on the page could turn it back on
-export function disabledOf(
-  d: AccessDraft,
-  servers: readonly SwitchableServer[],
-  skills: readonly SwitchableSkill[],
-  credentials: readonly SwitchableCredential[],
-): string[] {
+// the saved set: a key of a server, a skill, a credential or a
+// repository not shown is dropped, since nothing on the page could turn
+// it back on
+export function disabledOf(d: AccessDraft, shown: Shown = {}): string[] {
+  const { servers = [], skills = [], credentials = [], repos = [] } = shown;
   const kept = (keys: string[], off: readonly string[]) =>
     keys.filter((key) => off.includes(key));
   return [
@@ -61,18 +61,20 @@ export function disabledOf(
       credentials.map((credential) => credentialKey(credential.id)),
       d.credentialsOff,
     ),
+    ...kept(
+      repos.map((repo) => repoKey(repo.id)),
+      d.reposOff,
+    ),
   ].sort();
 }
 
 // what the row keeps its runs from, for the page's aside: the names of
-// its agent's servers and skills and the project's credentials that are
-// off, in name order. With the web off every credential goes with it,
-// so none is named
+// its agent's servers and skills and the project's credentials and
+// repositories that are off, in name order. With the web off every
+// credential goes with it, so none is named
 export function accessOf(
   a: Pick<AutomationSummary, "disabledCapabilities">,
-  servers: readonly SwitchableServer[],
-  skills: readonly SwitchableSkill[] = [],
-  credentials: readonly SwitchableCredential[] = [],
+  shown: Shown = {},
 ): {
   web: boolean;
   visuals: boolean;
@@ -80,7 +82,9 @@ export function accessOf(
   mcpOff: string[];
   skillsOff: string[];
   credentialsOff: string[];
+  reposOff: string[];
 } {
+  const { servers = [], skills = [], credentials = [], repos = [] } = shown;
   const web = !a.disabledCapabilities.includes(WEB);
   return {
     web,
@@ -100,5 +104,9 @@ export function accessOf(
           .map((c) => c.name)
           .sort()
       : [],
+    reposOff: repos
+      .filter((repo) => a.disabledCapabilities.includes(repoKey(repo.id)))
+      .map((repo) => repo.name)
+      .sort(),
   };
 }

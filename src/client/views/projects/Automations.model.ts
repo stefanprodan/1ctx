@@ -9,14 +9,10 @@
 // any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
-import type {
-  SwitchableCredential,
-  SwitchableServer,
-  SwitchableSkill,
-} from "../../../shared/api/sessions.ts";
 import {
   credentialOf,
   KNOWLEDGE,
+  repoOf,
   serverOf,
   skillOf,
   VISUALIZE,
@@ -32,7 +28,7 @@ import {
   type Role,
 } from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
-import { type AccessDraft, disabledOf } from "./Access.model.ts";
+import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
 import {
   daysOf,
   fieldsOf,
@@ -318,6 +314,7 @@ export function draftOf(
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
+      reposOff: [],
     };
   }
   return {
@@ -339,6 +336,7 @@ export function draftOf(
     credentialsOff: a.disabledCapabilities.filter(
       (key) => credentialOf(key) !== null,
     ),
+    reposOff: a.disabledCapabilities.filter((key) => repoOf(key) !== null),
   };
 }
 
@@ -386,14 +384,12 @@ export function automationFieldOf(
 
 // the body a save sends, or the first problem. Only emptiness and the
 // numbers' shape are checked here; every rule is the server's.
-// `servers` and `skills` are the picked agent's and `credentials` the
-// project's: a key for any other is not shown, so it is not saved
+// `shown` is what the switches list: a key for any other is not shown,
+// so it is not saved
 export function requestOf(
   d: Draft,
   limitMs: number,
-  servers: readonly SwitchableServer[] = [],
-  skills: readonly SwitchableSkill[] = [],
-  credentials: readonly SwitchableCredential[] = [],
+  shown: Shown = {},
 ):
   | { body: SaveAutomationRequest }
   | { problem: string; field: AutomationField } {
@@ -434,7 +430,7 @@ export function requestOf(
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
       rerunOnRestart: d.rerunOnRestart,
-      disabledCapabilities: disabledOf(d, servers, skills, credentials),
+      disabledCapabilities: disabledOf(d, shown),
     },
   };
 }

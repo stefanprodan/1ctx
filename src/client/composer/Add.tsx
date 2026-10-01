@@ -4,12 +4,12 @@
 // The plus at the start of the composer's row and its menu, placed as
 // the agent list is. Add files opens the file picker. Web access,
 // Visuals, Knowledge and Memory are switches, drawn as the rail's
-// theme switch is, and flipping one leaves the menu open. MCP servers
-// and Skills each swap the menu's rows for a switch per server or
-// skill, and so does Web access when the project has credentials, and
-// Escape or the pane's first row swaps them back. A pane's item says
-// how many are on. An item that cannot be used is off and says why on
-// a line of its own.
+// theme switch is, and flipping one leaves the menu open. MCP servers,
+// Skills and Repositories each swap the menu's rows for a switch per
+// server, skill or repository, and so does Web access when the project
+// has credentials, and Escape or the pane's first row swaps them back.
+// A pane's item says how many are on. An item that cannot be used is
+// off and says why on a line of its own.
 
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
@@ -30,11 +30,12 @@ import {
 } from "./Add.model.ts";
 import { AddPane } from "./AddPane.tsx";
 
-type Pane = "web" | "servers" | "skills";
+type Pane = "web" | "servers" | "skills" | "repos";
 const PANES: Record<Pane, { title: string; icon: IconName }> = {
   web: { title: "Web access", icon: "globe" },
   servers: { title: "MCP Servers", icon: "mcp" },
   skills: { title: "Skills", icon: "skill" },
+  repos: { title: "Repositories", icon: "code" },
 };
 
 // the menu's row that is a switch for a kind alone
@@ -124,6 +125,7 @@ export function Add({
   memory,
   servers,
   skills,
+  repos,
   onFlip,
 }: {
   // the picked agent can read files
@@ -139,6 +141,8 @@ export function Add({
   servers: PaneItem | null;
   // null when the picked agent has no skill
   skills: PaneItem | null;
+  // null when the project has no repository
+  repos: PaneItem | null;
   // a switch, of the menu or a pane, by its key
   onFlip: (key: string) => void;
 }) {
@@ -148,7 +152,7 @@ export function Add({
     pane.value = "menu";
     return true;
   });
-  const items = { web: webPane, servers, skills };
+  const items = { web: webPane, servers, skills, repos };
   const shown = pane.value === "menu" ? null : items[pane.value];
   const paneless = panelessOf(open.value, pane.value, shown);
   useEffect(() => {
@@ -160,6 +164,7 @@ export function Add({
     web: useRef<HTMLButtonElement>(null),
     servers: useRef<HTMLButtonElement>(null),
     skills: useRef<HTMLButtonElement>(null),
+    repos: useRef<HTMLButtonElement>(null),
   };
   const plus = useRef<HTMLButtonElement>(null);
   const was = useRef<"menu" | Pane>("menu");
@@ -170,7 +175,7 @@ export function Add({
       (row === null || row.disabled ? plus.current : row)?.focus();
     }
     was.current = pane.value;
-  }, [pane.value, rows.web, rows.servers, rows.skills]);
+  }, [pane.value, rows.web, rows.servers, rows.skills, rows.repos]);
   return (
     <div class="composer-agent" ref={root}>
       <button
@@ -265,7 +270,7 @@ export function Add({
             item={memory}
             onFlip={() => onFlip(MEMORY)}
           />
-          {(["servers", "skills"] as const).map((name) => {
+          {(["servers", "skills", "repos"] as const).map((name) => {
             const item = items[name];
             return item === null ? null : (
               <PaneLink

@@ -3,21 +3,24 @@
 //
 // The task editor's Access step: one list of switches, the web with
 // the project's credentials after it, visuals, the project docs, then
-// the picked agent's MCP servers and skills. Each row's meta says what
-// it is. A switch that cannot be flipped is off and faint, its meta
+// the picked agent's MCP servers and skills, and the project's
+// repositories. Each row's meta says what it is, a repository's the ref
+// it follows. A switch that cannot be flipped is off and faint, its meta
 // saying why.
 
 import type {
   SwitchableCredential,
+  SwitchableRepo,
   SwitchableServer,
   SwitchableSkill,
 } from "../../../shared/api/sessions.ts";
 import {
   credentialKey,
   mcpKey,
+  repoKey,
   skillKey,
 } from "../../../shared/capabilities.ts";
-import type { WebItem } from "../../composer/Add.model.ts";
+import { refWords, type WebItem } from "../../composer/Add.model.ts";
 import { Icon, type IconName } from "../../lib/icons.tsx";
 import {
   RowsAvatar,
@@ -83,6 +86,9 @@ export function AccessSection({
   credentials,
   credentialsOff,
   onCredential,
+  repos,
+  reposOff,
+  onRepo,
   disabled,
 }: {
   web: WebItem;
@@ -109,6 +115,10 @@ export function AccessSection({
   credentials: readonly SwitchableCredential[];
   credentialsOff: readonly string[];
   onCredential: (key: string) => void;
+  // the project's, none when the picked agent's model takes no tools
+  repos: readonly SwitchableRepo[];
+  reposOff: readonly string[];
+  onRepo: (key: string) => void;
   disabled: boolean;
 }) {
   const webRow = builtin(
@@ -177,6 +187,19 @@ export function AccessSection({
         on: !skillsOff.includes(key),
         blocked: false,
         onFlip: () => onSkill(key),
+      };
+    }),
+    ...repos.map((repo) => {
+      const key = repoKey(repo.id);
+      return {
+        key,
+        name: repo.name,
+        icon: "code" as const,
+        meta: refWords(repo.ref),
+        mono: true,
+        on: !reposOff.includes(key),
+        blocked: false,
+        onFlip: () => onRepo(key),
       };
     }),
   ];

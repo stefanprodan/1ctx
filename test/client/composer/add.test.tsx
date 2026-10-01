@@ -7,6 +7,7 @@ import {
   agentMoved,
   onWords,
   panelessOf,
+  reposItem,
   serversItem,
   skillsItem,
   switchItem,
@@ -290,6 +291,68 @@ describe("the Skills item", () => {
   });
 });
 
+describe("the Repositories item", () => {
+  const repos = [
+    { id: "r1", name: "flux2", ref: "main" },
+    { id: "r2", name: "podinfo", ref: "" },
+    { id: "r3", name: "website", ref: "v1.2.0" },
+  ];
+
+  test("is absent for a project without repositories", () => {
+    expect(
+      reposItem({ tools: true, repos: [], isOff: () => false }),
+    ).toBeNull();
+  });
+
+  test("lists a switch per repository with its ref, counting those on", () => {
+    const item = reposItem({
+      tools: true,
+      repos,
+      isOff: (key) => key === "repo:r2",
+    })!;
+    expect(item.live).toBe(true);
+    expect(onWords(item)).toBe("2 on");
+    expect(
+      item.rows.map((row) => [row.key, row.name, row.note, row.on]),
+    ).toEqual([
+      ["repo:r1", "flux2", "main", true],
+      ["repo:r2", "podinfo", "default branch", false],
+      ["repo:r3", "website", "v1.2.0", true],
+    ]);
+  });
+
+  test("an agent without tools shows it off and says why", () => {
+    expect(reposItem({ tools: false, repos, isOff: () => false })).toEqual({
+      live: false,
+      reason: "Agent cannot use tools",
+      on: 0,
+      rows: [],
+    });
+  });
+
+  test("the pane draws each repository with its ref", () => {
+    const item = reposItem({
+      tools: true,
+      repos,
+      isOff: (key) => key === "repo:r1",
+    })!;
+    const html = render(
+      <AddPane
+        title="Repositories"
+        icon="code"
+        rows={item.rows}
+        onBack={() => {}}
+        onFlip={() => {}}
+      />,
+    );
+    expect(html).toContain("Repositories");
+    expect(html).toContain("default branch");
+    expect(html).toContain("v1.2.0");
+    expect(html.indexOf("flux2")).toBeLessThan(html.indexOf("podinfo"));
+    expect(html.match(/switch-on/g)?.length).toBe(2);
+  });
+});
+
 // bug: back at the menu counted as a pane gone, so the reset queued there
 // undid a pane picked before it ran
 describe("the plus falling back to its menu", () => {
@@ -305,6 +368,8 @@ describe("the plus falling back to its menu", () => {
     expect(panelessOf(true, "skills", live)).toBe(false);
     expect(panelessOf(true, "skills", null)).toBe(true);
     expect(panelessOf(true, "servers", { ...live, live: false })).toBe(true);
+    expect(panelessOf(true, "repos", live)).toBe(false);
+    expect(panelessOf(true, "repos", null)).toBe(true);
   });
 });
 

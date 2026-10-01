@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The task editor's Access section, one list with the project's
-// credentials after Web access, and the Setup aside naming those off.
+// credentials after Web access and its repositories last, and the Setup
+// aside naming those off.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -16,9 +17,15 @@ const credentials = [
   { id: "c2", name: "github" },
 ];
 
+const repos = [
+  { id: "r1", name: "flux2", ref: "main" },
+  { id: "r2", name: "podinfo", ref: "" },
+];
+
 const section = (
   web: { live: boolean; on: boolean; reason: string | null },
   knowledgeOn = true,
+  shownRepos: typeof repos = [],
 ) =>
   render(
     <AccessSection
@@ -40,6 +47,9 @@ const section = (
       credentials={credentials}
       credentialsOff={["credential:c2"]}
       onCredential={() => {}}
+      repos={shownRepos}
+      reposOff={["repo:r2"]}
+      onRepo={() => {}}
       disabled={false}
     />,
   );
@@ -87,6 +97,23 @@ describe("the Access section's Knowledge switch", () => {
     expect(on).toContain('aria-label="Knowledge on"');
     expect(on.indexOf("Visuals")).toBeLessThan(on.indexOf("Knowledge"));
     expect(section(web, false)).toContain('aria-label="Knowledge off"');
+  });
+});
+
+describe("the Access section's repositories", () => {
+  const web = { live: true, on: true, reason: null };
+
+  test("a switch per repository last, with its ref, off as the draft says", () => {
+    const html = section(web, true, repos);
+    expect(html).toContain('aria-label="flux2 on"');
+    expect(html).toContain('aria-label="podinfo off"');
+    expect(html).toContain(">main<");
+    expect(html).toContain("default branch");
+    expect(html.indexOf("Knowledge")).toBeLessThan(html.indexOf("flux2"));
+  });
+
+  test("none without repositories", () => {
+    expect(section(web)).not.toContain("default branch");
   });
 });
 
@@ -141,6 +168,22 @@ describe("the Setup aside", () => {
     expect(html).not.toContain("Visuals");
     const both = render(<AccessLines row={row(["knowledge", "visualize"])} />);
     expect(both.indexOf("Visuals")).toBeLessThan(both.indexOf("Knowledge"));
+  });
+
+  test.serial("names the project's repositories that are off", () => {
+    answered({
+      agents: [],
+      startsOn: null,
+      capabilities: [],
+      servers: {},
+      skills: {},
+      credentials: [],
+      repos,
+    });
+    const html = render(<AccessLines row={row(["repo:r2", "repo:gone"])} />);
+    expect(html).toContain("Repositories off");
+    expect(html).toContain("podinfo");
+    expect(html).not.toContain("flux2");
   });
 
   test.serial("says Web access Off alone while the web is off", () => {

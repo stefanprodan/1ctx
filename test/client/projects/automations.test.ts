@@ -417,6 +417,7 @@ describe("the form", () => {
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
+      reposOff: [],
     });
   });
 
@@ -557,7 +558,7 @@ describe("the form", () => {
     const request = requestOf(
       filled({ web: false, mcpOff: ["mcp:gone", "mcp:a1"] }),
       LIMIT,
-      servers,
+      { servers },
     );
     expect("body" in request && request.body.disabledCapabilities).toEqual([
       "mcp:a1",
@@ -577,8 +578,10 @@ describe("the form", () => {
     const request = requestOf(
       filled({ mcpOff: ["mcp:a1"], skillsOff: ["skill:gone", "skill:s1"] }),
       LIMIT,
-      [{ id: "a1", name: "flux", tools: 18 }],
-      [{ id: "s1", name: "gitops" }],
+      {
+        servers: [{ id: "a1", name: "flux", tools: 18 }],
+        skills: [{ id: "s1", name: "gitops" }],
+      },
     );
     expect("body" in request && request.body.disabledCapabilities).toEqual([
       "mcp:a1",
@@ -595,13 +598,14 @@ describe("the form", () => {
       { id: "s2", name: "visualize" },
       { id: "s1", name: "gitops" },
     ];
-    expect(accessOf(automation({}), servers, skills)).toEqual({
+    expect(accessOf(automation({}), { servers, skills })).toEqual({
       web: true,
       visuals: true,
       knowledge: true,
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
+      reposOff: [],
     });
     const row = automation({
       disabledCapabilities: [
@@ -618,13 +622,14 @@ describe("the form", () => {
         "web",
       ],
     });
-    expect(accessOf(row, servers, skills)).toEqual({
+    expect(accessOf(row, { servers, skills })).toEqual({
       web: false,
       visuals: false,
       knowledge: false,
       mcpOff: ["flux", "github"],
       skillsOff: ["gitops", "visualize"],
       credentialsOff: [],
+      reposOff: [],
     });
     // nor does the editor keep a key it never shows
     const saved = requestOf(draftOf(row, "a1", "UTC", LIMIT), LIMIT);
@@ -649,9 +654,7 @@ describe("the form", () => {
     const request = requestOf(
       filled({ credentialsOff: ["credential:gone", "credential:c1"] }),
       LIMIT,
-      [],
-      [],
-      credentials,
+      { credentials },
     );
     expect("body" in request && request.body.disabledCapabilities).toEqual([
       "credential:c1",
@@ -665,17 +668,40 @@ describe("the form", () => {
     ];
     const keys = ["credential:c1", "credential:c2", "credential:gone"];
     expect(
-      accessOf(automation({ disabledCapabilities: keys }), [], [], credentials)
+      accessOf(automation({ disabledCapabilities: keys }), { credentials })
         .credentialsOff,
     ).toEqual(["finnhub", "github"]);
     const off = accessOf(
       automation({ disabledCapabilities: [...keys, "web"] }),
-      [],
-      [],
-      credentials,
+      { credentials },
     );
     expect(off.web).toBe(false);
     expect(off.credentialsOff).toEqual([]);
+  });
+
+  test("repositories off follow the row and save only for the project's", () => {
+    const row = automation({
+      disabledCapabilities: ["repo:gone", "repo:r1", "web"],
+    });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.reposOff).toEqual(["repo:gone", "repo:r1"]);
+    expect(shown.credentialsOff).toEqual([]);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, reposOff: [] }, row, LIMIT)).toBe(true);
+    const repos = [
+      { id: "r2", name: "podinfo", ref: "" },
+      { id: "r1", name: "flux2", ref: "main" },
+    ];
+    const request = requestOf(
+      filled({ reposOff: ["repo:gone", "repo:r1"] }),
+      LIMIT,
+      { repos },
+    );
+    expect("body" in request && request.body.disabledCapabilities).toEqual([
+      "repo:r1",
+    ]);
+    // the web off leaves the repositories named, since bash reads them
+    expect(accessOf(row, { repos }).reposOff).toEqual(["flux2"]);
   });
 
   test("memory is none or the task's own note", () => {

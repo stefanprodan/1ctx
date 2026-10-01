@@ -5,17 +5,12 @@
 // while everything is on.
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import { credentials, servers, skills } from "../../data/capabilities.ts";
+import { switchablesOf } from "../../data/capabilities.ts";
 import { AsideLine } from "../../ui/Split.tsx";
 import { accessOf } from "./Access.model.ts";
 
 export function AccessLines({ row }: { row: AutomationSummary }) {
-  const access = accessOf(
-    row,
-    servers.value[row.agentId] ?? [],
-    skills.value[row.agentId] ?? [],
-    credentials.value,
-  );
+  const access = accessOf(row, switchablesOf(row.agentId));
   return (
     <>
       {!access.web && <AsideLine label="Web access">Off</AsideLine>}
@@ -31,6 +26,11 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
       )}
       {access.skillsOff.length > 0 && (
         <AsideLine label="Skills off">{access.skillsOff.join(", ")}</AsideLine>
+      )}
+      {access.reposOff.length > 0 && (
+        <AsideLine label="Repositories off">
+          {access.reposOff.join(", ")}
+        </AsideLine>
       )}
     </>
   );

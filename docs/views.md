@@ -119,8 +119,8 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **Another agent or project drops the flips it cannot carry.**
   `composer/switches.ts`: another agent in a chat not made yet drops
   `mcp:` and `skill:` flips (`dropKind()`); another project on Home
-  drops `credential:` flips. The agent list going away for a moment is
-  no pick (`agentMoved()`).
+  drops `credential:` and `repo:` flips. The agent list going away for
+  a moment is no pick (`agentMoved()`).
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the
   focus and gives it back.

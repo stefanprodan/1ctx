@@ -8,18 +8,21 @@
 // credential, which goes with it. Memory and Knowledge are live
 // whenever the agent takes tools, since no admin switch governs them.
 // MCP servers is there when the picked agent is offered any, and leads
-// to a switch per server; Skills is the same for the skills it carries.
+// to a switch per server; Skills is the same for the skills it carries,
+// and Repositories for the project's repositories.
 // A pane's item counts what is on. An item that cannot be switched shows
 // off and says why on a line under its name.
 
 import type {
   SwitchableCredential,
+  SwitchableRepo,
   SwitchableServer,
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
 import {
   credentialKey,
   mcpKey,
+  repoKey,
   skillKey,
   WEB,
 } from "../../shared/capabilities.ts";
@@ -90,7 +93,7 @@ export const onWords = (item: PaneItem) => `${item.on} on`;
 // way back from a pane would undo a pane picked before it ran
 export function panelessOf(
   open: boolean,
-  pane: "menu" | "web" | "servers" | "skills",
+  pane: "menu" | "web" | "servers" | "skills" | "repos",
   shown: PaneItem | null,
 ): boolean {
   return !open || (pane !== "menu" && (shown === null || !shown.live));
@@ -198,6 +201,27 @@ export function skillsItem(input: {
       key: skillKey(skill.id),
       name: skill.name,
       note: "",
+    })),
+    input.isOff,
+  );
+}
+
+// the ref a repository follows, in words: empty is the default branch
+export const refWords = (ref: string) => (ref === "" ? "default branch" : ref);
+
+// a repository is read through bash, so an agent without tools has none
+export function reposItem(input: {
+  tools: boolean;
+  // the project's, for any agent
+  repos: readonly SwitchableRepo[];
+  isOff: (key: string) => boolean;
+}): PaneItem | null {
+  return paneItem(
+    input.tools,
+    input.repos.map((repo) => ({
+      key: repoKey(repo.id),
+      name: repo.name,
+      note: refWords(repo.ref),
     })),
     input.isOff,
   );
