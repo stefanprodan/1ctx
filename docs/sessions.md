@@ -275,7 +275,7 @@ Governs `src/server/sessions/` and the runner's sends in
 - **Every delete goes through `deleteSession()`**
   (`sessions/delete.ts`): the route, a task's retention and the sweep.
   The foreign keys take the dependents.
-- **Usage outlives every delete** (`docs/overview.md`). `latest()`
+- **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.
 
 ## Archive and agent retirement

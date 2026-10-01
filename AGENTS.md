@@ -121,7 +121,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept files, curl signing |
-| `docs/overview.md` | `overview/`, the usage windows |
+| `docs/monitor.md` | `overview/`: what the Monitor reads, the usage windows |
 | `docs/provision.md` | `provision/`, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the image, `deploy/`, release and CI |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` |
