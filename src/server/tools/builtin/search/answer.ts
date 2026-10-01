@@ -4,12 +4,10 @@
 // What the search wires share when they read an answer: the shape error,
 // a JSON object, and the numbered hit list the model reads.
 
+import { isRecord } from "../../../../shared/words.ts";
+
 export function unexpected(): never {
   throw new Error("websearch answered with an unexpected shape");
-}
-
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // the body as a JSON object; the parse alone sits in the try, so only a
@@ -21,7 +19,7 @@ export function jsonObject(body: string): Record<string, unknown> {
   } catch {
     return unexpected();
   }
-  return isObject(value) ? value : unexpected();
+  return isRecord(value) ? value : unexpected();
 }
 
 // one entry per hit with a URL, numbered without gaps: the title, the
@@ -30,7 +28,7 @@ export function formatHits(hits: unknown, excerpt: string): string {
   if (!Array.isArray(hits)) return unexpected();
   const results: string[] = [];
   for (const hit of hits) {
-    if (!isObject(hit) || typeof hit.url !== "string") continue;
+    if (!isRecord(hit) || typeof hit.url !== "string") continue;
     const title = typeof hit.title === "string" ? hit.title : "";
     const text = typeof hit[excerpt] === "string" ? hit[excerpt] : "";
     results.push(`${results.length + 1}. ${title}\n${hit.url}\n${text}`);

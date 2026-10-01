@@ -3,20 +3,9 @@
 
 import type { ToolVisualResponse } from "../../shared/api/sessions.ts";
 import type { Message } from "../../shared/contracts/session.ts";
-import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { type ToolCall, toolArguments } from "../../shared/contracts/tool.ts";
 import { hasLineBreak, MAX_TITLE } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
-
-function argumentsObject(text: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(text);
-    return value !== null && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 function validTitle(value: unknown): value is string {
   return (
@@ -29,7 +18,7 @@ function validTitle(value: unknown): value is string {
 
 export function offWireCall(call: ToolCall): ToolCall {
   if (call.name !== "visualize") return call;
-  const args = argumentsObject(call.arguments);
+  const args = toolArguments(call.arguments);
   // Rebuilding only the known fields keeps malformed arguments and
   // unexpected nested values from carrying the source on the wire.
   return {
@@ -51,7 +40,7 @@ export function readVisual(
 ): ToolVisualResponse | null {
   const call = reply.toolCalls?.[index];
   if (reply.kind !== "reply" || call?.name !== "visualize") return null;
-  const args = argumentsObject(call.arguments);
+  const args = toolArguments(call.arguments);
   if (
     !args ||
     !validTitle(args.title) ||

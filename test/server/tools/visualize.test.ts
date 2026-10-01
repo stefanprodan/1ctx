@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { makeVisualizeTool } from "../../../src/server/tools/builtin/visualize.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { parseHosts, parseToolPatch } from "../../../src/server/tools/parse.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";

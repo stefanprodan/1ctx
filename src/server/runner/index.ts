@@ -29,7 +29,7 @@ import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
 import { liveAuthor, principalOf } from "./authors.ts";
 import { compactSend } from "./compact.ts";
-import { endSend, FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS } from "./ending.ts";
+import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
@@ -48,31 +48,17 @@ import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
 import type { Runner, RunnerDeps } from "./types.ts";
 import { Writer } from "./writer.ts";
 
-export type { AttentionPort } from "./attention.ts";
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
-export type { Dispatcher } from "./queue.ts";
-export {
-  Registry,
-  Restarting,
-  RunCapacity,
-  type Running,
-} from "./registry.ts";
-export { type ActiveSend, live } from "./send.ts";
+export { Registry, RunCapacity, type Running } from "./registry.ts";
+export type { ActiveSend } from "./send.ts";
 export type { DrainResult, ShutdownResult } from "./shutdown.ts";
 export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
-export type { Runner, RunnerDeps } from "./types.ts";
-export {
-  HTML_EVERY_MS,
-  statusOf,
-  WRITE_EVERY_BYTES,
-  WRITE_EVERY_MS,
-  Writer,
-} from "./writer.ts";
+export type { Runner } from "./types.ts";
 
 // how long shutdown waits for the streams to let go
 export const SHUTDOWN_DRAIN_MS = 5000;
-export { FINALIZE_ATTEMPTS, FINALIZE_RETRY_MS };
+export { FINALIZE_RETRY_MS };
 
 export function runnerArea(deps: RunnerDeps): Runner {
   const registry = new Registry();

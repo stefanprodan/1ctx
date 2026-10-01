@@ -16,6 +16,7 @@ import {
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
+import { isRecord } from "../../shared/words.ts";
 import { ToolError } from "../lib/errors.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
@@ -72,7 +73,7 @@ export function validateArguments(
     return null;
   }
   if (result.valid) return null;
-  const properties = isObject(schema.properties) ? schema.properties : {};
+  const properties = isRecord(schema.properties) ? schema.properties : {};
   const required = Array.isArray(schema.required)
     ? schema.required.filter((name) => typeof name === "string")
     : [];
@@ -116,10 +117,6 @@ export function validateArguments(
 }
 
 const MAX_LISTED = 40;
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 export function cut(text: string, max: number): string {
   if (text.length <= max) return text;

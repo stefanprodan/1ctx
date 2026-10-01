@@ -10,9 +10,6 @@ export type LoginResponse = { user: Me };
 // GET /api/me: null when nobody is signed in
 export type MeResponse = { user: Me | null };
 
-// every error body
-export type ErrorResponse = { error: string };
-
 export type AccessDay = { day: string; start: number; signedIn: number };
 
 export type AccessRecent = { userId: string; at: number; online: boolean };

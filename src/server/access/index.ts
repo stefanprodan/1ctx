@@ -40,35 +40,15 @@ import {
 } from "./users.ts";
 import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
-export {
-  type Auth,
-  auth,
-  COOKIE,
-  cookieValue,
-  LOGIN_TTL_MS,
-  TOUCH_AFTER_MS,
-} from "./auth.ts";
-export {
-  type ActivityPort,
-  directoryRoutes,
-} from "./directory.ts";
+export { cookieValue, LOGIN_TTL_MS, TOUCH_AFTER_MS } from "./auth.ts";
 export {
   parseAbout,
   parseEmail,
   parseFullName,
   parseNoQuery,
   parseTz,
-  parseUsername,
   parseUserPassword,
 } from "./parse.ts";
-export { profileRoutes } from "./profile.ts";
-export { routes } from "./routes.ts";
-export { LoginStore } from "./store.ts";
-export {
-  type UsersPort as AdminUsersPort,
-  usersRoutes,
-} from "./users.ts";
-export { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
 export type AccessDeps = {
   db: Db;

@@ -9,7 +9,7 @@ import { isIP } from "node:net";
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
@@ -19,7 +19,7 @@ import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 
 export const LOGIN_LIMIT = 10;
-export const LOGIN_WINDOW_MS = 60 * 1000;
+export const LOGIN_WINDOW_MS = MINUTE_MS;
 
 // a hash to verify against when the name is unknown, so the work and the
 // time are the same as for a known name

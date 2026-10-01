@@ -19,9 +19,6 @@ import type {
 import { api, upload } from "./api.ts";
 import { me } from "./me.ts";
 
-// a staged item that is held: its id is never null
-export type Staged = StagedUpload & { id: string };
-
 export const staged = signal<ReadonlyMap<string, StagedUploads>>(new Map());
 
 let owner: string | null = null;

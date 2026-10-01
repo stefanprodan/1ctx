@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { silent } from "../../../src/server/lib/log.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import type { MemoryWork } from "../../../src/server/memory/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
 import {
@@ -9,7 +10,6 @@ import {
   type ToolsArea,
   toolsArea,
 } from "../../../src/server/tools/index.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import { memoryDb } from "../../helpers/db.ts";
 

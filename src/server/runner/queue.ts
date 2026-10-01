@@ -20,7 +20,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type { NotSentReason } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { Conflict, HttpError } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -49,7 +49,6 @@ import { ClaimLost, type QueuedClaim } from "./start.ts";
 import { type SummonAgents, summonGone, summons, turnBatch } from "./summon.ts";
 import { claimsOf, messagesOf, type TurnMessage } from "./turn.ts";
 
-const MINUTE_MS = 60_000;
 // passes one wake may run before it hands the rest to a later turn
 const PASSES_PER_WAKE = 4;
 // the chats one expiry read takes

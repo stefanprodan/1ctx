@@ -8,6 +8,7 @@
 
 import type { Windowed } from "../../shared/api/admin.ts";
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
+import { DAY_MS } from "../lib/clock.ts";
 
 export type UsageWindow = {
   days: string[];
@@ -65,8 +66,6 @@ const addDays = (day: CalendarDay, count: number): CalendarDay => {
     day: date.getUTCDate(),
   };
 };
-
-const DAY_MS = 86_400_000;
 
 const sameDay = (parts: CalendarDay, day: CalendarDay): boolean =>
   parts.year === day.year && parts.month === day.month && parts.day === day.day;

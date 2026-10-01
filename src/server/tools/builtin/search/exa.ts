@@ -6,7 +6,8 @@
 // network; the area passes the key and the version, the caller does the
 // request.
 
-import { isObject, jsonObject, unexpected } from "./answer.ts";
+import { isRecord } from "../../../../shared/words.ts";
+import { jsonObject, unexpected } from "./answer.ts";
 import {
   ProviderError,
   type ProviderRequest,
@@ -84,14 +85,14 @@ export function parseAnswer(
     mediaType === "application/json" ? body : messageData(body),
   );
   if (envelope.error !== undefined) {
-    if (!isObject(envelope.error)) return unexpected();
+    if (!isRecord(envelope.error)) return unexpected();
     throw new ProviderError(serverMessage(envelope.error.message));
   }
   const record = envelope.result;
-  if (!isObject(record) || !Array.isArray(record.content)) return unexpected();
+  if (!isRecord(record) || !Array.isArray(record.content)) return unexpected();
   const texts: string[] = [];
   for (const item of record.content) {
-    if (!isObject(item) || item.type !== "text") return unexpected();
+    if (!isRecord(item) || item.type !== "text") return unexpected();
     if (typeof item.text !== "string") return unexpected();
     texts.push(item.text);
   }

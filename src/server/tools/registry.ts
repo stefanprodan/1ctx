@@ -4,6 +4,7 @@
 // The ordered tool lookup. Unknown names, malformed arguments and
 // throws become failed results so the runner only handles ToolResult.
 
+import { parseArguments } from "../../shared/contracts/tool.ts";
 import { sanitize } from "../../shared/memory.ts";
 import { ToolError } from "../lib/errors.ts";
 import type { ToolCall } from "../providers/index.ts";
@@ -45,23 +46,18 @@ export class Registry {
       if (!tool) throw new ToolError(this.unknown(call.name), "tool not found");
       timeoutMs =
         (tool.timeoutMs ?? ctx.caps.callTimeoutMs) + (tool.graceMs ?? 0);
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
-      } catch {
-        throw new Error(`invalid JSON arguments for tool "${call.name}"`);
-      }
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
-        throw new Error(`arguments for tool "${call.name}" must be an object`);
+      const parsed = parseArguments(call.arguments);
+      if (!parsed.ok) {
+        throw new Error(
+          parsed.reason === "json"
+            ? `invalid JSON arguments for tool "${call.name}"`
+            : `arguments for tool "${call.name}" must be an object`,
+        );
       }
       started = performance.now();
       timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
-      const result = await tool.run(parsed as Record<string, unknown>, {
+      const result = await tool.run(parsed.args, {
         ...ctx,
         signal,
       });

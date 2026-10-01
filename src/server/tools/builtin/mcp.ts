@@ -1,6 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  parseArguments,
+  toolArguments,
+} from "../../../shared/contracts/tool.ts";
+import { isRecord } from "../../../shared/words.ts";
 import { ToolError } from "../../lib/errors.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../../mcp/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
@@ -25,20 +30,18 @@ function named(servers: OfferedServer[], value: unknown): OfferedMcpTool {
 }
 
 function object(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("arguments must be an object");
-  }
-  return value as Record<string, unknown>;
+  if (!isRecord(value)) throw new Error("arguments must be an object");
+  return value;
 }
 
 function outer(call: ToolCall): Record<string, unknown> {
-  let value: unknown;
-  try {
-    value = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
-  } catch {
-    throw new Error('invalid JSON arguments for tool "mcp_call"');
-  }
-  return object(value);
+  const parsed = parseArguments(call.arguments);
+  if (parsed.ok) return parsed.args;
+  throw new Error(
+    parsed.reason === "json"
+      ? 'invalid JSON arguments for tool "mcp_call"'
+      : "arguments must be an object",
+  );
 }
 
 export function mcpCallName(
@@ -58,12 +61,7 @@ export function mcpCallName(
 // never names a function the tools array lacks
 export function asMcpCall(servers: OfferedServer[], call: ToolCall): ToolCall {
   if (!flat(servers).some((tool) => tool.wireName === call.name)) return call;
-  let args: unknown;
-  try {
-    args = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
-  } catch {
-    args = call.arguments;
-  }
+  const args = toolArguments(call.arguments) ?? call.arguments;
   return {
     ...call,
     name: "mcp_call",

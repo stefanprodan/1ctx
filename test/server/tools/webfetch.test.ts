@@ -8,6 +8,7 @@
 // suite never reaches a network; hosts are made up.
 
 import { describe, expect, test } from "bun:test";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import {
   extractHtml,
   type FetchDependencies,
@@ -16,7 +17,6 @@ import {
   parseFetchUrl,
   sliceContent,
 } from "../../../src/server/tools/builtin/webfetch.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type {
   ToolBudget,
   ToolContext,

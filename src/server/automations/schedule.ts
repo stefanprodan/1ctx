@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { MAX_SCHEDULE, MAX_TZ } from "../../shared/words.ts";
+import { MINUTE_MS } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const MIN_GAP_MINUTES = 5;
@@ -85,7 +86,7 @@ export function nextFire(schedule: string, tz: string, from: number): number {
   if (date === null) throw new BadRequest("schedule never fires");
   if (date.getTime() > from) return date.getTime();
   try {
-    date = Bun.cron.parse(schedule, from + 60_000, { tz });
+    date = Bun.cron.parse(schedule, from + MINUTE_MS, { tz });
   } catch {
     throw new BadRequest("invalid schedule");
   }

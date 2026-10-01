@@ -11,7 +11,7 @@ import {
   DECIDER_WIRES,
 } from "../../shared/contracts/decider.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import type { ProviderRow } from "./store.ts";
@@ -19,7 +19,7 @@ import { CatalogError, type Fetcher } from "./types.ts";
 
 export { CatalogError, type Fetcher } from "./types.ts";
 
-export const CATALOG_TTL_MS = 60 * 60 * 1000;
+export const CATALOG_TTL_MS = HOUR_MS;
 export const CATALOG_TIMEOUT_MS = 10_000;
 export const SEARCH_LIMIT = 20;
 // more than a catalog: what is dropped unread past it

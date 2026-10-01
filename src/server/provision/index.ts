@@ -14,18 +14,9 @@ import {
 } from "./parse.ts";
 
 export { readSources } from "./input.ts";
-export {
-  type InventorySources,
-  inventoryOf,
-  projectDocsOf,
-} from "./inventory.ts";
+export { inventoryOf, projectDocsOf } from "./inventory.ts";
 export { loadKnowledge } from "./knowledge.ts";
-export {
-  type CredentialsView,
-  type Document,
-  type Inventory,
-  parse,
-} from "./parse.ts";
+export { type Document, type Inventory, parse } from "./parse.ts";
 
 export type ProvisionDeps = {
   handle: Handle;

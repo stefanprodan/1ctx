@@ -9,6 +9,7 @@
 // cached prefix.
 
 import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
+import { toolArguments } from "../../shared/contracts/tool.ts";
 import type { Offered } from "../tools/index.ts";
 
 export const TRACE_HEADING = "Calls in this turn, results not included:";
@@ -78,20 +79,9 @@ export function traceCalls(rows: readonly Message[]): TraceCall[] {
 
 const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
-function parsed(text: string): Record<string, unknown> | null {
-  try {
-    const value = JSON.parse(text === "" ? "{}" : text);
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 // a catalog call names the MCP tool and carries its arguments inside
 function unwrapped(text: string): Pick<TraceCall, "name" | "arguments"> {
-  const args = parsed(text);
+  const args = toolArguments(text);
   if (args === null || typeof args.name !== "string") {
     return { name: "mcp_call", arguments: text };
   }
@@ -118,7 +108,7 @@ const text = (args: Record<string, unknown>, key: string) =>
 // loaded, which a summoned agent may lack; a memory edit by its action
 // and topic, never its text, so none when its arguments do not parse
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
-  const args = parsed(call.arguments);
+  const args = toolArguments(call.arguments);
   if (args === null) {
     return call.name === "memory_edit" ? "" : flat(call.arguments);
   }
@@ -170,7 +160,7 @@ function foreign(
 ): boolean {
   if (call.name.startsWith("mcp__")) return !yours.mcp.has(call.name);
   if (call.name !== "skill" && call.name !== "skill_file") return false;
-  return !yours.skills.has(text(parsed(call.arguments) ?? {}, "name"));
+  return !yours.skills.has(text(toolArguments(call.arguments) ?? {}, "name"));
 }
 
 export const NOT_YOURS = " (not your tool)";

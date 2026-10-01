@@ -7,8 +7,7 @@
 // holds an admin to, its unit and its scope.
 // The code owns the defaults; a row in the limits table is an override
 // alone, so a default that changes in code changes for every server
-// that never overrode it. runner/limits.ts and tools/limits.ts re-export
-// from here, so tools/ never imports runner/.
+// that never overrode it.
 
 import type { LimitName, LimitScope, LimitUnit } from "../../shared/words.ts";
 

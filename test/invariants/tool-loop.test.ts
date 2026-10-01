@@ -10,8 +10,8 @@
 // the round numbers, the tool rows, the counters and the terminal cause.
 
 import { describe, expect, test } from "bun:test";
+import { LOOP_LIMITS } from "../../src/server/limits/index.ts";
 import { LOOP_LINE } from "../../src/server/runner/context.ts";
-import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
 import {
   NOT_RUN_LOOP,
   NOT_RUN_REPEAT,

@@ -11,6 +11,7 @@ import type {
   UsageResponse,
   UsageRow,
 } from "../../shared/api/admin.ts";
+import { DAY_MS } from "../lib/clock.ts";
 import {
   type DecisionSums,
   daysWindow,
@@ -29,8 +30,6 @@ import { SLOT_MS } from "./range.ts";
 const TOP = 10;
 
 type Instance = Pick<OverviewResponse["instance"], "version" | "startedAt">;
-
-const DAY_MS = 86_400_000;
 
 export const daysOf = (
   now: number,

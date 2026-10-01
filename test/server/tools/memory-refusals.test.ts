@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { memoryChars } from "../../../src/shared/memory.ts";
 import { area, context, now, task } from "./memory.helpers.ts";
 

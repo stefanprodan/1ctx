@@ -55,7 +55,6 @@ const MONTHS = [
   "Nov",
   "Dec",
 ];
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // "19 Sep", the same in every browser (Chrome's en-GB says "Sept")
 export function dayMonth(ms: number): string {
@@ -66,11 +65,6 @@ export function dayMonth(ms: number): string {
 // "19 Sep 2027"
 export function dayMonthYear(ms: number): string {
   return `${dayMonth(ms)} ${new Date(ms).getFullYear()}`;
-}
-
-// "Sat 19 Sep"
-export function weekdayDayMonth(ms: number): string {
-  return `${WEEKDAYS[new Date(ms).getDay()]} ${dayMonth(ms)}`;
 }
 
 const DAY = 86_400_000;

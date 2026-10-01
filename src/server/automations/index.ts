@@ -17,19 +17,7 @@ import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
 import { AutomationStore } from "./store.ts";
 
-export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
-export {
-  checkSchedule,
-  MIN_GAP_MINUTES,
-  nextFire,
-  nextFires,
-} from "./schedule.ts";
-export { type Scheduler, scheduler } from "./scheduler.ts";
-export {
-  type AutomationFields,
-  AutomationStore,
-  MAX_AUTOMATIONS_PER_PROJECT,
-} from "./store.ts";
+export { checkSchedule, nextFire, nextFires } from "./schedule.ts";
 
 export type AutomationsDeps = {
   db: Db;

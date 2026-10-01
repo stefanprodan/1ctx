@@ -16,6 +16,7 @@ import type {
 } from "../../shared/api/mcp.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
+import { toolArguments } from "../../shared/contracts/tool.ts";
 import { splitWireName } from "../../shared/mcp.ts";
 import { SKILL_TOOLS } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -235,15 +236,9 @@ export function skillLoads(db: Db, since: number, until: number): SkillLoads {
 }
 
 function callArgs(text: string | null): { name: string; path: string } | null {
-  if (text === null) return null;
-  let args: unknown;
-  try {
-    args = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  if (typeof args !== "object" || args === null) return null;
-  const { name, path } = args as Record<string, unknown>;
+  const args = text === null ? null : toolArguments(text);
+  if (args === null) return null;
+  const { name, path } = args;
   if (typeof name !== "string" || name === "") return null;
   return { name, path: typeof path === "string" ? path : "" };
 }

@@ -50,10 +50,8 @@ export {
 } from "./project-agents.ts";
 export { createSession, sending, stopSession } from "./session-start.ts";
 export {
-  loadOpened,
   loadToolResult,
   loadVisual,
-  openedFiles,
   retrying,
   toolResults,
   toolVisuals,
@@ -204,7 +202,11 @@ export function take(detail: SessionDetail): void {
 
 // a send of any kind answers the detail; the flips the person made ride
 // on the two kinds that take them and are forgotten once taken
-async function post(id: string, path: string, body?: object): Promise<void> {
+async function post(
+  id: string,
+  path: string,
+  body?: RegenerateRequest,
+): Promise<void> {
   sending.value = true;
   try {
     const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
@@ -218,7 +220,7 @@ async function post(id: string, path: string, body?: object): Promise<void> {
 
 // the last turn goes and its user message is sent again
 export const regenerateSession = (id: string): Promise<void> =>
-  post(id, "regenerate", changeOf(id) satisfies RegenerateRequest);
+  post(id, "regenerate", changeOf(id));
 
 // a summary round on its own; the next reply starts from the summary
 export const compactSession = (id: string) => post(id, "compact");

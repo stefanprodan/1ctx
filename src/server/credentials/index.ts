@@ -15,7 +15,6 @@ import { type ProjectsPort, routes, teamName } from "./routes.ts";
 import { type CredentialRow, CredentialStore } from "./store.ts";
 
 export {
-  type Checked,
   checkHeaderName,
   checkTemplate,
   headerValue,
@@ -23,14 +22,7 @@ export {
   normalizePrefix,
   prefixesOverlap,
 } from "./check.ts";
-export {
-  httpKeys,
-  type KeyPort,
-  type KeyRead,
-  keyState,
-  MAX_KEY_FILE_BYTES,
-  readKey,
-} from "./key.ts";
+export { httpKeys, type KeyRead, MAX_KEY_FILE_BYTES, readKey } from "./key.ts";
 export {
   parseHeader,
   parseKeyName,
@@ -38,12 +30,7 @@ export {
   parsePrefix,
   parseTemplate,
 } from "./parse.ts";
-export { type ProjectsPort, summary } from "./routes.ts";
-export {
-  type CredentialFields,
-  type CredentialRow,
-  CredentialStore,
-} from "./store.ts";
+export { type CredentialRow, CredentialStore } from "./store.ts";
 
 export type CredentialsDeps = {
   db: Db;
