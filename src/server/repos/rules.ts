@@ -11,8 +11,10 @@ export const DEFAULT_IGNORE: readonly string[] = (
   "*.woff *.woff2 *.ttf *.zip *.tar.gz *.tgz *.jar"
 ).split(" ");
 
-export const MAX_IGNORE_LINES = 200;
-export const MAX_IGNORE_BYTES = 8 * 1024;
+import {
+  MAX_REPO_IGNORE_BYTES as MAX_IGNORE_BYTES,
+  MAX_REPO_IGNORE_LINES as MAX_IGNORE_LINES,
+} from "../../shared/contracts/repo.ts";
 
 export interface IgnorePattern {
   /** the pattern as bytes, without its `!`, leading `/` and trailing `/` */

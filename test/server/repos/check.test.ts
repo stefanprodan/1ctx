@@ -73,6 +73,13 @@ describe("the repository parsers", () => {
     );
     expect(words(() => parseIgnoreText(3))).toBe("ignore must be text");
   });
+
+  test("a bad ignore line is refused by its number", () => {
+    expect(words(() => parseIgnoreText("dist/\n[abc\n"))).toBe(
+      "ignore line 2: unclosed [",
+    );
+    expect(parseIgnoreText("/*\n!/charts/\n")).toBe("/*\n!/charts/\n");
+  });
 });
 
 describe("the row a change asks for", () => {

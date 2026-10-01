@@ -23,6 +23,7 @@ import {
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { type Checked, checkRef, normalizeUrl } from "./adapters.ts";
+import { parseIgnore } from "./rules.ts";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
@@ -62,9 +63,11 @@ export function parseCredentialId(value: unknown): string | null {
   return value;
 }
 
-// the line-by-line syntax check, until the ignore matcher lands
 function checkIgnoreSyntax(text: string): Checked<string> {
-  return { ok: true, value: text };
+  const parsed = parseIgnore(text);
+  return parsed.ok
+    ? { ok: true, value: text }
+    : { ok: false, error: `ignore line ${parsed.line}: ${parsed.reason}` };
 }
 
 // .gitignore text: at most MAX_REPO_IGNORE_LINES lines and
