@@ -162,9 +162,9 @@ of that shell that shows a file on the chat page.
 
 - **A send's repositories come in its caps.** The runner looks them up
   once before the first round (`docs/repos.md`) and hands every command
-  of the send the same list: name, the tree's folder, kept files and
-  bytes and folders. The worker takes a folder only from the job, never from a
-  command.
+  of the send the same list: name, the tree's folder, kept files,
+  bytes and folders. The worker takes a folder only from the job, never
+  from a command.
 - **Each is a read-only `OverlayFs` at `/repos/<name>`** over the
   command's `InMemoryFs`, through a `MountableFs`, `allowSymlinks` on,
   `maxFileReadSize` at `repoFileBytes`, so a larger file is listed and

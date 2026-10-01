@@ -540,10 +540,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
   if (options.activate !== false) {
     await users.bootstrap();
     repaired = sessions.repair();
+    // before the queue, so a resumed send never sees a tree the cache drops
+    repoCache = repos.start();
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
-    repoCache = repos.start();
   }
   const routes: RouteDescriptor[] = [
     ...users.routes,

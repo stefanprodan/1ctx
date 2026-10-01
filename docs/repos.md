@@ -25,11 +25,13 @@ call them are in `docs/access.md`.
   letters, digits, `.`, `_` and `-`, never a leading dash, so no URL
   built from it carries an escape it did not make itself.
 - **A ref is a branch, a tag or a commit**, empty for the default
-  branch, by `checkRef()`. A 40 or 64 hex ref is a commit (`isCommit()`).
+  branch, by `checkRef()`. A 40 or 64 hex ref is a commit
+  (`isCommit()`).
 - **Ignore rules are `.gitignore` text,** at most
-  `MAX_REPO_IGNORE_LINES` lines and `MAX_REPO_IGNORE_BYTES` bytes. A line
-  git could never match, or with more than 8 `**`, is a 400 naming the
-  line: past that many, wildmatch (git's too) backtracks for minutes.
+  `MAX_REPO_IGNORE_LINES` lines and `MAX_REPO_IGNORE_BYTES` bytes. A
+  line git could never match, or with more than 8 `**`, is a 400 naming
+  the line: past that many, wildmatch (git's too) backtracks for
+  minutes.
   The fetch matches each path and its parent folders while unpacking.
 - **A change to the URL, kind, ref, credential or ignore rules sets the
   row `pending` and clears its error.** A rename does not; a refresh
@@ -215,9 +217,9 @@ start answers `{ mounts, notices, release }`:
   mounted repository (`repoLine()`), `, some paths ignored` when the
   rules kept a file out. A repository at another commit than the
   newest earlier turn of the chat that mounted it gets `repo <name>:
-  <ref> moved from <a> to <b>` in the system prompt, that send only. A repository off that an
-  earlier turn of the chat mounted gets `reposOffLine()`; one never
-  mounted is not named.
+  <ref> moved from <a> to <b>` in the system prompt, that send only.
+  A repository off that an earlier turn of the chat mounted gets
+  `reposOffLine()`; one never mounted is not named.
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 
