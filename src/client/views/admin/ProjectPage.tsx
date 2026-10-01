@@ -41,6 +41,7 @@ import {
 } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
+import { Repos } from "../projects/Repos.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import {
   DESCRIPTION_PLACEHOLDER,
@@ -123,6 +124,7 @@ function Body({ project }: { project: ProjectDetail }) {
     <SettingStack>
       <AboutCard project={project} saving={saving} />
       <MembersCard project={project} saving={saving} />
+      <Repos projectId={project.id} personal={false} />
       <SettingDelete
         title={`Delete ${project.name}`}
         line={deleteLine(project)}

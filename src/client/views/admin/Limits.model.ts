@@ -183,11 +183,11 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     text: "Days an archived chat is kept.",
   },
   repoBytes: {
-    label: "Repository size",
-    text: "The files one repository may keep.",
+    label: "Size",
+    text: "The files one repository keeps together.",
   },
   repoFiles: {
-    label: "Repository files",
+    label: "Files",
     text: "Files one repository may keep.",
   },
   repoFileBytes: {
@@ -196,7 +196,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   repoCacheBytes: {
     label: "Cache size",
-    text: "Every repository tree on disk together.",
+    text: "Every repository's files on disk together.",
   },
 };
 

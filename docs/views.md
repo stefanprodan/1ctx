@@ -137,6 +137,19 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted; the client never counts tokens.
 
+## Repositories
+
+- **One `views/projects/Repos.tsx` draws both lists:** the team
+  project's card on its admin page and the personal project's section
+  on its Settings tab. `personal` picks the routes in `data/repos.ts`
+  and leaves out the credential and the kind.
+- **A row's state is read again while it waits or fetches.** No frame
+  says a fetch ended, so `watchRepos()` reads the list every
+  `REPO_POLL_MS` while a row is pending or fetching and the tab is
+  seen, and stops once every row settled.
+- **A change sends only what changed** (`patchBody()`): a rename alone
+  never fetches the tree again.
+
 ## Knowledge
 
 - **A run's write lands on the open tab.** `data/knowledge.ts` applies

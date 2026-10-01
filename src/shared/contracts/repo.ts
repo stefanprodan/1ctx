@@ -10,6 +10,11 @@ export const MAX_REPO_REF = 200;
 // the ignore rules, in .gitignore format
 export const MAX_REPO_IGNORE_LINES = 200;
 export const MAX_REPO_IGNORE_BYTES = 8 * 1024;
+// what an empty ignore text stands for: files an agent never reads
+export const DEFAULT_REPO_IGNORE: readonly string[] = (
+  "*.png *.jpg *.jpeg *.gif *.ico *.webp *.mp4 *.mov *.mp3 " +
+  "*.woff *.woff2 *.ttf *.zip *.tar.gz *.tgz *.jar"
+).split(" ");
 
 // the hosts a member may add to their personal project, each its kind
 export const PUBLIC_REPO_HOSTS = {

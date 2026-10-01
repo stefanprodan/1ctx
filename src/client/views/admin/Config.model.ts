@@ -111,7 +111,7 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
   },
   {
     title: "Repositories",
-    line: "Trees fetched for bash, one by one and on disk together.",
+    line: "Files kept from each repository for bash.",
     names: ["repoBytes", "repoFiles", "repoFileBytes", "repoCacheBytes"],
   },
 ];

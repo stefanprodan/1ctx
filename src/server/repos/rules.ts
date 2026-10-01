@@ -5,16 +5,13 @@
 // ported from git's dir.c and wildmatch.c so every answer is git's.
 // Patterns and paths are matched as UTF-8 bytes, as git matches them.
 
-/** The rules an empty ignore text stands for: what an agent never reads. */
-export const DEFAULT_IGNORE: readonly string[] = (
-  "*.png *.jpg *.jpeg *.gif *.ico *.webp *.mp4 *.mov *.mp3 " +
-  "*.woff *.woff2 *.ttf *.zip *.tar.gz *.tgz *.jar"
-).split(" ");
-
 import {
+  DEFAULT_REPO_IGNORE as DEFAULT_IGNORE,
   MAX_REPO_IGNORE_BYTES as MAX_IGNORE_BYTES,
   MAX_REPO_IGNORE_LINES as MAX_IGNORE_LINES,
 } from "../../shared/contracts/repo.ts";
+
+export { DEFAULT_IGNORE };
 
 export interface IgnorePattern {
   /** the pattern as bytes, without its `!`, leading `/` and trailing `/` */

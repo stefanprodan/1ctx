@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A personal project's Settings tab, laid out as the profile: its owner
-// describes it, and its name is always personal. A team project is an
+// describes it and adds public repositories, and its name is always
+// personal. A team project is an
 // admin's to change, on the admin page.
 
 import { useSignal } from "@preact/signals";
@@ -14,6 +15,7 @@ import { Foot } from "../../ui/Foot.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
 import { Frame } from "./Frame.tsx";
 import { DescriptionField } from "./ProjectFields.tsx";
+import { Repos } from "./Repos.tsx";
 
 function SettingsForm({ project }: { project: ProjectDetail }) {
   const description = useSignal(project.description);
@@ -64,6 +66,9 @@ export function Settings({ params }: { params: Params }) {
               <SettingsForm key={shown.id} project={shown} />
             )}
           </Section>
+          {shown.kind === "personal" && (
+            <Repos key={shown.id} projectId={shown.id} personal />
+          )}
         </div>
       )}
     </Frame>

@@ -64,6 +64,7 @@ import {
   loadProviderUsage,
   providers,
 } from "../data/providers.ts";
+import { loadRepos } from "../data/repos.ts";
 import {
   homeProjectId,
   loadList,
@@ -428,7 +429,9 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Settings",
     role: "authenticated",
-    load: framed,
+    load: async (params) => {
+      await Promise.all([...frame(params.id), loadRepos(params.id)]);
+    },
   },
   {
     path: "/chat/:id",
@@ -526,6 +529,8 @@ export const ROUTES: Route[] = [
         loadUsers(),
         loadAdminProject(params.id),
         loadProjectUsage(params.id),
+        loadRepos(params.id),
+        loadCredentials(),
       ]);
     },
   },
