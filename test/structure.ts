@@ -8,8 +8,9 @@
 // resolver so index files and tsconfig paths behave as the bundler sees
 // them; CSS is read declaration by declaration, not line by line.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, relative, sep } from "node:path";
+import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
 
 // the layer order: a server area may import only areas above it
 export const LAYERS = [
@@ -43,6 +44,9 @@ export const LAYERS = [
 ] as const;
 
 export const MAX_LINES = 500;
+
+// every agent reads AGENTS.md and the docs a change touches whole
+export const MAX_DOC_TOKENS = 5000;
 
 // workers whose runtime graph may reach the database or an area's
 // index.ts, with the reason
@@ -667,6 +671,34 @@ export function networkCheck(testDir: string): Violation[] {
       if (code.includes(host)) {
         out.push({ file: rel, rule: "network", detail: `names ${host}` });
       }
+    }
+  }
+  return out;
+}
+
+// AGENTS.md and every docs/*.md under the root stay under
+// MAX_DOC_TOKENS, counted with the server's tokenizer
+export function docsCheck(root: string): Violation[] {
+  const docs = join(root, "docs");
+  const files = [
+    "AGENTS.md",
+    ...(existsSync(docs)
+      ? readdirSync(docs)
+          .filter((name) => name.endsWith(".md"))
+          .map((name) => join("docs", name))
+      : []),
+  ];
+  const out: Violation[] = [];
+  for (const rel of files) {
+    const path = join(root, rel);
+    if (!existsSync(path)) continue;
+    const count = countTokens(readFileSync(path, "utf8"));
+    if (count > MAX_DOC_TOKENS) {
+      out.push({
+        file: rel,
+        rule: "docs",
+        detail: `${count} tokens, over ${MAX_DOC_TOKENS}`,
+      });
     }
   }
   return out;

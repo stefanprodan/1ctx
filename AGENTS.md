@@ -169,6 +169,9 @@ fixture under `test/fixtures/structure/`.
   only from `tokens.css`: never a literal anywhere else, CSS or TSX, a
   `var()` fallback included (`LITERAL_EXEMPTIONS` lists the exceptions).
 - No test names a real provider host; the suite never reaches a network.
+- `AGENTS.md` and each `docs/*.md` stay under `MAX_DOC_TOKENS` (5,000
+  o200k tokens). A doc near the cap is cut, or split by topic with a
+  row in the Docs table, never trimmed of a rule to fit.
 
 ## Rules the code follows
 

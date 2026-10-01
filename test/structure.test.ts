@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { check, networkCheck } from "./structure.ts";
+import { check, docsCheck, networkCheck } from "./structure.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const FIXTURES = join(import.meta.dir, "fixtures", "structure");
@@ -21,6 +21,10 @@ describe("the layout", () => {
     expect(networkCheck(import.meta.dir)).toEqual([]);
   });
 
+  test("no doc is over the token cap", () => {
+    expect(docsCheck(ROOT)).toEqual([]);
+  });
+
   test("a visual palette belongs only to visual-theme.ts", () => {
     expect(
       check(join(FIXTURES, "tokens-visual-shell")).map((v) => v.file),
@@ -32,7 +36,11 @@ describe("the layout", () => {
     test(`fixture ${name} is rejected for ${rule}`, () => {
       const dir = join(FIXTURES, name);
       const violations =
-        rule === "network" ? networkCheck(join(dir, "test")) : check(dir);
+        rule === "network"
+          ? networkCheck(join(dir, "test"))
+          : rule === "docs"
+            ? docsCheck(dir)
+            : check(dir);
       // rejected for that rule and nothing else, so a fixture cannot
       // pass by accident
       expect(violations.length).toBeGreaterThan(0);
