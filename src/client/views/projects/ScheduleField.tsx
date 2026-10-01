@@ -13,6 +13,7 @@ import { MAX_SCHEDULE } from "../../../shared/words.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
 import { sentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { useDayTurn } from "../../lib/now.ts";
 import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
@@ -74,6 +75,8 @@ export function ScheduleField({
     preview.value?.key === previewKey(projectId, expression, tz)
       ? preview.value
       : null;
+  // today and tomorrow in the next run's words move at midnight
+  useDayTurn(tz);
   const now = Date.now();
   // the last fires stay on the strip while the next reading is asked,
   // so it does not blink at every keystroke; a refusal clears them

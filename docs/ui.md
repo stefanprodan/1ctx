@@ -81,7 +81,9 @@ client change. What each page draws is in `docs/views.md`.
   `share()`, `uploadNote()` (an uploaded item's files or size) and
   `sinceLine()` (a row's "since" date).
 - **A ticking clock is `useNow(ms)`** from `lib/now.ts`, null to hold
-  it still; a view never runs its own interval for "ago" words. The
+  it still; a view never runs its own interval for "ago" words. Words
+  that name the day (today, tomorrow) on a view that may stay open
+  redraw at midnight in their zone through `useDayTurn(tz)`. The
   transcript's live labels tick through `useTick()` in
   `transcript/fold.ts`.
 - **A name is a link** to its page wherever it is drawn, except inside a
