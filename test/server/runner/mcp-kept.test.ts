@@ -6,9 +6,19 @@
 // with it, and a bash command of the next round reads the file.
 
 import { expect, test } from "bun:test";
+import {
+  type KeptFile,
+  writeKeptFiles,
+} from "../../../src/server/bash/index.ts";
 import { settleRun } from "../../helpers/automations.ts";
-import { chatApp, startChat, waitScript } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  setLimits,
+  startChat,
+  waitScript,
+} from "../../helpers/chat.ts";
 import { mcpFetch } from "../mcp/fake.ts";
+import { close, finish, send, stage, start } from "./uploads-helpers.ts";
 
 const manifests = Array.from(
   { length: 4000 },
@@ -140,4 +150,54 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
     chat.app.db.query("select count(*) as n from mcp_kept_files").get(),
   ).toEqual({ n: 0 });
   expect(chat.app.bash.startKept(first.sessionId, null).next).toBe(2);
+});
+
+test("a refused start keeps the kept files it would have trimmed", async () => {
+  const chat = await chatApp();
+  try {
+    await setLimits(chat, { mcpKeptFiles: 10 });
+    const old = await stage(chat, "docs", "root file");
+    const started = await start(chat, [old.id]);
+    await finish(chat, started.sessionId, started.script);
+    const reply = chat.app.sessions
+      .messages(started.sessionId)
+      .find((row) => row.kind !== "user")!;
+    const file = (folder: number, name: string): KeptFile => ({
+      folder,
+      dir: `${String(folder).padStart(4, "0")}-get`,
+      name,
+      text: "kept",
+      data: null,
+      bytes: 4,
+    });
+    writeKeptFiles(chat.app.db, reply.id, [
+      ...Array.from({ length: 10 }, (_, i) => file(1, `part-${i}.txt`)),
+      file(2, "result.txt"),
+    ]);
+    const count = () =>
+      chat.app.db
+        .query<{ n: number }, [string]>(
+          "select count(*) as n from mcp_kept_files where session_id = ?",
+        )
+        .get(started.sessionId)!.n;
+
+    const clash = await stage(
+      chat,
+      "docs.tar",
+      await new Bun.Archive({ "readme.md": "nested" }).bytes(),
+    );
+    const refused = await chat.member.call(
+      "POST",
+      `/api/sessions/${started.sessionId}/messages`,
+      { body: { message: "read", uploads: [clash.id] } },
+    );
+    expect(refused.status).toBe(409);
+    expect(count()).toBe(11);
+
+    const next = await send(chat, started.sessionId);
+    expect(count()).toBe(1);
+    await finish(chat, started.sessionId, next.script);
+  } finally {
+    await close(chat);
+  }
 });

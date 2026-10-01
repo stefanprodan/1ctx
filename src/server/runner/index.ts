@@ -214,6 +214,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     const op: SendOp =
       event !== null ? "run" : "existing" in turn ? "regenerate" : "message";
     return prepareSend({
+      db: deps.db,
       registry,
       startedBy: event?.source === "schedule" ? null : user.id,
       wake: deps.wake,
