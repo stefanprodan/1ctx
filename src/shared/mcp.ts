@@ -11,7 +11,7 @@
 
 import type { AgentServer } from "./contracts/mcp.ts";
 import { escapeText } from "./skills.ts";
-import type { McpMode } from "./words.ts";
+import { isRecord, type McpMode } from "./words.ts";
 
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export const WIRE_PREFIX = "mcp__";
@@ -154,10 +154,6 @@ const SCHEMA_ONES = new Set([
   "unevaluatedProperties",
   "unevaluatedItems",
 ]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolveRef(root: unknown, ref: string): unknown {
   if (!ref.startsWith("#/")) return undefined;

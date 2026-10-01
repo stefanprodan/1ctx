@@ -17,6 +17,7 @@
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { toolArguments } from "../../shared/contracts/tool.ts";
 import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
 import { EFFORTS, type Effort, type Wire } from "../../shared/words.ts";
 import { tokens } from "../lib/tokens.ts";
@@ -210,20 +211,11 @@ function loadedSkills(
     if (row.status !== "done" || row.toolName !== "skill") continue;
     const call = calls.get(key)?.[index];
     if (call?.id !== row.toolCallId || call.name !== "skill") continue;
-    try {
-      const args = JSON.parse(call.arguments || "{}") as Record<
-        string,
-        unknown
-      >;
-      if (
-        typeof args.name === "string" &&
-        offered.has(args.name) &&
-        !seen.has(args.name)
-      ) {
-        seen.add(args.name);
-        names.push(args.name);
-      }
-    } catch {}
+    const name = toolArguments(call.arguments)?.name;
+    if (typeof name === "string" && offered.has(name) && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
   }
   return names;
 }

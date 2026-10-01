@@ -5,7 +5,8 @@
 // Nothing here reads a key file or reaches the network; the area passes
 // the key, the version and the deadline, the caller does the request.
 
-import { formatHits, isObject, jsonObject, unexpected } from "./answer.ts";
+import { isRecord } from "../../../../shared/words.ts";
+import { formatHits, jsonObject, unexpected } from "./answer.ts";
 import {
   ProviderError,
   type ProviderRequest,
@@ -50,6 +51,6 @@ export function parseAnswer(body: string): string {
     }
     return unexpected();
   }
-  if (!isObject(answer.data)) return unexpected();
+  if (!isRecord(answer.data)) return unexpected();
   return formatHits(answer.data.web, "description");
 }

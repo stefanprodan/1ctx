@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Message } from "../../shared/contracts/session.ts";
-import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { type ToolCall, toolArguments } from "../../shared/contracts/tool.ts";
 import { splitWireName } from "../../shared/mcp.ts";
 import { secs } from "./stream.ts";
 
@@ -21,14 +21,9 @@ export function ranCall(call: ToolCall, result: Message | null): ToolCall {
   if (name === call.name || call.name !== "mcp_call") {
     return { ...call, name };
   }
-  try {
-    const inner = (
-      JSON.parse(call.arguments || "{}") as Record<string, unknown>
-    ).arguments;
-    return { ...call, name, arguments: JSON.stringify(inner ?? {}) };
-  } catch {
-    return { ...call, name };
-  }
+  const args = toolArguments(call.arguments);
+  if (args === null) return { ...call, name };
+  return { ...call, name, arguments: JSON.stringify(args.arguments ?? {}) };
 }
 
 // Keep MCP folds readable by naming the server before the tool.
@@ -42,8 +37,9 @@ export function toolLabel(name: string): {
 }
 
 export function shortArg(name: string, args: string): string {
+  const value = toolArguments(args);
+  if (value === null) return "";
   try {
-    const value = JSON.parse(args || "{}") as Record<string, unknown>;
     if (name === "webfetch" && typeof value.url === "string") {
       const url = new URL(value.url);
       return url.host + (url.pathname === "/" ? "" : url.pathname);

@@ -8,7 +8,12 @@
 // providers type re-exports ToolCall, so the runner and the browser
 // name one shape.
 
-import type { BuiltinTool, SearchProvider, WebTool } from "../words.ts";
+import {
+  type BuiltinTool,
+  isRecord,
+  type SearchProvider,
+  type WebTool,
+} from "../words.ts";
 
 export const DEFAULT_VISUAL_HOSTS = [
   "https://cdn.jsdelivr.net",
@@ -29,6 +34,28 @@ export type ToolCall = {
   // never shown
   signature?: string;
 };
+
+export type ParsedArguments =
+  | { ok: true; args: Record<string, unknown> }
+  | { ok: false; reason: "json" | "object" };
+
+// a call's arguments as an object; a call with none may stream ""
+export function parseArguments(text: string): ParsedArguments {
+  let value: unknown;
+  try {
+    value = JSON.parse(text === "" ? "{}" : text);
+  } catch {
+    return { ok: false, reason: "json" };
+  }
+  return isRecord(value)
+    ? { ok: true, args: value }
+    : { ok: false, reason: "object" };
+}
+
+export function toolArguments(text: string): Record<string, unknown> | null {
+  const parsed = parseArguments(text);
+  return parsed.ok ? parsed.args : null;
+}
 
 // when a send carries a built-in: always, when the agent has skills,
 // when one of them has files, when MCP runs as a catalog, in every chat

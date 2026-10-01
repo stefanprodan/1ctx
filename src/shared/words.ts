@@ -4,6 +4,11 @@
 // The domain's enums as const arrays and their guards. Environment
 // neutral: no Bun, no DOM, no packages.
 
+// a JSON object: not null and not an array
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export const ROLES = ["admin", "member"] as const;
 export type Role = (typeof ROLES)[number];
 export function isRole(value: unknown): value is Role {
