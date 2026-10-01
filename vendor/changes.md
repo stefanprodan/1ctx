@@ -5,86 +5,6 @@ says how an entry is written and kept, and how a sync uses them. Paths
 in `Files` are full paths from `vendor/just-bash/`, those in `Tests`
 from the repository root.
 
-## Security
-
-### defense-descriptor: the box installs a patch as a data descriptor
-Files: `src/security/defense-in-depth-box.ts`
-Upstream: not reported
-Tests: `test/vendor/just-bash/defense-in-depth.test.ts`
-
-Now: `withValue()` installs a patched value as a data descriptor, never
-with a `get` or `set` beside `value`, where upstream spreads the
-descriptor. On Bun 1.4.2 both callers pass only data descriptors (the
-Module branch runs only for a `value`, the freeze branch patches
-`Reflect`, `JSON` and `Math`), so either side is safe at the 3.5.0 sync.
-
-Before: before #443 the accessor `Module._resolveFilename` went through
-it, and the spread made `defineProperty` throw, so every critical patch
-failed and `defenseInDepth: true` refused to run.
-
-### module-accessors: Module accessors patched through their own setter
-Files: `src/security/defense-in-depth-box.ts`,
-  `src/security/worker-defense-in-depth.ts`, upstream's
-  `src/security/module-accessor-descriptors.bun.test.ts`
-Upstream: ported from #443
-Tests: `test/vendor/just-bash/defense-in-depth.test.ts`,
-  `vendor/just-bash/src/security/module-accessor-descriptors.bun.test.ts`
-
-Now: upstream #443, ported ahead of the sync. `Module._load` and
-`Module._resolveFilename` reported as accessors are installed through
-their own setter with a guarded get and set in front; a set during a
-command is blocked as a call is, a set in audit mode is recorded and
-wrapped, and teardown resets the native slot through the original setter
-before the descriptors are restored. `require()` inside a command throws
-`module_resolve_filename`, so a package a command initialises outside a
-registry load or `runTrustedAsync` throws in the binary, where Bun
-bundles CommonJS with a real `require`. Upstream's
-`WorkerDefenseInDepth` suite passes. Take theirs at the 3.5.0 sync.
-
-Before: on Bun 1.4.2 `_resolveFilename` is an accessor whose native slot
-only its setter writes, so our data property installed, reported no
-failure and blocked nothing: `require()` inside a command loaded
-anything. The worker box, which we never start, failed its critical
-patch on Bun, so upstream's `WorkerDefenseInDepth` suite failed.
-
-### trusted-async-value: runTrustedAsync returns the awaited value
-Files: `src/security/defense-in-depth-box.ts`
-Upstream: ported from #503
-Tests: `test/vendor/just-bash/defense-in-depth.test.ts`
-
-Now: upstream #503, ported ahead of the sync: `runTrustedAsync` returns
-the awaited value, not the promise. Its other half is in the worker
-bridge we removed. Take theirs at the 3.5.0 sync.
-
-Before: adopting the promise went through the box's patched
-`Promise.prototype.then`, which drops callbacks once the execution is
-deactivated, so host work settling after a cancel lost its value and
-left its rejection unhandled.
-
-### cancel-load: a cancelled invocation stops waiting for a module load
-Files: `src/abort-signals.ts`, `src/commands/registry.ts`,
-  `src/custom-commands.ts`, `src/security/trusted-globals.ts`,
-  `src/security/defense-in-depth-box.ts`,
-  `src/test-utils/unhandled-rejections.ts` (new), upstream's
-  `src/commands/timeout/timeout.resolve-cancellation.test.ts`,
-  `src/custom-command-lazy-load.test.ts`,
-  `src/security/defense-in-depth-trusted-scope.test.ts`
-Upstream: ported from #506
-Tests: `test/vendor/just-bash/defense-in-depth.test.ts`,
-  `vendor/just-bash/src/commands/timeout/timeout.resolve-cancellation.test.ts`,
-  `vendor/just-bash/src/custom-command-lazy-load.test.ts`,
-  `vendor/just-bash/src/security/defense-in-depth-trusted-scope.test.ts`
-
-Now: upstream #506, ported ahead of the sync. A cancelled invocation
-stops waiting for its command's module load (`raceCancellation`); a
-custom command's lazy load is shared and its waiters detach, settled
-through the intrinsic `then` (`_promiseThen`); and deactivating an
-execution releases its trusted scope. Take theirs at the 3.5.0 sync.
-
-Before: `timeout` on a command still loading ended the whole script with
-`bash: execution aborted`, exit 124, since the load cannot be cancelled
-and held the invocation past the cleanup window.
-
 ## Network
 
 ### fetch: no redirect off http, and a refused body is let go
@@ -266,13 +186,15 @@ wrong byte.
 ### fs-children: a directory keeps its children, paths resolve unwalked
 Files: `src/fs/in-memory-fs/in-memory-fs.ts`, `src/commands/ls/ls.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/fs-walks.test.ts`
+Tests: `test/vendor/just-bash/fs-walks.test.ts`,
+  `test/vendor/just-bash/new-commands.test.ts`
 
 Now: the filesystem keeps each directory's child names beside its
 entries, written only through `store()` and `unstore()`, so `readdir`
 reads a directory's own children; with no symlink in the tree a path
 resolves to itself without a walk. ls keeps its output's byte count as
-it appends and checks `-R`'s subdirectories against a set.
+it appends, where upstream re-measures all it has written on each
+append (`ls -l` over 20,000 entries: 5.6 s, 81 ms with the count).
 
 Before: `readdir` scanned every path in the tree and `stat` rebuilt each
 prefix of a path, so `rm -rf`, `find` and `ls -R` cost the entries times
@@ -282,9 +204,11 @@ depth 8 and 25 s at 64; ls rescanned its whole output on every append.
 ## Every command
 
 ### version-flags: every command answers its tool's version flag
-Files: `src/commands/version.ts` (new), `src/commands/registry.ts`
+Files: `src/commands/version.ts` (new), `src/commands/registry.ts`,
+  `src/commands/mktemp/mktemp.ts`, `src/commands/yes/yes.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/fixes.test.ts`
+Tests: `test/vendor/just-bash/fixes.test.ts`,
+  `test/vendor/just-bash/new-commands.test.ts`
 
 Now: every other command whose tool has a version flag answers it before
 it loads, with that tool's first line marked `(just-bash, compatible)`
@@ -296,7 +220,11 @@ findutils 4.11.0 (`find`), tar 1.35, gzip 1.15, bash 5.3.15 (`bash`,
 asks anywhere before `--` where the tool reads options in any order, and
 first only for `env`, `timeout`, `expr`, `find`, `bash`, `sh` and `xan`.
 Commands with their own parser for it (awk, curl, diff, grep, rg, jq,
-yq, xargs) have their own entries.
+yq, xargs) have their own entries. mktemp and yes answer it in their own
+parsers, in getopt order, with coreutils 9.11's first line, so
+`--version` given as `-p`'s value, after `--`, or after a bad option is
+not asked; yes refuses a value on `--version` or `--help` as getopt
+does.
 
 Before: each was an unknown option, a missing file or an argument, where
 the tool it follows answers.
@@ -549,7 +477,7 @@ Files: `src/commands/diff/diff.ts`, `src/commands/diff/engine.ts`,
   `src/commands/diff/run.ts`, `src/commands/diff/budget.ts` and
   `src/commands/diff/text.ts` (all new, the last two moved out of
   `src/commands/diff/diff.ts` when directories came), `src/limits.ts`,
-  `src/commands/grep/grep.ts`, `package.json`, upstream's diff tests
+  `src/commands/grep/grep.ts`, `package.json`
 Upstream: not reported
 Tests: `test/vendor/just-bash/diff-engine.test.ts`,
   `test/vendor/just-bash/diff-gnu.test.ts`,
@@ -580,15 +508,14 @@ Now:
   file as empty with GNU's epoch times; exactly two operands, with GNU's
   `missing operand` and `extra operand`; a directory stands for the
   other file's namesake in it. Every refusal and trouble exits 2
-  (upstream's two tests of an unknown option now expect 2), and names in
-  messages are quoted for the shell as GNU quotes them. `-l` is refused,
-  and every form of `--color` and `--palette` is accepted and prints
-  plain text. `-v` and `--version` answer
-  `diff (GNU diffutils) 3.12 (just-bash, compatible)` and a line saying
-  what this is, exit 0.
-- **Formats.** GNU's formats. The normal format is the default
-  (upstream's tests that read unified output ask for `-u`); unified and
-  context have GNU's headers (a name quoted C-style when it holds a
+  (upstream's two tests of an unknown option, which expect 1, are in
+  the failures list), and names in messages are quoted for the shell as
+  GNU quotes them. `-l` is refused, and every form of `--color` and
+  `--palette` is accepted and prints plain text. `-v` and `--version`
+  answer `diff (GNU diffutils) 3.12 (just-bash, compatible)` and a line
+  saying what this is, exit 0.
+- **Formats.** GNU's formats. The normal format is the default; unified
+  and context have GNU's headers (a name quoted C-style when it holds a
   space, a quote or a control character, the file's time in the
   sandbox's `TZ`, stdin's the current time, `--label` and `-L` in their
   place), ranges and `\ No newline at end of file`. `-p` and `-F` print
@@ -679,7 +606,8 @@ Before: `env -- cmd` was an invalid option.
 ### find-links: find follows links under -H and -L, as GNU find
 Files: `src/commands/find/find.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/symlinks.test.ts`
+Tests: `test/vendor/just-bash/symlinks.test.ts`,
+  `test/vendor/just-bash/find-diagnostics.test.ts`
 
 Now: `-H`, `-L` and `-P` before the paths, as GNU findutils 4.11: `-P`
 (the default) never follows a link, `-H` follows the starting points,
@@ -695,6 +623,58 @@ Before: `find -L` was an unknown predicate, so a model could not search
 through linked folders; `find broken-link` was
 `No such file or directory`; and once `-L` came, a loop of links was
 listed as a broken link.
+
+### find-diagnostics: find reports failures in traversal order
+Files: `src/commands/find/find.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/find-diagnostics.test.ts`
+
+Now: built on 3.6.0's recoverable directory-read diagnostics, missing
+starting points, link errors and ancestor loops travel as ordered
+effects beside each node's actions. A read made only for a descent
+that `-prune` stops is not reported when the expression has no
+`-empty`. Traversal diagnostics use GNU findutils 4.11's C-locale path
+quoting, with escapes for apostrophes, backslashes, controls and UTF-8
+bytes. Recovery is by errno: an EACCES sandbox refusal is recoverable
+too, without exposing its message; other failures still propagate.
+
+Before: missing starting points and link failures wrote stderr before
+earlier nodes' `-exec` output. A speculative read of a directory later
+pruned could report an error GNU never meets. Directory and
+missing-path messages were unquoted, while link messages used raw
+single quotes. Upstream's comment said a filesystem policy refusal
+ended the search, where an EACCES one is recovered from.
+
+### find-path: relative and escaped path patterns match
+Files: `src/commands/find/matcher.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/find-path.test.ts`
+
+Now: both expression evaluators let a literal directory segment match
+at the beginning of a relative starting point. A pattern with a
+backslash skips the fast paths and goes through the shell pattern
+compiler, without extglobs, for GNU's escapes. Matching consumes the
+whole path, and an unpaired trailing backslash matches nothing.
+
+Before: the literal-segment check wanted a slash before the first
+segment, so `find src -path 'src/lib/*'` matched nothing. It also
+rejected escaped segments, and skipping that check alone did not help,
+because the shared command glob read backslashes literally.
+
+### find-prune: early pruning respects an OR's left branch
+Files: `src/commands/find/matcher.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/find-prune.test.ts`,
+  `test/vendor/just-bash/find-diagnostics.test.ts`
+
+Now: early evaluation takes an OR's right-hand `-prune` only when the
+left branch is known false. An unknown left branch waits for its
+directory's contents or metadata before pruning is decided.
+
+Before: early evaluation could take the right-hand prune without
+knowing the left result. That skipped the read `-empty` needed, left
+empty directories out of `-print`, hid some read errors and lost
+descendants when a metadata predicate made the left branch true.
 
 ## grep
 
@@ -828,7 +808,11 @@ Now:
   follow it, and jq 1.8's errors and answers where both tools agree and
   upstream answered null (see "The jq and yq dialects" in
   `vendor/differences.md`); an unbound variable is an error; `.a.[0]`
-  parses.
+  parses. An array's `to_entries` is upstream's, held to the element
+  limit, and `with_entries` of an array is held to it the same way,
+  entries and mapped results; the dialect's `map` over a map is held to
+  it too, and match, capture and sub limit errors exit 126 like the
+  others.
 - **mikefarah's functions.** mikefarah's functions: `documentIndex` and
   `di`, `fileIndex`, `fi` and `filename`, `to_number`, `to_string`,
   `@yaml`, `to_yaml`, `@yamld`, `from_yaml`, `@jsond`, `from_json`,
@@ -861,9 +845,8 @@ Before:
   every pair.
 - **Dialect.** where the tools part, a model got exit 0 with the wrong
   answer: `sub("-", "_")` and `select(.image == "nginx*")` answered null
-  or nothing, `type` never matched `!!str`, `keys` sorted, `to_entries`
-  of a list was null, and `.a * 2` printed null for every document
-  without `a`.
+  or nothing, `type` never matched `!!str`, `keys` sorted, and `.a * 2`
+  printed null for every document without `a`.
 - **mikefarah's functions.** models write them from mikefarah's docs,
   and each failed as an unknown function or a parse error, then changed
   nothing.
@@ -997,24 +980,33 @@ Before:
 - **eval-all.** the idioms that sort or count documents across a stream,
   or merge files, were refused with a pointer to `-s`.
 
-## ls
+## Regular expressions
 
-### ls-sort: ls -t, -S and the operand order as GNU ls
-Files: `src/commands/ls/ls.ts`, `src/commands/find/find.exec.test.ts`
+### regex-cache: the compile cache keeps the match mode and its bounds
+Files: `src/regex/user-regex.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/fixes.test.ts`
+Tests: `test/vendor/just-bash/regex-cache.test.ts`,
+  `vendor/just-bash/src/regex/compile-cache.test.ts`
 
-Now: `-t` sorts by modification time, newest first and a tie by name, as
-GNU ls does, `-r` reversing it; of `-S` and `-t` the last given wins; a
-tie of either goes by name; `-t` and `-S` read a link's own time and
-size (lstat). Operands are ordered as GNU ls orders them: what cannot be
-listed first, then the file operands as one block in the active sort,
-then the directories in it, and under `-d` every operand is in the one
-block (upstream's `find -exec ls {} +` test now expects the one block).
+Now: the compile cache uses the full numeric RE2 flags, `LONGEST_MATCH`
+included, for both compilation and its key. It keeps upstream's
+256-entry FIFO and 1,024-character source bounds. An entry has at most
+4,096 instructions and a weight of at most 8,192; the cached weight in
+all is at most 65,536. Weight is the instruction count plus every
+instruction's rune-array length, shared arrays counted each time, read
+from RE2JS 1.4.0's `re2().prog.inst`. Admission evicts the oldest
+entries until both count and weight fit. A larger program still
+compiles and runs, but neither enters the cache nor evicts an entry.
+These bounds count compiled storage units, not heap bytes, execution
+caches or programs callers keep. Matchers, offsets, captures,
+`lastIndex`, limits and signals stay with each instance. The cache
+constants carry their own marker.
 
-Before: `-t` was accepted and ignored, and `ls -t *.md` listed each file
-alone in the order given, so a model looking for the newest doc got the
-names in order and concluded nothing had changed.
+Before: our wrapper compiled every construction. Upstream's #399 cache
+derived the flags from the flag string alone, so taking it unchanged
+lost our longest-match mode. Source length and instruction count alone
+missed Unicode rune arrays: an 881-character, 83-instruction pattern
+kept about 1 MiB per cached entry in a Bun heap probe.
 
 ## rg
 

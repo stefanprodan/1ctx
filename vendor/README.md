@@ -17,8 +17,8 @@ release. Two files beside it hold the rest:
 | | |
 |---|---|
 | Upstream | `vercel-labs/just-bash`, directory `packages/just-bash` |
-| Tag | `just-bash@3.4.2` |
-| Kept as | a squashed `git subtree` at `vendor/just-bash` |
+| Tag | `just-bash@3.6.0` |
+| Kept as | a squashed `git subtree` at `vendor/just-bash`, split `c99a0c4` |
 | Resolved by | the `just-bash` entry of `paths` in `tsconfig.json`, pointing at `vendor/just-bash/src/index.ts`; Bun honours it when running, testing and compiling |
 | Its packages | pinned devDependencies in our `package.json`, the versions its 3.4.2 release resolved to |
 
@@ -135,14 +135,17 @@ tests fail upstream under Bun as well:
   never mount.
 
 Others fail because of the trim: the removed commands, the documents
-and the fixtures. The fuzzers need `fast-check` and two lifecycle tests
-need `tsx`, which we do not install. The ports of #443, #503 and #506
-left out the tests they need `tsx` or python3 for:
-`module-accessor-descriptors.test.ts`,
-`module-accessor-redefinition.test.ts`,
-`defense-in-depth-trusted-settlement.test.ts` and
-`python3.cancelled-load.test.ts`; a sync brings the first three back,
-to fail as the other `tsx` tests do.
+and the fixtures; `defense-in-depth-trusted-settlement.test.ts` needs
+the worker bridge we removed, and `python3.cancelled-load.test.ts`
+went with python3. The fuzzers need `fast-check`, two lifecycle tests
+and the two module accessor suites `tsx`, and the browser builds
+`esbuild`, which we do not install. The module accessor suites run on
+Bun as `test/vendor/just-bash/module-accessors.test.ts`. Some tests
+stub globals or the environment with `vi.stubGlobal` or `vi.stubEnv`,
+which Bun's vitest lacks. Some of upstream's diff tests expect what GNU
+diffutils 3.12 does not answer, such as headers without the file's
+time and exit 1 for an unknown option, and some of find's a path
+unquoted where GNU findutils 4.11 quotes it.
 
 `vendor/just-bash-failures.txt` lists every expected failure by name,
 and the first error line of every test file that failed to load, since
@@ -155,20 +158,18 @@ when run alone is reported and let through. A run that still differs
 is run again, three runs in all, since a loaded CI runner fails a
 host-disk test now and then even alone; a regression differs every
 time and fails the run. After a change that fixes one, or a sync, check each
-difference, then record it with `scripts/vendor-test.sh --update`. The
-list, as it was when vendored, matched a pristine 3.4.2 run under Bun
-(with only `defense-descriptor`, without which nothing runs) except for
-tests of what we removed.
+difference, then record it with `scripts/vendor-test.sh --update`.
 
 ## Syncing a new upstream release
 
-1. Read upstream's `CHANGELOG.md` for the new tag. Walk the entries of
-   `vendor/changes.md` whose `Upstream` is neither `fixed in` nor
-   `ported from`, check whether the changelog fixes each, and update the
-   line: `fixed in X.Y.Z` where it does, `issue #N` or `PR #N` where one
-   is open. For an entry `ported from #N`, check that the release has
-   #N. Each `fixed in X.Y.Z` and each `ported from` the release has is
-   a change to drop for theirs in step 4.
+1. Read upstream's `CHANGELOG.md` for the new tag, and the package's
+   commits between the two tags, since the changelog leaves some out.
+   Walk the entries of `vendor/changes.md` whose `Upstream` is neither
+   `fixed in` nor `ported from`, check whether the release fixes each,
+   and update the line: `fixed in X.Y.Z` where it does, `issue #N` or
+   `PR #N` where one is open. For an entry `ported from #N`, check that
+   the release has #N. Each `fixed in X.Y.Z` and each `ported from` the
+   release has is a change to drop for theirs in step 4.
 2. Recreate the split the last sync recorded. The squash commit names it
    in its `git-subtree-split:` line, but that commit lives only in the
    clone that made it, and `git subtree merge` needs it. Splitting the
@@ -176,7 +177,7 @@ tests of what we removed.
 
    ```sh
    git log -1 --grep='^git-subtree-dir: vendor/just-bash$' --format=%B
-   git clone --depth 1 --branch just-bash@3.4.2 \
+   git clone --depth 1 --branch just-bash@3.6.0 \
      https://github.com/vercel-labs/just-bash /tmp/just-bash-old
    git -C /tmp/just-bash-old subtree split --prefix=packages/just-bash -b vendor
    git fetch /tmp/just-bash-old vendor
@@ -219,7 +220,11 @@ tests of what we removed.
 5. Match the packages: compare `vendor/just-bash/package.json`
    `dependencies` with our pins, and move each to the version upstream's
    range resolves to. A package new to upstream needs the user's go-ahead.
-6. Check it:
+6. Update the tag and split in this file, the `Files` of each entry
+   whose files moved, and each section of `vendor/differences.md` the
+   release changed, before the checks: `changes.test.ts` reads the
+   `Files` paths.
+7. Check it:
 
    ```sh
    bun install --ignore-scripts
@@ -228,11 +233,9 @@ tests of what we removed.
    ```
 
    For every line `make vendor-test` reports, decide whether it is Bun,
-   the trim or a real regression; fix a regression, then `--update`.
+   the trim, an upstream test the recorded tool contradicts, or a real
+   regression; fix a regression, then `--update`.
    `make test` runs `changes.test.ts`, which fails on a marker left
    without its entry or an entry left without its markers.
    A new command upstream added is off until `KNOWLEDGE_COMMANDS` in
    `src/server/bash/commands.ts` names it.
-7. Update the tag in this file, the `Files` of each entry whose files
-   moved, and each section of `vendor/differences.md` the release
-   changed.
