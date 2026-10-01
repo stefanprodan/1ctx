@@ -154,6 +154,16 @@ describe("the words", () => {
       short: "Failed",
       bad: true,
     });
+    expect(
+      stateWords(
+        repo({
+          state: "failed",
+          error: "over the size cap",
+          files: 51_203,
+          bytes: 300 * 1024 * 1024,
+        }),
+      ).text,
+    ).toBe("Failed: over the size cap at 51,203 files, 300 MB");
   });
 
   test("the kind is asked only of a team project on another host", () => {

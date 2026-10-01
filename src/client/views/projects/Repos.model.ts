@@ -14,7 +14,7 @@ import {
   type RepoKind,
 } from "../../../shared/contracts/repo.ts";
 import { isName } from "../../../shared/words.ts";
-import { commas, pluralCommas } from "../../lib/format.ts";
+import { commas, pluralCommas, sizeWords } from "../../lib/format.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export type RepoDraft = {
@@ -157,12 +157,22 @@ export function stateWords(repo: RepoView): StateWords {
       return { text: "Waiting to fetch", short: "Waiting", bad: false };
     case "fetching":
       return { text: "Fetching", short: "Fetching", bad: false };
-    case "failed":
+    case "failed": {
+      // past a cap the fetch stores what it had seen when it stopped
+      const counts =
+        repo.error === "over the size cap" && repo.files !== null
+          ? [pluralCommas(repo.files, "file", "files")]
+          : [];
+      if (counts.length > 0 && repo.bytes !== null) {
+        counts.push(sizeWords(repo.bytes));
+      }
+      const seen = counts.length > 0 ? ` at ${counts.join(", ")}` : "";
       return {
-        text: repo.error === null ? "Failed" : `Failed: ${repo.error}`,
+        text: repo.error === null ? "Failed" : `Failed: ${repo.error}${seen}`,
         short: "Failed",
         bad: true,
       };
+    }
     case "ready": {
       const parts = [
         repo.commit === null ? "Ready" : `Ready at ${shortCommit(repo.commit)}`,
