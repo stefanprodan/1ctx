@@ -5,6 +5,7 @@
  * table. The table itself stays a `Map<number, string>` because it is part
  * of the public `CommandContext` surface — extensions read fd values as
  * content — so this module owns the string encoding instead.
+ * (1ctx) Content is bytes, one char each, as stdin is, never decoded text.
  *
  * Entry kinds:
  * - `input`      readable content (`N< file`, `N<<EOF`, `N<<<word`). Reading
@@ -23,6 +24,7 @@
  * older code paths.
  */
 
+import { encodeUtf8ToBytes, latin1FromBytes } from "../encoding.js";
 import { checkFdLimit } from "./helpers/result.js";
 import type { InterpreterContext } from "./types.js";
 
@@ -382,16 +384,21 @@ export async function writeFdEntry(
   const writeEntry = liveEntry ?? entry;
   if (writeEntry.kind !== "readwrite") return false;
 
+  // (1ctx) the entry holds the file's bytes and its position counts them
+  const bytes =
+    encoding === "utf8"
+      ? latin1FromBytes(encodeUtf8ToBytes(content))
+      : content;
   const updatedContent =
     writeEntry.content.slice(0, writeEntry.position) +
-    content +
-    writeEntry.content.slice(writeEntry.position + content.length);
+    bytes +
+    writeEntry.content.slice(writeEntry.position + bytes.length);
   const updated: FdEntry = {
     ...writeEntry,
-    position: writeEntry.position + content.length,
+    position: writeEntry.position + bytes.length,
     content: updatedContent,
   };
-  await ctx.fs.writeFile(writeEntry.path, updatedContent, encoding);
+  await ctx.fs.writeFile(writeEntry.path, updatedContent, "binary");
   const raw = encodeFdEntry(updated);
   for (const fd of descriptors) {
     if (isFdOpen(ctx, fd)) writeRawFd(ctx, fd, raw, false);

@@ -247,7 +247,8 @@ async function readInputEntry(
 ): Promise<{ entry?: FdEntry; error?: ExecResult }> {
   const filePath = ctx.fs.resolvePath(ctx.state.cwd, target);
   try {
-    const content = await ctx.fs.readFile(filePath);
+    // (1ctx) a descriptor carries the file's bytes, as `< file` does
+    const content = latin1FromBytes(await readBytesFrom(ctx.fs, filePath));
     return readwrite
       ? {
           entry: {
@@ -426,7 +427,10 @@ async function prepareRedirectionsWithState(
     const effectiveFd = effectiveRedirectFd(redir);
 
     if (redir.target.type === "HereDoc") {
-      const content = await hereDocContent(ctx, redir.target);
+      // (1ctx) every descriptor carries bytes, as stdin does
+      const content = latin1FromBytes(
+        encodeUtf8ToBytes(await hereDocContent(ctx, redir.target)),
+      );
       if (redir.fdVariable) {
         try {
           checkReadonlyError(ctx, redir.fdVariable);
@@ -457,7 +461,7 @@ async function prepareRedirectionsWithState(
         rememberFd(ctx, snapshot, effectiveFd);
         setFdEntry(ctx, effectiveFd, { kind: "input", content });
       } else if (effectiveFd === 0 || effectiveFd === null) {
-        stdin = latin1FromBytes(encodeUtf8ToBytes(content));
+        stdin = content;
         stdinSourceFd = -1;
         persistStandard(effectiveFd, { kind: "input", content: stdin });
       } else {
@@ -616,7 +620,10 @@ async function prepareRedirectionsWithState(
         if (opened.error) return fail(opened.error, index);
         entry = opened.entry;
       } else if (redir.operator === "<<<") {
-        entry = { kind: "input", content: `${target}\n` };
+        entry = {
+          kind: "input",
+          content: latin1FromBytes(encodeUtf8ToBytes(`${target}\n`)),
+        };
       } else if (redir.operator === "<" || redir.operator === "<>") {
         const opened = await readInputEntry(
           ctx,
@@ -761,7 +768,10 @@ async function prepareRedirectionsWithState(
         if (opened.error) return fail(opened.error, index);
         setFdEntry(ctx, fd, opened.entry as FdEntry);
       } else if (redir.operator === "<<<") {
-        setFdEntry(ctx, fd, { kind: "input", content: `${target}\n` });
+        setFdEntry(ctx, fd, {
+          kind: "input",
+          content: latin1FromBytes(encodeUtf8ToBytes(`${target}\n`)),
+        });
       } else if (redir.operator === "<" || redir.operator === "<>") {
         const opened = await readInputEntry(
           ctx,
