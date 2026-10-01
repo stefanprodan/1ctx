@@ -26,6 +26,7 @@ import {
   watchWidth,
 } from "../../../src/client/app/shell.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { MONITOR_HREF } from "../../../src/client/lib/hrefs.ts";
 
 const store = new Map<string, string>();
 const fakeStorage = {
@@ -45,6 +46,8 @@ beforeEach(() => {
     mustChangePassword: false,
   };
   path.value = "/";
+  lastWork.value = "/";
+  lastAdmin.value = MONITOR_HREF;
   narrow.value = false;
   showRail();
   closeDrawer();

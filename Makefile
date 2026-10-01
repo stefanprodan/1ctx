@@ -21,7 +21,7 @@ dev: ## Run with hot reload of the page and restart on server changes (make dev 
 	@bun run dev $(ARGS)
 
 test: ## Run tests
-	@bun run test
+	@bun run test $(ARGS)
 
 vendor-test: ## Run just-bash's own suite on vendor/just-bash against its expected failures
 	@bun run vendor-test

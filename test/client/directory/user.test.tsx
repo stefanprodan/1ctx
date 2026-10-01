@@ -56,6 +56,8 @@ const days: DirectoryUserDaysResponse = {
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
+  // a new user clears the held pages and days of the last test
+  me.value = null;
   me.value = {
     id: "u1",
     username: "casey",
