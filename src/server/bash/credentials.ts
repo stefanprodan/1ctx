@@ -94,7 +94,7 @@ export function webNetwork(
           allowedUrlPrefixes: urlPrefixes(web.domains),
           allowedMethods: ALL_METHODS,
         }),
-    // Bun cannot pin DNS, so a private-range check would fail closed
+    // Bun's fetch ignores the guarded dispatcher, so connect-time pinning is absent.
     denyPrivateRanges: false,
     timeoutMs: limits.timeoutMs,
     maxResponseSize: limits.maxResponseSize,
@@ -183,6 +183,21 @@ function replaceBytes(
   return Buffer.concat(parts);
 }
 
+function redactHeaders(
+  input: Record<string, string>,
+  secrets: readonly Secret[],
+): Record<string, string> {
+  const headers: Record<string, string> = Object.create(null);
+  for (const [name, value] of Object.entries(input)) {
+    const folded = name.toLowerCase();
+    if (secrets.some((secret) => folded.includes(secret.key.toLowerCase()))) {
+      continue;
+    }
+    headers[name] = redactText(value, secrets);
+  }
+  return headers;
+}
+
 export function redactResult(
   result: FetchResult,
   secrets: readonly Secret[],
@@ -200,14 +215,7 @@ export function redactResult(
   if (body !== result.body && body.byteLength > maxResponseSize) {
     throw new Error(`Response body too large (max: ${maxResponseSize} bytes)`);
   }
-  const headers: Record<string, string> = Object.create(null);
-  for (const [name, value] of Object.entries(result.headers)) {
-    const folded = name.toLowerCase();
-    if (secrets.some((secret) => folded.includes(secret.key.toLowerCase()))) {
-      continue;
-    }
-    headers[name] = redactText(value, secrets);
-  }
+  const headers = redactHeaders(result.headers, secrets);
   if (body !== result.body) headers["content-length"] = String(body.byteLength);
   return {
     status: result.status,
@@ -215,6 +223,15 @@ export function redactResult(
     headers,
     body,
     url: redactText(result.url, secrets),
+    ...(result.redirectChain === undefined
+      ? {}
+      : {
+          redirectChain: result.redirectChain.map((hop) => ({
+            status: hop.status,
+            statusText: redactText(hop.statusText, secrets),
+            headers: redactHeaders(hop.headers, secrets),
+          })),
+        }),
   };
 }
 

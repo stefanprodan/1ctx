@@ -66,7 +66,7 @@ export type Answer = {
 export type FetchRequest = {
   method?: string;
   headers?: [string, string][];
-  body?: string;
+  body?: string | Uint8Array<ArrayBuffer>;
   followRedirects?: boolean;
   timeoutMs?: number;
   maxRedirects?: number;
@@ -226,7 +226,11 @@ function isFetchRequest(value: unknown): value is FetchRequest {
     ]) &&
     isOptional(value.method, isString) &&
     isOptional(value.headers, (headers) => isList(headers, isHeader)) &&
-    isOptional(value.body, isString) &&
+    isOptional(
+      value.body,
+      (body) =>
+        isString(body) || (isBytes(body) && body.buffer instanceof ArrayBuffer),
+    ) &&
     isOptional(value.followRedirects, (flag) => typeof flag === "boolean") &&
     isOptional(value.timeoutMs, isCount) &&
     isOptional(value.maxRedirects, isCount)

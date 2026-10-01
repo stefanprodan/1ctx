@@ -30,6 +30,36 @@ const done = (patch: Record<string, unknown> = {}) => ({
 });
 
 describe("a command worker's messages", () => {
+  test("fetch bodies accept text and byte views, never other cloneable values", () => {
+    const message = (body: unknown) => ({
+      type: "fetch",
+      id: "job",
+      request: 0,
+      url: "https://network.example.test/",
+      options: { body },
+    });
+    for (const body of [
+      "text",
+      undefined,
+      new Uint8Array([0, 255]),
+      new Uint8Array([7, 0, 255, 8]).subarray(1, 3),
+    ]) {
+      const cloned = structuredClone(message(body));
+      expect(fromWorker(cloned, "job") === cloned).toBe(true);
+    }
+    for (const body of [
+      null,
+      1,
+      [0, 255],
+      new ArrayBuffer(2),
+      new Uint16Array([255]),
+      new Uint8Array(new SharedArrayBuffer(2)),
+      { 0: 255, length: 1 },
+    ]) {
+      expect(fromWorker(message(body), "job")).toBeNull();
+    }
+  });
+
   test("a whole answer of this job passes", () => {
     expect(fromWorker(done(), "job")).toEqual(done() as never);
   });

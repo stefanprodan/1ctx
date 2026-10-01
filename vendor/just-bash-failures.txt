@@ -7,6 +7,7 @@
 (fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
 (fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
 (fail) DNS rebinding SSRF protection > guarded-fetch error mapping > rejects a redirect to a private IP literal
+(fail) DNS rebinding integration (real DNS) > ENOTFOUND domain fails closed before fetch
 (fail) DNS rebinding integration (real DNS) > allows public domain through real DNS check (if DNS available)
 (fail) DNS rebinding integration (real DNS) > denyPrivateRanges + allow-list works with real DNS
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
@@ -18,8 +19,6 @@
 (fail) ReadWriteFs replacement mode and copy behavior > appends to a private write-only regular file
 (fail) ReadWriteFs replacement mode and copy behavior > changes metadata on a private mode-000 regular file
 (fail) ReadWriteFs special-file metadata operations > preserves a Unix socket during chmod and utimes
-(fail) allow-list bypass attempts > case sensitivity attacks > handles uppercase hostname - passes allow-list with normalized hostname
-(fail) allow-list bypass attempts > port manipulation attacks > allows explicit port 443 when default port is allowed
 (fail) allow-list e2e via BashEnv > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
 (fail) allow-list e2e via Sandbox > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
 (fail) awk built-in variables > FILENAME > should be empty for stdin
@@ -51,32 +50,6 @@
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when yq is used but not available
 (fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
 (fail) consumes stdin once across ordered data references
-(fail) curl -D/--dump-header > accepts --dump-header FILE
-(fail) curl -D/--dump-header > accepts --dump-header=FILE
-(fail) curl -D/--dump-header > accepts attached -Dfile form
-(fail) curl -D/--dump-header > clears a stale dump file on the same VFS when the request fails
-(fail) curl -D/--dump-header > dumps 4xx headers with -f -D before failing
-(fail) curl -D/--dump-header > dumps intermediate redirect headers with -D -L
-(fail) curl -D/--dump-header > emits -D - header block even with -v -o
-(fail) curl -D/--dump-header > prepends headers before the body with -D - and no -o
-(fail) curl -D/--dump-header > rejects blank -D argument
-(fail) curl -D/--dump-header > rejects missing -D argument
-(fail) curl -D/--dump-header > writes headers to a file with -D
-(fail) curl -D/--dump-header > writes headers to stdout with -D -
-(fail) curl -o does not materialise the body for stdout > does not stringify the body for -O either
-(fail) curl -o does not materialise the body for stdout > still applies --write-out on the -o path
-(fail) curl -o does not materialise the body for stdout > still emits the -D - header block on the -o path without stringifying the body
-(fail) curl -o does not materialise the body for stdout > writes the file without stringifying the body
-(fail) curl @file interpretation > --data-binary @file > preserves newlines in the file (unlike --data)
-(fail) curl @file interpretation > --data-binary @file > reads the file contents as the body
-(fail) curl @file interpretation > --data-binary @file > supports --data-binary=@file form
-(fail) curl @file interpretation > -d / --data @file > -d @file strips NUL, CR, and LF from the file contents
-(fail) curl @file interpretation > data from stdin with @- > --data-binary @- reads stdin verbatim
-(fail) curl @file interpretation > data from stdin with @- > --data-urlencode @- URL-encodes stdin
-(fail) curl @file interpretation > data from stdin with @- > --data-urlencode name@- prefixes URL-encoded stdin
-(fail) curl @file interpretation > data from stdin with @- > -d @- reads stdin and strips NUL, CR, and LF
-(fail) curl @file interpretation > data from stdin with @- > keeps --data-raw literal while reading explicit dash paths as files
-(fail) curl @file interpretation > data from stdin with @- > sends an empty POST body when stdin is empty
 (fail) diff > error handling > should error on unknown option
 (fail) diff > error handling > should error on unknown short option
 (fail) diff > filename quoting in -u/-c headers > should escape a double quote, and quote in -c headers too
@@ -133,7 +106,6 @@
 (fail) find over an unreadable directory > names the directory it could not read and keeps going
 (fail) find over an unreadable directory > reports a directory below -mindepth all the same
 (fail) find over an unreadable directory > reports every unreadable directory in traversal order
-(fail) firewall header transforms > no injection for non-matching hosts
 (fail) fromBuffer without Buffer (browser fallback) > base64 matches Node output across chunk boundaries
 (fail) fromBuffer without Buffer (browser fallback) > base64 never passes more than 8192 arguments to String.fromCharCode
 (fail) fromBuffer without Buffer (browser fallback) > binary matches Node output across chunk boundaries
@@ -176,16 +148,8 @@
 (fail) published package declarations > includes declaration trees referenced by public declarations
 (fail) query format builtins in browser mode > decodes browser base64 bytes using defined UTF-8 replacement
 (fail) query format builtins in browser mode > encodes Unicode as UTF-8 before browser base64 conversion
-(fail) request-owned DNS connector lookup > creates independent pools without patching process-global DNS
 (fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
 (fail) runtime error-forwarding leak probes > sqlite3 open-directory error does not expose host/internal markers
-(fail) secureFetch behavior > changes method to GET on 301/302/303 redirect and drops body
-(fail) secureFetch behavior > follows redirects and returns the final response
-(fail) secureFetch behavior > refuses a redirect whose rewritten method is not allowed
-(fail) secureFetch behavior > rewrites DELETE to GET on a 303 redirect
-(fail) secureFetch behavior > rewrites POST to GET on a 303 redirect
-(fail) secureFetch behavior > rewrites PUT to GET on a 303 redirect
-(fail) secureFetch behavior > strips Authorization on cross-origin redirect
 (fail) supports text and binary stdin request bodies without Buffer
 (fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
 (fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension

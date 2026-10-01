@@ -84,6 +84,51 @@ from jq 1.8.2 for the dialect rules. Where they part:
 - A user `def` cannot override a builtin: `def length: 5; [1] | length`
   is 1, where jq answers 5.
 
+## Where our curl still differs from curl
+
+`test/vendor/just-bash/curl.test.ts` pins write-out once across stdout,
+file and header-dump output, and ports upstream's three stdin-byte
+tests to Bun, whose vitest lacks `vi.stubGlobal` and
+`vi.unstubAllGlobals`. Where the command parts from curl:
+
+- `-V` and `--version` answer `curl 8.21.0 (just-bash, compatible)`,
+  the supported protocols and a sandbox description, not curl's build
+  and library details.
+- `-v` writes its trace to stdout, not stderr, and still echoes the
+  body there with `-o` or `-O`. A `-D -` header block precedes that
+  output; `-w` follows it once.
+- Cross-origin redirects strip caller-supplied `Authorization` and
+  `Cookie`, curl's default without `--location-trusted`, which we do
+  not support. Other caller headers remain. Managed credentials are
+  separate: every hop is signed only under its chosen prefix.
+- Once stripped, caller Authorization and Cookie stay stripped for the rest of the chain; curl 8.21 sends them again on a return to the first host.
+- `-d @file` reads UTF-8 text: invalid bytes such as `0xff`, `0xfe`
+  and `0x80` become U+FFFD, unchanged from 3.4.2. `-F f=@file` also
+  decodes UTF-8 before constructing its multipart body, replacing
+  invalid bytes but keeping NUL, CR and LF. Neither is binary-safe;
+  `--data-binary @file` preserves bytes.
+- A redirect to a URL containing `user:pass@` is followed with that
+  userinfo intact at fetch. These are server-selected credentials,
+  not a 1ctx managed secret.
+
+### Network under Bun
+
+The upstream 3.6.0 adapter loads guarded-fetch eagerly. 1ctx keeps
+`denyPrivateRanges: false`: every permitted request uses the current
+ambient fetch, and private/loopback destinations remain permitted when
+the web policy allows them. Non-HTTP redirects are refused before
+choosing a transport, including guarded-fetch's private-host bypass.
+
+Bun substitutes its built-in Undici module, whose fetch ignores the
+dispatcher. Private-range preflight checks are not a connect-time
+rebinding guarantee; 1ctx does not enable or promise that enforcement.
+Pinning npm Undici to guarded-fetch's version removes a duplicate
+package, not this runtime limitation.
+
+guarded-fetch wraps transport failures as `GuardedFetchError`, with the
+hostname in the message. The app still rebuilds only its first line,
+scrubs keys and discards the cause.
+
 ## Where our awk still differs from gawk
 
 `test/fixtures/just-bash/awk-gawk.json` holds what gawk 5.4.1 answered,

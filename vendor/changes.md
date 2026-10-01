@@ -10,31 +10,38 @@ from the repository root.
 ### fetch: no redirect off http, and a refused body is let go
 Files: `src/network/fetch.ts`
 Upstream: not reported
-Tests: `test/vendor/just-bash/fixes.test.ts`
+Tests: `test/vendor/just-bash/fixes.test.ts`,
+  `test/server/bash/network-contract.test.ts`
 
 Now:
 
 - **Redirects.** a redirect to anything but `http:` or `https:` is
-  `RedirectNotAllowedError`.
+  `RedirectNotAllowedError`, checked before choosing the next hop's
+  transport, private hosts included.
 - **Refused bodies.** a response refused for its `content-length`
-  cancels its body.
+  or malformed `Location` cancels its body without awaiting cleanup.
 
 Before:
 
-- **Redirects.** Bun's fetch reads `file:` URLs from the host's disk,
-  and full internet access checks no scheme.
+- **Redirects.** Bun's fetch reads `file:` URLs from the host's disk.
+  Upstream 3.6.0 bypasses guarded-fetch's scheme check for private
+  hosts when private-range denial is off.
 - **Refused bodies.** the connection was left open until the body was
-  collected.
+  collected, including when upstream 3.6.0 could not parse `Location`.
 
 ### network-exports: the package exports the allow-list and the fetch
 Files: `src/network/index.ts`, `src/index.ts`
 Upstream: not reported
-Tests: `test/server/bash/credentials.test.ts`
+Tests: `test/server/bash/credentials.test.ts`,
+  `test/server/bash/network-contract.test.ts`
 
 Now: the package exports `validateAllowList`, `matchesAllowListEntry`,
 `createSecureFetch` and the `FetchResult` and `SecureFetchOptions`
 types, so a credential's URL prefix is checked and matched by the rules
-curl's allow-list uses, and the mount builds curl's fetch itself (see
+curl's allow-list uses, and the mount builds curl's fetch itself. The
+3.6.0 contract carries byte request bodies through the worker and
+redirect history through the credential scrubber, including every
+hop's status text and headers (see
 "How the mount gives curl its network" in `vendor/README.md`).
 
 Before: none of them was exported.
@@ -462,6 +469,19 @@ check.
 
 Before: `curl --version` was `unrecognized option`, exit 1, where every
 curl answers it.
+
+### curl-write-out: append write-out once after composing stdout
+Files: `src/commands/curl/curl.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`
+
+Now: `-w` is appended once after the body, verbose output and `-D -`
+headers are composed, with or without `-o` or `-O`. Non-verbose file
+output still avoids stringifying the body.
+
+Before: upstream 3.6.0 appended `-w` in both `buildOutput()` and the
+verbose file-output branch, so `-v -o file -w X` printed `X` twice,
+also with `-D -` or `-O`.
 
 ## diff
 

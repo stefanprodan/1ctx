@@ -147,6 +147,15 @@ diffutils 3.12 does not answer, such as headers without the file's
 time and exit 1 for an unknown option, and some of find's a path
 unquoted where GNU findutils 4.11 quotes it.
 
+The network browser build test needs esbuild; the DNS guarded-path
+suite needs `vi.resetModules`, missing in Bun's vitest. Both fail
+before their tests run. The latter leaves its empty DNS mock installed
+across the single-process vendor suite, so the DNS-rebinding and
+private-range e2e cases fail there but pass alone with real DNS
+lookups and their own `_fetch` mock, without HTTP requests.
+`test/vendor/just-bash/network.test.ts` keeps the two deprecated
+connector-hook rejection checks outside the upstream tree.
+
 `vendor/just-bash-failures.txt` lists every expected failure by name,
 and the first error line of every test file that failed to load, since
 such a file runs none of its tests.
