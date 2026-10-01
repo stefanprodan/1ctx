@@ -79,6 +79,66 @@ function translatePattern(pattern: string): string {
   return RE2JS.translateRegExp(pattern);
 }
 
+// Only the immutable compiled RE2JS is shared; per-call state (lastIndex, the
+// reusable Matcher, result limits, AbortSignal) stays on each UserRegex.
+// Keyed on the numeric RE2 flags because `g` and `d` are handled by UserRegex.
+// Patterns are user-controlled and unbounded in length, so oversized ones are
+// compiled but not retained — the cache holds at most 256 KiB of pattern source.
+// (1ctx regex-cache) Unicode rune arrays can dwarf the instruction count.
+// Weight counts instructions plus each instruction's rune-array length, even
+// when arrays are shared: at most 8192 per entry and 65,536 across the cache.
+// These storage units are not heap bytes or RE2JS's mutable execution caches.
+const COMPILED_CACHE_MAX = 256;
+const COMPILED_CACHE_MAX_PATTERN_LENGTH = 1024;
+const COMPILED_CACHE_MAX_PROGRAM_SIZE = 4096;
+const COMPILED_CACHE_MAX_ENTRY_WEIGHT = 8192;
+const COMPILED_CACHE_MAX_WEIGHT = 65_536;
+const compiledCache = new Map<string, { compiled: RE2JS; weight: number }>();
+let compiledCacheWeight = 0;
+
+// (1ctx search-engine regex-cache) The caller includes the longest-match bit.
+function compilePattern(pattern: string, re2Flags: number): RE2JS {
+  if (pattern.length > COMPILED_CACHE_MAX_PATTERN_LENGTH) {
+    return RE2JS.compile(translatePattern(pattern), re2Flags);
+  }
+  const key = `${re2Flags} ${pattern}`;
+  const cached = compiledCache.get(key);
+  if (cached !== undefined) {
+    // (1ctx regex-cache) The weight travels with the program for FIFO removal.
+    return cached.compiled;
+  }
+  const compiled = RE2JS.compile(translatePattern(pattern), re2Flags);
+  // (1ctx regex-cache) Repetition can expand a short source into a large program.
+  if (compiled.programSize() > COMPILED_CACHE_MAX_PROGRAM_SIZE) {
+    return compiled;
+  }
+
+  // (1ctx regex-cache) RE2JS 1.4.0 keeps each Unicode class in Inst.runes.
+  const instructions: { runes: number[] }[] = compiled.re2().prog.inst;
+  const weight = instructions.reduce(
+    (sum, instruction) => sum + 1 + instruction.runes.length,
+    0,
+  );
+  if (weight > COMPILED_CACHE_MAX_ENTRY_WEIGHT) {
+    return compiled;
+  }
+
+  // (1ctx regex-cache) A large admission may displace several smaller entries.
+  for (const [oldest, entry] of compiledCache) {
+    if (
+      compiledCache.size < COMPILED_CACHE_MAX &&
+      compiledCacheWeight + weight <= COMPILED_CACHE_MAX_WEIGHT
+    ) {
+      break;
+    }
+    compiledCache.delete(oldest);
+    compiledCacheWeight -= entry.weight;
+  }
+  compiledCache.set(key, { compiled, weight });
+  compiledCacheWeight += weight;
+  return compiled;
+}
+
 /**
  * A wrapper around RE2JS that provides a RegExp-compatible interface.
  * Uses RE2 for linear-time matching, providing ReDoS protection.
@@ -206,10 +266,10 @@ export class UserRegex implements RegexLike {
     }
 
     try {
-      const translatedPattern = translatePattern(pattern);
+      // (1ctx search-engine regex-cache) Match mode belongs in the cache key too.
       const re2Flags =
         convertFlags(flags) | (limits.longest ? RE2JS.LONGEST_MATCH : 0);
-      this._re2 = RE2JS.compile(translatedPattern, re2Flags);
+      this._re2 = compilePattern(pattern, re2Flags);
     } catch (e) {
       if (e instanceof RE2JSSyntaxException) {
         // Provide helpful error messages for unsupported RE2 features
