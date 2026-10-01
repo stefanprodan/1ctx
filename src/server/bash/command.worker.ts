@@ -11,7 +11,10 @@ import {
   Bash,
   decodeBytesToUtf8,
   type FetchResult,
+  type IFileSystem,
   InMemoryFs,
+  MountableFs,
+  OverlayFs,
   type SecureFetch,
   stdoutAsBytes,
 } from "just-bash";
@@ -128,6 +131,34 @@ function workerFetch(id: string, running: Running): SecureFetch {
   };
 }
 
+// each repository read-only at /repos/<name> over the base, which keeps
+// every other tree; links resolve inside the tree only
+function withRepos(
+  base: InMemoryFs,
+  job: Job,
+): { fs: IFileSystem; notice: string } {
+  if (job.repos.length === 0) return { fs: base, notice: "" };
+  const fs = new MountableFs({ base });
+  let notice = "";
+  for (const repo of job.repos) {
+    try {
+      fs.mount(
+        `/repos/${repo.name}`,
+        new OverlayFs({
+          root: repo.folder,
+          mountPoint: "/",
+          readOnly: true,
+          allowSymlinks: true,
+          maxFileReadSize: job.repoFileBytes,
+        }),
+      );
+    } catch {
+      notice += `repo ${repo.name} is unavailable: its files are gone\n`;
+    }
+  }
+  return { fs, notice };
+}
+
 async function run(id: string, job: Job, running: Running): Promise<Answer> {
   const signal = running.controller.signal;
   const fs = new InMemoryFs({}, { maxTotalBytes: job.mountBytes });
@@ -173,16 +204,18 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
       return (await ask(id, running, { type: "kept", index })) as Uint8Array;
     });
   });
-  const cwd = await savedCwd(fs, job.cwd, job.docs);
+  const mounted = withRepos(fs, job);
+  const cwd = await savedCwd(mounted.fs, job.cwd, job.docs);
   // a cwd in the docs while they are off moves without a word
   let notice =
-    cwd !== job.cwd && (job.docs || !underKnowledge(job.cwd))
+    mounted.notice +
+    (cwd !== job.cwd && (job.docs || !underKnowledge(job.cwd))
       ? `started in ${cwd}: ${job.cwd} no longer exists\n`
-      : "";
+      : "");
   post({ type: "phase", id, phase: "run", notice });
   const opened: OpenedRecord[] = [];
   const bash = new Bash({
-    fs,
+    fs: mounted.fs,
     cwd,
     commands: [...KNOWLEDGE_COMMANDS],
     customCommands: [
@@ -225,7 +258,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
       refused: error instanceof Error ? error.message : String(error),
     };
   }
-  const after = await savedCwd(fs, result.env.PWD, job.docs);
+  const after = await savedCwd(mounted.fs, result.env.PWD, job.docs);
   return {
     ...printed,
     changes: {

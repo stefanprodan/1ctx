@@ -76,14 +76,14 @@ export function mountPath(path: string): boolean {
     Buffer.byteLength(path) <= MAX_MOUNT_PATH_BYTES &&
     !/\p{Cc}/u.test(path) &&
     !hasLineBreak(path) &&
-    ["knowledge", "tmp", "uploads", "mcp"].includes(parts[0] ?? "") &&
+    ["knowledge", "tmp", "uploads", "mcp", "repos"].includes(parts[0] ?? "") &&
     parts.every((part) => part !== "" && part !== "." && part !== "..") &&
     (!path.startsWith("/tmp/") || isScratchName(path.slice("/tmp/".length)))
   );
 }
 
 function mounted(path: string): boolean {
-  return ["/knowledge", "/tmp", "/uploads", "/mcp"].some(
+  return ["/knowledge", "/tmp", "/uploads", "/mcp", "/repos"].some(
     (root) => path === root || path.startsWith(`${root}/`),
   );
 }
@@ -209,8 +209,12 @@ export function makeOpenCommand(
         return refusal(arg, "no such file");
       }
       if (!final?.isFile) return refusal(arg, "not a regular file");
-      const bytes = await ctx.fs.readFileBuffer(path);
-      if (bytes.byteLength > caps.knowledgeFileBytes) {
+      // sized before the read, so a large repository file is never read
+      const bytes =
+        final.size > caps.knowledgeFileBytes
+          ? null
+          : await ctx.fs.readFileBuffer(path);
+      if (bytes === null || bytes.byteLength > caps.knowledgeFileBytes) {
         return refusal(
           arg,
           `over ${bytesWords(caps.knowledgeFileBytes)}, open a smaller part (sed -n '1,200p' f > /tmp/part.md)`,

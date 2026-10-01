@@ -3,9 +3,11 @@
 //
 // The mounted tree, read back in the command worker: what changed under
 // /knowledge and /tmp against the posted bytes, the discard notices for
-// the read-only trees, and the cwd the next command starts in.
+// the read-only trees, and the cwd the next command starts in. The
+// repositories are mounted over this tree, never in it, so nothing under
+// /repos is ever read back.
 
-import type { BashOptions, InMemoryFs } from "just-bash";
+import type { BashOptions, IFileSystem, InMemoryFs } from "just-bash";
 import {
   checkFile,
   checkNames,
@@ -88,7 +90,7 @@ export async function diff(
   };
 }
 
-async function directory(fs: InMemoryFs, path: string): Promise<boolean> {
+async function directory(fs: IFileSystem, path: string): Promise<boolean> {
   return (await fs.exists(path)) && (await fs.stat(path)).isDirectory;
 }
 
@@ -150,9 +152,19 @@ function keptChanged(fs: InMemoryFs, kept: readonly string[]): boolean {
   return seen !== expected.size;
 }
 
+// a write beside the mounted repositories lands in the base, and goes
+const reposWritten = (fs: InMemoryFs) =>
+  fs
+    .getAllPaths()
+    .some((path) => path === "/repos" || path.startsWith("/repos/"));
+
 // the discard notices, before the start notice
 export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
   let notice = "";
+  if (reposWritten(fs)) {
+    notice =
+      "changes under /repos were discarded: copy a file to /tmp to change it\n";
+  }
   if (keptChanged(fs, job.kept)) {
     notice =
       "changes under /mcp were discarded: copy a file to /tmp to change it\n" +
@@ -174,7 +186,7 @@ export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
 const home = (docs: boolean) => (docs ? "/knowledge" : "/tmp");
 
 export async function savedCwd(
-  fs: InMemoryFs,
+  fs: IFileSystem,
   pwd: string | undefined,
   docs: boolean,
 ): Promise<string> {
@@ -187,9 +199,11 @@ export async function savedCwd(
     path !== "/tmp" &&
     path !== "/uploads" &&
     path !== "/mcp" &&
+    path !== "/repos" &&
     !path.startsWith("/tmp/") &&
     !path.startsWith("/uploads/") &&
-    !path.startsWith("/mcp/")
+    !path.startsWith("/mcp/") &&
+    !path.startsWith("/repos/")
   )
     return home(docs);
   return (await directory(fs, path)) ? path : home(docs);
@@ -200,6 +214,9 @@ export function executionLimits(
   fs: InMemoryFs,
   remainingMs: number,
 ): NonNullable<BashOptions["executionLimits"]> {
+  // a whole repository fits one walk and one rg over it
+  const repoFiles = job.repos.reduce((sum, repo) => sum + repo.files, 0);
+  const repoBytes = job.repos.reduce((sum, repo) => sum + repo.bytes, 0);
   return {
     maxExecutionTimeMs: Math.max(1, remainingMs),
     maxOutputSize: job.ioBytes,
@@ -212,10 +229,11 @@ export function executionLimits(
     maxSedIterations: job.iterations,
     maxJqIterations: job.iterations,
     maxLiveBytes: 4 * job.mountBytes,
-    maxInputBytes: job.ioBytes,
+    maxInputBytes: job.ioBytes + repoBytes,
     maxArchiveBytes: 4 * job.mountBytes,
     maxArchiveCompressedBytes: 4 * job.mountBytes,
     maxArchiveEntryBytes: 4 * job.mountBytes,
-    maxTraversalEntries: Math.max(1000, fs.getAllPaths().length * 4),
+    maxTraversalEntries:
+      Math.max(1000, fs.getAllPaths().length * 4) + repoFiles,
   };
 }

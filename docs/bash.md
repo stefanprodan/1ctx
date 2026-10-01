@@ -1,15 +1,17 @@
 # Bash
 
 Governs `src/server/bash/`: the command and its worker, the mount,
-scratch `/tmp`, kept MCP files under `/mcp`, `open` and curl's fetch.
-Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
-`vendor/`.
+scratch `/tmp`, kept MCP files under `/mcp`, repositories under
+`/repos`, `open` and curl's fetch. Mounted docs and uploads are in
+`docs/knowledge.md`, the repositories' lookup and cache in
+`docs/repos.md`, the shell itself in `vendor/`.
 
 The bash tool runs a command in just-bash, a shell written in
 TypeScript, over a virtual filesystem: `/knowledge` (the project's
 docs), `/uploads` (the chat's attachments), `/tmp` (scratch: the chat's
 own files, kept between commands) and `/mcp` (kept MCP files: tool
-results too large for the context, `docs/mcp.md`). `open` is a command
+results too large for the context, `docs/mcp.md`) and `/repos` (the
+project's repositories, read-only). `open` is a command
 of that shell that shows a file on the chat page.
 
 ## The area
@@ -155,6 +157,33 @@ of that shell that shows a file on the chat page.
 - **`/mcp` is never committed.** An added or removed name gets a
   discard notice, found from `getAllPaths()` alone, since a `stat`
   would load every file. A changed file is dropped silently.
+
+## Repositories
+
+- **A send's repositories come in its caps.** The runner looks them up
+  once before the first round (`docs/repos.md`) and hands every command
+  of the send the same list: name, the tree's folder, kept files and
+  bytes. The worker takes a folder only from the job, never from a
+  command.
+- **Each is a read-only `OverlayFs` at `/repos/<name>`** over the
+  command's `InMemoryFs`, through a `MountableFs`, `allowSymlinks` on,
+  `maxFileReadSize` at `repoFileBytes`, so a larger file is listed and
+  reads as File too large. With no repository the worker mounts the
+  base alone.
+- **`/repos` never reaches a commit.** `tree.ts` reads the base only.
+  A write under `/repos` fails at the command with Read-only file
+  system; one beside the mounts lands in the base and is discarded
+  with a notice. `cp` out works; `mv` out leaves the copy and fails at
+  the remove.
+- **The caps grow with the mount.** `maxTraversalEntries` adds the
+  kept files and `maxInputBytes` the kept bytes, so one `find` or `rg`
+  covers a whole tree.
+- **A cwd or an opened path may be under `/repos`.** The next command
+  starts there while the repository is mounted, else at home with the
+  start notice. `open` sizes a file before reading it.
+- **The first command of a send says what was left out:** `repo <name>
+  is unavailable: <reason>`, and a regenerate's pinned commit no longer
+  cached. A folder gone from the cache is left out with a notice.
 
 ## The open command
 
