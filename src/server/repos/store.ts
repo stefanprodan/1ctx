@@ -169,7 +169,8 @@ export class ReposStore {
     return this.byId(id)!;
   }
 
-  // a change to what is fetched sets it pending and clears the error
+  // a change to what is fetched sets it pending and clears what the last
+  // fetch found, which no longer describes the row
   update(
     id: string,
     fields: RepoFields,
@@ -181,7 +182,13 @@ export class ReposStore {
         `update repos set name = ?, url = ?, kind = ?, ref = ?,
            credential_id = ?, ignore_rules = ?, updated_at = ?,
            state = case when ? then 'pending' else state end,
-           error = case when ? then null else error end
+           error = case when ? then null else error end,
+           etag = case when ? then null else etag end,
+           commit_id = case when ? then null else commit_id end,
+           fetched_at = case when ? then null else fetched_at end,
+           files = case when ? then null else files end,
+           bytes = case when ? then null else bytes end,
+           ignored = case when ? then null else ignored end
          where id = ?`,
       )
       .run(
@@ -192,8 +199,7 @@ export class ReposStore {
         fields.credentialId,
         fields.ignore,
         now,
-        refetch ? 1 : 0,
-        refetch ? 1 : 0,
+        ...Array<number>(8).fill(refetch ? 1 : 0),
         id,
       );
     return this.byId(id);

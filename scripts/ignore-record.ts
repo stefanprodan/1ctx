@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what git answers for each ignore text over one tree, into
-// ignore-cases.json beside this file: `bun test/fixtures/repos/ignore-record.ts`
+// test/fixtures/repos/ignore-cases.json: `bun scripts/ignore-record.ts`
 // with git on the PATH. Run by hand; the suite reads the fixture.
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_IGNORE } from "../../../src/server/repos/rules.ts";
+import { DEFAULT_IGNORE } from "../src/server/repos/rules.ts";
 
-const OUT = new URL("./ignore-cases.json", import.meta.url).pathname;
+const OUT = new URL("../test/fixtures/repos/ignore-cases.json", import.meta.url)
+  .pathname;
 
 // folders end in a slash
 const TREE = [
@@ -93,7 +94,7 @@ const CASES: Record<string, string> = {
   "default list": `${DEFAULT_IGNORE.join("\n")}\n`,
   "folder only": "build/\n",
   "file or folder": "build\n",
-  "anchored": "/build\n",
+  anchored: "/build\n",
   "anchored folder": "/build/\n",
   "anchored by a middle slash": "src/build\n",
   "middle slash folder only": "src/build/\n",
@@ -129,10 +130,10 @@ const CASES: Record<string, string> = {
   "question mark": "?.txt\n",
   "two question marks": "??.txt\n",
   "question mark not a slash": "a?c\n",
-  "class": "[ab].txt\n",
+  class: "[ab].txt\n",
   "negated class with bang": "[!ab].txt\n",
   "negated class with caret": "[^ab].txt\n",
-  "range": "[a-c].txt\n",
+  range: "[a-c].txt\n",
   "range and literal dash": "[a-].txt\n",
   "dash first": "[-a].txt\n",
   "bracket first": "[]].txt\n",
@@ -160,7 +161,7 @@ const CASES: Record<string, string> = {
   "case sensitive": "*.png\n",
   "upper case": "*.PNG\n",
   "prefix is not a match": "doc\n",
-  "dotfiles": ".*\n",
+  dotfiles: ".*\n",
   "dot folder": ".github/\n",
   "nested path": "a/b\n",
   "anchored nested folder": "/a/b/\n",
@@ -183,7 +184,12 @@ const CASES: Record<string, string> = {
   "negated folder then file": "build/\n!build/\n",
 };
 
-const git = (args: string[], cwd: string, env: Record<string, string>, stdin?: string) => {
+const git = (
+  args: string[],
+  cwd: string,
+  env: Record<string, string>,
+  stdin?: string,
+) => {
   const run = Bun.spawnSync(
     [
       "git",
@@ -193,7 +199,13 @@ const git = (args: string[], cwd: string, env: Record<string, string>, stdin?: s
       "core.precomposeunicode=false",
       ...args,
     ],
-    { cwd, env, stdin: stdin === undefined ? undefined : Buffer.from(stdin), stdout: "pipe", stderr: "pipe" },
+    {
+      cwd,
+      env,
+      stdin: stdin === undefined ? undefined : Buffer.from(stdin),
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   return run;
 };
@@ -240,18 +252,28 @@ try {
   const cases = [];
   for (const [name, ignore] of Object.entries(CASES)) {
     await writeFile(join(dir, ".gitignore"), ignore);
-    const run = git(["check-ignore", "--no-index", "-z", "--stdin"], dir, env, input);
+    const run = git(
+      ["check-ignore", "--no-index", "-z", "--stdin"],
+      dir,
+      env,
+      input,
+    );
     if (run.exitCode !== 0 && run.exitCode !== 1) {
       throw new Error(`${name}: ${run.stderr.toString()}`);
     }
-    const out = run.stdout.toString().split("\0").filter((p) => p !== "");
+    const out = run.stdout
+      .toString()
+      .split("\0")
+      .filter((p) => p !== "");
     cases.push({ name, ignore, ignored: out.sort() });
   }
   await writeFile(
     OUT,
     `${JSON.stringify({ git: version, tree: paths, cases }, null, 2)}\n`,
   );
-  console.log(`${cases.length} texts over ${paths.length} paths with ${version}`);
+  console.log(
+    `${cases.length} texts over ${paths.length} paths with ${version}`,
+  );
 } finally {
   await rm(dir, { recursive: true, force: true });
   await rm(home, { recursive: true, force: true });

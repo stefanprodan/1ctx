@@ -83,6 +83,23 @@ describe("the repository parsers", () => {
 });
 
 describe("the row a change asks for", () => {
+  test("a github URL names exactly an owner and a repository", () => {
+    expect(
+      words(() =>
+        desired(null, {
+          url: "https://ghe.example.test/org/team/widgets",
+          kind: "github",
+        }),
+      ),
+    ).toBe("url must be https://host/owner/name for github");
+    expect(
+      desired(null, {
+        url: "https://git.example.test/org/team/widgets",
+        kind: "gitlab",
+      }).url,
+    ).toBe("https://git.example.test/org/team/widgets");
+  });
+
   test("a public host fixes the kind and the name defaults to the repo's", () => {
     expect(desired(null, { url: "https://github.com/acme/widgets" })).toEqual({
       name: "widgets",

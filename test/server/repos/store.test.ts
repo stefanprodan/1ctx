@@ -69,7 +69,7 @@ test("a row is made pending, listed by name and found in its project only", () =
   }
 });
 
-test("a fetched row keeps what a change leaves out, and a refetch clears the error", () => {
+test("a fetched row keeps what a change leaves out, and a refetch clears what the fetch found", () => {
   const { db, store } = seeded();
   try {
     const { id } = store.create("p1", fields({ credentialId: "c1" }), 10);
@@ -115,7 +115,12 @@ test("a fetched row keeps what a change leaves out, and a refetch clears the err
       credentialId: null,
       state: "pending",
       error: null,
-      commit: "a".repeat(40),
+      etag: null,
+      commit: null,
+      fetchedAt: null,
+      files: null,
+      bytes: null,
+      ignored: null,
     });
     store.setFetched(id, { state: "fetching", error: null });
     expect(store.resetFetching()).toBe(1);

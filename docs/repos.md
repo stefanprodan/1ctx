@@ -27,7 +27,10 @@ call them are in `docs/access.md`.
 - **A ref is a branch, a tag or a commit**, empty for the default
   branch, by `checkRef()`. A 40 or 64 hex ref is a commit (`isCommit()`).
 - **Ignore rules are `.gitignore` text,** at most
-  `MAX_REPO_IGNORE_LINES` lines and `MAX_REPO_IGNORE_BYTES` bytes.
+  `MAX_REPO_IGNORE_LINES` lines and `MAX_REPO_IGNORE_BYTES` bytes. A line
+  git could never match, or with more than 8 `**`, is a 400 naming the
+  line: past that many, wildmatch (git's too) backtracks for minutes.
+  The fetch matches each path and its parent folders while unpacking.
 - **A change to the URL, kind, ref, credential or ignore rules sets the
   row `pending` and clears its error.** A rename does not; a refresh
   sets `pending`. The state is `pending`, `fetching`, `ready` or
@@ -42,6 +45,8 @@ call them are in `docs/access.md`.
   is `github` and `gitlab.com` is `gitlab`; for any other host the
   admin picks the kind on the row. GitHub Enterprise answers under
   `/api/v3`, GitLab under `/api/v4` with the project path encoded.
+  A `github` URL has exactly two segments, owner and name, on any host;
+  GitLab's may nest groups.
 - **An adapter knows its URLs:** the API base, the ref lookup (GitHub's
   with `application/vnd.github.sha`), the API tarball at a commit, the
   public archive by ref (`codeload.github.com` for github.com, `HEAD`

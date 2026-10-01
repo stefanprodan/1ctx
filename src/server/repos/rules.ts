@@ -174,8 +174,10 @@ function longestRun(p: string): string {
   return best;
 }
 
-// what makes wildmatch abort on every text: such a line never matches
+// a line git never matches, or with more ** runs than wildmatch backtracks fast
 function checkPattern(p: string): string | null {
+  const stars = p.replace(/\\[\s\S]/g, "").match(/\*\*/g)?.length ?? 0;
+  if (stars > 8) return "more than 8 **";
   for (let i = 0; i < p.length; i++) {
     if (p[i] === "\\") {
       if (++i >= p.length) return "ends in a backslash";

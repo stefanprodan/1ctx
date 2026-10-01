@@ -158,9 +158,10 @@ test("a folder answered once keeps its answer", () => {
 });
 
 test("many stars on a long name stay fast", () => {
-  const r = rules(`${"*a".repeat(60)}*b\n/${"**/a".repeat(30)}*b\n`);
-  const name = "a".repeat(4000);
-  const deep = Array(200).fill("a").join("/");
+  // each name holds the patterns' literals, so only the full match refuses it
+  const r = rules(`${"*a".repeat(60)}*ab*b\n${"**/a/".repeat(7)}b/**/b\n`);
+  const name = `${"a".repeat(4000)}b`;
+  const deep = `${Array(200).fill("a").join("/")}/b`;
   const start = performance.now();
   expect(ignored(r, name, false)).toBe(false);
   expect(ignored(r, deep, false)).toBe(false);

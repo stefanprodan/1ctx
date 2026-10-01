@@ -53,6 +53,9 @@ export function desired(
   if (kind === undefined) {
     throw new BadRequest(`kind is required for ${parsed.value.host}`);
   }
+  if (kind === "github" && parsed.value.segments.length !== 2) {
+    throw new BadRequest("url must be https://host/owner/name for github");
+  }
   const name = change.name ?? current?.name ?? defaultName(parsed.value);
   if (name === null) {
     throw new BadRequest("name is required: the URL's last segment is not one");
