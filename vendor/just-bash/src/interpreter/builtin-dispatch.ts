@@ -11,6 +11,8 @@ import {
   type ExecutionScope,
 } from "../execution-scope.js";
 import { getFileSystemIdentity, isFileSystemIdentity } from "../fs/identity.js";
+// (1ctx readonly-errors)
+import { isReadOnlyError } from "../fs/error-words.js";
 import { sanitizeErrorMessage } from "../fs/sanitize-error.js";
 import { awaitWithDefenseContext } from "../security/defense-context.js";
 import {
@@ -988,6 +990,11 @@ export async function executeExternalCommand(
     // Security violations must propagate to top-level error handling
     if (error instanceof SecurityViolationError) {
       throw error;
+    }
+    // (1ctx readonly-errors) a read-only refusal names the mount's path,
+    // not the agent's, so a command that let it through says the words only
+    if (isReadOnlyError(error)) {
+      return failure(`${commandName}: Read-only file system\n`);
     }
     return failure(
       `${commandName}: ${sanitizeErrorMessage(getErrorMessage(error))}\n`,

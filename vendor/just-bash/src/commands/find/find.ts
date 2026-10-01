@@ -1,6 +1,8 @@
 import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
+// (1ctx readonly-errors)
+import { isReadOnlyError } from "../../fs/error-words.js";
 import type { DirentEntry } from "../../fs/interface.js";
 // (1ctx find-links) keep host paths out of unfamiliar link errors
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
@@ -1093,7 +1095,12 @@ export const findCommand: RuntimeCommand = {
           try {
             await ctx.fs.rm(fullPath, { recursive: false });
           } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
+            // (1ctx readonly-errors) the words, never the backend's own path
+            const msg = isReadOnlyError(e)
+              ? "Read-only file system"
+              : e instanceof Error
+                ? e.message
+                : String(e);
             appendStderr(`find: cannot delete '${file}': ${msg}\n`);
             exitCode = 1;
           }

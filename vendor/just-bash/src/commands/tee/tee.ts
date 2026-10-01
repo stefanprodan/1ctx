@@ -1,4 +1,6 @@
 import { latin1FromBytes } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { fsErrorWords } from "../../fs/error-words.js";
 import type {
   ExecResult,
   RuntimeCommand,
@@ -56,8 +58,10 @@ export const teeCommand: RuntimeCommand = {
         } else {
           await ctx.fs.writeFile(filePath, content, "binary");
         }
-      } catch (_error) {
-        stderr += `tee: ${file}: No such file or directory\n`;
+      } catch (error) {
+        // (1ctx readonly-errors) GNU's words for why, not always ENOENT
+        const words = fsErrorWords(error) ?? "No such file or directory";
+        stderr += `tee: ${file}: ${words}\n`;
         exitCode = 1;
       }
     }

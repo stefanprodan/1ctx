@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { fsErrorSyscall, isReadOnlyError } from "../../fs/error-words.js";
 import { isSameOrDescendantPath } from "../../fs/path-utils.js";
 import {
   compareCanonicalContainment,
@@ -199,6 +201,14 @@ export const cpCommand: RuntimeCommand = {
         const message = getErrorMessage(error);
         if (message.includes("ENOENT") || message.includes("no such file")) {
           stderr += `cp: cannot stat '${src}': No such file or directory\n`;
+        } else if (isReadOnlyError(error)) {
+          // (1ctx readonly-errors) GNU names the copy it could not create
+          const target = destIsDir
+            ? `${dest.replace(/\/+$/, "")}/${src.split("/").pop() || src}`
+            : dest;
+          const kind =
+            fsErrorSyscall(error) === "mkdir" ? "directory" : "regular file";
+          stderr += `cp: cannot create ${kind} '${target}': Read-only file system\n`;
         } else {
           stderr += `cp: cannot copy '${src}': ${message}\n`;
         }

@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { isReadOnlyError } from "../../fs/error-words.js";
 import { FileTraversalBudget } from "../../fs/traversal.js";
 import { getErrorMessage } from "../../interpreter/helpers/errors.js";
 import type {
@@ -184,7 +186,10 @@ async function removeSingleDir(
 
     return { stdout, stderr: "", exitCode: 0 };
   } catch (error) {
-    const message = getErrorMessage(error);
+    // (1ctx readonly-errors) the words, never the backend's own path
+    const message = isReadOnlyError(error)
+      ? "Read-only file system"
+      : getErrorMessage(error);
     return {
       stdout: "",
       stderr: `rmdir: failed to remove '${displayPath}': ${message}\n`,

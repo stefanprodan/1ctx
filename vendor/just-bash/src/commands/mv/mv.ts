@@ -1,3 +1,9 @@
+// (1ctx readonly-errors)
+import {
+  fsErrorSyscall,
+  fsErrorWords,
+  isReadOnlyError,
+} from "../../fs/error-words.js";
 import { isSameOrDescendantPath } from "../../fs/path-utils.js";
 import {
   compareCanonicalContainment,
@@ -187,8 +193,24 @@ export const mvCommand: RuntimeCommand = {
           throw error;
         }
         const message = getErrorMessage(error);
+        const words = isReadOnlyError(error) ? fsErrorWords(error) : undefined;
         if (message.includes("ENOENT") || message.includes("no such file")) {
           stderr += `mv: cannot stat '${src}': No such file or directory\n`;
+        } else if (words !== undefined) {
+          // (1ctx readonly-errors) GNU's words for the step that failed: a
+          // move across file systems copies, then removes the source
+          const target = destIsDir
+            ? `${dest.replace(/\/+$/, "")}/${src.split("/").pop() || src}`
+            : dest;
+          const syscall = fsErrorSyscall(error);
+          stderr +=
+            syscall === "rm"
+              ? `mv: cannot remove '${src}': ${words}\n`
+              : syscall === "mv" || syscall === "rename"
+                ? `mv: cannot move '${src}' to '${target}': ${words}\n`
+                : syscall === "mkdir"
+                  ? `mv: cannot create directory '${target}': ${words}\n`
+                  : `mv: cannot create regular file '${target}': ${words}\n`;
         } else {
           stderr += `mv: cannot move '${src}': ${message}\n`;
         }

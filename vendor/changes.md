@@ -281,6 +281,58 @@ Before: these refused `--` as an unknown option or read it as a file, a
 duration or a mode, where GNU and jq take it as the end of the options;
 a model writes `cmd -- "$f"` for a name it did not choose.
 
+### readonly-errors: a write into a read-only mount fails as Linux does
+Files: `src/fs/error-words.ts` (new), `src/fs/overlay-fs/overlay-fs.ts`,
+  `src/interpreter/redirections.ts`, `src/interpreter/builtin-dispatch.ts`,
+  `src/commands/sed/sed.ts`, `src/commands/chmod/chmod.ts`,
+  `src/commands/mkdir/mkdir.ts`, `src/commands/mv/mv.ts`,
+  `src/commands/cp/cp.ts`, `src/commands/touch/touch.ts`,
+  `src/commands/ln/ln.ts`, `src/commands/rmdir/rmdir.ts`,
+  `src/commands/tee/tee.ts`, `src/commands/split/split.ts`,
+  `src/commands/sort/sort.ts`, `src/commands/tar/tar.ts`,
+  `src/commands/gzip/gzip.ts`, `src/commands/yq/yq.ts`,
+  `src/commands/curl/curl.ts`, `src/commands/find/find.ts`,
+  `src/commands/time/time.ts`, `src/commands/awk/interpreter/statements.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/readonly-errors.test.ts`
+
+Now:
+
+- **Redirects.** a refused open (`>`, `>>`, `>|`, `&>`, `&>>`, `N>`,
+  `>&file`, `<>`, `exec N>`) answers `bash: <target as typed>:
+  Read-only file system`, or `Permission denied`, `Is a directory`,
+  `No such file or directory` and the like, with exit 1 and the
+  command not run, as upstream's open PR #127 does. `<>` opens for
+  writing too, as `>>` does. A refused write after the open is
+  `bash: <command>: write error: <words>`. A full file system (ENOSPC)
+  and an unknown error still throw, so a full mount still ends the job.
+- **Commands.** each names the path as typed with GNU's words for the
+  errno, never the backend's message and its mount-relative path: `sed
+  -i` (`couldn't open temporary file <dir>/sedXXXXXX`, exit 4),
+  `chmod` (`changing permissions of`), `mkdir`, `mv` (`cannot remove`
+  the source after a copy across mounts, `cannot create regular file`,
+  `cannot move ... to`), `cp` (`cannot create regular file` or
+  `directory`), `touch`, `ln` (`failed to create symbolic link`, `hard
+  link ... =>`, `Invalid cross-device link`), `rmdir`, `tee`, `split`,
+  `sort -o` (`open failed:`), `tar` (`Cannot open:`, `Cannot mkdir:`),
+  `gzip` and `gunzip`, `yq -i`, `curl` (`(23) Failure writing output
+  to destination`), `find -delete`, `time -o` and awk's `print >`
+  (`cannot redirect to`). A command that lets a read-only error through
+  says `<command>: Read-only file system`.
+- **mkdir.** a read-only `OverlayFs` checks for the folder and its parent
+  before refusing, so `mkdir -p` of a folder there succeeds and `mkdir`
+  of one says `File exists`.
+
+Before:
+
+- **Redirects.** `echo x > /ro/f` threw `EROFS: read-only file system,
+  write '/f'` out of `exec()`, which fails the whole job in the worker.
+- **Commands.** `sed -i`, `chmod` and `tee` said `No such file or
+  directory`; the others printed the raw `EROFS: ..., mkdir '/d'`, whose
+  path is the mount's, not the agent's; `split` said only `failed to
+  write output`.
+- **mkdir.** `mkdir -p` of a folder in a read-only mount failed.
+
 ## awk
 
 ### awk: awk reads, splits, compares, prints and pipes as gawk 5.4.1

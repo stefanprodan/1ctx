@@ -6,6 +6,8 @@
  */
 
 import { latin1FromBytes } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { isReadOnlyError } from "../../fs/error-words.js";
 import { createUserRegex } from "../../regex/index.js";
 import type {
   ExecResult,
@@ -410,7 +412,8 @@ async function createTarArchive(
     try {
       await ctx.fs.writeFile(archivePath, archiveData);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "unknown error";
+      // (1ctx readonly-errors)
+      const msg = archiveWriteError(e);
       return {
         stdout: "",
         stderr: `tar: ${options.file}: ${msg}\n`,
@@ -546,7 +549,8 @@ async function appendTarArchive(
   try {
     await ctx.fs.writeFile(archivePath, archiveData);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
+    // (1ctx readonly-errors)
+    const msg = archiveWriteError(e);
     return {
       stdout: "",
       stderr: `tar: ${options.file}: ${msg}\n`,
@@ -693,7 +697,8 @@ async function updateTarArchive(
   try {
     await ctx.fs.writeFile(archivePath, archiveData);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
+    // (1ctx readonly-errors)
+    const msg = archiveWriteError(e);
     return {
       stdout: "",
       stderr: `tar: ${options.file}: ${msg}\n`,
@@ -950,7 +955,12 @@ async function extractTarArchive(
       }
     } catch (e) {
       if (isAborted(ctx)) return abortedResult();
-      const msg = e instanceof Error ? e.message : "unknown error";
+      // (1ctx readonly-errors) GNU tar's words for an entry it cannot write
+      const msg = isReadOnlyError(e)
+        ? `Cannot ${entry.type === "directory" ? "mkdir" : "open"}: Read-only file system`
+        : e instanceof Error
+          ? e.message
+          : "unknown error";
       errors.push(`tar: ${safeName}: ${msg}`);
     }
   }
@@ -1078,6 +1088,12 @@ async function listTarArchive(
   }
 
   return { stdout, stderr: "", exitCode: 0 };
+}
+
+// (1ctx readonly-errors) GNU tar's words for an archive it cannot write
+function archiveWriteError(e: unknown): string {
+  if (isReadOnlyError(e)) return "Cannot open: Read-only file system";
+  return e instanceof Error ? e.message : "unknown error";
 }
 
 export const tarCommand: RuntimeCommand = {

@@ -1,3 +1,5 @@
+// (1ctx readonly-errors)
+import { fsErrorWords } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { getErrorMessage } from "../../interpreter/helpers/errors.js";
 import type {
@@ -55,7 +57,9 @@ export const mkdirCommand: RuntimeCommand = {
         ) {
           stderr += `mkdir: cannot create directory '${dir}': File exists\n`;
         } else {
-          stderr += `mkdir: cannot create directory '${dir}': ${sanitizeErrorMessage(message)}\n`;
+          // (1ctx readonly-errors) the words, never the backend's own path
+          const words = fsErrorWords(error) ?? sanitizeErrorMessage(message);
+          stderr += `mkdir: cannot create directory '${dir}': ${words}\n`;
         }
         exitCode = 1;
       }

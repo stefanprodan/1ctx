@@ -1,3 +1,9 @@
+// (1ctx readonly-errors)
+import {
+  fsErrorCode,
+  fsErrorWords,
+  isReadOnlyError,
+} from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import type {
   ExecResult,
@@ -87,10 +93,14 @@ export const lnCommand: RuntimeCommand = {
       if (force) {
         try {
           await ctx.fs.rm(linkPath, { force: true });
-        } catch {
+        } catch (error) {
+          // (1ctx readonly-errors)
+          const words = isReadOnlyError(error)
+            ? "Read-only file system"
+            : "Permission denied";
           return {
             stdout: "",
-            stderr: `ln: cannot remove '${linkName}': Permission denied\n`,
+            stderr: `ln: cannot remove '${linkName}': ${words}\n`,
             exitCode: 1,
           };
         }
@@ -132,6 +142,18 @@ export const lnCommand: RuntimeCommand = {
           stderr: symbolic
             ? `ln: failed to create symbolic link '${linkName}': Operation not permitted\n`
             : `ln: '${target}': hard link not allowed for directory\n`,
+          exitCode: 1,
+        };
+      }
+      // (1ctx readonly-errors) GNU's words for a refused link, by its name
+      const code = fsErrorCode(e);
+      if (code === "EROFS" || code === "EXDEV") {
+        const what = symbolic
+          ? `symbolic link '${linkName}'`
+          : `hard link '${linkName}' => '${target}'`;
+        return {
+          stdout: "",
+          stderr: `ln: failed to create ${what}: ${fsErrorWords(e)}\n`,
           exitCode: 1,
         };
       }

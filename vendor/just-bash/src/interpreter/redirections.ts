@@ -17,6 +17,9 @@ import {
   readBytesFrom,
   utf8ByteLength,
 } from "../encoding.js";
+// (1ctx readonly-errors)
+import { rethrowFatalExecutionError } from "../fatal-execution-error.js";
+import { fsErrorCode, fsErrorWords } from "../fs/error-words.js";
 import type { ExecResult } from "../types.js";
 import {
   ControlFlowError,
@@ -54,6 +57,26 @@ import {
 } from "./numeric-fd-redirects.js";
 import type { InterpreterContext } from "./types.js";
 
+// (1ctx readonly-errors) bash's words for a refused open or write; a full
+// file system (ENOSPC) and anything else still throw, as before
+const REFUSALS = new Set([
+  "EROFS",
+  "EACCES",
+  "EPERM",
+  "EISDIR",
+  "ENOENT",
+  "ENOTDIR",
+]);
+
+function writeErrorWords(error: unknown): string | undefined {
+  rethrowFatalExecutionError(error);
+  if (error instanceof ControlFlowError) return undefined;
+  const code = fsErrorCode(error);
+  return code !== undefined && REFUSALS.has(code)
+    ? fsErrorWords(error)
+    : undefined;
+}
+
 /**
  * Check if a redirect target is valid for output (not a directory, respects noclobber).
  * Returns an error message string if invalid, null if valid.
@@ -78,8 +101,10 @@ async function checkOutputRedirectTarget(
     ) {
       return `bash: ${target}: cannot overwrite existing file\n`;
     }
-  } catch {
-    return `bash: ${target}: cannot open redirect target\n`;
+  } catch (error) {
+    // (1ctx readonly-errors)
+    const words = writeErrorWords(error) ?? "cannot open redirect target";
+    return `bash: ${target}: ${words}\n`;
   }
   return null;
 }
@@ -228,6 +253,11 @@ async function openOutputEntry(
     if (append) await ctx.fs.appendFile(filePath, "", "binary");
     else await ctx.fs.writeFile(filePath, "", "binary");
   } catch (error) {
+    // (1ctx readonly-errors) a refused open fails the command as bash's does
+    const words = writeErrorWords(error);
+    if (words) {
+      return { error: makeResult("", `bash: ${target}: ${words}\n`, 1) };
+    }
     if (!handleWriteError) throw error;
     return {
       error: makeResult(
@@ -246,19 +276,12 @@ async function readInputEntry(
   readwrite: boolean,
 ): Promise<{ entry?: FdEntry; error?: ExecResult }> {
   const filePath = ctx.fs.resolvePath(ctx.state.cwd, target);
+  // (1ctx readonly-errors) `<>` opens for writing too, as `>>` does, so a
+  // refused write fails here and the command does not run
+  let content: string | undefined;
   try {
     // (1ctx fd-bytes) a descriptor carries the file's bytes, as `< file` does
-    const content = latin1FromBytes(await readBytesFrom(ctx.fs, filePath));
-    return readwrite
-      ? {
-          entry: {
-            kind: "readwrite",
-            path: filePath,
-            position: 0,
-            content,
-          },
-        }
-      : { entry: { kind: "input", content } };
+    content = latin1FromBytes(await readBytesFrom(ctx.fs, filePath));
   } catch {
     if (!readwrite) {
       return {
@@ -269,26 +292,26 @@ async function readInputEntry(
         ),
       };
     }
-    try {
-      await ctx.fs.writeFile(filePath, "", "binary");
-      return {
-        entry: {
-          kind: "readwrite",
-          path: filePath,
-          position: 0,
-          content: "",
-        },
-      };
-    } catch {
-      return {
-        error: makeResult(
-          "",
-          `bash: ${target}: No such file or directory\n`,
-          1,
-        ),
-      };
-    }
   }
+  if (!readwrite) return { entry: { kind: "input", content: content ?? "" } };
+  try {
+    if (content === undefined) await ctx.fs.writeFile(filePath, "", "binary");
+    else await ctx.fs.appendFile(filePath, "", "binary");
+  } catch (error) {
+    const words =
+      writeErrorWords(error) ??
+      (content === undefined ? "No such file or directory" : undefined);
+    if (!words) throw error;
+    return { error: makeResult("", `bash: ${target}: ${words}\n`, 1) };
+  }
+  return {
+    entry: {
+      kind: "readwrite",
+      path: filePath,
+      position: 0,
+      content: content ?? "",
+    },
+  };
 }
 
 const hereDocContent = async (
@@ -1337,17 +1360,27 @@ export async function applyRedirections(
       exitCode = 1;
     }
     if (fd2Sink.kind === "invalid-output") pendingStderr = "";
-    const deliverToFile = async (
+    // (1ctx readonly-errors) a refused write is the command's write error
+    const refusable = async (write: () => Promise<unknown>) => {
+      try {
+        await write();
+      } catch (error) {
+        const words = writeErrorWords(error);
+        if (!words) throw error;
+        stderr += `${omitShellPrefix ? "" : "bash: "}${writeErrorCommand}: write error: ${words}\n`;
+        exitCode = 1;
+      }
+    };
+    const deliverToFile = (
       sink: { path: string; append: boolean },
       content: string,
       encoding: "binary" | "utf8",
-    ) => {
-      if (sink.append) {
-        await ctx.fs.appendFile(sink.path, content, encoding);
-      } else {
-        await ctx.fs.writeFile(sink.path, content, encoding);
-      }
-    };
+    ) =>
+      refusable(() =>
+        sink.append
+          ? ctx.fs.appendFile(sink.path, content, encoding)
+          : ctx.fs.writeFile(sink.path, content, encoding),
+      );
     if (
       fd1Sink === fd2Sink &&
       (fd1Sink.kind === "file" || fd1Sink.kind === "descriptor")
@@ -1362,12 +1395,15 @@ export async function applyRedirections(
         if (fd1Sink.kind === "file") {
           await deliverToFile(fd1Sink, combined, getStdoutEncoding(combined));
         } else {
-          await writeFdEntry(
-            ctx,
-            fd1Sink.source.entry,
-            fd1Sink.source.descriptors,
-            combined,
-            getStdoutEncoding(combined),
+          // (1ctx readonly-errors)
+          await refusable(() =>
+            writeFdEntry(
+              ctx,
+              fd1Sink.source.entry,
+              fd1Sink.source.descriptors,
+              combined,
+              getStdoutEncoding(combined),
+            ),
           );
         }
       }
@@ -1394,12 +1430,17 @@ export async function applyRedirections(
             );
             break;
           case "descriptor":
-            await writeFdEntry(
-              ctx,
-              sink.source.entry,
-              sink.source.descriptors,
-              content,
-              isStdout ? getStdoutEncoding(content) : getFileEncoding(content),
+            // (1ctx readonly-errors)
+            await refusable(() =>
+              writeFdEntry(
+                ctx,
+                sink.source.entry,
+                sink.source.descriptors,
+                content,
+                isStdout
+                  ? getStdoutEncoding(content)
+                  : getFileEncoding(content),
+              ),
             );
             break;
           case "invalid-output":

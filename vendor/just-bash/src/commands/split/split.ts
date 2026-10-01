@@ -10,6 +10,8 @@
 import { latin1FromBytes, utf8ByteLength } from "../../encoding.js";
 import type { ResourceLease } from "../../execution-scope.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
+// (1ctx readonly-errors)
+import { fsErrorWords } from "../../fs/error-words.js";
 import {
   type ResolvedFileIdentity,
   resolveFileIdentity,
@@ -596,8 +598,11 @@ export const split: RuntimeCommand = {
       // Build every chunk under a new sibling name. Visible output names are
       // changed only during commit, and existing entries are renamed to backups
       // rather than opened/truncated. This keeps a hard-linked input inode safe.
+      // (1ctx readonly-errors) the output being written, named on a refusal
+      let writing: PlannedOutput | undefined;
       try {
         for (const output of outputs) {
+          writing = output;
           output.stagePath = await uniqueSiblingPath(ctx, output.path, "stage");
           await ctx.fs.writeFile(output.stagePath, output.content);
         }
@@ -629,6 +634,7 @@ export const split: RuntimeCommand = {
         }
 
         for (const output of outputs) {
+          writing = output;
           // Repeat per-output just before its destructive rename to narrow the
           // validation/commit race on custom and host-backed filesystems.
           if (
@@ -661,7 +667,7 @@ export const split: RuntimeCommand = {
             output.backupPath = undefined;
           }
         }
-      } catch {
+      } catch (error) {
         for (const output of [...outputs].reverse()) {
           if (output.committed) {
             await ctx.fs
@@ -677,10 +683,14 @@ export const split: RuntimeCommand = {
               .catch(() => {});
           }
         }
+        const words = fsErrorWords(error);
         return {
           exitCode: 1,
           stdout: "",
-          stderr: "split: failed to write output\n",
+          stderr:
+            words !== undefined && writing !== undefined
+              ? `split: ${writing.displayName}: ${words}\n`
+              : "split: failed to write output\n",
         };
       }
 

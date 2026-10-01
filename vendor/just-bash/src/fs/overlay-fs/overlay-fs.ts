@@ -844,7 +844,6 @@ export class OverlayFs implements IFileSystem {
 
   async mkdir(path: string, options?: MkdirOptions): Promise<void> {
     validatePath(path, "mkdir");
-    this.assertWritable(`mkdir '${path}'`);
     const normalized = normalizePath(path);
 
     // Check if it exists (in memory or real fs)
@@ -869,6 +868,9 @@ export class OverlayFs implements IFileSystem {
       }
     }
 
+    // (1ctx readonly-errors) checked last, so an existing folder or a
+    // missing parent answers as on Linux and `mkdir -p` of a folder works
+    this.assertWritable(`mkdir '${path}'`);
     this.setMemoryEntry(normalized, {
       type: "directory",
       mode: DEFAULT_DIR_MODE,

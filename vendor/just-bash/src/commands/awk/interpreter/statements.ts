@@ -4,6 +4,8 @@
  * Async statement executor supporting file I/O operations.
  */
 
+// (1ctx readonly-errors)
+import { isReadOnlyError } from "../../../fs/error-words.js";
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
 import {
   assertDefenseContext,
@@ -318,7 +320,15 @@ async function writeToFile(
     checkAwkOutputSize(ctx);
     return;
   }
-  await writeFile(ctx, fs.resolvePath(ctx.cwd, filename), redirect, text);
+  try {
+    await writeFile(ctx, fs.resolvePath(ctx.cwd, filename), redirect, text);
+  } catch (error) {
+    // (1ctx readonly-errors) gawk's fatal error for a file it cannot open
+    if (!isReadOnlyError(error)) throw error;
+    throw new Error(
+      `cannot redirect to \`${filename}': Read-only file system`,
+    );
+  }
 }
 
 /**

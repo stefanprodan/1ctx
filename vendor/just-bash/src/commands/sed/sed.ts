@@ -1,4 +1,6 @@
 import { decodeBytesToUtf8 } from "../../encoding.js";
+// (1ctx readonly-errors)
+import { fsErrorWords } from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 import type { ExecutionLimits } from "../../limits.js";
@@ -527,9 +529,24 @@ export const sedCommand: RuntimeCommand = {
               exitCode: result.exitCode ?? 1,
             };
           }
-          await withDefenseContext("in-place output write", () =>
-            ctx.fs.writeFile(filePath, result.output),
-          );
+          try {
+            await withDefenseContext("in-place output write", () =>
+              ctx.fs.writeFile(filePath, result.output),
+            );
+          } catch (e) {
+            // (1ctx readonly-errors) GNU sed writes a temporary file beside
+            // the file, and names it when that fails
+            const words = fsErrorWords(e);
+            if (words === undefined || e instanceof SecurityViolationError)
+              throw e;
+            const slash = file.lastIndexOf("/");
+            const dir = slash < 0 ? "." : file.slice(0, slash) || "";
+            return {
+              stdout: "",
+              stderr: `sed: couldn't open temporary file ${dir}/sedXXXXXX: ${words}\n`,
+              exitCode: 4,
+            };
+          }
         } catch (e) {
           if (e instanceof SecurityViolationError) {
             throw e;

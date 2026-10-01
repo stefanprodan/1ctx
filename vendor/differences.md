@@ -289,6 +289,22 @@ findutils 4.11.0 answered. Where they part:
   from reading it. When both `-empty` and the descent fail on a folder,
   ours reports it once and GNU twice.
 
+## Where a write into a read-only mount still differs from Linux
+
+`test/vendor/just-bash/readonly-errors.test.ts` holds the words; these
+differ from bash and GNU coreutils 9.11 on a read-only Linux mount:
+
+- A write into a missing folder there says `Read-only file system`
+  where Linux says `No such file or directory`, and `rmdir` of a folder
+  with files says `Directory not empty` where Linux refuses it first.
+- `sed -i` names its temporary file `sedXXXXXX`, where GNU sed names
+  the random one it tried.
+- `mkdir -p` names the operand, where GNU names the first folder it
+  could not make; `chmod -R` stops at the operand and `mv` of a folder
+  out of the mount reports the folder once, where GNU reports each
+  entry.
+- `tar` leaves out GNU's closing `Exiting with failure status` line.
+
 ## Where our mktemp and yes still differ from GNU coreutils
 
 - GNU's unique-prefix abbreviations of long options (`--vers`, `--dry`,
