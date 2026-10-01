@@ -224,11 +224,11 @@ describe("Home", () => {
         },
       ];
       const html = render(<Home />);
-      expect(html).toContain('placeholder="Send a message to personal"');
+      expect(html).toContain('placeholder="Start a chat in personal"');
       expect(html).toContain('class="composer-chip-name cut">personal<');
       homeProjectId.value = "p2";
       const picked = render(<Home />);
-      expect(picked).toContain('placeholder="Send a message to platform"');
+      expect(picked).toContain('placeholder="Start a chat in platform"');
       expect(picked).toContain('class="composer-chip-name cut">platform<');
     },
   );

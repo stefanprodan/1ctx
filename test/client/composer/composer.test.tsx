@@ -144,6 +144,14 @@ describe("the composer's keys", () => {
   });
 });
 
+describe("the composer's words", () => {
+  test("the box at rest never says send", () => {
+    const { html } = keysOver("");
+    expect(html).toContain('placeholder="Message"');
+    expect(html).not.toMatch(/placeholder="[^"]*send/i);
+  });
+});
+
 describe("the @ menu", () => {
   const agents = [agent("a1", "coder"), agent("a2", "writer")];
   const listed = (html: string) =>

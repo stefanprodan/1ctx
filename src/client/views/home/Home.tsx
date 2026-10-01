@@ -58,7 +58,7 @@ export function Home() {
             }}
             agents={agents}
             agentId={null}
-            placeholder={`Send a message to ${target.name}`}
+            placeholder={`Start a chat in ${target.name}`}
             running={false}
             busy={sending.value}
             onSend={startChat(target.id)}
