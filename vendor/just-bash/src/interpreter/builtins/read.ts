@@ -2,7 +2,6 @@
  * read - Read a line of input builtin
  */
 
-import { utf8ByteLength } from "../../encoding.js";
 import type { ExecResult } from "../../types.js";
 import { ExecutionLimitError } from "../errors.js";
 import { advanceFd, getFdEntry, readFd } from "../fd-table.js";
@@ -283,8 +282,9 @@ export function handleRead(
   // Get input
   let line = "";
   let lineBytes = 0;
+  // (1ctx) the input is bytes, one char each, so its length is its size
   const appendLine = (value: string): void => {
-    const bytes = utf8ByteLength(value);
+    const bytes = value.length;
     if (bytes > ctx.limits.maxStringLength - lineBytes) {
       throw new ExecutionLimitError(
         `read: string length limit exceeded (${ctx.limits.maxStringLength} bytes)`,
@@ -295,7 +295,7 @@ export function handleRead(
     lineBytes += bytes;
   };
   const assertLineLimit = (value: string): void => {
-    if (utf8ByteLength(value) > ctx.limits.maxStringLength) {
+    if (value.length > ctx.limits.maxStringLength) {
       throw new ExecutionLimitError(
         `read: string length limit exceeded (${ctx.limits.maxStringLength} bytes)`,
         "string_length",
@@ -358,16 +358,20 @@ export function handleRead(
     const charAt = (pos: number): string =>
       effectiveStdin.substring(pos, pos + utf8CharBytes(effectiveStdin, pos));
     while (inputPos < effectiveStdin.length && charCount < nchars) {
-      const char = charAt(inputPos);
-      if (char === effectiveDelimiter) {
+      // (1ctx) the delimiter is one byte, matched before the sequence
+      if (effectiveStdin[inputPos] === effectiveDelimiter) {
         consumed = inputPos + 1;
         hitDelimiter = true;
         break;
       }
+      const char = charAt(inputPos);
       if (!raw && char === "\\" && inputPos + 1 < effectiveStdin.length) {
         // Backslash escape: consume both chars, but only count as 1 char
         // The escaped character is kept, backslash is removed
-        const nextChar = charAt(inputPos + 1);
+        const nextChar =
+          effectiveStdin[inputPos + 1] === effectiveDelimiter
+            ? effectiveDelimiter
+            : charAt(inputPos + 1);
         if (nextChar === effectiveDelimiter && effectiveDelimiter === "\n") {
           // Backslash-newline is a line continuation: consume both, don't count as a char
           // Continue reading from the next line

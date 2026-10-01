@@ -82,6 +82,46 @@ const cases: [string, string][] = [
   ['mapfile -d ab -t a <<< "xxbyyazz"; echo "${a[0]}"', "xxbyy\n"],
 ];
 
+// b1 holds c3 a9 e9, b2 a9 62 c3 a9 63, b3 e9 20 c8 9b; o1 to o3 start
+// with an overlong, a surrogate and a code point past U+10FFFF, o4 with
+// a valid three-byte character.
+const bytesSetup =
+  "printf 'ţă\\n' > t; printf 'Ã©\\n' > m; printf 'café\\nţară\\n' > two; " +
+  "printf 'aébéc' > g; echo w6np | base64 -d > b1; " +
+  "echo qWLDqWM= | base64 -d > b2; echo 6SDImw== | base64 -d > b3; " +
+  "echo 4ICAeAo= | base64 -d > o1; echo 7aCAeAo= | base64 -d > o2; " +
+  "echo 9JCAgHgK | base64 -d > o3; echo 4KCAeAo= | base64 -d > o4; ";
+
+const bytesCases: [string, string][] = [
+  ['read -u 3 -d é z 3<<< "aébéc"; echo "${#z}"', "1\n"],
+  ['read -u 3 -d é z 3<<EOF\naébéc\nEOF\necho "${#z}"', "1\n"],
+  ['{ read -d é z; } 3<<< "aébéc" <&3; echo "${#z}"', "1\n"],
+  ['read -u 3 z 3<<< "Ã©"; echo "${#z}"', "2\n"],
+  ['exec 3<<< "Ã©"; read z <&3; echo "${#z}"', "2\n"],
+  ['read -n 1 -u 3 z 3<<< "Ã©"; echo "$z"', "Ã\n"],
+  [
+    'exec {fd}<<< "ţă"; cat <&$fd; exec {fd}<<EOF\nÃ©\nEOF\nread -u $fd z; echo "${#z}"',
+    "ţă\n2\n",
+  ],
+  ['exec 3< m; read -u 3 z; echo "${#z}"', "2\n"],
+  ["exec 3<> two; read -u 3 a; echo xy >&3; cat two", "café\nxy\nră\n"],
+  ['exec 3<<< "ţă"; cat <&3 | base64', "xaPEgwo=\n"],
+  ["exec 3<<EOF\nţă\nEOF\ncat <&3 | base64", "xaPEgwo=\n"],
+  ["exec 3< t; read -n 1 x <&3; cat <&3 | base64", "xIMK\n"],
+  ["exec 3<> t; cat <&3 | base64", "xaPEgwo=\n"],
+  ["cat 3< t <&3 | base64", "xaPEgwo=\n"],
+  ['read -d é -n 5 z <<< "abéc"; echo "$z"', "ab\n"],
+  ['printf "éaéb" | { read -d é -n 1 v; echo "[$v]"; }', "[]\n"],
+  ['read a < b1; echo "${#a}"', "2\n"],
+  ['read a < b2; echo "${#a}"', "4\n"],
+  ['read a b < b3; echo "${#a} ${#b}"', "1 1\n"],
+  ['read -n 2 a < b1; echo "${#a}"', "2\n"],
+  ['mapfile -t m < b2; echo "${#m[0]}"', "4\n"],
+  ['{ read -d é p; read -r q; } < g; echo "${#q}"', "4\n"],
+  ['for f in o1 o2 o3 o4; do read a < $f; echo "${#a}"; done', "4\n4\n5\n2\n"],
+  ['{ read -n 1 a; read b; } < o4; echo "${#a} ${#b}"', "1 1\n"],
+];
+
 describe("read and mapfile over UTF-8", () => {
   for (const [script, want] of cases) {
     test(script, async () => {
@@ -90,6 +130,38 @@ describe("read and mapfile over UTF-8", () => {
       expect(result.stdout).toBe(want);
     });
   }
+
+  for (const [script, want] of bytesCases) {
+    test(script, async () => {
+      const result = await new Bash().exec(bytesSetup + script);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe(want);
+    });
+  }
+
+  test("read -n takes one byte that starts no valid sequence", async () => {
+    // bash folds the next byte into an invalid one; one byte is kept here.
+    const result = await new Bash().exec(
+      `${bytesSetup}for f in o1 o2 o3; do { read -n 1 a; read b; } < $f; echo "\${#a} \${#b}"; done`,
+    );
+    expect(result.stdout).toBe("1 3\n1 3\n1 4\n");
+  });
+
+  test("the string limit counts the bytes read", async () => {
+    const limits = { maxStringLength: 100 };
+    const fits = await new Bash({
+      executionLimits: limits,
+      files: { "/in": `${"é".repeat(45)}\n` },
+    }).exec('read v < /in; echo "${#v}"');
+    expect(fits.stderr).toBe("");
+    expect(fits.stdout).toBe("45\n");
+    const over = await new Bash({
+      executionLimits: limits,
+      files: { "/in": `${"é".repeat(51)}\n` },
+    }).exec('read v < /in; echo "${#v}"');
+    expect(over.stdout).toBe("");
+    expect(over.exitCode).not.toBe(0);
+  });
 
   test("a read loop copies a file byte for byte", async () => {
     const text = "café\nţară ăîș\n😀 emoji\n\tindented  \nlast";

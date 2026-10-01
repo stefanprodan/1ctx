@@ -6,9 +6,8 @@
  * in a UTF-8 locale and decode what lands in a variable.
  */
 
-import { decodeBytesToUtf8, unsafeBytesFromLatin1 } from "../../encoding.js";
-
 const utf8Encoder = new TextEncoder();
+const strictDecoder = new TextDecoder("utf-8", { fatal: true });
 
 /**
  * The delimiter byte for `-d delim`: bash takes the first byte of the
@@ -22,17 +21,21 @@ export function delimiterByte(arg: string): string {
 }
 
 /**
- * How many bytes the character at `pos` takes: a whole UTF-8 sequence,
- * or one byte when the bytes there are not one.
+ * How many bytes the character at `pos` takes: a whole well-formed UTF-8
+ * sequence (no overlong form, surrogate or code point past U+10FFFF), or
+ * one byte when the bytes there are not one.
  */
 export function utf8CharBytes(bytes: string, pos: number): number {
   const lead = bytes.charCodeAt(pos);
-  let length = 1;
-  if (lead >= 0xc2 && lead <= 0xdf) length = 2;
-  else if (lead >= 0xe0 && lead <= 0xef) length = 3;
-  else if (lead >= 0xf0 && lead <= 0xf4) length = 4;
-  if (length === 1 || pos + length > bytes.length) return 1;
-  for (let k = 1; k < length; k++) {
+  if (lead < 0xc2 || lead > 0xf4) return 1;
+  const length = lead <= 0xdf ? 2 : lead <= 0xef ? 3 : 4;
+  if (pos + length > bytes.length) return 1;
+  // The second byte's range depends on the lead (RFC 3629 section 4).
+  const second = bytes.charCodeAt(pos + 1);
+  const low = lead === 0xe0 ? 0xa0 : lead === 0xf0 ? 0x90 : 0x80;
+  const high = lead === 0xed ? 0x9f : lead === 0xf4 ? 0x8f : 0xbf;
+  if (second < low || second > high) return 1;
+  for (let k = 2; k < length; k++) {
     const next = bytes.charCodeAt(pos + k);
     if (next < 0x80 || next > 0xbf) return 1;
   }
@@ -40,9 +43,34 @@ export function utf8CharBytes(bytes: string, pos: number): number {
 }
 
 /**
- * Decode collected bytes as UTF-8 text; bytes that are not valid UTF-8
- * stay one character each, as the shell held them before.
+ * Decode collected bytes as UTF-8 text, one well-formed sequence at a
+ * time: a byte that starts none stays one character, U+0080 to U+00FF,
+ * so the valid characters around it still decode.
  */
 export function decodeInput(bytes: string): string {
-  return decodeBytesToUtf8(unsafeBytesFromLatin1(bytes));
+  let high = false;
+  for (let i = 0; i < bytes.length; i++) {
+    const code = bytes.charCodeAt(i);
+    if (code > 0xff) return bytes;
+    if (code > 0x7f) high = true;
+  }
+  if (!high) return bytes;
+  const buffer = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i);
+  try {
+    return strictDecoder.decode(buffer);
+  } catch {
+    // Not valid as a whole: decode around the bytes that are not.
+  }
+  let out = "";
+  let pos = 0;
+  while (pos < bytes.length) {
+    const length = utf8CharBytes(bytes, pos);
+    out +=
+      length === 1
+        ? bytes[pos]
+        : strictDecoder.decode(buffer.subarray(pos, pos + length));
+    pos += length;
+  }
+  return out;
 }
