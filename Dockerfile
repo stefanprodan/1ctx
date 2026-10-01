@@ -29,4 +29,4 @@ USER 65532:65532
 WORKDIR /data
 EXPOSE 11236
 ENTRYPOINT ["/usr/local/bin/1ctx"]
-CMD ["--listen", "0.0.0.0:11236", "--db", "/data/1ctx.sqlite", "--secrets", "/secrets"]
+CMD ["--listen", "0.0.0.0:11236", "--db", "/data/1ctx.sqlite", "--secrets", "/secrets", "--provision", "/provision"]

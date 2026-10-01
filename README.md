@@ -13,6 +13,10 @@ Stop the server, put the secret files in its secrets directory, then apply:
 cat instance.yaml | 1ctx provision -f - --db ./1ctx.sqlite --secrets ./secrets
 ```
 
+A server started with `--provision <file|dir>` applies the same way before
+it listens, at every start; a missing path or a directory with no YAML
+applies nothing, and a failure stops the start.
+
 `-f` is repeatable. A directory contributes only its `.yaml` and `.yml`
 files, sorted by name, without descending into subdirectories. Every
 document has `apiVersion: config.1ctx.dev/v1`, a `kind`, `metadata.name`

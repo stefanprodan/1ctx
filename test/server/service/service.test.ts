@@ -103,7 +103,17 @@ describe("service install", () => {
     const { all } = deps(backend);
 
     await runService(
-      ["install", "--db", "data/x.sqlite", "--secrets", "keys"],
+      [
+        "install",
+        "--db",
+        "data/x.sqlite",
+        "--secrets",
+        "keys",
+        "--provision",
+        "objects",
+        "--provision",
+        "/etc/1ctx",
+      ],
       all,
     );
 
@@ -114,6 +124,10 @@ describe("service install", () => {
       "/work/data/x.sqlite",
       "--secrets",
       "/work/keys",
+      "--provision",
+      "/work/objects",
+      "--provision",
+      "/etc/1ctx",
       "--drain",
       "10",
     ]);

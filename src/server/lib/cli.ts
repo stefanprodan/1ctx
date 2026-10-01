@@ -18,6 +18,8 @@ export type RunOptions = {
   dbPath: string;
   // null is the default directory, which depends on where the binary is
   secretsDir: string | null;
+  // files or folders applied before the server opens the db
+  provision: string[];
   secureCookie: boolean;
   trustProxy: boolean;
   // whole seconds; 0 terminates at once
@@ -66,6 +68,9 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
                          ":memory:" keeps nothing)
   --secrets <dir>        the secrets directory (default: ../secrets next to
                          the binary; .preview/secrets from source)
+  --provision <path>     YAML file or directory applied at every start, as
+                         provision -f does; a missing path or one with no
+                         YAML applies nothing, a failure exits; repeatable
   --secure-cookie        mark the login cookie Secure; set it when 1ctx is
                          served over TLS
   --trust-proxy          take the client address and scheme from the
@@ -121,13 +126,21 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
   let trustProxy = false;
   let drain = DEFAULT_DRAIN;
   const files: string[] = [];
+  const provision: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (provisioning && !PROVISION_FLAGS.includes(arg)) {
       return { kind: "error", message: `unknown provision option ${arg}` };
     }
-    const valued = ["-f", "--listen", "--db", "--secrets", "--drain"];
+    const valued = [
+      "-f",
+      "--listen",
+      "--db",
+      "--secrets",
+      "--provision",
+      "--drain",
+    ];
     let value = "";
     if (valued.includes(arg)) {
       const next = args[++i];
@@ -152,6 +165,15 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
         break;
       case "--secrets":
         secretsDir = value;
+        break;
+      case "--provision":
+        if (value === "" || value === "-") {
+          return {
+            kind: "error",
+            message: "--provision must be a file or a directory",
+          };
+        }
+        provision.push(value);
         break;
       case "--secure-cookie":
         secureCookie = true;
@@ -194,6 +216,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       ...address,
       dbPath,
       secretsDir,
+      provision,
       secureCookie,
       trustProxy,
       drain,
@@ -207,6 +230,7 @@ export function optionsToArgs(options: RunOptions): string[] {
   const host = options.hostname;
   const args = ["--listen", `${host}:${options.port}`, "--db", options.dbPath];
   if (options.secretsDir !== null) args.push("--secrets", options.secretsDir);
+  for (const path of options.provision) args.push("--provision", path);
   if (options.secureCookie) args.push("--secure-cookie");
   if (options.trustProxy) args.push("--trust-proxy");
   args.push("--drain", String(options.drain));

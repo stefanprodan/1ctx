@@ -1,5 +1,6 @@
 # Run with ONECTX_VERSION set to a release; ./secrets holds user-admin.key
-# for the first admin and the <kind>-<name>.key files.
+# for the first admin and the <kind>-<name>.key files, and ./provision (or
+# ONECTX_PROVISION) holds the YAML objects applied at every start.
 name: 1ctx
 services:
   1ctx:
@@ -15,5 +16,6 @@ services:
     volumes:
       - data:/data
       - ./secrets:/secrets:ro
+      - ${ONECTX_PROVISION:-./provision}:/provision:ro
 volumes:
   data:

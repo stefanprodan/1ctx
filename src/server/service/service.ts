@@ -11,7 +11,7 @@ import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
 const HEALTH_ATTEMPTS = 60;
-const VALUED = ["--listen", "--db", "--secrets", "--drain"];
+const VALUED = ["--listen", "--db", "--secrets", "--provision", "--drain"];
 // the manager's kill timeout over the drain: the runner's five-second
 // wait and room to close; the sum stays under the stop's own wait
 // (WAIT_MS in launchd.ts)
@@ -145,6 +145,7 @@ async function install(argv: string[], r: Resolved): Promise<void> {
       cli.options.dbPath === ":memory:" ? ":memory:" : pin(cli.options.dbPath),
     secretsDir:
       cli.options.secretsDir === null ? null : pin(cli.options.secretsDir),
+    provision: cli.options.provision.map(pin),
   };
   if (options.drain > MAX_SERVICE_DRAIN) {
     throw new ServiceError("drain must leave the service manager time to stop");

@@ -274,12 +274,12 @@ violation, and every rule has a rejected fixture under
   or ready, and answers an unexpected throw with a renewed JSON 500.
   `login limited` is logged once when an address's window closes, not
   per refusal. Startup is one event with paths, migrations, flags,
-  inventory and repair counts; the drain logs `draining`, then `drained`
-  or `drain over`, with counts; shutdown reports drained and ended sends
-  and timing. Catalog and MCP refreshes and hourly sweeps log only work
-  done or a failure. `subscribe()` on the bus takes the subscriber's
-  `Log`; a test collects events with `collectLogs()` from
-  `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
+  provision, inventory and repair counts; the drain logs `draining`,
+  then `drained` or `drain over`, with counts; shutdown reports drained
+  and ended sends and timing. Catalog and MCP refreshes and hourly
+  sweeps log only work done or a failure. `subscribe()` on the bus takes
+  the subscriber's `Log`; a test collects events with `collectLogs()`
+  from `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state
