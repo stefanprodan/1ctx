@@ -12,6 +12,11 @@ import {
   splitByIfsForRead,
   stripTrailingIfsWhitespace,
 } from "../helpers/ifs.js";
+import {
+  decodeInput,
+  delimiterByte,
+  utf8CharBytes,
+} from "../helpers/read-input.js";
 import { checkReadonlyError } from "../helpers/readonly.js";
 import { result } from "../helpers/result.js";
 import type { InterpreterContext } from "../types.js";
@@ -272,8 +277,8 @@ export function handleRead(
   }
 
   // Handle -d '' (empty delimiter) - reads until NUL byte
-  // Empty string delimiter means read until NUL byte (\0)
-  const effectiveDelimiter = delimiter === "" ? "\0" : delimiter;
+  // (1ctx) stdin is bytes and bash delimits on the first byte of -d
+  const effectiveDelimiter = delimiterByte(delimiter);
 
   // Get input
   let line = "";
@@ -319,18 +324,25 @@ export function handleRead(
 
   if (ncharsExact >= 0) {
     // -N: Read exactly N characters (ignores delimiters, no IFS splitting)
-    const toRead = Math.min(ncharsExact, effectiveStdin.length);
+    // (1ctx) N counts characters, a UTF-8 sequence being one, and the
+    // input advances by the bytes they took
+    let charCount = 0;
+    let toRead = 0;
+    while (toRead < effectiveStdin.length && charCount < ncharsExact) {
+      toRead += utf8CharBytes(effectiveStdin, toRead);
+      charCount++;
+    }
     line = effectiveStdin.substring(0, toRead);
     assertLineLimit(line);
     consumed = toRead;
-    foundDelimiter = toRead >= ncharsExact;
+    foundDelimiter = charCount >= ncharsExact;
 
     // Consume from appropriate source
     consumeInput(consumed);
 
     // With -N, assign entire content to first variable (no IFS splitting)
     const varName = varNames[0] || "REPLY";
-    ctx.state.env.set(varName, line);
+    ctx.state.env.set(varName, decodeInput(line));
     // Set remaining variables to empty
     for (let j = 1; j < varNames.length; j++) {
       ctx.state.env.set(varNames[j], "");
@@ -342,8 +354,11 @@ export function handleRead(
     let charCount = 0;
     let inputPos = 0;
     let hitDelimiter = false;
+    // (1ctx) a character is a whole UTF-8 sequence, never split
+    const charAt = (pos: number): string =>
+      effectiveStdin.substring(pos, pos + utf8CharBytes(effectiveStdin, pos));
     while (inputPos < effectiveStdin.length && charCount < nchars) {
-      const char = effectiveStdin[inputPos];
+      const char = charAt(inputPos);
       if (char === effectiveDelimiter) {
         consumed = inputPos + 1;
         hitDelimiter = true;
@@ -352,7 +367,7 @@ export function handleRead(
       if (!raw && char === "\\" && inputPos + 1 < effectiveStdin.length) {
         // Backslash escape: consume both chars, but only count as 1 char
         // The escaped character is kept, backslash is removed
-        const nextChar = effectiveStdin[inputPos + 1];
+        const nextChar = charAt(inputPos + 1);
         if (nextChar === effectiveDelimiter && effectiveDelimiter === "\n") {
           // Backslash-newline is a line continuation: consume both, don't count as a char
           // Continue reading from the next line
@@ -369,12 +384,12 @@ export function handleRead(
           continue;
         }
         appendLine(nextChar);
-        inputPos += 2;
+        inputPos += 1 + nextChar.length;
         charCount++;
         consumed = inputPos;
       } else {
         appendLine(char);
-        inputPos++;
+        inputPos += char.length;
         charCount++;
         consumed = inputPos;
       }
@@ -452,6 +467,9 @@ export function handleRead(
     // Consume from appropriate source
     consumeInput(consumed);
   }
+
+  // (1ctx) the line was collected as bytes; split and store it as text
+  line = decodeInput(line);
 
   // Remove trailing newline if present and delimiter is newline
   if (effectiveDelimiter === "\n" && line.endsWith("\n")) {

@@ -17,6 +17,7 @@ import { utf8ByteLength } from "../../encoding.js";
 import type { ExecResult } from "../../types.js";
 import { ExecutionLimitError } from "../errors.js";
 import { clearArray, setArrayElement } from "../helpers/array.js";
+import { decodeInput, delimiterByte } from "../helpers/read-input.js";
 import { checkReadonlyError } from "../helpers/readonly.js";
 import { result } from "../helpers/result.js";
 import type { InterpreterContext } from "../types.js";
@@ -39,7 +40,8 @@ export function handleMapfile(
     const arg = args[i];
     if (arg === "-d" && i + 1 < args.length) {
       // In bash, -d '' means use NUL byte as delimiter
-      delimiter = args[i + 1] === "" ? "\0" : args[i + 1] || "\n";
+      // (1ctx) stdin is bytes and bash delimits on the first byte of -d
+      delimiter = delimiterByte(args[i + 1]);
       i += 2;
     } else if (arg === "-n" && i + 1 < args.length) {
       maxCount = Number.parseInt(args[i + 1], 10) || 0;
@@ -87,7 +89,9 @@ export function handleMapfile(
   let skipped = 0;
   const maxArrayElements = ctx.limits.maxArrayElements;
 
-  const pushLine = (line: string): void => {
+  // (1ctx) a line is collected as bytes and stored as text
+  const pushLine = (bytes: string): void => {
+    const line = decodeInput(bytes);
     if (utf8ByteLength(line) > ctx.limits.maxStringLength) {
       throw new ExecutionLimitError(
         `mapfile: string length limit exceeded (${ctx.limits.maxStringLength} bytes)`,
