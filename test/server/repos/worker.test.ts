@@ -36,7 +36,7 @@ test("a job answers its closed word from the worker", async () => {
   const run = workerJobs(WORKER);
   const result = await run(
     job("http://git.test/acme/widgets.tar.gz"),
-    () => {},
+    () => true,
     new AbortController().signal,
   );
   expect(result).toEqual({
@@ -52,7 +52,7 @@ test("an aborted job ends its worker at once", async () => {
   stop.abort();
   const result = await run(
     job("http://git.test/acme/widgets.tar.gz"),
-    () => {},
+    () => true,
     stop.signal,
   );
   expect(result).toMatchObject({ ok: false });

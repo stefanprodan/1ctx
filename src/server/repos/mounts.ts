@@ -286,8 +286,12 @@ export class Mounts {
   private lookup(row: RepoRow): Promise<Lookup> {
     const key = this.lookupKey(row);
     const now = this.deps.clock();
+    // an expired answer may hold a credential's header: never kept
+    for (const [old, entry] of this.lookups) {
+      if (now - entry.at >= REPO_LOOKUP_MS) this.lookups.delete(old);
+    }
     const hit = this.lookups.get(key);
-    if (hit !== undefined && now - hit.at < REPO_LOOKUP_MS) return hit.answer;
+    if (hit !== undefined) return hit.answer;
     const answer = this.lookUp(row).catch(() => fail("host unreachable"));
     this.lookups.set(key, { at: now, answer });
     return answer;
@@ -297,9 +301,8 @@ export class Mounts {
     const auth = this.deps.auth(row);
     if (!auth.ok) return fail("no access");
     const header = auth.header;
-    if (isCommit(row.ref)) {
-      return { ok: true, commit: row.ref, etag: null, header };
-    }
+    // a commit is looked up too: the host's answer is the proof of
+    // access, never a tree another project fetched
     const host = adapter(row.url, row.kind);
     if (header === null) return this.archiveLookup(row, host);
     const etag = row.commit === null ? null : this.storedEtag(row);
@@ -335,26 +338,42 @@ export class Mounts {
         : null;
     return new Promise<Lookup>((resolve) => {
       let settled = false;
-      const onEvent = (event: JobEvent) => {
-        if (settled) return;
+      const onEvent = (event: JobEvent): boolean => {
+        if (settled) return false;
         settled = true;
         const commit = event.commit ?? row.commit!;
-        if (event.commit !== null) {
-          // the job unpacks on: it is this commit's fetch now
+        let go = true;
+        if (event.commit !== null && !event.published) {
           const folder = cache.folder(source, commit, ignore);
-          const tree = job.then((done) =>
-            done.ok || done.error !== "no commit"
-              ? (done as Tree)
-              : fail("host unreachable"),
-          );
-          this.fetches!.track(folder, tree);
+          // a tree refused a while ago or being fetched is not unpacked
+          // twice: the job stops at the commit and the turn asks for it
+          if (
+            this.fetches!.refusal(folder) !== null ||
+            this.fetches!.busy(folder)
+          ) {
+            go = false;
+          } else {
+            // the job unpacks on: it is this commit's fetch now
+            const tree = job.then((done) =>
+              done.ok || done.error !== "no commit"
+                ? (done as Tree)
+                : fail("host unreachable"),
+            );
+            this.fetches!.track(folder, tree);
+          }
         }
         resolve({ ok: true, commit, etag: event.etag, header: null });
+        return go;
       };
       const job = this.fetches!.run(
         row,
         host,
-        { url: host.archiveUrl(row.ref), etag, expect: null, header: null },
+        {
+          url: host.archiveUrl(row.ref),
+          etag,
+          expect: isCommit(row.ref) ? row.ref : null,
+          header: null,
+        },
         onEvent,
       );
       void job.then(async (done) => {

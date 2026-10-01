@@ -73,7 +73,9 @@ call them are in `docs/access.md`.
 ## The lookup
 
 - **A turn resolves each repository's ref to a commit** through
-  `prepare()` (below). A full commit id needs no lookup.
+  `prepare()` (below). A full commit id is looked up like any ref: the
+  host's answer is the proof of access, so a tree another project
+  fetched signed is never mounted by an unsigned row naming its commit.
 - **One lookup per repository a minute** (`REPO_LOOKUP_MS`), shared by
   URL, ref and credential, and by project when signed, since a
   credential is bound per project. Never shared between a signed and an
@@ -106,10 +108,16 @@ call them are in `docs/access.md`.
   without a byte. The main thread terminates the worker at the deadline
   and at the drain, since the unpack's loops are synchronous; the
   worker also checks its time between members.
-- **One fetch per tree folder at a time**, each in one of
-  `REPO_FETCHES_IN_FLIGHT` slots and a process slot (`acquireProcess()`),
-  so commands keep the rest. A tree that failed is not fetched again for
-  a minute, one over the caps for `REPO_REFUSED_MS`, until a refresh.
+- **One fetch per tree folder at a time.** The request, a 304 and a
+  commit already cached take no slot: at the commit the worker asks the
+  main thread, which takes one of `REPO_FETCHES_IN_FLIGHT` fetch slots
+  and a process slot (`acquireProcess()`) only for an unpack, so a
+  lookup never waits behind other fetches and commands keep the rest.
+  `prepare()` itself takes no slot, so a caller holding one cannot
+  deadlock it; a fetch waiting for a slot is past the turn's wait.
+- **A tree that failed is not unpacked again** for a minute, one over
+  the caps for `REPO_REFUSED_MS`, until a refresh. A public lookup that
+  names such a commit, or one being fetched, stops at the commit.
 - **The row follows the fetch:** `pending`, `fetching` while one runs,
   `ready` or `failed` with its word. A create, a refresh and a change
   to what is fetched start a lookup and a fetch at once, so the admin
@@ -129,11 +137,14 @@ call them are in `docs/access.md`.
   `validPath()` (`lib/paths.ts`, the skills' rule): no leading `/`, no
   `.`, `..` or empty segment, no backslash or control character. A bad
   name, a duplicate or a member under a file or a link fails the fetch.
+  A name the volume cannot hold beside another (`README` and `readme`
+  on a case-insensitive one) is dropped and counted.
 - **The commit is the first member's pax `comment=`,** 40 or 64 hex.
   When the job knows the commit, a different one fails it `not found`.
 - **Files keep their mode with the owner's read bit,** and every file
   and folder gets the commit's time. A symlink whose target stays
-  inside the tree is kept; one out of it, a hard link to nothing kept
+  inside the tree is kept, its target written normalized from its
+  folder (only leading `..`), so no target walks through another link; one out of it, a hard link to nothing kept
   and any other member is dropped and counted (`dropped`). A hard link
   to a kept file is a copy.
 - **The ignore rules apply while unpacking,** per path and its parents

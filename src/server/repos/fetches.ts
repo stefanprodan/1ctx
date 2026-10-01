@@ -110,18 +110,34 @@ export class Fetches {
     if (swept.trees > 0) this.logSwept(swept);
   }
 
+  // a tree being fetched now
+  busy(folder: string): boolean {
+    return this.inFlight.has(folder);
+  }
+
+  // a tree whose fetch failed a while ago, under the caps in force
+  refusal(folder: string): Failure | null {
+    const key = this.refusedKey(folder);
+    const refused = this.refused.get(key);
+    if (refused === undefined) return null;
+    if (this.deps.clock() < refused.until) return refused.tree;
+    this.refused.delete(key);
+    return null;
+  }
+
+  private refusedKey(folder: string): string {
+    const limits = this.deps.limits();
+    return `${folder}:${limits.repoBytes}:${limits.repoFiles}`;
+  }
+
   // a tree by commit: joined when in flight, else fetched
   byCommit(row: RepoRow, commit: string, header: RepoHeader | null) {
     const ignore = ignoreKey(row.ignore);
     const folder = this.deps.cache.folder(sourceOf(row.url), commit, ignore);
     const running = this.inFlight.get(folder);
     if (running !== undefined) return running;
-    const limits = this.deps.limits();
-    const refusedKey = `${folder}:${limits.repoBytes}:${limits.repoFiles}`;
-    const refused = this.refused.get(refusedKey);
-    if (refused !== undefined && this.deps.clock() < refused.until) {
-      return Promise.resolve(refused.tree);
-    }
+    const refused = this.refusal(folder);
+    if (refused !== null) return Promise.resolve(refused);
     const host = adapter(row.url, row.kind);
     const url =
       header === null ? host.archiveUrl(commit) : host.tarballUrl(commit);
@@ -129,29 +145,25 @@ export class Fetches {
       row,
       host,
       { url, etag: null, expect: commit, header },
-      () => {},
+      () => true,
     ).then((done) => {
       if (done.ok || done.error !== "no commit") return done as Tree;
       return fail("host unreachable");
     });
-    return this.track(folder, tree, refusedKey);
+    return this.track(folder, tree);
   }
 
-  track(
-    folder: string,
-    tree: Promise<Tree>,
-    refusedKey?: string,
-  ): Promise<Tree> {
+  // a tree's fetch, joined by the turns that need it; a failure is
+  // not tried again for a while, one over the caps for longer
+  track(folder: string, tree: Promise<Tree>): Promise<Tree> {
     this.inFlight.set(folder, tree);
+    const key = this.refusedKey(folder);
     void tree.then((done) => {
       if (this.inFlight.get(folder) === tree) this.inFlight.delete(folder);
-      if (done.ok || refusedKey === undefined) return;
+      if (done.ok || this.deps.signal.aborted) return;
       const hold =
         done.error === "over the size cap" ? REPO_REFUSED_MS : REPO_LOOKUP_MS;
-      this.refused.set(refusedKey, {
-        until: this.deps.clock() + hold,
-        tree: done,
-      });
+      this.refused.set(key, { until: this.deps.clock() + hold, tree: done });
     });
     return tree;
   }
@@ -160,20 +172,36 @@ export class Fetches {
     row: RepoRow,
     host: Adapter,
     request: FetchRequest,
-    onEvent: (event: JobEvent) => void,
+    // false stops the job at the commit, before it unpacks
+    onEvent: (event: JobEvent) => boolean,
   ): Promise<Fetched> {
     const cache = this.deps.cache;
     const signal = this.deps.signal;
     let releaseSlot: (() => void) | undefined;
     let releaseProcess: (() => void) | undefined;
+    let full = false;
     const id = newId();
-    try {
-      releaseSlot = await this.slots.acquire(signal);
-      releaseProcess = await this.deps.acquire(signal);
-      const limits = this.deps.limits();
-      if (!cache.roomFor(limits.repoBytes)) return fail("cache full");
+    const limits = this.deps.limits();
+    // the request, a 304 and a cached commit take no slot; only an
+    // unpack does, so a lookup never waits behind other fetches
+    const unpack = async (event: JobEvent): Promise<boolean> => {
+      if (!onEvent(event)) return false;
+      if (event.commit === null || event.published) return true;
+      try {
+        releaseSlot = await this.slots.acquire(signal);
+        releaseProcess = await this.deps.acquire(signal);
+      } catch {
+        return false;
+      }
+      if (!cache.roomFor(limits.repoBytes)) {
+        full = true;
+        return false;
+      }
       const evicted = cache.evict(limits.repoCacheBytes);
       if (evicted.trees > 0) this.logSwept(evicted);
+      return true;
+    };
+    try {
       this.running.add(id);
       const started = performance.now();
       const ignore = ignoreKey(row.ignore);
@@ -198,9 +226,10 @@ export class Fetches {
           stallMs: REPO_STALL_MS,
           userAgent: this.deps.userAgent,
         },
-        onEvent,
+        unpack,
         signal,
       );
+      if (full) return fail("cache full");
       if (!done.ok) return done;
       if (done.kind === "unchanged") {
         const entry = cache.get(source, row.commit ?? "", ignore);

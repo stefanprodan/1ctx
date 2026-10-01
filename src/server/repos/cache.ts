@@ -26,7 +26,7 @@ import {
   tmpDir,
   treeFolder,
   treesDir,
-} from "./unpack.ts";
+} from "./tree.ts";
 
 // what a fetch leaves free on the cache's volume, beyond repoBytes
 export const REPO_FREE_BYTES = 1024 * 1024 * 1024;

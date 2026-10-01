@@ -19,10 +19,25 @@ export type FetchMessage =
   | { type: "event"; event: JobEvent }
   | { type: "done"; result: JobResult };
 
-self.onmessage = async (message: MessageEvent<FetchJob>) => {
-  const result = await runJob(message.data, {
+// the main thread's answer to an event: whether to unpack
+export type GoMessage = { type: "go"; go: boolean };
+
+let answer: ((go: boolean) => void) | null = null;
+
+self.onmessage = async (message: MessageEvent<FetchJob | GoMessage>) => {
+  const data = message.data;
+  if ("type" in data) {
+    answer?.(data.go);
+    answer = null;
+    return;
+  }
+  const result = await runJob(data, {
     fetch,
-    emit: (event) => self.postMessage({ type: "event", event }),
+    emit: (event) =>
+      new Promise<boolean>((resolve) => {
+        answer = resolve;
+        self.postMessage({ type: "event", event } satisfies FetchMessage);
+      }),
   });
   self.postMessage({ type: "done", result } satisfies FetchMessage);
 };

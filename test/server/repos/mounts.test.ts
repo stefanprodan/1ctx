@@ -53,6 +53,8 @@ type Options = {
   free?: number;
   cache?: boolean;
   jobs?: (base: JobRunner) => JobRunner;
+  // a process slot; granted at once by default
+  acquire?: (signal: AbortSignal) => Promise<() => void>;
 };
 
 function setup(options: Options = {}) {
@@ -106,7 +108,7 @@ function setup(options: Options = {}) {
     fetch: host.fetch,
     limits: () => limits,
     log: logs.logFactory("repos"),
-    acquire: async () => () => {},
+    acquire: options.acquire ?? (async () => () => {}),
     userAgent: "1ctx/test",
     freeSpace: () => options.free ?? Number.MAX_SAFE_INTEGER,
   });
@@ -281,16 +283,45 @@ test("a failed lookup mounts nothing and says why, logged once", async () => {
   ]);
 });
 
-test("a full commit ref needs no lookup", async () => {
+test("a commit ref is looked up too, so a tree fetched signed is never mounted unsigned", async () => {
+  const atCommit = `${PAGE}/archive/${COMMIT}.tar.gz`;
+  const answers: Record<string, HostAnswer> = {
+    [`${API}commits/main`]: new Response(COMMIT),
+    [`${API}tarball/${COMMIT}`]: redirect(`${CODELOAD}/${COMMIT}?token=short`),
+    [`${CODELOAD}/${COMMIT}?token=short`]: tarResponse(tree()),
+    // private: the archive answers no one unsigned
+    [atCommit]: new Response("not found", { status: 404 }),
+  };
+  const { repos, host, add } = setup({ answers });
+  add("p1", { ref: "main", credentialId: "c1" });
+  expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
+  const other = add("p2", { ref: COMMIT });
+  const refused = await repos.prepare("p2");
+  expect(refused.mounts).toEqual([]);
+  expect(refused.notices).toEqual([
+    { repoId: other.id, name: "widgets", reason: "not found" },
+  ]);
+  expect(host.calls.at(-1)?.url).toBe(atCommit);
+});
+
+test("a commit ref is looked up once a minute, a cached one with its ETag", async () => {
   const url = `${PAGE}/archive/${COMMIT}.tar.gz`;
   const { repos, host, add, tick } = setup({
-    answers: { [url]: tarResponse(tree()) },
+    answers: {
+      [url]: (call) =>
+        call.headers["if-none-match"] === '"c1"'
+          ? new Response(null, { status: 304 })
+          : tarResponse(tree(), '"c1"'),
+    },
   });
   add("p1", { ref: COMMIT });
   expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
+  expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
   tick(60_001);
   expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
-  expect(host.calls.map((call) => call.url)).toEqual([url]);
+  expect(
+    host.calls.map((call) => call.headers["if-none-match"] ?? null),
+  ).toEqual([null, '"c1"']);
 });
 
 test("a turn waits for a cold tree at most its wait, and the fetch goes on", async () => {
@@ -367,13 +398,16 @@ test("a regenerate mounts its commit when cached, else the lookup's with a note"
   });
 });
 
-test("a tree over the caps fails and is not fetched again for a while", async () => {
-  const url = `${PAGE}/archive/${COMMIT}.tar.gz`;
-  const { repos, host, add, tick } = setup({
-    answers: { [url]: tarResponse(tree(COMMIT, 3)) },
+test("a tree over the caps fails and is not unpacked again for a while", async () => {
+  const atCommit = `${PAGE}/archive/${COMMIT}.tar.gz`;
+  const { repos, host, add, tick, jobs } = setup({
+    answers: {
+      [ARCHIVE]: tarResponse(tree(COMMIT, 3)),
+      [atCommit]: tarResponse(tree(COMMIT, 3)),
+    },
     limits: { repoFiles: 2 },
   });
-  const row = add("p1", { ref: COMMIT });
+  const row = add("p1");
   const prepared = await repos.prepare("p1");
   expect(prepared.notices).toEqual([
     { repoId: row.id, name: "widgets", reason: "over the size cap" },
@@ -385,13 +419,20 @@ test("a tree over the caps fails and is not fetched again for a while", async ()
     files: 3,
     bytes: 3,
   });
-  tick(60_001);
+  // within the minute nothing is asked; past it the lookup stops at
+  // the commit, and the tree by commit is never fetched
   await repos.prepare("p1");
-  expect(host.calls).toHaveLength(1);
+  tick(60_001);
+  const later = await repos.prepare("p1");
+  expect(later.notices.map((notice) => notice.reason)).toEqual([
+    "over the size cap",
+  ]);
+  expect(host.calls.map((call) => call.url)).toEqual([ARCHIVE, ARCHIVE]);
+  expect(jobs()).toBe(2);
 });
 
 test("a full cache volume refuses the fetch", async () => {
-  const { repos, add, host } = setup({
+  const { repos, add, host, dir } = setup({
     answers: { [ARCHIVE]: tarResponse(tree()) },
     free: 0,
   });
@@ -400,7 +441,58 @@ test("a full cache volume refuses the fetch", async () => {
   expect(prepared.notices).toEqual([
     { repoId: row.id, name: "widgets", reason: "cache full" },
   ]);
-  expect(host.calls).toEqual([]);
+  // the lookup went out; the unpack was refused
+  expect(host.calls).toHaveLength(1);
+  expect(readdirSync(join(dir, "trees"))).toEqual([]);
+});
+
+test("a cached tree mounts while other fetches hold every slot", async () => {
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const slow = async () => {
+    await gate;
+    return tarResponse(tree());
+  };
+  const answers: Record<string, HostAnswer> = {
+    [ARCHIVE]: (call) =>
+      call.headers["if-none-match"]
+        ? new Response(null, { status: 304 })
+        : tarResponse(tree(), '"e1"'),
+    "https://git.test/acme/one/archive/HEAD.tar.gz": slow,
+    "https://git.test/acme/two/archive/HEAD.tar.gz": slow,
+  };
+  // the process slots are held by commands: none is granted
+  let granted = true;
+  const { repos, add, tick } = setup({
+    answers,
+    acquire: (signal) =>
+      granted
+        ? Promise.resolve(() => {})
+        : new Promise((_, reject) =>
+            signal.addEventListener("abort", () => reject(signal.reason)),
+          ),
+  });
+  add("p1");
+  (await repos.prepare("p1")).release();
+  granted = false;
+  add("p2", { name: "one", url: "https://git.test/acme/one" });
+  add("p3", { name: "two", url: "https://git.test/acme/two" });
+  const cold = repos.prepare("p2", { waitMs: 20 });
+  const colder = repos.prepare("p3", { waitMs: 20 });
+  tick(60_001);
+  const cached = await repos.prepare("p1", { waitMs: 200 });
+  expect(cached.mounts.map((mount) => mount.commit)).toEqual([COMMIT]);
+  open();
+  // a cold tree past its wait: the turn goes on, never stuck on a slot
+  expect((await cold).notices.map((notice) => notice.reason)).toEqual([
+    "fetching",
+  ]);
+  expect((await colder).notices.map((notice) => notice.reason)).toEqual([
+    "fetching",
+  ]);
+  repos.close();
 });
 
 test("without a cache directory nothing is fetched and no row changes", async () => {

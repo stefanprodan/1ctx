@@ -14,9 +14,9 @@ import {
   fchmodSync,
   constants as fs,
   futimesSync,
+  lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -32,6 +32,15 @@ import { isCommit } from "./adapters.ts";
 import type { RepoHeader } from "./check.ts";
 import { follow, statusError } from "./redirect.ts";
 import { effectiveIgnore, ignored, parseIgnore } from "./rules.ts";
+import { readMeta, type TreeMeta, tmpDir, treeFolder } from "./tree.ts";
+
+export {
+  readMeta,
+  type TreeMeta,
+  tmpDir,
+  treeFolder,
+  treesDir,
+} from "./tree.ts";
 
 export type FetchCaps = {
   // the kept tree's bytes and files; a file past fileBytes is kept and
@@ -62,23 +71,13 @@ export type FetchJob = {
   userAgent: string;
 };
 
-// tree.json: what a published folder holds
-export type TreeMeta = {
-  commit: string;
-  // the commit's time, seconds since the epoch
-  time: number;
-  files: number;
-  bytes: number;
-  // files past fileBytes, kept and unreadable
-  large: number;
-  // files and links the ignore rules kept out
-  ignored: number;
-  // links out of the tree, hard links to nothing kept, other members
-  dropped: number;
+// sent before the answer: the commit the tarball names, or null for a
+// 304, and whether its tree is published already
+export type JobEvent = {
+  commit: string | null;
+  etag: string | null;
+  published: boolean;
 };
-
-// sent before the answer: the commit the tarball names, or null for a 304
-export type JobEvent = { commit: string | null; etag: string | null };
 
 export type JobResult =
   | { ok: true; kind: "unchanged" }
@@ -104,18 +103,21 @@ export type JobResult =
 
 export type JobIo = {
   fetch: typeof fetch;
-  emit(event: JobEvent): void;
+  // for a tree not published, whether to unpack it: the caller takes its
+  // slots first, or stops a tree it refused
+  emit(event: JobEvent): boolean | Promise<boolean>;
   signal?: AbortSignal;
 };
 
-export const treesDir = (cacheDir: string) => join(cacheDir, "trees");
-export const tmpDir = (cacheDir: string) => join(cacheDir, "tmp");
-export const treeFolder = (
-  cacheDir: string,
-  source: string,
-  commit: string,
-  ignoreKey: string,
-) => join(treesDir(cacheDir), source, `${commit}-${ignoreKey}`);
+// a member the volume cannot hold beside another, as a case-insensitive
+// or normalizing one: dropped, never a failed fetch
+class Dropped extends Error {}
+
+const clash = (error: unknown) =>
+  error instanceof Dropped ||
+  ["EEXIST", "ENOTDIR"].includes(
+    (error as NodeJS.ErrnoException | null)?.code ?? "",
+  );
 
 class Refused extends Error {
   constructor(readonly word: RepoError) {
@@ -126,30 +128,6 @@ class Refused extends Error {
 // the tarball named a commit already published: the read stops there
 class Published extends Error {}
 
-export function readMeta(folder: string): TreeMeta | null {
-  try {
-    const meta = JSON.parse(readFileSync(join(folder, "tree.json"), "utf8"));
-    if (
-      typeof meta !== "object" ||
-      meta === null ||
-      !isCommit(meta.commit) ||
-      ![
-        meta.time,
-        meta.files,
-        meta.bytes,
-        meta.large,
-        meta.ignored,
-        meta.dropped,
-      ].every((n) => Number.isSafeInteger(n) && n >= 0)
-    ) {
-      return null;
-    }
-    return meta as TreeMeta;
-  } catch {
-    return null;
-  }
-}
-
 function writeAll(fd: number, chunk: Uint8Array): void {
   let offset = 0;
   while (offset < chunk.length) {
@@ -157,13 +135,18 @@ function writeAll(fd: number, chunk: Uint8Array): void {
   }
 }
 
-// a symlink's target, resolved from its folder, stays inside the tree
-function inside(path: string, target: string): boolean {
+// a symlink's target as written: normalized from its folder, so only
+// leading ".." walk up and never through another link; null out of the
+// tree
+function linkTarget(path: string, target: string): string | null {
   if (target === "" || target.startsWith("/") || target.includes("\\")) {
-    return false;
+    return null;
   }
   const resolved = posix.normalize(posix.join(posix.dirname(path), target));
-  return resolved !== ".." && !resolved.startsWith("../") && resolved !== ".";
+  if (resolved === ".." || resolved.startsWith("../") || resolved === ".") {
+    return null;
+  }
+  return posix.relative(posix.dirname(path), resolved);
 }
 
 export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
@@ -177,6 +160,8 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
   ]);
   const ends = setTimeout(() => deadline.abort(), job.deadlineMs);
   let stallTimer = setTimeout(() => stall.abort(), job.stallMs);
+  // while the caller takes its slots, a quiet stream is no stall
+  let paused = false;
   const work = join(tmpDir(job.cacheDir), job.id);
   const files = join(work, "files");
   let published = false;
@@ -214,7 +199,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
     status = response.status;
     if (status === 304 && job.etag !== null) {
       await response.body?.cancel().catch(() => {});
-      io.emit({ commit: null, etag: job.etag });
+      io.emit({ commit: null, etag: job.etag, published: true });
       return { ok: true, kind: "unchanged" };
     }
     if (status !== 200 || response.body === null) {
@@ -239,7 +224,9 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
             throw new Refused("over the size cap");
           }
           clearTimeout(stallTimer);
-          stallTimer = setTimeout(() => stall.abort(), job.stallMs);
+          if (!paused) {
+            stallTimer = setTimeout(() => stall.abort(), job.stallMs);
+          }
           controller.enqueue(chunk);
         },
       }),
@@ -263,7 +250,18 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
         const kind = kinds.get(prefix);
         if (kind === "dir") continue;
         if (kind !== undefined) throw new Refused("host unreachable");
-        mkdirSync(join(files, prefix), { mode: 0o755 });
+        try {
+          mkdirSync(join(files, prefix), { mode: 0o755 });
+        } catch (error) {
+          // another name of this folder on a case-insensitive volume
+          const code = (error as NodeJS.ErrnoException).code;
+          if (
+            code !== "EEXIST" ||
+            !lstatSync(join(files, prefix)).isDirectory()
+          ) {
+            throw new Dropped();
+          }
+        }
         kinds.set(prefix, "dir");
         dirs.push(prefix);
       }
@@ -296,14 +294,21 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           }
           commit = comment;
         }
-        io.emit({ commit, etag });
         const target = treeFolder(
           job.cacheDir,
           job.source,
           commit,
           job.ignoreKey,
         );
-        if (existsSync(join(target, "tree.json"))) throw new Published();
+        const published = existsSync(join(target, "tree.json"));
+        paused = true;
+        clearTimeout(stallTimer);
+        const go = await io.emit({ commit, etag, published });
+        paused = false;
+        stallTimer = setTimeout(() => stall.abort(), job.stallMs);
+        if (published) throw new Published();
+        if (!go) throw new Refused("host unreachable");
+        inTime();
         top = member.name.split("/")[0]!;
         time = member.mtime;
         mkdirSync(files, { recursive: true, mode: 0o700 });
@@ -333,13 +338,23 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
         if (member.size > job.caps.fileBytes) meta.large++;
         over ||= meta.files > job.caps.files || meta.bytes > job.caps.bytes;
         if (over) return;
-        claim(path);
+        let fd: number;
+        try {
+          claim(path);
+          fd = openSync(
+            join(files, path),
+            fs.O_WRONLY | fs.O_CREAT | fs.O_EXCL | fs.O_NOFOLLOW,
+            0o600,
+          );
+        } catch (error) {
+          if (!clash(error)) throw error;
+          meta.files--;
+          meta.bytes -= member.size;
+          if (member.size > job.caps.fileBytes) meta.large--;
+          meta.dropped++;
+          return;
+        }
         kinds.set(path, "file");
-        const fd = openSync(
-          join(files, path),
-          fs.O_WRONLY | fs.O_CREAT | fs.O_EXCL | fs.O_NOFOLLOW,
-          0o600,
-        );
         try {
           for await (const chunk of body) writeAll(fd, chunk);
           fchmodSync(fd, (member.mode & 0o777) | 0o400);
@@ -350,11 +365,19 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
         written.add(path);
         return;
       }
-      if (member.type === "symlink" && inside(path, member.linkname)) {
+      const link =
+        member.type === "symlink" ? linkTarget(path, member.linkname) : null;
+      if (link !== null) {
         if (over) return;
-        claim(path);
+        try {
+          claim(path);
+          symlinkSync(link, join(files, path));
+        } catch (error) {
+          if (!clash(error)) throw error;
+          meta.dropped++;
+          return;
+        }
         kinds.set(path, "link");
-        symlinkSync(member.linkname, join(files, path));
         return;
       }
       if (member.type === "link") {
@@ -369,9 +392,22 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           if (size > job.caps.fileBytes) meta.large++;
           over ||= meta.files > job.caps.files || meta.bytes > job.caps.bytes;
           if (over) return;
-          claim(path);
+          try {
+            claim(path);
+            copyFileSync(
+              join(files, from),
+              join(files, path),
+              fs.COPYFILE_EXCL,
+            );
+          } catch (error) {
+            if (!clash(error)) throw error;
+            meta.files--;
+            meta.bytes -= size;
+            if (size > job.caps.fileBytes) meta.large--;
+            meta.dropped++;
+            return;
+          }
           kinds.set(path, "file");
-          copyFileSync(join(files, from), join(files, path), fs.COPYFILE_EXCL);
           utimesSync(join(files, path), time, time);
           written.add(path);
           return;

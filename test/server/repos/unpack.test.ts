@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -78,7 +79,10 @@ async function run(
   const events: JobEvent[] = [];
   const result = await runJob(fixture, {
     fetch: host.fetch,
-    emit: (event) => events.push(event),
+    emit: (event) => {
+      events.push(event);
+      return true;
+    },
   });
   const commit = result.ok && result.kind === "tree" ? result.commit : COMMIT;
   const folder = treeFolder(fixture.cacheDir, "s1", commit, fixture.ignoreKey);
@@ -103,7 +107,7 @@ test("a tarball is unpacked under its commit with modes and the commit's time", 
     { name: "locked", body: "x", mode: 0o000 },
     { name: "docs/deep/nested/README.md", body: "# hi\n" },
   ]);
-  expect(events).toEqual([{ commit: COMMIT, etag: '"t1"' }]);
+  expect(events).toEqual([{ commit: COMMIT, etag: '"t1"', published: false }]);
   expect(result).toMatchObject({
     ok: true,
     kind: "tree",
@@ -322,7 +326,7 @@ test("a commit already published stops the read", async () => {
   const host = fakeHost({
     [URL]: tarResponse(tarball([{ name: "b", body: "y" }])),
   });
-  const result = await runJob(fixture, { fetch: host.fetch, emit() {} });
+  const result = await runJob(fixture, { fetch: host.fetch, emit: () => true });
   expect(result).toMatchObject({
     ok: true,
     fetched: false,
@@ -364,7 +368,13 @@ test("a job that loses the publish to a concurrent one removes its own", async (
     },
   });
   const host = fakeHost({ [URL]: () => new Response(body) });
-  const result = await runJob(fixture, { fetch: host.fetch, emit: named });
+  const result = await runJob(fixture, {
+    fetch: host.fetch,
+    emit: () => {
+      named();
+      return true;
+    },
+  });
   expect(result).toMatchObject({
     ok: true,
     fetched: false,
@@ -378,7 +388,9 @@ test("a host's answer maps to a closed word, a 304 to unchanged", async () => {
     etag: '"t1"',
   });
   expect(unchanged.result).toEqual({ ok: true, kind: "unchanged" });
-  expect(unchanged.events).toEqual([{ commit: null, etag: '"t1"' }]);
+  expect(unchanged.events).toEqual([
+    { commit: null, etag: '"t1"', published: true },
+  ]);
   for (const [status, error] of [
     [404, "not found"],
     [401, "no access"],
@@ -390,7 +402,7 @@ test("a host's answer maps to a closed word, a 304 to unchanged", async () => {
     expect(result).toEqual({ ok: false, error, status });
   }
   const host = fakeHost({});
-  const result = await runJob(job(), { fetch: host.fetch, emit() {} });
+  const result = await runJob(job(), { fetch: host.fetch, emit: () => true });
   expect(result).toEqual({
     ok: false,
     error: "host unreachable",
@@ -411,4 +423,42 @@ test("a body that stalls or runs past the deadline fails", async () => {
   const late = await run(silent(), { deadlineMs: 30 });
   expect(late.result).toMatchObject({ ok: false, error: "host unreachable" });
   expect(leftovers(late.job)).toEqual([]);
+});
+
+test("a link is written normalized, so no target walks through another link", async () => {
+  const deep = Array.from({ length: 19 }, (_, i) => `a${i}`).join("/");
+  const { result, files } = await run([
+    { name: "x/marker", body: "m" },
+    { name: `${deep}/s`, type: "symlink", linkname: `${"../".repeat(19)}x` },
+    {
+      name: `${deep}/l`,
+      type: "symlink",
+      linkname: `s/${"../".repeat(20)}etc/hosts`,
+    },
+  ]);
+  expect(result).toMatchObject({ ok: true, meta: { dropped: 0 } });
+  expect(readlinkSync(join(files, deep, "s"))).toBe(`${"../".repeat(18)}../x`);
+  // lexically etc/hosts in the tree, which is not there: it never
+  // reaches the host's file through s
+  expect(readlinkSync(join(files, deep, "l"))).toBe(
+    `${"../".repeat(18)}../etc/hosts`,
+  );
+  const real = realpathSync(join(files, deep, "s"));
+  expect(real.endsWith("/files/x")).toBe(true);
+  expect(() => realpathSync(join(files, deep, "l"))).toThrow();
+});
+
+test("names one volume cannot hold apart are dropped, not a failed fetch", async () => {
+  const { result, files } = await run([
+    { name: "README", body: "upper" },
+    { name: "readme", body: "lower" },
+    { name: "Docs/a.md", body: "a" },
+    { name: "docs/b.md", body: "b" },
+  ]);
+  expect(result).toMatchObject({ ok: true });
+  const meta = (result as { meta: { files: number; dropped: number } }).meta;
+  // a case-insensitive volume drops the second of each, a sensitive one
+  // keeps all four
+  expect(meta.files + meta.dropped).toBe(4);
+  expect(readdirSync(files).length).toBe(meta.dropped === 0 ? 4 : 2);
 });

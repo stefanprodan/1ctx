@@ -5,7 +5,7 @@
 // when it answers, at its deadline or when the area closes. The worker
 // file is an entry of the compiled binary, so compose.ts builds its URL.
 
-import type { FetchMessage } from "./fetch.worker.ts";
+import type { FetchMessage, GoMessage } from "./fetch.worker.ts";
 import {
   type FetchJob,
   type JobEvent,
@@ -15,7 +15,8 @@ import {
 
 export type JobRunner = (
   job: FetchJob,
-  onEvent: (event: JobEvent) => void,
+  // for a tree not published, whether to unpack it
+  onEvent: (event: JobEvent) => boolean | Promise<boolean>,
   signal: AbortSignal,
 ) => Promise<JobResult>;
 
@@ -40,8 +41,10 @@ export function workerJobs(url: URL): JobRunner {
       const timer = setTimeout(stop, job.deadlineMs);
       signal.addEventListener("abort", stop, { once: true });
       worker.onmessage = (message: MessageEvent<FetchMessage>) => {
-        if (message.data.type === "event") onEvent(message.data.event);
-        else finish(message.data.result);
+        if (message.data.type === "done") return finish(message.data.result);
+        void Promise.resolve(onEvent(message.data.event)).then((go) => {
+          if (!done) worker.postMessage({ type: "go", go } satisfies GoMessage);
+        });
       };
       worker.onerror = stop;
       worker.postMessage(job);
