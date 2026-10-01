@@ -65,7 +65,7 @@ never written in a tracked file.
   under emulation. The binary's `.env` and `bunfig.toml` autoload is
   off, since its working directory is the data volume.
 - **`.dockerignore` is an allowlist.** The tree holds secrets.
-- **The container runs as 65532 on a read-only root, with no
+- **The container runs as 65532 on a read-only root, with no Linux
   capabilities.** The server needs no writable `/tmp`; keep it so.
   `make image-smoke` runs the image that way and requires a clean exit
   on SIGTERM.
@@ -86,7 +86,7 @@ never written in a tracked file.
 
 ## Docker Compose
 
-- **`compose.yaml` runs a release by `ONECTX_VERSION`, the tag.**
+- **`deploy/compose.yaml` runs a release by `ONECTX_VERSION`, the tag.**
   `compose.dev.yaml`, layered over it with `ONECTX_VERSION=dev`, builds
   from the checkout and never pulls.
 
@@ -97,15 +97,15 @@ never written in a tracked file.
   in every workflow, and Dependabot's `docker` ecosystem bumps it.
 - **CI (`test.yml`) has a macOS and a Linux job.** Only the macOS job
   runs `make lint` and `make vendor-test`. Only the Linux job runs the
-  test files in parallel and `make image-smoke` for amd64. Nothing in
-  CI runs the arm64 image; it is smoked by hand on an arm64 machine.
+  test files in parallel and `make image-smoke` for amd64. Nothing in CI
+  runs the arm64 image; it is smoke-tested by hand on an arm64 machine.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a
   prerelease.
 - **The release builds every archive on one Linux amd64 runner.** Bun
   cross-compiles linux arm64 and darwin arm64, the darwin build ad-hoc
-  signed. Only the amd64 binary is smoked there.
+  signed. Only the amd64 binary is smoke-tested there.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.

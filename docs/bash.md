@@ -5,6 +5,13 @@ scratch `/tmp`, kept MCP files under `/mcp`, `open` and curl's fetch.
 Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
 `vendor/`.
 
+The bash tool runs a command in just-bash, a shell written in
+TypeScript, over a virtual filesystem: `/knowledge` (the project's
+docs), `/uploads` (the chat's attachments), `/tmp` (scratch: the chat's
+own files, kept between commands) and `/mcp` (kept MCP files: tool
+results too large for the context, `docs/mcp.md`). `open` is a command
+of that shell that shows a file on the chat page.
+
 ## The area
 
 - **Bash sits after knowledge and reaches it only through a port.** The
@@ -37,14 +44,14 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
   runs and answers capped and redacted.
 - **The interpreter's deadline wins.** The deadline starts before the
   queues. The interpreter stops at the call timeout with exit 124 and
-  its own output; the worker is ended `BACKSTOP_MS` later, and the
+  its own output; the worker is ended `BACKSTOP_MS` later, and the tool
   registry waits half a second past that (`graceMs`).
 - **An abort posts a cancel first.** Unanswered within
   `CANCEL_GRACE_MS`, the worker is ended. Shutdown ends every worker.
 - **A result is the output, then its tail.** stdout then stderr, cut to
   `resultCut`, then a tail every later cut keeps: `exit N` and the
-  receipts when saved, or `nothing saved: <reason>` and `exit N`. The
-  refusal always stays last.
+  receipts (a line per file saved or deleted) when saved, or
+  `nothing saved: <reason>` and `exit N`. The refusal always stays last.
 - **Mounted files keep their times.** A doc mounts with `updated_at`,
   an upload with `created_at`, scratch with the session's `used_at`, so
   `ls -t` works.
@@ -78,7 +85,9 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
   <name>]` in body, headers, status text, final URL and errors. The tool
   scrubs the result again, the tail kept apart.
 
-## The trees
+## The writable trees
+
+`/knowledge` and `/tmp` are the trees a command may change.
 
 - **A command's trees commit once or not at all.** An abort, exit 124
   or 126, or a throw discards both writable trees. Any other exit,
@@ -90,10 +99,10 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
 - **Written doc paths go on the tool row.** `finishTool` stores them as
   `savedDocs` for another agent's trace (`docs/sessions.md`). A call a
   terminal stop ends before its row is finished keeps none.
-- **The docs off leave no `/knowledge`.** With `knowledge: false` the
-  mount reads no rows. Anything written there is discarded with a
-  notice, the command starts in `/tmp`, and a saved cwd under
-  `/knowledge` stays saved for later.
+- **Knowledge off leaves no `/knowledge`.** With the `knowledge`
+  capability off the mount reads no rows. Anything written there is
+  discarded with a notice, the command starts in `/tmp`, and a saved cwd
+  under `/knowledge` stays saved for later.
 
 ## Scratch
 
@@ -102,7 +111,7 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
   fails the command.
 - **Sweeps skip a chat holding or waiting for a command.** The idle
   sweep (`scratchIdleDays`) and archiving drop scratch, except for a
-  chat in the held set of `bash/queue.ts`.
+  chat in the held set of `bash/queue.ts` (a command running or queued).
 - **A scratch name is what a real `/tmp` takes.** `bash/names.ts`: any
   character but NUL, well-formed Unicode, Linux's `NAME_MAX` and
   `PATH_MAX`. The 64-segment cap bounds just-bash's tree walks; keep it.
@@ -134,11 +143,12 @@ Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
   discard notice, found from `getAllPaths()` alone, since a `stat`
   would load every file. A changed file is dropped silently.
 
-## open
+## The open command
 
-- **`open` copies a mounted text file onto the chat page.** HTML and
-  SVG become a visual when Visuals was on at send start and the text
-  fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest is code.
+- **`open` copies a mounted text file onto the chat page.** HTML and SVG
+  become a visual when the admin's Visuals switch was on at send start
+  and the text fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest
+  is code.
 - **A refused `open` stops nothing.** Outside the trees, a symlink, a
   directory, past `knowledgeFileBytes`, non-text, or past
   `MAX_OPENS_PER_COMMAND`. The copies are `opened_files` rows written in

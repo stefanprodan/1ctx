@@ -19,7 +19,13 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
   caps and the offered set it started on; a send cap applies at the
   next admission.
 
-## The loop
+## The tool loop
+
+The tool loop is a send's rounds: the model calls tools, the server
+runs them and sends the results back, until the model answers in
+words. When a cap or a repeated call stops the tools, the loop ends
+with the answer round, one more round that asks for the answer in
+words.
 
 - **Every cap is weighed before a round's calls launch.** Over a cap,
   the calls are recorded not run and the loop goes to the answer round
@@ -73,20 +79,22 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 
 ## The offered set
 
-- **The offered set is decided once per send in `tools/offer.ts`.** A
-  model that accepts tools always gets `datetime` and `bash`. The
-  session's disabled set is applied before schemas are built, and the
-  page's preview calls the same `offered()`.
+- **The offered set, the tools a send gives the model, is decided once
+  per send in `tools/offer.ts`.** A model that accepts tools always gets
+  `datetime` and `bash`. The session's disabled set is applied before
+  schemas are built, and the agent page's tool count
+  (`agents/directory.ts`) calls the same `offered()`.
 - **The admin's `web` row is one mode: `off`, `all` or `listed`.** Off
   and all keep the saved hosts. Web off (admin or chat) removes
   webfetch, websearch, bash's network and every credential. Websearch
   also needs a provider, null on a fresh instance. Webfetch checks every
   redirect against the listed origins. The send keeps its web snapshot.
-- **Search needs no key.** Every provider answers keyless; a
+- **Websearch needs no key.** Every provider answers keyless; a
   `search-<provider>.key` file only raises the rate.
 - **Only the `visualize` row's `enabled` is read.** Webfetch's and
   websearch's `enabled` are ignored, and no route patches webfetch.
-- **Each capability key drops exactly its part.**
+- **Each capability key drops exactly its part.** A capability is a part
+  of the offer a chat or automation may switch off (`docs/sessions.md`).
   - `web`: as above.
   - `visualize`: drops the tool only; `open` and the skill read the
     admin's row alone.
@@ -110,14 +118,16 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 
 ## Visuals
 
-- **A visual is a sandboxed document.** `GET /api/visual` serves a
-  fixed shell with a CSP sandbox, an opaque origin, the saved resource
-  hosts and `connect-src 'none'`. The iframe grants only
-  `allow-scripts`. A MessageChannel port binds the parent to the first
-  loaded document, so a later navigation loses it.
-- **Drafts are inert; the final runs once.** Scripts run after the tool
-  succeeds. Detail and envelopes replace a stored visual's `html` with
-  its size; the visual route serves it.
+- **A visual is a sandboxed document:** HTML or SVG the `visualize` tool
+  or bash's `open` draws in the chat. `GET /api/visual` serves a fixed
+  shell with a CSP sandbox, an opaque origin, the saved resource hosts
+  and `connect-src 'none'`. The iframe grants only `allow-scripts`. A
+  MessageChannel port binds the parent to the first loaded document, so
+  a later navigation loses it.
+- **Drafts are inert; the final runs once.** A draft is the visual's
+  HTML while it streams. Scripts run after the tool succeeds. Detail and
+  envelopes replace a stored visual's `html` with its size; the visual
+  route serves it.
 - **The frame's theme is the chat's, not the system's.**
   `tools/visual-theme.ts` alone defines the frame's colours, as a
   separate document outside the client stylesheet rules.
@@ -133,10 +143,11 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 
 ## HTTP credentials
 
-- **A credential is a row, its key an `http-` file.** Rows never hold
-  a key; `readKey()` reads it at the moment of use and answers
-  `missing` or `unusable` by `isUsableKey()`. Routes answer key state,
-  never a value.
+- **A credential is a row, its key an `http-` file.** It makes curl in
+  bash send a header holding the key on requests under a URL prefix.
+  Rows never hold a key; `readKey()` reads it at the moment of use and
+  answers `missing` or `unusable` by `isUsableKey()`. Routes answer key
+  state, never a value.
 - **A credential's header is an RFC token, never a transport header
   or `proxy-*`** (`check.ts`, case folded). The template is printable
   ASCII with `{key}` exactly once.
@@ -155,9 +166,11 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 
 ## Skills
 
-- **A skill is stored text and never runs.** Ingest caps live in
-  `skills/limits.ts`; text is cleaned and shown as text. Archives go
-  through `lib/archive.ts`, duplicate member names refused.
+- **A skill is stored text and never runs.** It is an Agent Skills
+  folder (a `SKILL.md` and its files) an agent loads through the `skill`
+  tool. Ingest caps live in `skills/limits.ts`; text is cleaned and
+  shown as text. Archives go through `lib/archive.ts`, duplicate member
+  names refused.
 - **A GitHub directory is never the repo's archive.** `skills/github.ts`
   pins the ref to a commit, lists the folder in one trees call and
   reads each file raw, so the caps count the skill, not the repo. That

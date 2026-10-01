@@ -4,6 +4,11 @@ Governs `src/server/memory/`, the `memory_edit` tools
 (`tools/builtin/memory.ts`), a run's memory phase in
 `src/server/runner/` and `shared/memory.ts`.
 
+Memory is what agents keep between sessions: one note per project, and
+one per automation that has its own (`ownMemory`), carried in the system
+prompt. A chat edits the project's note as it goes; a run with its own
+note edits it in the memory phase, an extra step after its main rounds.
+
 ## Notes
 
 - **A note is entries of `{topic, text}`.** `shared/memory.ts` owns
@@ -31,10 +36,11 @@ Governs `src/server/memory/`, the `memory_edit` tools
   absent included), or when the note already holds its result;
   otherwise it is refused with the note listed (`memory/edit.ts`,
   pure).
-- **A refusal marks the whole note seen.** So the retry applies,
-  except when it repeats the text refused because another chat wrote
-  the topic: the handle keeps that text per topic and refuses it
-  again, asking for a merge, without counting a failed round.
+- **A refusal marks the whole note seen.** So the retry applies, except
+  when it repeats the text refused because another chat wrote the topic:
+  the tool's handle (`tools/builtin/memory.ts`) keeps that text per
+  topic and refuses it again, asking for a merge, without counting a
+  failed round.
 - **The snapshot lives until a summary.** `startSend` writes the view
   when there is none, and `finalizeSend` deletes it after a done
   summary, so the next turn, a fork and a new chat take the current
@@ -63,11 +69,12 @@ Governs `src/server/memory/`, the `memory_edit` tools
   the operations, skipping each whose expected text no longer matches.
   A topic whose first operation expected text but is absent at replay
   start skips every set, so a hand delete is never resurrected.
-- **The phase never resends the run.** `runner/memory-packet.ts`
-  builds its input: its own system prompt (`memorySystem()`), and the
-  task, the answer and a receipt per tool call as a record inside
-  tags. A model that reads the task under the run's prompt goes back
-  to the task.
+- **The phase never resends the run.** `runner/memory-packet.ts` builds
+  its input: its own system prompt (`memorySystem()`), and the task, the
+  answer and a receipt per tool call (a line naming the call and its
+  outcome, with an excerpt of the result) as a record inside tags. A
+  model that reads the task under the run's prompt goes back to the
+  task.
 - **The packet fits the window by cutting the run, never the note.**
   The room check counts the tool schemas too; it drops excerpts, then
   receipts, then halves the answer. An unknown window skips the check.

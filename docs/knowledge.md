@@ -4,7 +4,11 @@ Governs `src/server/knowledge/` (the project docs, their history,
 search, views, uploads, chat staging and the process slots) and
 `shared/knowledge.ts`. The bash side is in `docs/bash.md`.
 
-## The base
+Knowledge is a project's shared text files (docs): users edit them on
+the Knowledge page and agents read and write them under `/knowledge` in
+bash. An upload adds files to it, or attaches them to a chat message.
+
+## The knowledge base
 
 - **Knowledge is versioned UTF-8 text per project.**
   `knowledge_versions` keeps every post-image and a delete version with
@@ -27,16 +31,16 @@ search, views, uploads, chat staging and the process slots) and
 - **Age expires only deleted files' history.** Each write evicts past
   the per-file version count and the project's history bytes; the
   hourly sweep never drops a live file's versions.
-- **The prompt names the base only when bash is offered and the docs
-  are on.** `knowledgeBlock()` gives a count and the last changes,
-  never a list or a text, and says the files are data, not
-  instructions.
+- **The prompt names the base only when bash is offered and the
+  `knowledge` capability is on.** `knowledgeBlock()` gives a count and
+  the last changes, never a list or a text, and says the files are data,
+  not instructions.
 
 ## Reads
 
-- **Views are rendered at read, never stored.** A renderer change then
-  reaches every file and version. `RenderCache` keys a view by a file's
-  revision or a version id.
+- **Views are rendered at read, never stored.** A view is a file as its
+  page draws it. A renderer change then reaches every file and version.
+  `RenderCache` keys a view by a file's revision or a version id.
 - **Search streams, never indexes.** Each row query is its own
   statement, finalized at the end: a cached one left mid-step by an
   early stop refuses its next use. A text is read only once it fits
@@ -69,13 +73,17 @@ search, views, uploads, chat staging and the process slots) and
 
 ## Chat attachments
 
+An attachment is staged: uploaded before its message is sent and held
+for its user until a send claims it into the chat.
+
 - **Staged uploads are the caller's alone.** The `/uploads` routes
-  address only the caller's rows in a project they may open. Staging
-  expires after 24 hours; the sweep never removes a session's uploads.
-- **Staging has its own quota per user and project.** 20 items and the
-  current `uploadBytes` and `uploadFiles`.
+  address only the caller's rows in a project they may open. A staged
+  upload expires after 24 hours (its lease); the sweep never removes a
+  session's uploads.
+- **Staged uploads have their own quota per user and project.** 20 items
+  and the current `uploadBytes` and `uploadFiles`.
 - **Claim and copy run in the caller's transaction.** A send that then
-  fails restores staging. The claim is in `docs/sessions.md`.
+  fails restores the staged uploads. The claim is in `docs/sessions.md`.
 - **A command never changes `/uploads`.** A change to names, types or
   bytes there is discarded with a notice. The mount budget counts the
   existing uploads even over a lowered cap.

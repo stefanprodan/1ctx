@@ -1,6 +1,8 @@
 # 1ctx
 
-One continuous context for agents. Domain: 1ctx.dev.
+One continuous context for agents. Domain: 1ctx.dev. 1ctx is a
+self-hosted server where users chat with AI agents in projects and run
+them on schedules (automations), with shared knowledge and memory.
 
 - **Runtime:** Bun only, TypeScript run directly, one standalone
   binary. No Node.
@@ -43,13 +45,17 @@ make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
 ```
 
-The preview runs the source with `ONECTX_DEV=1` against
-`.preview/1ctx.sqlite` and the secrets in `.preview/secrets/`. A CSS
-edit hot-reloads, a client edit reloads the page, a server edit restarts
-the process. The first start writes `user-admin.key` with the password
-`admin-preview`. Check a UI change in Chrome through the DevTools MCP at
-1440 and 390 wide; the console must stay empty. Report what was verified
-and how. Do not commit unless asked.
+The preview is a local, throwaway instance for trying a change. It runs
+the source with `ONECTX_DEV=1` against `.preview/1ctx.sqlite` and the
+secrets in `.preview/secrets/`. A CSS edit hot-reloads, a client edit
+reloads the page, a server edit restarts the process. The first start
+writes `user-admin.key` with the password `admin-preview`. Check a UI
+change in Chrome through the DevTools MCP at 1440 and 390 wide; the
+console must stay empty. Report what was verified and how. Do not commit
+unless asked.
+
+Staging is a long-running instance on a separate machine, used for real
+work, so its data is kept; `docs/deploy.md` says how it is run.
 
 ## Layout
 
@@ -84,12 +90,13 @@ deploy/       Docker Compose files for the container image (docs/deploy.md).
 import, and the factory `<area>Area(deps)`, the one place its store is
 built), `store.ts` (`<Noun>Store`), `routes.ts`, `parse.ts` (the request
 parsers) and named files for logic. A module declares each port it needs
-as its own small interface; `compose.ts` passes the capability of the
-area that answers it. A port to an area built later is a closure called
-only after the list is complete. An edge the layer order forbids is a
-port, never an import. A test of one area builds it with its factory and
-fakes for its ports; `test/helpers/app.ts` calls `compose()`, so the
-integration tests run the binary's wiring.
+as its own small interface; `compose.ts` passes what the factory of the
+area that answers it returns for that port. A port to an area built
+later is a closure called only after the list is complete. An edge the
+layer order forbids is a port, never an import. A test of one area
+builds it with its factory and fakes for its ports;
+`test/helpers/app.ts` calls `compose()`, so the integration tests run
+the binary's wiring.
 
 **Workers.** A `*.worker.ts` is an extra entry of `bun build --compile`
 in `package.json`'s build script. Its URL is built in `compose.ts`,
@@ -111,18 +118,18 @@ change it in the same commit as the code that changes a rule.
 | Doc | Governs |
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
-| `docs/views.md` | what a page draws: `views/`, the composer, the stream, the admin pages |
+| `docs/views.md` | what a page draws: `views/`, the composer, the session list (stream), the admin pages |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
-| `docs/sessions.md` | `sessions/` and the runner's sends, for chats and runs: caps, writer, queue, compaction |
+| `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue, compaction |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention ask |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
-| `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept files, curl signing |
-| `docs/monitor.md` | `overview/`: what the Monitor reads, the usage windows |
-| `docs/provision.md` | `provision/`, `--provision` |
+| `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
+| `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
+| `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
@@ -218,8 +225,9 @@ fixture under `test/fixtures/structure/`.
   test sets what it reads itself. Local runs take the files one by one.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
-- **UI copy is short and plain.** No em-dashes anywhere. A send is a
-  turn in a chat and a run in a task; the page never says send.
+- **UI copy is short and plain.** No em-dashes anywhere. A send (one
+  pass of the runner, `docs/sessions.md`) is a turn in a chat and a run
+  in an automation (a task on the page); the page never says send.
 - `perl -i -pe` for global replaces, `uv run` for ad hoc Python, never
   pip.
 - The brand SVGs and PNGs in `site/` are generated: change

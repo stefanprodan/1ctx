@@ -3,6 +3,11 @@
 Governs `src/server/provision/`: `1ctx provision` and the server's
 `--provision`.
 
+Provisioning applies YAML documents, one object each (a `kind` from
+`KINDS`: users, projects, credentials, providers, deciders, skills, MCP
+servers, agents, tools), to an instance's database, creating or updating
+what they name.
+
 ## Running it
 
 - **One routine serves both entry points.** `provisionPaths()` in
@@ -38,7 +43,7 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
   applied after every kind it references. A reference names an object
   in the input or a live one.
 
-## Per-kind traps
+## Rules per kind
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused
@@ -48,7 +53,8 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.
 - **A `Decider`'s save checks the model against the live decisions
-  catalog.** It fails while the provider's server is down.
+  catalog** (`docs/providers.md`). It fails while the provider's server
+  is down.
 - **A `Credential` is checked before anything is written.** Its key
   file must be present and usable. Its `projects` name team projects
   only. The per-project cap and prefix overlaps are checked over the

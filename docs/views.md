@@ -6,14 +6,17 @@ forms and the data layer's general rules are in `docs/ui.md`.
 
 ## The stream
 
+The stream is the session list on Home and on a project's Feed: chats
+and runs, one row each, under the filters All, Chats and Tasks (runs).
+
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the stream lands on both.
 - **The Not sent card reads its own route, never the feed.** `GET
-  /api/me/not-sent` runs on Home's load and after Discard all. While
-  the card is mounted (`watchNotSent()`), the user's `notSent` event, a
+  /api/me/not-sent` runs on Home's load and after Discard all. While the
+  card is mounted (`watchNotSent()`), the user's `notSent` event, a
   listed chat's delete and a revocation read it again through one
   `Flight`. Discard all sends the ids the card shows, so a row that
-  turned since is never discarded unseen.
+  became not sent since is never discarded unseen.
 - **A row is drawn from the server's row alone.** `stream/Row.model.ts`
   never reads a transcript. A working, failed or stopped line names
   `sendAgent` (the summoned agent on a summoned turn), else the chat's.
@@ -43,8 +46,9 @@ forms and the data layer's general rules are in `docs/ui.md`.
   origin as not found, so every link picks its page by origin.
 - **Regenerate sends no agent.** The server reruns the send's agent. A
   refusal shows in the turn's failure block until the next press.
-- **An envelope that archives the chat on screen reads the detail
-  again.** The archived foot needs who archived it and until when.
+- **An envelope that archives the chat on screen reads the session's
+  detail again.** The archived foot needs who archived it and until
+  when.
 - **A queued row's actions never lose an open edit.** Edit and Send
   again are refused while an edit is open (`views/sessions/queue.ts`).
   Send again deletes the row first and hands its text over only once
@@ -155,10 +159,10 @@ forms and the data layer's general rules are in `docs/ui.md`.
 - **"Waiting" is computed on the page.** No field carries it: a row not
   suspended whose `nextAt` is past the page's clock by
   `WAIT_GRACE_MS`.
-- **A later page of runs is fenced by the runs' turn.** `closeRuns()`,
-  a filter change, a revocation and a first-page load drop a
-  `loadMoreRuns()` in flight. A filter change is cold and keeps only
-  the tally; a tally refresh is warm.
+- **A later page of runs is fenced by a load counter** (`runsTurn` in
+  `data/runs.ts`). `closeRuns()`, a filter change, a revocation and a
+  first-page load drop a `loadMoreRuns()` in flight. A filter change is
+  cold and keeps only the tally; a tally refresh is warm.
 - **The editor saves the whole `disabledCapabilities`.** `disabledOf()`
   in `Access.model.ts` keeps only keys the picked agent and the project
   have, so a stale key is dropped on save. Memory has no switch there
@@ -209,10 +213,10 @@ reporting.
 - **Navigate after a call only while `address()` is unchanged.** A
   create, a rename and `SettingDelete`'s `leaveTo` compare the address
   the call started on, so a user who moved on is not pulled back.
-- **Tabs whose drafts live in the cards stay mounted.** The Config board
-  and Web access hide inactive tabs instead of unmounting them. An
-  agent's and an MCP server's tabs may unmount, since the page holds
-  their drafts.
+- **Tabs whose drafts live in the cards stay mounted.** The Config
+  zone's landing page (`ConfigBoard.tsx`) and Web access hide inactive
+  tabs instead of unmounting them. An agent's and an MCP server's tabs
+  may unmount, since the page holds their drafts.
 - **A limit is a `NumberBox` text box, never a number input.** A
   `LimitsSetting` card sends only its own limits; Use defaults fills the
   draft without saving. Lowering the days archived chats are kept asks
@@ -241,8 +245,8 @@ reporting.
   only. New decider shows only while a provider's wire is in
   `DECIDER_WIRES`. `deciderFieldOf()` and `decisionFieldOf()` match
   the server's whole phrases, so a changed server message changes them.
-- **The boards poll only while seen.** `watchOverview()`,
-  `watchUsage()` and `watchAccessBoard()` stop while the tab is hidden
-  (`lib/poll.ts`) and ask every 30 seconds, just over the server's 25
-  second keep. Usage asks again only for the current month. The Monitor
-  shows no money.
+- **The Monitor, Usage and Access pages poll only while seen.**
+  `watchOverview()`, `watchUsage()` and `watchAccessBoard()` stop while
+  the tab is hidden (`lib/poll.ts`) and ask every 30 seconds, just over
+  the server's 25 second keep. Usage asks again only for the current
+  month. The Monitor shows no money.

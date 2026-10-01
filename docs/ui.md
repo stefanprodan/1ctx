@@ -32,11 +32,11 @@ draws is in `docs/views.md`.
   reconnect takes the navigation path. A new server build or protocol
   reloads the page.
 - **`data/socket.ts` knows no entity.** Modules register for frames.
-  `data/sessions.ts` applies a durable envelope only when its revision
-  is above the one held, and applies stream frames in sequence
-  through `transcript/stream.ts`. A gap, a frame ahead of the buffer
-  or an overflow before `watched` refetches the detail. The server's
-  side is in `docs/access.md`.
+  `data/sessions.ts` applies an envelope (`docs/sessions.md`) only when
+  its revision is above the one held, and applies stream frames in
+  sequence through `transcript/stream.ts`. A gap, a frame ahead of the
+  buffer or an overflow before `watched` refetches the session's detail.
+  The server's side is in `docs/access.md`.
 - **Logic lives beside the view, not in it.** A view with real logic
   gets `Name.model.ts` or `Name.state.ts`, and its copy may sit in
   `Name.words.ts`, all tested without a DOM.
@@ -51,12 +51,12 @@ strip or filter chips. Its stylesheet holds only what sits inside an
 open row's body or a meta. The shared shapes are below.
 
 - **Every list is `ui/Rows.tsx`.** `RowsCard` on a page, `RowsList`
-  inset in a form or an open row. A row is `RowsOpen` (opens in
-  place), `RowsGo` (a link), `RowsButton` (an action) or `RowsLine`
-  (neither). The head, end and controls (`RowsTitle`, `RowsMeta`,
-  `RowsEnd`, `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`,
-  `RowsNote`, `RowsFailed`, ...) are exported from `Rows.tsx`. The
-  stream's session row (`stream/Row.tsx`) is the one row outside Rows.
+  inset in a form or an open row. A row is `RowsOpen` (opens in place),
+  `RowsGo` (a link), `RowsButton` (an action) or `RowsLine` (neither).
+  The head, end and controls (`RowsTitle`, `RowsMeta`, `RowsEnd`,
+  `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
+  `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
+  row (`stream/Row.tsx`) is the one row outside Rows.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
 - **A paged list ends in `ShowMore`** from `stream/Stream.tsx` while
@@ -141,13 +141,14 @@ open row's body or a meta. The shared shapes are below.
 
 ## Shell
 
-- **One shell, no header or top bar.** `app/shell.ts` holds its
-  state. From 720 up the rail is a column the user can hide, kept in
-  `localStorage`. Below 720 it covers the screen and is never kept.
-  The breakpoint is `NARROW` in `shell.ts` and the same number in
-  `shell.css`; change both.
-- **The address picks the rail's face.** The admin face is
-  `app/zones.ts`: an admin page lives under its zone's address and
+- **One shell, no header or top bar.** `app/shell.ts` holds its state.
+  From 720 up the rail (the side navigation) is a column the user can
+  hide, kept in `localStorage`. Below 720 it covers the screen and is
+  never kept. The breakpoint is `NARROW` in `shell.ts` and the same
+  number in `shell.css`; change both.
+- **The address picks what the rail shows.** Under an admin address it
+  shows the admin panel's zones (Monitor, Access, Config) from
+  `app/zones.ts`; an admin page lives under its zone's address and
   nowhere else.
 - **On touch nothing takes a focus the user did not give,** and every
   field is `--text-touch` (16px), since iOS zooms into a smaller one

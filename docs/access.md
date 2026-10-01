@@ -103,7 +103,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `<kind>-<name>.key`, the kind from `SECRET_KINDS`, the name by
   `isSecretName`; `read()`, `has()` and `list()` refuse a name of
   another kind. `compose.ts` binds each area's reader; only provision,
-  the overview's key checks and the log scrubber read by kind.
+  the Monitor's key checks (`overview/`) and the log scrubber read by
+  kind.
 - **`read()` sizes a file before reading it.** Null for an absent or
   empty file, a non-regular file after links (a FIFO could block) and
   one past `maxBytes`; `main.ts` caps `http-` files.
@@ -114,6 +115,12 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   both.
 
 ## The socket
+
+The socket (`/api/socket`) is each tab's one websocket. It carries two
+kinds of frame (`shared/socket.ts`): a durable frame, which goes to
+every connection that may see its project and carries a revision, and a
+stream frame, the live tokens of a send, which goes only to the
+connections watching that session.
 
 - **Delivery is per connection, never a Bun topic.** A connection
   holds its user's visible project ids and at most one watched session,

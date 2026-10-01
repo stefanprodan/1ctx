@@ -5,13 +5,22 @@ Governs `src/server/sessions/` and the runner's sends in
 
 A session is one conversation row, of one of two origins
 (`SESSION_ORIGINS`): a chat, which users write in, or a run, which an
-automation starts on its schedule or by Run now. Both share the table,
-the writer, the runner, the caps and the sweep, so this doc covers
-both and says "chat" or "run" where a rule holds for one only. A send
-is one pass of the runner over a session (`SEND_KINDS`: `chat`,
-`compact`, `run`): a turn in a chat, the whole of a run. What only
-runs and automations do is in `docs/automations.md`; the tool loop in
-`docs/tools.md`; memory in `docs/memory.md`.
+automation (a scheduled task) starts on its schedule or by Run now. Both
+share the table, the writer, the runner, the caps and the sweep, so this
+doc covers both and says "chat" or "run" where a rule holds for one
+only. A send is one pass of the runner over a session (`SEND_KINDS`:
+`chat`, `compact`, `run`): a turn in a chat (the user messages that open
+it and the agent's reply), the whole of a run, or a compaction. A send
+is one or more rounds, each one request to the model and the tool calls
+it answers with. What only runs and automations do is in
+`docs/automations.md`; the tool loop in `docs/tools.md`; memory in
+`docs/memory.md`.
+
+An envelope is the `session` socket frame (`shared/socket.ts`) one
+session transaction publishes: the summary with its revision, the rows
+written, the ids removed, the send row and the session's row in the
+session list. A summon is a chat message whose first word is `@name`:
+that agent answers the one turn (see Summons).
 
 ## Sends and caps
 
@@ -73,7 +82,7 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   consecutive user messages.
 - **A start whose user messages pass `START_FRAME_BYTES`** sends its
   envelope with the reply alone and `messagesCut`; a tab reads the
-  detail.
+  session's detail (`GET /api/sessions/:id`).
 
 ## The queue
 
@@ -106,7 +115,7 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   row.
 - **The hourly sweep deletes not-sent rows after `NOT_SENT_KEPT_MS`.**
 
-## The dispatcher
+## The queue dispatcher
 
 - **It starts a chat's queue as one turn.** `runner/queue.ts` is
   started in `compose.ts` after `sessions.repair()` and before the
@@ -121,9 +130,9 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   when none waits. It skips a chat whose authors or project are full
   and ends only at a full process.
 - **Rows that can never start turn not sent.** An archived chat, a
-  retired agent (summons included), a row past `queuedMinutes`, a gone,
-  disabled or must-change-password author, or an upload that no longer
-  checks. An author who lost the chat loses the row outright.
+  retired (deleted) agent, summons included, a row past `queuedMinutes`,
+  a gone, disabled or must-change-password author, or an upload that no
+  longer checks. An author who lost the chat loses the row outright.
 - **The rest start in order up to the first summon,** which starts
   alone once they end. The turn counts against the oldest author with
   room under `sendsPerUser`; with none, the rows wait.
@@ -163,12 +172,14 @@ runs and automations do is in `docs/automations.md`; the tool loop in
 
 - **A shutdown drains, then terminates** (`runner/shutdown.ts`). At the
   first signal: health says `draining`, ready answers 503, the
-  dispatcher closes, the scheduler drains and the registry refuses
-  every admission with `Restarting` (a 503).
+  dispatcher closes, the scheduler drains and the runner's registry
+  (`runner/registry.ts`) refuses every admission with `Restarting` (a
+  503).
 - **`runner.drain()` waits up to `--drain`** (0 in `compose()` by
   default) for the running sends, a run's memory phase included, and
-  their attention asks. The second signal cuts the wait. The listener
-  keeps serving, so a watched turn streams to its end.
+  their attention asks (`docs/automations.md`). The second signal cuts
+  the wait. The listener keeps serving, so a watched turn streams to its
+  end.
 - **`runner.shutdown(close)` then ends the rest with cause
   `shutdown`.** It aborts the asks and waits within `SHUTDOWN_DRAIN_MS`
   for the streams, the asks and `close` (bash, MCP). Past it `close`
@@ -176,11 +187,13 @@ runs and automations do is in `docs/automations.md`; the tool loop in
 
 ## Capabilities and the system prompt
 
-- **A session's disabled capabilities are one sorted set.** Create,
-  send and regenerate take a `capabilities` change of `disable` and
-  `enable` keys (`web`, `visualize`, `knowledge`, `memory`,
-  `mcp:<id>`, `skill:<id>`, `credential:<id>`). The parser checks only
-  an id's shape; unknown ids are kept and ignored.
+- **A session's disabled capabilities are one sorted set.** A capability
+  is a part of what a send offers that a user may switch off for one
+  chat or automation. Create, send and regenerate take a `capabilities`
+  change of `disable` and `enable` keys (`web`, `visualize`,
+  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`).
+  The parser checks only an id's shape; unknown ids are kept and
+  ignored.
 - **The change is applied twice.** The policy resolves it before
   schemas are built, and `startSend` applies it again to the current
   row in its transaction, a turn's changes in message order, the later
@@ -190,10 +203,10 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   `runner/prompt.ts`): the agent and project line, the agent's prompt,
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
-  memory, knowledge, the date, the off lines (web, visualize,
-  knowledge, memory, MCP, skills), and last the change note. What is
-  fixed per agent and project comes first; the user's line follows
-  because it changes with a team chat's author.
+  memory, knowledge, the date, the off lines (web, visualize, knowledge,
+  memory, MCP, skills), and last the MCP change note (`docs/mcp.md`).
+  What is fixed per agent and project comes first; the user's line
+  follows because it changes with a team chat's author.
 
 ## Summons
 
@@ -209,16 +222,17 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   one refused so turns not sent with reason `failed`: the reason check
   is fixed in its table, and a new reason needs a rebuild migration.
 - **A summoned send never compacts,** and `SessionSummary.usage` reads
-  the chat agent's rounds only. Compaction and the meter are the chat
-  agent's.
+  the chat agent's rounds only. Compaction and the composer's context
+  meter are the chat agent's.
 - **Another agent's turn goes into history as text**
   (`runner/context.ts`). Its answer is a user message opening
   `[name] `, then its trace (`runner/trace.ts`) as another user message.
   Never its calls, results, reasoning or signatures, so no provider sees
   a call without its result. A skill it loaded is not counted as
   loaded.
-- **A turn is the building agent's own** when neither send is summoned,
-  or both are summoned sends of the same agent.
+- **A past turn is the agent's own** when history is built for a send
+  and neither send is summoned, or both are summoned sends of the same
+  agent.
 - **The trace never leaks a tool's content.** `memory_edit` shows
   only `action=` and `topic=`. A saving bash call always keeps a
   ` saved` mark however it is cut. A tool the reader is not offered
@@ -227,14 +241,15 @@ runs and automations do is in `docs/automations.md`; the tool loop in
 - **The writer drops a leading `[its name]` mark** from a stored answer
   (`unmarked`). Live frames may still show it.
 - **A summoned send's cache key is `<chat>:<agent>`,** so agents share
-  no sticky route or slot.
+  no sticky provider route or server cache slot.
 
 ## Uploads
 
-- **A send's uploads are claimed in `startSend`.** Preflight checks
-  each message's staged ids against its author, project and lease, and
-  requires `bash` offered. In the transaction the claim rechecks the
-  caps and writes `messages.uploads` with each user message.
+- **A send's uploads are claimed in `startSend`.** Preflight checks each
+  message's staged upload ids (`docs/knowledge.md`) against its author,
+  project and 24-hour lease, and requires `bash` offered. In the
+  transaction the claim rechecks the caps and writes `messages.uploads`
+  with each user message.
 - **A turn's messages are claimed in one call** (`claimTurn()`),
   reading and writing the tree once, since each write upserts every
   file in it. A later throw rolls back the tree, staging and rows.
@@ -249,13 +264,14 @@ runs and automations do is in `docs/automations.md`; the tool loop in
   and sends after them go, their usage stays. The envelope names them
   in `removedMessageIds`. A summoned turn reruns on its send's agent; a
   retired one is the 400 "the agent <name> is gone".
-- **Fork copies through a settled turn,** never memory phase rows,
-  into a chat the caller owns on a live agent. Source ids are recorded
-  without foreign keys. Usage and the attention mark are not copied.
-  A packed row is unpacked into `content`, since a fork is live.
+- **Fork copies through a settled turn,** never memory phase rows, into
+  a chat the caller owns on a live agent. Source ids are recorded
+  without foreign keys. Usage and the attention mark are not copied. A
+  packed row (see Packing) is unpacked into `content`, since a fork is
+  live.
 - **Fork copies the upload tree in the same transaction.** Files last
   written by an unsent user turn are restaged for the caller under a
-  fresh lease outside staging quotas.
+  fresh lease outside the upload staging quotas.
 - **Reasoning stays with its provider and model,** tool call
   signatures with their model.
 - **Rename and delete are the owner's or an admin's;** anyone else

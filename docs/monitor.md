@@ -4,13 +4,20 @@ Governs `src/server/overview/` and the usage windows in
 `src/server/usage/window.ts` (`lastDays()`, `monthWindow()`). The
 Monitor's pages are in `docs/views.md`.
 
-## The admin reads
+The Monitor is the admin's view of the whole instance, under
+`/admin/monitor`: the overview (usage over a range, what needs an
+admin's attention, the server's load), Usage by month and Storage.
+
+## What the Monitor reads
 
 - **A personal project is counted and never named.** Its `id` and
   `name` are null in every answer, with its owner given.
 - **Attention and load are read at each request, never cached.**
-  Load reads memory, save the queue's counts, one statement over its
-  partial indexes.
+  Attention is what needs an admin: a missing key, a failed MCP or skill
+  refresh (`overview/attention.ts`), not a run's attention mark; load is
+  the process's CPU and memory, the running sends and the queue. Load
+  reads memory, save the queue's counts, one statement over its partial
+  indexes.
 - **Load's CPU and memory are the process's, not the machine's.** CPU
   is over `availableParallelism()`, memory against
   `process.constrainedMemory()`, so both follow a container's caps.
@@ -46,9 +53,9 @@ Monitor's pages are in `docs/views.md`.
 - **An object's last 30 days is `lastDays()`.** Every per-object usage
   route goes through it: 30 times 24 hours ending now, no zone, the
   answer carrying `since` and `until`.
-- **The overview and the month are calendar days in the zone.** 30d
-  and 90d end today. `all` starts on the day of the first row. The
-  month is `monthWindow()`, cut at today.
+- **The overview and the month are calendar days in the zone the page
+  asks in.** 30d and 90d end today. `all` starts on the day of the first
+  row. The month is `monthWindow()`, cut at today.
 
 ## The scan worker and the cache
 

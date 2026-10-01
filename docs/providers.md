@@ -4,6 +4,13 @@ Governs `src/server/providers/`, `deciders/`, `lib/fetcher.ts` and an
 agent's provider, model, window, tools, thinking, effort, upstream and
 skip4Bit fields.
 
+A provider is a configured model API: a base URL, a key file unless the
+server needs none, and a wire, the API dialect it speaks (`WIRES` in
+`shared/words.ts`). Its catalog is the list of models it serves. A
+decider is a named decision model on a provider; a decision is a typed
+question a feature asks it (`run-attention` is the one today), answered
+with probabilities.
+
 ## Providers and catalogs
 
 - **A provider is added and deleted, never changed.** There is no
@@ -89,7 +96,7 @@ shared body must be checked against each.
   timeout is retried once, since each costs two minutes. A `served`
   event does not count as started. No wait passes the turn's deadline
   (the memory phase's own window in that phase).
-- **Only chat rounds retry.** Deciders, catalogs and MCP calls are
+- **Only a send's rounds retry.** Deciders, catalogs and MCP calls are
   never retried here.
 - **A provider's words are kept but never logged.** A `remote` failure
   is a `ProviderRefusal`: the chat row keeps its words exactly, and
@@ -129,10 +136,11 @@ shared body must be checked against each.
 
 ## Decisions
 
-- **A decision model answers typed questions with probabilities and
-  no text.** Only `DECIDER_WIRES` serve them. Its catalog is the
+- **A decision model answers typed questions with probabilities and no
+  text.** Only `DECIDER_WIRES` serve them. Its catalog is the
   `kind=decisions` search, `<base>/models?output_modalities=decisions`;
-  `parseCatalog` also reads TypeSafe's `models[].name` (kev.serve).
+  `parseCatalog` also reads the name-only `models[].name` list that some
+  decision servers answer (TypeSafe's, kev.serve).
 - **The call is `POST <base>/systemone` and never guesses.**
   `providers/systemone.ts` reads the body with a cap and normalizes
   each answer to `{type, probabilities, pick, probability}`, ignoring

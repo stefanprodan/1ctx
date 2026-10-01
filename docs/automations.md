@@ -2,8 +2,15 @@
 
 Governs `src/server/automations/` (the rows, the schedule, the
 scheduler), runs in `src/server/runner/` and the attention ask
-(`runner/attention.ts`). A run is a session, so what it shares with
-chats (the caps, the scheduled share, the writer, the sweep) is in
+(`runner/attention.ts`, see Attention).
+
+An automation (a scheduled task on the page) is a project's saved
+instructions that one agent carries out on a cron schedule or by Run
+now. Each time it starts, a run is made: a session the agent works
+through alone. A fire is one due occurrence of the schedule, recorded as
+an event whose outcome is `run`, `skipped` or `deferred`
+(`EVENT_OUTCOMES`). A run is a session, so what it shares with chats
+(the caps, the scheduled share, the writer, the sweep) is in
 `docs/sessions.md`.
 
 ## Automations
@@ -24,10 +31,10 @@ chats (the caps, the scheduled share, the writer, the sweep) is in
   it. A PATCH that changes the schedule or zone recomputes it from
   now, which ends a cap wait; other fields leave it. Resume computes
   it from now.
-- **A retired agent blocks its automations.** Deleting an agent
-  suspends them (`docs/sessions.md`). While the agent is retired,
-  resume, Run now and a PATCH that keeps the agent are a 409 until a
-  live agent is picked.
+- **A retired agent blocks its automations.** Deleting an agent retires
+  it (the row stays) and suspends them (`docs/sessions.md`). While the
+  agent is retired, resume, Run now and a PATCH that keeps the agent are
+  a 409 until a live agent is picked.
 - **Deleting an automation keeps its runs unless asked.** A running
   run makes it a 409. The runs stay with `automation_id` null, or
   `?runs=delete` deletes them in the same transaction. Either way it
@@ -42,8 +49,8 @@ chats (the caps, the scheduled share, the writer, the sweep) is in
   earliest `next_at` or a minute.
 - **`wake()` is level-triggered.** It bumps a generation the sleep
   compares, so a wake with no sleeper is not lost. A store write, a
-  freed send place and a moved send cap wake it; the queue's
-  dispatcher hears a freed place first.
+  freed send place and a moved send cap wake it; the dispatcher of
+  queued chat messages hears a freed place first (`docs/sessions.md`).
 - **Missed fires are dropped, never replayed.** A due row whose next
   occurrence has passed too becomes one skipped event (`still
   waiting`) with `next_at` at the newest past occurrence, found by a
@@ -69,10 +76,10 @@ chats (the caps, the scheduled share, the writer, the sweep) is in
 
 ## Restarts
 
-- **A drain defers, never fires.** From `scheduler.drain()` at the
-  first signal, a pass starts nothing: each due row, waiting ones
-  included, records one `deferred` event (reason `restarting`) per due
-  time and keeps `next_at`, so the next start fires it. Run now is the
+- **A drain defers, never fires.** From `scheduler.drain()` at the first
+  signal, a pass starts nothing: each due row, waiting ones included,
+  records one `deferred` event (reason `restarting`) per due time and
+  keeps `next_at`, so the next start fires it. Run now is the runner
   registry's 503.
 - **A fire after a deferral says it was late.** A scheduled fire whose
   last event is `deferred` for the same due time records the reason
@@ -104,9 +111,11 @@ chats (the caps, the scheduled share, the writer, the sweep) is in
 
 ## Attention
 
-Once a run finishes, a decider is asked whether its answer needs a
-user to look at it. The answer is stored on the session as
-`attention`, which the stream shows.
+Once a run finishes, a decider (a model that answers typed questions,
+`docs/providers.md`) is asked whether its answer needs a user to look at
+it. That question is the attention ask. The answer is stored on the
+session as `attention`, the attention mark, which the session list
+shows.
 
 - **Only a run that finished is asked.** `runner/attention.ts` starts
   from `endSend()` after `finalizeSend` committed, for cause `finish`
