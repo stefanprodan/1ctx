@@ -105,7 +105,7 @@ function compilePattern(pattern: string, re2Flags: number): RE2JS {
   const key = `${re2Flags} ${pattern}`;
   const cached = compiledCache.get(key);
   if (cached !== undefined) {
-    // (1ctx regex-cache) The weight travels with the program for FIFO removal.
+    // (1ctx regex-cache) An entry keeps its weight beside the program.
     return cached.compiled;
   }
   const compiled = RE2JS.compile(translatePattern(pattern), re2Flags);

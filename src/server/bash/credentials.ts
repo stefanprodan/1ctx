@@ -94,7 +94,8 @@ export function webNetwork(
           allowedUrlPrefixes: urlPrefixes(web.domains),
           allowedMethods: ALL_METHODS,
         }),
-    // Bun's fetch ignores the guarded dispatcher, so connect-time pinning is absent.
+    // Bun's fetch ignores the guarded dispatcher, so connect-time
+    // pinning is absent.
     denyPrivateRanges: false,
     timeoutMs: limits.timeoutMs,
     maxResponseSize: limits.maxResponseSize,

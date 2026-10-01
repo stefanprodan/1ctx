@@ -101,7 +101,9 @@ tests to Bun, whose vitest lacks `vi.stubGlobal` and
   `Cookie`, curl's default without `--location-trusted`, which we do
   not support. Other caller headers remain. Managed credentials are
   separate: every hop is signed only under its chosen prefix.
-- Once stripped, caller Authorization and Cookie stay stripped for the rest of the chain; curl 8.21 sends them again on a return to the first host.
+- Once stripped, caller Authorization and Cookie stay stripped for the
+  rest of the chain; curl 8.21 sends them again on a return to the
+  first host.
 - `-d @file` reads UTF-8 text: invalid bytes such as `0xff`, `0xfe`
   and `0x80` become U+FFFD, unchanged from 3.4.2. `-F f=@file` also
   decodes UTF-8 before constructing its multipart body, replacing
@@ -479,9 +481,7 @@ for one of the reasons below. Where they part:
 - `sub("(w)eb", "$1x")` reads `$1x` as group 1 and `x`; Go reads a
   group named `1x`, empty.
 - Map keys are strings: `with_entries` on a list prints `"0": a`, where
-  mikefarah's map has the integer key `0`, and
-  `["a"] | with_entries(.key |= . + 1)` is `{"1": "a"}`, where
-  mikefarah's is `{"0": "a"}`.
+  mikefarah's map has the integer key `0`.
 - `match` answers its fields in jq's order; `sub(re; repl; "g")`
   replaces every match, as the other forms do; `@sh` quotes every
   string; `length` of a number is its absolute value, not its digits;

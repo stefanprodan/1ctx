@@ -20,7 +20,7 @@ release. Two files beside it hold the rest:
 | Tag | `just-bash@3.6.0` |
 | Kept as | a squashed `git subtree` at `vendor/just-bash`, split `c99a0c4` |
 | Resolved by | the `just-bash` entry of `paths` in `tsconfig.json`, pointing at `vendor/just-bash/src/index.ts`; Bun honours it when running, testing and compiling |
-| Its packages | pinned devDependencies in our `package.json`, the versions its 3.4.2 release resolved to |
+| Its packages | pinned devDependencies in our `package.json`, the versions its 3.6.0 release resolved to |
 
 Code in `src/` and `test/` imports `just-bash` as a package. Nothing
 outside `vendor/just-bash/` reaches into its files, but the unit tests
@@ -229,6 +229,8 @@ difference, then record it with `scripts/vendor-test.sh --update`.
 5. Match the packages: compare `vendor/just-bash/package.json`
    `dependencies` with our pins, and move each to the version upstream's
    range resolves to. A package new to upstream needs the user's go-ahead.
+   A package moved here that `patches/` patches gets its patch checked:
+   dropped when the new version fixes the bug, regenerated otherwise.
 6. Update the tag and split in this file, the `Files` of each entry
    whose files moved, and each section of `vendor/differences.md` the
    release changed, before the checks: `changes.test.ts` reads the
