@@ -14,6 +14,8 @@
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import { type ByteString, unsafeBytesFromLatin1 } from "../../encoding.js";
+// (1ctx overlay-trusted)
+import { DefenseInDepthBox } from "../../security/defense-in-depth-box.js";
 import {
   type FileContent,
   fromBuffer,
@@ -52,6 +54,29 @@ import {
   validatePath,
   validateRootDirectory,
 } from "../real-fs-utils.js";
+
+// Bun's fs.promises.open makes a FinalizationRegistry, which the
+// defense-in-depth box blocks, so each disk call runs trusted; the scope
+// is the call alone and never reaches agent code (1ctx overlay-trusted)
+const disk = {
+  lstat: (path: string) =>
+    DefenseInDepthBox.runTrustedAsync(() => fs.promises.lstat(path)),
+  readlink: (path: string) =>
+    DefenseInDepthBox.runTrustedAsync(() => fs.promises.readlink(path)),
+  readdir: (path: string) =>
+    DefenseInDepthBox.runTrustedAsync(() =>
+      fs.promises.readdir(path, { withFileTypes: true }),
+    ),
+  readFile: (path: string, flags: number) =>
+    DefenseInDepthBox.runTrustedAsync(async () => {
+      const fh = await fs.promises.open(path, flags);
+      try {
+        return await fh.readFile();
+      } finally {
+        await fh.close();
+      }
+    }),
+};
 
 /** Error patterns that are safe to pass through (contain virtual paths, not real ones). */
 const OVERLAY_PASSTHROUGH_ERRORS = ["ELOOP", "EFBIG", "EPERM"] as const;
@@ -434,7 +459,7 @@ export class OverlayFs implements IFileSystem {
     }
 
     try {
-      await fs.promises.lstat(canonical);
+      await disk.lstat(canonical); // (1ctx overlay-trusted)
       return true;
     } catch {
       return false;
@@ -517,12 +542,12 @@ export class OverlayFs implements IFileSystem {
     }
 
     try {
-      const stat = await fs.promises.lstat(canonical);
+      const stat = await disk.lstat(canonical); // (1ctx overlay-trusted)
       if (stat.isSymbolicLink()) {
         if (!this.allowSymlinks) {
           throw new Error(`ENOENT: no such file or directory, open '${path}'`);
         }
-        const rawTarget = await fs.promises.readlink(canonical);
+        const rawTarget = await disk.readlink(canonical); // (1ctx overlay-trusted)
         const virtualTarget = this.realTargetToVirtual(normalized, rawTarget);
         const resolvedTarget = this.resolveSymlink(normalized, virtualTarget);
         return this.readFileBuffer(resolvedTarget, seen);
@@ -543,13 +568,8 @@ export class OverlayFs implements IFileSystem {
       const flags = this.allowSymlinks
         ? fs.constants.O_RDONLY
         : fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW;
-      const fh = await fs.promises.open(canonical, flags);
-      try {
-        const content = await fh.readFile();
-        return new Uint8Array(content);
-      } finally {
-        await fh.close();
-      }
+      // (1ctx overlay-trusted)
+      return new Uint8Array(await disk.readFile(canonical, flags));
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
       if (code === "ENOENT") {
@@ -690,12 +710,12 @@ export class OverlayFs implements IFileSystem {
       // Use lstat to avoid following OS-level symlinks directly.
       // If it's a symlink, resolve through the virtual layer to prevent
       // leaking metadata about files outside the sandbox.
-      const lstatResult = await fs.promises.lstat(canonical);
+      const lstatResult = await disk.lstat(canonical); // (1ctx overlay-trusted)
       if (lstatResult.isSymbolicLink()) {
         if (!this.allowSymlinks) {
           throw new Error(`ENOENT: no such file or directory, stat '${path}'`);
         }
-        const rawTarget = await fs.promises.readlink(canonical);
+        const rawTarget = await disk.readlink(canonical); // (1ctx overlay-trusted)
         const virtualTarget = this.realTargetToVirtual(normalized, rawTarget);
         const resolvedTarget = this.resolveSymlink(normalized, virtualTarget);
         return this.stat(resolvedTarget, seen);
@@ -771,7 +791,7 @@ export class OverlayFs implements IFileSystem {
     }
 
     try {
-      const stat = await fs.promises.lstat(canonical);
+      const stat = await disk.lstat(canonical); // (1ctx overlay-trusted)
       return {
         isFile: stat.isFile(),
         isDirectory: stat.isDirectory(),
@@ -912,7 +932,7 @@ export class OverlayFs implements IFileSystem {
         // lstat detects it.  Node.js has no fd-based readdir, so a tiny
         // TOCTOU window remains between this lstat and the readdir below.
         if (!this.allowSymlinks) {
-          const dirStat = await fs.promises.lstat(canonical);
+          const dirStat = await disk.lstat(canonical); // (1ctx overlay-trusted)
           if (dirStat.isSymbolicLink()) {
             // Treat as non-existent — don't leak real-FS entries
             if (!this.memory.has(normalized)) {
@@ -923,9 +943,7 @@ export class OverlayFs implements IFileSystem {
             return entriesMap;
           }
         }
-        const realEntries = await fs.promises.readdir(canonical, {
-          withFileTypes: true,
-        });
+        const realEntries = await disk.readdir(canonical); // (1ctx overlay-trusted)
         for (const dirent of realEntries) {
           if (
             !deletedChildren.has(dirent.name) &&
@@ -1004,12 +1022,12 @@ export class OverlayFs implements IFileSystem {
     }
 
     try {
-      const stat = await fs.promises.lstat(canonical);
+      const stat = await disk.lstat(canonical); // (1ctx overlay-trusted)
       if (stat.isSymbolicLink()) {
         if (!this.allowSymlinks) {
           return { normalized, outsideOverlay: true };
         }
-        const rawTarget = await fs.promises.readlink(canonical);
+        const rawTarget = await disk.readlink(canonical); // (1ctx overlay-trusted)
         const virtualTarget = this.realTargetToVirtual(normalized, rawTarget);
         const resolvedTarget = this.resolveSymlink(normalized, virtualTarget);
         return this.resolveForReaddir(resolvedTarget, true);
@@ -1411,7 +1429,7 @@ export class OverlayFs implements IFileSystem {
     }
 
     try {
-      const rawTarget = await fs.promises.readlink(canonical);
+      const rawTarget = await disk.readlink(canonical); // (1ctx overlay-trusted)
 
       // For relative targets, verify the resolved target stays within root.
       // sanitizeSymlinkTarget treats all relative targets as "within root"
@@ -1516,14 +1534,14 @@ export class OverlayFs implements IFileSystem {
           const canonical = this.resolveRealPath_(realPath);
           if (canonical) {
             try {
-              const stat = await fs.promises.lstat(canonical);
+              const stat = await disk.lstat(canonical); // (1ctx overlay-trusted)
               if (stat.isSymbolicLink()) {
                 if (!this.allowSymlinks) {
                   throw new Error(
                     `ENOENT: no such file or directory, realpath '${path}'`,
                   );
                 }
-                const rawTarget = await fs.promises.readlink(canonical);
+                const rawTarget = await disk.readlink(canonical); // (1ctx overlay-trusted)
                 const virtualTarget = this.realTargetToVirtual(
                   resolved,
                   rawTarget,
@@ -1550,7 +1568,7 @@ export class OverlayFs implements IFileSystem {
             const canonicalWithBase = this.resolveRealPathParent_(realPath);
             if (canonicalWithBase) {
               try {
-                const stat = await fs.promises.lstat(canonicalWithBase);
+                const stat = await disk.lstat(canonicalWithBase); // (1ctx overlay-trusted)
                 if (stat.isSymbolicLink()) {
                   throw new Error(
                     `ENOENT: no such file or directory, realpath '${path}'`,

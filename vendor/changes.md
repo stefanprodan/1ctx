@@ -208,6 +208,26 @@ prefix of a path, so `rm -rf`, `find` and `ls -R` cost the entries times
 the folders: 1000 files, one folder chain each, took 0.3 s to remove at
 depth 8 and 25 s at 64; ls rescanned its whole output on every append.
 
+### overlay-trusted: OverlayFs reads the disk under the box
+Files: `src/fs/overlay-fs/overlay-fs.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/overlay-trusted.test.ts`
+
+Now: each of OverlayFs's own disk calls (`lstat`, `readlink`, `readdir`
+and the open, read and close of a file) runs in
+`DefenseInDepthBox.runTrustedAsync`, the call alone, so a read works
+with `defenseInDepth: true` and a command after it stays blocked. The
+synchronous calls (`realpathSync`, `lstatSync`, `readdirSync`) allocate
+nothing the box blocks and are left as they were. Path checks,
+symlinks and `readOnly` are unchanged. It follows upstream's #397 for
+lazy files; upstream's open issue #406 is the same refusal for any host
+filesystem.
+
+Before: under the box every file read failed, since Bun's
+`fs.promises.open` makes a `FinalizationRegistry`, which the box
+refuses: `cat` said `No such file or directory`, `rg` found nothing and
+`cp` out of the mount was `EIO`.
+
 ## Every command
 
 ### version-flags: every command answers its tool's version flag

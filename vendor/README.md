@@ -26,6 +26,10 @@ Code in `src/` and `test/` imports `just-bash` as a package. Nothing
 outside `vendor/just-bash/` reaches into its files, but the unit tests
 of our own modules in `test/vendor/just-bash/`.
 
+A file system that reaches the host's disk is mounted only read-only: a
+read-only `OverlayFs` may be, nothing writable (`ReadWriteFs`, a
+writable `OverlayFs`).
+
 The vendored tree is outside Biome (`biome.json`) and the structure test.
 `tsc` checks the files our code imports, with our settings.
 
@@ -131,8 +135,7 @@ tests fail upstream under Bun as well:
 
 - the `bundle` tests: they need the built `dist/`;
 - browser mode;
-- the host-disk file systems `ReadWriteFs` and `OverlayFs`, which we
-  never mount.
+- the host-disk file systems `ReadWriteFs` and `OverlayFs`.
 
 Others fail because of the trim: the removed commands, the documents
 and the fixtures; `defense-in-depth-trusted-settlement.test.ts` needs
