@@ -11,14 +11,20 @@ import pkg from "../../package.json";
 import page from "../client/index.html";
 import type { SecretKind } from "../shared/words.ts";
 import { TOUCH_AFTER_MS } from "./access/index.ts";
-import { type ComposeOptions, compose } from "./compose.ts";
+import { compose } from "./compose.ts";
 import { httpKeys, MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
-import { heldByAnother, inspect, open } from "./db/index.ts";
+import { type Db, open } from "./db/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
-import { logger, scrubErrors, silent } from "./lib/log.ts";
+import {
+  errorFields,
+  type LogFactory,
+  logger,
+  scrubErrors,
+  silent,
+} from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
-import { loadKnowledge, parse, readSources } from "./provision/index.ts";
+import { type ProvisionResult, provisionPaths } from "./provision/index.ts";
 import { defaultDir, type Secrets, secrets } from "./secrets/index.ts";
 import { runService, ServiceError } from "./service/index.ts";
 import { serve } from "./web/serve.ts";
@@ -66,52 +72,32 @@ if (cli.kind === "service") {
   process.exit(0);
 }
 
-if (cli.kind === "provision") {
-  const { files, dbPath, secretsDir } = cli.options;
-  try {
-    if (heldByAnother(dbPath)) {
-      throw new Error(
-        `another process has ${dbPath} open; stop the server before provisioning`,
-      );
-    }
-    const documents = await loadKnowledge(parse(await readSources(files)));
-    const store = secrets(
-      secretsDir ?? defaultDir(Bun.main, process.execPath),
-      "local",
-    );
-    const options: Omit<ComposeOptions, "db"> = {
+// an app that only provisions and starts nothing
+function provisioner(store: Secrets, log: LogFactory = () => silent) {
+  return (db: Db) =>
+    compose({
+      db,
       secret: readerOf(store),
       secretNames: (kind) => store.list(kind),
       clock: wallClock,
-      log: () => silent,
+      log,
       version: VERSION,
       secureCookie: false,
       trustProxy: false,
       activate: false,
-    };
-    const snapshot = inspect(dbPath);
-    try {
-      const check = await compose({ ...options, db: snapshot });
-      try {
-        check.provision.validate(documents);
-      } finally {
-        await check.shutdown();
-      }
-    } finally {
-      snapshot.close();
-    }
-    if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-    const db = open(dbPath).db;
-    try {
-      const app = await compose({ ...options, db });
-      try {
-        await app.provision.apply(documents);
-      } finally {
-        await app.shutdown();
-      }
-    } finally {
-      db.close();
-    }
+    });
+}
+
+if (cli.kind === "provision") {
+  const { files, dbPath, secretsDir } = cli.options;
+  try {
+    const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
+    await provisionPaths({
+      paths: files,
+      dbPath,
+      compose: provisioner(store),
+      output: console.log,
+    });
   } catch (error) {
     console.error(
       `error: ${error instanceof Error ? error.message : String(error)}`,
@@ -121,15 +107,10 @@ if (cli.kind === "provision") {
   process.exit(0);
 }
 
-const { hostname, port, dbPath, secretsDir, secretsMode } = cli.options;
+const { hostname, port, dbPath, secretsDir, provision } = cli.options;
 const { secureCookie, trustProxy, drain } = cli.options;
 
-if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-const { db, migrations } = open(dbPath);
-const store = secrets(
-  secretsDir ?? defaultDir(Bun.main, process.execPath),
-  secretsMode,
-);
+const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
 const keys = httpKeys({
   secret: readerOf(store),
   secretNames: (kind) => store.list(kind),
@@ -142,6 +123,36 @@ const log = scrubErrors(logger("1ctx"), () =>
     }),
   ),
 );
+
+// applied before the server opens the db, so nothing it caches is stale
+let provisioned: ProvisionResult | null = null;
+if (provision.length > 0) {
+  try {
+    provisioned = await provisionPaths({
+      paths: provision,
+      dbPath,
+      // the first admin's creation is still said; the router's request
+      // lines for each applied object are not
+      compose: provisioner(store, (area) =>
+        area === "users" ? logger(area) : silent,
+      ),
+      optional: true,
+    });
+  } catch (error) {
+    log.error("provision failed", errorFields(error));
+    process.exit(1);
+  }
+}
+
+if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
+const opened = open(dbPath);
+const db = opened.db;
+const migrations = [...(provisioned?.migrations ?? []), ...opened.migrations];
+// zeros when a path was given and held nothing to apply
+const applied =
+  provision.length > 0
+    ? (provisioned?.counts ?? { created: 0, updated: 0, unchanged: 0 })
+    : undefined;
 
 const app = await compose({
   db,
@@ -176,8 +187,12 @@ log.info("startup", {
   listen: `http://${server.hostname}:${server.port}`,
   db: displayPath(dbPath),
   secrets: displayPath(store.dir),
-  mode: store.mode,
   migrations: migrations.length > 0 ? migrations.join(",") : "current",
+  provision:
+    provision.length > 0 ? provision.map(displayPath).join(",") : undefined,
+  provision_created: applied?.created,
+  provision_updated: applied?.updated,
+  provision_unchanged: applied?.unchanged,
   flags: flags || "none",
   drain,
   providers: app.providers.list().length,

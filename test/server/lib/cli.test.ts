@@ -30,7 +30,7 @@ describe("parseCli", () => {
       port: 1235,
       dbPath: "/home/u/.1ctx/1ctx.sqlite",
       secretsDir: null,
-      secretsMode: "local",
+      provision: [],
       secureCookie: false,
       trustProxy: false,
       drain: 10,
@@ -46,8 +46,10 @@ describe("parseCli", () => {
         "x.sqlite",
         "--secrets",
         "/s",
-        "--secrets-mode",
-        "mounted",
+        "--provision",
+        "/p",
+        "--provision",
+        "more.yaml",
         "--secure-cookie",
         "--trust-proxy",
         "--drain",
@@ -58,7 +60,7 @@ describe("parseCli", () => {
       port: 8080,
       dbPath: "x.sqlite",
       secretsDir: "/s",
-      secretsMode: "mounted",
+      provision: ["/p", "more.yaml"],
       secureCookie: true,
       trustProxy: true,
       drain: 30,
@@ -75,10 +77,16 @@ describe("parseCli", () => {
     expect(error(["--listen", "h:70000"])).toBe(
       "--listen port must be 1 to 65535",
     );
-    expect(error(["--secrets-mode", "x"])).toBe(
-      "--secrets-mode: local or mounted",
+    expect(error(["--secrets-mode", "mounted"])).toBe(
+      "unknown option --secrets-mode",
     );
     expect(error(["-f", "a.yaml"])).toBe("-f is only for provision");
+    expect(error(["--provision"])).toBe("--provision needs a value");
+    for (const path of ["", "-"]) {
+      expect(error(["--provision", path])).toBe(
+        "--provision must be a file or a directory",
+      );
+    }
     for (const drain of ["-1", "1.5", "x", "3601", "", "1e2"]) {
       expect(error(["--drain", drain])).toBe(
         "--drain must be whole seconds, 0 to 3600",
@@ -106,6 +114,9 @@ describe("parseCli", () => {
     expect(error(["provision", "--listen", "h:1"])).toBe(
       "unknown provision option --listen",
     );
+    expect(error(["provision", "-f", "a.yaml", "--provision", "b"])).toBe(
+      "unknown provision option --provision",
+    );
   });
 
   test("service hands its arguments on untouched", () => {
@@ -121,7 +132,8 @@ describe("optionsToArgs", () => {
     for (const argv of [
       [],
       ["--listen", "0.0.0.0:1235"],
-      ["--listen", "[::]:9", "--secrets", "/s", "--secrets-mode", "mounted"],
+      ["--listen", "[::]:9", "--secrets", "/s"],
+      ["--provision", "/p", "--provision", "q.yaml"],
       ["--db", ":memory:", "--secure-cookie", "--trust-proxy"],
       ["--drain", "0"],
       ["--drain", "30"],
@@ -149,5 +161,6 @@ describe("optionsToArgs", () => {
   test("help names the drain and its default", () => {
     expect(HELP).toContain("--drain <seconds>");
     expect(HELP).toContain("(default: 10)");
+    expect(HELP).toContain("--provision <path>");
   });
 });

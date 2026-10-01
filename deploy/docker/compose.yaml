@@ -1,0 +1,21 @@
+# Run with ONECTX_VERSION set to a release; ./secrets holds user-admin.key
+# for the first admin and the <kind>-<name>.key files, and ./provision (or
+# ONECTX_PROVISION) holds the YAML objects applied at every start.
+name: 1ctx
+services:
+  1ctx:
+    image: ghcr.io/stefanprodan/1ctx:${ONECTX_VERSION:?set ONECTX_VERSION to a 1ctx release}
+    restart: unless-stopped
+    # the drain (10 s by default) plus 15
+    stop_grace_period: 25s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "11236:11236"
+    volumes:
+      - data:/data
+      - ./secrets:/secrets:ro
+      - ${ONECTX_PROVISION:-./provision}:/provision:ro
+volumes:
+  data:

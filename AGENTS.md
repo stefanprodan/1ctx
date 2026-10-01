@@ -38,6 +38,8 @@ make test           # bun test, concurrent; run after any code change, before fi
 make vendor-test    # just-bash's own suite on vendor/just-bash, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
+make image          # the container image, native and loaded; PLATFORMS=a,b only builds
+make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
@@ -94,7 +96,8 @@ test/           by invariant: invariants/<name>.test.ts for the cross-
                 structure/ holds one violating root per layout rule).
 scripts/        preview.sh, staging.sh (the staging instance over ssh, its
                 host in the gitignored scripts/staging.env), smoke.sh
-                (what `make smoke` runs), vendor-test.sh, brand.py
+                (what `make smoke` runs), smoke-http.sh (its HTTP checks,
+                shared with image-smoke.sh), image.sh, vendor-test.sh, brand.py
                 which regenerates the brand SVGs in site/ from the brand
                 book (`uv run scripts/brand.py`), and the recorders
                 run by hand, *-record.ts, six of them over record-cases.ts
@@ -113,6 +116,11 @@ vendor/         just-bash/, the vendored source (a git subtree, outside
                 from the tools they follow) and just-bash-failures.txt,
                 what `make vendor-test` expects.
 docs/           the rules of each area, one file per topic (see Docs).
+deploy/         docker/compose.yaml, the image as one service, and
+                compose.dev.yaml, which builds it from the checkout
+                (docs/admin.md).
+Dockerfile      the image: cross-compiles the binary on the build platform
+                into distroless cc, nonroot; .dockerignore is an allowlist.
 ```
 
 An area under `src/server/<area>/` has `index.ts` (what others may
@@ -147,7 +155,7 @@ name. Read the one that covers a change before making it.
 | `docs/mcp.md` | before changing `src/server/mcp/`, MCP tools in a send or the files under `/mcp` |
 | `docs/knowledge.md` | before changing `src/server/knowledge/` or uploads |
 | `docs/bash.md` | before changing `src/server/bash/`, the bash tool, `open`, scratch or kept MCP files |
-| `docs/admin.md` | before changing `overview/`, `provision/`, `service/` or the staging scripts |
+| `docs/admin.md` | before changing `overview/`, `provision/`, `service/`, the staging scripts, the `Dockerfile` or `deploy/` |
 | `vendor/README.md` | before changing `vendor/just-bash/` or syncing it with upstream |
 | `vendor/changes.md` | before changing a hunk of `vendor/just-bash/`: the entry its `(1ctx <id>)` marker names, kept in the same commit |
 | `vendor/differences.md` | before changing what a vendored command answers: where it still parts from the tool it follows |
@@ -266,12 +274,12 @@ violation, and every rule has a rejected fixture under
   or ready, and answers an unexpected throw with a renewed JSON 500.
   `login limited` is logged once when an address's window closes, not
   per refusal. Startup is one event with paths, migrations, flags,
-  inventory and repair counts; the drain logs `draining`, then `drained`
-  or `drain over`, with counts; shutdown reports drained and ended sends
-  and timing. Catalog and MCP refreshes and hourly sweeps log only work
-  done or a failure. `subscribe()` on the bus takes the subscriber's
-  `Log`; a test collects events with `collectLogs()` from
-  `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
+  provision, inventory and repair counts; the drain logs `draining`,
+  then `drained` or `drain over`, with counts; shutdown reports drained
+  and ended sends and timing. Catalog and MCP refreshes and hourly
+  sweeps log only work done or a failure. `subscribe()` on the bus takes
+  the subscriber's `Log`; a test collects events with `collectLogs()`
+  from `test/helpers/app.ts`, passing its `logFactory` to `testApp()`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is
   recorded as a fixture before it is fixed.
 - **Tests in a file run concurrently.** A test that sets module state

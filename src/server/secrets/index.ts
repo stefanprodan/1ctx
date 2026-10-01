@@ -2,19 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Secrets are files: one bare value per file in the secrets directory,
-// named by the thing that uses it. Local mode lets the admin page write
-// them later; mounted mode is a Kubernetes Secret and read-only. Nothing
-// here logs or returns a value to a route; a holder reads what it needs.
+// named by the thing that uses it. The server only reads them, so a
+// mounted Kubernetes Secret works as is. Nothing here logs or returns a
+// value to a route; a holder reads what it needs.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { isSecretName, SECRET_KINDS } from "../../shared/words.ts";
 
-export type SecretsMode = "local" | "mounted";
-
 export type Secrets = {
   readonly dir: string;
-  readonly mode: SecretsMode;
   // the bare value with surrounding whitespace removed, or null when the
   // file is absent, empty or not a regular file, or larger than maxBytes,
   // which is checked before the file is read
@@ -33,14 +30,13 @@ export function defaultDir(main: string, execPath: string): string {
     : resolve(dirname(execPath), "..", "secrets");
 }
 
-export function secrets(dir: string, mode: SecretsMode): Secrets {
+export function secrets(dir: string): Secrets {
   const pathOf = (kind: string, name: string) => {
     if (!isSecretName(kind, name)) throw new Error("bad secret name");
     return join(dir, `${name}.key`);
   };
   return {
     dir,
-    mode,
     read(kind, name, maxBytes = Number.POSITIVE_INFINITY) {
       const path = pathOf(kind, name);
       // a FIFO or a device sizes as 0 and could block the read

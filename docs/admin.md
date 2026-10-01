@@ -1,7 +1,8 @@
-# Admin: overview, provision, service and staging
+# Admin: overview, provision, service, staging and the image
 
 Governs `src/server/overview/`, `provision/`, `service/`,
-`scripts/staging.sh` and the staging targets. The Monitor's pages are
+`scripts/staging.sh`, the staging targets, `Dockerfile`,
+`.dockerignore` and `deploy/`. The Monitor's pages are
 in `docs/views.md` and `docs/ui.md`.
 
 - **`overview/` is what an admin reads about the instance.** `overview/`
@@ -112,34 +113,43 @@ in `docs/views.md` and `docs/ui.md`.
   against `process.constrainedMemory()`, `contained` when that is below
   the host's memory, sampled only once `compose()` activates the app.
 - **`provision/` applies YAML through the router.** `provision/` is the
-  CLI-only area after `overview/` and before `service/`. `1ctx provision
-  -f <file|dir|->` combines YAML inputs, validates offline against a
-  database snapshot, then applies through the composed router with one
-  admin login. `compose({activate: false})` defers bootstrap and leaves
-  session repair and the scheduler off; apply reports bootstrap first.
-  No listener, sweep or MCP refresh loop runs. Stop the server before
-  provisioning. Omitted fields stay, supplied membership lists replace,
-  passwords and their change flag are creation-only, and objects not
-  named are never deleted. An `Agent` is matched by name among live
-  agents, so one naming a deleted agent creates a new agent, and the
-  automations the delete paused stay on the retired one until edited.
-  Provisioning has no `Automation` object to move them: until someone
-  picks a live agent on each, its resume, run now and any edit that
-  keeps the agent are 409s. An `Agent` takes `default: true` and nothing
-  else there: a second in one apply is refused, and leaving it out keeps
-  the mark wherever it is. A `Decider` (after `Provider`: `spec:
-  {provider, model, default?: true}`) takes the same default rule, and
-  its save checks the model against the live decisions catalog, so it
-  fails while a local server is down. Tool objects configure `web` with
-  mode and domains, `websearch` with a nullable provider, and
-  `visualize` with its switch and hosts; webfetch is read-only. A
-  `Credential` (`keyFrom`, `url`, `header`, `value`, `methods`,
-  `projects` by team name) is applied after `Project`; its preflight
-  checks the key file by `readKey()`, refuses a personal or missing
-  project, and checks the per-project cap and prefix overlaps over the
-  held rows with the input laid on them. A `Project`'s `knowledge` names
-  a folder relative to its YAML file, never from stdin:
-  `loadKnowledge()` in `provision/knowledge.ts` reads it before
+  area after `overview/` and before `service/`, run before any server
+  opens the database. `1ctx provision -f <file|dir|->` combines YAML
+  inputs, validates offline against a database snapshot, then applies
+  through the composed router with one admin login. `compose({activate:
+  false})` defers bootstrap and leaves session repair and the scheduler
+  off; apply reports bootstrap first. No listener, sweep or MCP refresh
+  loop runs. Stop the server before provisioning. The server's
+  `--provision <path>` (repeatable) runs the same routine,
+  `provisionPaths()` in `provision/run.ts`, before it opens the
+  database: a missing path or a folder with no top-level YAML applies
+  nothing, a failure logs `provision failed` and exits 1 before
+  listening, and the startup event carries `provision_created`,
+  `_updated` and `_unchanged`. It runs at every start because compose
+  and Kubernetes restart the server to apply a change; a one-shot or
+  init container would fail a plain `up -d` and an upgrade, since the
+  old server still holds the database. Omitted fields stay, supplied
+  membership lists replace, passwords and their change flag are
+  creation-only, and objects not named are never deleted. An `Agent` is
+  matched by name among live agents, so one naming a deleted agent
+  creates a new agent, and the automations the delete paused stay on the
+  retired one until edited. Provisioning has no `Automation` object to
+  move them: until someone picks a live agent on each, its resume, run
+  now and any edit that keeps the agent are 409s. An `Agent` takes
+  `default: true` and nothing else there: a second in one apply is
+  refused, and leaving it out keeps the mark wherever it is. A `Decider`
+  (after `Provider`: `spec: {provider, model, default?: true}`) takes
+  the same default rule, and its save checks the model against the live
+  decisions catalog, so it fails while a local server is down. Tool
+  objects configure `web` with mode and domains, `websearch` with a
+  nullable provider, and `visualize` with its switch and hosts; webfetch
+  is read-only. A `Credential` (`keyFrom`, `url`, `header`, `value`,
+  `methods`, `projects` by team name) is applied after `Project`; its
+  preflight checks the key file by `readKey()`, refuses a personal or
+  missing project, and checks the per-project cap and prefix overlaps
+  over the held rows with the input laid on them. A `Project`'s
+  `knowledge` names a folder relative to its YAML file, never from
+  stdin: `loadKnowledge()` in `provision/knowledge.ts` reads it before
   validation, each file a doc named by its path, the uploader's metadata
   left out and a symlink refused; preflight checks the docs with the
   knowledge area's `checkFile`, `checkNames` and `checkTotals` against
@@ -188,3 +198,40 @@ in `docs/views.md` and `docs/ui.md`.
   .backup` there before the swap and keeps the last three. It installs
   with the default drain; `DRAIN=<s>` passes `--drain` for one deploy.
   A migration that ran on staging is frozen as if merged.
+- **The image runs the binary as 65532 on a read-only root.** The
+  `Dockerfile` builds on `$BUILDPLATFORM` and cross-compiles with `bun
+  build --compile --target` (`TARGET` in the `build` script), so no
+  platform needs emulation; the build turns off the binary's `.env` and
+  `bunfig.toml` autoload, since its working directory is the data
+  volume. `make image` builds `ghcr.io/stefanprodan/1ctx:dev` for the
+  native platform and loads it; `PLATFORMS=linux/amd64,linux/arm64`
+  builds those into the cache only, a check of each cross-compile. `make
+  image-smoke` runs that image as production does (plain `CMD`, a fresh
+  named volume, read-only secrets and root, no capabilities), signs in
+  and requires a clean exit on SIGTERM; CI runs it on the Linux job for
+  amd64, and arm64 is smoked on an arm64 dev machine. Both pass
+  `VERSION` as the build argument. `.dockerignore` is an allowlist: the
+  tree holds secrets. The binary is `/usr/local/bin/1ctx`, the
+  `ENTRYPOINT`; `CMD` is `--listen 0.0.0.0:11236 --db /data/1ctx.sqlite
+  --secrets /secrets --provision /provision`, and a compose `command:`
+  or `docker run` arguments replace it whole, so they repeat what they
+  keep. `/secrets` is mounted read-only and holds `user-admin.key` for
+  the first admin and the `<kind>-<name>.key` files, each readable by
+  65532 (`chown 65532` or mode 644: an unreadable key throws where it is
+  read, and `user-admin.key` fails the first start); the server only
+  reads it. `/data` is a named volume, which takes the image's `/data`
+  with its owner 65532. Never a bind mount on Docker Desktop or
+  OrbStack: their VirtioFS breaks the POSIX locks the SQLite WAL needs,
+  which hangs or corrupts the database. On a Linux host a bind mount
+  works once the folder is `chown 65532:65532`. Stop grace is the drain
+  plus 15: `stop_grace_period: 25s` against the default `--drain 10`,
+  and `docker run --stop-timeout 25` for a plain run, since Docker's 10
+  s default would kill the shutdown after the drain. The bash tool and
+  the workers need no writable `/tmp`. `deploy/docker/compose.yaml` runs
+  a release by `ONECTX_VERSION`, since there is no `latest` tag, and
+  mounts `${ONECTX_PROVISION:-./provision}` read-only on `/provision`.
+  `compose.dev.yaml` beside it builds the image from the checkout and
+  never pulls: `ONECTX_VERSION=dev docker compose -f compose.yaml -f
+  compose.dev.yaml up -d --build`. `LICENSE` and
+  `THIRD_PARTY_LICENSES.md` are in `/usr/share/doc/1ctx/`, as in the
+  release archive.

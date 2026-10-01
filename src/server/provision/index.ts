@@ -17,6 +17,7 @@ export { readSources } from "./input.ts";
 export { inventoryOf, projectDocsOf } from "./inventory.ts";
 export { loadKnowledge } from "./knowledge.ts";
 export { type Document, type Inventory, parse } from "./parse.ts";
+export { type ProvisionResult, provisionPaths } from "./run.ts";
 
 export type ProvisionDeps = {
   handle: Handle;

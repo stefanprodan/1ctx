@@ -123,3 +123,5 @@ workspace/
 .preview/
 bin/
 .*.bun-build
+deploy/docker/secrets/
+deploy/docker/provision/

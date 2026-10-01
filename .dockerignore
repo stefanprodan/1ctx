@@ -1,0 +1,10 @@
+# An allowlist: the tree holds secrets that must never reach the context.
+*
+!package.json
+!bun.lock
+!patches/
+!tsconfig.json
+!LICENSE
+!THIRD_PARTY_LICENSES.md
+!src/
+!vendor/
