@@ -30,7 +30,6 @@ describe("parseCli", () => {
       port: 1235,
       dbPath: "/home/u/.1ctx/1ctx.sqlite",
       secretsDir: null,
-      secretsMode: "local",
       secureCookie: false,
       trustProxy: false,
       drain: 10,
@@ -46,8 +45,6 @@ describe("parseCli", () => {
         "x.sqlite",
         "--secrets",
         "/s",
-        "--secrets-mode",
-        "mounted",
         "--secure-cookie",
         "--trust-proxy",
         "--drain",
@@ -58,7 +55,6 @@ describe("parseCli", () => {
       port: 8080,
       dbPath: "x.sqlite",
       secretsDir: "/s",
-      secretsMode: "mounted",
       secureCookie: true,
       trustProxy: true,
       drain: 30,
@@ -75,8 +71,8 @@ describe("parseCli", () => {
     expect(error(["--listen", "h:70000"])).toBe(
       "--listen port must be 1 to 65535",
     );
-    expect(error(["--secrets-mode", "x"])).toBe(
-      "--secrets-mode: local or mounted",
+    expect(error(["--secrets-mode", "mounted"])).toBe(
+      "unknown option --secrets-mode",
     );
     expect(error(["-f", "a.yaml"])).toBe("-f is only for provision");
     for (const drain of ["-1", "1.5", "x", "3601", "", "1e2"]) {
@@ -121,7 +117,7 @@ describe("optionsToArgs", () => {
     for (const argv of [
       [],
       ["--listen", "0.0.0.0:1235"],
-      ["--listen", "[::]:9", "--secrets", "/s", "--secrets-mode", "mounted"],
+      ["--listen", "[::]:9", "--secrets", "/s"],
       ["--db", ":memory:", "--secure-cookie", "--trust-proxy"],
       ["--drain", "0"],
       ["--drain", "30"],

@@ -18,7 +18,6 @@ export type RunOptions = {
   dbPath: string;
   // null is the default directory, which depends on where the binary is
   secretsDir: string | null;
-  secretsMode: "local" | "mounted";
   secureCookie: boolean;
   trustProxy: boolean;
   // whole seconds; 0 terminates at once
@@ -67,8 +66,6 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
                          ":memory:" keeps nothing)
   --secrets <dir>        the secrets directory (default: ../secrets next to
                          the binary; .preview/secrets from source)
-  --secrets-mode <mode>  local (writable from the admin page) or mounted
-                         (read-only, a Kubernetes Secret) (default: local)
   --secure-cookie        mark the login cookie Secure; set it when 1ctx is
                          served over TLS
   --trust-proxy          take the client address and scheme from the
@@ -120,7 +117,6 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
   let listen = DEFAULT_LISTEN;
   let dbPath = defaultDb(home);
   let secretsDir: string | null = null;
-  let secretsMode: RunOptions["secretsMode"] = "local";
   let secureCookie = false;
   let trustProxy = false;
   let drain = DEFAULT_DRAIN;
@@ -131,14 +127,7 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
     if (provisioning && !PROVISION_FLAGS.includes(arg)) {
       return { kind: "error", message: `unknown provision option ${arg}` };
     }
-    const valued = [
-      "-f",
-      "--listen",
-      "--db",
-      "--secrets",
-      "--secrets-mode",
-      "--drain",
-    ];
+    const valued = ["-f", "--listen", "--db", "--secrets", "--drain"];
     let value = "";
     if (valued.includes(arg)) {
       const next = args[++i];
@@ -163,12 +152,6 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
         break;
       case "--secrets":
         secretsDir = value;
-        break;
-      case "--secrets-mode":
-        if (value !== "local" && value !== "mounted") {
-          return { kind: "error", message: "--secrets-mode: local or mounted" };
-        }
-        secretsMode = value;
         break;
       case "--secure-cookie":
         secureCookie = true;
@@ -211,7 +194,6 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
       ...address,
       dbPath,
       secretsDir,
-      secretsMode,
       secureCookie,
       trustProxy,
       drain,
@@ -225,9 +207,6 @@ export function optionsToArgs(options: RunOptions): string[] {
   const host = options.hostname;
   const args = ["--listen", `${host}:${options.port}`, "--db", options.dbPath];
   if (options.secretsDir !== null) args.push("--secrets", options.secretsDir);
-  if (options.secretsMode !== "local") {
-    args.push("--secrets-mode", options.secretsMode);
-  }
   if (options.secureCookie) args.push("--secure-cookie");
   if (options.trustProxy) args.push("--trust-proxy");
   args.push("--drain", String(options.drain));

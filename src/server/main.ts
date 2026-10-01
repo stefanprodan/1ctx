@@ -75,10 +75,7 @@ if (cli.kind === "provision") {
       );
     }
     const documents = await loadKnowledge(parse(await readSources(files)));
-    const store = secrets(
-      secretsDir ?? defaultDir(Bun.main, process.execPath),
-      "local",
-    );
+    const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
     const options: Omit<ComposeOptions, "db"> = {
       secret: readerOf(store),
       secretNames: (kind) => store.list(kind),
@@ -121,15 +118,12 @@ if (cli.kind === "provision") {
   process.exit(0);
 }
 
-const { hostname, port, dbPath, secretsDir, secretsMode } = cli.options;
+const { hostname, port, dbPath, secretsDir } = cli.options;
 const { secureCookie, trustProxy, drain } = cli.options;
 
 if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
 const { db, migrations } = open(dbPath);
-const store = secrets(
-  secretsDir ?? defaultDir(Bun.main, process.execPath),
-  secretsMode,
-);
+const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
 const keys = httpKeys({
   secret: readerOf(store),
   secretNames: (kind) => store.list(kind),
@@ -176,7 +170,6 @@ log.info("startup", {
   listen: `http://${server.hostname}:${server.port}`,
   db: displayPath(dbPath),
   secrets: displayPath(store.dir),
-  mode: store.mode,
   migrations: migrations.length > 0 ? migrations.join(",") : "current",
   flags: flags || "none",
   drain,

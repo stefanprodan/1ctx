@@ -11,7 +11,7 @@ import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
 const HEALTH_ATTEMPTS = 60;
-const VALUED = ["--listen", "--db", "--secrets", "--secrets-mode", "--drain"];
+const VALUED = ["--listen", "--db", "--secrets", "--drain"];
 // the manager's kill timeout over the drain: the runner's five-second
 // wait and room to close; the sum stays under the stop's own wait
 // (WAIT_MS in launchd.ts)
