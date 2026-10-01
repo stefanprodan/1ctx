@@ -1,293 +1,189 @@
 # Tools
 
 Governs `src/server/tools/`, `limits/`, `credentials/`, `skills/`, the
-tool loop and the policy in `src/server/runner/`, and the visual frame
+tool loop and policy in `src/server/runner/`, and the visual frame
 (`GET /api/visual`, `tools/visual-theme.ts`, `tools/visual-scheme.ts`).
-The admin pages are in `docs/views.md`, MCP tools in `docs/mcp.md`, bash's
-mount in `docs/bash.md`.
+MCP tools are in `docs/mcp.md`, the bash tool and curl in
+`docs/bash.md`, the system prompt's order in `docs/sessions.md`.
 
-## The loop
+## Limits
 
-- **The tool loop is bounded, and the server places every row.** The
-  loop caps (rounds, calls per round and per send, tool time, result
-  bytes, `toolWorkTokens`) and the per-tool caps have their defaults,
-  floors and ceilings in one table, `limits/defaults.ts`; an admin's
-  override is a row in `limits`, `PUT /api/limits` writing only the
-  limits it names, `limits.current()` merges them, and
-  every importer reads the types and the defaults from
-  `limits/index.ts`; `tools/` never imports `runner/`. The `sends` scope
-  holds `sendsPerUser` (1 to 16, default 4), `sendsPerProject` (4 to
-  64, default 16) and `sendsRunning` (4 to 256, default 64), written
-  only in that order (`docs/sessions.md`), with the queue's
-  `queuedPerUser` (1 to 32, default 8) and `queuedMinutes` (10 to 240,
-  default 60, unit `minutes`). The `chats` scope
-  holds `archiveIdleDays` (1 to 180, default 30) and
-  `archivedDeleteDays` (30 to 1825, default 365), neither with an off
-  value; the chats sweep reads them at each pass. `maxBashCalls` refuses
-  excess bash calls before queue or slot admission without ending the loop.
-  A bash `command not found` for a name the send offers as a tool gains
-  one line saying to call it as a tool, through `mcp_call` for a catalog
-  MCP name (`tools/bash-hint.ts`).
-- **Spend and thresholds.**
-  Main rounds spend prompt less cached, a tenth of cached rounded up
-  (`CACHED_DIVISOR` in `runner/round.ts`) and completion, or a request
-  estimate without usage; `send end` logs it as `spent_tokens`. The
-  tool-work threshold and the window threshold are checked before
-  calls, forcing one answer round.
-- **Repeats are refused once.**
-  Three equal call rounds in a row are refused once, recorded not run
-  with a result pointing at the earlier ones and finish reason
-  `tool_repeat` ("repeat refused" in the fold), and the loop goes on; a
-  second trip, or one with fewer than two rounds left, is the answer
-  round with `tool_loop`.
-- **The answer round keeps the cached prefix.**
-  The answer round sends the schemas unchanged and no `tool_choice`,
-  which would miss a server's cached prefix, and ends the request with
-  the ask as a request-local user message after the last result, naming
-  the reason (the models called again when it sat inside a tool
-  result, and Gemini refuses a request ending on a model turn). A round
-  that still calls is asked again: on `openai-compatible` first with the
-  same request, which a local server's cached prefix answers in seconds,
-  then on every wire once without schemas. A reply to that last request
-  that writes a call as text (`runner/text-calls.ts`) keeps only the
-  words before it, or a stop line, with finish reason `tool_text`.
-  The crossing and answer rounds may pass the tool-work budget; summaries
-  and memory have their own limits. Results that outgrow the remaining
-  window are cut largest first before storage, keeping bash's exit and
-  receipts and a cut line. The work row carries `tool_limit`, `token_limit`,
-  `context_limit` or `tool_loop`; the answer keeps the provider's finish
-  reason, except `tool_text`.
-- **The server places every row.** A change to a limit or a tool applies to
-  the next send, a send cap to the next admission; a send in flight
-  keeps the caps and the set it started on. A round's calls run in
-  parallel under the call timeout (plus a tool's `graceMs`, bash's 1.5 s
-  to answer at its own deadline) and the send's signal. A tool row is
-  a message of kind `tool`, and each tool's end is one transaction,
-  one revision, one envelope; only the reply text streams. Every
-  message carries its `send_id` and `round`, and a reply row its
-  `slot`, `work` or `answer`, written by the server: at the first call
-  delta, or when the round ends. The client groups by send and slot and
-  never infers placement
-  from the call arrays, the finish reason or the live map. A tool row
-  travels without its result; detail and envelopes carry `resultBytes`,
-  and `GET /api/sessions/:id/messages/:messageId/result` answers it cut
-  at the display cap. The runner reads the full row from the store.
-- **Words that name input or a server's answer are a `ToolError`.**
-  `ToolError` (`lib/errors.ts`) carries the words the model reads and
-  `logged`, a fixed phrase that `errorFields()` logs in their place. A
-  tool throws one whenever its words hold the call's input or what a
-  server sent: an unknown tool's name, a skill file's path and the file
-  list, webfetch's URL, scheme, host, redirect and media type,
-  datetime's timezone, an MCP tool's name and argument check, an MCP
-  `isError` answer, the MCP client's HTTP body and SDK or protocol
-  words (the status stays), and a search provider's words (the status
-  stays). Other tool failures are fixed text with closed values, or a
-  runtime's own error (a fetch that could not connect). `withClient`
-  rethrows a `ToolError` as it is and wraps anything else in one, and
-  websearch keeps the class when it scrubs the key. `skill refresh
-  failed` logs `skill source refused` and the status for a refusal; the
-  row keeps the words. `tool failed` names the tool by `toolLogName()`
-  (`tools/index.ts`): a built-in's name, `mcp:` and the server's
-  configured name for an offered MCP tool, whose own name is server
-  text, else `unknown`, never the name the model wrote.
+- **`limits/defaults.ts` is the one table of limits.** Each has its
+  default, floor, ceiling, unit and scope there. A row in `limits` is
+  an admin's override alone, merged by `limits.current()`. Importers
+  take types and defaults from `limits/index.ts`; `tools/` never
+  imports `runner/`.
+- **The send caps stay ordered.** `sendsPerUser <= sendsPerProject <=
+  sendsRunning`; a write breaking it is a 400.
+- **A change applies to the next send.** A send in flight keeps the
+  caps and the offered set it started on; a send cap applies at the
+  next admission.
+
+## The tool loop
+
+The tool loop is a send's rounds: the model calls tools, the server
+runs them and sends the results back, until the model answers in
+words. When a cap or a repeated call stops the tools, the loop ends
+with the answer round, one more round that asks for the answer in
+words.
+
+- **Every cap is weighed before a round's calls launch.** Over a cap,
+  the calls are recorded not run and the loop goes to the answer round
+  with `tool_limit`, `token_limit` or `context_limit`. `maxBashCalls`
+  is the exception: excess bash calls get an error result before queue
+  or slot admission, and the loop goes on.
+- **Spend counts cached tokens at a tenth.** A main round spends prompt
+  less cached, plus cached / `CACHED_DIVISOR` rounded up, plus
+  completion, or an estimate without usage.
+- **Three equal call rounds in a row are refused once.** The calls are
+  recorded not run with finish reason `tool_repeat` and the loop goes
+  on. A second trip, or one with fewer than two rounds left, is the
+  answer round with `tool_loop`.
+- **The answer round keeps the cached prefix.** It sends the schemas
+  unchanged and no `tool_choice`, since either change misses a
+  server's cached prefix. The ask is a request-local user message after
+  the last result: inside a tool result models called again, and Gemini
+  refuses a request ending on a model turn.
+- **An answer round that still calls is asked again, then bare.** On
+  `openai-compatible` it first repeats the same request, cheap on a
+  local server's cache. Then every wire gets one request without
+  schemas; a call written there as text is dropped
+  (`runner/text-calls.ts`) with finish reason `tool_text`.
+- **Results that outgrow the window are cut largest first.** A cut
+  keeps each result's `tail` (bash's exit and receipts, MCP's path
+  lines) and adds a cut line, before storage.
+- **A round's calls run in parallel.** Each runs under the call
+  timeout plus its tool's `graceMs` and the send's signal. Each call's
+  end is one transaction, one revision, one envelope.
+- **The server places every row.** Every message carries `send_id` and
+  `round`, and a reply its `slot` (`work` or `answer`), written by the
+  server. The client never infers placement from call arrays, finish
+  reasons or the live map.
+- **A tool row travels without its result.** Detail and envelopes carry
+  `resultBytes`; the result route answers it cut at the display cap. The
+  runner reads the full row from the store.
+- **A command not found that names a tool gains a hint.**
+  `tools/bash-hint.ts` adds a line saying to call it as a tool, or
+  through `mcp_call` for a catalog MCP name.
+
+## Errors
+
+- **Words holding a call's input or a server's answer are a
+  `ToolError`.** Its `logged` phrase is logged in their place. That
+  covers names, paths, URLs, hosts, timezones the model wrote, and any
+  text a remote server sent (MCP, search, webfetch). Other failures are
+  fixed text with closed values.
+- **`tool failed` names the tool by `toolLogName()`.** A built-in's
+  name, `mcp:<server>` for an offered MCP tool, else `unknown`; never
+  the name the model wrote.
 
 ## The offered set
 
-- **The offered set is decided once per send.** The offered set is
-  decided once per send in `runner/policy.ts` from the `tools` rows: a
-  model that accepts tools always gets `datetime` and `bash` over the
-  project's knowledge base. The admin's `web` row has one mode, `off`,
-  `all` or `listed`, with plain hosts in `hosts`; off and all keep the
-  saved list. The send's disabled set is applied before schemas are
-  built: `web` off removes webfetch, websearch and bash's network.
-  Websearch also needs a provider, null for None and on a fresh
-  instance. Webfetch checks every redirect against the listed origins.
-  The send keeps its web snapshot, domains included. Visualize keeps its
-  separate switch and is unaffected. Only the `visualize` row's
-  `enabled` is used; webfetch's and websearch's are ignored. `GET
-  /api/projects/:id/agents` answers the tools capability's
-  `capabilities()`: `web` unless the admin's mode is off, `visualize`
-  while the Visuals row is on, and `knowledge` and `memory` always,
-  through a forward port.
-- **Four keys stand alone in the set.**
-  The prompt adds `WEB_OFF_LINE` after the date and before the MCP note
-  exactly when the send's set holds `web` and it offers tools, regardless
-  of the admin's mode. `visualize` is the second kind-alone key of the
-  set (`VISUALIZE` in `shared/capabilities.ts`): `tools/offer.ts` drops
-  the `visualize` tool and only the tool when the send's set holds it,
-  `open` and the skill untouched, and the prompt adds the constant
-  `VISUALIZE_OFF_LINE` after the web line by the same rule.
-  `knowledge` (`KNOWLEDGE`) is the third: it keeps `bash` and sets
-  `Offered.knowledge` false, which the bash tool's caps carry to the mount
-  (`docs/bash.md`); the prompt drops the knowledge block and adds
-  `KNOWLEDGE_OFF_LINE` after the visualize line exactly when the set
-  holds it and the send offers `bash`.
-  `memory` (`MEMORY`) is the fourth: the offer drops the chat's
-  `memory_edit` and the note stays in the prompt; `MEMORY_OFF_LINE`
-  follows the knowledge line when the set holds it, the send offers
-  tools and it is a chat. An
-  automation's set accepts it and it means nothing there. The memory
-  phase offers the own-note `memory_edit` alone.
-- **Search needs no key.**
-  Every provider (exa, firecrawl, tavily) answers keyless, its
-  `search-<provider>.key` file raises the rate, and the runner never holds
-  a key.
-- **The tools API.** `GET /api/tools` holds `access` (mode and
-  domains), `search` (nullable provider and key presence), and
-  `visualize` (its switch and hosts). The one `PATCH /api/tools/:name`
-  descriptor accepts web mode/domains, websearch provider, or visualize
-  enabled/hosts, never webfetch. The Built-in catalog is
-  `tools/catalog.ts`, built by the send's own factories with sample
-  inputs (name enums empty, `memory_edit` the chat's with the own-note
-  text as its `variant`); the bash catalog sample uses all-mode words.
+- **The offered set, the tools a send gives the model, is decided once
+  per send in `tools/offer.ts`.** A model that accepts tools always gets
+  `datetime` and `bash`. The session's disabled set is applied before
+  schemas are built, and the agent page's tool count
+  (`agents/directory.ts`) calls the same `offered()`.
+- **The admin's `web` row is one mode: `off`, `all` or `listed`.** Off
+  and all keep the saved hosts. Web off (admin or chat) removes
+  webfetch, websearch, bash's network and every credential. Websearch
+  also needs a provider, null on a fresh instance. Webfetch checks every
+  redirect against the listed origins. The send keeps its web snapshot.
+- **Websearch needs no key.** Every provider answers keyless; a
+  `search-<provider>.key` file only raises the rate.
+- **Only the `visualize` row's `enabled` is read.** Webfetch's and
+  websearch's `enabled` are ignored, and no route patches webfetch.
+- **Each capability key drops exactly its part.** A capability is a part
+  of the offer a chat or automation may switch off (`docs/sessions.md`).
+  - `web`: as above.
+  - `visualize`: drops the tool only; `open` and the skill read the
+    admin's row alone.
+  - `knowledge`: keeps `bash`, with no `/knowledge` mount
+    (`docs/bash.md`), and drops the knowledge block.
+  - `memory`: drops a chat's `memory_edit`; the note stays in the
+    prompt. It means nothing in a run.
+  - `mcp:<id>`, `skill:<id>`, `credential:<id>`: removed before the
+    offer is built, so nothing of them reaches the send.
+- **Each off key adds its line to the prompt.** The lines are
+  `WEB_OFF_LINE`, `VISUALIZE_OFF_LINE`, `KNOWLEDGE_OFF_LINE`,
+  `MEMORY_OFF_LINE`, `mcpOffLine()` and `skillsOffLine()`, added only
+  when the send offers tools (the knowledge line only with `bash`).
+  They exist because history may still show what the switch turned
+  off. `tools.capabilities()` lists the switchable keys: `web`
+  unless the mode is off, `visualize` while its row is on, and
+  `knowledge` and `memory` always.
+- **A delete forgets its key.** Deleting an MCP server, a skill or a
+  credential forgets `mcp:`, `skill:` or `credential:<id>` in sessions
+  and automations in the same transaction. Unassigning forgets nothing.
 
 ## Visuals
 
-- **A visual is a sandboxed document.** The `visualize` web tool is on
-  by default, with script, style and font hosts cdnjs.cloudflare.com,
-  cdn.jsdelivr.net, unpkg.com and esm.sh; admins edit or empty the list.
-  The tool description carries the saved hosts. Watchers receive draft
-  `visual` frames by message and call index, in the send's sequence;
-  the live snapshot carries `drafts`. Preview is inert; final runs
-  scripts once, after the tool succeeds. `GET /api/visual` authenticates
-  and serves the fixed shell with a CSP sandbox and opaque origin,
-  the saved resource hosts and `connect-src 'none'`. The iframe grants
-  only `allow-scripts`; the page's CSP meta sets `frame-src 'self'`.
-  A MessageChannel port binds the parent to the first loaded document;
-  a later navigation closes it. The frame stays 680px wide, scrolling
-  on narrow screens and past 2,000px height. The stored fragment comes
-  from `GET /api/sessions/:id/messages/:messageId/calls/:index/visual`
-  after success; detail and envelopes replace its `html` with its size.
-- **The frame's theme is the chat's.**
-  `tools/visual-theme.ts` alone defines the frame's colours; its CSS is
-  a separate document, outside the client stylesheet rules. The parent
-  supplies the theme; the frame sets `data-theme` and dispatches
-  `visualtheme`. The frame rewrites the visual's `prefers-color-scheme`
-  queries and `matchMedia` to answer the chat's theme, not the system's
-  (`tools/visual-scheme.ts`). A whole page (`<html>` or `<body>`) loses its
-  plain backdrop, padding and margin only when its text reads on the
-  chat's ground at 4.5:1 (`visualGround()`, measured without the
-  frame's own attributes). A page whose text does not read there and
-  that paints no background of its own gets the plain backdrop of
-  `VISUAL_BACKDROPS` its text reads on, compared as painted, and the
-  8px body spacing a browser gives, since the frame is see-through; a
-  fragment keeps the chat's ground. The height counts the body's own
-  spacing.
-  Change `skills/visualize/` in the same commit as the frame's
-  names or the tool's contract.
+- **A visual is a sandboxed document:** HTML or SVG the `visualize` tool
+  or bash's `open` draws in the chat. `GET /api/visual` serves a fixed
+  shell with a CSP sandbox, an opaque origin, the saved resource hosts
+  and `connect-src 'none'`. The iframe grants only `allow-scripts`. A
+  MessageChannel port binds the parent to the first loaded document, so
+  a later navigation loses it.
+- **Drafts are inert; the final runs once.** A draft is the visual's
+  HTML while it streams. Scripts run after the tool succeeds. Detail and
+  envelopes replace a stored visual's `html` with its size; the visual
+  route serves it.
+- **The frame's theme is the chat's, not the system's.**
+  `tools/visual-theme.ts` alone defines the frame's colours, as a
+  separate document outside the client stylesheet rules.
+  `tools/visual-scheme.ts` rewrites `prefers-color-scheme` and
+  `matchMedia` to answer the chat's theme.
+- **A whole page keeps a readable ground.** It loses its backdrop only
+  when its text reads on the chat's ground at 4.5:1 (`visualGround()`).
+  Otherwise, with no background of its own, it gets the
+  `VISUAL_BACKDROPS` entry its text reads on and a browser's 8px body
+  spacing, since the frame is see-through.
+- **`skills/visualize/` follows the frame.** Change it in the same
+  commit as the frame's names or the tool's contract.
 
 ## HTTP credentials
 
-- **An HTTP credential is a row, its key an `http-` file.**
-  `credentials/` is the area after `projects/`: the tables `credentials`
-  and `credential_projects` (links cascading with both sides), the
-  store, the routes, the parsers and the pure rules in `check.ts`. The
-  prefix is `normalizePrefix()`: https, no userinfo, query or fragment,
-  at most `MAX_PREFIX`, stored as origin and path with the host's
-  trailing dot dropped, and passing just-bash's `validateAllowList`.
-  The header is an RFC token, never a transport header or `proxy-*`
-  (case folded); the template is printable ASCII, at most
-  `MAX_TEMPLATE`, with `{key}` exactly once. The key is `isUsableKey`,
-  16 to 4,096 visible ASCII characters, read at the moment by
-  `readKey()`: `missing` with no file, `unusable` when empty, too large
-  or failing the rule. Methods default to GET and HEAD. A credential
-  binds team projects only (a personal or unknown id is a 400), at most
-  `MAX_CREDENTIALS_PER_PROJECT` to a project and never two whose
-  prefixes overlap by `prefixesOverlap()`, both checked after the write
-  in the transaction that writes the links (a 409 rolls it back).
-  `GET`, `POST /api/credentials` and `PATCH`, `DELETE
-  /api/credentials/:id` are `admin`; the list answers the `http-` key
-  names with `usable` and each row's `key` state, never a value; PATCH
-  takes any field but the name, a supplied `projectIds` replacing; a
-  delete forgets `credential:<id>` in sessions and automations in the
-  same transaction. `GET /api/projects/:id/agents` also answers
-  `credentials`, the project's `{id, name}` in name
-  order, for any agent, the same for members and admins.
-- **A send signs bash's curl with its project's credentials.** The tools
-  area's `offered()` takes the project's rows through a port to
-  `credentials/`, in name order, as `credentials` (id, name, key name,
-  prefix, header, template, methods), and those whose `credential:<id>`
-  the send's set holds as `credentialsOff` (id, name, prefix); both are
-  empty without network (the admin's mode or the chat's `web` off),
-  outside a project, for a personal project and in the memory phase. The
-  bash tool, at each command with network, checks each row by id (gone
-  or unbound is `deleted`; a key name, prefix, header, template or
-  methods differing from the send's is `changed`) and reads its key by
-  the key name through `readKey()` (`missing`, `unusable`), so a
-  replaced file applies to the next command; the keys ride in the
-  command caps as `CommandCredential`s and nowhere else, and the tool
-  scrubs its result of them again, the tail kept apart.
-- **One fetch per URL, picked once.** `bash/credentials.ts` builds
-  the `SecureFetch` the mount passes as just-bash's `fetch`:
-  `commandFetch()` picks once, by `matchesAllowListEntry` on the URL
-  curl asked for over every offered and off prefix, the web fetch
-  (`webNetwork()`, all or listed as before, never a transform) or that
-  credential's own `createSecureFetch`, its prefix the one allow-list
-  entry carrying the header, its methods the allowed ones. So a signed
-  redirect off the prefix, to http or to another credential is refused,
-  an unsigned request redirected into a prefix stays unsigned, and a
-  prefix is reached in listed mode without its host. An off, keyless,
-  unusable, removed or changed credential, a method it lacks and a
-  routing header the command sets (`ROUTING_HEADERS`: host, forwarded,
-  the `x-forwarded-*`, URL rewrite and method override headers) are
-  refused by its name before anything is sent, never the key file; the
-  web fetch refuses `host`, `forwarded` and `x-forwarded-host`. Each
-  fetch is made on first use.
-- **A key never reaches the result.** Every key the command read, and
-  its JSON-escaped forms (`escapedForms()`: `\/`, `\u` in either case),
-  is replaced by `[credential <name>]` in the result as bytes (body,
-  header values, status text, final URL), a header whose name holds one
-  is dropped, `content-length` follows a changed body and a body grown
-  past the cap is refused; an error is rebuilt from its first line, keys
-  replaced, its name kept. The bash description adds `curl to <prefix,
-  cut at 80> (<name>) is signed in; send no key.` per offered
-  credential; the Config board and the agent page count bash without
-  any.
+- **A credential is a row, its key an `http-` file.** It makes curl in
+  bash send a header holding the key on requests under a URL prefix.
+  Rows never hold a key; `readKey()` reads it at the moment of use and
+  answers `missing` or `unusable` by `isUsableKey()`. Routes answer key
+  state, never a value.
+- **A credential's header is an RFC token, never a transport header
+  or `proxy-*`** (`check.ts`, case folded). The template is printable
+  ASCII with `{key}` exactly once.
+- **A prefix is `normalizePrefix()`'s form.** Https, no userinfo, query
+  or fragment, and accepted by just-bash's `validateAllowList`, since
+  it becomes an allow-list entry.
+- **A credential binds team projects only.** At most
+  `MAX_CREDENTIALS_PER_PROJECT` per project, and never two whose
+  prefixes overlap (`prefixesOverlap()`). Both are checked after the
+  write, in the transaction that writes the links, so a 409 rolls it
+  back.
+- **A send offers its project's credentials only with network.** The
+  offer is empty with web off, outside a team project and in the memory
+  phase. A chat's `credential:<id>` moves one to `credentialsOff`, so
+  curl refuses its prefix by name. How curl signs is in `docs/bash.md`.
 
 ## Skills
 
-- **A skill is stored text, never executable.** An admin adds a
-  `SKILL.md` and its text files from a GitHub directory, an archive, a
-  discovery index or a raw file through the compose fetcher. A GitHub
-  directory is never the repo's archive: `skills/github.ts` pins the ref
-  to a commit, lists the folder with one trees call and reads each file
-  from `raw.githubusercontent.com` at that commit, so the caps count the
-  skill and a repo of any size works. That is two unauthenticated API
-  calls per add or refresh (GitHub allows 60 an hour per address);
-  symlinks and submodules are left out, as in an archive. Tar, tar.gz
-  and zip archives go through `lib/archive.ts`; duplicate member names
-  are refused. An index digest is checked on add and refresh. Refresh is
-  explicit and never renames the skill; deleting one an agent names is a
-  409. Its delete forgets `skill:<skill id>` in sessions and automations
-  in the same transaction, without revisions or envelopes; unassigning
-  forgets nothing. Stored text is cleaned and shown as text, ingest caps
-  live in `skills/limits.ts`, and nothing runs.
-- **An agent's skills are one send snapshot.** Their capped catalog from
-  `shared/skills.ts` sits in the prompt before the date line. The `skill`
-  tool's name is an enum of that catalog, and `skill_file` is offered only
-  when it can answer. These two tools come from skills, never the tools
-  rows or their admin pages, a deliberate exception to the offered-set rule.
-  A call reads the current body by the snapshot's id and name. After a
-  summary, the user message names still-offered skills the building
-  agent itself loaded before it, never another agent's in the chat,
-  each load paired with its call by position in its round, as the
-  writer pairs them.
-  Before the catalog is built, `tools/offer.ts` removes the agent's skills
-  whose `skill:<skill id>` is disabled, so the block, the enum and
-  `skill_file` come from what is left, and all off means no block and no
-  tool. The policy's `skillsOff` holds their sorted names, empty for a
-  model without tools; `skillsOffLine()` names them after the MCP-off
-  line, since a skill loaded before the flip left its body in history.
-  `GET /api/projects/:id/agents` also answers `skills`, keyed by agent
-  id, with `{id, name}` in name order from `skills/switchable.ts`, one
-  read. Agents without skills have no entry.
-- **A skill's usage is read from the calls.** A tool row holds only the
-  result, so `skillLoads()` in `sessions/activity.ts` joins each `skill`
-  and `skill_file` row to its call in the round's reply by position
-  among the round's tool rows, as the writer pairs them, the id checked
-  too, and reads the name (and a file's path) from the call's arguments; a
-  call whose arguments are not JSON or name no skill counts for none.
-  `GET /api/usage/skills` and `GET /api/skills/:id/usage` answer
-  `lastDays()`, a deleted skill's calls under its name. The first sits
-  outside `/api/skills/`, since `/api/skills/usage` would overlap
-  `GET /api/skills/:id`.
+- **A skill is stored text and never runs.** It is an Agent Skills
+  folder (a `SKILL.md` and its files) an agent loads through the `skill`
+  tool. Ingest caps live in `skills/limits.ts`; text is cleaned and
+  shown as text. Archives go through `lib/archive.ts`, duplicate member
+  names refused.
+- **A GitHub directory is never the repo's archive.** `skills/github.ts`
+  pins the ref to a commit, lists the folder in one trees call and
+  reads each file raw, so the caps count the skill, not the repo. That
+  is two unauthenticated API calls per add or refresh (60 an hour per
+  address). Symlinks and submodules are left out.
+- **Refresh is explicit and never renames.** A source now holding
+  another name is a 409. Deleting a skill an agent uses is a 409.
+- **An agent's skills are one send snapshot.** The `skill` and
+  `skill_file` tools come from the agent's skills, never from the
+  `tools` rows. The `skill` name is an enum of the capped catalog, and
+  `skill_file` is offered only when it can answer. A call reads the
+  current body by the snapshot's id and name.
+- **Skill usage is read from the calls.** A tool row holds only the
+  result, so `skillLoads()` pairs each `skill` row with its call by
+  position in the round, as the writer pairs them, and reads the name
+  from the arguments. Usage routes answer through `lastDays()`.

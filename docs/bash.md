@@ -1,162 +1,155 @@
 # Bash
 
-Governs `src/server/bash/`: the command, its worker, the mount, scratch
-`/tmp`, kept MCP files under `/mcp`, `open` and curl's fetch. The docs
-and uploads a command mounts are in `docs/knowledge.md`, kept files'
-budget and fork in `docs/mcp.md`, and the shell itself in `vendor/`:
-just-bash and how a change to it is recorded in `vendor/README.md`, our
-changes in `vendor/changes.md`, and its recorders and what still differs
-in `vendor/differences.md`.
+Governs `src/server/bash/`: the command and its worker, the mount,
+scratch `/tmp`, kept MCP files under `/mcp`, `open` and curl's fetch.
+Mounted docs and uploads are in `docs/knowledge.md`, the shell itself in
+`vendor/`.
+
+The bash tool runs a command in just-bash, a shell written in
+TypeScript, over a virtual filesystem: `/knowledge` (the project's
+docs), `/uploads` (the chat's attachments), `/tmp` (scratch: the chat's
+own files, kept between commands) and `/mcp` (kept MCP files: tool
+results too large for the context, `docs/mcp.md`). `open` is a command
+of that shell that shows a file on the chat page.
 
 ## The area
 
-- **Bash sits after knowledge.** Its worker's files import only
-  `knowledge/rules.ts`, so a worker starts without the database or the
-  renderer; the rest of bash may use `knowledge/index.ts`. Knowledge
-  reaches bash only as a port: the mounted docs, the mounted uploads
-  and `commitDocs`, so bash never holds a `KnowledgeStore`. Its log lines
-  say `area=bash`.
-- **Kept MCP files are bash's.** `bash/kept.ts` holds them; the runner
-  writes them, fork copies them, the tools area names their path.
+- **Bash sits after knowledge and reaches it only through a port.** The
+  port gives the mounted docs, the uploads and `commitDocs`; bash never
+  holds a `KnowledgeStore`.
+- **The worker's files load no database.** They import only
+  `knowledge/rules.ts` of the areas, so a worker starts small.
+- **Kept MCP files are bash's.** `bash/kept.ts` stores, trims, mounts
+  and copies them; `tools/kept.ts` only decides what a result keeps
+  (`docs/mcp.md`).
 
 ## The command
 
-- **Each command runs in its own worker.** `bash/worker.ts` starts a
-  `Worker` per command and ends it when the job settles, so a command
-  that never yields holds no stream. `bash/command.worker.ts` runs
-  just-bash with the pinned commands of `bash/commands.ts`, no host
-  filesystem and `defenseInDepth: true`; it is an entry of `bun build
-  --compile`, its URL built in `compose.ts`. `bash/mount.ts` admits the
-  command, reads the rows and commits on the server's thread. Every
-  file's bytes are transferred, never cloned, so the thread keeps none.
-- **The worker is untrusted.** Commands inside can post messages, so
-  the server drops a message of another id or type, after its job
-  settled, or a request number seen before, and fails the job at once
-  (`command answer malformed`) on an answer of the wrong shape. It
-  re-derives every decision from what it holds: doc names by the
-  knowledge name rule, scratch paths by the scratch rule on the answer,
-  over the stored rows at commit and at mount, deletes only of mounted
-  files, scratch totals from the rows it wrote, no doc change with the
-  docs off, nothing saved on exit 124 or 126 or a `refused` answer
-  (its reason is shown, never trusted to allow a save), and an opened
-  record only
-  as `open` would make it (`checkOpened()`).
+- **Each command runs in its own worker.** `bash/worker.ts` starts one
+  per command and ends it when the job settles, so a command that never
+  yields holds nothing. The worker runs just-bash with the pinned
+  commands of `bash/commands.ts`, no host filesystem and
+  `defenseInDepth: true`. File bytes are transferred, never cloned.
+- **The worker is untrusted.** Code inside can post messages. The
+  server drops a message of another id or type, one after its job
+  settled, or a repeated request number. An answer of the wrong shape
+  fails the job at once (`command answer malformed`).
+- **The server re-derives every decision.** Names by the knowledge and
+  scratch rules over the stored rows, deletes only of mounted files,
+  scratch totals from its own rows, an opened record only as `open`
+  would make it (`checkOpened()`). A `refused` answer's reason is shown,
+  never trusted to allow a save.
 - **The worker holds no database and no key.** A kept file is a read
-  request the server answers with `readKept`; a failed read is a read
-  error in the command. curl's fetch is a request the server runs
-  through `commandFetch()` with the command's credentials, http and
-  https only, and answers capped and redacted; curl giving up on a
-  fetch ends that fetch alone.
-- **Deadline, cancel, shutdown.** The deadline starts before the
-  queues. The interpreter stops at the call timeout with its own exit
-  124, words and output; the worker is ended `BACKSTOP_MS` (1 s) later,
-  and the tool registry waits half a second more (`graceMs`), so the
-  mount's own words end a stuck command. An abort posts a cancel;
-  unanswered within `CANCEL_GRACE_MS`, the worker is ended with a
-  `command cancel unanswered` warning. Shutdown ends every running
-  worker. An ended job commits nothing, and a command that saves
-  nothing puts `phase` and `cause` on the runner's `tool failed` line.
+  request answered by `readKept`. curl's fetch is a request the server
+  runs and answers capped and redacted.
+- **The interpreter's deadline wins.** The deadline starts before the
+  queues. The interpreter stops at the call timeout with exit 124 and
+  its own output; the worker is ended `BACKSTOP_MS` later, and the tool
+  registry waits half a second past that (`graceMs`).
+- **An abort posts a cancel first.** Unanswered within
+  `CANCEL_GRACE_MS`, the worker is ended. Shutdown ends every worker.
 - **A result is the output, then its tail.** stdout then stderr, cut to
-  `resultCut` with a mark, then the tail the cuts keep whole: `exit N`
-  and the receipts when the command saved, `nothing saved: <reason>`
-  and `exit N` when it ran but saved nothing (exit 124 or 126, a
-  refused diff, a cap, a conflict, a well-formed answer the mount's
-  checks refuse), so the agent sees what the command printed and the
-  refusal stays last. The reason takes at most half the room past the
-  mark, never less than `nothing saved`; a cut too narrow for output
-  and exit returns the refusal alone. A worker's diff that throws
-  answers `refused` with the output instead of failing the job. A
-  command that never answered, or whose answer fails the shape check
-  (`command answer malformed`), is `nothing saved: <reason>` alone.
-- **Mounted files keep their times.** A doc mounts with its
-  `updated_at`, an upload with its `created_at`, a scratch file with the
-  session's `used_at`, a folder with its newest file's time, so `ls -t`
-  finds the newest doc.
+  `resultCut`, then a tail every later cut keeps: `exit N` and the
+  receipts (a line per file saved or deleted) when saved, or
+  `nothing saved: <reason>` and `exit N`. The refusal always stays last.
+- **Mounted files keep their times.** A doc mounts with `updated_at`,
+  an upload with `created_at`, scratch with the session's `used_at`, so
+  `ls -t` works.
 
 ## Network
 
-- **The web snapshot opens the network.** Only the send's web snapshot
-  enables curl (never wget), through `commandFetch()`: all mode allows
-  the internet, listed mode `urlPrefixes()`, all seven methods, both
-  with `denyPrivateRanges: false` since Bun cannot pin DNS, and the
-  fetch deadline and body caps. No snapshot, no network. Downloads go
-  to `/tmp`, since non-text bytes in `/knowledge` fail the save.
-  Signing with a credential is in `docs/tools.md`.
-- **just-bash's curl is an HTTP client, not curl.** `-w` knows
-  `http_code`, `content_type`, `url_effective` and `size_download`;
-  there is no timing, TLS detail, `-k` or `--retry`, and it sends Bun's
-  user agent unless `-A` is given. The bash description says no more of
-  it than that it calls HTTP APIs.
+- **Only the send's web snapshot opens the network.** No snapshot, no
+  network. curl only, never wget. All mode allows the internet, listed
+  mode `urlPrefixes()`. `denyPrivateRanges` is false since Bun cannot
+  pin DNS.
+- **Downloads go to `/tmp`.** Non-text bytes in `/knowledge` fail the
+  save.
+- **just-bash's curl is an HTTP client, not curl.** No timing, TLS
+  detail, `-k` or `--retry`; `-w` knows only a few variables. The tool
+  description promises no more than calling HTTP APIs.
+- **One fetch per URL, picked once.** `commandFetch()`
+  (`bash/credentials.ts`) matches the URL curl asked for against every
+  offered and off credential prefix. It uses that credential's own
+  `createSecureFetch`, its prefix the one allow-list entry, or else the
+  web fetch. So a signed redirect off its prefix is refused, and an
+  unsigned request redirected into a prefix stays unsigned.
+- **Each credential is checked at every command.** A row gone, unbound
+  or differing from the send's is refused, and its key is read through
+  `readKey()` then, so a replaced file applies to the next command.
+- **Refusals name the credential, never the key file.** Off, keyless,
+  unusable, deleted or changed credentials, a method it lacks and a
+  routing header (`ROUTING_HEADERS`) are refused before anything is
+  sent. Keys ride only in the command caps.
+- **A key never reaches the result.** Every key read, and its
+  JSON-escaped forms (`escapedForms()`), is replaced by `[credential
+  <name>]` in body, headers, status text, final URL and errors. The tool
+  scrubs the result again, the tail kept apart.
 
-## The trees
+## The writable trees
 
-- **The docs off leave no `/knowledge`.** With `knowledge: false` in
-  the caps the mount reads no rows and makes no `/knowledge`; anything
-  written there is discarded with the notice `changes under /knowledge
-  were discarded: the project docs are off` (not for empty folders).
-  The command starts in `/tmp`; a saved cwd under `/knowledge` stays
-  saved for when the docs are on again. `open` answers `no such file`
-  under `/knowledge`.
-- **A command's trees commit once or not at all.** At most four
-  commands hold mounts at once: the per-chat queue (`bash/queue.ts`) is
-  taken before a process slot (`acquireProcess()`, shared with uploads)
-  and released after it. An abort, exit 124 or 126 or a throw discards
-  both writable trees; any other exit, nonzero included, commits in one
-  transaction (`bash/commit.ts`): the caps read once, the docs through
-  `commitDocs` (one version and `knowledge.changed` per file), then
-  scratch under its revision, with the cwd and last use, re-read so the
-  totals count stored rows. Receipts list the docs, then `open`; an
-  overflow rolls both back. The paths of the docs written (a delete
-  saves none) go back on the result as `saved`, and `finishTool` stores
-  them on the call's tool row as `{paths, count, dir}` (`savedDocs`:
-  the first 50 paths, the total, the one shared directory or null),
-  null when none, for another agent's trace (`docs/sessions.md`); a
-  fork copies them. A call a terminal stop ends after its commit but
-  before its row is finished keeps no `saved`, as it keeps no receipts.
-- **Scratch is the chat's `/tmp`.** `ScratchStore` (`bash/scratch.ts`)
-  over `session_scratch` and `session_scratch_files`, cascading with the
-  session, keeps regular files of any bytes and their modes; a symlink
-  or other type fails the command, empty directories are not kept. A
-  missing saved cwd starts in `/knowledge` (`/tmp` with the docs off)
-  with a notice. The hourly sweep drops scratch idle past
-  `scratchIdleDays` (the sweep line's `bash` field); archiving a chat
-  drops its scratch through the sessions area's port. Both skip a chat
-  in the held set, the one in `bash/queue.ts` of chats holding or
-  waiting for a command. An agent's delete keeps scratch.
-- **A scratch name is what a real `/tmp` takes.** `bash/names.ts` holds
-  the rule: any character but NUL, case-sensitive, no empty, `.` or `..`
-  segment, well-formed Unicode (a lone surrogate would be stored as
-  U+FFFD), at most 255 bytes a segment (Linux's `NAME_MAX`), 64
-  segments and 4,095 bytes in all, under Linux's `PATH_MAX`. The depth
-  cap bounds just-bash's tree walks, linear in the entries since its
-  filesystem keeps each folder's children: at 64, the slowest `rm -rf`
-  or `ls -R` of a full `/tmp` takes about a second. A file and a folder
-  cannot share a path. The knowledge rule stays on `/knowledge`, so
-  copying a spaced scratch file there fails with its words.
-- **Scratch counts names as bytes.** A file's stored size is its bytes
-  plus its path's, so empty files cannot hold megabytes of names under
-  `scratchBytes`. The answer's written list is refused past
-  `scratchFiles` (or the mounted count, if larger) before any row is
-  written, and the commit checks the totals before it walks the names.
+`/knowledge` and `/tmp` are the trees a command may change.
+
+- **A command's trees commit once or not at all.** An abort, exit 124
+  or 126, or a throw discards both writable trees. Any other exit,
+  nonzero included, commits in one transaction (`bash/commit.ts`): docs
+  through `commitDocs`, then scratch. An overflow rolls both back.
+- **At most four commands hold mounts at once.** The per-chat queue
+  (`bash/queue.ts`) is taken before a process slot (`acquireProcess()`,
+  shared with uploads) and released after it.
+- **Written doc paths go on the tool row.** `finishTool` stores them as
+  `savedDocs` for another agent's trace (`docs/sessions.md`). A call a
+  terminal stop ends before its row is finished keeps none.
+- **Knowledge off leaves no `/knowledge`.** With the `knowledge`
+  capability off the mount reads no rows. Anything written there is
+  discarded with a notice, the command starts in `/tmp`, and a saved cwd
+  under `/knowledge` stays saved for later.
+
+## Scratch
+
+- **Scratch is the chat's `/tmp`.** Regular files of any bytes and
+  their modes, cascading with the session. A symlink or other type
+  fails the command.
+- **Sweeps skip a chat holding or waiting for a command.** The idle
+  sweep (`scratchIdleDays`) and archiving drop scratch, except for a
+  chat in the held set of `bash/queue.ts` (a command running or queued).
+- **A scratch name is what a real `/tmp` takes.** `bash/names.ts`: any
+  character but NUL, well-formed Unicode, Linux's `NAME_MAX` and
+  `PATH_MAX`. The 64-segment cap bounds just-bash's tree walks; keep it.
+- **Scratch counts names as bytes.** A file's size is its bytes plus
+  its path's, so empty files cannot hold megabytes of names. Caps are
+  checked before any row is written.
 - **A stored row outside the rule is left out, not fatal.** The mount
-  skips it (and a file under a stored file's path) with the notice
-  `left out N files in /tmp whose name is no longer allowed, dropped
-  when the command saves`, and a saving command removes it, so a
-  stricter rule never locks a chat out of its `/tmp`.
-- **A cwd or an opened path is one line.** It is at most `/tmp/` plus
-  the longest scratch name, well-formed, with no control character or
-  line break, and under `/tmp` by the scratch rule; `open` refuses such
-  a name itself rather than failing the command. A visual's fallback
-  title, the file's base name, is cut to `MAX_TITLE`, and becomes
-  `Visual` when the name breaks a line.
-- **`open` copies a file onto the chat page.** `open <file>`
-  (`bash/open.ts`, `trusted: false`) copies a mounted text file as it is
-  now: `.html`, `.htm` and `.svg` as a visual when Visuals was on at
-  send start and the text fits `VISUAL_FRAME_BYTES`, else code; `.md`
-  and `.markdown` rendered; anything else as code in the language
-  `languageOf` gives. A path outside the trees, a symlink, a directory,
-  a file over `knowledgeFileBytes`, non-text bytes and the eleventh open
-  (`MAX_OPENS_PER_COMMAND`) are refusals that stop nothing. The copies
-  are `opened_files` rows written in `finishTool`'s transaction; the
-  page reads them through `sessions/opened.ts`.
+  skips it with a notice and a saving command removes it, so a stricter
+  rule never locks a chat out of its `/tmp`.
+- **A cwd or an opened path is one line.** No control character or
+  line break, under `/tmp` by the scratch rule.
 
+## Kept MCP files
+
+- **Kept files are rows owned by the tool row.** `mcp_kept_files`,
+  written in `finishTool`'s transaction and cascading with the message.
+  An archived chat or ended run keeps them unpacked, since fork copies
+  them (`copyKeptFiles`) and its results name their paths.
+- **Folders are never reused.** Each call's folder is
+  `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`.
+- **Trimming happens at send start, under the runner's lock.**
+  `startKept()` trims the oldest folders to `mcpKeptBytes` and
+  `mcpKeptFiles`, so no command loses a file while it reads. It runs in
+  the transaction with `startSend`, so a refused start trims nothing.
+- **Kept files mount lazily.** The worker asks the server on first
+  read. They count in `mountBytes` and `ioBytes` (four reads of the
+  largest).
+- **`/mcp` is never committed.** An added or removed name gets a
+  discard notice, found from `getAllPaths()` alone, since a `stat`
+  would load every file. A changed file is dropped silently.
+
+## The open command
+
+- **`open` copies a mounted text file onto the chat page.** HTML and SVG
+  become a visual when the admin's Visuals switch was on at send start
+  and the text fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest
+  is code.
+- **A refused `open` stops nothing.** Outside the trees, a symlink, a
+  directory, past `knowledgeFileBytes`, non-text, or past
+  `MAX_OPENS_PER_COMMAND`. The copies are `opened_files` rows written in
+  `finishTool`'s transaction.
