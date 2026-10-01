@@ -120,6 +120,8 @@ const days: DirectoryAgentDaysResponse = {
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
+  // a new user clears the held pages and days of the last test
+  me.value = null;
   me.value = casey;
   userPage.value = null;
   userPageError.value = null;

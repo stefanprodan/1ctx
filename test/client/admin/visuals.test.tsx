@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { me } from "../../../src/client/data/me.ts";
 import {
   limits,
   loadVisualsUsage,
@@ -23,6 +24,7 @@ import {
   DEFAULT_VISUAL_HOSTS,
   type WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
+import { admin } from "../../helpers/client-fixtures.ts";
 
 const visual: WebToolSummary = {
   name: "visualize",
@@ -103,6 +105,10 @@ describe("the Visuals page", () => {
   const realFetch = globalThis.fetch;
   let held: [typeof tools.value, typeof limits.value];
   beforeEach(() => {
+    // a new user drops the usage an earlier test read
+    const was = me.value;
+    me.value = admin({ id: "reset" });
+    me.value = was;
     held = [tools.value, limits.value];
   });
   afterEach(() => {

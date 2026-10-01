@@ -61,6 +61,7 @@ beforeEach(() => {
   me.value = casey;
   projects.value = null;
   project.value = null;
+  path.value = "/";
   globalThis.fetch = (async () =>
     Response.json(answer())) as unknown as typeof fetch;
 });

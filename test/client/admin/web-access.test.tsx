@@ -8,6 +8,7 @@ import {
   credentials,
   credentialsError,
 } from "../../../src/client/data/credentials.ts";
+import { me } from "../../../src/client/data/me.ts";
 import {
   limits,
   loadWebUsage,
@@ -34,6 +35,7 @@ import type {
   SearchState,
 } from "../../../src/shared/contracts/tool.ts";
 import type { WebAccess as Access } from "../../../src/shared/web.ts";
+import { admin } from "../../helpers/client-fixtures.ts";
 
 const tool = (
   name: BuiltinToolSummary["name"],
@@ -180,6 +182,10 @@ describe("the Web access page", () => {
     string,
   ];
   beforeEach(() => {
+    // a new user drops the usage an earlier test read
+    const was = me.value;
+    me.value = admin({ id: "reset" });
+    me.value = was;
     held = [tools.value, limits.value, credentials.value, path.value];
     path.value = "/admin/config/web";
   });

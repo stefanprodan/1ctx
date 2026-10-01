@@ -167,12 +167,18 @@ describe("a session's page", () => {
 });
 
 describe("App before the first load answers", () => {
-  test("a public route renders without waiting", () => {
-    me.value = undefined;
-    path.value = "/login";
-    const html = render(<App />);
-    expect(html).toContain("<form");
-    path.value = "/";
-    expect(render(<App />)).toBe("");
+  test.serial("a public route renders without waiting", async () => {
+    await match("/login")!.route.view.load();
+    const held = [me.value, path.value] as const;
+    try {
+      me.value = undefined;
+      path.value = "/login";
+      const html = render(<App />);
+      expect(html).toContain("<form");
+      path.value = "/";
+      expect(render(<App />)).toBe("");
+    } finally {
+      [me.value, path.value] = held;
+    }
   });
 });
