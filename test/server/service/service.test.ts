@@ -86,10 +86,13 @@ describe("service install", () => {
         "0.0.0.0:1235",
         "--db",
         "/home/u/.1ctx/1ctx.sqlite",
+        "--drain",
+        "10",
       ],
       home: HOME,
       workingDirectory: "/home/u/.1ctx",
       logPath: "/home/u/.1ctx/1ctx.log",
+      exitTimeout: 25,
     });
     expect(probed).toEqual(["http://127.0.0.1:1235/api/health"]);
     expect(lines).toEqual(["1ctx v1.2.3 up at http://127.0.0.1:1235"]);
@@ -111,6 +114,8 @@ describe("service install", () => {
       "/work/data/x.sqlite",
       "--secrets",
       "/work/keys",
+      "--drain",
+      "10",
     ]);
   });
 
@@ -127,7 +132,21 @@ describe("service install", () => {
     await expect(runService(["install", "-v"], all)).rejects.toThrow(
       "takes the server's options",
     );
+    await expect(runService(["install", "--drain", "41"], all)).rejects.toThrow(
+      "drain must leave the service manager time to stop",
+    );
     expect(calls).toEqual([]);
+  });
+
+  test("the manager's kill timeout is the drain plus fifteen seconds", async () => {
+    const { backend, definition } = fake();
+    const { all } = deps(backend);
+
+    await runService(["install", "--drain", "20"], all);
+    expect(definition()?.exitTimeout).toBe(35);
+    expect(definition()?.programArguments.slice(-2)).toEqual(["--drain", "20"]);
+    await runService(["install", "--restart", "--drain", "40"], all);
+    expect(definition()?.exitTimeout).toBe(55);
   });
 
   test("--restart is the switch anywhere it cannot be a value", async () => {
@@ -239,6 +258,7 @@ describe("service status", () => {
       `binary: ${BIN}`,
       "version: v1.2.3",
       "url: http://127.0.0.1:1235",
+      "drain: 10s",
     ]);
   });
 

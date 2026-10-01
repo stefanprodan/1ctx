@@ -11,7 +11,11 @@
 // started it and may hold only a share of the project's and the
 // process's places, so the rest stays free for users.
 
-import { Conflict, TooManyRequests } from "../lib/errors.ts";
+import {
+  Conflict,
+  ServiceUnavailable,
+  TooManyRequests,
+} from "../lib/errors.ts";
 import { type SendCaps, scheduledShare } from "../limits/index.ts";
 import type { ActiveSend } from "./send.ts";
 
@@ -49,8 +53,15 @@ export class CapFull extends TooManyRequests {
   }
 }
 
-// the lock's own refusals: the chat's send holds it, or shutdown began
+// the lock's own refusal: the chat's send holds it
 export class LockHeld extends Conflict {}
+
+// every admission from the first signal to the exit
+export class Restarting extends ServiceUnavailable {
+  constructor() {
+    super("the server is restarting");
+  }
+}
 
 // the count, not the cap: a lowered cap leaves more going
 const going = (n: number): string =>
@@ -98,7 +109,7 @@ export class Registry {
   // the lock's refusals alone, for a caller that checks before it builds
   // a send
   locked(sessionId: string): void {
-    if (this.closed) throw new LockHeld("the server is shutting down");
+    if (this.closed) throw new Restarting();
     const own = this.sends.get(sessionId);
     if (own === undefined) return;
     if (own.terminal !== null) {
@@ -184,7 +195,7 @@ export class Registry {
     return true;
   }
 
-  // no more admissions: shutdown has begun
+  // no more admissions: the drain has begun
   close(): void {
     this.closed = true;
   }

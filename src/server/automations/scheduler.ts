@@ -3,7 +3,7 @@
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
-import type { EventSource } from "../../shared/words.ts";
+import { DEFERRED_BY_RESTART, type EventSource } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
@@ -16,7 +16,7 @@ import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { nextFire } from "./schedule.ts";
 import { type AutomationStore, RETIRED } from "./store.ts";
-import { replaceMissed, type Waiting, Waits } from "./waits.ts";
+import { deferDue, replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = 60_000;
 const SWEEP_MS = 3_600_000;
@@ -38,6 +38,8 @@ type Deps = {
 
 export type Scheduler = {
   start(): number;
+  // from the first signal: nothing fires, what comes due is deferred
+  drain(): void;
   stop(): void;
   wake(): void;
   pass(): Promise<void>;
@@ -50,6 +52,7 @@ export type Scheduler = {
 
 export function scheduler(deps: Deps): Scheduler {
   let running = false;
+  let draining = false;
   let wakeWait: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
   let lastSweep = deps.clock();
@@ -191,7 +194,12 @@ export function scheduler(deps: Deps): Scheduler {
             dueAt: dueAt!,
             source,
             outcome: "run",
-            reason: null,
+            reason:
+              source === "schedule" &&
+              row.lastEventOutcome === "deferred" &&
+              row.lastEventDueAt === dueAt
+                ? DEFERRED_BY_RESTART
+                : null,
             nextAt,
             runSessionId: prepared.detail.session.id,
           })!;
@@ -272,6 +280,10 @@ export function scheduler(deps: Deps): Scheduler {
   };
 
   const fire = async (id: string): Promise<SessionDetail | null> => {
+    if (draining) {
+      deferDue(deps, id, deps.clock());
+      return null;
+    }
     const seen = waits.generation;
     try {
       const result = start(id, "schedule", null);
@@ -366,6 +378,13 @@ export function scheduler(deps: Deps): Scheduler {
     const now = deps.clock();
     passAt = now;
     const due = deps.store.due(now);
+    if (draining) {
+      for (const row of due) {
+        if (!keepGoing()) return;
+        deferDue(deps, row.id, now);
+      }
+      return;
+    }
     waits.prune(new Set(due.map((row) => row.id)));
     for (const row of due) {
       if (!keepGoing()) return;
@@ -393,7 +412,7 @@ export function scheduler(deps: Deps): Scheduler {
     if (waits.generation !== seen) return;
     const now = deps.clock();
     // while a cap is full the rows left due are waits, not wakes
-    const earliest = deps.store.earliest(waits.any ? passAt : null);
+    const earliest = deps.store.earliest(waits.any || draining ? passAt : null);
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;
     const sleeper =
@@ -425,6 +444,12 @@ export function scheduler(deps: Deps): Scheduler {
         deps.log.error("scheduler stopped", errorFields(err)),
       );
       return reconciled;
+    },
+    drain() {
+      draining = true;
+      // the cap waits go: a waiting row is deferred like a due one
+      waits.retry();
+      wake();
     },
     stop() {
       running = false;

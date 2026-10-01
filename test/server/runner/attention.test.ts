@@ -97,6 +97,7 @@ async function deciderApp(
     deaf?: boolean;
     decider?: boolean;
     logs?: boolean;
+    drainMs?: number;
   } = {},
 ) {
   const server = decisions(options.hold, options.deaf);
@@ -104,6 +105,7 @@ async function deciderApp(
   const chat = await chatApp({
     fetcher: server.fetcher,
     logFactory: options.logs ? logs.logFactory : undefined,
+    drainMs: options.drainMs,
   });
   chat.app.automationScheduler.stop();
   if (options.decider !== false) {
@@ -483,7 +485,36 @@ test("shutdown with a run in flight and a held ask meets the deadline", async ()
   await tick();
   expect(asked[0]!.signal?.aborted).toBeTrue();
   chat.app.now.value += SHUTDOWN_DRAIN_MS;
-  expect(await done).toEqual({ ended: 1, timedOut: true });
+  expect(await done).toEqual({ ended: 1, timedOut: true, drained: 0 });
+});
+
+describe("a drain", () => {
+  test("waits for the ask of a run that finished inside it", async () => {
+    const { chat, asked } = await deciderApp({ hold: true, drainMs: 10_000 });
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    const done = chat.app.shutdown();
+    main.reply(ANSWER);
+    while (asked.length === 0) await tick();
+    expect(chat.app.sessions.byId(sessionId)?.status).toBe("done");
+    asked[0]!.release();
+    expect(await done).toEqual({ ended: 0, timedOut: false, drained: 1 });
+    expect(mark(chat, sessionId)?.attention).toBe(0.9802);
+  });
+
+  test("aborts an ask still held at its bound", async () => {
+    const { chat, asked } = await deciderApp({ hold: true, drainMs: 10_000 });
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    const done = chat.app.shutdown();
+    main.reply(ANSWER);
+    while (asked.length === 0) await tick();
+    expect(asked[0]!.signal?.aborted).toBe(false);
+    chat.app.now.value += 10_000;
+    expect(await done).toEqual({ ended: 0, timedOut: false, drained: 1 });
+    expect(asked[0]!.signal?.aborted).toBe(true);
+    expect(mark(chat, sessionId)?.attention).toBeNull();
+  });
 });
 
 describe("the asks", () => {

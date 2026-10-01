@@ -11,6 +11,8 @@ export type ServiceDefinition = {
   workingDirectory: string;
   // the manager sends the server's stdout and stderr here
   logPath: string;
+  // seconds from the stop's signal to the manager's kill
+  exitTimeout: number;
 };
 
 export type ServiceState = {

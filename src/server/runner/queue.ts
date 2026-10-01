@@ -38,7 +38,13 @@ import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
 import { queueMessage } from "./enqueue.ts";
 import type { PreparedRun } from "./prepare.ts";
-import { CapFull, LockHeld, type Registry, RunCapacity } from "./registry.ts";
+import {
+  CapFull,
+  LockHeld,
+  type Registry,
+  Restarting,
+  RunCapacity,
+} from "./registry.ts";
 import { ClaimLost, type QueuedClaim } from "./start.ts";
 import { type SummonAgents, summonGone, summons, turnBatch } from "./summon.ts";
 import { claimsOf, messagesOf, type TurnMessage } from "./turn.ts";
@@ -88,6 +94,7 @@ const keeps = (err: unknown): boolean =>
   err instanceof CapFull ||
   err instanceof RunCapacity ||
   err instanceof LockHeld ||
+  err instanceof Restarting ||
   err instanceof ClaimLost;
 
 const processFull = (err: unknown): boolean =>
@@ -100,11 +107,13 @@ const PROBED = new Error("probed");
 export type Dispatcher = {
   // expire what waited too long, start what can, set the timer
   start(): void;
-  // no pass after this: a row left queued stays queued
+  // no pass after this, from the drain's start: a row left queued stays
+  // queued, and every message to a chat is queued for the next start
   close(): void;
   wake(): void;
-  // the message queued when the chat's lock is held, else null: the
-  // chat is free, its own queue tried first, and the caller sends
+  // the message queued when the chat's lock is held or the dispatcher
+  // is closed, else null: the chat is free, its own queue tried first,
+  // and the caller sends
   enqueue(
     principal: Principal,
     sessionId: string,
@@ -463,7 +472,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     if (started && !closed && registry.get(session.id) === null) {
       startChat(session.id);
     }
-    if (registry.get(session.id) === null) return null;
+    if (!closed && registry.get(session.id) === null) return null;
     const queued = queueMessage(deps, session, principal.userId, fields);
     if (started && !closed && armedMinutes === null) arm();
     return queued;

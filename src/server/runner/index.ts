@@ -40,7 +40,7 @@ import { ProviderRefusal, type RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
-import { shutdownRunner } from "./shutdown.ts";
+import { drainRunner, shutdownRunner } from "./shutdown.ts";
 import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
 import { refuseNewSummon, regeneratedAgent, turnAgent } from "./summon.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
@@ -52,9 +52,14 @@ export type { AttentionPort } from "./attention.ts";
 export type { Event } from "./event.ts";
 export type { PreparedRun } from "./prepare.ts";
 export type { Dispatcher } from "./queue.ts";
-export { Registry, RunCapacity, type Running } from "./registry.ts";
+export {
+  Registry,
+  Restarting,
+  RunCapacity,
+  type Running,
+} from "./registry.ts";
 export { type ActiveSend, live } from "./send.ts";
-export type { ShutdownResult } from "./shutdown.ts";
+export type { DrainResult, ShutdownResult } from "./shutdown.ts";
 export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
 export type { Runner, RunnerDeps } from "./types.ts";
 export {
@@ -455,13 +460,16 @@ export function runnerArea(deps: RunnerDeps): Runner {
       }
     },
     live: liveOf,
-    shutdown: () =>
+    drain: (boundMs, cut = new Promise<void>(() => {})) =>
+      drainRunner(registry, deps.clock, deps.log, boundMs, asks, cut),
+    shutdown: (close) =>
       shutdownRunner(
         registry,
         deps.clock,
         (send) => void terminate(send, "shutdown"),
         SHUTDOWN_DRAIN_MS,
         () => asks.close(),
+        close,
       ),
     settled: () => asks.settled(),
     queue: null!,

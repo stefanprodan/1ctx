@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A message to a chat and the author's writes to one that waits. A
-// message to an idle chat answers the detail; to a busy one it waits,
-// answered 202 with the caller's queue. An edit and a delete (Remove,
-// Discard, Send again) name the revision the row was read at, so a
-// start that took it first answers 409. Every queue answer carries the
-// session revision its commit made and lands only where it is newer
-// than the queue held (session-queue.ts), so an answer that arrives
-// after an envelope moved past it never puts a started row back.
+// message to an idle chat answers the detail; to a busy one, or to any
+// during a drain, it waits, answered 202 with the caller's queue. An
+// edit and a delete (Remove, Discard, Send again) name the revision the
+// row was read at, so a start that took it first answers 409. Every
+// queue answer carries the session revision its commit made and lands
+// only where it is newer than the queue held (session-queue.ts), so an
+// answer that arrives after an envelope moved past it never puts a
+// started row back.
 
 import type {
   EditQueuedRequest,

@@ -8,6 +8,7 @@
 
 import { useSignal } from "@preact/signals";
 import type { StreamRow } from "../../../shared/api/sessions.ts";
+import { DEFERRED_BY_RESTART } from "../../../shared/words.ts";
 import { stopSession } from "../../data/sessions.ts";
 import { says, stamp } from "../../lib/format.ts";
 import { runHref } from "../../lib/hrefs.ts";
@@ -39,10 +40,13 @@ export function RunRow({
   row,
   deadlineMs,
   now,
+  deferred = false,
 }: {
   row: StreamRow;
   deadlineMs: number;
   now: number;
+  // the automation's last run, which a restart deferred
+  deferred?: boolean;
 }) {
   const failure = useSignal<string | null>(null);
   const { session } = row;
@@ -76,7 +80,14 @@ export function RunRow({
     >
       {/* the icon says how the run started, and who pressed Run now
           under the pointer, so the line is the feed's: author and words */}
-      <span class="automations-run-icon" title={sourceText(row) || undefined}>
+      <span
+        class="automations-run-icon"
+        title={
+          [sourceText(row), deferred ? DEFERRED_BY_RESTART : ""]
+            .filter((part) => part !== "")
+            .join(", ") || undefined
+        }
+      >
         <Icon
           name={session.runSource === "manual" ? "bolt" : "clock"}
           size={15}

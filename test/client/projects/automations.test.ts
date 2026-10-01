@@ -317,6 +317,31 @@ describe("the row's words", () => {
     expect(eventNote({ ...late, lastEventSource: "manual" }, now)).toBeNull();
   });
 
+  test("a fire a restart deferred says so, and so does its run", () => {
+    const deferred = automation({
+      lastEventAt: now - 60_000,
+      lastEventDueAt: now - 90_000,
+      lastEventSource: "schedule",
+      lastEventOutcome: "deferred",
+      lastEventReason: "restarting",
+      lastRunStatus: "done",
+    });
+    expect(eventNote(deferred, now)).toBe("Deferred by a restart 1m ago");
+    const ran = {
+      ...deferred,
+      lastEventAt: now - 60_000,
+      lastEventDueAt: now - 3 * 60_000,
+      lastEventOutcome: "run" as const,
+      lastEventReason: "deferred by a restart",
+    };
+    expect(eventNote(ran, now)).toBe(
+      "The last run started 2m late, deferred by a restart",
+    );
+    expect(eventNote({ ...ran, lastEventDueAt: now - 70_000 }, now)).toBe(
+      "The last run was deferred by a restart",
+    );
+  });
+
   test("the owner changes a row, and an admin only in a team project", () => {
     const row = automation();
     expect(canChange(row, { id: "u1", role: "member" }, "team")).toBe(true);

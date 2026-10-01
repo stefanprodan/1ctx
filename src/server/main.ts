@@ -122,7 +122,7 @@ if (cli.kind === "provision") {
 }
 
 const { hostname, port, dbPath, secretsDir, secretsMode } = cli.options;
-const { secureCookie, trustProxy } = cli.options;
+const { secureCookie, trustProxy, drain } = cli.options;
 
 if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
 const { db, migrations } = open(dbPath);
@@ -152,6 +152,7 @@ const app = await compose({
   version: VERSION,
   secureCookie,
   trustProxy,
+  drainMs: drain * 1000,
 });
 app.sweep();
 app.mcpStart();
@@ -178,6 +179,7 @@ log.info("startup", {
   mode: store.mode,
   migrations: migrations.length > 0 ? migrations.join(",") : "current",
   flags: flags || "none",
+  drain,
   providers: app.providers.list().length,
   agents: app.agents.list().length,
   mcp_servers: app.mcp.list().length,
@@ -186,31 +188,26 @@ log.info("startup", {
   reconciled: app.reconciled,
 });
 
-// in order: no more sends, every send ended and its rows written, the
-// sockets closed with the restart code, the listener stopped without
-// cutting a request, then the db
-let stopping = false;
-const shutdown = async (signal: string) => {
-  if (stopping) return;
-  stopping = true;
-  const started = performance.now();
-  const result = await app.shutdown();
-  await stop();
-  db.close();
-  log.info("shutdown", {
-    signal,
-    ended: result.ended,
-    duration: performance.now() - started,
-    timed_out: result.timedOut || undefined,
-  });
-  process.exit(0);
-};
-const onSignal = (signal: string) => {
-  shutdownOnSignal(signal, {
-    shutdown,
-    log,
-    exit: (code) => process.exit(code),
-  });
-};
+// in order: no more sends, the running ones drained, what is left
+// ended and its rows written, the sockets closed with the restart code,
+// the listener stopped without cutting a request, then the db
+const onSignal = shutdownOnSignal({
+  async shutdown(signal, cut) {
+    const started = performance.now();
+    const result = await app.shutdown(cut);
+    await stop();
+    db.close();
+    log.info("shutdown", {
+      signal,
+      drained: result.drained,
+      ended: result.ended,
+      duration: performance.now() - started,
+      timed_out: result.timedOut || undefined,
+    });
+    process.exit(0);
+  },
+  log,
+  exit: (code) => process.exit(code),
+});
 process.on("SIGINT", () => onSignal("SIGINT"));
 process.on("SIGTERM", () => onSignal("SIGTERM"));

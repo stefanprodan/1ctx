@@ -160,3 +160,51 @@ export function replaceMissed(
   }
   if (skipped) deps.log.info("skip", { automation: id, reason: STILL_WAITING });
 }
+
+export const RESTARTING = "restarting";
+
+// during a drain a due row records a deferred event, once per due time,
+// and keeps its next_at, so the next start fires it
+export function deferDue(
+  deps: { db: Db; store: AutomationStore; log: Log },
+  id: string,
+  now: number,
+): void {
+  let deferred = false;
+  try {
+    transact(deps.db, () => {
+      const row = deps.store.byId(id);
+      if (
+        row === null ||
+        row.suspendedAt !== null ||
+        row.nextAt === null ||
+        row.nextAt > now ||
+        (row.lastEventOutcome === "deferred" &&
+          row.lastEventDueAt === row.nextAt)
+      ) {
+        return { result: undefined };
+      }
+      deferred = true;
+      const updated = deps.store.recordEvent(row.id, {
+        at: now,
+        dueAt: row.nextAt,
+        source: "schedule",
+        outcome: "deferred",
+        reason: RESTARTING,
+      })!;
+      return {
+        result: undefined,
+        events: [
+          {
+            type: "automation.changed" as const,
+            data: { projectId: updated.projectId, automation: updated },
+          },
+        ],
+      };
+    });
+  } catch (err) {
+    deps.log.error("defer failed", { automation: id, ...errorFields(err) });
+    return;
+  }
+  if (deferred) deps.log.info("defer", { automation: id });
+}

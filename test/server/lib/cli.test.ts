@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   type Cli,
+  HELP,
   optionsToArgs,
   parseCli,
 } from "../../../src/server/lib/cli.ts";
@@ -32,6 +33,7 @@ describe("parseCli", () => {
       secretsMode: "local",
       secureCookie: false,
       trustProxy: false,
+      drain: 10,
     });
   });
 
@@ -48,6 +50,8 @@ describe("parseCli", () => {
         "mounted",
         "--secure-cookie",
         "--trust-proxy",
+        "--drain",
+        "30",
       ]),
     ).toEqual({
       hostname: "[::1]",
@@ -57,6 +61,7 @@ describe("parseCli", () => {
       secretsMode: "mounted",
       secureCookie: true,
       trustProxy: true,
+      drain: 30,
     });
   });
 
@@ -74,6 +79,14 @@ describe("parseCli", () => {
       "--secrets-mode: local or mounted",
     );
     expect(error(["-f", "a.yaml"])).toBe("-f is only for provision");
+    for (const drain of ["-1", "1.5", "x", "3601", "", "1e2"]) {
+      expect(error(["--drain", drain])).toBe(
+        "--drain must be whole seconds, 0 to 3600",
+      );
+    }
+    expect(error(["--drain"])).toBe("--drain needs a value");
+    expect(run(["--drain", "0"]).drain).toBe(0);
+    expect(run(["--drain", "3600"]).drain).toBe(3600);
   });
 
   test("version and help win where they stand", () => {
@@ -110,18 +123,31 @@ describe("optionsToArgs", () => {
       ["--listen", "0.0.0.0:1235"],
       ["--listen", "[::]:9", "--secrets", "/s", "--secrets-mode", "mounted"],
       ["--db", ":memory:", "--secure-cookie", "--trust-proxy"],
+      ["--drain", "0"],
+      ["--drain", "30"],
     ]) {
       const options = run(argv);
       expect(run(optionsToArgs(options))).toEqual(options);
     }
   });
 
-  test("the address and the database are always spelled out", () => {
+  test("the address, the database and the drain are always spelled out", () => {
     expect(optionsToArgs(run([]))).toEqual([
       "--listen",
       "127.0.0.1:1235",
       "--db",
       "/home/u/.1ctx/1ctx.sqlite",
+      "--drain",
+      "10",
     ]);
+    expect(optionsToArgs(run(["--drain", "30"])).slice(-2)).toEqual([
+      "--drain",
+      "30",
+    ]);
+  });
+
+  test("help names the drain and its default", () => {
+    expect(HELP).toContain("--drain <seconds>");
+    expect(HELP).toContain("(default: 10)");
   });
 });

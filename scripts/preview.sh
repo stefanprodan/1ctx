@@ -76,9 +76,10 @@ reset() {
 
 start() {
   keys
+  # no drain, since stop waits only five seconds for the exit
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \
     --listen "127.0.0.1:$PORT" --db "$DIR/1ctx.sqlite" \
-    --secrets "$DIR/secrets" >"$LOG" 2>&1 &
+    --secrets "$DIR/secrets" --drain 0 >"$LOG" 2>&1 &
   echo $! >"$PID"
   for _ in $(seq 1 50); do
     if curl -sf -o /dev/null "$URL/api/health"; then

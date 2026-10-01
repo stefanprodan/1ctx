@@ -155,7 +155,7 @@ describe("the terminal transition", () => {
     a.script.content("a1");
     await tick();
     const result = await chat.app.shutdown();
-    expect(result).toEqual({ ended: 2, timedOut: false });
+    expect(result).toEqual({ ended: 2, timedOut: false, drained: 0 });
     for (const { detail } of [a, b]) {
       expect(chat.app.sessions.send(detail.send.id)!).toMatchObject({
         status: "stopped",

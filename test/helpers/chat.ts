@@ -352,6 +352,7 @@ export async function chatApp(
     window?: number;
     // a file the test reopens, for a restart over the same rows
     db?: Db;
+    drainMs?: number;
   } = {},
 ): Promise<ChatApp> {
   const scripted = scriptedFetch(options.fetcher, options.window);
@@ -362,6 +363,7 @@ export async function chatApp(
     secrets,
     tools: options.tools,
     db: options.db,
+    drainMs: options.drainMs,
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
   });
   const admin = app.client();

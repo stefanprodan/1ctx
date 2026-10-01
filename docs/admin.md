@@ -160,8 +160,23 @@ in `docs/views.md` and `docs/ui.md`.
   runs, so it refuses what the server would, pins relative paths and
   writes every option out through `optionsToArgs()`; `start`, `restart`
   and `status` read them back from the definition. A start waits for
-  `GET /api/health`. The log is the manager's, `~/.1ctx/1ctx.log`,
-  rotated at 8 MB only on an install. `--purge` removes the database and
+  `GET /api/health`.
+  `--drain <seconds>` (default 10, whole seconds 0 to 3600, 0 for no
+  wait) bounds how long a stop lets running chats and runs end on their
+  own (`docs/sessions.md`); it is a flag, matched to the manager's kill
+  timeout, never a limit. A fire due during the shutdown is recorded as
+  deferred even with `--drain 0`. `install` writes launchd's
+  `ExitTimeOut` as the drain plus 15 and refuses a drain past 40 with
+  "drain must leave the service manager time to stop", so `ExitTimeOut`
+  stays under the stop's own 60 s wait for the exit (`WAIT_MS` in
+  `launchd.ts`); a Kubernetes `terminationGracePeriodSeconds` is the
+  drain plus 15 likewise. The preview runs with `--drain 0`.
+  `GET /api/health` answers `draining: true` from the first signal,
+  still 200 for a liveness probe; `GET /api/ready`, public, answers 200
+  `{ready: true}` until then and 503 `{ready: false, reason:
+  "draining"}` after, for a readiness probe. Neither is logged. The log
+  is the manager's, `~/.1ctx/1ctx.log`, rotated at 8 MB only on an
+  install. `--purge` removes the database and
   the log, never the secrets. The tests run the commands over a fake
   backend and the launchd backend over a fake `launchctl`, on any
   platform.
@@ -170,5 +185,6 @@ in `docs/views.md` and `docs/ui.md`.
   data under `~/.1ctx`. It holds real data and takes `main` only:
   `staging-deploy` refuses another branch or a dirty checkout unless
   `ALLOW_BRANCH=1`, stamps the commit into the version, takes a `sqlite3
-  .backup` there before the swap and keeps the last three. A migration
-  that ran on staging is frozen as if merged.
+  .backup` there before the swap and keeps the last three. It installs
+  with the default drain; `DRAIN=<s>` passes `--drain` for one deploy.
+  A migration that ran on staging is frozen as if merged.

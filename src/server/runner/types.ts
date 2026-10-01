@@ -31,7 +31,7 @@ import type { Dispatcher } from "./queue.ts";
 import type { Registry } from "./registry.ts";
 import type { RoundDeps } from "./round.ts";
 import type { live } from "./send.ts";
-import type { ShutdownResult } from "./shutdown.ts";
+import type { DrainResult, ShutdownResult } from "./shutdown.ts";
 import type { QueuedClaim } from "./start.ts";
 import type { TurnMessage } from "./turn.ts";
 import type { WriterDeps } from "./writer.ts";
@@ -114,9 +114,12 @@ export type Runner = {
   // every send on a deleted agent ends as a stop does
   stopAgent(agentId: string): void;
   live: (sessionId: string) => ReturnType<typeof live> | null;
+  // no more admissions, then up to boundMs for the running sends and
+  // their asks to end on their own; cut ends the wait
+  drain(boundMs: number, cut?: Promise<void>): Promise<DrainResult>;
   // every send terminated with cause shutdown and its stream let go,
-  // or the deadline passed
-  shutdown(): Promise<ShutdownResult>;
+  // the asks aborted, then close, or the deadline passed
+  shutdown(close?: () => Promise<void>): Promise<ShutdownResult>;
   // every attention ask queued or in flight has ended
   settled(): Promise<void>;
   // the messages waiting behind busy chats

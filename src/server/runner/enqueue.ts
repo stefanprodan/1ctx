@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One message written to the queue of a chat whose lock is held, in one
-// transaction with its bounds: the author's rows, queued and not sent,
-// under queuedPerUser, the chat's under MAX_QUEUED_PER_CHAT, and a
-// staged file in one queued message of the chat only. A summon of no
+// One message written to the queue of a chat whose lock is held, or of
+// any chat during a drain, in one transaction with its bounds: the
+// author's rows, queued and not sent, under queuedPerUser, the chat's
+// under MAX_QUEUED_PER_CHAT, and a staged file in one queued message of
+// the chat only. A summon of no
 // agent is refused here, not when it would start.
 
 import type {

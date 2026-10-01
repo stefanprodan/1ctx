@@ -27,7 +27,11 @@ import {
   type AutomationSummary,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
-import type { ProjectKind, Role } from "../../../shared/words.ts";
+import {
+  DEFERRED_BY_RESTART,
+  type ProjectKind,
+  type Role,
+} from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { type AccessDraft, disabledOf } from "./Access.model.ts";
 import {
@@ -219,22 +223,27 @@ export function deadlineShare(ms: number, deadlineMs: number): number {
   return Math.min(1, ms / deadlineMs);
 }
 
-// a skipped event's reason, and a fire that ran a minute or more past
-// the one that was meant, for the automation page
+// a skipped or deferred event, and a run a restart deferred or that ran
+// a minute or more past the fire that was meant, for the automation page
 export function eventNote(a: AutomationSummary, now: number): string | null {
   if (a.lastEventAt === null) return null;
   if (a.lastEventOutcome === "skipped") {
     const why = a.lastEventReason ?? "no reason given";
     return `Skipped ${ago(a.lastEventAt, now)}: ${why}`;
   }
+  if (a.lastEventOutcome === "deferred") {
+    return `Deferred by a restart ${ago(a.lastEventAt, now)}`;
+  }
+  const deferred = a.lastEventReason === DEFERRED_BY_RESTART;
   if (
     a.lastEventSource === "schedule" &&
     a.lastEventDueAt !== null &&
     a.lastEventAt - a.lastEventDueAt >= 60_000
   ) {
-    return `The last run started ${elapsed(a.lastEventAt - a.lastEventDueAt)} late`;
+    const late = `The last run started ${elapsed(a.lastEventAt - a.lastEventDueAt)} late`;
+    return deferred ? `${late}, ${DEFERRED_BY_RESTART}` : late;
   }
-  return null;
+  return deferred ? `The last run was ${DEFERRED_BY_RESTART}` : null;
 }
 
 // the owner edits and deletes; in a team project an admin does too

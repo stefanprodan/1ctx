@@ -286,12 +286,17 @@ export const NOT_SENT_REASONS = [
 ] as const;
 export type NotSentReason = (typeof NOT_SENT_REASONS)[number];
 
-// what made an automation's event: its schedule, or someone's Run now
-export const EVENT_SOURCES = ["schedule", "manual"] as const;
+// what made an automation's event: its schedule, someone's Run now, or a
+// start that runs again what a restart cut
+export const EVENT_SOURCES = ["schedule", "manual", "restart"] as const;
 export type EventSource = (typeof EVENT_SOURCES)[number];
-// an event opened a run, or was skipped with a reason
-export const EVENT_OUTCOMES = ["run", "skipped"] as const;
+// an event opened a run, was skipped with a reason, or was put off to the
+// next start by a restart
+export const EVENT_OUTCOMES = ["run", "skipped", "deferred"] as const;
 export type EventOutcome = (typeof EVENT_OUTCOMES)[number];
+// the reason on the run event of a fire a restart put off, the one trace
+// of the deferral once the run overwrites it
+export const DEFERRED_BY_RESTART = "deferred by a restart";
 // an automation's runs narrowed on its page
 export const RUN_FILTERS = ["failed", "manual"] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];

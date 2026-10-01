@@ -26,8 +26,11 @@ editor are in `docs/views.md`.
   (null once resumed and for rows suspended before the column); the
   summary carries the owner's and the suspender's usernames and a stream
   row its `runBy`, so an admin outside the project is named too. A run's
-  session keeps `run_source` (`schedule` or `manual`, null for a chat
-  and for runs made before the column).
+  session keeps `run_source` (`schedule`, `manual` or `restart`, null
+  for a chat and for runs made before the column); `last_event_source`
+  takes the same words and `last_event_outcome` is `run`, `skipped` or
+  `deferred`. `rerun_on_restart` (0 by default) is the automation's
+  opt-in to run again what a restart cut.
 - **Runs and the preview are routes.** `GET
   /api/automations/:id/runs?filter=failed|manual&before=` narrows and
   pages the rows, by last activity then id, and answers the tally of
@@ -70,6 +73,21 @@ editor are in `docs/views.md`.
   row's `next_at` past now, so it takes that fire. A PATCH that changes
   the schedule or the zone recomputes `next_at` from now and so ends a
   wait, other fields leave it, and suspend nulls it.
+- **A drain defers, never fires.** `scheduler.drain()` runs at the
+  first signal and `stop()` after the runner's shutdown. It drops the
+  cap waits; from then a pass, and a fire called during one, starts
+  nothing: each due row, waiting ones included, records one event of
+  outcome `deferred`, reason `restarting`, with its due time
+  (`deferDue()` in `automations/waits.ts`, once per due time), and
+  keeps `next_at`, so the next start's first pass fires it. The sleep
+  counts only rows due after the pass, so a row coming due within the
+  drain is deferred too and one due after it records nothing. A
+  scheduled fire whose row's last event is a `deferred` one for the
+  same due time records its run event with the reason
+  `DEFERRED_BY_RESTART` ("deferred by a restart", `shared/words.ts`),
+  decided in the fire's transaction, so the lateness outlives the
+  deferral; the automation page's note and the run's icon title in the
+  Runs log say it. Run now during the drain is the registry's 503.
 - **A run is a session of kind `run`.** A run is a session with
   origin `automation`, its `automationId`, the automation's name as
   title and a send of kind `run`; the runner refuses `send`,
@@ -78,7 +96,8 @@ editor are in `docs/views.md`.
   `stopped`. The row keeps its last event (`last_event_*`) apart from
   its last run (`last_run_*`, written from the session row on
   `session.changed` and by `reconcile()` at start). The scheduler
-  starts after `sessions.repair()` and stops first at shutdown. A run
+  starts after `sessions.repair()`, drains at the first signal and
+  stops after the runner's shutdown. A run
   that ends with cause `finish` is then asked whether it needs
   attention, after it is `done` (`docs/sessions.md`).
 - **Deleting an automation keeps its runs unless asked.**

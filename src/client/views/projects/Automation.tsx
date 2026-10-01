@@ -16,7 +16,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
-import type { RunFilter } from "../../../shared/words.ts";
+import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
 import {
@@ -365,6 +365,10 @@ export function Automation({ params }: { params: Params }) {
                       row={r}
                       deadlineMs={deadlineMs}
                       now={now}
+                      deferred={
+                        row?.lastRunSessionId === r.session.id &&
+                        row.lastEventReason === DEFERRED_BY_RESTART
+                      }
                     />
                   ))}
                   <ShowMore
