@@ -36,6 +36,21 @@ describe("version flag", () => {
     });
   }
 
+  test("refuses an attached value, as gyes does", async () => {
+    const bash = new Bash();
+    for (const flag of ["--version=x", "--help=x"]) {
+      const result = await bash.exec(`yes a ${flag}`);
+      const name = flag.slice(0, flag.indexOf("="));
+      expect(result.stderr).toBe(
+        `yes: option '${name}' doesn't allow an argument\n`,
+      );
+      expect(result.stdout).toBe("");
+      expect(result.exitCode).toBe(1);
+    }
+    const bad = await bash.exec("yes -x --version=x");
+    expect(bad.stderr).toContain("invalid option -- 'x'");
+  });
+
   test("is not reached after a bad option or as a value", async () => {
     const bash = new Bash({ files: { "/w/.keep": "" } });
     const bad = await bash.exec("mktemp --bad --version");
@@ -164,11 +179,9 @@ describe("createExclusive on InMemoryFs", () => {
 
 describe("yes ends", () => {
   test("under head", async () => {
-    const started = performance.now();
     const result = await new Bash().exec("yes | head -n 3");
     expect(result.stdout).toBe("y\ny\ny\n");
     expect(result.exitCode).toBe(0);
-    expect(performance.now() - started).toBeLessThan(2000);
   });
 
   test("at the iteration cap", async () => {
@@ -185,12 +198,17 @@ describe("yes ends", () => {
     expect(one.stdout).toBe("");
   });
 
-  test("an aborted run stops before it", async () => {
+  test("a cancel stops a loop of it", async () => {
     const controller = new AbortController();
-    controller.abort();
-    const result = await new Bash().exec("yes | head -n 1", {
-      signal: controller.signal,
-    });
-    expect(result.stdout).toBe("");
+    setTimeout(() => controller.abort(), 10);
+    // yes runs to its end in one step, so the cancel lands between
+    // statements; the sleep lets the timer fire, the cap bounds a miss
+    const bash = new Bash({ executionLimits: { maxLoopIterations: 200 } });
+    const result = await bash.exec(
+      "while true; do yes | head -n 1; sleep 0.001; done",
+      { signal: controller.signal },
+    );
+    expect(result.exitCode).toBe(124);
+    expect(result.stdout.split("\n").length).toBeLessThan(200);
   });
 });

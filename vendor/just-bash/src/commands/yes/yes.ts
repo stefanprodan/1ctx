@@ -60,6 +60,15 @@ export const yesCommand: RuntimeCommand = {
       if (arg === "--version") {
         return { stdout: YES_VERSION, stderr: "", exitCode: 0 };
       }
+      // (1ctx version-flags) getopt refuses a value on a flag that takes none
+      const attached = /^--(help|version)=/.exec(arg);
+      if (attached) {
+        return {
+          stdout: "",
+          stderr: `yes: option '--${attached[1]}' doesn't allow an argument\n`,
+          exitCode: 1,
+        };
+      }
       // A lone "-" is an operand, as in GNU yes; anything else that starts
       // with a dash is an option, even after an operand (getopt permutes).
       // Grouped short options are reported by their first offending letter,
