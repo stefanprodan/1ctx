@@ -9,7 +9,12 @@ import type { Save } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
 import { Seg } from "../../ui/Seg.tsx";
 import type { AgentDrafts } from "./AgentPage.state.ts";
-import { effortApplies, statedModel, thinkingChoices } from "./Agents.model.ts";
+import {
+  effortApplies,
+  resetsThinking,
+  statedModel,
+  thinkingChoices,
+} from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import { EffortField } from "./EffortField.tsx";
 import { ModelFacts } from "./ModelFacts.tsx";
@@ -58,7 +63,7 @@ export function ModelFields({
         onChange={() => d.change()}
         onCancel={() => d.cancel()}
         onProvider={(id) => d.chooseProvider(id)}
-        onPick={(m) => d.pick(m, fixedThinking(m) !== null)}
+        onPick={(m) => d.pick(m, resetsThinking(m, wire, d.thinking.value))}
       />
       {picked !== null && (
         <div class="agent-page-settings">
@@ -101,11 +106,13 @@ export function ModelFields({
             <Seg
               label="Thinking"
               name="thinking"
-              options={thinkingChoices(picked).map((c) => ({
-                value: c.value ?? ("default" as const),
-                label: c.label,
-                disabled: busy,
-              }))}
+              options={thinkingChoices(picked, wire, d.thinking.value).map(
+                (c) => ({
+                  value: c.value ?? ("default" as const),
+                  label: c.label,
+                  disabled: busy,
+                }),
+              )}
               value={
                 (fixedThinking(picked) === null ? d.thinking.value : null) ??
                 "default"

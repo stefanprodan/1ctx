@@ -82,7 +82,9 @@ memory in `docs/memory.md`, runs in `docs/automations.md`.
   row is its author's alone: a change to one (turned, removed,
   discarded, swept) publishes `queue.mine`, the author's not-sent rows
   in the chat as previews, which the socket sends as `notSent` to that
-  user's connections holding the project; a change to their not-sent
+  user's connections holding the project, before the watchers' frame of
+  the same commit, so the author's tab never draws a turning row gone;
+  a change to their not-sent
   rows alone (a Discard, Discard all, the sweep) publishes nothing else.
   `GET /api/sessions/:id/queued/:queuedId` is the author's row whole,
   for an Edit or a Send again of a row a frame carried cut. A write's

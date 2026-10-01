@@ -4,6 +4,7 @@
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
+import { type Db, transact } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
@@ -26,6 +27,7 @@ export type PreparedRun = {
 };
 
 export function prepareSend(fields: {
+  db: Db;
   registry: Registry;
   // the user the send counts against, null for a scheduled run
   startedBy: string | null;
@@ -100,37 +102,43 @@ export function prepareSend(fields: {
   fields.registry.set(send);
   let started: ReturnType<Writer["startSend"]>;
   try {
-    // under the lock, before the send is written and any command mounts:
-    // the kept files trimmed to the budget stay put for the whole send
-    if (fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
-      // a regenerate's kept files go with the rows it replaces
-      const kept = fields.startKept(
-        fields.sessionId,
-        "existing" in turn ? turn.existing.at(-1)!.seq : null,
-      );
-      let next = kept.next;
-      send.keep = {
-        take: () => next++,
-        maxBytes: kept.maxBytes,
-        used: kept.used,
-        maxFiles: kept.maxFiles,
-        files: kept.files,
+    // a refused start rolls the trim back with it
+    started = transact(fields.db, () => {
+      // under the lock, before the send is written and any command mounts:
+      // the kept files trimmed to the budget stay put for the whole send
+      if (fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
+        // a regenerate's kept files go with the rows it replaces
+        const kept = fields.startKept(
+          fields.sessionId,
+          "existing" in turn ? turn.existing.at(-1)!.seq : null,
+        );
+        let next = kept.next;
+        send.keep = {
+          take: () => next++,
+          maxBytes: kept.maxBytes,
+          used: kept.used,
+          maxFiles: kept.maxFiles,
+          files: kept.files,
+        };
+      }
+      return {
+        result: fields.writer.startSend({
+          sendId,
+          replyId,
+          sessionId: fields.sessionId,
+          session: fields.session,
+          turn,
+          origin: fields.origin,
+          automationId: fields.automationId,
+          kind: fields.kind,
+          title: fields.title,
+          policy: fields.policy,
+          changes: fields.changes,
+          mcpDigest: fields.policy.offered.mcpPrompt.digest,
+          ...(fields.claim === undefined ? {} : { claim: fields.claim }),
+        }),
+        events: [],
       };
-    }
-    started = fields.writer.startSend({
-      sendId,
-      replyId,
-      sessionId: fields.sessionId,
-      session: fields.session,
-      turn,
-      origin: fields.origin,
-      automationId: fields.automationId,
-      kind: fields.kind,
-      title: fields.title,
-      policy: fields.policy,
-      changes: fields.changes,
-      mcpDigest: fields.policy.offered.mcpPrompt.digest,
-      ...(fields.claim === undefined ? {} : { claim: fields.claim }),
     });
     send.mcpNote = changeNote(
       started.previousMcpDigest,

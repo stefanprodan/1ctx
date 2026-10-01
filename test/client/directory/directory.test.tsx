@@ -96,7 +96,7 @@ const agent: DirectoryAgentResponse = {
   tools: [
     {
       name: "datetime",
-      description: "Get the current date and time. Call it first.",
+      description: "Get the current date and time.",
       provider: null,
     },
     { name: "websearch", description: "Search the web.", provider: "exa" },

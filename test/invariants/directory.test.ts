@@ -17,6 +17,7 @@ import type {
   DirectoryUsersResponse,
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
+import { firstSentence } from "../../src/shared/mcp.ts";
 import { hashPassword } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -223,12 +224,15 @@ describe("the directory", () => {
     const offered = chat.app.runner.registry.get(started.sessionId)!.policy
       .offered.tools;
     expect(body.tokens.tools).toBe(wireTokens(offered));
-    // each with the description the model reads
+    // each with the first sentence of the description the model reads,
+    // all the page draws
     for (const tool of body.tools) {
-      expect(tool.description).toBe(
-        offered.find((t) => t.name === tool.name)!.description,
-      );
+      const full = offered.find((t) => t.name === tool.name)!.description;
+      expect(tool.description).toBe(firstSentence(full));
     }
+    expect(body.tools.find((t) => t.name === "bash")!.description).not.toBe(
+      offered.find((t) => t.name === "bash")!.description,
+    );
     const catalogResponse = await chat.admin.call("GET", "/api/tools");
     expect(catalogResponse.status).toBe(200);
     const catalog: ToolsResponse = await catalogResponse.json();

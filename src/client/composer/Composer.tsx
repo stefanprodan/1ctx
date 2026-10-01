@@ -98,7 +98,7 @@ export function Composer({
   onEdit,
   project,
   off = NONE_OFF,
-  placeholder: idle = "Send a message",
+  placeholder: idle = "Message",
 }: {
   scope: Scope;
   // the project a file is staged in: the chat's, or the one a new chat

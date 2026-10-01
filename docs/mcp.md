@@ -124,5 +124,6 @@ kept results under `/mcp` (`tools/kept.ts`). The MCP admin page is in
   never committed, an added or removed name under it gives a discard
   notice found from `getAllPaths()` alone (a `stat` would load every
   file), a changed file is dropped without one, and `open` and the saved
-  cwd accept it. `prepareSend` calls `startKept` before `startSend`. A
+  cwd accept it. `prepareSend` calls `startKept` before `startSend`, in
+  one transaction, so a refused start trims nothing. A
   kept name is server text and never reaches a log field.

@@ -39,9 +39,9 @@ export type DirectorySkill = OfferedSkill & {
   files: number;
 };
 
-// a built-in tool a send would offer: its description as the model
-// reads it, and the provider that answers it when an admin picked one
-// (websearch's exa, firecrawl or tavily)
+// a built-in tool a send would offer: the first sentence of its
+// description, all the page draws, and the provider that answers it when
+// an admin picked one (websearch's exa, firecrawl or tavily)
 export type DirectoryTool = {
   name: string;
   description: string;

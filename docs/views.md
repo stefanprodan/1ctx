@@ -153,7 +153,9 @@ The primitives and the rules every view follows are in `docs/ui.md`.
   caller's whole queue at its commit's revision. Each part is taken only
   from a revision above the one it holds, so a late answer never puts
   back a row a start took and a detail read before a change never
-  undoes it.
+  undoes it. A row in the not-sent part is never drawn from the queued
+  one too, and the author's event comes before the watchers' frame, so
+  a turning row is drawn once at every step.
 
 ## The composer
 
