@@ -3,8 +3,7 @@
 //
 // find reports what it cannot read in traversal order, beside the output of
 // the node it met it on, as GNU findutils 4.11 find answered the same tree
-// on a real disk (its entries put in our sorted order). An unreadable folder
-// keeps upstream's unquoted message; a link keeps GNU's quoted one.
+// on a real disk (its entries put in our sorted order), in the C locale.
 
 import { describe, expect, test } from "bun:test";
 import { Bash, type IFileSystem, InMemoryFs } from "just-bash";
@@ -39,7 +38,7 @@ async function run(script: string, fatal?: string) {
   return bash.exec(script);
 }
 
-const denied = (path: string) => `find: ${path}: Permission denied\n`;
+const denied = (path: string) => `find: '${path}': Permission denied\n`;
 const eloop = (path: string) =>
   `find: '${path}': Too many levels of symbolic links\n`;
 const cycle = (path: string) =>
@@ -109,7 +108,7 @@ const cases: Case[] = [
     `find t/b missing t/a -exec ${echo}`,
     "",
     e("t/b", "t/b/g", "t/b/up") +
-      "find: missing: No such file or directory\n" +
+      "find: 'missing': No such file or directory\n" +
       e("t/a", "t/a/f", "t/a/locked") +
       denied("t/a/locked"),
     1,
@@ -127,6 +126,13 @@ const cases: Case[] = [
     0,
   ],
   ["find -L t/ll -prune", "t/ll\n", "", 0],
+  ["find t -name locked -prune -o -empty -print", "t/a/f\nt/b/g\n", "", 0],
+  [
+    "find t -empty -o -name locked -prune",
+    "t/a/f\nt/a/locked\nt/b/g\n",
+    denied("t/a/locked"),
+    1,
+  ],
 ];
 
 describe("find diagnostics", () => {
@@ -144,6 +150,60 @@ describe("find diagnostics", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("ABORT_ERR");
     expect(result.stderr).not.toContain("Too many levels");
+    expect(result.exitCode).toBe(1);
+  });
+
+  const quoted: [string, string][] = [
+    ["nope", "'nope'"],
+    ["q/it's x", "'q/it\\'s x'"],
+    ["q/a\\b", "'q/a\\\\b'"],
+    ["q/a\nb", "'q/a\\nb'"],
+    ["q/a\tb", "'q/a\\tb'"],
+    ['q/a"b', `'q/a"b'`],
+    ["q/caf\u00e9", "'q/caf\\303\\251'"],
+    ["q/\x01\x07\b\v\f\r\x7f", "'q/\\001\\a\\b\\v\\f\\r\\177'"],
+  ];
+  for (const [path, diagnostic] of quoted) {
+    test(`quotes a missing path ${JSON.stringify(path)}`, async () => {
+      const result = await new Bash({ cwd: "/" }).exec(
+        `find '${path.replaceAll("'", "'\\''")}'`,
+      );
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toBe(
+        `find: ${diagnostic}: No such file or directory\n`,
+      );
+      expect(result.exitCode).toBe(1);
+    });
+  }
+
+  test("quotes an unreadable folder, a link error and an ancestor loop", async () => {
+    const memory = new InMemoryFs();
+    await memory.mkdir("/it's locked");
+    await memory.mkdir("/it's parent");
+    await memory.symlink("it's loop", "/it's loop");
+    await memory.symlink(".", "/it's parent/up");
+    const fs = new Proxy(memory, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value !== "function") return value;
+        if (prop === "readdir" || prop === "readdirWithFileTypes") {
+          return async (path: string, ...rest: unknown[]) => {
+            if (path === "/it's locked") throw new Error("EACCES: denied");
+            return value.call(target, path, ...rest);
+          };
+        }
+        return value.bind(target);
+      },
+    }) as IFileSystem;
+    const result = await new Bash({ fs, cwd: "/" }).exec(
+      `find -L "it's locked" "it's loop" "it's parent"`,
+    );
+    expect(result.stdout).toBe("it's locked\nit's parent\n");
+    expect(result.stderr).toBe(
+      "find: 'it\\'s locked': Permission denied\n" +
+        "find: 'it\\'s loop': Too many levels of symbolic links\n" +
+        "find: File system loop detected; the following directory is part of the cycle: 'it\\'s parent/up'\n",
+    );
     expect(result.exitCode).toBe(1);
   });
 });

@@ -1,8 +1,27 @@
 // Matcher functions for find command
 
+// (1ctx find-path) the shared command glob does not interpret escapes
+import { patternToRegex } from "../../interpreter/expansion/pattern.js";
 import { createUserRegex } from "../../regex/index.js";
 import { matchGlob } from "../../utils/glob.js";
 import type { EvalContext, EvalResult, Expression } from "./types.js";
+
+// (1ctx find-path) reuse shell escapes without enabling extglobs. GNU does
+// not match a trailing unpaired backslash; the shell compiler makes it literal.
+function matchEscapedPath(
+  path: string,
+  pattern: string,
+  ignoreCase?: boolean,
+): EvalResult {
+  const trailing = pattern.match(/\\+$/)?.[0].length ?? 0;
+  const matches =
+    trailing % 2 === 0 &&
+    createUserRegex(
+      `^${patternToRegex(pattern, true)}$`,
+      ignoreCase ? "is" : "s",
+    ).exec(path)?.[0] === path;
+  return { matches, pruned: false, printed: false };
+}
 
 /**
  * Evaluate a find expression and return both match result and prune flag.
@@ -43,6 +62,10 @@ export function evaluateExpressionWithPrune(
       // Fast paths for common patterns
       const pattern = expr.pattern;
       const path = ctx.relativePath;
+      // (1ctx find-path) neither literal-segment nor glob fast paths unescape
+      if (pattern.includes("\\")) {
+        return matchEscapedPath(path, pattern, expr.ignoreCase);
+      }
 
       // Fast path 1: Check for required directory segments (e.g., "*/pulls/*" requires "/pulls/")
       // Look for literal path segments in the pattern
@@ -402,6 +425,10 @@ export function evaluateSimpleExpression(
     }
     case "path": {
       const pattern = expr.pattern;
+      // (1ctx find-path) keep the simple evaluator's escape rules identical
+      if (pattern.includes("\\")) {
+        return matchEscapedPath(relativePath, pattern, expr.ignoreCase);
+      }
       // Fast path: Check for required directory segments
       const segments = pattern.split("/");
       for (let i = 0; i < segments.length - 1; i++) {
@@ -685,9 +712,13 @@ function evaluatePruneBranchEarly(
         if (leftResult.pruned) {
           return { shouldPrune: true };
         }
+        // (1ctx find-prune) the right branch is reached only if the left is
+        // known false. An unknown left may need -empty's read before -prune.
+        if (!leftResult.matches) {
+          return evaluatePruneBranchEarly(expr.right, ctx);
+        }
       }
-      // Also check right branch
-      return evaluatePruneBranchEarly(expr.right, ctx);
+      return { shouldPrune: false };
     }
     case "and": {
       // For AND, both sides must match for prune to trigger

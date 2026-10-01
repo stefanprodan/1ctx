@@ -2,6 +2,7 @@ import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
 import type { DirentEntry } from "../../fs/interface.js";
+// (1ctx find-links) keep host paths out of unfamiliar link errors
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { FileTraversalBudget } from "../../fs/traversal.js";
 import { shellJoinArgs } from "../../helpers/shell-quote.js";
@@ -115,9 +116,34 @@ function statWords(error: unknown): string {
   return sanitizeErrorMessage(message);
 }
 
+// (1ctx find-diagnostics) GNU find's C-locale quoting, not shell quoting.
+function diagnosticPath(path: string): string {
+  const escapes: Record<number, string> = {
+    7: "\\a",
+    8: "\\b",
+    9: "\\t",
+    10: "\\n",
+    11: "\\v",
+    12: "\\f",
+    13: "\\r",
+    39: "\\'",
+    92: "\\\\",
+  };
+  let quoted = "'";
+  for (const byte of new TextEncoder().encode(path)) {
+    quoted +=
+      escapes[byte] ??
+      (byte < 32 || byte >= 127
+        ? `\\${byte.toString(8).padStart(3, "0")}`
+        : String.fromCharCode(byte));
+  }
+  return `${quoted}'`;
+}
+
 const findHelp = {
   name: "find",
   summary: "search for files in a directory hierarchy",
+  // (1ctx find-links) advertise the supported link policies
   usage: "find [-H] [-L] [-P] [path...] [expression]",
   options: [
     "-P               never follow symbolic links (the default)",
@@ -395,7 +421,7 @@ export const findCommand: RuntimeCommand = {
         effects.push({
           action: {
             type: "diagnostic",
-            message: `find: ${searchPath}: No such file or directory\n`,
+            message: `find: ${diagnosticPath(searchPath)}: No such file or directory\n`,
           },
           path: searchPath,
           printfData: {
@@ -416,6 +442,7 @@ export const findCommand: RuntimeCommand = {
       interface WorkItem {
         path: string;
         depth: number;
+        // (1ctx find-links) a dirent's type describes the link, not its target
         typeInfo?: {
           isFile: boolean;
           isDirectory: boolean;
@@ -447,6 +474,7 @@ export const findCommand: RuntimeCommand = {
         problem?: string;
       }
 
+      // (1ctx find-links) link failures name the same path as a printed node
       const relativeOf = (currentPath: string) =>
         currentPath === basePath
           ? searchPath
@@ -463,6 +491,7 @@ export const findCommand: RuntimeCommand = {
         item: WorkItem,
       ): Promise<ProcessedNode | null> {
         const { path: currentPath, depth, typeInfo } = item;
+        // (1ctx find-links) -H applies to this depth only
         const followed = followsAt(depth);
         traversalBudget.visit(depth);
         traceCounters.nodeCount++;
@@ -477,6 +506,7 @@ export const findCommand: RuntimeCommand = {
         let isDirectory: boolean;
         let stat: Awaited<ReturnType<typeof ctx.fs.stat>> | undefined;
 
+        // (1ctx find-links) followed links need their target's type
         if (
           typeInfo &&
           !needsStatMetadata &&
@@ -499,11 +529,12 @@ export const findCommand: RuntimeCommand = {
             traceCounters.statCalls++;
             traceCounters.statTime += Date.now() - statStart;
           } catch (error) {
-            // (1ctx find-links) a link that loops is GNU's error, not a missing file
+            // (1ctx find-links find-diagnostics) a link that loops is GNU's
+            // quoted error, not a missing file
             if (followed && !isMissing(error)) {
               return problemNode(
                 item,
-                `find: '${relativeOf(currentPath)}': ${statWords(error)}\n`,
+                `find: ${diagnosticPath(relativeOf(currentPath))}: ${statWords(error)}\n`,
               );
             }
             return null;
@@ -521,10 +552,11 @@ export const findCommand: RuntimeCommand = {
           name = currentPath.split("/").pop() || "";
         }
 
+        // (1ctx find-links) share the spelling with link failures
         const relativePath = relativeOf(currentPath);
 
-        // (1ctx find-links) under -L, a directory reached again through a link is
-        // GNU's file system loop: reported, left out, and exit 1
+        // (1ctx find-links find-diagnostics) under -L, a directory reached
+        // again through a link is GNU's quoted file system loop, exit 1
         let ancestors: string[] | undefined;
         if (follow === "L" && isDirectory) {
           const parent = item.ancestors ?? [];
@@ -532,7 +564,7 @@ export const findCommand: RuntimeCommand = {
           if (parent.includes(real)) {
             return problemNode(
               item,
-              `find: File system loop detected; the following directory is part of the cycle: '${relativePath}'\n`,
+              `find: File system loop detected; the following directory is part of the cycle: ${diagnosticPath(relativePath)}\n`,
             );
           }
           ancestors = [...parent, real];
@@ -609,6 +641,7 @@ export const findCommand: RuntimeCommand = {
                   typeInfo: {
                     isFile: entry.isFile,
                     isDirectory: entry.isDirectory,
+                    // (1ctx find-links) -L must stat links, not trust dirents
                     isSymbolicLink: entry.isSymbolicLink,
                   },
                   ancestors,
@@ -631,6 +664,7 @@ export const findCommand: RuntimeCommand = {
                       ? `/${entry}`
                       : `${currentPath}/${entry}`,
                   depth: depth + 1,
+                  // (1ctx find-links) track ancestors without typed readdir too
                   ancestors,
                   resultIndex: idx,
                 });
@@ -735,7 +769,8 @@ export const findCommand: RuntimeCommand = {
                 {
                   action: {
                     type: "diagnostic",
-                    message: `find: ${node.relativePath}: ${node.unreadable}\n`,
+                    // (1ctx find-diagnostics) quote directory errors like links
+                    message: `find: ${diagnosticPath(node.relativePath)}: ${node.unreadable}\n`,
                   },
                   path: node.relativePath,
                   printfData,
@@ -1327,11 +1362,9 @@ function formatCtimeDate(date: Date): string {
 }
 
 /**
- * The errnos a directory read can fail with that are the directory's own
- * problem, and what GNU find prints for each. Nothing else is recoverable
- * here: a cancellation, an execution limit, or a filesystem policy refusal
- * carries a code of its own and must end the search, not become a line of
- * stderr, so the phrase comes from this table and never from the error.
+ * (1ctx find-diagnostics) Recovery is by errno, not by cause: ReadWriteFs
+ * also uses EACCES for a sandbox refusal, which must not expose its message.
+ * Cancellations, limits and errors outside this table still end the search.
  */
 const UNREADABLE_DIRECTORY_REASONS = new Map<string, string>([
   ["EACCES", "Permission denied"],
