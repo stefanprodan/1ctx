@@ -29,28 +29,11 @@ import { type PicksPort, startingRoutes } from "./starting.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
 export {
-  directoryRoutes,
-  type SkillsListPort,
-  type ToolsPort,
-  type UsagePort,
-} from "./directory.ts";
-export {
   MAX_MODEL,
   MAX_PROMPT,
   MAX_SERVERS_PER_AGENT,
 } from "./parse.ts";
-export {
-  type AccessPort,
-  type AutomationsPort,
-  type CredentialsPort,
-  type ProvidersPort,
-  type RunnerPort,
-  routes,
-  type SessionsPort,
-  type SkillsPort,
-} from "./routes.ts";
-export type { PicksPort } from "./starting.ts";
-export { type AgentRow, AgentStore, summary } from "./store.ts";
+export { type AgentRow, AgentStore } from "./store.ts";
 
 export type AgentsDeps = {
   db: Db;

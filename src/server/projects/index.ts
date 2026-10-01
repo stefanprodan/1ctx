@@ -17,14 +17,7 @@ import {
 } from "./routes.ts";
 import { type ProjectRow, ProjectStore } from "./store.ts";
 
-export {
-  type AccessPort,
-  type KnowledgePort,
-  routes,
-  type SessionsPort,
-  type UsagePort,
-} from "./routes.ts";
-export { type ProjectRow, ProjectStore, summary } from "./store.ts";
+export { type ProjectRow, ProjectStore } from "./store.ts";
 export { visible } from "./visible.ts";
 
 export type ProjectsDeps = {

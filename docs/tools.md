@@ -14,8 +14,8 @@ mount in `docs/bash.md`.
   floors and ceilings in one table, `limits/defaults.ts`; an admin's
   override is a row in `limits`, `PUT /api/limits` writing only the
   limits it names, `limits.current()` merges them, and
-  `runner/limits.ts` and `tools/limits.ts` re-export the types and
-  the defaults; `tools/` never imports `runner/`. The `sends` scope
+  every importer reads the types and the defaults from
+  `limits/index.ts`; `tools/` never imports `runner/`. The `sends` scope
   holds `sendsPerUser` (1 to 16, default 4), `sendsPerProject` (4 to
   64, default 16) and `sendsRunning` (4 to 256, default 64), written
   only in that order (`docs/sessions.md`), with the queue's

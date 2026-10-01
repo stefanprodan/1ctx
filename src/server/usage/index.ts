@@ -25,13 +25,10 @@ export {
   type DecisionSlot,
   type DecisionSums,
   type DecisionUsageFields,
-  type DecisionUsageRow,
-  DecisionUsageStore,
   decisionSlots,
-  decisionTotals,
 } from "./decisions.ts";
 export { parseZoneQuery } from "./parse.ts";
-export { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
+export { type UsageFields, UsageStore } from "./store.ts";
 export {
   countByDay,
   daysWindow,

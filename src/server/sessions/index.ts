@@ -46,7 +46,7 @@ import { SessionStore } from "./store.ts";
 import { envelopeRow } from "./stream.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
-export { ARCHIVED, refuseArchived } from "./archive.ts";
+export { refuseArchived } from "./archive.ts";
 export {
   parseFeedCursor,
   parseRunsCursor,
@@ -61,18 +61,9 @@ export {
   lineFrom,
   MAX_REGENERATE_BODY,
   MAX_SESSION_BODY,
-  MAX_SMALL_BODY,
   parseCreateSession,
-  parseEditQueued,
-  parseForkSession,
-  parseMessage,
-  parseMessageId,
-  parseQueuedId,
   parseRegenerate,
-  parseRemoveQueued,
-  parseRenameSession,
   parseSendMessage,
-  parseStreamQuery,
   titleFrom,
 } from "./parse.ts";
 export {
@@ -80,16 +71,12 @@ export {
   NOT_SENT_KEPT_MS,
   onWire as queuedOnWire,
   type QueuedRow,
-  type QueueLoad,
-  QueueStore,
   queueChanged,
   queueFrameEvent,
   type WaitingCursor,
 } from "./queued.ts";
 export { queueAnswer } from "./queued-routes.ts";
-export { type AccessPort, detail, type LivePort, routes } from "./routes.ts";
 export {
-  cutResult,
   offWire,
   RESULT_DISPLAY_CHARS,
   type ReplyFinish,
@@ -99,7 +86,6 @@ export {
 } from "./rows.ts";
 export { lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
-export type { ChatSweep } from "./sweep.ts";
 
 export const RESTART_ERROR = "the server restarted";
 

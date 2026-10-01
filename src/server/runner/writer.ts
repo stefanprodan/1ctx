@@ -41,7 +41,6 @@ import {
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type { Started } from "./start.ts";
-export { HTML_EVERY_MS, WRITE_EVERY_BYTES, WRITE_EVERY_MS } from "./stream.ts";
 export type { SessionsPort } from "./writer-port.ts";
 
 // the text a call cut before it ran gets, as its content

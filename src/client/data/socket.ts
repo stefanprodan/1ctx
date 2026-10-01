@@ -190,8 +190,3 @@ export function startSocket(override?: Partial<SocketDeps>): () => void {
     build = null;
   };
 }
-
-// the socket's state for a test
-export function socketState(): { open: boolean; attempt: number } {
-  return { open: wire !== null && wire.readyState === OPEN, attempt };
-}

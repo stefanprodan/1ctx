@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import type { SearchProvider } from "../../../src/server/tools/builtin/search/types.ts";
 import type {
   Search,
   SearchDependencies,
 } from "../../../src/server/tools/builtin/websearch.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type {
   ToolBudget,
   ToolContext,

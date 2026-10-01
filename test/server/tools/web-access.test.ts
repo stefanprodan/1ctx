@@ -3,9 +3,9 @@
 
 import { expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import type { WebAccessMode } from "../../../src/shared/web.ts";

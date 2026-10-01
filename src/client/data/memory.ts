@@ -45,10 +45,6 @@ function pathOf(key: string): string {
   return `/api/${base}/${encodeURIComponent(id)}/memory`;
 }
 
-export function noteOf(key: string): Memory | null {
-  return notes.value.get(key) ?? null;
-}
-
 function keep(key: string, memory: Memory): void {
   // a later word on the row never loses to an earlier answer
   const held = notes.value.get(key);

@@ -244,7 +244,6 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
 }
 
 export {
-  type ChatEditOutcome,
   type ChatMemoryEdit,
   chatEdit,
   noteWords,
@@ -255,14 +254,9 @@ export {
   parseSaveMemory,
   parseUndoMemory,
 } from "./parse.ts";
-export { type AccessPort, type RoutesDeps, routes } from "./routes.ts";
 export {
-  type MemoryCommit,
   type MemoryOperation,
-  type MemoryRow,
   MemoryStore,
-  type MemoryTarget,
-  type MemoryView,
   type MemoryWork,
   memoryWork,
   replay,

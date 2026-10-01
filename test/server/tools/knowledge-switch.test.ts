@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import { silent } from "../../../src/server/lib/log.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import { KNOWLEDGE } from "../../../src/shared/capabilities.ts";
 import { memoryDb } from "../../helpers/db.ts";

@@ -11,14 +11,11 @@ import { type AgentsPort, routes, type UsagePort } from "./routes.ts";
 import { SkillStore } from "./store.ts";
 import { switchable } from "./switchable.ts";
 
-export { cleanText } from "./clean.ts";
-export { fetchSource, fetchText } from "./fetch.ts";
 export { parseSkillMd } from "./frontmatter.ts";
 export * from "./limits.ts";
-export { changeOf, discover, type LoadedSkill, loadSkill } from "./load.ts";
-export { parseAdd, parseDiscover, parseFile } from "./parse.ts";
-export { parseIndex, pick, resolve, validPath } from "./source.ts";
-export { SkillStore, summary } from "./store.ts";
+export { type LoadedSkill, loadSkill } from "./load.ts";
+export { validPath } from "./source.ts";
+export { SkillStore } from "./store.ts";
 
 export type SkillsDeps = {
   db: Db;

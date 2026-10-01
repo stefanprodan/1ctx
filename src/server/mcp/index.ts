@@ -331,12 +331,6 @@ export function mcpArea(deps: McpDeps): Mcp {
   return area;
 }
 
-export { discover, fingerprint } from "./discover.ts";
 export { changeNote } from "./note.ts";
-export { RefreshCoordinator } from "./refresh.ts";
-export {
-  type McpCallOutput,
-  type McpContent,
-  resultText,
-} from "./result.ts";
-export { type McpServerRow, McpServerStore, summary } from "./store.ts";
+export type { McpCallOutput, McpContent } from "./result.ts";
+export { McpServerStore } from "./store.ts";

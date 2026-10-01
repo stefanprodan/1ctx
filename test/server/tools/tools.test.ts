@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
 import { formatDatetime } from "../../../src/server/tools/builtin/datetime.ts";
@@ -18,7 +19,6 @@ import {
   type ToolsArea,
   toolsArea,
 } from "../../../src/server/tools/index.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import type {
   ToolBudget,
   ToolContext,

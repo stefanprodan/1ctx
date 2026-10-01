@@ -117,6 +117,5 @@ export {
   keptPath,
   writeKeptFiles,
 } from "./kept.ts";
-export type { CommandCaps, CommandResult } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";
 export type { CommandEnd } from "./protocol.ts";

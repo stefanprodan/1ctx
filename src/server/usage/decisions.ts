@@ -35,7 +35,7 @@ export type DecisionUsageRow = Omit<DecisionUsageFields, "now"> & {
   createdAt: number;
 };
 
-// the decisions of a slot of slotMs, or of all time with slot absent
+// the decisions of a slot of slotMs
 export type DecisionSums = {
   decisions: number;
   tokens: number;
@@ -97,14 +97,6 @@ export function decisionSlots(
          group by slot order by slot`,
     )
     .all(since, until);
-}
-
-// every decision there is; cost null when none named one
-export function decisionTotals(db: Db): DecisionSums {
-  const sums = db
-    .query<DecisionSums, []>(`select ${SUMS} from decision_usage`)
-    .get()!;
-  return { ...sums, cost: sums.priced > 0 ? sums.cost : null };
 }
 
 export class DecisionUsageStore {

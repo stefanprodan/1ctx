@@ -5,6 +5,7 @@
 // exhausted line on a copy, and the system prompt, on fixtures.
 
 import { describe, expect, test } from "bun:test";
+import { LOOP_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import {
   type ChatMessageIn,
   requestTokens,
@@ -22,12 +23,10 @@ import {
   unmarked,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
-import { LOOP_LIMITS } from "../../../src/server/runner/limits.ts";
 import type { Offered, SendPolicy } from "../../../src/server/runner/policy.ts";
 import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/index.ts";
 import {
   KNOWLEDGE,
   KNOWLEDGE_OFF_LINE,

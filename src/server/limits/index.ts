@@ -32,13 +32,11 @@ export {
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
-  type QueueCaps,
   type SendCaps,
   scheduledShare,
   TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
-export { LimitStore } from "./store.ts";
 
 export type LimitsDeps = {
   db: Db;

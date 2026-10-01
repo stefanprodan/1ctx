@@ -11,14 +11,13 @@ import {
   heldSessions,
 } from "../../../src/server/bash/queue.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
-import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import {
   commandCredentials,
   makeBashTool,
 } from "../../../src/server/tools/builtin/bash.ts";
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import { settleRun } from "../../helpers/automations.ts";

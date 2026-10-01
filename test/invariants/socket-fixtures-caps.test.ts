@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
-import { LOOP_LIMITS } from "../../src/server/runner/limits.ts";
+import { DEFAULT_LIMITS, LOOP_LIMITS } from "../../src/server/limits/index.ts";
 import { HTML_EVERY_MS } from "../../src/server/runner/stream.ts";
 import { settleRun } from "../helpers/automations.ts";
 import {

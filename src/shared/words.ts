@@ -4,7 +4,6 @@
 // The domain's enums as const arrays and their guards. Environment
 // neutral: no Bun, no DOM, no packages.
 
-// a JSON object: not null and not an array
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -94,7 +93,6 @@ export function isAbout(value: unknown): value is string {
   return typeof value === "string" && value.length <= MAX_ABOUT;
 }
 
-// a password a user picks
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD_BYTES = 1024;
 
@@ -107,8 +105,6 @@ export type OpenedKind = (typeof OPENED_KINDS)[number];
 export const PROJECT_KINDS = ["personal", "team"] as const;
 export type ProjectKind = (typeof PROJECT_KINDS)[number];
 
-// a name an admin gives a thing on the server: a project, a provider, an
-// agent
 export const MIN_NAME = 2;
 export const MAX_NAME = 80;
 export function isName(value: unknown): value is string {
@@ -120,9 +116,6 @@ export function isName(value: unknown): value is string {
   );
 }
 
-// a knowledge file's name is a path: one to eight segments joined by
-// `/`, each 1 to 80 characters of ASCII letters, digits, dot, dash and
-// underscore, never `.` or `..`, 200 characters at most
 export const MAX_KNOWLEDGE_NAME = 200;
 export const MAX_KNOWLEDGE_SEGMENTS = 8;
 const KNOWLEDGE_SEGMENT_RE = /^[A-Za-z0-9._-]{1,80}$/;
@@ -151,12 +144,9 @@ export function isServerName(value: unknown): value is string {
     SERVER_NAME_RE.test(value)
   );
 }
-// the two sides an MCP server's tools are sorted into
 export const SIDES = ["read", "write"] as const;
 export type Side = (typeof SIDES)[number];
 
-// a pattern on MCP tool names: `*` alone, or a name in the characters
-// MCP allows with an optional trailing `*` making it a prefix
 const PATTERN_RE = /^[a-zA-Z0-9_.-]{1,128}\*?$/;
 export function isPattern(value: unknown): value is string {
   return typeof value === "string" && (value === "*" || PATTERN_RE.test(value));
@@ -204,7 +194,6 @@ export const RESERVED_PROJECT_NAMES: readonly string[] = [
   PERSONAL_PROJECT_NAME,
 ];
 
-// the robots an agent shows as; adding one is a code change
 export const AVATARS = ["bot", "face", "dome", "boxy", "bust"] as const;
 export type Avatar = (typeof AVATARS)[number];
 export function isAvatar(value: unknown): value is Avatar {
@@ -251,9 +240,7 @@ export const SESSION_STATUSES = [
 ] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
-// why a send ended: the model finished, a user stopped it, the
-// provider failed, the process shut down, the process was found
-// restarted with the send still running, or a run passed its deadline
+// restart: the process was found restarted with the send still running
 export const SEND_CAUSES = [
   "finish",
   "stop",
@@ -268,12 +255,9 @@ export type SendCause = (typeof SEND_CAUSES)[number];
 export const SEND_KINDS = ["chat", "compact", "run"] as const;
 export type SendKind = (typeof SEND_KINDS)[number];
 
-// what opened a session: a person's chat, or an automation's run
 export const SESSION_ORIGINS = ["chat", "automation"] as const;
 export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
 
-// why a chat is archived: someone archived it, its agent was deleted,
-// or it went the admin's days without activity
 export const ARCHIVE_REASONS = ["manual", "agent", "idle"] as const;
 export type ArchiveReason = (typeof ARCHIVE_REASONS)[number];
 
@@ -291,18 +275,13 @@ export const NOT_SENT_REASONS = [
 ] as const;
 export type NotSentReason = (typeof NOT_SENT_REASONS)[number];
 
-// what made an automation's event: its schedule, someone's Run now, or a
-// start that runs again what a restart cut
 export const EVENT_SOURCES = ["schedule", "manual", "restart"] as const;
 export type EventSource = (typeof EVENT_SOURCES)[number];
-// an event opened a run, was skipped with a reason, or was put off to the
-// next start by a restart
 export const EVENT_OUTCOMES = ["run", "skipped", "deferred"] as const;
 export type EventOutcome = (typeof EVENT_OUTCOMES)[number];
 // the reason on the run event of a fire a restart put off, the one trace
 // of the deferral once the run overwrites it
 export const DEFERRED_BY_RESTART = "deferred by a restart";
-// an automation's runs narrowed on its page
 export const RUN_FILTERS = ["failed", "manual"] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];
 export function isRunFilter(value: unknown): value is RunFilter {
@@ -315,9 +294,8 @@ export const PREVIEW_FIRES = 5;
 // zone; the server parses both and its 400 is the rule's only words
 export const MAX_SCHEDULE = 100;
 export const MAX_TZ = 64;
-// the zone a user starts in when nobody picked one
 export const DEFAULT_TZ = "UTC";
-// an IANA zone the runtime knows, links such as UTC included
+// links such as UTC count as zones
 export function isTimeZone(value: unknown): value is string {
   if (typeof value !== "string" || value === "" || value.length > MAX_TZ) {
     return false;
@@ -329,7 +307,6 @@ export function isTimeZone(value: unknown): value is string {
     return false;
   }
 }
-// how long an automation's runs are kept, in days
 export const RETENTION_DAYS = { min: 1, max: 365, default: 30 } as const;
 export const MAX_MEMORY_GUIDANCE = 2000;
 
@@ -344,13 +321,11 @@ export const MESSAGE_STATUSES = [
 ] as const;
 export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 
-// a message a user writes; the cap is in bytes, the server's
 export const MAX_MESSAGE_BYTES = 256 * 1024;
 export const VISUAL_FRAME_BYTES = 512 * 1024;
 export const MAX_TITLE = 80;
 // a title is one line by the same rule as a full name
 export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
-// the stream's search box
 export const MAX_SEARCH = 100;
 
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
@@ -427,7 +402,6 @@ export const LIMIT_NAMES = [
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
-// what a limit's number counts; the page turns ms and bytes into words
 export const LIMIT_UNITS = [
   "count",
   "ms",
@@ -439,11 +413,7 @@ export const LIMIT_UNITS = [
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
-// where a limit applies: over the whole send, to one tool call, to a
-// project's knowledge base, a storage cap read at each write, to the
-// chats and runs going at once, read at each admission, to the
-// visuals a send draws, or to chats, which the hourly sweep archives
-// and deletes by their days
+// knowledge caps are read at each write, sends caps at each admission
 export const LIMIT_SCOPES = [
   "send",
   "call",
@@ -454,9 +424,8 @@ export const LIMIT_SCOPES = [
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 
-// a skill's name, the Agent Skills rule: lowercase ASCII letters, digits
-// and hyphens, no hyphen at either end and none doubled, 1 to 64.
-// Stricter than isName, since a skill written for any client obeys it
+// the Agent Skills rule, stricter than isName, since a skill written for
+// any client obeys it
 export const MAX_SKILL_NAME = 64;
 const SKILL_NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export function isSkillName(value: unknown): value is string {
@@ -473,17 +442,13 @@ export const MAX_SKILL_COMPATIBILITY = 500;
 // the Claude API's cap per request; recall drops past it
 export const MAX_SKILLS_PER_AGENT = 20;
 
-// the window an admin may state for a model its catalog does not
-// describe, in tokens
+// the window an admin may state for a model its catalog does not describe
 export const MIN_CONTEXT_LENGTH = 1_024;
 export const MAX_CONTEXT_LENGTH = 10_000_000;
 
-// where a skill came from: a GitHub directory, a tarball with a path
-// inside it, a site's discovery index, or one raw SKILL.md
 export const SKILL_SOURCES = ["github", "archive", "index", "file"] as const;
 export type SkillSource = (typeof SKILL_SOURCES)[number];
 
 // never switched on their own: `skill` loads a body, `skill_file`
 // reads one of its files
 export const SKILL_TOOLS = ["skill", "skill_file"] as const;
-export type SkillTool = (typeof SKILL_TOOLS)[number];

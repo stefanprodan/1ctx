@@ -50,10 +50,8 @@ export {
 } from "./project-agents.ts";
 export { createSession, sending, stopSession } from "./session-start.ts";
 export {
-  loadOpened,
   loadToolResult,
   loadVisual,
-  openedFiles,
   retrying,
   toolResults,
   toolVisuals,

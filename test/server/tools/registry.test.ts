@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { ToolError } from "../../../src/server/lib/errors.ts";
 import { errorFields } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/tools/limits.ts";
+import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type {
   Tool,
