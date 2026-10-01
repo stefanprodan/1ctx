@@ -42,14 +42,14 @@ targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
   beside the YAML is copied, so a `knowledge` path elsewhere is
   refused.
 
-## The image
+## The container image
 
 - **The build cross-compiles on `$BUILDPLATFORM`.** `bun build
   --compile --target` builds every platform natively, so nothing runs
   under emulation. The binary's `.env` and `bunfig.toml` autoload is
   off, since its working directory is the data volume.
 - **`.dockerignore` is an allowlist.** The tree holds secrets.
-- **The image runs as 65532 on a read-only root, with no
+- **The container runs as 65532 on a read-only root, with no
   capabilities.** The server needs no writable `/tmp`; keep it so.
   `make image-smoke` runs the image that way and requires a clean exit
   on SIGTERM.

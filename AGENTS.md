@@ -77,7 +77,7 @@ site/         1ctx.dev and the brand files, its own project.
 vendor/       just-bash/ (a git subtree, outside Biome and the structure
               rules) and its three docs.
 docs/         the rules of each area (see Docs).
-deploy/       compose files for the image (docs/deploy.md).
+deploy/       compose files for the container image (docs/deploy.md).
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
@@ -123,7 +123,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept files, curl signing |
 | `docs/monitor.md` | `overview/`: what the Monitor reads, the usage windows |
 | `docs/provision.md` | `provision/`, `--provision` |
-| `docs/deploy.md` | `service/`, staging, the image, `deploy/`, release and CI |
+| `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |
