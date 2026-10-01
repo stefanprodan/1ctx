@@ -47,7 +47,6 @@ describe("atomic knowledge and scratch commits", () => {
   test.each([
     ["deadline exit", "exit 124", "nothing saved"],
     ["limit exit", "exit 126", "nothing saved"],
-    ["loop limit", "while true; do :; done", "exit 126"],
     [
       "long segment",
       `touch /tmp/${"x".repeat(256)}`,
@@ -90,6 +89,22 @@ describe("atomic knowledge and scratch commits", () => {
       }
     },
   );
+
+  // the loop limit counts iterations, so a slow runner needs the time
+  test("loop limit saves neither tree, cwd nor last use", async () => {
+    const s = prepared();
+    try {
+      const result = await run(s, `${edits}; while true; do :; done`, {
+        ...callCaps,
+        callTimeoutMs: 60_000,
+      });
+      expect(result.error).toBe(true);
+      expect(result.content).toContain("exit 126");
+      s.unchanged();
+    } finally {
+      s.db.close();
+    }
+  });
 
   test("an abort after mounting saves nothing", async () => {
     const s = prepared();

@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
       - name: Test
-        run: make test
+        run: make test ARGS=--parallel
       - name: Test vendored just-bash
         run: make vendor-test
       - name: Build
@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Test
-        run: make test
+        run: make test ARGS=--parallel
       - name: Build
         run: make build
       - name: Smoke test binary
