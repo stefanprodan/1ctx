@@ -19,7 +19,7 @@ import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
-import { loadProjects } from "./projects.ts";
+import { keepProject, loadProjects } from "./projects.ts";
 import { usageSlot } from "./slot.ts";
 import { onSocketEvent } from "./socket.ts";
 
@@ -125,6 +125,7 @@ function take(project: ProjectDetail, forUser: string | null): void {
   seen.set(project.id, project);
   adminProject.value = project;
   adminProjectError.value = null;
+  keepProject(project);
   // a list never loaded stays unloaded: one row would pass for all
   if (adminProjects.value !== null) {
     adminProjects.value = [

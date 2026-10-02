@@ -134,15 +134,22 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
   one view, so a tab change keeps the head and its Activity card
   mounted. The Directory loads both lists on either tab, so both tabs
   carry a count.
+- **Every project has a Settings tab,** a team's after Members. An
+  admin writes a team project's description and repositories there
+  through the admin page's routes and entities, and a member reads
+  them; the name is the admin page's alone. The answer to an admin's
+  project write goes through `keepProject()`, so both pages show one
+  row.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted; the client never counts tokens.
 
 ## Repositories
 
-- **One `views/projects/Repos.tsx` draws both lists:** the team
-  project's card on its admin page and the personal project's section
-  on its Settings tab. `personal` picks the routes in `data/repos.ts`
-  and leaves out the key and the kind. The Key select lists the `http-`
+- **One `views/projects/Repos.tsx` draws every list:** the team
+  project's card on its admin page and a section on every project's
+  Settings tab. `personal` picks the routes in `data/repos.ts` and
+  leaves out the key and the kind. A team's member gets `edit` off: the
+  rows with their state, no control. The Key select lists the `http-`
   files from `credentialKeys`, after None.
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every

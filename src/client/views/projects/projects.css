@@ -1,5 +1,6 @@
-/* The column a project's settings sections stack in; the Projects
-   page is rows from ui/Rows.tsx. */
+/* The column a project's settings sections stack in, and a team
+   project's description as a member reads it; the Projects page is
+   rows from ui/Rows.tsx. */
 
 @layer tokens, base, owners;
 
@@ -7,5 +8,13 @@
   .projects-settings {
     display: flex;
     flex-direction: column;
+  }
+  .projects-about {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .projects-about-none {
+    color: var(--faint);
   }
 }

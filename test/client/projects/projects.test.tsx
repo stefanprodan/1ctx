@@ -5,10 +5,12 @@
 // projects under Projects, and the two pages render their rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { options } from "preact";
 import { render } from "preact-render-to-string";
 import { projectHere } from "../../../src/client/app/Rail.model.ts";
 import { Rail } from "../../../src/client/app/Rail.tsx";
 import { path } from "../../../src/client/app/router.ts";
+import { adminProject } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   loadProject,
@@ -19,6 +21,7 @@ import {
   projectsError,
   savePersonalProject,
 } from "../../../src/client/data/projects.ts";
+import { repoLists } from "../../../src/client/data/repos.ts";
 import {
   loadProjectAgents,
   projectAgentCount,
@@ -36,8 +39,14 @@ import {
 } from "../../../src/client/views/projects/Project.model.ts";
 import { Project } from "../../../src/client/views/projects/Project.tsx";
 import { Projects } from "../../../src/client/views/projects/Projects.tsx";
+import {
+  PUBLIC_HINT,
+  TEAM_HINT,
+} from "../../../src/client/views/projects/Repos.model.ts";
 import { Settings } from "../../../src/client/views/projects/Settings.tsx";
+import type { RepoView } from "../../../src/shared/api/repos.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { settle } from "../../helpers/async.ts";
 
 const casey: Me = {
   id: "u1",
@@ -399,13 +408,25 @@ describe("Project.model", () => {
     );
   });
 
-  test("a personal project has Settings where a team has Members", () => {
+  test("a team has Members before Settings, a personal project Settings", () => {
     expect(tabsOf("p1", "team").map((t) => t.label)).toEqual([
       "Feed",
       "Automations",
       "Memory",
       "Knowledge",
       "Members",
+      "Settings",
+    ]);
+    expect(tabsOf("p1", "team")[5]).toEqual({
+      label: "Settings",
+      href: "/projects/p1/settings",
+    });
+    expect(tabsOf("p1", "personal").map((t) => t.label)).toEqual([
+      "Feed",
+      "Automations",
+      "Memory",
+      "Knowledge",
+      "Settings",
     ]);
     expect(tabsOf("p1", "personal")[1]).toEqual({
       label: "Automations",
@@ -433,6 +454,7 @@ describe("Project.model", () => {
       undefined,
       6,
       9,
+      undefined,
     ]);
     // Settings counts nothing
     expect(tabsOf("p1", "personal", counts).map((t) => t.count)).toEqual([
@@ -450,7 +472,14 @@ describe("Project.model", () => {
         members: 4,
         agents: null,
       }).map((t) => t.count),
-    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+    ).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
     expect(tabsOf("p1", "team", { ...counts, automations: 0 })[1]?.count).toBe(
       0,
     );
@@ -585,7 +614,7 @@ describe("the pages", () => {
     expect(html).not.toContain("personal project");
   });
 
-  test("Settings describes a personal project, a note for a team", () => {
+  test("Settings describes a personal project", () => {
     project.value = {
       ...personal,
       description: "Scratch work",
@@ -594,7 +623,7 @@ describe("the pages", () => {
       latestFiles: [],
       members: [casey],
     };
-    let html = render(<Settings params={{ id: "p1" }} />);
+    const html = render(<Settings params={{ id: "p1" }} />);
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/projects/p1/settings"',
     );
@@ -607,12 +636,177 @@ describe("the pages", () => {
     expect(html).toContain(">Scratch work</textarea>");
     expect(html).toContain("What agents should know about it.");
     expect(html).toContain('class="section-form"');
-    project.value = { ...project.value, kind: "team" };
-    html = render(<Settings params={{ id: "p1" }} />);
-    // a team has no Settings tab, and Members is not the page shown
-    expect(html).not.toContain("tabs-tab-on");
-    expect(html).not.toContain('name="description"');
-    expect(html).toContain("An admin manages a team project.");
+    expect(html).toContain(PUBLIC_HINT);
+  });
+
+  describe("a team project's Settings", () => {
+    const teamRow = () => ({
+      ...personal,
+      id: "p2",
+      kind: "team" as const,
+      name: "platform",
+      description: "Incidents and pages",
+      chats: 0,
+      knowledge: { files: 0, tokens: 0 },
+      latestFiles: [],
+      members: [casey],
+    });
+    const podinfo: RepoView = {
+      id: "r1",
+      name: "podinfo",
+      url: "https://github.com/stefanprodan/podinfo",
+      kind: "github",
+      ref: "",
+      ignore: "",
+      state: "ready",
+      error: null,
+      commit: "3f2a1c9d8e7b6a5f4e3d2c1b0a9f8e7d6c5b4a39",
+      fetchedAt: 1,
+      files: 364,
+      bytes: 1_000,
+      ignored: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    afterEach(() => {
+      repoLists.value = new Map();
+    });
+
+    test.serial("a member reads the description and the rows", () => {
+      project.value = teamRow();
+      repoLists.value = new Map([["p2", [podinfo]]]);
+      let html = render(<Settings params={{ id: "p2" }} />);
+      expect(html).toContain(
+        'class="tabs-tab tabs-tab-on" href="/projects/p2/settings"',
+      );
+      expect(html).toContain(
+        '<p class="projects-about">Incidents and pages</p>',
+      );
+      expect(html).not.toContain("<form");
+      expect(html).not.toContain('name="description"');
+      expect(html).toContain(TEAM_HINT);
+      expect(html).not.toContain(PUBLIC_HINT);
+      expect(html).toContain(
+        "github.com/stefanprodan/podinfo · default branch",
+      );
+      expect(html).toContain("Ready at 3f2a1c9, 364 files");
+      expect(html).not.toContain("Add repository");
+      expect(html).not.toContain(">Refresh<");
+      expect(html).not.toContain(">Change<");
+      expect(html).not.toContain("<button");
+      project.value = { ...teamRow(), description: "" };
+      repoLists.value = new Map([["p2", []]]);
+      html = render(<Settings params={{ id: "p2" }} />);
+      expect(html).toContain("No description yet.");
+      expect(html).toContain("projects-about-none");
+      expect(html).toContain("No repositories yet.");
+      expect(html).not.toContain("<button");
+    });
+
+    test.serial("an admin edits the description and the rows", () => {
+      me.value = { ...casey, role: "admin" };
+      project.value = teamRow();
+      repoLists.value = new Map([["p2", [podinfo]]]);
+      const html = render(<Settings params={{ id: "p2" }} />);
+      // a team project's description is required, its name is not here
+      expect(html).toContain('name="description"');
+      expect(html).toContain('aria-required="true"');
+      expect(html).toContain(">Incidents and pages</textarea>");
+      expect(html).not.toContain('name="name"');
+      expect(html).toContain(TEAM_HINT);
+      expect(html).toContain("Add repository");
+      expect(html).toContain(">Refresh<");
+      expect(html).toContain(">Change<");
+    });
+
+    test.serial(
+      "an admin's save sends the description alone and lands on both pages",
+      async () => {
+        me.value = { ...casey, role: "admin" };
+        project.value = teamRow();
+        const saved = { ...teamRow(), description: "Pages only" };
+        const sent: { url: string; method?: string; body: unknown }[] = [];
+        globalThis.fetch = (async (url: string, init?: RequestInit) => {
+          if (init?.method === "PATCH") {
+            sent.push({
+              url,
+              method: init.method,
+              body: JSON.parse(String(init.body)),
+            });
+            return Response.json({ project: saved });
+          }
+          return Response.json({ projects: [] });
+        }) as unknown as typeof fetch;
+        // one render: the textarea and the form share its draft
+        const previous = options.vnode;
+        let onInput: ((e: Event) => void) | undefined;
+        let onSubmit: ((e: Event) => void) | undefined;
+        options.vnode = (v) => {
+          previous?.(v);
+          const props = v.props as Record<string, unknown>;
+          if (v.type === "textarea" && props.name === "description") {
+            onInput = props.onInput as (e: Event) => void;
+          }
+          if (v.type === "form" && onSubmit === undefined) {
+            onSubmit = props.onSubmit as (e: Event) => void;
+          }
+        };
+        try {
+          render(<Settings params={{ id: "p2" }} />);
+        } finally {
+          options.vnode = previous;
+        }
+        onInput?.({
+          currentTarget: { value: " Pages only " },
+        } as unknown as Event);
+        onSubmit?.(new Event("submit", { cancelable: true }));
+        await settle();
+        expect(sent).toEqual([
+          {
+            url: "/api/projects/p2",
+            method: "PATCH",
+            body: { description: "Pages only" },
+          },
+        ]);
+        expect(project.value).toEqual(saved);
+        expect(adminProject.value).toEqual(saved);
+      },
+    );
+
+    test.serial("an admin's empty description is refused at once", async () => {
+      me.value = { ...casey, role: "admin" };
+      project.value = teamRow();
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        return Response.json({});
+      }) as unknown as typeof fetch;
+      const previous = options.vnode;
+      let onInput: ((e: Event) => void) | undefined;
+      let onSubmit: ((e: Event) => void) | undefined;
+      options.vnode = (v) => {
+        previous?.(v);
+        const props = v.props as Record<string, unknown>;
+        if (v.type === "textarea" && props.name === "description") {
+          onInput = props.onInput as (e: Event) => void;
+        }
+        if (v.type === "form" && onSubmit === undefined) {
+          onSubmit = props.onSubmit as (e: Event) => void;
+        }
+      };
+      try {
+        render(<Settings params={{ id: "p2" }} />);
+      } finally {
+        options.vnode = previous;
+      }
+      expect(onInput).toBeDefined();
+      expect(onSubmit).toBeDefined();
+      onInput?.({ currentTarget: { value: "  " } } as unknown as Event);
+      onSubmit?.(new Event("submit", { cancelable: true }));
+      await settle();
+      expect(calls).toBe(0);
+    });
   });
 
   test("Members of a personal project shows only the agents", () => {

@@ -47,8 +47,13 @@ export const URL_PLACEHOLDER = "https://github.com/owner/name";
 export const IGNORE_PLACEHOLDER = DEFAULT_REPO_IGNORE.join("\n");
 export const IGNORE_HINT = "In .gitignore format. Replaces the default list.";
 export const PUBLIC_HINT =
-  "Public repositories on github.com or gitlab.com, read-only in bash.";
+  "Read-only clones of public repositories for agents.";
+export const TEAM_HINT = "Read-only clones for agents, managed by admins.";
 export const CAP_LINE = `At most ${MAX_REPOS_PER_PROJECT} repositories.`;
+
+// the Settings tab's side text, the same for an admin and a member
+export const reposHint = (personal: boolean): string =>
+  personal ? PUBLIC_HINT : TEAM_HINT;
 
 // the typed URL's host, lowercased, null while it is no https URL
 export function hostOf(url: string): string | null {

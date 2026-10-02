@@ -59,11 +59,11 @@ import {
   ignoreRows,
   KIND_OPTIONS,
   nameOf,
-  PUBLIC_HINT,
   patchBody,
   type RepoDraft,
   repoFieldOf,
   repoKeyOptions,
+  reposHint,
   stateWords,
   URL_PLACEHOLDER,
   urlText,
@@ -76,15 +76,21 @@ const NEW = "new";
 export function Repos({
   projectId,
   personal,
+  section = personal,
+  edit = true,
 }: {
   projectId: string;
   personal: boolean;
+  // a Settings tab's section rather than the admin page's card
+  section?: boolean;
+  // false for a team's member, who reads the rows and changes none
+  edit?: boolean;
 }) {
   const open = useSignal<string | null>(null);
   useEffect(() => watchRepos(projectId), [projectId]);
   const list = reposOf(projectId);
-  const full = list !== null && atCap(list);
-  const add = list !== null && !full && (
+  const full = edit && list !== null && atCap(list);
+  const add = edit && list !== null && !full && (
     <RowsAdd
       label="Add repository"
       disabled={open.value !== null}
@@ -94,11 +100,16 @@ export function Repos({
     />
   );
   const rows = (
-    <RepoRows target={{ projectId, personal }} list={list} open={open} />
+    <RepoRows
+      target={{ projectId, personal }}
+      list={list}
+      open={open}
+      edit={edit}
+    />
   );
-  if (personal) {
+  if (section) {
     return (
-      <Section title="Repositories" text={PUBLIC_HINT}>
+      <Section title="Repositories" text={reposHint(personal)}>
         <div class="field">
           {add && <div class="repos-head">{add}</div>}
           {list !== null || repoErrorOf(projectId) !== null ? (
@@ -126,10 +137,12 @@ export function RepoRows({
   target,
   list,
   open,
+  edit = true,
 }: {
   target: RepoTarget;
   list: RepoView[] | null;
   open: Signal<string | null>;
+  edit?: boolean;
 }) {
   // Refresh writes at once, and a refusal shows on its row
   const actions = useSave(async () => {});
@@ -142,18 +155,20 @@ export function RepoRows({
     open.value = null;
   };
   const notice = actions.notice();
+  // a member never has an editor, though one was open when edit turned off
+  const opened = edit ? open.value : null;
   return (
     <>
-      {open.value === NEW && (
+      {opened === NEW && (
         <RowsNew>
           <RepoForm target={target} row={null} onClose={close} />
         </RowsNew>
       )}
-      {list.length === 0 && open.value !== NEW && (
+      {list.length === 0 && opened !== NEW && (
         <RowsNote>No repositories yet.</RowsNote>
       )}
       {list.map((repo) =>
-        open.value === repo.id ? (
+        opened === repo.id ? (
           <RowsNew key={repo.id}>
             <RepoForm target={target} row={repo} onClose={close} />
           </RowsNew>
@@ -161,6 +176,7 @@ export function RepoRows({
           <RepoLine
             key={repo.id}
             repo={repo}
+            edit={edit}
             locked={open.value !== null || actions.busy}
             failed={
               notice !== null && acting.value === repo.id
@@ -183,12 +199,14 @@ export function RepoRows({
 
 function RepoLine({
   repo,
+  edit,
   locked,
   failed,
   onRefresh,
   onChange,
 }: {
   repo: RepoView;
+  edit: boolean;
   locked: boolean;
   failed: string | undefined;
   onRefresh: () => void;
@@ -205,24 +223,26 @@ function RepoLine({
       <RowsMeta bad={state.bad} short={state.short}>
         {state.text}
       </RowsMeta>
-      <RowsEnd error={failed}>
-        <button
-          type="button"
-          class="btn btn-small"
-          disabled={locked || repo.state === "fetching"}
-          onClick={onRefresh}
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          class="btn btn-small"
-          disabled={locked}
-          onClick={onChange}
-        >
-          Change
-        </button>
-      </RowsEnd>
+      {edit && (
+        <RowsEnd error={failed}>
+          <button
+            type="button"
+            class="btn btn-small"
+            disabled={locked || repo.state === "fetching"}
+            onClick={onRefresh}
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            class="btn btn-small"
+            disabled={locked}
+            onClick={onChange}
+          >
+            Change
+          </button>
+        </RowsEnd>
+      )}
     </RowsLine>
   );
 }

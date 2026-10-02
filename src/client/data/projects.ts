@@ -105,13 +105,19 @@ export async function savePersonalProject(
     body,
   );
   if (owner !== forUser) return;
+  keepProject(saved);
+  await loadProjects();
+}
+
+// a write's answer, the admin's on a team project included, lands over
+// any load out, so the project's tabs and the admin page show one row
+export function keepProject(saved: ProjectDetail): void {
   kept.set(saved.id, saved);
   if (project.value?.id === saved.id) {
     wanted = { id: saved.id, turn: wanted.turn + 1 };
     project.value = saved;
     projectError.value = null;
   }
-  await loadProjects();
 }
 
 function onAccessChanged(event: SocketEvent): void {

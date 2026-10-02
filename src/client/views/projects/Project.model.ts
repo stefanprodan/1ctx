@@ -57,9 +57,9 @@ export function settledCounts(kind: ProjectKind, counts: TabCounts): TabCounts {
   return shown.every((n) => n !== null) ? counts : NO_COUNTS;
 }
 
-// every project has automations; a team's users are its Members, and
-// a personal project has one user, who describes it in Settings.
-// Members counts the users and the agents the tab lists
+// every project has automations and Settings; a team's users are its
+// Members, and a personal project has one user. Members counts the
+// users and the agents the tab lists
 export function tabsOf(
   id: string,
   kind: ProjectKind,
@@ -82,13 +82,16 @@ export function tabsOf(
       href: `/projects/${id}/knowledge`,
       ...counted(counts.knowledge),
     },
-    kind === "team"
-      ? {
-          label: "Members",
-          href: `/projects/${id}/members`,
-          ...counted(members),
-        }
-      : { label: "Settings", href: `/projects/${id}/settings` },
+    ...(kind === "team"
+      ? [
+          {
+            label: "Members",
+            href: `/projects/${id}/members`,
+            ...counted(members),
+          },
+        ]
+      : []),
+    { label: "Settings", href: `/projects/${id}/settings` },
   ];
 }
 

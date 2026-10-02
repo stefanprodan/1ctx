@@ -43,6 +43,7 @@ import {
   loadServerUsage,
   servers,
 } from "../data/mcp.ts";
+import { me } from "../data/me.ts";
 import { keyOf, loadMemory } from "../data/memory.ts";
 import { loadNotSent } from "../data/not-sent.ts";
 import {
@@ -430,7 +431,15 @@ export const ROUTES: Route[] = [
     title: () => "Settings",
     role: "authenticated",
     load: async (params) => {
-      await Promise.all([...frame(params.id), loadRepos(params.id)]);
+      // an admin picks a team project's key files there
+      const keys =
+        me.value?.role === "admin" &&
+        projects.value?.find((p) => p.id === params.id)?.kind !== "personal";
+      await Promise.all([
+        ...frame(params.id),
+        loadRepos(params.id),
+        ...(keys ? [loadCredentials()] : []),
+      ]);
     },
   },
   {
