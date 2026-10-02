@@ -195,13 +195,14 @@ describe("curl @file interpretation", () => {
       // Real file contents may contain `=` bytes that must NOT be treated as
       // a name/value separator. encodeFormData would split on `=` and emit
       // `a=b%26c`; the @file form must treat the whole body as one value:
-      // every `=` percent-encodes to %3d.
+      // every `=` percent-encodes to %3D.
       const env = createEnv({ "/note.txt": "a=b&c" });
       const result = await env.exec(
         "curl --data-urlencode @/note.txt https://api.example.com/test",
       );
       expect(result.exitCode).toBe(0);
-      expect(lastRequest?.options.body).toBe("a%3db%26c");
+      // (1ctx curl-urlencode) curl writes uppercase hex
+      expect(lastRequest?.options.body).toBe("a%3Db%26c");
     });
 
     it("percent-encodes `=` inside file contents for the name@file form", async () => {
@@ -210,7 +211,8 @@ describe("curl @file interpretation", () => {
         "curl --data-urlencode payload@/note.txt https://api.example.com/test",
       );
       expect(result.exitCode).toBe(0);
-      expect(lastRequest?.options.body).toBe("payload=k%3dv");
+      // (1ctx curl-urlencode) curl writes uppercase hex
+      expect(lastRequest?.options.body).toBe("payload=k%3Dv");
     });
 
     it("supports --data-urlencode=@file form", async () => {

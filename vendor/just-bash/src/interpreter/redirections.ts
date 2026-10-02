@@ -66,17 +66,20 @@ const REFUSALS = new Set([
   "EISDIR",
   "ENOENT",
   "ENOTDIR",
+  "ELOOP",
 ]);
 
 // a read that fails for the file itself, not for its absence: a file over
-// the read limit, or a folder opened for writing too
+// the read limit, a looping link, or a folder opened for writing too
 function readErrorWords(
   error: unknown,
   readwrite: boolean,
 ): string | undefined {
   rethrowFatalExecutionError(error);
   const code = fsErrorCode(error);
-  return code === "EFBIG" || (readwrite && code === "EISDIR")
+  return code === "EFBIG" ||
+    code === "ELOOP" ||
+    (readwrite && code === "EISDIR")
     ? fsErrorWords(error)
     : undefined;
 }

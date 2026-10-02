@@ -993,6 +993,967 @@
       "stdout": "",
       "exit": 5,
       "error": true
+    },
+    {
+      "name": "regex: test with a bad pattern fails",
+      "args": [
+        "-n",
+        "\"a\" | test(\"(\")"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "regex: scan with a bad pattern fails",
+      "args": [
+        "-nc",
+        "\"a\" | [scan(\"(\")]"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "regex: splits with a bad pattern fails",
+      "args": [
+        "-nc",
+        "\"a\" | [splits(\"(\")]"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "regex: empty matches step over a character",
+      "args": [
+        "-nc",
+        "\"a1b\" | [scan(\"\\\\d*\")]"
+      ],
+      "stdout": "[\"\",\"1\",\"\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "regex: empty matches beside an emoji",
+      "args": [
+        "-nc",
+        "\"😀b\" | gsub(\"\";\"-\")"
+      ],
+      "stdout": "\"-😀----b-\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"-😀-b-\"\n",
+        "exit": 0,
+        "reason": "an empty match steps over a whole character, where jq 1.8 steps one UTF-8 byte inside it"
+      }
+    },
+    {
+      "name": "closures: a filter argument runs per element",
+      "args": [
+        "-c",
+        "def m(f): [.[] | f]; m(. * 2)"
+      ],
+      "stdin": "[1,2]\n",
+      "stdout": "[2,4]\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument closes over the caller",
+      "args": [
+        "-c",
+        "def f(g): def h: g; map(h); f(. + 1)"
+      ],
+      "stdin": "[1,2]\n",
+      "stdout": "[2,3]\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: a $x parameter keeps x whole",
+      "args": [
+        "-c",
+        "def f($x): x; [f(1,2)]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[1,2,1,2]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "[1,2]\n",
+        "exit": 0,
+        "reason": "A $x parameter also binds x to each value, so `def f($x): x` answers one value per run where jq runs the whole filter."
+      }
+    },
+    {
+      "name": "closures: a def sees its own variables",
+      "args": [
+        "-c",
+        "1 as $x | def f: $x; 2 as $x | f"
+      ],
+      "stdin": "null\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: a def hides a builtin",
+      "args": [
+        "-c",
+        "def length: 5; [1] | length"
+      ],
+      "stdin": "null\n",
+      "stdout": "5\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "1\n",
+        "exit": 0,
+        "reason": "A def of a builtin's name and arity loses to the builtin."
+      }
+    },
+    {
+      "name": "closures: an argument named as a caller's def",
+      "args": [
+        "-c",
+        "def g: 1; def f(g): g; f(g)"
+      ],
+      "stdin": "null\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "index: the index reads the term's input",
+      "args": [
+        "-c",
+        ".a[.k]"
+      ],
+      "stdin": "{\"a\":{\"x\":1},\"k\":\"x\"}\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "iterate: null is an error",
+      "args": [
+        "-c",
+        "[.items[]]"
+      ],
+      "stdin": "{\"items\":null}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "iterate: an update over null is an error",
+      "args": [
+        "-c",
+        ".items[] |= 1"
+      ],
+      "stdin": "{}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "optional: ? guards the last step",
+      "args": [
+        "-c",
+        "[.[].b?]"
+      ],
+      "stdin": "[1,{\"b\":2}]\n",
+      "stdout": "[2]\n",
+      "exit": 0
+    },
+    {
+      "name": "optional: ? leaves the base's error",
+      "args": [
+        "-c",
+        ".a.b?"
+      ],
+      "stdin": "1\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "optional: path of a guarded step",
+      "args": [
+        "-c",
+        "[path(.[].b?)]"
+      ],
+      "stdin": "[1,{\"b\":2}]\n",
+      "stdout": "[[1,\"b\"]]\n",
+      "exit": 0
+    },
+    {
+      "name": "walk: reaches scalars",
+      "args": [
+        "-c",
+        "walk(if type == \"number\" then . + 1 else . end)"
+      ],
+      "stdin": "[1,[2]]\n",
+      "stdout": "[2,[3]]\n",
+      "exit": 0
+    },
+    {
+      "name": "walk: empty drops",
+      "args": [
+        "-c",
+        "walk(if type == \"number\" then empty else . end)"
+      ],
+      "stdin": "{\"a\":{\"b\":1},\"c\":[1,2]}\n",
+      "stdout": "{\"a\":{},\"c\":[]}\n",
+      "exit": 0
+    },
+    {
+      "name": "map_values: the first output",
+      "args": [
+        "-c",
+        "map_values(.[])"
+      ],
+      "stdin": "[[1,2]]\n",
+      "stdout": "[1]\n",
+      "exit": 0
+    },
+    {
+      "name": "map_values: empty deletes",
+      "args": [
+        "-c",
+        "map_values(empty)"
+      ],
+      "stdin": "[1,2,3]\n",
+      "stdout": "[]\n",
+      "exit": 0
+    },
+    {
+      "name": "from_entries: a number key fails",
+      "args": [
+        "-c",
+        "to_entries | from_entries"
+      ],
+      "stdin": "[1,2]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "from_entries: k is no key in 1.8",
+      "args": [
+        "-c",
+        "from_entries"
+      ],
+      "stdin": "[{\"k\":\"a\",\"v\":1}]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "from_entries: Key and Value",
+      "args": [
+        "-c",
+        "from_entries"
+      ],
+      "stdin": "[{\"Key\":\"a\",\"Value\":1}]\n",
+      "stdout": "{\"a\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "with_entries: a number key fails",
+      "args": [
+        "-c",
+        "with_entries(.key |= 1)"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "indices: empty needle",
+      "args": [
+        "-c",
+        "[indices(\"\"), index(\"\"), rindex(\"\")]"
+      ],
+      "stdin": "\"abc\"\n",
+      "stdout": "[[],null,null]\n",
+      "exit": 0
+    },
+    {
+      "name": "indices: code point offsets",
+      "args": [
+        "-c",
+        "indices(\"a\")"
+      ],
+      "stdin": "\"é😀a\"\n",
+      "stdout": "[2]\n",
+      "exit": 0
+    },
+    {
+      "name": "indices: an object indexes",
+      "args": [
+        "-c",
+        "indices(\"a\")"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "tostream: closing events",
+      "args": [
+        "-c",
+        "[tostream]"
+      ],
+      "stdin": "{\"a\":[1,{\"b\":2}],\"c\":3}\n",
+      "stdout": "[[[\"a\",0],1],[[\"a\",1,\"b\"],2],[[\"a\",1,\"b\"]],[[\"a\",1]],[[\"c\"],3],[[\"c\"]]]\n",
+      "exit": 0
+    },
+    {
+      "name": "fromstream: one value per top-level close",
+      "args": [
+        "-c",
+        "[fromstream(1|truncate_stream([[0],1],[[1,0],2],[[1,0]],[[1]]))]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[[2]]\n",
+      "exit": 0
+    },
+    {
+      "name": "compare: null below numbers",
+      "args": [
+        "-c",
+        "[null < 3, [1] < [2], {\"a\":1} < {\"a\":2}, \"B\" < \"a\"]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[true,true,true,true]\n",
+      "exit": 0
+    },
+    {
+      "name": "compare: nan below numbers",
+      "args": [
+        "-c",
+        "[nan < 1, 1 < nan, nan < nan]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[true,false,true]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "[false,false,false]\n",
+        "exit": 0,
+        "reason": "nan compares as JavaScript's NaN, below nothing, where jq sorts it below every number, itself included."
+      }
+    },
+    {
+      "name": "sort: code point order",
+      "args": [
+        "-c",
+        "sort"
+      ],
+      "stdin": "[\"b\",\"B\",\"a\",\"é\",\"z\"]\n",
+      "stdout": "[\"B\",\"a\",\"b\",\"z\",\"é\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "recurse: null steps",
+      "args": [
+        "-c",
+        "[recurse(if . < 3 then .+1 else empty end)] | length"
+      ],
+      "stdin": "null\n",
+      "stdout": "4\n",
+      "exit": 0
+    },
+    {
+      "name": "interpolation: one string per output",
+      "args": [
+        "-c",
+        "\"\\(1,2) \\(3,4)\""
+      ],
+      "stdin": "null\n",
+      "stdout": "\"1 3\"\n\"2 3\"\n\"1 4\"\n\"2 4\"\n",
+      "exit": 0
+    },
+    {
+      "name": "format string: @sh",
+      "args": [
+        "-c",
+        "@sh \"ls \\(.a)\""
+      ],
+      "stdin": "{\"a\":\"x y\"}\n",
+      "stdout": "\"ls 'x y'\"\n",
+      "exit": 0
+    },
+    {
+      "name": "format string: @json",
+      "args": [
+        "-c",
+        "@json \"v=\\(.)\""
+      ],
+      "stdin": "[1]\n",
+      "stdout": "\"v=[1]\"\n",
+      "exit": 0
+    },
+    {
+      "name": "format string: plain text",
+      "args": [
+        "-c",
+        "@base64 \"abc\""
+      ],
+      "stdin": "null\n",
+      "stdout": "\"abc\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@text: JSON for non-strings",
+      "args": [
+        "-c",
+        "[null, 1.5, [1]] | map(@text)"
+      ],
+      "stdin": "null\n",
+      "stdout": "[\"null\",\"1.5\",\"[1]\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "numbers: infinity prints as the largest double",
+      "args": [
+        "-c",
+        "[infinite, -infinite, (infinite | tostring)]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[1.7976931348623157e+308,-1.7976931348623157e+308,\"1.7976931348623157e+308\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "round: half away from zero",
+      "args": [
+        "-c",
+        "[-1.5, 2.5] | map(round)"
+      ],
+      "stdin": "null\n",
+      "stdout": "[-2,3]\n",
+      "exit": 0
+    },
+    {
+      "name": "modulo: operands cut to integers",
+      "args": [
+        "-c",
+        "[5.9 % 2.1, -5.5 % 2]"
+      ],
+      "stdin": "null\n",
+      "stdout": "[1,-1]\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "[1.7000000000000002,-1.5]\n",
+        "exit": 0,
+        "reason": "% keeps the fractions of its operands, where jq cuts them to integers first."
+      }
+    },
+    {
+      "name": "modulo: a divisor under 1",
+      "args": [
+        "-c",
+        "5 % 0.5"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true,
+      "accept": {
+        "stdout": "0\n",
+        "exit": 0,
+        "reason": "% keeps the fractions of its operands, so a divisor under 1 does not divide by zero as in jq."
+      }
+    },
+    {
+      "name": "math: a string is refused",
+      "args": [
+        "-c",
+        "floor"
+      ],
+      "stdin": "\"a\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "abs: null cannot be negated",
+      "args": [
+        "-c",
+        "abs"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "tonumber: blanks refused",
+      "args": [
+        "-c",
+        "tonumber"
+      ],
+      "stdin": "\" 42 \"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "tonumber: hex refused",
+      "args": [
+        "-c",
+        "tonumber"
+      ],
+      "stdin": "\"0x10\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "tonumber: nan and infinity",
+      "args": [
+        "-c",
+        "[\"nan\", \"-Infinity\", \"+.5\", \"5.\"] | map(tonumber)"
+      ],
+      "stdin": "null\n",
+      "stdout": "[null,-1.7976931348623157e+308,0.5,5]\n",
+      "exit": 0
+    },
+    {
+      "name": "add: an object's values",
+      "args": [
+        "-c",
+        "add"
+      ],
+      "stdin": "{\"a\":[1],\"b\":[2]}\n",
+      "stdout": "[1,2]\n",
+      "exit": 0
+    },
+    {
+      "name": "add: mixed kinds fail",
+      "args": [
+        "-c",
+        "add"
+      ],
+      "stdin": "[1,\"a\"]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "add: a lone boolean",
+      "args": [
+        "-c",
+        "add"
+      ],
+      "stdin": "[true]\n",
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "add: null is not iterated",
+      "args": [
+        "-c",
+        "add"
+      ],
+      "stdin": "null\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "has: each key",
+      "args": [
+        "-c",
+        "[has(\"a\",\"b\")]"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "[true,false]\n",
+      "exit": 0
+    },
+    {
+      "name": "has: a key of the wrong kind",
+      "args": [
+        "-c",
+        "has(0)"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "join: an object's values",
+      "args": [
+        "-c",
+        "join(\",\")"
+      ],
+      "stdin": "{\"a\":\"b\",\"c\":\"d\"}\n",
+      "stdout": "\"b,d\"\n",
+      "exit": 0
+    },
+    {
+      "name": "join: a number separator fails",
+      "args": [
+        "-c",
+        "join(1)"
+      ],
+      "stdin": "[\"a\",1]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "flatten: an object's values",
+      "args": [
+        "-c",
+        "flatten"
+      ],
+      "stdin": "{\"a\":[1,[2]],\"b\":3}\n",
+      "stdout": "[1,2,3]\n",
+      "exit": 0
+    },
+    {
+      "name": "INDEX: by the elements",
+      "args": [
+        "-c",
+        "INDEX(.)"
+      ],
+      "stdin": "[1,2]\n",
+      "stdout": "{\"1\":1,\"2\":2}\n",
+      "exit": 0
+    },
+    {
+      "name": "INDEX: by a field",
+      "args": [
+        "-c",
+        "INDEX(.id)"
+      ],
+      "stdin": "[{\"id\":1}]\n",
+      "stdout": "{\"1\":{\"id\":1}}\n",
+      "exit": 0
+    },
+    {
+      "name": "transpose: a scalar row fails",
+      "args": [
+        "-c",
+        "transpose"
+      ],
+      "stdin": "[1]\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "transpose: an object's rows",
+      "args": [
+        "-c",
+        "transpose"
+      ],
+      "stdin": "{\"a\":[1],\"b\":[2,3]}\n",
+      "stdout": "[[1,2],[null,3]]\n",
+      "exit": 0
+    },
+    {
+      "name": "ltrimstr: a number input fails",
+      "args": [
+        "-c",
+        "ltrimstr(\"a\")"
+      ],
+      "stdin": "1\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "ltrimstr: each argument",
+      "args": [
+        "-c",
+        "[ltrimstr(\"a\",\"ab\")]"
+      ],
+      "stdin": "\"abc\"\n",
+      "stdout": "[\"bc\",\"c\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "startswith: a number argument fails",
+      "args": [
+        "-c",
+        "startswith(1)"
+      ],
+      "stdin": "\"a\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "contains: kinds differ",
+      "args": [
+        "-c",
+        "contains(\"a\")"
+      ],
+      "stdin": "1\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "test: an unknown modifier",
+      "args": [
+        "-c",
+        "test(\"T\"; \"q\")"
+      ],
+      "stdin": "\"test\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "pattern: a string key",
+      "args": [
+        "-c",
+        ". as {\"a b\": $x} | $x"
+      ],
+      "stdin": "{\"a b\":1}\n",
+      "stdout": "1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "An object pattern takes a $name or a (expression) key, not a string key, so `. as {\"a b\": $x}` is a parse error."
+      }
+    },
+    {
+      "name": "strptime: a date",
+      "args": [
+        "-c",
+        "strptime(\"%Y-%m-%d\")"
+      ],
+      "stdin": "\"2015-03-05\"\n",
+      "stdout": "[2015,2,5,0,0,0,4,63]\n",
+      "exit": 0
+    },
+    {
+      "name": "strptime: a time alone",
+      "args": [
+        "-c",
+        "strptime(\"%H:%M\")"
+      ],
+      "stdin": "\"10:15\"\n",
+      "stdout": "[1900,0,0,10,15,0,8,367]\n",
+      "exit": 0
+    },
+    {
+      "name": "strptime: names and a zone",
+      "args": [
+        "-c",
+        "strptime(\"%a, %d %b %Y %H:%M:%S %z\")"
+      ],
+      "stdin": "\"Thu, 05 Mar 2015 23:51:47 +0100\"\n",
+      "stdout": "[2015,2,5,23,51,47,4,63]\n",
+      "exit": 0
+    },
+    {
+      "name": "strptime: a mismatch",
+      "args": [
+        "-c",
+        "strptime(\"%Y-%m-%d\")"
+      ],
+      "stdin": "\"2015-13-05\"\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "strptime: the rest after a blank",
+      "args": [
+        "-c",
+        "strptime(\"%Y-%m-%d\")"
+      ],
+      "stdin": "\"2015-03-05 x\"\n",
+      "stdout": "[2015,2,5,0,0,0,4,63,\" x\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "strftime: C conversions",
+      "args": [
+        "-c",
+        "strftime(\"%a %b %e %j %I %p %U %V %G %u %s %z %Z %%Y\")"
+      ],
+      "stdin": "1425599507\n",
+      "stdout": "\"Thu Mar  5 064 11 PM 09 10 2015 4 1425599507 +0000 GMT %Y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "strftime: an array is normalized",
+      "args": [
+        "-c",
+        "strftime(\"%Y-%m-%d\")"
+      ],
+      "stdin": "[2015]\n",
+      "stdout": "\"2014-12-31\"\n",
+      "exit": 0
+    },
+    {
+      "name": "gmtime: fractional seconds",
+      "args": [
+        "-c",
+        "gmtime"
+      ],
+      "stdin": "-1.5\n",
+      "stdout": "[1969,11,31,23,59,59.5,3,364]\n",
+      "exit": 0
+    },
+    {
+      "name": "mktime: missing fields",
+      "args": [
+        "-c",
+        "mktime"
+      ],
+      "stdin": "[]\n",
+      "stdout": "-2209075200\n",
+      "exit": 0
+    },
+    {
+      "name": "arity: a builtin at another arity",
+      "args": [
+        "-c",
+        "ltrimstr"
+      ],
+      "stdin": "\"a\"\n",
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "errors: the next input still runs",
+      "args": [
+        "-c",
+        ".a"
+      ],
+      "stdin": "{\"a\":1} 2 {\"a\":3}\n",
+      "stdout": "1\n3\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "errors: the last input's status",
+      "args": [
+        "-c",
+        ".a"
+      ],
+      "stdin": "{\"a\":1} 2\n",
+      "stdout": "1\n",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "input_filename: stdin",
+      "args": [
+        "-c",
+        "input_filename"
+      ],
+      "stdin": "1\n",
+      "stdout": "\"<stdin>\"\n",
+      "exit": 0
+    },
+    {
+      "name": "stderr: written raw, passed on",
+      "args": [
+        "-c",
+        "stderr"
+      ],
+      "stdin": "\"x\"\n",
+      "stdout": "\"x\"\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "debug: written as DEBUG",
+      "args": [
+        "-c",
+        "debug(\"m\")"
+      ],
+      "stdin": "1\n",
+      "stdout": "1\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "-e: the last output decides",
+      "args": [
+        "-e",
+        "-c",
+        ". == 2"
+      ],
+      "stdin": "1 2 3\n",
+      "stdout": "false\ntrue\nfalse\n",
+      "exit": 1
+    },
+    {
+      "name": "-e: no output",
+      "args": [
+        "-e",
+        "-c",
+        "empty"
+      ],
+      "stdin": "1\n",
+      "stdout": "",
+      "exit": 4
+    },
+    {
+      "name": "closures: an argument passed on recursively",
+      "args": [
+        "-c",
+        "def rec(f): if . > 0 then . - 1 | rec(f) else f end; 3 | rec(. + 100)"
+      ],
+      "stdin": "null\n",
+      "stdout": "100\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument passed through two defs",
+      "args": [
+        "-c",
+        "def apply(f): f; def twice(f): apply(f) | apply(f); 1 | twice(. + 1)"
+      ],
+      "stdin": "null\n",
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument passed on under its own name",
+      "args": [
+        "-c",
+        "def x(f): f; def y(f): x(f); 5 | y(. * 2)"
+      ],
+      "stdin": "null\n",
+      "stdout": "10\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument passed on in path mode",
+      "args": [
+        "-c",
+        "def x(f): f; def y(f): x(f); path(y(.a.b))"
+      ],
+      "stdin": "null\n",
+      "stdout": "[\"a\",\"b\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument passed on under an update",
+      "args": [
+        "-c",
+        "def f(g): g |= . + 1; def h(g): f(g); h(.a)"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "{\"a\":2}\n",
+      "exit": 0
+    },
+    {
+      "name": "closures: an argument named as a caller's def under an update",
+      "args": [
+        "-c",
+        "def g: .a; def f(g): g; f(g) |= 5"
+      ],
+      "stdin": "{\"a\":1}\n",
+      "stdout": "{\"a\":5}\n",
+      "exit": 0
     }
   ]
 }

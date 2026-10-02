@@ -59,7 +59,8 @@ describe("jq positional-argument flags", () => {
         "jq -n '$ARGS.positional' --jsonargs 1 notjson",
       );
       expect(result.stdout).toBe("");
-      expect(result.stderr).toBe(
+      // jq's pointer to its help follows (1ctx jq-inputs)
+      expect(result.stderr).toStartWith(
         "jq: invalid JSON text passed to --jsonargs\n",
       );
       expect(result.exitCode).toBe(2);

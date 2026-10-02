@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the server takes from a command worker: an answer of this job
+// What the server takes from a command worker: a message of this job
 // passes only whole, docs by the knowledge name rule, scratch paths by
 // the scratch rule, and one that does not check out is malformed rather
 // than dropped.
@@ -56,7 +56,19 @@ describe("a command worker's messages", () => {
       new Uint8Array(new SharedArrayBuffer(2)),
       { 0: 255, length: 1 },
     ]) {
-      expect(fromWorker(message(body), "job")).toBeNull();
+      expect(fromWorker(message(body), "job")).toBe(MALFORMED);
+    }
+  });
+
+  test("a request or phase of this job in the wrong shape is malformed", () => {
+    for (const message of [
+      { type: "phase", id: "job", phase: "commit", notice: "" },
+      { type: "kept", id: "job", request: 0, index: -1 },
+      { type: "kept", id: "job", request: 0 },
+      { type: "abort", id: "job", request: "0" },
+      { type: "fetch", id: "job", request: 0, url: 5, options: {} },
+    ]) {
+      expect(fromWorker(message, "job")).toBe(MALFORMED);
     }
   });
 

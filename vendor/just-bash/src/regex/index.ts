@@ -18,6 +18,8 @@
 export {
   ConstantRegex,
   createUserRegex,
+  // (1ctx regex-builtins)
+  stepPastEmpty,
   type RegexLike,
   type ReplaceCallback,
   UserRegex,

@@ -12,6 +12,7 @@ import {
   type Fixture,
   fileBytes,
   fileValue,
+  listTree,
   maskTimes,
   type RecordedCase,
   sortLines,
@@ -50,10 +51,34 @@ export async function runCase(
   );
   const written: Record<string, FileValue> = {};
   for (const [name, value] of Object.entries(files)) {
-    const now = await fs.readFileBuffer(`/work/${name}`);
-    if (!Bun.deepEquals(now, fileBytes(value))) written[name] = fileValue(now);
+    // a file the run removed or moved is in the tree, when listed
+    const now = await fs.readFileBuffer(`/work/${name}`).catch(() => undefined);
+    if (now !== undefined && !Bun.deepEquals(now, fileBytes(value))) {
+      written[name] = fileValue(now);
+    }
   }
-  return { ...result, written };
+  const tree = fixture.tree
+    ? await listTree("/work", {
+        readdir: (path) => fs.readdir(path),
+        lstat: async (path) => {
+          const info = await fs.lstat(path);
+          return {
+            isDirectory: () => info.isDirectory,
+            isSymbolicLink: () => info.isSymbolicLink,
+          };
+        },
+        readlink: (path) => fs.readlink(path),
+      })
+    : undefined;
+  return { ...result, written, tree };
+}
+
+/** The stderr and tree a case expects, when its fixture records them. */
+function expectedExtras(c: RecordedCase) {
+  return {
+    stderr: c.accept?.stderr ?? c.stderr,
+    tree: c.accept?.tree ?? c.tree,
+  };
 }
 
 /** What the case expects on stdout, as the shell hands it back. */
@@ -88,6 +113,9 @@ function matches(
   }
   if ((c.error || c.warned) && !c.accept && result.stderr === "") return false;
   const written = c.accept?.written ?? c.written ?? {};
+  const { stderr, tree } = expectedExtras(c);
+  if (stderr !== undefined && result.stderr !== stderr) return false;
+  if (tree !== undefined && !Bun.deepEquals(result.tree, tree)) return false;
   return Bun.deepEquals(result.written, written);
 }
 
@@ -125,6 +153,9 @@ export function recordedCases(
       }
       const written = c.accept?.written ?? c.written ?? {};
       expect(result.written).toEqual(written);
+      const { stderr, tree } = expectedExtras(c);
+      if (stderr !== undefined) expect(result.stderr).toBe(stderr);
+      if (tree !== undefined) expect(result.tree).toEqual(tree);
     });
   }
 }

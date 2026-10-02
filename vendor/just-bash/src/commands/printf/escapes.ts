@@ -4,6 +4,8 @@
  */
 
 import { utf8ByteLength } from "../../encoding.js";
+// (1ctx printf-bytes)
+import { escapedByte } from "./raw-bytes.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
 
 export { utf8ByteLength } from "../../encoding.js";
@@ -141,6 +143,8 @@ export function parseWidthPrecision(
 export function processEscapes(
   str: string,
   maxBytes: number = DEFAULT_MAX_FORMAT_BYTES,
+  // (1ctx printf-bytes) a byte escape above 0x7f is held as a byte
+  bytes = false,
 ): string {
   if (utf8ByteLength(str) > maxBytes) {
     throw new ExecutionLimitError(
@@ -208,14 +212,17 @@ export function processEscapes(
             octal += str[j];
             j++;
           }
-          result += String.fromCharCode(parseInt(octal, 8));
+          // (1ctx printf-bytes)
+          result += bytes
+            ? escapedByte(parseInt(octal, 8) & 0xff)
+            : String.fromCharCode(parseInt(octal, 8));
           i = j;
           break;
         }
         case "x": {
           // Hex escape sequence \xHH
           // Collect consecutive \xHH escapes and try to decode as UTF-8
-          const bytes: number[] = [];
+          const hexBytes: number[] = [];
           let j = i;
           while (
             j + 3 < str.length &&
@@ -223,18 +230,22 @@ export function processEscapes(
             str[j + 1] === "x" &&
             /[0-9a-fA-F]{2}/.test(str.slice(j + 2, j + 4))
           ) {
-            bytes.push(parseInt(str.slice(j + 2, j + 4), 16));
+            hexBytes.push(parseInt(str.slice(j + 2, j + 4), 16));
             j += 4;
           }
 
-          if (bytes.length > 0) {
+          if (hexBytes.length > 0 && bytes) {
+            // (1ctx printf-bytes) each byte as itself
+            for (const byte of hexBytes) result += escapedByte(byte);
+            i = j;
+          } else if (hexBytes.length > 0) {
             // Try to decode the bytes as UTF-8
             try {
               const decoder = new TextDecoder("utf-8", { fatal: true });
-              result += decoder.decode(new Uint8Array(bytes));
+              result += decoder.decode(new Uint8Array(hexBytes));
             } catch {
               // If not valid UTF-8, fall back to Latin-1 (1:1 byte to codepoint)
-              for (const byte of bytes) {
+              for (const byte of hexBytes) {
                 result += String.fromCharCode(byte);
               }
             }

@@ -3,18 +3,21 @@
 //
 // The defense-in-depth box on real Bun, as every bash command runs under
 // it: require() and require.resolve are blocked inside a command and a
-// reassignment of Module._resolveFilename too, on the main thread and in a
-// Worker; trusted host work that settles after a cancel still reaches its
-// caller; a lazy file's provider runs trusted while an untrusted command
-// after it stays blocked; timeout on a command still loading ends only
-// that command. Each case runs in its own bun process, since the box
-// patches process globals and the tests of a file run concurrently.
+// reassignment of Module._resolveFilename too, on the main thread and in
+// a Worker, with no patch failed once the box is on; the worker's own box
+// blocks them and code from strings; trusted host work that settles
+// after a cancel still reaches its caller; a lazy file's provider runs
+// trusted while an untrusted command after it stays blocked; timeout on a
+// command still loading ends only that command. Each case runs in its own
+// bun process, since the box patches process globals and the tests of a
+// file run concurrently.
 
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 const SRC = join(import.meta.dir, "../../../vendor/just-bash/src");
 const BOX = join(SRC, "security/defense-in-depth-box.ts");
+const WORKER_BOX = join(SRC, "security/worker-defense-in-depth.ts");
 const INDEX = join(SRC, "index.ts");
 
 async function runBun(script: string): Promise<string> {
@@ -32,6 +35,22 @@ async function runBun(script: string): Promise<string> {
   return stdout.trim();
 }
 
+// a script run in a Worker, printing what it posts back
+const inWorker = (body: string) => `
+  const url = URL.createObjectURL(
+    new Blob([${JSON.stringify(body)}], { type: "text/javascript" }),
+  );
+  const worker = new Worker(url);
+  worker.onmessage = (event) => {
+    console.log(event.data);
+    worker.terminate();
+  };
+  worker.onerror = (event) => {
+    console.log(JSON.stringify({ error: event.message }));
+    worker.terminate();
+  };
+`;
+
 // the guard's probe, the same on the main thread and in a Worker; it
 // reports each attempt as ok or the violation it raised
 const GUARD = `
@@ -42,8 +61,10 @@ const GUARD = `
     catch (error) { return error.violation?.type ?? "error"; }
   };
   const box = DefenseInDepthBox.getInstance(true);
-  const out = { failures: box.getPatchFailures() };
+  const out = {};
+  // the patches go on at activation, so their failures are read after it
   const handle = box.activate();
+  out.failures = box.getPatchFailures();
   await handle.run(async () => {
     out.require = attempt(() => require("child_process"));
     out.resolve = attempt(() => require.resolve("node:path"));
@@ -71,21 +92,36 @@ describe("the defense-in-depth box on bun", () => {
 
   test("blocks require inside a command in a worker", async () => {
     const body = `${GUARD}\npostMessage(JSON.stringify(out));`;
-    const out = await runBun(`
-      const url = URL.createObjectURL(
-        new Blob([${JSON.stringify(body)}], { type: "text/javascript" }),
-      );
-      const worker = new Worker(url);
-      worker.onmessage = (event) => {
-        console.log(event.data);
-        worker.terminate();
-      };
-      worker.onerror = (event) => {
-        console.log(JSON.stringify({ error: event.message }));
-        worker.terminate();
-      };
-    `);
+    const out = await runBun(inWorker(body));
     expect(JSON.parse(out)).toEqual(BLOCKED);
+  }, 20_000);
+
+  // the worker's own box, which patches the whole worker at once, with
+  // every patch in place
+  test("the worker box blocks require and code from strings in a worker", async () => {
+    const body = `
+      const { WorkerDefenseInDepth } = await import(${JSON.stringify(WORKER_BOX)});
+      const attempt = (fn) => {
+        try { fn(); return "ok"; }
+        catch (error) { return error.violation?.type ?? "error"; }
+      };
+      const box = new WorkerDefenseInDepth({ enabled: true });
+      const out = {
+        active: box.getStats().isActive,
+        failures: box.patchFailures,
+        require: attempt(() => require("child_process")),
+        resolve: attempt(() => require.resolve("node:path")),
+        code: attempt(() => new Function("return 1")),
+      };
+      box.deactivate();
+      out.codeAfter = attempt(() => new Function("return 1"));
+      postMessage(JSON.stringify(out));
+    `;
+    const out = JSON.parse(await runBun(inWorker(body)));
+    expect(out).toMatchObject({ active: true, failures: [], codeAfter: "ok" });
+    expect(out.require).not.toBe("ok");
+    expect(out.resolve).not.toBe("ok");
+    expect(out.code).not.toBe("ok");
   }, 20_000);
 
   // host work the command awaits, settled only after the command was

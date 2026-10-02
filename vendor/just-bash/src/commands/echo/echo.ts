@@ -1,3 +1,5 @@
+// (1ctx printf-bytes)
+import { escapedByte, outputOf } from "../printf/raw-bytes.js";
 import type {
   ExecResult,
   RuntimeCommand,
@@ -74,7 +76,8 @@ function processEscapes(input: string): { output: string; stop: boolean } {
             result += "\0";
           } else {
             const code = parseInt(octal, 8) % 256;
-            result += String.fromCharCode(code);
+            // (1ctx printf-bytes)
+            result += escapedByte(code);
           }
           i = j;
           break;
@@ -97,7 +100,8 @@ function processEscapes(input: string): { output: string; stop: boolean } {
             i += 2;
           } else {
             const code = parseInt(hex, 16);
-            result += String.fromCharCode(code);
+            // (1ctx printf-bytes)
+            result += escapedByte(code);
             i = j;
           }
           break;
@@ -206,7 +210,8 @@ export const echoCommand: RuntimeCommand = {
       if (result.stop) {
         // \c encountered - suppress newline and stop
         return {
-          stdout: output,
+          // (1ctx printf-bytes)
+          ...outputOf(output),
           stderr: "",
           exitCode: 0,
           internalStdinConsumed: 0,
@@ -219,7 +224,8 @@ export const echoCommand: RuntimeCommand = {
     }
 
     return {
-      stdout: output,
+      // (1ctx printf-bytes)
+      ...outputOf(output),
       stderr: "",
       exitCode: 0,
       internalStdinConsumed: 0,

@@ -48,6 +48,22 @@ Before: none of them was exported.
 
 ## Build and trim
 
+### vitest-shim: the suite stubs globals and variables on Bun
+Files: `src/vitest-setup.ts`
+Upstream: not reported
+Tests: none, it lets 19 of upstream's tests run under `make vendor-test`
+
+Now: the setup file every upstream test file preloads adds
+`vi.stubGlobal`, `vi.unstubAllGlobals`, `vi.stubEnv` and
+`vi.unstubAllEnvs` where Bun's vi lacks them, with vitest's meaning: a
+stub sets the value, and unstubbing puts back what each name held before
+its first stub.
+
+Before: the 19 tests that stub `Buffer`, `fetch` or a variable failed on
+Bun alone and sat in the expected failures, so what they cover, the
+browser fallbacks, `file` on gzip, curl's stdin bytes and lazy files
+under the box, went unchecked.
+
 ### trim: the removed commands leave the registry
 Files: `src/commands/registry.ts`, `src/commands/fuzz-flags.ts`
 Upstream: not reported
@@ -188,6 +204,40 @@ or a heredoc (`N<<`) holds bytes, as stdin does, and a write through
 Before: a descriptor held decoded text, so `cat <&3` wrote `ţ` as one
 wrong byte.
 
+### revoke-pending: a stopped command's pending calls reject at once
+Files: `src/interpreter/builtin-dispatch.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/revoke-pending.test.ts`
+
+Now: when a command is stopped (timeout, an abort, its deadline) and
+its context revoked, every call it made that is still pending rejects
+at once, so the command unwinds inside the cleanup grace and only it
+fails: `timeout 0.01 cat file` over a slow lazy file answers 124 and
+the script goes on. The call's own result is dropped when it lands.
+
+Before: a pending call, such as the read of a large MCP result kept as
+a lazy file, held the command past the grace, so the execution scope
+was poisoned and the whole script ended, `bash: execution aborted`,
+exit 124. Upstream's #506 and #397 do not cover it.
+
+### globstar: a trailing ** lists everything below, as bash
+Files: `src/shell/glob.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`
+
+Now: under `shopt -s globstar` a pattern that ends in `**` matches every
+file and folder below the folder before it, and that folder itself with
+its slash (`a/**` gives `a/ a/b a/b/f`), as bash 5 does; `**` alone
+lists everything below the current folder. A pattern that ends in `**/`
+matches only the folders, each with its slash (`a/**/` gives `a/ a/b/`),
+a link to a folder among them. After more than one `**` (`a/**/**`,
+`a/**/c/**`) the folder a trailing `**` follows has no slash, as bash
+names it. It descends into no link and leaves dot entries out unless
+`dotglob` is set.
+
+Before: the walk matched the empty name after `**` against nothing, so
+`echo a/**` and `echo **` under globstar printed the pattern itself.
+
 ## Filesystem
 
 ### fs-children: a directory keeps its children, paths resolve unwalked
@@ -241,11 +291,46 @@ Before:
   `/repos/r/a` for a folder of its own. A link in the middle of a path
   dropped the components after it.
 
+### fs-links: a write through a linked folder lands in it
+Files: `src/fs/in-memory-fs/in-memory-fs.ts`,
+  `src/commands/readlink/readlink.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`,
+  `test/vendor/just-bash/awk.test.ts`
+
+Now:
+
+- **InMemoryFs.** every call resolves the linked folders above the last
+  name, as the kernel does, and the last name as its call would: a
+  write, an append and `chmod` follow it, so `echo y > link` writes the
+  file the link names; `mkdir`, `cp`, `mv`, `symlink`, `link` and
+  `readlink` act on the name itself. `mkdir -p` stands on a link to a
+  folder, and a file copied onto a link to a file is written through it.
+  A loop of links refuses the call with ELOOP, which a redirect and the
+  commands report as `Too many levels of symbolic links`
+  (`readonly-errors`), the script going on.
+- **readlink -f.** it resolves the components in turn, as GNU does: a
+  link's target goes in front of the components still to go, so `..`
+  after a link climbs from where it led and a link to `.` resolves.
+  Every component but the last must exist; a missing folder, a file in
+  the middle or a loop answers nothing, exit 1.
+
+Before:
+
+- **InMemoryFs.** only `readdir`, `rm`, reads and stats followed a
+  linked folder; `mkdir la/new`, a write, `cp`, `mv`, `chmod`, `ln` and
+  `readlink` through one stored the entry under the link's own path,
+  where nothing could read it, and a write to a link replaced it.
+- **readlink -f.** it followed only the last component, so `d/self/f`
+  through `self -> .` printed itself, and a path it could not resolve
+  printed the path, exit 0.
+
 ## Every command
 
 ### version-flags: every command answers its tool's version flag
 Files: `src/commands/version.ts` (new), `src/commands/registry.ts`,
-  `src/commands/mktemp/mktemp.ts`, `src/commands/yes/yes.ts`
+  `src/commands/mktemp/mktemp.ts`, `src/commands/yes/yes.ts`,
+  `src/commands/mktemp/mktemp.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/fixes.test.ts`,
   `test/vendor/just-bash/new-commands.test.ts`
@@ -320,37 +405,44 @@ Files: `src/fs/error-words.ts` (new), `src/fs/overlay-fs/overlay-fs.ts`,
   `src/commands/tac/tac.ts`, `src/commands/tar/tar.ts`,
   `src/commands/tee/tee.ts`, `src/commands/time/time.ts`,
   `src/commands/touch/touch.ts`, `src/commands/xan/csv.ts`,
-  `src/commands/xan/xan-data.ts`, `src/commands/yq/yq.ts`
+  `src/commands/xan/xan-data.ts`, `src/commands/yq/yq.ts`,
+  `src/fs/mountable-fs/mountable-fs.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/readonly-errors.test.ts`,
   `test/vendor/just-bash/overlay-mount.test.ts`,
-  `test/vendor/just-bash/awk.test.ts`
+  `test/vendor/just-bash/awk.test.ts`,
+  `test/vendor/just-bash/symlinks.test.ts`,
+  `test/vendor/just-bash/bash-gnu.test.ts`
 
 Now:
 
 - **Redirects.** a refused open (`>`, `>>`, `>|`, `&>`, `&>>`, `N>`,
   `>&file`, `<>`, `exec N>`) answers `bash: <target as typed>: <words>`
   (`Read-only file system`, `Not a directory`, `Is a directory`, `No such
-  file or directory`, ...) with exit 1 and the command not run, as
-  upstream's open PR #127 does. `<>` refuses a read-only file by setting
-  the time it already has, which changes nothing elsewhere. A refused
-  write after the open is `bash: <command>: write error: <words>`. A
+  file or directory`, `Too many levels of symbolic links`, ...) with exit
+  1 and the command not run, as upstream's open PR #127 does. `<>`
+  refuses a read-only file by setting the time it already has, which
+  changes nothing elsewhere. A refused write after the open is `bash:
+  <command>: write error: <words>`. A
   full file system (ENOSPC) and an unknown error still throw, so a full
   mount still ends the job.
 - **Writing commands.** each names the path as typed with GNU's words,
   never the backend's message and its mount-relative path: `sed -i`
   (`couldn't open temporary file <dir>/sedXXXXXX`, exit 4), sed's `w`
   file (`couldn't open file F`, exit 4, where it wrote nothing before),
-  `chmod` (`changing permissions of`), `mkdir`, `mv` (`cannot remove` the
-  source after a copy across mounts, `cannot create regular file` or
-  `directory`, `cannot move ... to`, a mount point `Device or resource
-  busy`), `cp` (`cannot create regular file` or `directory`), `touch`,
+  `chmod` (`changing permissions of`, `cannot access` a looping link),
+  `mkdir`, `mv` (`cannot remove` the source after a copy across mounts,
+  `cannot create regular file` or `directory`, `cannot move ... to`, a
+  mount point `Device or resource busy`), `cp` (`cannot create regular
+  file` or `directory`), `touch`,
   `ln`, `rmdir`, `tee`, `split`, `sort -o` (`open failed:`), `tar`
   (`Cannot open:`, `Cannot mkdir:`), `gzip`, `yq -i`, `curl` (`(23)`),
   `find -delete`, `time -o` and awk's `print >` (`cannot redirect to`).
 - **Reads.** a file over the read limit (EFBIG) is `<cmd>: <path>: File
   too large` in every command that reads files, `rg: <path>: File too
   large (os error 27)` and exit 2 in rg, which skipped it silently.
+  A looping link (ELOOP) is `Too many levels of symbolic links` in a
+  redirect and in a command that reads through `readErrorWords`.
 - **The fallback.** a command that lets a read-only refusal or EFBIG
   through says `<command>: Read-only file system` or `File too large`.
 - **OverlayFs.** a read-only overlay checks a path before refusing it: an
@@ -407,6 +499,7 @@ Files: `src/commands/awk/awk2.ts`, `src/commands/awk/ast.ts`,
   `src/commands/awk/check.ts` (new), `src/commands/awk/format.ts` (new),
   `src/commands/awk/lexer.ts`, `src/commands/awk/options.ts` (new),
   `src/commands/awk/parser2.ts`, `src/commands/awk/parser2-print.ts`,
+  `src/commands/awk/regex.ts` (new),
   `src/commands/awk/interpreter/context.ts`,
   `src/commands/awk/interpreter/expressions.ts`,
   `src/commands/awk/interpreter/fields.ts`,
@@ -541,6 +634,14 @@ Now:
   and a BOM survives, except through a link, which keeps the read and
   rewrite. The output's UTF-8 length is kept as it grows, for `printf`'s
   limit.
+- **Longest match.** `match`, `sub`, `gsub`, `gensub`, `split`, a regex
+  `FS` and a regex `RS` take the leftmost-longest match, as POSIX awk
+  does: `match("foobar", /foo|foobar/)` sets `RLENGTH` 6. A pattern with
+  a shortest-match operator (`*?`, `+?`, `??`, `{n,m}?`, POSIX 2024's,
+  which gawk 5.4 reads) matches leftmost-first instead, so
+  `match("a<b>c<d>", /<.*?>/)` sets `RLENGTH` 3. `sub`, `gsub` and
+  `gensub`'s `"g"` skip an empty match right where a match ended, as
+  gawk: `gsub(/b*|c/, "[&]")` on `abc` gives `[]a[b][c]`.
 
 Before:
 
@@ -592,6 +693,12 @@ Before:
 - **Output files.** each `print > f` re-read and re-wrote the whole
   file, a failed append replaced the file with its text, and each
   `printf` measured the whole output, so 10k lines took over a second.
+- **Longest match.** every one took the first alternative that matched,
+  as JavaScript does: `match("foobar", /foo|foobar/)` set `RLENGTH` 3
+  and `sub(/foo|foobar/, "X")` left `bar`. Taking the longest everywhere
+  then ignored `*?`, which models write out of PCRE habit:
+  `gsub(/<.+?>/, "")` on `a<b>c<d>` left `a` where gawk leaves `ac`. An
+  empty match after a match was replaced too, `[]a[b][c][]`.
 
 ## curl
 
@@ -620,6 +727,58 @@ output still avoids stringifying the body.
 Before: upstream 3.6.0 appended `-w` in both `buildOutput()` and the
 verbose file-output branch, so `-v -o file -w X` printed `X` twice,
 also with `-D -` or `-O`.
+
+### curl-bytes: a file curl sends goes as its bytes
+Files: `src/commands/curl/curl.ts`, `src/commands/curl/form.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`
+
+Now: `-d @file`, `--data-urlencode @file`, `-F f=@file` and `-T file`
+read the file's bytes. A file that is UTF-8 goes as text as before; one
+that is not goes as bytes, `-d` dropping NUL, CR and LF from them, and
+`--data-urlencode` encodes each byte (`%FF`), as curl does.
+
+Before: each read the file as UTF-8 text, so a byte that is not UTF-8,
+such as `0xff`, was sent as U+FFFD's three bytes; only `--data-binary
+@file` was byte-exact.
+
+### curl-urlencode: --data-urlencode writes uppercase hex, as curl
+Files: `src/commands/curl/form.ts`,
+  `src/commands/curl/tests/data-at-file.test.ts`,
+  `src/commands/curl/tests/data-options.test.ts`,
+  `src/commands/curl/tests/form.test.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`
+
+Now: `--data-urlencode` writes each escape in uppercase hex, `%2A` and
+`%C3%A9`, in the body and in the query under `-G`, inline or from a
+file, as curl 8.21 does. The upstream tests that pinned lowercase pin
+uppercase.
+
+Before: every escape was lowercased, `%2a`, which no curl writes; a
+server that compares a signed or cached query byte for byte saw a
+different string.
+
+### curl-timeout: -m and --connect-timeout read seconds as curl does
+Files: `src/commands/curl/parse.ts`,
+  `src/commands/curl/tests/parse.test.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`,
+  `test/server/bash/worker-boundary.test.ts`
+
+Now: `-m`, `-m<secs>`, `--max-time` and `--connect-timeout` (with `=`
+too) read seconds as curl 8.21's secs2ms: digits, then an optional `.`
+and digits, the rest ignored, in whole milliseconds, so `1.0001` is
+1000 ms and `1e300` is 1 s. 0, or under a millisecond, is no limit, and
+a value past what a timer holds is clamped to it; the fetch's own
+deadline still caps it. A missing, negative or non-numeric value is
+curl's `option -m: expected a proper numerical parameter`, exit 2. `-m`
+wins over `--connect-timeout` whatever their order.
+
+Before: the seconds went through `parseFloat` times 1000, so `-m
+1.0001` asked for 1000.1 ms, which the command worker's protocol takes
+for a malformed request: the whole bash command failed and nothing
+after curl ran. `-m abc` and `-m -1` were ignored with exit 0.
 
 ## diff
 
@@ -867,6 +1026,58 @@ Before:
   rg, grep, the glob walks and the identity checks did not reproduce a
   leak, so their settle is defensive.
 
+### find-exec: -exec, -delete and -name as GNU find
+Files: `src/commands/find/find.ts`, `src/commands/find/matcher.ts`,
+  `src/commands/find/parser.ts`, `scripts/find-record.ts`,
+  `scripts/record-cases.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/find-gnu.test.ts`,
+  `test/vendor/just-bash/symlinks.test.ts`
+
+Now:
+
+- **The live walk.** an expression with `-exec ;` or `-delete` walks
+  one entry at a time and runs each action when evaluation reaches it,
+  as GNU findutils 4.11 does: `-exec ;` is true when its command exits
+  0 and never changes find's exit, `-delete` is false when it fails, and
+  `-empty` reads a folder when reached, so `-empty -delete` removes the
+  folders it emptied. An entry is stat'ed on arrival and a folder again
+  right before it is read, after any command ran: one removed is `No
+  such file or directory` and one swapped for a link `Not a directory`,
+  exit 1, and neither is read. `-delete` removes by the type it met and
+  refuses an entry whose folder's real path changed since the read.
+  Every other expression keeps the batched walk.
+- **-exec.** `{}` is replaced inside a larger argument too, with no
+  shell reading; `+` ends the command only right after `{}`, and an
+  argument holding `{}` more than once with `+` is GNU's error. A
+  failed `+` batch is exit 1.
+- **-name.** a backslash escapes, through the same compiler as `-path`.
+- **The small gaps.** `-mindepth` leaves `-prune` unevaluated above it;
+  without `-empty` the whole expression decides `-prune` before the
+  read; `''` and `file/` fail as GNU's; a missing starting point keeps
+  its slash in messages and in what is printed (`find d/` prints `d/`);
+  `-newer` with a missing reference fails before the walk;
+  an unknown predicate is quoted `` `-x' ``.
+- **The recorder.** a fixture may record stderr and the tree a run
+  leaves, which the find fixture compares.
+
+Before:
+
+- **The live walk.** every action ran after the walk: `-exec ;` was
+  always true and passed its command's exit on as find's, a failed
+  `-delete` was true, and `-empty -delete` left the folders it emptied.
+  A first draft that ran actions in order trusted a folder's type from
+  before a command ran, so a command that swapped a folder for a link
+  sent the walk, and `-delete`, outside the root.
+- **-exec.** `-exec mv {} {}.bak ;` made a literal `{}.bak`, and any
+  `+` ended the command.
+- **-name.** `-name '*\.ts'` matched nothing.
+- **The small gaps.** `-mindepth 2 -prune` printed nothing; `find ''`
+  walked the current folder; `find file/` printed the file; `-newer`
+  with a missing reference was silent; one extra folder read for a
+  prune whose left side held an action or metadata test.
+- **The recorder.** it compared stdout and changed files only.
+
 ## grep
 
 ### grep: grep's options, BRE, ERE and -P as GNU grep 3.12
@@ -877,7 +1088,9 @@ Files: `src/commands/search-engine/gnu-regex.ts` (new),
   `src/commands/grep/grep.patterns-from-file-validation.test.ts`,
   `src/commands/grep/grep.ts`, `src/commands/search-engine/matcher.ts`,
   upstream's grep tests, `src/commands/search-engine/pcre.ts` (new),
-  `src/commands/search-engine/unicode-sets.ts`
+  `src/commands/search-engine/unicode-sets.ts`,
+  `src/commands/grep/grep.basic.test.ts`,
+  `src/commands/grep/grep.patterns-from-file.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/grep-gnu.test.ts`,
   `test/vendor/just-bash/grep.test.ts`,
@@ -970,6 +1183,41 @@ Before: it gave such a key undefined, so `with_entries` dropped keys
 like `creationTimestamp: null` and sent a `yq -i` file through the plain
 writer.
 
+### regex-builtins: regex builtins fail, step and replace as jq and Go
+Files: `src/commands/query-engine/builtins/string-builtins.ts`,
+  `src/commands/query-engine/builtins/dialect-builtins.ts`,
+  `src/regex/user-regex.ts`, `src/regex/index.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`,
+  `test/vendor/just-bash/jq-agent.test.ts`,
+  `test/vendor/just-bash/yq-mikefarah.test.ts`
+
+Now:
+
+- **Errors.** jq's `test`, `scan` and `splits` fail on a pattern that
+  does not compile, exit 5, as `match` and `sub` did.
+- **Empty matches.** the search after an empty match goes on past a whole
+  code point, in every user regex and the dialect's matcher, so `gsub("";
+  "-")` beside an emoji keeps it whole.
+- **${1}.** a yq replacement reads `${1}` as group 1 and a name or number
+  no group has as empty, as Go does.
+- **Splits.** jq's `split(re; flags)` splits on the pattern as `splits`
+  does, an empty match at the end of the input ends a split, and each
+  pattern and flags given makes a split. yq's `sub`, `match` and
+  `capture` skip an empty match where the last match ended, as Go does.
+
+Before:
+
+- **Errors.** they answered `false` or nothing for a bad pattern, so a
+  typo read as no match.
+- **Empty matches.** the search stepped one UTF-16 unit, landing between
+  the halves of a surrogate pair, and the replacement split the emoji
+  into two lone surrogates.
+- **${1}.** yq printed `${1}` as it was written, and `${nope}` too.
+- **Splits.** `split/2` split on the pattern's text, `splits` with a
+  pattern that can match empty failed with `start index out of bounds`,
+  and yq's `sub("b*"; "-")` replaced the empty match after `b` too.
+
 ### query-dialect: the engine follows jq or yq where they part
 Files: `src/commands/query-engine/builtins/dialect-builtins.ts` (new),
   `src/commands/query-engine/evaluator.ts`,
@@ -980,6 +1228,7 @@ Files: `src/commands/query-engine/builtins/dialect-builtins.ts` (new),
 Upstream: not reported
 Tests: `test/vendor/just-bash/yq-mikefarah.test.ts`,
   `test/vendor/just-bash/jq-1.8.test.ts`,
+  `test/vendor/just-bash/jq-agent.test.ts`,
   `test/vendor/just-bash/yq.test.ts`
 
 Now:
@@ -1027,6 +1276,9 @@ Now:
   `with_entries` or `del`) is refused, and a replacement's path is its
   input's, so `to_entries | .[] | key` counts. `.a[0]` on a string
   answers nothing (jq's error).
+- **Escapes.** a string literal reads `\uXXXX`, a surrogate pair as
+  two escapes, so `."caf\u00e9"` finds its key, and fails on one
+  without four hex digits.
 
 Before:
 
@@ -1044,12 +1296,15 @@ Before:
 - **Arithmetic.** `.spec.replicas | . + 1` lost its `---`, `.n - 1`
   printed nothing where mikefarah prints 1, and `key` answered null
   inside a function.
+- **Escapes.** both read `\u00e9` as `u00e9`.
 
 ### yq: yq as mikefarah's: streams, flags, formats and kept comments
 Files: `src/commands/yq/yq.ts`, `src/commands/yq/formats.ts`,
   `src/commands/yq/preserve.ts` (new), `src/commands/yq/documents.ts`
   (new), `src/commands/query-engine/evaluator.ts`,
-  `src/commands/query-engine/parser.ts`, `src/index.ts`
+  `src/commands/query-engine/parser.ts`, `src/index.ts`,
+  `src/commands/query-engine/path-tag.ts` (new),
+  `src/commands/query-engine/builtins/dialect-builtins.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/yq.test.ts`,
   `test/vendor/just-bash/fixes.test.ts`,
@@ -1135,6 +1390,18 @@ Now:
   array, `EXPR as $x ireduce (INIT; UPDATE)` folds them, and every other
   node runs per document. `-i` writes each file its own documents'
   results. `ireduce` parses in both dialects and jq refuses it.
+- **Limits.** every list of results the walker gathers (a pipe, a
+  comma, `as`, `if`, arithmetic, `..`, eval-all) and the records of a
+  run are held to `maxQueryElements`, and a node the walker splits is
+  charged as the engine charges it. A leaf's own values reach the limit
+  before the walker sees them, so a run holds at most twice the limit.
+  A result's path is a tag, its parent's tag and the keys below,
+  spelled out only when `path`, `key` or a kept comment reads it; `..`
+  tags its nodes as it walks them, and `key` reads the last key alone.
+  The path passes of a command share a budget as large as the user's
+  and apart from it; once it is spent the paths are unknown. `key` at
+  the root answers nothing, and a `path` prints as a plain list, as
+  mikefarah's.
 
 Before:
 
@@ -1170,6 +1437,61 @@ Before:
   `-o json` showed a `<<` key.
 - **eval-all.** the idioms that sort or count documents across a stream,
   or merge files, were refused with a pointer to `-s`.
+- **Limits.** only the engine's own evaluations were held to the limit,
+  so `yq -n '[range(3000)|range(3000)]'` grew to 4 GB and 17 s where jq
+  stops. Every result carried its whole path, results times depth:
+  `[..]` over a deep document held 1.7 GB. The path passes spent the
+  user's iterations, and on a document with an anchor gave up, so
+  `.. | key` failed and `..` dropped the comments. `key` at the root
+  answered null, and a `path` took its node's flow style and comment.
+
+## ls and stat
+
+### ls-long: ls -l prints each entry's own mode and a link's target
+Files: `src/commands/ls/ls.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`,
+  `test/vendor/just-bash/overlay-read.test.ts`
+
+Now: every line of `ls -l` comes from lstat, as GNU's: a file or folder
+shows its own permission bits, and a link shows `lrwxrwxrwx`, its
+target's length as its size and `-> target` after its name, with the
+mark `-F` gives after the target. An operand typed with a trailing slash
+(`ls -ld l/`) shows, and `-F` marks, what its link leads to.
+
+Before: every line read `-rw-r--r--` or `drwxr-xr-x` whatever the mode,
+and a link showed its target's mode and no target.
+
+### stat-mode: stat prints the permission bits
+Files: `src/commands/stat/stat.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/overlay-read.test.ts`
+
+Now: `%a` and the default format's access mode are the permission bits,
+special bits included (`4755`), as GNU's.
+
+Before: they printed the mode as the file system gave it, so a file of
+`OverlayFs`, whose mode carries the file type, read `100644`.
+
+## printf and echo
+
+### printf-bytes: a byte escape writes the byte
+Files: `src/commands/printf/raw-bytes.ts` (new),
+  `src/commands/printf/escapes.ts`, `src/commands/printf/printf.ts`,
+  `src/commands/echo/echo.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`
+
+Now: a byte escape above 0x7f (`\351`, `\xe9`, `%b`'s `\0351`, `echo
+-e '\xe9'`) is held as a lone surrogate, U+DC80 plus the byte less 0x80,
+which no UTF-8 text decodes to, and written as the byte itself, the rest
+of the output in UTF-8, as bash writes it. A variable holds text, so
+`printf -v` turns held bytes that spell a UTF-8 character (`\xc3\xa9`)
+into that character, and a lone byte into the character of its value.
+
+Before: such an escape became the character of its value, written as two
+UTF-8 bytes, so `printf '\351'` wrote `c3 a9` and a file a script built
+byte by byte came out wrong.
 
 ## Regular expressions
 
@@ -1219,7 +1541,22 @@ Files: `src/commands/rg/rg-options.ts`, `src/commands/rg/rg.ts`,
   `src/commands/search-engine/regex.ts`,
   `src/commands/search-engine/index.ts`,
   `src/commands/rg/file-types.ts`, `src/commands/rg/file-types-data.ts`
-  (new), our `scripts/rg-record.ts`
+  (new), our `scripts/rg-record.ts`,
+  `src/commands/rg/imported-tests/binary.test.ts`,
+  `src/commands/rg/imported-tests/feature.test.ts`,
+  `src/commands/rg/imported-tests/misc.test.ts`,
+  `src/commands/rg/imported-tests/regression.test.ts`,
+  `src/commands/rg/rg-parser-threads.test.ts`,
+  `src/commands/rg/rg.basic.test.ts`,
+  `src/commands/rg/rg.edge-cases.test.ts`,
+  `src/commands/rg/rg.filtering.test.ts`,
+  `src/commands/rg/rg.flags.test.ts`,
+  `src/commands/rg/rg.max-count.test.ts`,
+  `src/commands/rg/rg.no-filename.test.ts`,
+  `src/commands/rg/rg.output.test.ts`,
+  `src/commands/rg/rg.pattern-file-limits.security.test.ts`,
+  `src/commands/rg/rg.patterns.test.ts`,
+  `src/commands/rg/rg.ripgrep-compat.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/rg-ripgrep.test.ts`,
   `test/vendor/just-bash/rg.test.ts`,
@@ -1357,7 +1694,13 @@ Files: `src/commands/search-engine/matcher.ts`,
   `src/regex/user-regex.ts`, upstream's
   `src/commands/grep/grep.perl.test.ts`, `src/commands/grep/grep.ts`,
   `src/commands/rg/rg-options.ts`,
-  `src/commands/search-engine/regex.ts`, upstream's grep and rg tests
+  `src/commands/search-engine/regex.ts`, upstream's grep and rg tests,
+  `src/commands/grep/grep.binary.test.ts`,
+  `src/commands/rg/imported-tests/binary.test.ts`,
+  `src/commands/rg/imported-tests/feature.test.ts`,
+  `src/commands/rg/rg.edge-cases.test.ts`,
+  `src/commands/rg/rg.max-count.test.ts`,
+  `src/commands/rg/rg.no-filename.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/search-engine.test.ts`,
   `test/vendor/just-bash/grep-gnu.test.ts`,
@@ -1412,7 +1755,8 @@ Files: `src/commands/xargs/xargs.ts`,
   `src/commands/xargs/xargs-input.ts`,
   `src/commands/xargs/xargs-plan.ts`,
   `src/commands/xargs/xargs-quote.ts` (the last four new), upstream's
-  xargs tests and `src/commands/resource-limits.security.test.ts`
+  xargs tests and `src/commands/resource-limits.security.test.ts`,
+  `src/commands/xargs/xargs.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/xargs-gnu.test.ts`,
   `test/vendor/just-bash/xargs.test.ts`
@@ -1445,3 +1789,391 @@ Before: a model's `xargs -P 12 -I{} sh -c '...'` was refused as
 long option were refused too; quoted names split, `-d` dropped the final
 newline, a failure came back as the command's own code, and every item
 went on one command line.
+
+### jq-closures: a function's filter arguments are closures
+Files: `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/path-expressions.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`,
+  `test/vendor/just-bash/jq-paths.test.ts`
+
+Now: a filter argument of a function the query defines runs where the
+body calls it, on that input, with the caller's functions and variables,
+so `def m(f): [.[] | f]` maps, and a function's body sees the variables
+of its definition.
+
+Before: an argument ran once, on the call's input, and its outputs were
+pasted in as literals, so `def m(f): [.[] | f]; [1,2] | m(. * 2)`
+failed.
+
+### jq-index-input: an index reads the term's input
+Files: `src/commands/query-engine/evaluator.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: `.a[.k]` reads `.k` from the input of the whole term, as jq and
+mikefarah's yq do.
+
+Before: it read `.a.k`, so `.a[.k]` was null.
+
+### jq-iterate-null: jq stops on iterating null
+Files: `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/path-expressions.ts`,
+  `src/commands/query-engine/jq-text.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`,
+  `test/vendor/just-bash/jq-paths.test.ts`
+
+Now: in jq, `.[]` over null, a number, a string or a boolean is jq's
+`Cannot iterate over` error, in value and path mode; yq still iterates
+null to nothing, as mikefarah's does.
+
+Before: value mode iterated every scalar to nothing, path mode null.
+
+### jq-optional-step: ? after a step guards that step alone
+Files: `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/path-expressions.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `.a.b?` guards the `.b` step only, so `[.[].b?]` keeps
+the `.b` of the elements that have one and an error in `.a` stands;
+yq keeps guarding the whole path.
+
+Before: `?` covered the path before it, so one bad element emptied
+`[.[].b?]`.
+
+### jq-walk: walk reaches scalars
+Files: `src/commands/query-engine/builtins/navigation-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: `walk(f)` is jq's definition without the stack: f runs on every
+value, leaves included, an array takes every output of its children, an
+object a key's first and drops a key with none.
+
+Before: f's answer on a scalar was dropped and only f's first output
+kept, so `walk(if type == "number" then . + 1 else . end)` changed
+nothing.
+
+### jq-map-values: map_values is .[] |= f
+Files: `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `map_values(f)` sets each value to f's first output and
+removes it when f has none.
+
+Before: a list kept every output of f.
+
+### jq-from-entries: from_entries as jq 1.8 defines it
+Files: `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `from_entries` and `with_entries` take the key from
+`key`, `Key`, `name` or `Name` and the value from `value` or
+`Value`, fail on a key that is not a string and iterate a map's values.
+
+Before: a number or boolean key was made a string, `k` and `v` were
+read, and `[1,2] | to_entries | from_entries` answered.
+
+### jq-indices: index, rindex and indices as jq defines them
+Files: `src/commands/query-engine/builtins/index-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: a string's offsets are in code points and an empty needle finds
+nothing; anything but a list or two strings is `.[$i]`, so null
+answers null and a number fails.
+
+Before: `"" | indices("")` looped forever, offsets were UTF-16 units,
+and `rindex("")` answered the length.
+
+### jq-tostream: tostream closes containers, fromstream emits each value
+Files: `src/commands/query-engine/builtins/object-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: `tostream` closes each non-empty container after its last child
+with that child's path, as jq; `fromstream` outputs each top-level
+value as its closing event arrives and starts afresh, so
+`fromstream(1|truncate_stream(...))` splits a list.
+
+Before: `tostream` ended with one `[[]]` and `fromstream` merged
+every event into one value.
+
+### jq-compare: every value is ordered, strings by code point
+Files: `src/commands/query-engine/jq-text.ts` (new),
+  `src/commands/query-engine/value-operations.ts`,
+  `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/json-output.ts`,
+  `src/commands/query-engine/builtins/object-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: `<`, `<=`, `>` and `>=` order any two values in jq's order;
+strings sort by code point in comparisons, `sort`, `keys` and `-S`.
+
+Before: the operators compared only two numbers or two strings (`[1] <
+[2]` and `null < 3` were false) and strings went by the locale.
+
+### jq-format-strings: format strings and one string per interpolation
+Files: `src/commands/query-engine/parser.ts`,
+  `src/commands/query-engine/parser-types.ts`,
+  `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: `@sh "echo \(.x)"` and the other formats render each
+interpolated value through the format; an interpolation with several
+outputs makes one string each, the first varying fastest; jq's `@text`
+writes any value but a string as JSON.
+
+Before: a format before a string was a parse error, the outputs of an
+interpolation were joined into one string, and `@text` of null was "".
+
+### jq-infinity: an infinity prints as the largest double
+Files: `src/commands/query-engine/jq-text.ts`,
+  `src/commands/query-engine/value-operations.ts`,
+  `src/commands/query-engine/json-output.ts`,
+  `src/commands/query-engine/builtins/format-builtins.ts`,
+  `src/commands/query-engine/builtins/object-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: output, `tojson`, `tostring`, `@json` and interpolation write
+an infinity as `1.7976931348623157e+308`, signed, as jq.
+
+Before: it was written as null.
+
+### jq-math: round, abs and math on non-numbers as jq
+Files: `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `round` rounds half away from zero, `abs` fails on null
+and booleans, and the one-argument math builtins fail on anything but a
+number.
+
+Before: `-1.5 | round` was -1, and the rest answered null.
+
+### jq-tonumber: tonumber reads only a number
+Files: `src/commands/query-engine/builtins/object-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: jq's `tonumber` takes a decimal number with an optional sign, or
+nan, inf or infinity in any case, and nothing around it.
+
+Before: blanks, hex and binary were read, and `"nan"` failed.
+
+### jq-add: add as jq's reduce
+Files: `src/commands/query-engine/builtins/array-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `add` adds a map's values, fails on null and scalars, and
+on mixed kinds gives `+`'s answer or error.
+
+Before: a map and mixed kinds answered null.
+
+### jq-has: has and in answer per key and check kinds
+Files: `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `has` and `in` answer once per output of their argument,
+null has nothing, and a key of the wrong kind is jq's error.
+
+Before: only the first key was asked and a wrong kind answered false.
+
+### jq-builtins: join, flatten, transpose, INDEX, trims, contains, modifiers
+Files: `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, `join`, `flatten` and `transpose` take a map's values
+and follow jq's definitions (a list in `join` and a scalar row in
+`transpose` fail); `INDEX(f)` indexes the elements; `ltrimstr`,
+`rtrimstr`, `trimstr`, `startswith` and `endswith` fail on
+non-strings and answer per argument; `contains` and `inside` fail on
+two kinds; a regex modifier other than g, i, x, n, s, p or l fails, and
+`splits` and `split(re; flags)` fail on a pattern that is not a string.
+
+Before: these answered null, false or the input unchanged, and
+`[1,2] | INDEX(.)` keyed the whole list.
+
+### jq-stderr: each input on its own, debug, stderr, input_filename
+Files: `src/commands/jq/jq.ts`,
+  `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/builtins/io-builtins.ts` (new),
+  `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: an error in one input is written as `jq: error (at <stdin>): ...`
+and the next input still runs; the exit status is the last input's, and
+`-e` reads the last output (4 for none). `debug` and `debug(m)`
+write `["DEBUG:",v]`, `stderr` writes its input raw, and
+`input_filename` names the file, `<stdin>` or null.
+
+Before: one error dropped every output of every input, as a `parse
+error`; `debug` wrote nothing and `stderr` and `input_filename` were
+unknown; `-e` failed only when every output was null or false.
+
+### jq-dates: the time builtins as jq on glibc
+Files: `src/commands/query-engine/builtins/date-builtins.ts`,
+  `src/commands/query-engine/builtins/time-format.ts` (new)
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`,
+  `test/vendor/just-bash/jq-agent.test.ts`
+
+Now: `gmtime`, `mktime`, `strftime` and `todate` are UTC arithmetic over
+any year, an array normalized as timegm does; `strftime` takes every C
+conversion with glibc's flags (`-`, `_`, `0`, `^`, `#`), a width, and
+`E` and `O`, which the C locale ignores, where glibc takes them, and
+fails as jq does when the text passes jq's buffer of the format's length
+and 100 bytes; `strptime` reads any glibc format, with glibc's weekday
+and day of the year; `localtime` and `strflocaltime` use TZ.
+
+Before: `strptime` read only the ISO format, `strftime` ten
+conversions with `%%` read first, `localtime` was unknown, and
+`gmtime | todate` failed.
+
+### jq-arity: a builtin at an arity jq lacks fails
+Files: `src/commands/query-engine/builtins/jq-builtins.ts` (new),
+  `src/commands/query-engine/builtins/dialect-builtins.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-1.8.test.ts`
+
+Now: in jq, a call of a jq 1.8.2 builtin at an arity jq does not define,
+`ltrimstr` or `tojson(1)`, is `ltrimstr/0 is not defined`, exit 3;
+mikefarah's `env(NAME)` still works.
+
+Before: such a call answered null.
+
+### yq-documents: yq edits Kubernetes manifests as mikefarah's
+Files: `src/commands/yq/yq.ts`,
+  `src/commands/yq/preserve.ts`, `src/commands/yq/formats.ts`,
+  `src/commands/query-engine/builtins/dialect-builtins.ts`,
+  `src/commands/query-engine/parser.ts`,
+  `src/commands/query-engine/parser-types.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/yq-mikefarah.test.ts`,
+  `test/vendor/just-bash/yq-kube.test.ts`,
+  `test/vendor/just-bash/yq.test.ts`
+
+Now: in yq, a `del` that removes a document's root outputs nothing for
+it, so `yq -i 'del(select(.kind == "A"))'` drops that document and its
+`---` from a stream, on stdout too; a file's first document keeps the
+`---` it opened with when its root comes out first, as mikefarah writes
+it, and only before that root, not before a scalar result; a closing
+`...` is not written back. A map or list an edit copies from the
+document (`.spec.volumes += [.spec.volumes[0] | .name = "b"]`,
+`{"x": .}`) is written as its node, comments and spelling kept; a
+written number keeps the spelling the filter writes it with
+(`.defaultMode = 0600`, `.replicas = 600`) unless it lands on a node
+holding the same value, which keeps its own, and otherwise takes the
+spelling an equal number has in the document, nodes the edit deletes or
+overwrites included, so a copy or a move keeps `0644` (`.mode =
+.defaultMode | del(.defaultMode)`); no `-i` edit is refused for a
+number's spelling (vendor/differences.md has the cases this spells
+wrong); keys in a new order keep their comments; a new string of several
+lines is a literal block; `-e` says `Error: no matches found` when it
+fails, as mikefarah's. A file under `%YAML` keeps the directive and its
+one `---` (`-N` drops the `---`); a `%TAG` handle is spelled out in full
+(`!<tag:example.com,2000:x>`) and its line and `---` dropped, as
+mikefarah writes them; `%YAML` on a later document, or on a later file
+of `ea`, fails the input, as his parser does. Over several files, a file
+that opens with `---` prints that one marker after the one before it,
+on stdout and in `-s` files; under `ea` a later file's opening `---`
+goes and its head comment stays.
+
+Before: the deleted document was written as `null` between the others,
+an edit dropped the leading `---` of a manifest and kept a closing
+`...`; a copied `defaultMode: 0644` or a written `0600` became `644` and
+`600`, which Kubernetes reads as other modes, and a moved one `644`;
+`sort_keys` and a reorder wrote the document afresh without its
+comments; a new multi-line value was a quoted string with `\n`; `-e`
+failed without a word. A `---` was written above a file's `%YAML`
+line, `%TAG` lines stayed, a later document's `%YAML` was printed
+between two documents, and a second file that opened with `---` printed
+two.
+
+### jq-inputs: input, inputs and jq's output flags
+Files: `src/commands/jq/jq.ts`,
+  `src/commands/jq/jq.arg.test.ts`,
+  `src/commands/jq/jq.args-positional.test.ts`,
+  `src/commands/query-engine/builtins/control-builtins.ts`,
+  `src/commands/query-engine/builtins/io-builtins.ts`,
+  `src/commands/query-engine/builtins/dialect-builtins.ts`,
+  `src/commands/query-engine/evaluator.ts`,
+  `src/commands/query-engine/json-output.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/jq-agent.test.ts`
+
+Now: every input is queued and run in turn, and `input` and `inputs`
+take the next ones from that queue, with `-n` too, so `jq -n 'reduce
+inputs as $l (...)'` folds an NDJSON log and `[inputs]` gathers raw
+lines; past the last input `input` fails as jq 1.8's does. Under `-n`
+input that does not parse, or a file that cannot be read, is told only
+when `input` reaches it, so `jq -n '{x:1}'` ignores whatever stdin
+holds; a file that cannot be read exits 2. `first`, `limit` and
+`isempty` take `inputs` one at a time and stop at a comma once they
+have their results, and raise an error that comes before them.
+`--stream` runs each value's stream events, `--indent N` (-1 for a tab,
+to 7) and `--raw-output0` work, the last of `--indent`, `--tab` and `-c`
+wins, `-j` prints strings raw, and `-a` writes every character past
+ASCII as `\uXXXX`, every string as JSON, as jq does. An option error
+ends with jq's pointer to `jq --help`.
+
+Before: `input` and `inputs` were unknown functions, `-n` read no input,
+`first(error("x"))` and `isempty(error("x"))` answered as if nothing
+failed, `--stream`, `--indent` and `--raw-output0` were refused as
+unknown, `-j` printed strings quoted and `-a` was ignored.
+
+### yq-split: -s splits results into files, as mikefarah's
+Files: `src/commands/yq/yq.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/yq.test.ts`,
+  `test/vendor/just-bash/yq-kube.test.ts`
+
+Now: `-s EXP` (`--split-exp`) writes each result to the file EXP names
+on it, as mikefarah's yq does, so `yq -s '.kind + "-" + .metadata.name'
+all.yaml` splits a manifest into one file per resource: `$index` counts
+the results, `.yml` follows the name (`.json`, `.properties` for those
+outputs) unless it has an extension, its folders are made, and each file
+holds what stdout would print for that result, its `---` and head
+comment first. A first argument that names a file is the file and the
+filter `.` (`yq app.yaml`); `-N` drops the `---` a head comment
+carries; `-n` with a file and `-s` with `-i` are refused in mikefarah's
+words. jq's slurp is `ea '[.]'`. The filter over every file and each
+name spend one iteration budget for the whole command; a name that
+fails says `Error: <message>` as mikefarah's does, and a write the file
+system refuses names the file (`yq: out/0.yml: No space left on
+device`).
+
+Before: `-s` was jq's slurp, so the split failed with `Cannot index
+array with string "kind"`, and `yq app.yaml` read `app.yaml` as a filter.
+Each file and each name had a budget of its own, so one command could
+run hundreds of times the limit.
+
+### yq-anchors: -i edits a file with anchors and merge keys
+Files: `src/commands/yq/preserve.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/yq-mikefarah.test.ts`
+
+Now: an edit of a file with anchors is checked where it wrote, the
+text still reading and each written place reading as written, so an
+edit of an anchor's target goes through and shows through its aliases
+and merge keys, as mikefarah's references do; a key a merge key brings
+back after a `del` passes; a merge key is written `!!merge <<:`, as
+mikefarah writes it.
+
+Before: the whole document was held to our values, where an alias is a
+copy, so `yq -i '.base.mem = 8'` on a Helm values file with `<<: *base`
+was refused with a word about YAML 1.1, and a merge key lost the tag
+mikefarah writes.
+

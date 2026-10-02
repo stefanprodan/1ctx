@@ -147,12 +147,16 @@ export const chmodCommand: RuntimeCommand = {
         }
       } catch (error) {
         rethrowFatalExecutionError(error);
-        // (1ctx readonly-errors) a file that exists but refuses the change
+        // (1ctx readonly-errors) a file that exists but refuses the change;
+        // a missing file or a looping link is one chmod cannot reach
+        const code = fsErrorCode(error);
         const words = fsErrorWords(error);
         stderr +=
-          words === undefined || fsErrorCode(error) === "ENOENT"
+          words === undefined || code === "ENOENT"
             ? `chmod: cannot access '${file}': No such file or directory\n`
-            : `chmod: changing permissions of '${file}': ${words}\n`;
+            : code === "ELOOP"
+              ? `chmod: cannot access '${file}': ${words}\n`
+              : `chmod: changing permissions of '${file}': ${words}\n`;
         anyError = true;
       }
     }

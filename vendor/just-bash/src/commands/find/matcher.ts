@@ -4,7 +4,12 @@
 import { patternToRegex } from "../../interpreter/expansion/pattern.js";
 import { createUserRegex } from "../../regex/index.js";
 import { matchGlob } from "../../utils/glob.js";
-import type { EvalContext, EvalResult, Expression } from "./types.js";
+import type {
+  EvalContext,
+  EvalResult,
+  Expression,
+  FindAction,
+} from "./types.js";
 
 // (1ctx find-path) reuse shell escapes without enabling extglobs. GNU does
 // not match a trailing unpaired backslash; the shell compiler makes it literal.
@@ -35,6 +40,10 @@ export function evaluateExpressionWithPrune(
     case "name": {
       // Fast path: check extension before full glob match for patterns like "*.json"
       const pattern = expr.pattern;
+      // (1ctx find-exec) a backslash escapes, as in -path
+      if (pattern.includes("\\")) {
+        return matchEscapedPath(ctx.name, pattern, expr.ignoreCase);
+      }
       const extMatch = pattern.match(/^\*(\.[a-zA-Z0-9]+)$/);
       if (extMatch) {
         const requiredExt = extMatch[1];
@@ -261,6 +270,54 @@ export function evaluateExpressionWithPrune(
 }
 
 /**
+ * What the walk that runs actions as they are reached gives the evaluator:
+ * the action itself, true when it succeeded, and -empty, read when reached,
+ * since an earlier action may have emptied the folder. (1ctx find-exec)
+ */
+export interface LiveHooks {
+  action(action: FindAction): Promise<boolean>;
+  empty(): Promise<boolean>;
+}
+
+/**
+ * Evaluate an expression in order, running each action as GNU find does
+ * when evaluation reaches it, so an action's result decides the branch.
+ * (1ctx find-exec)
+ */
+export async function evaluateLive(
+  expr: Expression,
+  ctx: EvalContext,
+  hooks: LiveHooks,
+): Promise<{ matches: boolean; pruned: boolean }> {
+  switch (expr.type) {
+    case "action":
+      return { matches: await hooks.action(expr.action), pruned: false };
+    case "empty":
+      return { matches: await hooks.empty(), pruned: false };
+    case "not": {
+      const inner = await evaluateLive(expr.expr, ctx, hooks);
+      return { matches: !inner.matches, pruned: inner.pruned };
+    }
+    case "and": {
+      const left = await evaluateLive(expr.left, ctx, hooks);
+      if (!left.matches) return left;
+      const right = await evaluateLive(expr.right, ctx, hooks);
+      return { matches: right.matches, pruned: left.pruned || right.pruned };
+    }
+    case "or": {
+      const left = await evaluateLive(expr.left, ctx, hooks);
+      if (left.matches) return left;
+      const right = await evaluateLive(expr.right, ctx, hooks);
+      return { matches: right.matches, pruned: left.pruned || right.pruned };
+    }
+    default: {
+      const { matches, pruned } = evaluateExpressionWithPrune(expr, ctx);
+      return { matches, pruned };
+    }
+  }
+}
+
+/**
  * Check if an expression needs full stat metadata (size, mtime, mode)
  * vs just type info (isFile/isDirectory) which can come from dirent
  */
@@ -402,6 +459,10 @@ export function evaluateSimpleExpression(
     case "name": {
       // Fast path: check extension before full glob match for patterns like "*.json"
       const pattern = expr.pattern;
+      // (1ctx find-exec) a backslash escapes, as in -path
+      if (pattern.includes("\\")) {
+        return matchEscapedPath(name, pattern, expr.ignoreCase);
+      }
       const extMatch = pattern.match(/^\*(\.[a-zA-Z0-9]+)$/);
       if (extMatch) {
         const requiredExt = extMatch[1];

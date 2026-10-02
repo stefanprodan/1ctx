@@ -40,18 +40,42 @@ export function evalControlBuiltin(
   isTruthy: IsTruthyFn,
   ExecutionLimitError: ExecutionLimitErrorClass,
 ): QueryValue[] | null {
+  // the first n results of f, an error before them raised: comma and
+  // parentheses stop once n are kept and inputs is taken one at a time, as
+  // jq's generators are lazy; a pipe runs whole (1ctx jq-inputs)
+  const upTo = (ast: AstNode, n: number): QueryValue[] => {
+    if (ast.type === "Paren") return upTo(ast.expr, n);
+    if (ast.type === "Comma") {
+      const left = upTo(ast.left, n);
+      if (left.length >= n) return left;
+      try {
+        return [...left, ...upTo(ast.right, n - left.length)];
+      } catch (e) {
+        // a break carries the results before it to its label
+        const b = e as { withPrependedResults?: (r: QueryValue[]) => Error };
+        throw b.withPrependedResults?.(left) ?? e;
+      }
+    }
+    if (
+      ast.type !== "Call" ||
+      ast.name !== "inputs" ||
+      ast.args.length !== 0 ||
+      !ctx.input ||
+      ctx.funcs?.has("inputs/0")
+    ) {
+      return evaluate(value, ast, ctx).slice(0, n);
+    }
+    const out: QueryValue[] = [];
+    for (let next = out.length < n ? ctx.input() : undefined; next; ) {
+      out.push(next.value);
+      next = out.length < n ? ctx.input() : undefined;
+    }
+    return out;
+  };
   switch (name) {
     case "first":
       if (args.length > 0) {
-        // Use lazy evaluation - get first value without evaluating rest
-        try {
-          const results = evaluateWithPartialResults(value, args[0], ctx);
-          return results.length > 0 ? [results[0]] : [];
-        } catch (e) {
-          // Always re-throw execution limit errors
-          if (e instanceof ExecutionLimitError) throw e;
-          return [];
-        }
+        return upTo(args[0], 1); // (1ctx jq-inputs)
       }
       if (Array.isArray(value) && value.length > 0) return [value[0]];
       return [null];
@@ -185,16 +209,7 @@ export function evalControlBuiltin(
         }
         // jq: limit(0; expr) should return [] without evaluating expr
         if (n === 0) return [];
-        // Use lazy evaluation to get partial results before errors
-        let results: QueryValue[];
-        try {
-          results = evaluateWithPartialResults(value, args[1], ctx);
-        } catch (e) {
-          // Always re-throw execution limit errors
-          if (e instanceof ExecutionLimitError) throw e;
-          results = [];
-        }
-        return results.slice(0, n);
+        return upTo(args[1], n); // (1ctx jq-inputs)
       });
     }
 
@@ -204,15 +219,7 @@ export function evalControlBuiltin(
       // It should short-circuit: if first value is produced, return false
       // For comma expressions like `1,error("foo")`, the left side produces a value
       // before the right side errors, so we should return false
-      try {
-        const results = evaluateWithPartialResults(value, args[0], ctx);
-        return [results.length === 0];
-      } catch (e) {
-        // Always re-throw execution limit errors
-        if (e instanceof ExecutionLimitError) throw e;
-        // If an error occurs without any results, return true
-        return [true];
-      }
+      return [upTo(args[0], 1).length === 0]; // (1ctx jq-inputs)
     }
 
     case "isvalid": {

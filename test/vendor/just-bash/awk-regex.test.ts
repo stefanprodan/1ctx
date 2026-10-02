@@ -6,6 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { charsBefore } from "../../../vendor/just-bash/src/commands/awk/chars.ts";
+import { hasShortestMatch } from "../../../vendor/just-bash/src/commands/awk/regex.ts";
 import { createUserRegex } from "../../../vendor/just-bash/src/regex/user-regex.ts";
 
 describe("the regex layer's offsets", () => {
@@ -64,5 +65,28 @@ describe("the regex layer's group offsets", () => {
     const [whole, group] = spans("(b)c", text) ?? [];
     expect(whole).toEqual({ start: 5, end: 7 });
     expect(charsBefore(text, group.start) + 1).toBe(4);
+  });
+});
+
+describe("awk's shortest-match operators", () => {
+  test("a ? after a quantifier makes it shortest", () => {
+    for (const p of ["<.*?>", "a+?", "a??", "a{2,3}?", "a{2,}?", "(ab)*?c"]) {
+      expect(hasShortestMatch(p)).toBe(true);
+    }
+  });
+
+  test("an escaped or bracketed ? is a character", () => {
+    for (const p of [
+      "a?",
+      "\\*?",
+      "a\\??",
+      "[*?]",
+      "[]*?]",
+      "[[:alpha:]?]",
+      "x{?",
+      "x{,2}?",
+    ]) {
+      expect(hasShortestMatch(p)).toBe(false);
+    }
   });
 });

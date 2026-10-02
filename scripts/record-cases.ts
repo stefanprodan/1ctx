@@ -7,9 +7,12 @@
 // the suite reads the fixture and never needs the binary.
 
 import {
+  lstat,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
+  readlink,
   rm,
   symlink,
   utimes,
@@ -42,12 +45,18 @@ export interface RecordedCase {
   maskTimes?: boolean;
   /** every file the run changed, as it was left */
   written?: Record<string, FileValue>;
+  /** stderr's words, when the fixture compares them */
+  stderr?: string;
+  /** every path left after the run, when the fixture lists them */
+  tree?: string[];
   /** ours where it differs on purpose, with the reason */
   accept?: {
     stdout: string;
     exit: number;
     reason: string;
     written?: Record<string, FileValue>;
+    stderr?: string;
+    tree?: string[];
   };
 }
 
@@ -63,7 +72,42 @@ export interface Fixture {
   links?: Record<string, string>;
   /** the modification time of every file, as an ISO date */
   mtime?: string;
+  /** stderr is recorded and compared word for word */
+  stderr?: boolean;
+  /** the paths left after each run are recorded and compared */
+  tree?: boolean;
   cases: RecordedCase[];
+}
+
+/**
+ * Every path under a folder, sorted: a folder with a trailing slash, a
+ * link as `name -> target`. The suite lists its own tree the same way.
+ */
+export async function listTree(
+  root: string,
+  read: {
+    readdir(path: string): Promise<string[]>;
+    lstat(
+      path: string,
+    ): Promise<{ isDirectory(): boolean; isSymbolicLink(): boolean }>;
+    readlink(path: string): Promise<string>;
+  },
+): Promise<string[]> {
+  const paths: string[] = [];
+  const walk = async (dir: string, prefix: string) => {
+    for (const name of await read.readdir(dir)) {
+      const full = `${dir}/${name}`;
+      const info = await read.lstat(full);
+      if (info.isSymbolicLink()) {
+        paths.push(`${prefix}${name} -> ${await read.readlink(full)}`);
+      } else if (info.isDirectory()) {
+        paths.push(`${prefix}${name}/`);
+        await walk(full, `${prefix}${name}/`);
+      } else paths.push(`${prefix}${name}`);
+    }
+  };
+  await walk(root, "");
+  return paths.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 export function fileBytes(value: FileValue): Uint8Array {
@@ -110,6 +154,8 @@ export async function record(
     env?: Record<string, string>;
     /** a case without stdin gets /dev/null, never an empty pipe */
     nullStdin?: boolean;
+    /** the name the binary is run under, for its messages */
+    argv0?: string;
   } = {},
 ): Promise<void> {
   const version = Bun.spawnSync([binary, "--version"], {
@@ -151,6 +197,7 @@ export async function record(
         }
       }
       const run = Bun.spawnSync([binary, ...c.args], {
+        argv0: options.argv0,
         cwd: dir,
         env: {
           PATH: process.env.PATH ?? "",
@@ -168,11 +215,23 @@ export async function record(
       });
       const written: Record<string, FileValue> = {};
       for (const [name, value] of Object.entries(files)) {
-        const now = new Uint8Array(await readFile(join(dir, name)));
-        if (!Bun.deepEquals(now, fileBytes(value))) {
+        // a file the run removed or moved is in the tree, when listed
+        const now = await readFile(join(dir, name)).then(
+          (bytes) => new Uint8Array(bytes),
+          () => undefined,
+        );
+        if (now !== undefined && !Bun.deepEquals(now, fileBytes(value))) {
           written[name] = fileValue(now);
         }
       }
+      const tree = fixture.tree
+        ? await listTree(dir, {
+            readdir: (path) => readdir(path),
+            lstat: (path) => lstat(path),
+            readlink: (path) => readlink(path),
+          })
+        : undefined;
+      const stderr = fixture.stderr ? run.stderr.toString() : undefined;
       const said = run.stderr.toString().trim() !== "";
       const out = fileValue(new Uint8Array(run.stdout));
       let stdout = typeof out === "string" ? out : undefined;
@@ -193,6 +252,8 @@ export async function record(
         c.error,
         c.warned,
         c.written,
+        c.stderr,
+        c.tree,
       ]);
       if (next.stdout !== undefined) c.stdout = next.stdout;
       else delete c.stdout;
@@ -205,6 +266,10 @@ export async function record(
       else delete c.warned;
       if (Object.keys(written).length > 0) c.written = written;
       else delete c.written;
+      if (stderr !== undefined) c.stderr = stderr;
+      else delete c.stderr;
+      if (tree !== undefined) c.tree = tree;
+      else delete c.tree;
       const after = JSON.stringify([
         c.stdout,
         c.stdoutBase64,
@@ -212,6 +277,8 @@ export async function record(
         c.error,
         c.warned,
         c.written,
+        c.stderr,
+        c.tree,
       ]);
       if (before !== after) {
         moved.push(c.name);

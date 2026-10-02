@@ -8,7 +8,8 @@
  */
 
 import { ExecutionAbortedError } from "../../../interpreter/errors.js";
-import { createUserRegex, type UserRegex } from "../../../regex/index.js";
+import type { UserRegex } from "../../../regex/index.js";
+import { awkRegex } from "../regex.js";
 
 export interface AwkRecord {
   record: string;
@@ -84,7 +85,8 @@ function checkAbort(index: number, signal?: AbortSignal): void {
 function separator(rs: string, compiled: Map<string, UserRegex>): UserRegex {
   let regex = compiled.get(rs);
   if (regex) return regex;
-  regex = createUserRegex(rs);
+  // (1ctx awk) a record separator matches as match() does
+  regex = awkRegex(rs);
   // gawk splits erratically on a separator that matches the empty string
   if (regex.test("")) {
     throw new Error("RS matches the empty string");

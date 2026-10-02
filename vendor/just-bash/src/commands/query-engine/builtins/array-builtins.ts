@@ -197,6 +197,25 @@ export function evalArrayBuiltin(
           // Use null-prototype to prevent prototype pollution from user-controlled JSON
           return mergeToNullPrototype(...(filtered as object[]));
         }
+        // jq's `reduce .[] as $x (null; . + $x)`: a lone true is itself,
+        // mixed kinds are +'s error, where upstream answered null
+        // (1ctx jq-add)
+        if (ctx.dialect !== "yq") {
+          let sum: QueryValue = null;
+          for (const x of filtered) {
+            sum = evaluate(
+              null,
+              {
+                type: "BinaryOp",
+                op: "+",
+                left: { type: "Literal", value: sum },
+                right: { type: "Literal", value: x },
+              },
+              ctx,
+            )[0];
+          }
+          return sum;
+        }
         return null;
       };
 
@@ -208,6 +227,16 @@ export function evalArrayBuiltin(
       // Existing behavior for add (no args) - add array elements
       if (Array.isArray(value)) {
         return [addValues(value)];
+      }
+      // jq adds a map's values and iterates nothing else (1ctx jq-add)
+      if (ctx.dialect !== "yq") {
+        if (value !== null && typeof value === "object") {
+          return [addValues(Object.values(value))];
+        }
+        const kind = value === null ? "null" : typeof value;
+        throw new Error(
+          `Cannot iterate over ${kind} (${JSON.stringify(value) ?? "null"})`,
+        );
       }
       return [null];
     }

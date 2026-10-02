@@ -80,8 +80,8 @@ export const CASES: Case[] = [
   [{ a: 1 }, '(.a | tostring) = "1"', null],
   [{ a: 1 }, ".a.b = 1", null],
   [[1], ".a = 1", null],
-  // null iterates to nothing here, as in mikefarah's yq; jq stops on it
-  [null, ".[] = 1", [null]],
+  // jq stops on null, where mikefarah's yq iterates it to nothing
+  [null, ".[] = 1", null],
   [[1, 2, 3], ".[-5] = 9", null],
   [
     {

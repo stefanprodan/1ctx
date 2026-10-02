@@ -13,7 +13,7 @@ DIR=$ROOT/vendor/just-bash
 LIST=$ROOT/vendor/just-bash-failures.txt
 LOG=$(mktemp "${TMPDIR:-/tmp}/vendor-test.XXXXXX")
 ATTEMPTS=3
-trap 'rm -f "$LOG" "$LOG.now" "$LOG.new" "$LOG.files" "$LOG.alone"' EXIT
+trap 'rm -f "$LOG" "$LOG.now" "$LOG.new" "$LOG.files" "$LOG.alone" "$LOG.first"' EXIT
 
 cd "$DIR"
 
@@ -64,6 +64,11 @@ matches() {
         ! sed -E 's/ \[[0-9.]+m?s\]$//' "$LOG.alone" | grep -qxF -f "$LOG.new"; then
         echo "vendor-test: passed alone, failed only beside other files:"
         sed 's/^/  /' "$LOG.new"
+        # what bun said before each, so a flake's assertion is in the log
+        # to root-cause later, not only its name
+        while IFS= read -r line; do
+          grep -aF -B 30 "$line" "$LOG" | grep -av '^(pass)' | tail -30 || true
+        done <"$LOG.new"
         return 0
       fi
     fi
@@ -73,7 +78,11 @@ matches() {
 
 run
 if [[ ${1:-} == --update ]]; then
-  cp "$LOG.now" "$LIST"
+  # only what fails twice: a test that failed once under load is a flake,
+  # which the passes-alone rule lets through, not an expected failure
+  cp "$LOG.now" "$LOG.first"
+  run
+  LC_ALL=C comm -12 "$LOG.first" "$LOG.now" >"$LIST"
   echo "vendor-test: wrote $(wc -l <"$LIST" | tr -d ' ') expected failures"
   exit 0
 fi

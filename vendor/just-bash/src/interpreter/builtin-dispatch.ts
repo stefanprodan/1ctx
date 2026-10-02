@@ -113,6 +113,9 @@ function createRevocableCommandContext(
   let active = true;
   const facadeAbort = context.signal ? new AbortController() : undefined;
   const wrappedValues = new WeakMap<object, object>();
+  // (1ctx revoke-pending) the rejections of the promises handed out and not
+  // yet settled, called on revoke
+  const pending = new Set<(reason: unknown) => void>();
   const assertActive = () => {
     if (!active) {
       throw new ExecutionAbortedError(
@@ -162,9 +165,27 @@ function createRevocableCommandContext(
     }
 
     if (value instanceof Promise) {
-      const wrappedPromise = value.then((result) => {
-        assertActive();
-        return wrapValue(result);
+      // (1ctx revoke-pending) a call still pending when the context is
+      // revoked rejects at once, so a command awaiting a slow read (a lazy
+      // file) unwinds inside the cleanup grace instead of poisoning the
+      // whole script; the call's own result, when it lands, is dropped
+      const wrappedPromise = new Promise((resolve, reject) => {
+        pending.add(reject);
+        value.then(
+          (result) => {
+            pending.delete(reject);
+            try {
+              assertActive();
+              resolve(wrapValue(result));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (error: unknown) => {
+            pending.delete(reject);
+            reject(error);
+          },
+        );
       });
       wrappedValues.set(value, wrappedPromise);
       return wrappedPromise;
@@ -331,6 +352,16 @@ function createRevocableCommandContext(
     ) as RuntimeCommandContext,
     revoke() {
       active = false;
+      // (1ctx revoke-pending)
+      for (const reject of pending) {
+        reject(
+          new ExecutionAbortedError(
+            "",
+            `bash: ${commandName} used its context after cancellation\n`,
+          ),
+        );
+      }
+      pending.clear();
       if (!facadeAbort?.signal.aborted) {
         facadeAbort?.abort(
           new ExecutionAbortedError(

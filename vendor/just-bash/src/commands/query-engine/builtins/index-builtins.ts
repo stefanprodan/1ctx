@@ -28,118 +28,81 @@ export function evalIndexBuiltin(
   evaluate: EvalFn,
   deepEqual: DeepEqualFn,
 ): QueryValue[] | null {
+  // jq's definitions, in indicesOf (1ctx jq-indices)
   switch (name) {
-    case "index": {
-      if (args.length === 0) return [null];
-      const needles = evaluate(value, args[0], ctx);
-      // Handle generator args - each needle produces its own output
-      return needles.map((needle) => {
-        if (typeof value === "string" && typeof needle === "string") {
-          // jq: index("") on "" returns null, not 0
-          if (needle === "" && value === "") return null;
-          const idx = value.indexOf(needle);
-          return idx >= 0 ? idx : null;
-        }
-        if (Array.isArray(value)) {
-          // If needle is an array, search for it as a subsequence
-          if (Array.isArray(needle)) {
-            for (let i = 0; i <= value.length - needle.length; i++) {
-              let match = true;
-              for (let j = 0; j < needle.length; j++) {
-                if (!deepEqual(value[i + j], needle[j])) {
-                  match = false;
-                  break;
-                }
-              }
-              if (match) return i;
-            }
-            return null;
-          }
-          // Otherwise search for the element
-          const idx = value.findIndex((x) => deepEqual(x, needle));
-          return idx >= 0 ? idx : null;
-        }
-        return null;
-      });
-    }
-
-    case "rindex": {
-      if (args.length === 0) return [null];
-      const needles = evaluate(value, args[0], ctx);
-      // Handle generator args - each needle produces its own output
-      return needles.map((needle) => {
-        if (typeof value === "string" && typeof needle === "string") {
-          const idx = value.lastIndexOf(needle);
-          return idx >= 0 ? idx : null;
-        }
-        if (Array.isArray(value)) {
-          // If needle is an array, search for it as a subsequence from the end
-          if (Array.isArray(needle)) {
-            for (let i = value.length - needle.length; i >= 0; i--) {
-              let match = true;
-              for (let j = 0; j < needle.length; j++) {
-                if (!deepEqual(value[i + j], needle[j])) {
-                  match = false;
-                  break;
-                }
-              }
-              if (match) return i;
-            }
-            return null;
-          }
-          // Otherwise search for the element
-          for (let i = value.length - 1; i >= 0; i--) {
-            if (deepEqual(value[i], needle)) return i;
-          }
-          return null;
-        }
-        return null;
-      });
-    }
-
+    case "index":
+    case "rindex":
     case "indices": {
-      if (args.length === 0) return [[]];
+      if (args.length !== 1) return null;
       const needles = evaluate(value, args[0], ctx);
-      // Handle generator args - each needle produces its own result array
       return needles.map((needle) => {
-        const result: number[] = [];
-        if (typeof value === "string" && typeof needle === "string") {
-          let idx = value.indexOf(needle);
-          while (idx !== -1) {
-            result.push(idx);
-            idx = value.indexOf(needle, idx + 1);
-          }
-        } else if (Array.isArray(value)) {
-          if (Array.isArray(needle)) {
-            // Search for consecutive subarray matches
-            const needleLen = needle.length;
-            if (needleLen === 0) {
-              // Empty array matches at every position
-              for (let i = 0; i <= value.length; i++) result.push(i);
-            } else {
-              for (let i = 0; i <= value.length - needleLen; i++) {
-                let match = true;
-                for (let j = 0; j < needleLen; j++) {
-                  if (!deepEqual(value[i + j], needle[j])) {
-                    match = false;
-                    break;
-                  }
-                }
-                if (match) result.push(i);
-              }
-            }
-          } else {
-            // Search for individual element
-            for (let i = 0; i < value.length; i++) {
-              if (deepEqual(value[i], needle)) result.push(i);
-            }
-          }
+        const found = indicesOf(value, needle, ctx, evaluate, deepEqual);
+        if (name === "indices") return found;
+        // index is `indices($i) | .[0]`, rindex `.[-1:][0]`
+        if (found === null) return null;
+        if (!Array.isArray(found)) {
+          throw new Error(`Cannot index ${typeName(found)} with number`);
         }
-        return result;
+        const at = name === "index" ? 0 : found.length - 1;
+        return found.length > 0 ? found[at] : null;
       });
     }
 
     default:
       return null;
   }
+}
+
+function typeName(v: QueryValue): string {
+  if (v === null) return "null";
+  return Array.isArray(v) ? "array" : typeof v;
+}
+
+/**
+ * jq's `def indices($i)`: an array's positions of $i, or of the run $i
+ * when it is an array; a string's code point offsets of $i, overlapping,
+ * none for an empty one; anything else `.[$i]`. Upstream counted UTF-16
+ * units, looped forever on `"" | indices("")` and answered `[]` for the
+ * rest (1ctx jq-indices)
+ */
+function indicesOf(
+  value: QueryValue,
+  needle: QueryValue,
+  ctx: EvalContext,
+  evaluate: EvalFn,
+  deepEqual: DeepEqualFn,
+): QueryValue {
+  if (Array.isArray(value)) {
+    const run = Array.isArray(needle) ? needle : [needle];
+    const result: number[] = [];
+    if (run.length === 0) return result;
+    for (let i = 0; i + run.length <= value.length; i++) {
+      if (run.every((item, j) => deepEqual(value[i + j], item))) result.push(i);
+    }
+    return result;
+  }
+  if (typeof value === "string" && typeof needle === "string") {
+    const result: number[] = [];
+    if (needle === "") return result;
+    let points = 0;
+    let counted = 0;
+    for (let at = value.indexOf(needle); at !== -1; ) {
+      for (; counted < at; counted++) {
+        const code = value.charCodeAt(counted);
+        // the second half of a surrogate pair is no code point of its own
+        if (code < 0xdc00 || code > 0xdfff) points++;
+      }
+      result.push(points);
+      const step = value.codePointAt(at) as number > 0xffff ? 2 : 1;
+      at = value.indexOf(needle, at + step);
+    }
+    return result;
+  }
+  return (
+    evaluate(
+      value,
+      { type: "Index", index: { type: "Literal", value: needle } },
+      ctx,
+    )[0] ?? null
+  );
 }

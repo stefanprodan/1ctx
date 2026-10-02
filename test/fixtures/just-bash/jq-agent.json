@@ -1,0 +1,2349 @@
+{
+  "recordedWith": "jq-1.8.2",
+  "files": {
+    "ec2.json": "{\"Reservations\": [{\"Instances\": [{\"InstanceId\": \"i-01\", \"InstanceType\": \"t3.micro\", \"State\": {\"Name\": \"running\"}, \"Tags\": [{\"Key\": \"Name\", \"Value\": \"web\"}, {\"Key\": \"env\", \"Value\": \"prod\"}], \"PrivateIpAddress\": \"10.1.0.4\", \"LaunchTime\": \"2026-09-01T00:00:00+00:00\"}]}, {\"Instances\": [{\"InstanceId\": \"i-02\", \"InstanceType\": \"m5.large\", \"State\": {\"Name\": \"stopped\"}, \"Tags\": [{\"Key\": \"env\", \"Value\": \"dev\"}], \"LaunchTime\": \"2026-08-15T12:30:00+00:00\"}]}]}\n",
+    "issues.json": "[\n  {\"number\": 101, \"title\": \"Crash on startup\", \"state\": \"open\", \"user\": {\"login\": \"alice\"}, \"labels\": [{\"name\": \"bug\"}, {\"name\": \"p1\"}], \"comments\": 4, \"created_at\": \"2026-09-01T12:00:00Z\", \"body\": \"Stack trace:\\n  at main()\\n\", \"pull_request\": null},\n  {\"number\": 102, \"title\": \"Add dark mode\", \"state\": \"closed\", \"user\": {\"login\": \"bob\"}, \"labels\": [{\"name\": \"enhancement\"}], \"comments\": 0, \"created_at\": \"2026-09-02T09:15:00Z\", \"body\": null},\n  {\"number\": 103, \"title\": \"Fix typo in README\", \"state\": \"open\", \"user\": {\"login\": \"alice\"}, \"labels\": [], \"comments\": 1, \"created_at\": \"2026-09-03T18:45:30Z\", \"body\": \"Small fix\", \"pull_request\": {\"url\": \"https://api.github.com/repos/o/r/pulls/103\"}},\n  {\"number\": 104, \"title\": \"Ünicode ✓ title\", \"state\": \"open\", \"user\": {\"login\": \"carol\"}, \"labels\": [{\"name\": \"bug\"}], \"comments\": 12, \"created_at\": \"2026-09-04T00:00:00Z\", \"body\": \"tab\\there \\\"quoted\\\"\"}\n]\n",
+    "lines.txt": "line one\nline two\n\nline four\n",
+    "logs.ndjson": "{\"ts\":\"2026-09-30T10:00:01Z\",\"level\":\"info\",\"msg\":\"started\",\"port\":8080}\n{\"ts\":\"2026-09-30T10:00:02Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":1503.5,\"user\":\"u1\"}\n{\"ts\":\"2026-09-30T10:00:03Z\",\"level\":\"warn\",\"msg\":\"slow request\",\"latency_ms\":820,\"user\":\"u2\"}\n{\"ts\":\"2026-09-30T10:00:04Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":2001,\"user\":\"u1\"}\n{\"ts\":\"2026-09-30T10:00:05Z\",\"level\":\"info\",\"msg\":\"request\",\"latency_ms\":12.25,\"user\":\"u3\"}\n",
+    "order.json": "{\"id\":1,\"price\":10.50,\"qty\":3}\n",
+    "package.json": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\"node\": \">=20\"},\n  \"workspaces\": [\"packages/*\"]\n}\n",
+    "pods.json": "{\n  \"apiVersion\": \"v1\",\n  \"items\": [\n    {\n      \"metadata\": {\"name\": \"web-7d4b9c-abcde\", \"namespace\": \"prod\", \"labels\": {\"app\": \"web\", \"tier\": \"frontend\"}, \"creationTimestamp\": \"2026-09-30T10:00:00Z\"},\n      \"spec\": {\"nodeName\": \"node-1\", \"containers\": [{\"name\": \"web\", \"image\": \"nginx:1.27\", \"resources\": {\"requests\": {\"cpu\": \"100m\", \"memory\": \"64Mi\"}}}]},\n      \"status\": {\"phase\": \"Running\", \"podIP\": \"10.0.0.5\", \"containerStatuses\": [{\"name\": \"web\", \"ready\": true, \"restartCount\": 0}]}\n    },\n    {\n      \"metadata\": {\"name\": \"api-5f6d8-xyz12\", \"namespace\": \"prod\", \"labels\": {\"app\": \"api\"}, \"creationTimestamp\": \"2026-09-29T08:30:00Z\"},\n      \"spec\": {\"nodeName\": \"node-2\", \"containers\": [{\"name\": \"api\", \"image\": \"ghcr.io/acme/api:2.3.1\"}, {\"name\": \"sidecar\", \"image\": \"envoy:1.30\"}]},\n      \"status\": {\"phase\": \"Running\", \"podIP\": \"10.0.0.6\", \"containerStatuses\": [{\"name\": \"api\", \"ready\": false, \"restartCount\": 7}, {\"name\": \"sidecar\", \"ready\": true, \"restartCount\": 0}]}\n    },\n    {\n      \"metadata\": {\"name\": \"job-1-q9w8e\", \"namespace\": \"batch\", \"labels\": {\"app\": \"job\"}, \"creationTimestamp\": \"2026-09-28T23:59:59Z\"},\n      \"spec\": {\"nodeName\": null, \"containers\": [{\"name\": \"job\", \"image\": \"busybox:1.36\"}]},\n      \"status\": {\"phase\": \"Pending\"}\n    }\n  ],\n  \"kind\": \"List\"\n}\n",
+    "tf.json": "{\"vpc_id\": {\"sensitive\": false, \"type\": \"string\", \"value\": \"vpc-0abc\"}, \"subnet_ids\": {\"sensitive\": false, \"type\": [\"list\", \"string\"], \"value\": [\"subnet-1\", \"subnet-2\"]}, \"db_password\": {\"sensitive\": true, \"type\": \"string\", \"value\": \"s3cr3t\"}, \"ratio\": {\"sensitive\": false, \"type\": \"number\", \"value\": 1.0}}\n"
+  },
+  "cases": [
+    {
+      "name": "pretty print",
+      "args": [
+        ".",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "pretty print numbers",
+      "args": [
+        ".",
+        "order.json"
+      ],
+      "stdout": "{\n  \"id\": 1,\n  \"price\": 10.50,\n  \"qty\": 3\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "pretty tf",
+      "args": [
+        ".",
+        "tf.json"
+      ],
+      "stdout": "{\n  \"vpc_id\": {\n    \"sensitive\": false,\n    \"type\": \"string\",\n    \"value\": \"vpc-0abc\"\n  },\n  \"subnet_ids\": {\n    \"sensitive\": false,\n    \"type\": [\n      \"list\",\n      \"string\"\n    ],\n    \"value\": [\n      \"subnet-1\",\n      \"subnet-2\"\n    ]\n  },\n  \"db_password\": {\n    \"sensitive\": true,\n    \"type\": \"string\",\n    \"value\": \"s3cr3t\"\n  },\n  \"ratio\": {\n    \"sensitive\": false,\n    \"type\": \"number\",\n    \"value\": 1.0\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "compact",
+      "args": [
+        "-c",
+        ".",
+        "issues.json"
+      ],
+      "stdout": "[{\"number\":101,\"title\":\"Crash on startup\",\"state\":\"open\",\"user\":{\"login\":\"alice\"},\"labels\":[{\"name\":\"bug\"},{\"name\":\"p1\"}],\"comments\":4,\"created_at\":\"2026-09-01T12:00:00Z\",\"body\":\"Stack trace:\\n  at main()\\n\",\"pull_request\":null},{\"number\":102,\"title\":\"Add dark mode\",\"state\":\"closed\",\"user\":{\"login\":\"bob\"},\"labels\":[{\"name\":\"enhancement\"}],\"comments\":0,\"created_at\":\"2026-09-02T09:15:00Z\",\"body\":null},{\"number\":103,\"title\":\"Fix typo in README\",\"state\":\"open\",\"user\":{\"login\":\"alice\"},\"labels\":[],\"comments\":1,\"created_at\":\"2026-09-03T18:45:30Z\",\"body\":\"Small fix\",\"pull_request\":{\"url\":\"https://api.github.com/repos/o/r/pulls/103\"}},{\"number\":104,\"title\":\"Ünicode ✓ title\",\"state\":\"open\",\"user\":{\"login\":\"carol\"},\"labels\":[{\"name\":\"bug\"}],\"comments\":12,\"created_at\":\"2026-09-04T00:00:00Z\",\"body\":\"tab\\there \\\"quoted\\\"\"}]\n",
+      "exit": 0
+    },
+    {
+      "name": "field",
+      "args": [
+        ".version",
+        "package.json"
+      ],
+      "stdout": "\"1.10.0\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw field",
+      "args": [
+        "-r",
+        ".version",
+        "package.json"
+      ],
+      "stdout": "1.10.0\n",
+      "exit": 0
+    },
+    {
+      "name": "nested field",
+      "args": [
+        "-r",
+        ".scripts.build",
+        "package.json"
+      ],
+      "stdout": "tsc -p .\n",
+      "exit": 0
+    },
+    {
+      "name": "quoted key",
+      "args": [
+        "-r",
+        ".dependencies[\"react\"]",
+        "package.json"
+      ],
+      "stdout": "^18.3.1\n",
+      "exit": 0
+    },
+    {
+      "name": "missing field",
+      "args": [
+        ".nope",
+        "package.json"
+      ],
+      "stdout": "null\n",
+      "exit": 0
+    },
+    {
+      "name": "keys",
+      "args": [
+        "keys",
+        "package.json"
+      ],
+      "stdout": "[\n  \"dependencies\",\n  \"devDependencies\",\n  \"engines\",\n  \"name\",\n  \"private\",\n  \"scripts\",\n  \"version\",\n  \"workspaces\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "keys_unsorted",
+      "args": [
+        "-c",
+        "keys_unsorted",
+        "package.json"
+      ],
+      "stdout": "[\"name\",\"version\",\"private\",\"scripts\",\"dependencies\",\"devDependencies\",\"engines\",\"workspaces\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "dependency names",
+      "args": [
+        "-r",
+        ".dependencies | keys[]",
+        "package.json"
+      ],
+      "stdout": "react\nzod\n",
+      "exit": 0
+    },
+    {
+      "name": "deps to lines",
+      "args": [
+        "-r",
+        ".dependencies | to_entries[] | \"\\(.key)@\\(.value)\"",
+        "package.json"
+      ],
+      "stdout": "react@^18.3.1\nzod@3.23.8\n",
+      "exit": 0
+    },
+    {
+      "name": "has",
+      "args": [
+        "has(\"scripts\")",
+        "package.json"
+      ],
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "length of object",
+      "args": [
+        ".dependencies | length",
+        "package.json"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "type",
+      "args": [
+        ".workspaces | type",
+        "package.json"
+      ],
+      "stdout": "\"array\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-S sort keys",
+      "args": [
+        "-S",
+        ".",
+        "package.json"
+      ],
+      "stdout": "{\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"name\": \"@acme/app\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"version\": \"1.10.0\",\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "--tab",
+      "args": [
+        "--tab",
+        ".engines",
+        "package.json"
+      ],
+      "stdout": "{\n\t\"node\": \">=20\"\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "--indent 4",
+      "args": [
+        "--indent",
+        "4",
+        ".engines",
+        "package.json"
+      ],
+      "stdout": "{\n    \"node\": \">=20\"\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-j join",
+      "args": [
+        "-j",
+        ".name, \" \", .version",
+        "package.json"
+      ],
+      "stdout": "@acme/app 1.10.0",
+      "exit": 0
+    },
+    {
+      "name": "pod names",
+      "args": [
+        "-r",
+        ".items[].metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\njob-1-q9w8e\n",
+      "exit": 0
+    },
+    {
+      "name": "running pods",
+      "args": [
+        "-r",
+        ".items[] | select(.status.phase == \"Running\") | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\n",
+      "exit": 0
+    },
+    {
+      "name": "pod tsv",
+      "args": [
+        "-r",
+        ".items[] | [.metadata.name, .status.phase, .spec.nodeName] | @tsv",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\tRunning\tnode-1\napi-5f6d8-xyz12\tRunning\tnode-2\njob-1-q9w8e\tPending\t\n",
+      "exit": 0
+    },
+    {
+      "name": "pod csv",
+      "args": [
+        "-r",
+        ".items[] | [.metadata.name, .metadata.namespace] | @csv",
+        "pods.json"
+      ],
+      "stdout": "\"web-7d4b9c-abcde\",\"prod\"\n\"api-5f6d8-xyz12\",\"prod\"\n\"job-1-q9w8e\",\"batch\"\n",
+      "exit": 0
+    },
+    {
+      "name": "images unique",
+      "args": [
+        "-r",
+        "[.items[].spec.containers[].image] | unique[]",
+        "pods.json"
+      ],
+      "stdout": "busybox:1.36\nenvoy:1.30\nghcr.io/acme/api:2.3.1\nnginx:1.27\n",
+      "exit": 0
+    },
+    {
+      "name": "not ready containers",
+      "args": [
+        "-r",
+        ".items[] | .metadata.name as $p | .status.containerStatuses[]? | select(.ready | not) | \"\\($p)/\\(.name) restarts=\\(.restartCount)\"",
+        "pods.json"
+      ],
+      "stdout": "api-5f6d8-xyz12/api restarts=7\n",
+      "exit": 0
+    },
+    {
+      "name": "restart total",
+      "args": [
+        "[.items[].status.containerStatuses[]?.restartCount] | add",
+        "pods.json"
+      ],
+      "stdout": "7\n",
+      "exit": 0
+    },
+    {
+      "name": "count by phase",
+      "args": [
+        "-c",
+        ".items | group_by(.status.phase) | map({phase: .[0].status.phase, count: length})",
+        "pods.json"
+      ],
+      "stdout": "[{\"phase\":\"Pending\",\"count\":1},{\"phase\":\"Running\",\"count\":2}]\n",
+      "exit": 0
+    },
+    {
+      "name": "count by namespace reduce",
+      "args": [
+        "-c",
+        "reduce .items[] as $p ({}; .[$p.metadata.namespace] += 1)",
+        "pods.json"
+      ],
+      "stdout": "{\"prod\":2,\"batch\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "labels select",
+      "args": [
+        "-r",
+        ".items[] | select(.metadata.labels.tier == \"frontend\") | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\n",
+      "exit": 0
+    },
+    {
+      "name": "map projection",
+      "args": [
+        "-c",
+        "[.items[] | {name: .metadata.name, ip: .status.podIP}]",
+        "pods.json"
+      ],
+      "stdout": "[{\"name\":\"web-7d4b9c-abcde\",\"ip\":\"10.0.0.5\"},{\"name\":\"api-5f6d8-xyz12\",\"ip\":\"10.0.0.6\"},{\"name\":\"job-1-q9w8e\",\"ip\":null}]\n",
+      "exit": 0
+    },
+    {
+      "name": "alternative operator",
+      "args": [
+        "-r",
+        ".items[] | .spec.nodeName // \"unscheduled\"",
+        "pods.json"
+      ],
+      "stdout": "node-1\nnode-2\nunscheduled\n",
+      "exit": 0
+    },
+    {
+      "name": "optional iterate",
+      "args": [
+        "-c",
+        "[.items[].status.containerStatuses[]?.name]",
+        "pods.json"
+      ],
+      "stdout": "[\"web\",\"api\",\"sidecar\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "sort_by date",
+      "args": [
+        "-r",
+        ".items | sort_by(.metadata.creationTimestamp) | .[].metadata.name",
+        "pods.json"
+      ],
+      "stdout": "job-1-q9w8e\napi-5f6d8-xyz12\nweb-7d4b9c-abcde\n",
+      "exit": 0
+    },
+    {
+      "name": "first/last",
+      "args": [
+        "-r",
+        ".items | first.metadata.name, last.metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\njob-1-q9w8e\n",
+      "exit": 0
+    },
+    {
+      "name": "index negative",
+      "args": [
+        "-r",
+        ".items[-1].metadata.name",
+        "pods.json"
+      ],
+      "stdout": "job-1-q9w8e\n",
+      "exit": 0
+    },
+    {
+      "name": "slice",
+      "args": [
+        "-c",
+        "[.items[:2][].metadata.name]",
+        "pods.json"
+      ],
+      "stdout": "[\"web-7d4b9c-abcde\",\"api-5f6d8-xyz12\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "any/all",
+      "args": [
+        "-c",
+        "[.items | any(.status.phase == \"Pending\"), all(.status.phase == \"Running\")]",
+        "pods.json"
+      ],
+      "stdout": "[true,false]\n",
+      "exit": 0
+    },
+    {
+      "name": "min_by/max_by",
+      "args": [
+        "-r",
+        ".items | (min_by(.metadata.creationTimestamp), max_by(.metadata.creationTimestamp)) | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "job-1-q9w8e\nweb-7d4b9c-abcde\n",
+      "exit": 0
+    },
+    {
+      "name": "paths to image",
+      "args": [
+        "-c",
+        "[paths(type == \"string\" and test(\"nginx\"))]",
+        "pods.json"
+      ],
+      "stdout": "[[\"items\",0,\"spec\",\"containers\",0,\"image\"]]\n",
+      "exit": 0
+    },
+    {
+      "name": "recursive images",
+      "args": [
+        "-r",
+        ".. | .image? // empty",
+        "pods.json"
+      ],
+      "stdout": "nginx:1.27\nghcr.io/acme/api:2.3.1\nenvoy:1.30\nbusybox:1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "del status",
+      "args": [
+        "-c",
+        ".items[0] | del(.status, .metadata.creationTimestamp)",
+        "pods.json"
+      ],
+      "stdout": "{\"metadata\":{\"name\":\"web-7d4b9c-abcde\",\"namespace\":\"prod\",\"labels\":{\"app\":\"web\",\"tier\":\"frontend\"}},\"spec\":{\"nodeName\":\"node-1\",\"containers\":[{\"name\":\"web\",\"image\":\"nginx:1.27\",\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"64Mi\"}}}]}}\n",
+      "exit": 0
+    },
+    {
+      "name": "with_entries filter labels",
+      "args": [
+        "-c",
+        ".items[0].metadata.labels | with_entries(select(.key != \"tier\"))",
+        "pods.json"
+      ],
+      "stdout": "{\"app\":\"web\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "to_entries keys values",
+      "args": [
+        "-r",
+        ".items[0].metadata.labels | to_entries | map(\"\\(.key)=\\(.value)\") | join(\",\")",
+        "pods.json"
+      ],
+      "stdout": "app=web,tier=frontend\n",
+      "exit": 0
+    },
+    {
+      "name": "fromdate age",
+      "args": [
+        ".items[0].metadata.creationTimestamp | fromdateiso8601",
+        "pods.json"
+      ],
+      "stdout": "1790762400\n",
+      "exit": 0
+    },
+    {
+      "name": "date compare",
+      "args": [
+        "-r",
+        ".items[] | select((.metadata.creationTimestamp | fromdate) > (\"2026-09-29T00:00:00Z\" | fromdate)) | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\n",
+      "exit": 0
+    },
+    {
+      "name": "strftime",
+      "args": [
+        "-r",
+        ".items[0].metadata.creationTimestamp | fromdate | strftime(\"%Y-%m-%d %H:%M\")",
+        "pods.json"
+      ],
+      "stdout": "2026-09-30 10:00\n",
+      "exit": 0
+    },
+    {
+      "name": "split string",
+      "args": [
+        "-r",
+        ".items[].spec.containers[0].image | split(\":\") | .[1]",
+        "pods.json"
+      ],
+      "stdout": "1.27\n2.3.1\n1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "sub/gsub",
+      "args": [
+        "-r",
+        ".items[].metadata.name | sub(\"-[a-z0-9]+-[a-z0-9]+$\"; \"\")",
+        "pods.json"
+      ],
+      "stdout": "web\napi\njob\n",
+      "exit": 0
+    },
+    {
+      "name": "capture",
+      "args": [
+        "-c",
+        ".items[].spec.containers[0].image | capture(\"(?<repo>[^:]+):(?<tag>.+)\")",
+        "pods.json"
+      ],
+      "stdout": "{\"repo\":\"nginx\",\"tag\":\"1.27\"}\n{\"repo\":\"ghcr.io/acme/api\",\"tag\":\"2.3.1\"}\n{\"repo\":\"busybox\",\"tag\":\"1.36\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "test regex",
+      "args": [
+        "-r",
+        ".items[].metadata.name | select(test(\"^(web|api)-\"))",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\n",
+      "exit": 0
+    },
+    {
+      "name": "ascii_downcase",
+      "args": [
+        "-r",
+        ".kind | ascii_downcase",
+        "pods.json"
+      ],
+      "stdout": "list\n",
+      "exit": 0
+    },
+    {
+      "name": "startswith ltrimstr",
+      "args": [
+        "-r",
+        ".items[].spec.containers[].image | select(startswith(\"ghcr.io/\")) | ltrimstr(\"ghcr.io/\")",
+        "pods.json"
+      ],
+      "stdout": "acme/api:2.3.1\n",
+      "exit": 0
+    },
+    {
+      "name": "map_values",
+      "args": [
+        "-c",
+        ".items[0].metadata.labels | map_values(ascii_upcase)",
+        "pods.json"
+      ],
+      "stdout": "{\"app\":\"WEB\",\"tier\":\"FRONTEND\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "limit",
+      "args": [
+        "-r",
+        "limit(2; .items[].metadata.name)",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\n",
+      "exit": 0
+    },
+    {
+      "name": "first(f)",
+      "args": [
+        "-r",
+        "first(.items[] | select(.status.phase == \"Running\")) | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\n",
+      "exit": 0
+    },
+    {
+      "name": "indices",
+      "args": [
+        "[.items[].metadata.namespace] | index(\"batch\")",
+        "pods.json"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "-e exit",
+      "args": [
+        "-e",
+        ".items[] | select(.status.phase == \"Failed\")",
+        "pods.json"
+      ],
+      "stdout": "",
+      "exit": 4
+    },
+    {
+      "name": "-e ok",
+      "args": [
+        "-e",
+        ".kind",
+        "pods.json"
+      ],
+      "stdout": "\"List\"\n",
+      "exit": 0
+    },
+    {
+      "name": "--arg select",
+      "args": [
+        "-r",
+        "--arg",
+        "ns",
+        "prod",
+        ".items[] | select(.metadata.namespace == $ns) | .metadata.name",
+        "pods.json"
+      ],
+      "stdout": "web-7d4b9c-abcde\napi-5f6d8-xyz12\n",
+      "exit": 0
+    },
+    {
+      "name": "--argjson",
+      "args": [
+        "-c",
+        "--argjson",
+        "n",
+        "1",
+        ".items[$n].metadata.name",
+        "pods.json"
+      ],
+      "stdout": "\"api-5f6d8-xyz12\"\n",
+      "exit": 0
+    },
+    {
+      "name": "$ENV",
+      "args": [
+        "-r",
+        "$ENV.NS",
+        "pods.json"
+      ],
+      "env": {
+        "NS": "prod"
+      },
+      "stdout": "prod\n",
+      "exit": 0
+    },
+    {
+      "name": "env.",
+      "args": [
+        "-r",
+        "env.NS",
+        "pods.json"
+      ],
+      "env": {
+        "NS": "prod"
+      },
+      "stdout": "prod\n",
+      "exit": 0
+    },
+    {
+      "name": "--args",
+      "args": [
+        "-n",
+        "-c",
+        "$ARGS",
+        "--args",
+        "a",
+        "b"
+      ],
+      "stdout": "{\"positional\":[\"a\",\"b\"],\"named\":{}}\n",
+      "exit": 0
+    },
+    {
+      "name": "--jsonargs",
+      "args": [
+        "-n",
+        "-c",
+        "$ARGS.positional",
+        "--jsonargs",
+        "1",
+        "{\"a\":2}"
+      ],
+      "stdout": "[1,{\"a\":2}]\n",
+      "exit": 0
+    },
+    {
+      "name": "--slurpfile",
+      "args": [
+        "-c",
+        "--slurpfile",
+        "o",
+        "order.json",
+        "{v: .version, o: $o}",
+        "package.json"
+      ],
+      "stdout": "{\"v\":\"1.10.0\",\"o\":[{\"id\":1,\"price\":10.50,\"qty\":3}]}\n",
+      "exit": 0
+    },
+    {
+      "name": "--rawfile",
+      "args": [
+        "-c",
+        "--rawfile",
+        "t",
+        "lines.txt",
+        "$t | split(\"\\n\")",
+        "package.json"
+      ],
+      "stdout": "[\"line one\",\"line two\",\"\",\"line four\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "issue titles",
+      "args": [
+        "-r",
+        ".[] | \"#\\(.number) \\(.title)\"",
+        "issues.json"
+      ],
+      "stdout": "#101 Crash on startup\n#102 Add dark mode\n#103 Fix typo in README\n#104 Ünicode ✓ title\n",
+      "exit": 0
+    },
+    {
+      "name": "open issues by user",
+      "args": [
+        "-r",
+        ".[] | select(.state == \"open\" and .user.login == \"alice\") | .number",
+        "issues.json"
+      ],
+      "stdout": "101\n103\n",
+      "exit": 0
+    },
+    {
+      "name": "label filter",
+      "args": [
+        "-r",
+        ".[] | select(any(.labels[]; .name == \"bug\")) | .title",
+        "issues.json"
+      ],
+      "stdout": "Crash on startup\nÜnicode ✓ title\n",
+      "exit": 0
+    },
+    {
+      "name": "label names join",
+      "args": [
+        "-r",
+        ".[] | \"\\(.number): \\([.labels[].name] | join(\", \"))\"",
+        "issues.json"
+      ],
+      "stdout": "101: bug, p1\n102: enhancement\n103: \n104: bug\n",
+      "exit": 0
+    },
+    {
+      "name": "not PRs",
+      "args": [
+        "-r",
+        ".[] | select(.pull_request == null) | .number",
+        "issues.json"
+      ],
+      "stdout": "101\n102\n104\n",
+      "exit": 0
+    },
+    {
+      "name": "count per user",
+      "args": [
+        "-c",
+        "group_by(.user.login) | map({(.[0].user.login): length}) | add",
+        "issues.json"
+      ],
+      "stdout": "{\"alice\":2,\"bob\":1,\"carol\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "sum comments",
+      "args": [
+        "map(.comments) | add",
+        "issues.json"
+      ],
+      "stdout": "17\n",
+      "exit": 0
+    },
+    {
+      "name": "average",
+      "args": [
+        "map(.comments) | add / length",
+        "issues.json"
+      ],
+      "stdout": "4.25\n",
+      "exit": 0
+    },
+    {
+      "name": "sort desc",
+      "args": [
+        "-r",
+        "sort_by(-.comments) | .[0].title",
+        "issues.json"
+      ],
+      "stdout": "Ünicode ✓ title\n",
+      "exit": 0
+    },
+    {
+      "name": "unique_by",
+      "args": [
+        "-c",
+        "unique_by(.user.login) | map(.user.login)",
+        "issues.json"
+      ],
+      "stdout": "[\"alice\",\"bob\",\"carol\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "body null alt",
+      "args": [
+        "-r",
+        ".[] | .body // \"(no body)\"",
+        "issues.json"
+      ],
+      "stdout": "Stack trace:\n  at main()\n\n(no body)\nSmall fix\ntab\there \"quoted\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw unicode",
+      "args": [
+        "-r",
+        ".[3].title",
+        "issues.json"
+      ],
+      "stdout": "Ünicode ✓ title\n",
+      "exit": 0
+    },
+    {
+      "name": "json unicode",
+      "args": [
+        ".[3].title",
+        "issues.json"
+      ],
+      "stdout": "\"Ünicode ✓ title\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-a ascii",
+      "args": [
+        "-a",
+        ".[3].title",
+        "issues.json"
+      ],
+      "stdout": "\"\\u00dcnicode \\u2713 title\"\n",
+      "exit": 0
+    },
+    {
+      "name": "escapes",
+      "args": [
+        ".[3].body",
+        "issues.json"
+      ],
+      "stdout": "\"tab\\there \\\"quoted\\\"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw escapes",
+      "args": [
+        "-r",
+        ".[3].body",
+        "issues.json"
+      ],
+      "stdout": "tab\there \"quoted\"\n",
+      "exit": 0
+    },
+    {
+      "name": "@sh",
+      "args": [
+        "-r",
+        ".[] | @sh \"echo \\(.title)\"",
+        "issues.json"
+      ],
+      "stdout": "echo 'Crash on startup'\necho 'Add dark mode'\necho 'Fix typo in README'\necho 'Ünicode ✓ title'\n",
+      "exit": 0
+    },
+    {
+      "name": "@base64",
+      "args": [
+        "-r",
+        ".[0].title | @base64",
+        "issues.json"
+      ],
+      "stdout": "Q3Jhc2ggb24gc3RhcnR1cA==\n",
+      "exit": 0
+    },
+    {
+      "name": "@base64d",
+      "args": [
+        "-r",
+        "\"Q3Jhc2g=\" | @base64d",
+        "issues.json"
+      ],
+      "stdout": "Crash\n",
+      "exit": 0
+    },
+    {
+      "name": "@uri",
+      "args": [
+        "-r",
+        ".[3].title | @uri",
+        "issues.json"
+      ],
+      "stdout": "%C3%9Cnicode%20%E2%9C%93%20title\n",
+      "exit": 0
+    },
+    {
+      "name": "@html",
+      "args": [
+        "-r",
+        "\"<a href=\\\"x\\\">&</a>\" | @html",
+        "issues.json"
+      ],
+      "stdout": "&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;\n",
+      "exit": 0
+    },
+    {
+      "name": "@json in string",
+      "args": [
+        "-r",
+        ".[0] | {n: .number} | @json",
+        "issues.json"
+      ],
+      "stdout": "{\"n\":101}\n",
+      "exit": 0
+    },
+    {
+      "name": "tojson fromjson",
+      "args": [
+        "-c",
+        ".[0].labels | tojson | fromjson",
+        "issues.json"
+      ],
+      "stdout": "[{\"name\":\"bug\"},{\"name\":\"p1\"}]\n",
+      "exit": 0
+    },
+    {
+      "name": "tostring tonumber",
+      "args": [
+        "-c",
+        "[.[0].number | tostring, (\"42\" | tonumber)]",
+        "issues.json"
+      ],
+      "stdout": "[\"101\",42]\n",
+      "exit": 0
+    },
+    {
+      "name": "if then else",
+      "args": [
+        "-r",
+        ".[] | if .comments > 3 then \"hot\" elif .comments > 0 then \"warm\" else \"cold\" end",
+        "issues.json"
+      ],
+      "stdout": "hot\ncold\nwarm\nhot\n",
+      "exit": 0
+    },
+    {
+      "name": "try catch",
+      "args": [
+        "-c",
+        "[.[] | try (.body | ascii_downcase) catch \"n/a\"]",
+        "issues.json"
+      ],
+      "stdout": "[\"stack trace:\\n  at main()\\n\",\"n/a\",\"small fix\",\"tab\\there \\\"quoted\\\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "error suppress ?",
+      "args": [
+        "-c",
+        "[.[] | (.body | ascii_downcase)?]",
+        "issues.json"
+      ],
+      "stdout": "[\"stack trace:\\n  at main()\\n\",\"small fix\",\"tab\\there \\\"quoted\\\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "$__loc__",
+      "args": [
+        "-c",
+        "$__loc__",
+        "issues.json"
+      ],
+      "stdout": "{\"file\":\"<top-level>\",\"line\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "input_filename",
+      "args": [
+        "input_filename",
+        "package.json"
+      ],
+      "stdout": "\"package.json\"\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson filter",
+      "args": [
+        "-c",
+        "select(.level == \"error\")",
+        "logs.ndjson"
+      ],
+      "stdout": "{\"ts\":\"2026-09-30T10:00:02Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":1503.5,\"user\":\"u1\"}\n{\"ts\":\"2026-09-30T10:00:04Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":2001,\"user\":\"u1\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson fields",
+      "args": [
+        "-r",
+        "\"\\(.ts) \\(.level) \\(.msg)\"",
+        "logs.ndjson"
+      ],
+      "stdout": "2026-09-30T10:00:01Z info started\n2026-09-30T10:00:02Z error db timeout\n2026-09-30T10:00:03Z warn slow request\n2026-09-30T10:00:04Z error db timeout\n2026-09-30T10:00:05Z info request\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson slurp count",
+      "args": [
+        "-s",
+        "map(select(.level == \"error\")) | length",
+        "logs.ndjson"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson slurp group",
+      "args": [
+        "-s",
+        "-c",
+        "group_by(.level) | map({level: .[0].level, n: length})",
+        "logs.ndjson"
+      ],
+      "stdout": "[{\"level\":\"error\",\"n\":2},{\"level\":\"info\",\"n\":2},{\"level\":\"warn\",\"n\":1}]\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson inputs reduce",
+      "args": [
+        "-n",
+        "-c",
+        "reduce inputs as $l ({}; .[$l.level] += 1)",
+        "logs.ndjson"
+      ],
+      "stdout": "{\"info\":2,\"error\":2,\"warn\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson max latency",
+      "args": [
+        "-s",
+        "map(.latency_ms // 0) | max",
+        "logs.ndjson"
+      ],
+      "stdout": "2001\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson avg latency",
+      "args": [
+        "-s",
+        "[.[].latency_ms | numbers] | add / length",
+        "logs.ndjson"
+      ],
+      "stdout": "1084.1875\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson floats",
+      "args": [
+        "-c",
+        ".latency_ms",
+        "logs.ndjson"
+      ],
+      "stdout": "null\n1503.5\n820\n2001\n12.25\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson arithmetic",
+      "args": [
+        "-c",
+        ".latency_ms / 1000",
+        "logs.ndjson"
+      ],
+      "stdout": "1.5035\n0.82\n2.001\n0.01225\n",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "ndjson round",
+      "args": [
+        "-c",
+        ".latency_ms | round?",
+        "logs.ndjson"
+      ],
+      "stdout": "1504\n820\n2001\n12\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson floor",
+      "args": [
+        "-c",
+        "(.latency_ms // 0) | floor",
+        "logs.ndjson"
+      ],
+      "stdout": "0\n1503\n820\n2001\n12\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson to csv",
+      "args": [
+        "-r",
+        "[.ts, .level, (.latency_ms // \"\")] | @csv",
+        "logs.ndjson"
+      ],
+      "stdout": "\"2026-09-30T10:00:01Z\",\"info\",\"\"\n\"2026-09-30T10:00:02Z\",\"error\",1503.5\n\"2026-09-30T10:00:03Z\",\"warn\",820\n\"2026-09-30T10:00:04Z\",\"error\",2001\n\"2026-09-30T10:00:05Z\",\"info\",12.25\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson unique users",
+      "args": [
+        "-s",
+        "-r",
+        "[.[].user | values] | unique | .[]",
+        "logs.ndjson"
+      ],
+      "stdout": "u1\nu2\nu3\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson first",
+      "args": [
+        "-n",
+        "-c",
+        "input",
+        "logs.ndjson"
+      ],
+      "stdout": "{\"ts\":\"2026-09-30T10:00:01Z\",\"level\":\"info\",\"msg\":\"started\",\"port\":8080}\n",
+      "exit": 0
+    },
+    {
+      "name": "ndjson -c .",
+      "args": [
+        "-c",
+        ".",
+        "logs.ndjson"
+      ],
+      "stdout": "{\"ts\":\"2026-09-30T10:00:01Z\",\"level\":\"info\",\"msg\":\"started\",\"port\":8080}\n{\"ts\":\"2026-09-30T10:00:02Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":1503.5,\"user\":\"u1\"}\n{\"ts\":\"2026-09-30T10:00:03Z\",\"level\":\"warn\",\"msg\":\"slow request\",\"latency_ms\":820,\"user\":\"u2\"}\n{\"ts\":\"2026-09-30T10:00:04Z\",\"level\":\"error\",\"msg\":\"db timeout\",\"latency_ms\":2001,\"user\":\"u1\"}\n{\"ts\":\"2026-09-30T10:00:05Z\",\"level\":\"info\",\"msg\":\"request\",\"latency_ms\":12.25,\"user\":\"u3\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "raw input lines",
+      "args": [
+        "-R",
+        ".",
+        "lines.txt"
+      ],
+      "stdout": "\"line one\"\n\"line two\"\n\"\"\n\"line four\"\n",
+      "exit": 0
+    },
+    {
+      "name": "raw slurp split",
+      "args": [
+        "-R",
+        "-s",
+        "-c",
+        "split(\"\\n\") | map(select(length > 0))",
+        "lines.txt"
+      ],
+      "stdout": "[\"line one\",\"line two\",\"line four\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "raw input -n inputs",
+      "args": [
+        "-n",
+        "-R",
+        "-c",
+        "[inputs]",
+        "lines.txt"
+      ],
+      "stdout": "[\"line one\",\"line two\",\"\",\"line four\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "tf values",
+      "args": [
+        "-c",
+        "map_values(.value)",
+        "tf.json"
+      ],
+      "stdout": "{\"vpc_id\":\"vpc-0abc\",\"subnet_ids\":[\"subnet-1\",\"subnet-2\"],\"db_password\":\"s3cr3t\",\"ratio\":1.0}\n",
+      "exit": 0
+    },
+    {
+      "name": "tf non sensitive",
+      "args": [
+        "-c",
+        "with_entries(select(.value.sensitive | not)) | map_values(.value)",
+        "tf.json"
+      ],
+      "stdout": "{\"vpc_id\":\"vpc-0abc\",\"subnet_ids\":[\"subnet-1\",\"subnet-2\"],\"ratio\":1.0}\n",
+      "exit": 0
+    },
+    {
+      "name": "tf raw list",
+      "args": [
+        "-r",
+        ".subnet_ids.value[]",
+        "tf.json"
+      ],
+      "stdout": "subnet-1\nsubnet-2\n",
+      "exit": 0
+    },
+    {
+      "name": "tf number",
+      "args": [
+        ".ratio.value",
+        "tf.json"
+      ],
+      "stdout": "1.0\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 ids",
+      "args": [
+        "-r",
+        ".Reservations[].Instances[].InstanceId",
+        "ec2.json"
+      ],
+      "stdout": "i-01\ni-02\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 tag name",
+      "args": [
+        "-r",
+        ".Reservations[].Instances[] | (.Tags // [] | from_entries | .Name // \"-\") as $n | \"\\(.InstanceId)\\t\\($n)\\t\\(.State.Name)\"",
+        "ec2.json"
+      ],
+      "stdout": "i-01\tweb\trunning\ni-02\t-\tstopped\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 tags from_entries Key",
+      "args": [
+        "-c",
+        ".Reservations[].Instances[] | .Tags | from_entries",
+        "ec2.json"
+      ],
+      "stdout": "{\"Name\":\"web\",\"env\":\"prod\"}\n{\"env\":\"dev\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 flatten",
+      "args": [
+        "-c",
+        "[.Reservations[].Instances] | flatten | map(.InstanceType)",
+        "ec2.json"
+      ],
+      "stdout": "[\"t3.micro\",\"m5.large\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 ip optional",
+      "args": [
+        "-r",
+        ".Reservations[].Instances[] | .PrivateIpAddress // \"none\"",
+        "ec2.json"
+      ],
+      "stdout": "10.1.0.4\nnone\n",
+      "exit": 0
+    },
+    {
+      "name": "ec2 date with offset",
+      "args": [
+        "-r",
+        ".Reservations[].Instances[] | .LaunchTime | sub(\"\\\\+00:00$\"; \"Z\") | fromdate",
+        "ec2.json"
+      ],
+      "stdout": "1788220800\n1786797000\n",
+      "exit": 0
+    },
+    {
+      "name": "set version",
+      "args": [
+        ".version = \"1.11.0\"",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.11.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "--arg set",
+      "args": [
+        "--arg",
+        "v",
+        "2.0.0",
+        ".version = $v",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"2.0.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "add dependency",
+      "args": [
+        ".dependencies += {\"lodash\": \"4.17.21\"}",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\",\n    \"lodash\": \"4.17.21\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "add script",
+      "args": [
+        ".scripts.lint = \"biome check .\"",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\",\n    \"lint\": \"biome check .\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "del dependency",
+      "args": [
+        "del(.dependencies.zod)",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "sort deps",
+      "args": [
+        ".dependencies |= (to_entries | sort_by(.key) | from_entries)",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "update nested |=",
+      "args": [
+        ".engines.node |= \"\\(.) <23\"",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20 <23\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "append array",
+      "args": [
+        ".workspaces += [\"apps/*\"]",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\",\n    \"apps/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "merge objects *",
+      "args": [
+        ". * {\"scripts\": {\"dev\": \"vite\"}}",
+        "package.json"
+      ],
+      "stdout": "{\n  \"name\": \"@acme/app\",\n  \"version\": \"1.10.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"tsc -p .\",\n    \"test\": \"vitest run\",\n    \"dev\": \"vite\"\n  },\n  \"dependencies\": {\n    \"react\": \"^18.3.1\",\n    \"zod\": \"3.23.8\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"5.6.2\"\n  },\n  \"engines\": {\n    \"node\": \">=20\"\n  },\n  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "setpath",
+      "args": [
+        "setpath([\"a\",\"b\"]; 1) | .a",
+        "package.json"
+      ],
+      "stdout": "{\n  \"b\": 1\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "getpath",
+      "args": [
+        "getpath([\"scripts\",\"test\"])",
+        "package.json"
+      ],
+      "stdout": "\"vitest run\"\n",
+      "exit": 0
+    },
+    {
+      "name": "walk",
+      "args": [
+        "-c",
+        "walk(if type == \"string\" then ascii_upcase else . end) | .engines",
+        "package.json"
+      ],
+      "stdout": "{\"node\":\">=20\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "pick",
+      "args": [
+        "-c",
+        "pick(.name, .version)",
+        "package.json"
+      ],
+      "stdout": "{\"name\":\"@acme/app\",\"version\":\"1.10.0\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "to_entries sort",
+      "args": [
+        "-c",
+        ".scripts | to_entries | sort_by(.value) | map(.key)",
+        "package.json"
+      ],
+      "stdout": "[\"build\",\"test\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "increment numbers",
+      "args": [
+        "-c",
+        ".items[].status.containerStatuses[]?.restartCount |= . + 1 | [.items[].status.containerStatuses[]?.restartCount]",
+        "pods.json"
+      ],
+      "stdout": "[1,8,1]\n",
+      "exit": 0
+    },
+    {
+      "name": "price arithmetic",
+      "args": [
+        "-c",
+        ".price * .qty",
+        "order.json"
+      ],
+      "stdout": "31.5\n",
+      "exit": 0
+    },
+    {
+      "name": "number output",
+      "args": [
+        "-c",
+        ".price",
+        "order.json"
+      ],
+      "stdout": "10.50\n",
+      "exit": 0
+    },
+    {
+      "name": "tostring float",
+      "args": [
+        "-r",
+        ".price | tostring",
+        "order.json"
+      ],
+      "stdout": "10.50\n",
+      "exit": 0
+    },
+    {
+      "name": "@text price",
+      "args": [
+        "-r",
+        "\"\\(.price)\"",
+        "order.json"
+      ],
+      "stdout": "10.50\n",
+      "exit": 0
+    },
+    {
+      "name": "-n object",
+      "args": [
+        "-n",
+        "-c",
+        "{a: 1, b: [1,2], c: \"x\"}"
+      ],
+      "stdout": "{\"a\":1,\"b\":[1,2],\"c\":\"x\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "-n --arg object",
+      "args": [
+        "-n",
+        "-c",
+        "--arg",
+        "k",
+        "v",
+        "{($k): $k}"
+      ],
+      "stdout": "{\"v\":\"v\"}\n",
+      "exit": 0
+    },
+    {
+      "name": "-n range",
+      "args": [
+        "-n",
+        "-c",
+        "[range(5)]"
+      ],
+      "stdout": "[0,1,2,3,4]\n",
+      "exit": 0
+    },
+    {
+      "name": "-n now type",
+      "args": [
+        "-n",
+        "now | type"
+      ],
+      "stdout": "\"number\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-n env count",
+      "args": [
+        "-n",
+        "$ENV | type"
+      ],
+      "stdout": "\"object\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-n large int",
+      "args": [
+        "-n",
+        "9007199254740993"
+      ],
+      "stdout": "9007199254740993\n",
+      "exit": 0
+    },
+    {
+      "name": "-n float",
+      "args": [
+        "-n",
+        "[1.0, 1.50, 1e2, 0.1 + 0.2]"
+      ],
+      "stdout": "[\n  1.0,\n  1.50,\n  1E+2,\n  0.30000000000000004\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "-n string mult",
+      "args": [
+        "-n",
+        "\"ab\" * 3"
+      ],
+      "stdout": "\"ababab\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-n @csv quote",
+      "args": [
+        "-n",
+        "-r",
+        "[\"a,b\", \"c\\\"d\", 1, null, true] | @csv"
+      ],
+      "stdout": "\"a,b\",\"c\"\"d\",1,,true\n",
+      "exit": 0
+    },
+    {
+      "name": "-n @tsv",
+      "args": [
+        "-n",
+        "-r",
+        "[\"a\\tb\", \"c\\\\d\", null] | @tsv"
+      ],
+      "stdout": "a\\tb\tc\\\\d\t\n",
+      "exit": 0
+    },
+    {
+      "name": "-n input error",
+      "args": [
+        "-n",
+        "input"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "--raw-output0",
+      "args": [
+        "--raw-output0",
+        ".dependencies | keys[]",
+        "package.json"
+      ],
+      "stdout": "react\u0000zod\u0000",
+      "exit": 0
+    },
+    {
+      "name": "--seq",
+      "args": [
+        "--seq",
+        ".name",
+        "package.json"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "warned": true
+    },
+    {
+      "name": "--stream",
+      "args": [
+        "-c",
+        "--stream",
+        ".",
+        "order.json"
+      ],
+      "stdout": "[[\"id\"],1]\n[[\"price\"],10.50]\n[[\"qty\"],3]\n[[\"qty\"]]\n",
+      "exit": 0
+    },
+    {
+      "name": "-r array error",
+      "args": [
+        "-r",
+        ".workspaces",
+        "package.json"
+      ],
+      "stdout": "[\n  \"packages/*\"\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "syntax error",
+      "args": [
+        ".items[",
+        "pods.json"
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "bad json input",
+      "args": [
+        ".",
+        "lines.txt"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "multiple files",
+      "args": [
+        "-r",
+        ".name? // .kind",
+        "package.json",
+        "pods.json"
+      ],
+      "stdout": "@acme/app\nList\n",
+      "exit": 0
+    },
+    {
+      "name": "-s two files",
+      "args": [
+        "-c",
+        "-s",
+        "map(type)",
+        "package.json",
+        "order.json"
+      ],
+      "stdout": "[\"object\",\"object\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "getpath strings",
+      "args": [
+        "-r",
+        "[paths(scalars)] | map(map(tostring) | join(\".\")) | .[]",
+        "order.json"
+      ],
+      "stdout": "id\nprice\nqty\n",
+      "exit": 0
+    },
+    {
+      "name": "leaf_paths",
+      "args": [
+        "-c",
+        "[leaf_paths]",
+        "order.json"
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "tojson spacing",
+      "args": [
+        "-r",
+        "{\"a\":[1,{\"b\":null}]} | tojson",
+        "order.json"
+      ],
+      "stdout": "{\"a\":[1,{\"b\":null}]}\n",
+      "exit": 0
+    },
+    {
+      "name": "keys of array",
+      "args": [
+        "-c",
+        ".items | keys",
+        "pods.json"
+      ],
+      "stdout": "[0,1,2]\n",
+      "exit": 0
+    },
+    {
+      "name": "ascii",
+      "args": [
+        "-c",
+        "[.[] | .title | explode | length]",
+        "issues.json"
+      ],
+      "stdout": "[16,13,18,15]\n",
+      "exit": 0
+    },
+    {
+      "name": "splits",
+      "args": [
+        "-c",
+        "[.[0].body | splits(\"\\n\")]",
+        "issues.json"
+      ],
+      "stdout": "[\"Stack trace:\",\"  at main()\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "ltrimstr miss",
+      "args": [
+        "-r",
+        ".[0].title | ltrimstr(\"x\")",
+        "issues.json"
+      ],
+      "stdout": "Crash on startup\n",
+      "exit": 0
+    },
+    {
+      "name": "join numbers",
+      "args": [
+        "-r",
+        "map(.number) | join(\",\")",
+        "issues.json"
+      ],
+      "stdout": "101,102,103,104\n",
+      "exit": 0
+    },
+    {
+      "name": "@csv numbers floats",
+      "args": [
+        "-r",
+        "[.price, .qty, 0.1] | @csv",
+        "order.json"
+      ],
+      "stdout": "10.50,3,0.1\n",
+      "exit": 0
+    },
+    {
+      "name": "-n ignores yaml stdin",
+      "args": [
+        "-n",
+        "{x:1}"
+      ],
+      "stdin": "a: 1\n",
+      "stdout": "{\n  \"x\": 1\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-n ignores a missing file",
+      "args": [
+        "-n",
+        "1",
+        "nope.json"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "-n --arg ignores bad stdin",
+      "args": [
+        "-n",
+        "--arg",
+        "x",
+        "y",
+        "$x"
+      ],
+      "stdin": "garbage\n",
+      "stdout": "\"y\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-n input after a parse error",
+      "args": [
+        "-nc",
+        "[input, (try input catch \"bad\")]"
+      ],
+      "stdin": "1 garbage\n",
+      "stdout": "[1,\"bad\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "-n input of a parse error",
+      "args": [
+        "-n",
+        "input"
+      ],
+      "stdin": "garbage\n",
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "-n try input past a parse error",
+      "args": [
+        "-nc",
+        "[try input catch \"bad\", input]",
+        "bad.json",
+        "ok.json"
+      ],
+      "files": {
+        "bad.json": "garbage\n",
+        "ok.json": "{\"a\":1}\n"
+      },
+      "stdout": "[\"bad\",{\"a\":1}]\n",
+      "exit": 0
+    },
+    {
+      "name": "-n inputs past a missing file",
+      "args": [
+        "-nc",
+        "[inputs]",
+        "nope.json",
+        "ok.json"
+      ],
+      "files": {
+        "ok.json": "{\"a\":1}\n"
+      },
+      "stdout": "[{\"a\":1}]\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "-n input of a missing file",
+      "args": [
+        "-n",
+        "input",
+        "nope.json"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "-nR inputs before a missing file",
+      "args": [
+        "-nc",
+        "-R",
+        "[inputs]",
+        "ok.json",
+        "nope.json"
+      ],
+      "files": {
+        "ok.json": "{\"a\":1}\n"
+      },
+      "stdout": "[\"{\\\"a\\\":1}\"]\n",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "-ns input of files",
+      "args": [
+        "-nc",
+        "-s",
+        "input",
+        "ok.json",
+        "ok.json"
+      ],
+      "files": {
+        "ok.json": "{\"a\":1}\n"
+      },
+      "stdout": "[{\"a\":1},{\"a\":1}]\n",
+      "exit": 0
+    },
+    {
+      "name": "--indent -1 uses a tab",
+      "args": [
+        "-n",
+        "--indent",
+        "-1",
+        "[1]"
+      ],
+      "stdout": "[\n\t1\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "--indent 8 refused",
+      "args": [
+        "-n",
+        "--indent",
+        "8",
+        "[1]"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "--indent abc refused",
+      "args": [
+        "-n",
+        "--indent",
+        "abc",
+        "[1]"
+      ],
+      "stdout": "",
+      "exit": 2,
+      "error": true
+    },
+    {
+      "name": "-n first of inputs before a bad file",
+      "args": [
+        "-nc",
+        "first(inputs)",
+        "ok.json",
+        "bad.json"
+      ],
+      "files": {
+        "ok.json": "{\"a\":1}\n",
+        "bad.json": "garbage\n"
+      },
+      "stdout": "{\"a\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "-n limit of inputs before a missing file",
+      "args": [
+        "-nc",
+        "[limit(1; inputs)]",
+        "ok.json",
+        "nope.json"
+      ],
+      "files": {
+        "ok.json": "{\"a\":1}\n"
+      },
+      "stdout": "[{\"a\":1}]\n",
+      "exit": 0
+    },
+    {
+      "name": "--indent after -c",
+      "args": [
+        "-n",
+        "-c",
+        "--indent",
+        "1",
+        "{a:[1]}"
+      ],
+      "stdout": "{\n \"a\": [\n  1\n ]\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-c after --tab",
+      "args": [
+        "-n",
+        "--tab",
+        "-c",
+        "{a:[1]}"
+      ],
+      "stdout": "{\"a\":[1]}\n",
+      "exit": 0
+    },
+    {
+      "name": "splits empty pattern",
+      "args": [
+        "-nc",
+        "\"abc\" | [splits(\"\")]"
+      ],
+      "stdout": "[\"\",\"a\",\"b\",\"c\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "splits empty match after a match",
+      "args": [
+        "-nc",
+        "\"ab\" | [splits(\"a*\")]"
+      ],
+      "stdout": "[\"\",\"\",\"b\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "splits end anchor",
+      "args": [
+        "-nc",
+        "\"abc\" | [splits(\"$\")]"
+      ],
+      "stdout": "[\"abc\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "splits empty input",
+      "args": [
+        "-nc",
+        "\"\" | [splits(\"\")]"
+      ],
+      "stdout": "[\"\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex with flags",
+      "args": [
+        "-nc",
+        "\"aXbxc\" | split(\"x\"; \"i\")"
+      ],
+      "stdout": "[\"a\",\"b\",\"c\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex null flags",
+      "args": [
+        "-nc",
+        "\"a1b22c\" | split(\"[0-9]+\"; null)"
+      ],
+      "stdout": "[\"a\",\"b\",\"c\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex empty match",
+      "args": [
+        "-nc",
+        "\"abc\" | split(\"b*\"; null)"
+      ],
+      "stdout": "[\"\",\"a\",\"\",\"c\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex bad modifier",
+      "args": [
+        "-nc",
+        "\"abc\" | split(\"b\"; \"q\")"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "gsub empty pattern",
+      "args": [
+        "-nc",
+        "\"abc\" | gsub(\"\"; \"-\")"
+      ],
+      "stdout": "\"-a-b-c-\"\n",
+      "exit": 0
+    },
+    {
+      "name": "scan empty pattern",
+      "args": [
+        "-nc",
+        "\"abc\" | [scan(\"\")]"
+      ],
+      "stdout": "[\"\",\"\",\"\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex generators",
+      "args": [
+        "-nc",
+        "\"a1b\" | split(\"[0-9]\", \"b\"; null)"
+      ],
+      "stdout": "[\"a\",\"b\"]\n[\"a1\",\"\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "split regex pattern not a string",
+      "args": [
+        "-nc",
+        "\"abc\" | split(1; null)"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "string unicode escape",
+      "args": [
+        "-nc",
+        "\"caf\\u00e9\""
+      ],
+      "stdout": "\"café\"\n",
+      "exit": 0
+    },
+    {
+      "name": "string surrogate pair escape",
+      "args": [
+        "-nc",
+        "\"\\ud83d\\ude00\""
+      ],
+      "stdout": "\"😀\"\n",
+      "exit": 0
+    },
+    {
+      "name": "string lone low surrogate",
+      "args": [
+        "-nc",
+        "\"\\ude00\""
+      ],
+      "stdout": "\"�\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"\ude00\"\n",
+        "exit": 0,
+        "reason": "A string literal reads only the escapes upstream does plus \\uXXXX: a lone surrogate is kept as is, \\b and \\f read as their letter, and an unknown escape is its letter, not an error."
+      }
+    },
+    {
+      "name": "string json escapes",
+      "args": [
+        "-nc",
+        "\"\\b\\f\\/\\u0000\""
+      ],
+      "stdout": "\"\\b\\f/\\u0000\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "\"bf/\\u0000\"\n",
+        "exit": 0,
+        "reason": "A string literal reads only the escapes upstream does plus \\uXXXX: a lone surrogate is kept as is, \\b and \\f read as their letter, and an unknown escape is its letter, not an error."
+      }
+    },
+    {
+      "name": "field unicode escape",
+      "args": [
+        ".\"\\u0061\""
+      ],
+      "stdin": "{\"a\":3}\n",
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "object key unicode escape",
+      "args": [
+        "-nc",
+        "{\"\\u0061\": 1}"
+      ],
+      "stdout": "{\"a\":1}\n",
+      "exit": 0
+    },
+    {
+      "name": "interpolation after unicode escape",
+      "args": [
+        "-nc",
+        "\"\\u00e9\\(1 + 1)\\(\"\\u00e9\")\""
+      ],
+      "stdout": "\"é2é\"\n",
+      "exit": 0
+    },
+    {
+      "name": "string lone high surrogate",
+      "args": [
+        "-nc",
+        "\"\\ud83d\""
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "\"\ud83d\"\n",
+        "exit": 0,
+        "reason": "A string literal reads only the escapes upstream does plus \\uXXXX: a lone surrogate is kept as is, \\b and \\f read as their letter, and an unknown escape is its letter, not an error."
+      }
+    },
+    {
+      "name": "string short unicode escape",
+      "args": [
+        "-nc",
+        "\"\\u12\""
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "string bad unicode escape",
+      "args": [
+        "-nc",
+        "\"\\uZZZZ\""
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true
+    },
+    {
+      "name": "string unknown escape",
+      "args": [
+        "-nc",
+        "\"\\q\""
+      ],
+      "stdout": "",
+      "exit": 3,
+      "error": true,
+      "accept": {
+        "stdout": "\"q\"\n",
+        "exit": 0,
+        "reason": "A string literal reads only the escapes upstream does plus \\uXXXX: a lone surrogate is kept as is, \\b and \\f read as their letter, and an unknown escape is its letter, not an error."
+      }
+    },
+    {
+      "name": "strftime glibc padding flags",
+      "args": [
+        "-nr",
+        "1699000000 | strftime(\"%-d|%_d|%0e|%-e|%-H|%_m|%-j\")"
+      ],
+      "env": {
+        "TZ": "UTC"
+      },
+      "stdout": "3| 3|03|3|8|11|307\n",
+      "exit": 0
+    },
+    {
+      "name": "strftime E and O modifiers",
+      "args": [
+        "-nr",
+        "1699000000 | strftime(\"%Ey|%EY|%Od|%OH|%Oy|%Ec\")"
+      ],
+      "env": {
+        "TZ": "UTC"
+      },
+      "stdout": "23|2023|03|08|23|Fri Nov  3 08:26:40 2023\n",
+      "exit": 0
+    },
+    {
+      "name": "-n first of a select over inputs before a bad value",
+      "args": [
+        "-n",
+        "first(inputs | select(. > 1))",
+        "mix.json"
+      ],
+      "files": {
+        "mix.json": "1 2 3 x 4\n"
+      },
+      "stdout": "2\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "first and limit run a pipe whole, so an error past the first result fails the call where jq answers the first."
+      }
+    },
+    {
+      "name": "-n first of a select over inputs reaching a bad value",
+      "args": [
+        "-n",
+        "first(inputs | select(. > 3))",
+        "mix.json"
+      ],
+      "files": {
+        "mix.json": "1 2 3 x 4\n"
+      },
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "-n limit over two inputs calls",
+      "args": [
+        "-nc",
+        "[limit(1; inputs, inputs)]"
+      ],
+      "stdin": "1 2\n",
+      "stdout": "[1]\n",
+      "exit": 0
+    },
+    {
+      "name": "first of an error",
+      "args": [
+        "-n",
+        "first(error(\"x\"))"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "limit past an empty to an error",
+      "args": [
+        "-nc",
+        "[limit(1; empty, error(\"x\"))]"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "limit stops before an error",
+      "args": [
+        "-nc",
+        "[limit(1; (1, error(\"a\")), error(\"b\"))]"
+      ],
+      "stdout": "[1]\n",
+      "exit": 0
+    },
+    {
+      "name": "limit reaches an error",
+      "args": [
+        "-nc",
+        "[limit(2; 1, error(\"x\"))]"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "first through a pipe before an error",
+      "args": [
+        "-nc",
+        "[1,2] | first(.[] | if . == 2 then error(\"z\") else . end)"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "",
+        "exit": 5,
+        "reason": "first and limit run a pipe whole, so an error past the first result fails the call where jq answers the first."
+      }
+    },
+    {
+      "name": "try first of an error",
+      "args": [
+        "-nc",
+        "try first(error(\"x\")) catch ."
+      ],
+      "stdout": "\"x\"\n",
+      "exit": 0
+    },
+    {
+      "name": "isempty of an error",
+      "args": [
+        "-nc",
+        "isempty(error(\"x\"))"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "limit before a break",
+      "args": [
+        "-nc",
+        "[label $f | limit(2; 1, break $f)]"
+      ],
+      "stdout": "[1]\n",
+      "exit": 0
+    },
+    {
+      "name": "strftime past jq's buffer",
+      "args": [
+        "-n",
+        "0 | strftime(\"%c%c%c%c%c\")"
+      ],
+      "stdout": "",
+      "exit": 5,
+      "error": true
+    },
+    {
+      "name": "strftime within jq's buffer",
+      "args": [
+        "-n",
+        "0 | strftime(\"%p\" * 60) | length"
+      ],
+      "stdout": "120\n",
+      "exit": 0
+    }
+  ]
+}

@@ -77,7 +77,9 @@ export const statCommand: RuntimeCommand = {
 
         if (format) {
           // Handle custom format
-          const modeOctal = stat.mode.toString(8);
+          // (1ctx stat-mode) the permission bits; a disk's mode carries the
+          // file type above them
+          const modeOctal = (stat.mode & 0o7777).toString(8);
           const modeStr = formatMode(stat.mode, stat.isDirectory);
           const replacements = new Map<string, string>([
             ["%n", file],
@@ -97,7 +99,8 @@ export const statCommand: RuntimeCommand = {
           appendStdout(`${output}\n`);
         } else {
           // Default format
-          const modeOctal = stat.mode.toString(8).padStart(4, "0");
+          // (1ctx stat-mode)
+          const modeOctal = (stat.mode & 0o7777).toString(8).padStart(4, "0");
           const modeStr = formatMode(stat.mode, stat.isDirectory);
           appendStdout(
             `  File: ${file}\n  Size: ${stat.size}\t\tBlocks: ${Math.ceil(stat.size / 512)}\nAccess: (${modeOctal}/${modeStr})\nModify: ${stat.mtime.toISOString()}\n`,

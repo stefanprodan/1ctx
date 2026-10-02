@@ -615,14 +615,14 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
 
     case "Iterate": {
       const base = ast.base;
-      // null iterates to nothing, as mikefarah's yq and this engine's value
-      // mode do, so a stream edit skips the documents without the key; jq
-      // stops on it
+      // null iterates to nothing in mikefarah's yq, so a stream edit skips
+      // the documents without the key; jq stops on it (1ctx jq-iterate-null)
+      const lenient = ctx.dialect === "yq";
       return through(
         ctx,
         () => (base ? evaluatePaths(v, base, ctx) : HERE(v)),
         (b) => {
-          if (b.value !== null && typeof b.value !== "object") {
+          if (b.value === null ? !lenient : typeof b.value !== "object") {
             throw new Error(`Cannot iterate over ${described(b.value)}`);
           }
           return children(ctx, b.value);
@@ -652,8 +652,24 @@ function pathsOf(v: QueryValue, ast: AstNode, ctx: EvalContext): Located[] {
       return [...out, ...right];
     }
 
-    case "Optional":
+    case "Optional": {
+      const step = ast.expr;
+      // jq's `?` after a step guards that step alone, so `.[].b?` keeps
+      // the .b of the elements that have one; mikefarah's yq guards the
+      // whole path (1ctx jq-optional-step)
+      if (
+        ctx.dialect !== "yq" &&
+        (step.type === "Field" || step.type === "Index" || step.type === "Slice" || step.type === "Iterate") &&
+        step.base
+      ) {
+        const base = step.base;
+        const at = { ...step, base: undefined };
+        return through(ctx, () => evaluatePaths(v, base, ctx), (b) =>
+          optional(() => evaluatePaths(b.value, at, ctx)),
+        );
+      }
       return optional(() => evaluatePaths(v, ast.expr, ctx));
+    }
 
     case "Try": {
       const handler = ast.catch;
@@ -844,7 +860,8 @@ function callPaths(
   const userFunc = ctx.funcs?.get(funcKey);
   if (!userFunc) return null;
   const funcs = new Map(userFunc.closure ?? ctx.funcs ?? new Map());
-  funcs.set(funcKey, userFunc);
+  // an argument never sees itself (1ctx jq-closures)
+  if (!userFunc.argument) funcs.set(funcKey, userFunc);
   const values: { name: string; values: QueryValue[] }[] = [];
   for (let i = 0; i < userFunc.params.length; i++) {
     const param = userFunc.params[i];
@@ -855,6 +872,7 @@ function callPaths(
         params: [],
         body: args[i],
         closure: new Map(ctx.funcs ?? []),
+        argument: true,
       });
     }
   }

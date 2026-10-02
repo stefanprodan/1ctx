@@ -14,6 +14,8 @@ import {
   processEscapes,
   utf8ByteLength,
 } from "./escapes.js";
+// (1ctx printf-bytes)
+import { escapedByte, outputOf, textOf } from "./raw-bytes.js";
 import { formatStrftime } from "./strftime.js";
 
 /**
@@ -243,7 +245,8 @@ export const printfCommand: RuntimeCommand = {
       );
 
       // First, process escape sequences in the format string.
-      const processedFormat = processEscapes(format, maxOutputBytes);
+      // (1ctx printf-bytes) a byte escape is held as a byte
+      const processedFormat = processEscapes(format, maxOutputBytes, true);
 
       // Format and handle argument reuse (bash loops through format until all args consumed)
       let output = "";
@@ -306,7 +309,8 @@ export const printfCommand: RuntimeCommand = {
             return ctx.env.get(varName) ?? "";
           });
           if (ctx.assignShellVariable) {
-            await ctx.assignShellVariable(arrayName, output, key);
+            // (1ctx printf-bytes) a held byte as the character of its value
+            await ctx.assignShellVariable(arrayName, textOf(output), key);
           } else {
             throw new Error(
               "printf -v array assignment requires an interpreter assignment gateway",
@@ -314,12 +318,12 @@ export const printfCommand: RuntimeCommand = {
           }
         } else {
           if (ctx.assignShellVariable) {
-            await ctx.assignShellVariable(targetVar, output);
+            await ctx.assignShellVariable(targetVar, textOf(output));
           } else {
             if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(targetVar)) {
               throw new Error(`${targetVar}: not a valid identifier`);
             }
-            ctx.env.set(targetVar, output);
+            ctx.env.set(targetVar, textOf(output));
           }
         }
         return {
@@ -331,7 +335,8 @@ export const printfCommand: RuntimeCommand = {
       }
 
       return {
-        stdout: output,
+        // (1ctx printf-bytes) held bytes written as themselves
+        ...outputOf(output),
         stderr: errorMessage,
         exitCode: hadError ? 1 : 0,
         internalStdinConsumed: 0,
@@ -1203,8 +1208,8 @@ function processBEscapes(
           }
 
           if (bytes.length > 0) {
-            // Decode bytes as UTF-8 with error recovery
-            result += decodeUtf8WithRecovery(bytes);
+            // (1ctx printf-bytes) each byte as itself, as bash writes it
+            for (const byte of bytes) result += escapedByte(byte);
             i = j;
           } else {
             result += "\\x";
@@ -1238,7 +1243,8 @@ function processBEscapes(
             j++;
           }
           if (octal) {
-            result += String.fromCharCode(parseInt(octal, 8));
+            // (1ctx printf-bytes)
+            result += escapedByte(parseInt(octal, 8) & 0xff);
           } else {
             result += "\0"; // Just \0 is NUL
           }
@@ -1259,7 +1265,8 @@ function processBEscapes(
             octal += str[j];
             j++;
           }
-          result += String.fromCharCode(parseInt(octal, 8));
+          // (1ctx printf-bytes)
+          result += escapedByte(parseInt(octal, 8) & 0xff);
           i = j;
           break;
         }

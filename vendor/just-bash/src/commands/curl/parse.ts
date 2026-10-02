@@ -70,6 +70,43 @@ function pushUrlencodePart(options: CurlOptions, value: string): void {
   options.dataParts.push({ value: encodeFormData(value) });
 }
 
+// (1ctx curl-timeout) The most a timer holds; the fetch's own deadline is
+// shorter, and a longer delay would make setTimeout fire at once.
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+// curl's largest whole seconds, LONG_MAX / 1000 - 1
+const MAX_SECONDS = 9223372036854774n;
+const MAX_FRACTION = 9223372036854775807n;
+
+/**
+ * (1ctx curl-timeout) Seconds as curl's secs2ms reads them: digits, then an
+ * optional `.` and digits, the rest ignored, so `1.5` is 1500 ms and `1e300`
+ * is 1 s. The answer is whole milliseconds, or curl's complaint.
+ */
+export function parseSeconds(value: string): number | string {
+  const whole = /^\d+/.exec(value)?.[0];
+  if (whole === undefined || BigInt(whole) > MAX_SECONDS) {
+    return "expected a proper numerical parameter";
+  }
+  let ms = 0;
+  if (value[whole.length] === ".") {
+    const fraction = /^\d+/.exec(value.slice(whole.length + 1))?.[0];
+    // curl answers a missing or oversized fraction this way
+    if (fraction === undefined || BigInt(fraction) > MAX_FRACTION) {
+      return "too large number";
+    }
+    ms = Number(fraction.padEnd(3, "0").slice(0, 3));
+  }
+  return Math.min(Number(whole) * 1000 + ms, MAX_TIMEOUT_MS);
+}
+
+function curlParamError(name: string, problem: string): ExecResult {
+  return {
+    stdout: "",
+    stderr: `curl: option ${name}: ${problem}\ncurl: try 'curl --help' or 'curl --manual' for more information\n`,
+    exitCode: 2,
+  };
+}
+
 /**
  * Parse curl command line arguments
  */
@@ -95,6 +132,9 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
 
   let impliesPost = false;
   let explicitMethod = false;
+  // (1ctx curl-timeout) -m wins over --connect-timeout; 0 is no limit
+  let maxTimeMs = 0;
+  let connectTimeoutMs = 0;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -217,30 +257,36 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
       if (options.method === "GET") {
         options.method = "PUT";
       }
-    } else if (arg === "-m" || arg === "--max-time") {
-      const secs = parseFloat(args[++i] ?? "0");
-      if (!Number.isNaN(secs) && secs > 0) {
-        options.timeoutMs = secs * 1000;
+    } else if (
+      arg === "-m" ||
+      arg === "--max-time" ||
+      arg === "--connect-timeout" ||
+      arg.startsWith("--max-time=") ||
+      arg.startsWith("--connect-timeout=") ||
+      (arg.startsWith("-m") && !arg.startsWith("--"))
+    ) {
+      // (1ctx curl-timeout) seconds as curl reads them, in whole milliseconds
+      const eq = arg.indexOf("=");
+      let name = arg;
+      let value: string | undefined;
+      if (arg.startsWith("--") && eq > 0) {
+        value = arg.slice(eq + 1);
+      } else if (arg.startsWith("-m") && arg.length > 2) {
+        name = "-m";
+        value = arg.slice(2);
+      } else {
+        value = args[++i];
       }
-    } else if (arg.startsWith("--max-time=")) {
-      const secs = parseFloat(arg.slice(11));
-      if (!Number.isNaN(secs) && secs > 0) {
-        options.timeoutMs = secs * 1000;
+      if (value === undefined) {
+        return curlParamError(name, "requires parameter");
       }
-    } else if (arg === "--connect-timeout") {
-      const secs = parseFloat(args[++i] ?? "0");
-      if (!Number.isNaN(secs) && secs > 0) {
-        // Use connect-timeout as overall timeout if max-time not set
-        if (options.timeoutMs === undefined) {
-          options.timeoutMs = secs * 1000;
-        }
-      }
-    } else if (arg.startsWith("--connect-timeout=")) {
-      const secs = parseFloat(arg.slice(18));
-      if (!Number.isNaN(secs) && secs > 0) {
-        if (options.timeoutMs === undefined) {
-          options.timeoutMs = secs * 1000;
-        }
+      const ms = parseSeconds(value);
+      if (typeof ms === "string") return curlParamError(name, ms);
+      if (name.startsWith("--connect-timeout")) {
+        // connect-timeout stands for the overall timeout when -m is not set
+        connectTimeoutMs = ms;
+      } else {
+        maxTimeMs = ms;
       }
     } else if (arg === "-o" || arg === "--output") {
       options.outputFile = args[++i];
@@ -384,6 +430,10 @@ export function parseOptions(args: string[]): CurlOptions | ExecResult {
   if (impliesPost && !explicitMethod && !options.getMode) {
     options.method = "POST";
   }
+
+  // (1ctx curl-timeout)
+  const timeoutMs = maxTimeMs || connectTimeoutMs;
+  if (timeoutMs > 0) options.timeoutMs = timeoutMs;
 
   return options;
 }

@@ -105,9 +105,10 @@ same commit as the change that makes or closes it.
 `test/vendor/just-bash/changes.test.ts`, part of `make test`, holds the
 two together: every id a marker names under `vendor/just-bash/src` and
 `scripts/` has an entry, every entry has a marker or `Markers: none`,
-every `Files` and `Tests` path exists, the ids are unique kebab-case,
-every entry has its fields in order, and no bare `(1ctx)` marker is
-left.
+every `Files` and `Tests` path exists, every marker sits in a file its
+entry's `Files` lists and names an id once, the ids are unique
+kebab-case, every entry has its fields in order, and no bare `(1ctx)`
+marker is left.
 
 ## How the mount gives curl its network
 
@@ -143,9 +144,10 @@ the worker bridge we removed, and `python3.cancelled-load.test.ts`
 went with python3. The fuzzers need `fast-check`, two lifecycle tests
 and the two module accessor suites `tsx`, and the browser builds
 `esbuild`, which we do not install. The module accessor suites run on
-Bun as `test/vendor/just-bash/module-accessors.test.ts`. Some tests
-stub globals or the environment with `vi.stubGlobal` or `vi.stubEnv`,
-which Bun's vitest lacks. Some of upstream's diff tests expect what GNU
+Bun as `test/vendor/just-bash/module-accessors.test.ts`. Bun's vitest
+lacks `vi.stubGlobal` and `vi.stubEnv`; `src/vitest-setup.ts` adds them
+with vitest's meaning, so the tests that stub `Buffer`, `fetch` or a
+variable run. Some of upstream's diff tests expect what GNU
 diffutils 3.12 does not answer, such as headers without the file's
 time and exit 1 for an unknown option, and some of find's a path
 unquoted where GNU findutils 4.11 quotes it.
@@ -166,11 +168,13 @@ The run fails when the set moves either way, a new failure or a listed
 one passing. The suite runs in one process that shares static state,
 such as `ReadWriteFs`'s mutation queue, so under load a host-disk test
 can fail for another file's leftovers: a new failure whose file passes
-when run alone is reported and let through. A run that still differs
+when run alone is reported and let through, with what bun said before
+it, so its assertion stays in the log. A run that still differs
 is run again, three runs in all, since a loaded CI runner fails a
 host-disk test now and then even alone; a regression differs every
 time and fails the run. After a change that fixes one, or a sync, check each
-difference, then record it with `scripts/vendor-test.sh --update`.
+difference, then record it with `scripts/vendor-test.sh --update`, which
+runs the suite twice and keeps what failed both times.
 
 ## Syncing a new upstream release
 

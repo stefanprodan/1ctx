@@ -1,0 +1,1473 @@
+{
+  "recordedWith": "yq (https://github.com/mikefarah/yq/) version v4.53.3",
+  "files": {
+    "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n",
+    "got.yaml": "apiVersion: v1\nitems:\n- apiVersion: v1\n  kind: Pod\n  metadata:\n    creationTimestamp: \"2026-01-02T03:04:05Z\"\n    labels:\n      app: web\n    managedFields:\n    - apiVersion: v1\n      fieldsType: FieldsV1\n      manager: kubectl\n    name: web-1\n    namespace: default\n    resourceVersion: \"12345\"\n    uid: 0c0e8a3c-1111-2222-3333-444455556666\n  spec:\n    containers:\n    - image: nginx:1.27\n      name: web\n  status:\n    phase: Running\n- apiVersion: v1\n  kind: Pod\n  metadata:\n    creationTimestamp: \"2026-01-02T03:04:06Z\"\n    labels:\n      app: api\n    name: api-1\n    namespace: default\n    resourceVersion: \"12346\"\n    uid: 0c0e8a3c-7777-2222-3333-444455556666\n  spec:\n    containers:\n    - image: busybox:1.36\n      name: api\n  status:\n    phase: Pending\nkind: List\nmetadata:\n  resourceVersion: \"\"\n",
+    "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.x\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 2\n    ingress:\n      enabled: false\n    resources:\n      requests:\n        cpu: 100m\n",
+    "kustomization.yaml": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: apps\nresources:\n  - deployment.yaml\n  - service.yaml\nimages:\n  - name: ghcr.io/stefanprodan/podinfo\n    newTag: 6.7.1\nlabels:\n  - pairs:\n      app.kubernetes.io/part-of: demo\n",
+    "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n",
+    "overlay.yaml": "replicaCount: 3\nimage:\n  tag: \"1.27\"\nextra: true\n",
+    "pod.json": "{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"x\",\"labels\":{\"a\":\"b\"}},\"spec\":{\"containers\":[{\"name\":\"c\",\"image\":\"nginx\"}]}}\n",
+    "values.yaml": "replicaCount: 1\nimage:\n  repository: nginx\n  tag: \"1.25\"\nservice:\n  port: 80\n"
+  },
+  "cases": [
+    {
+      "name": "names",
+      "args": [
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\n---\npodinfo\n---\npodinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "kinds",
+      "args": [
+        ".kind",
+        "app.yaml"
+      ],
+      "stdout": "Deployment\n---\nService\n---\nConfigMap\n",
+      "exit": 0
+    },
+    {
+      "name": "kind/name",
+      "args": [
+        ".kind + \"/\" + .metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "Deployment/podinfo\n---\nService/podinfo\n---\nConfigMap/podinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "string interp",
+      "args": [
+        "\"\\(.kind)/\\(.metadata.name)\"",
+        "app.yaml"
+      ],
+      "stdout": "Deployment/podinfo\nService/podinfo\nConfigMap/podinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "deployment image",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].image",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "all images",
+      "args": [
+        ".spec.template.spec.containers[].image",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\nbusybox:1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "images via ..",
+      "args": [
+        ".. | select(has(\"image\")) | .image",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\nbusybox:1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "images via .. ?",
+      "args": [
+        ".. | .image? | select(. != null)",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\nbusybox:1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "container by name",
+      "args": [
+        ".spec.template.spec.containers[] | select(.name == \"podinfod\") | .image",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "replicas",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.replicas",
+        "app.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "select whole doc",
+      "args": [
+        "select(.kind == \"Service\")",
+        "app.yaml"
+      ],
+      "stdout": "apiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n",
+      "exit": 0
+    },
+    {
+      "name": "select two conditions",
+      "args": [
+        "select(.kind == \"Deployment\" and .metadata.name == \"podinfo\") | .metadata.namespace",
+        "app.yaml"
+      ],
+      "stdout": "apps\n",
+      "exit": 0
+    },
+    {
+      "name": "labels map",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.labels",
+        "app.yaml"
+      ],
+      "stdout": "app.kubernetes.io/name: podinfo\napp.kubernetes.io/version: \"6.7.1\"\n",
+      "exit": 0
+    },
+    {
+      "name": "dotted label",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.labels.\"app.kubernetes.io/version\"",
+        "app.yaml"
+      ],
+      "stdout": "6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "bracket label",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.labels[\"app.kubernetes.io/version\"]",
+        "app.yaml"
+      ],
+      "stdout": "6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "annotations to_entries",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.annotations | to_entries | .[] | .key + \"=\" + .value",
+        "app.yaml"
+      ],
+      "stdout": "fluxcd.io/automated=true\nreloader.stakater.com/auto=true\n",
+      "exit": 0
+    },
+    {
+      "name": "block scalar",
+      "args": [
+        "select(.kind == \"ConfigMap\") | .data.\"config.yaml\"",
+        "app.yaml"
+      ],
+      "stdout": "server:\n  port: 9898\nlogLevel: info\n\n",
+      "exit": 0
+    },
+    {
+      "name": "block scalar strip",
+      "args": [
+        "select(.kind == \"ConfigMap\") | .data.\"script.sh\"",
+        "app.yaml"
+      ],
+      "stdout": "#!/bin/sh\necho \"hello: world\"\n",
+      "exit": 0
+    },
+    {
+      "name": "configmap data",
+      "args": [
+        "select(.kind == \"ConfigMap\") | .data",
+        "app.yaml"
+      ],
+      "stdout": "version: \"1.10\"\nenabled: \"on\"\nconfig.yaml: |\n  server:\n    port: 9898\n  logLevel: info\nscript.sh: |-\n  #!/bin/sh\n  echo \"hello: world\"\n",
+      "exit": 0
+    },
+    {
+      "name": "quoted scalars",
+      "args": [
+        "select(.kind == \"ConfigMap\") | .data.version",
+        "app.yaml"
+      ],
+      "stdout": "1.10\n",
+      "exit": 0
+    },
+    {
+      "name": "keys",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[0] | keys",
+        "app.yaml"
+      ],
+      "stdout": "- name\n- image\n- imagePullPolicy\n- command\n- env\n- ports\n- resources\n",
+      "exit": 0
+    },
+    {
+      "name": "length",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers | length",
+        "app.yaml"
+      ],
+      "stdout": "2\n",
+      "exit": 0
+    },
+    {
+      "name": "join names",
+      "args": [
+        "select(.kind == \"Deployment\") | [.spec.template.spec.containers[].name] | join(\",\")",
+        "app.yaml"
+      ],
+      "stdout": "podinfod,sidecar\n\n\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "podinfod,sidecar\n",
+        "exit": 0,
+        "reason": "a select that matches nothing outputs nothing, where mikefarah still feeds an empty list to [...] and prints a blank line per document",
+        "written": {}
+      }
+    },
+    {
+      "name": "env as list",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env",
+        "app.yaml"
+      ],
+      "stdout": "- name: PODINFO_UI_COLOR\n  value: \"#34577c\"\n- name: PODINFO_CACHE\n  value: \"yes\"\n",
+      "exit": 0
+    },
+    {
+      "name": "flow seq read",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[1].args",
+        "app.yaml"
+      ],
+      "stdout": "[\"sleep\", \"infinity\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "resources",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].resources",
+        "app.yaml"
+      ],
+      "stdout": "limits:\n  memory: 256Mi\nrequests:\n  cpu: 100m\n  memory: 64Mi\n",
+      "exit": 0
+    },
+    {
+      "name": "has",
+      "args": [
+        "select(.kind == \"Deployment\") | has(\"spec\")",
+        "app.yaml"
+      ],
+      "stdout": "true\n",
+      "exit": 0
+    },
+    {
+      "name": "document index",
+      "args": [
+        "di",
+        "app.yaml"
+      ],
+      "stdout": "0\n1\n2\n",
+      "exit": 0
+    },
+    {
+      "name": "select by di",
+      "args": [
+        "select(di == 1) | .metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\n",
+      "exit": 0
+    },
+    {
+      "name": "-N names",
+      "args": [
+        "-N",
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\npodinfo\npodinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "-o json doc",
+      "args": [
+        "-o",
+        "json",
+        "select(.kind == \"Deployment\") | .metadata",
+        "app.yaml"
+      ],
+      "stdout": "{\n  \"name\": \"podinfo\",\n  \"namespace\": \"apps\",\n  \"labels\": {\n    \"app.kubernetes.io/name\": \"podinfo\",\n    \"app.kubernetes.io/version\": \"6.7.1\"\n  },\n  \"annotations\": {\n    \"fluxcd.io/automated\": \"true\",\n    \"reloader.stakater.com/auto\": \"true\"\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-o=json",
+      "args": [
+        "-o=json",
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "\"podinfo\"\n\"podinfo\"\n\"podinfo-config\"\n",
+      "exit": 0
+    },
+    {
+      "name": "-oj",
+      "args": [
+        "-oj",
+        "select(.kind==\"Service\") | .spec.ports",
+        "app.yaml"
+      ],
+      "stdout": "[\n  {\n    \"name\": \"http\",\n    \"port\": 9898,\n    \"targetPort\": \"http\"\n  }\n]\n",
+      "exit": 0
+    },
+    {
+      "name": "-o json -I0",
+      "args": [
+        "-o",
+        "json",
+        "-I0",
+        "select(.kind == \"Service\")",
+        "app.yaml"
+      ],
+      "stdout": "{\"apiVersion\":\"v1\",\"kind\":\"Service\",\"metadata\":{\"name\":\"podinfo\",\"namespace\":\"apps\"},\"spec\":{\"type\":\"ClusterIP\",\"selector\":{\"app.kubernetes.io/name\":\"podinfo\"},\"ports\":[{\"name\":\"http\",\"port\":9898,\"targetPort\":\"http\"}]}}\n",
+      "exit": 0
+    },
+    {
+      "name": "-r",
+      "args": [
+        "-r",
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\n---\npodinfo\n---\npodinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "eval",
+      "args": [
+        "eval",
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\n---\npodinfo\n---\npodinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "e",
+      "args": [
+        "e",
+        ".metadata.name",
+        "app.yaml"
+      ],
+      "stdout": "podinfo\n---\npodinfo\n---\npodinfo-config\n",
+      "exit": 0
+    },
+    {
+      "name": "ea count",
+      "args": [
+        "ea",
+        "[.] | length",
+        "app.yaml"
+      ],
+      "stdout": "3\n",
+      "exit": 0
+    },
+    {
+      "name": "ea select",
+      "args": [
+        "eval-all",
+        "select(.kind == \"Service\") | .metadata.name",
+        "app.yaml",
+        "kustomization.yaml"
+      ],
+      "stdout": "podinfo\n",
+      "exit": 0
+    },
+    {
+      "name": "two files",
+      "args": [
+        ".kind",
+        "app.yaml",
+        "helmrelease.yaml"
+      ],
+      "stdout": "Deployment\n---\nService\n---\nConfigMap\n---\nHelmRelease\n",
+      "exit": 0
+    },
+    {
+      "name": "list items names",
+      "args": [
+        ".items[].metadata.name",
+        "got.yaml"
+      ],
+      "stdout": "web-1\napi-1\n",
+      "exit": 0
+    },
+    {
+      "name": "list items select",
+      "args": [
+        ".items[] | select(.status.phase == \"Running\") | .metadata.name",
+        "got.yaml"
+      ],
+      "stdout": "web-1\n",
+      "exit": 0
+    },
+    {
+      "name": "list tsv",
+      "args": [
+        ".items[] | [.metadata.name, .status.phase] | @tsv",
+        "got.yaml"
+      ],
+      "stdout": "web-1\tRunning\napi-1\tPending\n",
+      "exit": 0
+    },
+    {
+      "name": "list csv",
+      "args": [
+        ".items[] | [.metadata.name, .spec.containers[0].image] | @csv",
+        "got.yaml"
+      ],
+      "stdout": "web-1,nginx:1.27\napi-1,busybox:1.36\n",
+      "exit": 0
+    },
+    {
+      "name": "map names",
+      "args": [
+        ".items | map(.metadata.name)",
+        "got.yaml"
+      ],
+      "stdout": "- web-1\n- api-1\n",
+      "exit": 0
+    },
+    {
+      "name": "comments stripped",
+      "args": [
+        "... comments=\"\"",
+        "one.yaml"
+      ],
+      "stdout": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25\nstatus: {}\n",
+      "exit": 0
+    },
+    {
+      "name": "json to yaml -P",
+      "args": [
+        "-P",
+        ".",
+        "pod.json"
+      ],
+      "stdout": "{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Pod\",\n  \"metadata\": {\n    \"name\": \"x\",\n    \"labels\": {\n      \"a\": \"b\"\n    }\n  },\n  \"spec\": {\n    \"containers\": [\n      {\n        \"name\": \"c\",\n        \"image\": \"nginx\"\n      }\n    ]\n  }\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "json in yaml out",
+      "args": [
+        "-p",
+        "json",
+        "-o",
+        "yaml",
+        ".",
+        "pod.json"
+      ],
+      "stdout": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: x\n  labels:\n    a: b\nspec:\n  containers:\n    - name: c\n      image: nginx\n",
+      "exit": 0
+    },
+    {
+      "name": "yaml to json",
+      "args": [
+        "-o",
+        "json",
+        ".",
+        "one.yaml"
+      ],
+      "stdout": "{\n  \"apiVersion\": \"apps/v1\",\n  \"kind\": \"Deployment\",\n  \"metadata\": {\n    \"name\": \"web\",\n    \"creationTimestamp\": null,\n    \"resourceVersion\": \"999\"\n  },\n  \"spec\": {\n    \"replicas\": 1,\n    \"template\": {\n      \"spec\": {\n        \"containers\": [\n          {\n            \"name\": \"web\",\n            \"image\": \"nginx:1.25\"\n          }\n        ]\n      }\n    }\n  },\n  \"status\": {}\n}\n",
+      "exit": 0
+    },
+    {
+      "name": "-e missing",
+      "args": [
+        "-e",
+        ".spec.missing",
+        "one.yaml"
+      ],
+      "stdout": "null\n",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "-e present",
+      "args": [
+        "-e",
+        ".spec.replicas",
+        "one.yaml"
+      ],
+      "stdout": "1\n",
+      "exit": 0
+    },
+    {
+      "name": "alternative",
+      "args": [
+        ".spec.strategy // \"RollingUpdate\"",
+        "one.yaml"
+      ],
+      "stdout": "RollingUpdate\n",
+      "exit": 0
+    },
+    {
+      "name": "select contains",
+      "args": [
+        ".. | select(type == \"!!str\" and test(\"podinfo:\")) ",
+        "app.yaml"
+      ],
+      "stdout": "ghcr.io/stefanprodan/podinfo:6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "split resources",
+      "args": [
+        ".resources[]",
+        "kustomization.yaml"
+      ],
+      "stdout": "deployment.yaml\nservice.yaml\n",
+      "exit": 0
+    },
+    {
+      "name": "merge ireduce",
+      "args": [
+        "ea",
+        ". as $item ireduce ({}; . * $item)",
+        "values.yaml",
+        "overlay.yaml"
+      ],
+      "stdout": "replicaCount: 3\nimage:\n  repository: nginx\n  tag: \"1.27\"\nservice:\n  port: 80\nextra: true\n",
+      "exit": 0
+    },
+    {
+      "name": "merge load",
+      "args": [
+        ". * load(\"overlay.yaml\")",
+        "values.yaml"
+      ],
+      "stdout": "replicaCount: 3\nimage:\n  repository: nginx\n  tag: \"1.27\"\nservice:\n  port: 80\nextra: true\n",
+      "exit": 0
+    },
+    {
+      "name": "env strenv",
+      "args": [
+        ".image.tag = strenv(TAG)",
+        "values.yaml"
+      ],
+      "env": {
+        "TAG": "1.27"
+      },
+      "stdout": "replicaCount: 1\nimage:\n  repository: nginx\n  tag: \"1.27\"\nservice:\n  port: 80\n",
+      "exit": 0
+    },
+    {
+      "name": "env env()",
+      "args": [
+        ".replicaCount = env(REPLICAS)",
+        "values.yaml"
+      ],
+      "env": {
+        "REPLICAS": "4"
+      },
+      "stdout": "replicaCount: 4\nimage:\n  repository: nginx\n  tag: \"1.25\"\nservice:\n  port: 80\n",
+      "exit": 0
+    },
+    {
+      "name": "string concat env",
+      "args": [
+        ".spec.template.spec.containers[0].image = \"nginx:\" + strenv(TAG)",
+        "one.yaml"
+      ],
+      "env": {
+        "TAG": "1.27"
+      },
+      "stdout": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27 # pinned\nstatus: {}\n",
+      "exit": 0
+    },
+    {
+      "name": "-i replicas single",
+      "args": [
+        "-i",
+        ".spec.replicas = 3",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "-i image single",
+      "args": [
+        "-i",
+        ".spec.template.spec.containers[0].image = \"nginx:1.27\"",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "-i select replicas",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.replicas) = 3",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i select dot replicas",
+      "args": [
+        "-i",
+        "select(.kind == \"Deployment\").spec.replicas = 3",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i container image by name",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[] | select(.name == \"podinfod\") | .image) = \"ghcr.io/stefanprodan/podinfo:6.8.0\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.8.0\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i image sub",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].image) |= sub(\":.*\", \":6.8.0\")",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.8.0\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i namespace every doc",
+      "args": [
+        "-i",
+        ".metadata.namespace = \"prod\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: prod # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: prod\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: prod\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i add label",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .metadata.labels.team) = \"web\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n    team: web\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i add dotted annotation",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .metadata.annotations[\"fluxcd.io/reconcile\"]) = \"disabled\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\n    fluxcd.io/reconcile: disabled\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i del annotations",
+      "args": [
+        "-i",
+        "del(select(.kind == \"Deployment\") | .metadata.annotations)",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i del resources",
+      "args": [
+        "-i",
+        "del(.spec.template.spec.containers[] | select(.name == \"podinfod\") | .resources)",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i append env",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env) += [{\"name\": \"LOG\", \"value\": \"debug\"}]",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n            - name: LOG\n              value: debug\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i del env by name",
+      "args": [
+        "-i",
+        "del(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[] | select(.name == \"PODINFO_CACHE\"))",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i with",
+      "args": [
+        "-i",
+        "with(select(.kind == \"Deployment\"); .spec.replicas = 4 | .metadata.labels.tier = \"front\")",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n    tier: front\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 4\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i configmap value",
+      "args": [
+        "-i",
+        "select(.kind == \"ConfigMap\").data.version = \"1.11\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.11\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i configmap multiline",
+      "args": [
+        "-i",
+        "select(.kind == \"ConfigMap\").data.extra = \"a: 1\\nb: 2\\n\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n  extra: |\n    a: 1\n    b: 2\n"
+      }
+    },
+    {
+      "name": "-i service port",
+      "args": [
+        "-i",
+        "select(.kind == \"Service\").spec.ports[0].port = 80",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 80\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i set args list",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[1].args) = [\"sleep\", \"3600\"]",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [sleep, \"3600\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "an item the edit did not change keeps its node and its quotes, as an edited scalar does",
+        "written": {
+          "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"3600\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+        }
+      }
+    },
+    {
+      "name": "-i add container",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers) += [{\"name\": \"proxy\", \"image\": \"envoy:1.30\", \"ports\": [{\"containerPort\": 8080}]}]",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n        - name: proxy\n          image: envoy:1.30\n          ports:\n            - containerPort: 8080\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i kustomize image tag",
+      "args": [
+        "-i",
+        "(.images[] | select(.name == \"ghcr.io/stefanprodan/podinfo\") | .newTag) = \"6.8.0\"",
+        "kustomization.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "kustomization.yaml": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: apps\nresources:\n  - deployment.yaml\n  - service.yaml\nimages:\n  - name: ghcr.io/stefanprodan/podinfo\n    newTag: 6.8.0\nlabels:\n  - pairs:\n      app.kubernetes.io/part-of: demo\n"
+      }
+    },
+    {
+      "name": "-i kustomize add resource",
+      "args": [
+        "-i",
+        ".resources += [\"configmap.yaml\"]",
+        "kustomization.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "kustomization.yaml": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: apps\nresources:\n  - deployment.yaml\n  - service.yaml\n  - configmap.yaml\nimages:\n  - name: ghcr.io/stefanprodan/podinfo\n    newTag: 6.7.1\nlabels:\n  - pairs:\n      app.kubernetes.io/part-of: demo\n"
+      }
+    },
+    {
+      "name": "-i kustomize sort resources",
+      "args": [
+        "-i",
+        ".resources |= sort",
+        "kustomization.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "-i kustomize add patch",
+      "args": [
+        "-i",
+        ".patches += [{\"path\": \"patch.yaml\", \"target\": {\"kind\": \"Deployment\", \"name\": \"podinfo\"}}]",
+        "kustomization.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "kustomization.yaml": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nnamespace: apps\nresources:\n  - deployment.yaml\n  - service.yaml\nimages:\n  - name: ghcr.io/stefanprodan/podinfo\n    newTag: 6.7.1\nlabels:\n  - pairs:\n      app.kubernetes.io/part-of: demo\npatches:\n  - path: patch.yaml\n    target:\n      kind: Deployment\n      name: podinfo\n"
+      }
+    },
+    {
+      "name": "-i helm values",
+      "args": [
+        "-i",
+        ".spec.values.replicaCount = 3 | .spec.values.ingress.enabled = true",
+        "helmrelease.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.x\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 3\n    ingress:\n      enabled: true\n    resources:\n      requests:\n        cpu: 100m\n"
+      }
+    },
+    {
+      "name": "-i helm version",
+      "args": [
+        "-i",
+        ".spec.chart.spec.version = \"6.8.0\"",
+        "helmrelease.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.8.0\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 2\n    ingress:\n      enabled: false\n    resources:\n      requests:\n        cpu: 100m\n"
+      }
+    },
+    {
+      "name": "-i helm merge values",
+      "args": [
+        "-i",
+        ".spec.values *= load(\"overlay.yaml\")",
+        "helmrelease.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.x\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 3\n    ingress:\n      enabled: false\n    resources:\n      requests:\n        cpu: 100m\n    image:\n      tag: \"1.27\"\n    extra: true\n"
+      }
+    },
+    {
+      "name": "-i helm values from file",
+      "args": [
+        "-i",
+        ".spec.values = load(\"values.yaml\")",
+        "helmrelease.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.x\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 1\n    image:\n      repository: nginx\n      tag: \"1.25\"\n    service:\n      port: 80\n"
+      }
+    },
+    {
+      "name": "-i clean kubectl",
+      "args": [
+        "-i",
+        "del(.metadata.creationTimestamp, .metadata.resourceVersion, .status)",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\n"
+      }
+    },
+    {
+      "name": "clean list",
+      "args": [
+        "del(.items[].metadata.managedFields, .items[].metadata.uid, .items[].metadata.resourceVersion, .items[].metadata.creationTimestamp, .items[].status)",
+        "got.yaml"
+      ],
+      "stdout": "apiVersion: v1\nitems:\n  - apiVersion: v1\n    kind: Pod\n    metadata:\n      labels:\n        app: web\n      name: web-1\n      namespace: default\n    spec:\n      containers:\n        - image: nginx:1.27\n          name: web\n  - apiVersion: v1\n    kind: Pod\n    metadata:\n      labels:\n        app: api\n      name: api-1\n      namespace: default\n    spec:\n      containers:\n        - image: busybox:1.36\n          name: api\nkind: List\nmetadata:\n  resourceVersion: \"\"\n",
+      "exit": 0
+    },
+    {
+      "name": "list to stream",
+      "args": [
+        ".items[]",
+        "got.yaml"
+      ],
+      "stdout": "apiVersion: v1\nkind: Pod\nmetadata:\n  creationTimestamp: \"2026-01-02T03:04:05Z\"\n  labels:\n    app: web\n  managedFields:\n    - apiVersion: v1\n      fieldsType: FieldsV1\n      manager: kubectl\n  name: web-1\n  namespace: default\n  resourceVersion: \"12345\"\n  uid: 0c0e8a3c-1111-2222-3333-444455556666\nspec:\n  containers:\n    - image: nginx:1.27\n      name: web\nstatus:\n  phase: Running\napiVersion: v1\nkind: Pod\nmetadata:\n  creationTimestamp: \"2026-01-02T03:04:06Z\"\n  labels:\n    app: api\n  name: api-1\n  namespace: default\n  resourceVersion: \"12346\"\n  uid: 0c0e8a3c-7777-2222-3333-444455556666\nspec:\n  containers:\n    - image: busybox:1.36\n      name: api\nstatus:\n  phase: Pending\n",
+      "exit": 0
+    },
+    {
+      "name": "list split -s",
+      "args": [
+        "-s",
+        ".metadata.name",
+        ".items[]",
+        "got.yaml"
+      ],
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "name": "-i add replicas when missing",
+      "args": [
+        "-i",
+        "select(.kind == \"Deployment\").spec.revisionHistoryLimit = 5",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n  revisionHistoryLimit: 5\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i number as string",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].ports[0].containerPort) = \"8080\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: \"8080\"\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i set yes string",
+      "args": [
+        "-i",
+        "(select(.kind == \"Deployment\") | .spec.template.spec.containers[0].env[1].value) = \"no\"",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"no\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  type: ClusterIP\n  selector:\n    app.kubernetes.io/name: podinfo\n  ports:\n    - name: http\n      port: 9898\n      targetPort: http\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i set bool",
+      "args": [
+        "-i",
+        ".spec.values.ingress.enabled = true",
+        "helmrelease.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "helmrelease.yaml": "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: podinfo\n  namespace: apps\nspec:\n  interval: 10m\n  chart:\n    spec:\n      chart: podinfo\n      version: \"6.x\"\n      sourceRef:\n        kind: HelmRepository\n        name: podinfo\n  values:\n    replicaCount: 2\n    ingress:\n      enabled: true\n    resources:\n      requests:\n        cpu: 100m\n"
+      }
+    },
+    {
+      "name": "-i head comment",
+      "args": [
+        "-i",
+        ". head_comment = \"managed by flux\"",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "# managed by flux\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "-i line comment",
+      "args": [
+        "-i",
+        ".spec.replicas line_comment = \"scaled\"",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1 # scaled\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "-i sort keys",
+      "args": [
+        "-i",
+        "sort_keys(.metadata)",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  creationTimestamp: null\n  name: web\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "-i del a doc",
+      "args": [
+        "-i",
+        "del(select(.kind == \"Service\"))",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: podinfo-config\n  namespace: apps\ndata:\n  version: \"1.10\"\n  enabled: \"on\"\n  config.yaml: |\n    server:\n      port: 9898\n    logLevel: info\n  script.sh: |-\n    #!/bin/sh\n    echo \"hello: world\"\n"
+      }
+    },
+    {
+      "name": "-i keep only",
+      "args": [
+        "-i",
+        "select(.kind == \"Deployment\")",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "app.yaml": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n"
+      }
+    },
+    {
+      "name": "stdin",
+      "args": [
+        ".spec.template.spec.containers[0].image",
+        "-"
+      ],
+      "stdin": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  creationTimestamp: null\n  resourceVersion: \"999\"\nspec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.25 # pinned\nstatus: {}\n",
+      "stdout": "nginx:1.25\n",
+      "exit": 0
+    },
+    {
+      "name": "-i json file",
+      "args": [
+        "-i",
+        ".metadata.name = \"y\"",
+        "pod.json"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pod.json": "{\n  \"apiVersion\": \"v1\",\n  \"kind\": \"Pod\",\n  \"metadata\": {\n    \"name\": \"y\",\n    \"labels\": {\n      \"a\": \"b\"\n    }\n  },\n  \"spec\": {\n    \"containers\": [\n      {\n        \"name\": \"c\",\n        \"image\": \"nginx\"\n      }\n    ]\n  }\n}\n"
+      }
+    },
+    {
+      "name": "-i indent 4",
+      "args": [
+        "-i",
+        "-I4",
+        ".spec.replicas = 3",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "one.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n    name: web\n    creationTimestamp: null\n    resourceVersion: \"999\"\nspec:\n    replicas: 3\n    template:\n        spec:\n            containers:\n                - name: web\n                  image: nginx:1.25 # pinned\nstatus: {}\n"
+      }
+    },
+    {
+      "name": "select image tag split",
+      "args": [
+        "select(.kind == \"Deployment\") | .spec.template.spec.containers[0].image | split(\":\") | .[1]",
+        "app.yaml"
+      ],
+      "stdout": "6.7.1\n",
+      "exit": 0
+    },
+    {
+      "name": "to_entries labels",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.labels | to_entries",
+        "app.yaml"
+      ],
+      "stdout": "- key: app.kubernetes.io/name\n  value: podinfo\n- key: app.kubernetes.io/version\n  value: \"6.7.1\"\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "- key: app.kubernetes.io/name\n  value: podinfo\n- key: app.kubernetes.io/version\n  value: 6.7.1\n",
+        "exit": 0,
+        "reason": "a list the filter builds prints afresh, where mikefarah copies each value's quotes",
+        "written": {}
+      }
+    },
+    {
+      "name": "with_entries",
+      "args": [
+        "select(.kind == \"Deployment\") | .metadata.labels |= with_entries(select(.key | test(\"version\") | not))",
+        "app.yaml"
+      ],
+      "stdout": "# podinfo: frontend stack\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: podinfo\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: podinfo\n    spec:\n      containers:\n        - name: podinfod\n          image: ghcr.io/stefanprodan/podinfo:6.7.1\n          imagePullPolicy: IfNotPresent\n          command:\n            - ./podinfo\n            - --port=9898\n            - --level=info\n          env:\n            - name: PODINFO_UI_COLOR\n              value: \"#34577c\"\n            - name: PODINFO_CACHE\n              value: \"yes\"\n          ports:\n            - name: http\n              containerPort: 9898\n              protocol: TCP\n          resources:\n            limits:\n              memory: 256Mi\n            requests:\n              cpu: 100m\n              memory: 64Mi\n        - name: sidecar\n          image: busybox:1.36\n          args: [\"sleep\", \"infinity\"]\n",
+      "exit": 0
+    },
+    {
+      "name": "unique kinds",
+      "args": [
+        "ea",
+        "[.kind] | unique",
+        "app.yaml"
+      ],
+      "stdout": "- Deployment\n- Service\n- ConfigMap\n",
+      "exit": 0
+    },
+    {
+      "name": "group by namespace",
+      "args": [
+        "ea",
+        "[.] | group_by(.metadata.namespace) | .[] | .[0].metadata.namespace",
+        "app.yaml",
+        "helmrelease.yaml"
+      ],
+      "stdout": "apps\n",
+      "exit": 0
+    },
+    {
+      "name": "pick",
+      "args": [
+        "select(.kind == \"Deployment\") | pick([\"metadata\"])",
+        "app.yaml"
+      ],
+      "stdout": "# podinfo: frontend stack\n---\nmetadata:\n  name: podinfo\n  namespace: apps # prod namespace\n  labels:\n    app.kubernetes.io/name: podinfo\n    app.kubernetes.io/version: \"6.7.1\"\n  annotations:\n    fluxcd.io/automated: \"true\"\n    reloader.stakater.com/auto: \"true\"\n",
+      "exit": 0
+    },
+    {
+      "name": "path expression",
+      "args": [
+        "select(.kind == \"Deployment\") | path(.spec.template.spec.containers[0].image)",
+        "app.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true,
+      "accept": {
+        "stdout": "- spec\n- template\n- spec\n- containers\n- 0\n- image\n",
+        "exit": 0,
+        "reason": "jq's path(f) is accepted, which mikefarah refuses",
+        "written": {}
+      }
+    },
+    {
+      "name": "paths leaves",
+      "args": [
+        "[paths(..)] | length",
+        "one.yaml"
+      ],
+      "stdout": "",
+      "exit": 1,
+      "error": true,
+      "accept": {
+        "stdout": "14\n",
+        "exit": 0,
+        "reason": "jq's paths(f) is accepted, which mikefarah refuses",
+        "written": {}
+      }
+    },
+    {
+      "name": "tag of",
+      "args": [
+        ".spec.replicas | tag",
+        "one.yaml"
+      ],
+      "stdout": "!!int\n",
+      "exit": 0
+    },
+    {
+      "name": "key",
+      "args": [
+        ".spec.replicas | key",
+        "one.yaml"
+      ],
+      "stdout": "replicas\n",
+      "exit": 0
+    },
+    {
+      "name": "-i moves defaultMode, 0644 kept",
+      "args": [
+        "-i",
+        ".spec.volumes[0].configMap.mode = .spec.volumes[0].configMap.defaultMode | del(.spec.volumes[0].configMap.defaultMode)",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      }
+    },
+    {
+      "name": "moves defaultMode on stdout, 0644 kept",
+      "args": [
+        ".spec.volumes[0].configMap.mode = .spec.volumes[0].configMap.defaultMode | del(.spec.volumes[0].configMap.defaultMode)",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n",
+      "exit": 0
+    },
+    {
+      "name": "-i with() moves defaultMode",
+      "args": [
+        "-i",
+        "with(.spec.volumes[0].configMap; .mode = .defaultMode | del(.defaultMode))",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      }
+    },
+    {
+      "name": "-i renames defaultMode by with_entries",
+      "args": [
+        "-i",
+        ".spec.volumes[0].configMap |= with_entries(.key |= sub(\"defaultMode\"; \"mode\"))",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      }
+    },
+    {
+      "name": "-i copies defaultMode and overwrites it",
+      "args": [
+        "-i",
+        ".spec.volumes[0].configMap.mode = .spec.volumes[0].configMap.defaultMode | .spec.volumes[0].configMap.defaultMode = 420",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 420\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      }
+    },
+    {
+      "name": "-i moves a mode between volumes",
+      "args": [
+        "-i",
+        ".spec.volumes[1].secret.defaultMode = .spec.volumes[0].configMap.defaultMode | del(.spec.volumes[0])",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0644\n"
+      }
+    },
+    {
+      "name": "-i writes 644 beside 0644",
+      "args": [
+        "-i",
+        ".spec.volumes[1].secret.defaultMode = 644",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 644\n"
+      }
+    },
+    {
+      "name": "-i writes 644 where 0644 was deleted",
+      "args": [
+        "-i",
+        ".spec.volumes[1].secret.defaultMode = 644 | del(.spec.volumes[0].configMap.defaultMode)",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 644\n"
+      }
+    },
+    {
+      "name": "-i copies defaultMode beside a written 644",
+      "args": [
+        "-i",
+        ".spec.volumes[0].configMap.mode = .spec.volumes[0].configMap.defaultMode | .spec.volumes[1].secret.defaultMode = 644",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "A number the filter writes keeps the filter's spelling, so a value copied from the document that equals it takes that spelling too: the copied 0644 is written 644; our values do not carry their spelling.",
+        "written": {
+          "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n        mode: 644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 644\n"
+        }
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 644\n"
+      }
+    },
+    {
+      "name": "-i copies defaultMode beside a written 420",
+      "args": [
+        "-i",
+        ".spec.volumes[0].configMap.mode = .spec.volumes[0].configMap.defaultMode | .spec.volumes[1].secret.defaultMode = 420",
+        "vol.yaml"
+      ],
+      "files": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 0440\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "vol.yaml": "apiVersion: v1\nkind: Pod\nspec:\n  volumes:\n    - name: config\n      configMap:\n        name: app\n        defaultMode: 0644\n        mode: 0644\n    - name: tls\n      secret:\n        secretName: tls\n        defaultMode: 420\n"
+      }
+    },
+    {
+      "name": "-i adds to a number beside a 0600",
+      "args": [
+        "-i",
+        ".spec.containers[0].livenessProbe.periodSeconds += 590",
+        "sec.yaml"
+      ],
+      "files": {
+        "sec.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 10\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "sec.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 600\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "reason": "A computed number takes the spelling an equal number has in the document, so 600 is written 0600, which a YAML 1.1 reader like Kubernetes reads as 384; our values do not carry their spelling.",
+        "written": {
+          "sec.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 0600\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+        }
+      }
+    },
+    {
+      "name": "-i writes 600 beside a 0600",
+      "args": [
+        "-i",
+        ".spec.containers[0].livenessProbe.periodSeconds = 600",
+        "pod.yaml"
+      ],
+      "files": {
+        "pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 10\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 600\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      }
+    },
+    {
+      "name": "-i writes 400 beside a 0400",
+      "args": [
+        "-i",
+        ".spec.containers[0].livenessProbe.timeoutSeconds = 400",
+        "pod.yaml"
+      ],
+      "files": {
+        "pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 10\n        timeoutSeconds: 1\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  containers:\n    - name: c\n      image: busybox\n      livenessProbe:\n        periodSeconds: 10\n        timeoutSeconds: 400\n  volumes:\n    - name: a\n      secret:\n        secretName: a\n        defaultMode: 0644\n    - name: b\n      projected:\n        defaultMode: 0600\n        sources:\n          - secret:\n              name: b\n              items:\n                - key: k\n                  path: k\n                  mode: 0400\n"
+      }
+    }
+  ]
+}

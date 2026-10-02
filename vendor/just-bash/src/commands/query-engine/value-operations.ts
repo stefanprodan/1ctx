@@ -12,6 +12,9 @@ import {
   safeHasOwn,
   safeSet,
 } from "./safe-object.js";
+// (1ctx jq-compare jq-infinity)
+import { compareText, sortedKeys } from "./jq-text.js";
+export { compareText, jqJson, sortedKeys } from "./jq-text.js";
 
 export type QueryValue = unknown;
 
@@ -50,7 +53,8 @@ export function canonical(value: QueryValue): string {
  */
 export function compare(a: QueryValue, b: QueryValue): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  // (1ctx jq-compare)
+  if (typeof a === "string" && typeof b === "string") return compareText(a, b);
   return 0;
 }
 
@@ -212,7 +216,8 @@ export function compareJq(a: QueryValue, b: QueryValue): number {
   if (ta !== tb) return ta - tb;
 
   if (typeof a === "number" && typeof b === "number") return a - b;
-  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  // (1ctx jq-compare)
+  if (typeof a === "string" && typeof b === "string") return compareText(a, b);
   if (typeof a === "boolean" && typeof b === "boolean")
     return (a ? 1 : 0) - (b ? 1 : 0);
   if (Array.isArray(a) && Array.isArray(b)) {
@@ -226,11 +231,11 @@ export function compareJq(a: QueryValue, b: QueryValue): number {
   const aObj = asQueryRecord(a);
   const bObj = asQueryRecord(b);
   if (aObj && bObj) {
-    const aKeys = Object.keys(aObj).sort();
-    const bKeys = Object.keys(bObj).sort();
+    const aKeys = sortedKeys(Object.keys(aObj));
+    const bKeys = sortedKeys(Object.keys(bObj));
     // First compare keys
     for (let i = 0; i < Math.min(aKeys.length, bKeys.length); i++) {
-      const keyCmp = aKeys[i].localeCompare(bKeys[i]);
+      const keyCmp = compareText(aKeys[i], bKeys[i]);
       if (keyCmp !== 0) return keyCmp;
     }
     if (aKeys.length !== bKeys.length) return aKeys.length - bKeys.length;

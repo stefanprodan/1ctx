@@ -570,6 +570,39 @@ export class GlobExpander {
     // Get the file pattern after **
     const filePattern = afterDoubleStar.replace(/^\//, "");
 
+    // (1ctx globstar) a trailing ** matches every file and folder below,
+    // and the folder it follows itself, with its slash, as bash's; `**/`
+    // matches only the folders, each with its slash. After `**/**` bash
+    // names that folder without its slash.
+    const trailing = /^\*\*((?:\/\*\*)*)(\/*)$/.exec(
+      pattern.slice(doubleStarIndex),
+    );
+    if (trailing) {
+      const foldersOnly = trailing[2] !== "";
+      const repeated = trailing[1] !== "";
+      const prefix = pattern.slice(0, doubleStarIndex);
+      const root = prefix.replace(/\/$/, "");
+      if (prefix !== "") {
+        try {
+          this.checkOpsLimit();
+          const stat = await this.fs.stat(
+            this.fs.resolvePath(this.cwd, root || "/"),
+          );
+          if (!stat.isDirectory) return [];
+        } catch (error) {
+          if (error instanceof ExecutionLimitError) throw error;
+          return [];
+        }
+        results.push(repeated && !foldersOnly ? root || "/" : prefix);
+      }
+      await this.walkEverything(
+        root || (prefix ? "/" : ""),
+        results,
+        foldersOnly,
+      );
+      return results.sort();
+    }
+
     // Check if the file pattern contains another ** (multiple globstar)
     // If so, we need to recursively expand from each directory
     if (filePattern.includes("**") && this.isGlobstarValid(filePattern)) {
@@ -579,7 +612,14 @@ export class GlobExpander {
         results,
       );
       // Dedupe results since multiple ** can match the same file from different paths
-      const unique = [...new Set(results)];
+      // (1ctx globstar) after more than one **, bash names the folder a
+      // trailing ** follows without its slash
+      const named = pattern.endsWith("/")
+        ? results
+        : results.map((path) =>
+            path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path,
+          );
+      const unique = [...new Set(named)];
       return unique.sort();
     } else {
       await this.walkDirectory(beforeDoubleStar, filePattern, results);
@@ -684,6 +724,74 @@ export class GlobExpander {
         throw error;
       }
       // Directory doesn't exist
+    }
+  }
+
+  /**
+   * (1ctx globstar) Every entry below a folder, named from `dir` ("" for
+   * the current one), descending into folders but never through a link,
+   * and leaving dot entries out unless dotglob is set; with `foldersOnly`
+   * only the folders, each with its slash.
+   */
+  private async walkEverything(
+    dir: string,
+    results: string[],
+    foldersOnly = false,
+  ): Promise<void> {
+    this.checkOpsLimit();
+    const fullPath = this.fs.resolvePath(this.cwd, dir || ".");
+    let entries: { name: string; isDirectory: boolean; isSymbolicLink: boolean }[];
+    try {
+      this.checkOpsLimit();
+      if (this.fs.readdirWithFileTypes) {
+        entries = await this.fs.readdirWithFileTypes(fullPath);
+      } else {
+        entries = [];
+        for (const name of await this.fs.readdir(fullPath)) {
+          this.checkOpsLimit();
+          const stat = await this.fs.lstat(
+            fullPath === "/" ? `/${name}` : `${fullPath}/${name}`,
+          );
+          entries.push({
+            name,
+            isDirectory: stat.isDirectory,
+            isSymbolicLink: stat.isSymbolicLink,
+          });
+        }
+      }
+    } catch (error) {
+      if (error instanceof ExecutionLimitError) throw error;
+      return;
+    }
+    const dirs: string[] = [];
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") && !this.dotglob) continue;
+      const path =
+        dir === "" ? entry.name : dir === "/" ? `/${entry.name}` : `${dir}/${entry.name}`;
+      if (entry.isDirectory) {
+        results.push(foldersOnly ? `${path}/` : path);
+        dirs.push(path);
+      } else if (!foldersOnly) {
+        results.push(path);
+      } else if (entry.isSymbolicLink) {
+        // `**/` names a link to a folder as a folder, never entering it
+        try {
+          this.checkOpsLimit();
+          const target = await this.fs.stat(
+            fullPath === "/" ? `/${entry.name}` : `${fullPath}/${entry.name}`,
+          );
+          if (target.isDirectory) results.push(`${path}/`);
+        } catch (error) {
+          if (error instanceof ExecutionLimitError) throw error;
+        }
+      }
+    }
+    for (let i = 0; i < dirs.length; i += DEFAULT_BATCH_SIZE) {
+      const batch = dirs.slice(i, i + DEFAULT_BATCH_SIZE);
+      // (1ctx find-batch)
+      await settleAll(
+        batch.map((path) => this.walkEverything(path, results, foldersOnly)),
+      );
     }
   }
 

@@ -107,18 +107,17 @@ describe("curl option parsing", () => {
       expect(result.exitCode).toBe(0);
     });
 
-    it("should handle negative timeout gracefully", async () => {
+    // (1ctx curl-timeout) curl refuses a negative or non-numeric timeout
+    it("should refuse a negative timeout", async () => {
       const env = createEnv();
       const result = await env.exec("curl -m -5 https://api.example.com/test");
-      // Negative timeout should be ignored
-      expect(result.exitCode).toBe(0);
+      expect(result.exitCode).toBe(2);
     });
 
-    it("should handle non-numeric timeout", async () => {
+    it("should refuse a non-numeric timeout", async () => {
       const env = createEnv();
       const result = await env.exec("curl -m abc https://api.example.com/test");
-      // Invalid timeout should be ignored
-      expect(result.exitCode).toBe(0);
+      expect(result.exitCode).toBe(2);
     });
 
     it("should parse --max-time=value form", async () => {

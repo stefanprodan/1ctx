@@ -12,14 +12,27 @@
 import type { RE2JS } from "re2js";
 import YAML from "yaml";
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
-import { createUserRegex, type UserRegex } from "../../../regex/index.js";
+import {
+  createUserRegex,
+  // (1ctx regex-builtins)
+  stepPastEmpty,
+  type UserRegex,
+} from "../../../regex/index.js";
 import type { Dialect, EvalContext } from "../evaluator.js";
 import { type AstNode, parse } from "../parser.js";
+// (1ctx yq)
+import { lastPathKey, type PathTag, pathKeys } from "../path-tag.js";
+// (1ctx jq-stderr jq-inputs jq-arity jq-math)
+import { evalIoBuiltin } from "./io-builtins.js";
+import { JQ_BUILTIN_NAMES, JQ_BUILTINS } from "./jq-builtins.js";
+import { iterated } from "../jq-text.js";
 import { asQueryRecord, safeSet, sanitizeParsedData } from "../safe-object.js";
 import {
   canonical,
   compareJq,
+  containsDeep,
   deepEqual,
+  jqJson,
   type QueryValue,
 } from "../value-operations.js";
 
@@ -258,6 +271,9 @@ function matches(
   input: string,
   global: boolean,
   limit: number,
+  // Go's rule for mikefarah's yq: no empty match where the last one ended
+  // (1ctx regex-builtins)
+  goEmpty = false,
 ): Match[] {
   const re2 = (regex as unknown as { _re2: RE2JS })._re2;
   const names: (string | null)[] = [];
@@ -268,10 +284,17 @@ function matches(
   const matcher = re2.matcher(input);
   const found: Match[] = [];
   let position = 0;
+  let previousEnd = -1;
   while (position <= input.length && matcher.find(position)) {
-    if (found.length >= limit) limitExceeded(limit);
     const start = matcher.start(0);
     const end = matcher.end(0);
+    const skipped = goEmpty && start === end && start === previousEnd;
+    previousEnd = end;
+    if (skipped) {
+      position = stepPastEmpty(input, end);
+      continue;
+    }
+    if (found.length >= limit) limitExceeded(limit);
     const groups: Group[] = [];
     for (let i = 1; i <= count; i++) {
       const text = matcher.group(i);
@@ -284,7 +307,8 @@ function matches(
     }
     found.push({ start, end, groups });
     if (!global) break;
-    position = end > start ? end : end + 1;
+    // (1ctx regex-builtins) past a whole code point
+    position = end > start ? end : stepPastEmpty(input, end);
   }
   return found;
 }
@@ -336,6 +360,12 @@ function notString(value: QueryValue): never {
   throw new Error(`${described(value)} cannot be matched, as it is not a string`);
 }
 
+// which argument of a regex builtin holds its modifiers (1ctx jq-builtins)
+const REGEX_FLAGS_ARG: Record<string, number> = Object.assign(
+  Object.create(null),
+  { test: 1, match: 1, capture: 1, scan: 1, splits: 1, sub: 2, gsub: 2 },
+);
+
 function regexBuiltin(
   value: QueryValue,
   name: string,
@@ -344,17 +374,45 @@ function regexBuiltin(
   evaluate: EvalFn,
 ): QueryValue[] | null {
   const yq = ctx.dialect === "yq";
+  // jq takes only g, i, x, n, s, p and l as modifiers (1ctx jq-builtins)
+  // split/2 is a regex split, its flags splits' (1ctx jq-builtins)
+  const at = name === "split" ? 1 : REGEX_FLAGS_ARG[name];
+  if (!yq && at !== undefined && args.length > at) {
+    for (const flags of evaluate(value, args[at], ctx)) {
+      if (flags === null) continue;
+      if (typeof flags !== "string") {
+        throw new Error(`${described(flags)} is not a string`);
+      }
+      const shown = name === "splits" || name === "split" ? `${flags}g` : flags;
+      if (/[^gixnspl]/.test(flags)) {
+        throw new Error(`${shown} is not a valid modifier string`);
+      }
+    }
+  }
+  // a regex split takes a string and string patterns, as jq's match does
+  // (1ctx jq-builtins)
+  const splitChecks = (input: QueryValue, re: AstNode | undefined): null => {
+    if (typeof input !== "string") notString(input);
+    for (const pattern of re ? evaluate(value, re, ctx) : []) {
+      if (typeof pattern !== "string") {
+        throw new Error(`${described(pattern)} is not a string`);
+      }
+    }
+    return null;
+  };
   switch (name) {
     case "test":
       if (typeof value !== "string") notString(value);
       return null;
     case "split":
       if (value === null && yq) return [];
+      if (!yq && args.length > 1) return splitChecks(value, args[0]);
       if (typeof value !== "string") {
         throw new Error("split input and separator must be strings");
       }
       return null;
     case "splits":
+      return splitChecks(value, yq ? undefined : args[0]);
     case "scan":
       if (typeof value !== "string") notString(value);
       return null;
@@ -370,6 +428,7 @@ function regexBuiltin(
         value,
         flags.includes("g"),
         ctx.limits.maxArrayElements,
+        yq,
       );
       return name === "match"
         ? found.map((m) => matchObject(m, value))
@@ -388,8 +447,8 @@ function regexBuiltin(
         const replacement = firstString(value, args[1], ctx, evaluate, "");
         const regex = createUserRegex(pattern, flags);
         // the match count holds to the element limit, as jq's does
-        matches(regex, value, true, ctx.limits.maxArrayElements);
-        return [regex.replace(value, replacement)];
+        matches(regex, value, true, ctx.limits.maxArrayElements, true);
+        return [regex.replace(value, replacement, true)];
       }
       const regex = createUserRegex(pattern, flags.replaceAll("g", ""));
       const found = matches(
@@ -452,6 +511,115 @@ function entries(value: QueryValue[], ctx: EvalContext): QueryValue[] {
       ["value", item],
     ]),
   );
+}
+
+// jq 1.8's `map({(.key // .Key // .name // .Name): if has("value") then
+// .value else .Value end}) | add // {}`: a key that is not a string
+// fails, where upstream made it one (1ctx jq-from-entries)
+function jqFromEntries(items: QueryValue[]): Record<string, QueryValue> {
+  const out: Record<string, QueryValue> = Object.create(null);
+  for (const item of items) {
+    const entry = asQueryRecord(item);
+    if (item !== null && !entry) {
+      throw new Error(`Cannot index ${jqType(item)} with string ("key")`);
+    }
+    const field = (name: string): QueryValue =>
+      entry && Object.hasOwn(entry, name) ? (entry[name] as QueryValue) : null;
+    let key: QueryValue = null;
+    for (const name of ["key", "Key", "name", "Name"]) {
+      key = field(name);
+      if (key !== null && key !== false) break;
+    }
+    if (typeof key !== "string") {
+      throw new Error(`Cannot use ${described(key)} as object key`);
+    }
+    const found = entry !== null && Object.hasOwn(entry, "value");
+    safeSet(out, key, found ? field("value") : field("Value"));
+  }
+  return out;
+}
+
+// jq's has: null has nothing, a list its indices, a map its keys (1ctx jq-has)
+function jqHas(container: QueryValue, key: QueryValue): boolean {
+  if (container === null) return false;
+  if (Array.isArray(container) && typeof key === "number") {
+    return key >= 0 && key < container.length;
+  }
+  const map = Array.isArray(container) ? null : asQueryRecord(container);
+  if (map && typeof key === "string") return Object.hasOwn(map, key);
+  throw new Error(
+    `Cannot check whether ${jqType(container)} has a ${jqType(key)} key`,
+  );
+}
+
+// what `.[]` iterates: a list's items or a map's values (1ctx jq-builtins)
+function jqItems(value: QueryValue): QueryValue[] {
+  if (Array.isArray(value)) return value;
+  const map = asQueryRecord(value);
+  if (map) return Object.values(map) as QueryValue[];
+  return cannotIterate(value);
+}
+
+// jq's length: null 0, a number its size, a string its code points
+function jqLength(value: QueryValue): number {
+  if (value === null) return 0;
+  if (typeof value === "number") return Math.abs(value);
+  if (typeof value === "string") return [...value].length;
+  if (Array.isArray(value)) return value.length;
+  const map = asQueryRecord(value);
+  if (map) return Object.keys(map).length;
+  throw new Error(`${described(value)} has no length`);
+}
+
+// jq's join: booleans and numbers as text, null as "", anything else
+// added as it is, so a list or a map fails as + does (1ctx jq-builtins)
+function jqJoin(
+  items: QueryValue[],
+  sep: QueryValue,
+  ctx: EvalContext,
+  evaluate: EvalFn,
+): QueryValue {
+  const plus = (a: QueryValue, b: QueryValue): QueryValue =>
+    evaluate(
+      null,
+      {
+        type: "BinaryOp",
+        op: "+",
+        left: { type: "Literal", value: a },
+        right: { type: "Literal", value: b },
+      },
+      ctx,
+    )[0];
+  let out: QueryValue = null;
+  for (const item of items) {
+    const piece =
+      typeof item === "boolean" || typeof item === "number"
+        ? jqJson(item)
+        : item === null
+          ? ""
+          : item;
+    const prefix = out === null ? "" : plus(out, sep);
+    out = plus(prefix, piece);
+  }
+  return out ?? "";
+}
+
+// jq's _flatten: lists are opened while the depth allows, any other
+// value kept; a negative depth never reaches 0 (1ctx jq-builtins)
+function jqFlatten(
+  items: QueryValue[],
+  depth: QueryValue,
+  out: QueryValue[],
+  limit: number,
+): void {
+  for (const item of items) {
+    if (Array.isArray(item) && depth !== 0) {
+      jqFlatten(item, typeof depth === "number" ? depth - 1 : depth, out, limit);
+      continue;
+    }
+    if (out.length >= limit) limitExceeded(limit);
+    out.push(item);
+  }
 }
 
 // the key of an entry with_entries wrote: jq takes only a string
@@ -720,18 +888,24 @@ function loaded(ctx: EvalContext, name: string, raw: boolean): QueryValue {
 
 // the path the yq walker knows for this very value; a value inside a
 // function it does not follow has none, and a quiet null would mislead
+// (1ctx yq) kept as a tag, so key reads its last key alone
 function sourcePath(
   value: QueryValue,
   name: string,
   ctx: EvalContext,
-): (string | number)[] | undefined {
+): (string | number)[] | PathTag | undefined {
   const node = ctx.sourceNode;
   if (node === undefined) return ctx.currentPath;
-  if (Object.is(node.value, value) && node.path) return [...node.path];
+  if (Object.is(node.value, value) && node.path) return node.path;
   throw new Error(
     `${name} is known after a path step or select at the top of the filter, as in .[] | select(...) | ${name}, not inside map, with_entries or del`,
   );
 }
+
+/** jq's one-argument math builtins that upstream answered null on a non-number (1ctx jq-math) */
+const JQ_MATH = new Set(
+  "floor ceil round sqrt log log10 log2 exp sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh cbrt expm1 log1p trunc".split(" "),
+);
 
 function jsonText(value: QueryValue, indent: number): string {
   return indent === 0
@@ -747,6 +921,29 @@ export function evalDialectBuiltin(
   evaluate: EvalFn,
 ): QueryValue[] | null {
   const yq = ctx.dialect === "yq";
+  // (1ctx jq-stderr jq-inputs)
+  const io = evalIoBuiltin(value, name, args, ctx, evaluate);
+  if (io !== null) return io;
+  // a jq builtin at an arity jq does not define, mikefarah's env(NAME)
+  // and a function the query defined aside (1ctx jq-arity)
+  const funcKey = `${name}/${args.length}`;
+  if (
+    !yq &&
+    JQ_BUILTIN_NAMES.has(name) &&
+    !JQ_BUILTINS.has(funcKey) &&
+    funcKey !== "env/1" &&
+    !ctx.funcs?.has(funcKey)
+  ) {
+    throw new Error(`${funcKey} is not defined`);
+  }
+  // jq's one-argument math refuses anything but a number, and its round
+  // is C's, half away from zero (1ctx jq-math)
+  if (!yq && args.length === 0 && JQ_MATH.has(name)) {
+    if (typeof value !== "number") {
+      throw new Error(`${iterated(value)} number required`);
+    }
+    if (name === "round") return [value < 0 ? -Math.round(-value) : Math.round(value)];
+  }
   if (
     yq &&
     args.length === 1 &&
@@ -776,16 +973,37 @@ export function evalDialectBuiltin(
     case "with_entries": {
       if (args.length === 0) return null;
       if (value === null && yq) return [];
-      if (asQueryRecord(value)) return null;
+      const source = asQueryRecord(value);
+      // a map's entries go back through jq's from_entries (1ctx jq-from-entries)
+      if (source && !yq) {
+        const limit = ctx.limits.maxArrayElements;
+        const mapped: QueryValue[] = [];
+        for (const key of Object.keys(source)) {
+          const entry = record([
+            ["key", key],
+            ["value", source[key] as QueryValue],
+          ]);
+          const items = evaluate(entry, args[0], ctx);
+          if (mapped.length > limit - items.length) limitExceeded(limit);
+          mapped.push(...items);
+        }
+        return [jqFromEntries(mapped)];
+      }
+      if (source) return null;
       if (!Array.isArray(value)) return hasNoKeys(value);
       const out: Record<string, QueryValue> = Object.create(null);
       const limit = ctx.limits.maxArrayElements;
       let mapped = 0;
+      const all: QueryValue[] = [];
       for (const entry of entries(value, ctx)) {
         const items = evaluate(entry, args[0], ctx);
         // the bound upstream's with_entries puts on a map's mapped entries
         mapped += items.length;
         if (mapped > limit) limitExceeded(limit);
+        if (!yq) {
+          all.push(...items);
+          continue;
+        }
         for (const item of items) {
           const obj = asQueryRecord(item);
           if (!obj) continue;
@@ -793,7 +1011,42 @@ export function evalDialectBuiltin(
           safeSet(out, entryKey(key, yq), obj.value ?? obj.v ?? null);
         }
       }
-      return [out];
+      return [yq ? out : jqFromEntries(all)];
+    }
+    case "del": {
+      // mikefarah drops a document whose root del removes, where the
+      // engine answered null and wrote a null document (1ctx yq-documents)
+      if (!yq || args.length !== 1) return null;
+      const paths = evaluate(value, { type: "Call", name: "path", args }, ctx);
+      if (paths.some((p) => Array.isArray(p) && p.length === 0)) return [];
+      return null;
+    }
+    case "has":
+      // one answer per key, and jq's error for a key of the wrong kind,
+      // where upstream took the first key and answered false (1ctx jq-has)
+      if (yq || args.length !== 1) return null;
+      return evaluate(value, args[0], ctx).map((key) => jqHas(value, key));
+    case "in":
+      if (yq || args.length !== 1) return null;
+      return evaluate(value, args[0], ctx).map((map) => jqHas(map, value));
+    case "abs":
+      // jq's `if . < 0 then - . else . end`: null and booleans sort below
+      // 0 and cannot be negated, where upstream answered null (1ctx jq-math)
+      if (yq || args.length > 0) return null;
+      if (value === null || typeof value === "boolean") {
+        throw new Error(`${described(value)} cannot be negated`);
+      }
+      return [typeof value === "number" ? Math.abs(value) : value];
+    case "@text":
+      // jq's tostring: any value but a string as JSON, where upstream
+      // gave String(value) and "" for null (1ctx jq-format-strings)
+      if (yq) return null;
+      return [typeof value === "string" ? value : jqJson(value)];
+    case "from_entries": {
+      if (yq || args.length > 0) return null;
+      const map = asQueryRecord(value);
+      if (!Array.isArray(value) && !map) return cannotIterate(value);
+      return [jqFromEntries((map ? Object.values(map) : value) as QueryValue[])];
     }
     case "map":
     case "map_values": {
@@ -817,6 +1070,15 @@ export function evalDialectBuiltin(
         }
         return [out];
       }
+      // jq's map_values is `.[] |= f`: each value set to f's first
+      // output, removed when f has none (1ctx jq-map-values)
+      if (name === "map_values" && !yq) {
+        return evaluate(
+          value,
+          { type: "UpdateOp", op: "|=", path: { type: "Iterate" }, value: args[0] },
+          ctx,
+        );
+      }
       return null;
     }
     case "min":
@@ -831,7 +1093,110 @@ export function evalDialectBuiltin(
     case "join":
     case "flatten":
       if (value === null || isScalar(value)) cannotIterate(value);
-      return null;
+      if (yq) return null;
+      // jq's own definitions, over a map's values too, where upstream
+      // answered null for a map and joined with String() (1ctx jq-builtins)
+      if (name === "join") {
+        if (args.length !== 1) return null;
+        return evaluate(value, args[0], ctx).map((sep) =>
+          jqJoin(jqItems(value), sep, ctx, evaluate),
+        );
+      }
+      if (args.length > 1) return null;
+      return (args.length === 0 ? [-1] : evaluate(value, args[0], ctx)).map(
+        (depth) => {
+          if (typeof depth === "number" && depth < 0 && args.length > 0) {
+            throw new Error("flatten depth must not be negative");
+          }
+          const out: QueryValue[] = [];
+          jqFlatten(jqItems(value), depth, out, ctx.limits.maxArrayElements);
+          return out;
+        },
+      );
+    case "transpose": {
+      if (yq || args.length > 0) return null;
+      // `[range(0; map(length) | max // 0) as $i | [.[][$i]]]`: a row that
+      // cannot be indexed fails, where upstream skipped it (1ctx jq-builtins)
+      const rows = jqItems(value);
+      let width = 0;
+      for (const row of rows) width = Math.max(width, jqLength(row));
+      if (width * rows.length > ctx.limits.maxArrayElements) {
+        limitExceeded(ctx.limits.maxArrayElements);
+      }
+      const out: QueryValue[] = [];
+      for (let i = 0; i < width; i++) {
+        out.push(
+          rows.map((row) => {
+            if (row === null) return null;
+            if (!Array.isArray(row)) {
+              throw new Error(`Cannot index ${jqType(row)} with number`);
+            }
+            return i < row.length ? row[i] : null;
+          }),
+        );
+      }
+      return [out];
+    }
+    case "INDEX": {
+      if (yq || args.length === 0 || args.length > 2) return null;
+      // `reduce stream as $row ({}; .[$row | f | tostring] = $row)`, the
+      // stream `.[]` when only f is given (1ctx jq-builtins)
+      const rows =
+        args.length === 1 ? jqItems(value) : evaluate(value, args[0], ctx);
+      const by = args[args.length - 1];
+      const out: Record<string, QueryValue> = Object.create(null);
+      for (const row of rows) {
+        for (const key of evaluate(row, by, ctx)) {
+          safeSet(out, typeof key === "string" ? key : jqJson(key), row);
+        }
+      }
+      return [out];
+    }
+    case "ltrimstr":
+    case "rtrimstr":
+    case "trimstr":
+    case "startswith":
+    case "endswith": {
+      if (yq || args.length !== 1) return null;
+      // jq 1.8 defines the trims on startswith and endswith, which take
+      // only strings, and answers once per argument (1ctx jq-builtins)
+      return evaluate(value, args[0], ctx).map((x) => {
+        const left = name !== "rtrimstr" && name !== "endswith";
+        const check = (fn: string) => {
+          if (typeof value !== "string" || typeof x !== "string") {
+            throw new Error(`${fn}() requires string inputs`);
+          }
+        };
+        check(left ? "startswith" : "endswith");
+        const text = value as string;
+        const part = x as string;
+        if (name === "startswith") return text.startsWith(part);
+        if (name === "endswith") return text.endsWith(part);
+        let out = text;
+        if (left && out.startsWith(part)) out = out.slice(part.length);
+        if (name !== "ltrimstr" && out.endsWith(part)) {
+          out = out.slice(0, out.length - part.length);
+        }
+        return out;
+      });
+    }
+    case "contains":
+    case "inside": {
+      if (yq || args.length !== 1) return null;
+      // jq refuses values of two kinds, true and false among them, where
+      // upstream answered false (1ctx jq-builtins)
+      return evaluate(value, args[0], ctx).map((other) => {
+        const [a, b] = name === "contains" ? [value, other] : [other, value];
+        const kind = (v: QueryValue) =>
+          typeof v === "boolean" ? String(v) : jqType(v);
+        if (kind(a) !== kind(b)) {
+          throw new Error(
+            `${described(a)} and ${described(b)} cannot have their containment checked`,
+          );
+        }
+        return containsDeep(a, b);
+      });
+    }
     case "any":
     case "all":
       if (args.length === 0 && (value === null || isScalar(value))) {
@@ -1037,12 +1402,18 @@ export function evalDialectBuiltin(
       return [name === "any_c" ? items.some(test) : items.every(test)];
     }
     case "key": {
+      // the root has no key, and mikefarah's answers nothing for it
       const path = sourcePath(value, name, ctx);
-      return [path && path.length > 0 ? path[path.length - 1] : null];
+      if (path === undefined) return [null];
+      const key = Array.isArray(path) ? path.at(-1) : lastPathKey(path);
+      return key === undefined ? [] : [key];
     }
-    case "path":
+    case "path": {
       if (args.length > 0) return null;
-      return [sourcePath(value, name, ctx) ?? null];
+      const path = sourcePath(value, name, ctx);
+      if (path === undefined) return [null];
+      return [Array.isArray(path) ? [...path] : pathKeys(path)];
+    }
     case "with":
       if (args.length !== 2) return null;
       return evaluate(

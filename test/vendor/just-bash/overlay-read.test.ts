@@ -102,6 +102,10 @@ describe("OverlayFs under the defense-in-depth box", () => {
     ["find /src -type f", "/src/lib/a.ts\n"],
     ["rg -l const /src/lib", "/src/lib/a.ts\n"],
     ["grep -r world /README.md", "world\n"],
+    // (1ctx stat-mode ls-long) the permission bits, not the disk's whole mode
+    ["stat -c %a /README.md /src", "644\n755\n"],
+    ["ls -l /README.md | cut -c1-10", "-rw-r--r--\n"],
+    ["ls -l /src | cut -c1-10", "total 2\ndrwxr-xr-x\nlrwxrwxrwx\n"],
   ];
   for (const [script, stdout] of cases)
     test.serial(`reads the disk: ${script}`, async () => {

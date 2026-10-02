@@ -183,12 +183,11 @@ export function parseExpressions(
       // Handled separately in find.ts, skip it
     } else if (arg === "-exec") {
       // Parse -exec command {} ; or -exec command {} +
-      const commandParts: string[] = [];
+      // (1ctx find-exec) `+` ends the command only right after `{}`, as GNU's
       i++;
-      while (i < args.length && args[i] !== ";" && args[i] !== "+") {
-        commandParts.push(args[i]);
-        i++;
-      }
+      const end = execEnd(args, i);
+      const commandParts = args.slice(i, end);
+      i = end;
       if (i >= args.length) {
         return {
           expr: null,
@@ -197,15 +196,18 @@ export function parseExpressions(
         };
       }
       if (commandParts.length === 0) {
-        return missingArgument("-exec");
+        return invalidArgument("-exec", args[i]);
       }
       const batchMode = args[i] === "+";
       if (
         batchMode &&
-        (commandParts.at(-1) !== "{}" ||
-          commandParts.filter((part) => part === "{}").length !== 1)
+        commandParts.filter((part) => part.includes("{}")).length !== 1
       ) {
-        return invalidArgument("-exec", "+");
+        return {
+          expr: null,
+          pathIndex: i,
+          error: "find: Only one instance of {} is supported with -exec ... +\n",
+        };
       }
       tokens.push({
         type: "expr",
@@ -241,7 +243,8 @@ export function parseExpressions(
       return {
         expr: null,
         pathIndex: i,
-        error: `find: unknown predicate '${arg}'\n`,
+        // (1ctx find-exec) GNU's quotes
+        error: `find: unknown predicate \`${arg}'\n`,
       };
     } else {
       return {
@@ -265,6 +268,21 @@ export function parseExpressions(
   }
 
   return { expr: result.expr, pathIndex: i };
+}
+
+/**
+ * Where an -exec command whose first word is at `start` ends: the index of
+ * its `;`, or of a `+` right after a `{}`, or the end of the arguments.
+ * Anywhere else `+` is an argument, as GNU find reads it. (1ctx find-exec)
+ */
+export function execEnd(args: readonly string[], start: number): number {
+  let i = start;
+  while (i < args.length) {
+    if (args[i] === ";") break;
+    if (args[i] === "+" && i > start && args[i - 1] === "{}") break;
+    i++;
+  }
+  return i;
 }
 
 /**

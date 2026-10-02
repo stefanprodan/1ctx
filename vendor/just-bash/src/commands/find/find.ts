@@ -2,7 +2,11 @@ import { utf8ByteLength } from "../../encoding.js";
 import { ExecutionOutputAccumulator } from "../../execution-output.js";
 import type { ExecutionScope } from "../../execution-scope.js";
 // (1ctx readonly-errors)
-import { fsErrorCode, isReadOnlyError } from "../../fs/error-words.js";
+import {
+  fsErrorCode,
+  fsErrorWords,
+  isReadOnlyError,
+} from "../../fs/error-words.js";
 import type { DirentEntry } from "../../fs/interface.js";
 // (1ctx find-links) keep host paths out of unfamiliar link errors
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
@@ -111,13 +115,14 @@ import {
   collectNewerRefs,
   evaluateExpressionWithPrune,
   evaluateForEarlyPrune,
+  evaluateLive,
   evaluateSimpleExpression,
   expressionHasPrune,
   expressionNeedsEmptyCheck,
   expressionNeedsStatMetadata,
   isSimpleExpression,
 } from "./matcher.js";
-import { parseExpressions } from "./parser.js";
+import { execEnd, parseExpressions } from "./parser.js";
 import type {
   EvalContext,
   EvalResult,
@@ -261,8 +266,8 @@ export const findCommand: RuntimeCommand = {
     for (let i = expressionStart; i < args.length; i++) {
       const arg = args[i];
       if (arg === "-exec") {
-        i++;
-        while (i < args.length && args[i] !== ";" && args[i] !== "+") i++;
+        // (1ctx find-exec) the parser's rule for where the command ends
+        i = execEnd(args, i + 1);
       } else if (arg === "-maxdepth" || arg === "-mindepth") {
         const value = args[i + 1];
         if (value === undefined || !/^\d+$/.test(value)) {
@@ -301,7 +306,21 @@ export const findCommand: RuntimeCommand = {
 
     const expressionActions = collectActions(expr);
     const hasAnyAction = expressionActions.length > 0;
-    if (expressionActions.some((a) => a.type === "delete")) depthFirst = true;
+    const hasDelete = expressionActions.some((a) => a.type === "delete");
+    if (hasDelete) depthFirst = true;
+    // (1ctx find-exec) `-exec ;` and `-delete` answer true or false and change
+    // the tree, so they run in order as the walk reaches them; every other
+    // expression keeps the batched walk
+    const live =
+      hasDelete ||
+      expressionActions.some((a) => a.type === "exec" && !a.batchMode);
+    if (!ctx.exec && expressionActions.some((a) => a.type === "exec")) {
+      return {
+        stdout: "",
+        stderr: "find: -exec not supported in this context\n",
+        exitCode: 1,
+      };
+    }
 
     // Result type for find entries
     interface FindResult {
@@ -385,8 +404,13 @@ export const findCommand: RuntimeCommand = {
       try {
         const refStat = await ctx.fs.stat(refFullPath);
         newerRefTimes.set(refPath, refStat.mtime?.getTime() ?? Date.now());
-      } catch {
-        // Reference file doesn't exist, -newer will always be false
+      } catch (error) {
+        // (1ctx find-exec) GNU fails before the walk
+        return {
+          stdout: "",
+          stderr: `find: ${diagnosticPath(refPath)}: ${fsErrorWords(error) ?? "No such file or directory"}\n`,
+          exitCode: 1,
+        };
       }
     }
 
@@ -419,8 +443,121 @@ export const findCommand: RuntimeCommand = {
     const hasReaddirWithFileTypes =
       typeof ctx.fs.readdirWithFileTypes === "function";
 
+    // Batch -exec nodes collect only paths for which that exact expression node
+    // was reached. All other effects retain entry and expression order.
+    const batchExecPaths = new Map<FindAction, string[]>();
+
+    // (1ctx find-exec) a command with its arguments, its output in order with
+    // find's own, answering its exit code
+    const runCommand = async (command: string[]): Promise<number> => {
+      if (!ctx.exec) return 1;
+      traversalBudget.checkpoint();
+      const result = await ctx.exec(shellJoinArgs([command[0]]), {
+        // (1ctx exec-env) the command is a process: it sees the exported variables
+        env: { ...ctx.exportedEnv },
+        replaceEnv: true,
+        cwd: ctx.cwd,
+        signal: ctx.signal,
+        args: command.slice(1),
+      });
+      if (output) output.appendResult(result);
+      else {
+        appendStdout(result.stdout);
+        appendStderr(result.stderr);
+      }
+      return result.exitCode;
+    };
+
+    // (1ctx find-exec) an effect performed, answering the action's truth:
+    // `-exec ;` is true when its command succeeds, the others always. -delete
+    // runs in the live walk, which knows what the entry was.
+    const perform = async (effect: EvaluatedEffect): Promise<boolean> => {
+      const { action, path: file } = effect;
+      switch (action.type) {
+        case "diagnostic":
+          appendStderr(action.message);
+          exitCode = 1;
+          return false;
+        case "print":
+          appendStdout(`${file}\n`);
+          return true;
+        case "print0":
+          appendStdout(`${file}\0`);
+          return true;
+        case "printf":
+          appendStdout(formatFindPrintf(action.format, effect.printfData));
+          return true;
+        case "delete":
+          return false;
+        case "exec": {
+          if (action.batchMode) {
+            const paths = batchExecPaths.get(action) ?? [];
+            paths.push(file);
+            batchExecPaths.set(action, paths);
+            return true;
+          }
+          // every `{}`, inside a larger argument too, with no shell reading
+          const command = action.command.map((part) =>
+            part.replaceAll("{}", file),
+          );
+          return (await runCommand(command)) === 0;
+        }
+      }
+    };
+
+    // (1ctx find-exec) -delete on an entry the walk met as a folder or not,
+    // read from the folder whose real path was `parentReal`. GNU removes by
+    // the type it met, so a folder swapped for a file is `Not a directory`.
+    // Removal goes by path, where GNU's goes through the folder it read: an
+    // entry whose folder moved is refused rather than removed through the
+    // swapped path.
+    const deleteEntry = async (
+      file: string,
+      name: string,
+      wasDirectory: boolean,
+      parentReal: string | undefined,
+    ): Promise<boolean> => {
+      // GNU never removes the folder it stands in
+      if (name === ".") return true;
+      const fullPath = ctx.fs.resolvePath(ctx.cwd, file);
+      const fail = (words: string) => {
+        appendStderr(`find: cannot delete ${diagnosticPath(file)}: ${words}\n`);
+        exitCode = 1;
+        return false;
+      };
+      let now: Awaited<ReturnType<typeof ctx.fs.lstat>>;
+      try {
+        now = await ctx.fs.lstat(fullPath);
+      } catch {
+        return fail("No such file or directory");
+      }
+      if (wasDirectory && !now.isDirectory) return fail("Not a directory");
+      if (!wasDirectory && now.isDirectory) return fail("Is a directory");
+      if (parentReal !== undefined) {
+        const parent = fullPath.slice(0, fullPath.lastIndexOf("/")) || "/";
+        const real = await ctx.fs.realpath(parent).catch(() => undefined);
+        if (real !== parentReal) return fail("No such file or directory");
+      }
+      try {
+        await ctx.fs.rm(fullPath, { recursive: false });
+        return true;
+      } catch (e) {
+        // (1ctx readonly-errors) the words, never the backend's own path
+        return fail(
+          isReadOnlyError(e)
+            ? "Read-only file system"
+            : fsErrorCode(e) === "EBUSY"
+              ? "Device or resource busy"
+              : (fsErrorWords(e) ??
+                  (e instanceof Error ? e.message : String(e))),
+        );
+      }
+    };
+
     // Process each search path
     for (let searchPath of searchPaths) {
+      // (1ctx find-exec) messages name the starting point as given
+      const given = searchPath;
       // (1ctx find-links) a trailing slash resolves a symbolic link, as in any path
       const slashed = searchPath.length > 1 && searchPath.endsWith("/");
       // Normalize trailing slashes (except for root "/")
@@ -436,16 +573,26 @@ export const findCommand: RuntimeCommand = {
       // Check if path exists
       // (1ctx find-links) a starting point that is a link exists when the link does,
       // unless it is followed through a trailing slash
-      try {
-        if (slashed) await ctx.fs.stat(basePath);
-        else await ctx.fs.lstat(basePath);
-      } catch {
+      // (1ctx find-exec) as GNU's: '' names nothing, and a slash wants a folder
+      let startProblem: string | undefined;
+      if (given === "") startProblem = "No such file or directory";
+      else {
+        try {
+          const start = slashed
+            ? await ctx.fs.stat(basePath)
+            : await ctx.fs.lstat(basePath);
+          if (slashed && !start.isDirectory) startProblem = "Not a directory";
+        } catch {
+          startProblem = "No such file or directory";
+        }
+      }
+      if (startProblem !== undefined) {
         // (1ctx find-diagnostics) after the starting points before it, not
         // ahead of their -exec output
-        effects.push({
+        const missing: EvaluatedEffect = {
           action: {
             type: "diagnostic",
-            message: `find: ${diagnosticPath(searchPath)}: No such file or directory\n`,
+            message: `find: ${diagnosticPath(given)}: ${startProblem}\n`,
           },
           path: searchPath,
           printfData: {
@@ -458,7 +605,9 @@ export const findCommand: RuntimeCommand = {
             depth: 0,
             startingPoint: searchPath,
           },
-        });
+        };
+        if (live) await perform(missing);
+        else effects.push(missing);
         continue;
       }
 
@@ -499,9 +648,12 @@ export const findCommand: RuntimeCommand = {
       }
 
       // (1ctx find-links) link failures name the same path as a printed node
+      // (1ctx find-exec) the starting point as typed, its slash kept
       const relativeOf = (currentPath: string) =>
         currentPath === basePath
-          ? searchPath
+          ? slashed
+            ? `${searchPath}/`
+            : searchPath
           : searchPath === "."
             ? `./${currentPath.slice(basePath === "/" ? basePath.length : basePath.length + 1)}`
             : searchPath + currentPath.slice(basePath.length);
@@ -602,14 +754,31 @@ export const findCommand: RuntimeCommand = {
         // Early prune optimization: check if we can skip this directory before readdir
         // This avoids reading directory contents for directories that will be pruned
         let earlyPruned = false;
-        if (isDirectory && hasPruneExpr && !depthFirst) {
-          const earlyResult = evaluateForEarlyPrune(expr, {
-            name,
-            relativePath,
-            isFile,
-            isDirectory,
-          });
-          earlyPruned = earlyResult.shouldPrune;
+        // (1ctx find-exec) GNU does not evaluate above -mindepth, so -prune
+        // stops nothing there
+        const evaluated = minDepth === null || depth >= minDepth;
+        if (isDirectory && hasPruneExpr && !depthFirst && evaluated) {
+          // (1ctx find-exec) without -empty the whole expression is known
+          // before the read, an action or metadata test on the left included
+          earlyPruned =
+            needsEmptyCheck || expr === null
+              ? evaluateForEarlyPrune(expr, {
+                  name,
+                  relativePath,
+                  isFile,
+                  isDirectory,
+                }).shouldPrune
+              : evaluateExpressionWithPrune(expr, {
+                  name,
+                  relativePath,
+                  isFile,
+                  isDirectory,
+                  isEmpty: false,
+                  mtime: stat?.mtime?.getTime() ?? Date.now(),
+                  size: stat?.size ?? 0,
+                  mode: stat?.mode ?? 0o644,
+                  newerRefTimes,
+                }).pruned;
           if (earlyPruned) {
             traceCounters.earlyPrunes++;
           }
@@ -705,7 +874,13 @@ export const findCommand: RuntimeCommand = {
         // If we already early-pruned, use that result
         // Skip this evaluation entirely if there's no -prune in the expression
         let pruned = earlyPruned;
-        if (!depthFirst && expr !== null && !earlyPruned && hasPruneExpr) {
+        if (
+          !depthFirst &&
+          expr !== null &&
+          !earlyPruned &&
+          hasPruneExpr &&
+          evaluated
+        ) {
           const evalStart = Date.now();
           const evalCtx: EvalContext = {
             name,
@@ -756,6 +931,206 @@ export const findCommand: RuntimeCommand = {
           pruned: false,
           problem,
         };
+      }
+
+      // (1ctx find-exec) The walk for `-exec ;` and `-delete`: one entry at a
+      // time, in order, each action run when evaluation reaches it. An entry
+      // is stat'ed when the walk arrives, and a folder again right before it
+      // is read, since a command may have removed it or swapped it for a
+      // link; GNU then says why and does not descend. `parentReal` is the
+      // real path of the folder an entry was read from, so -delete never
+      // removes through a folder swapped after the read.
+      let liveResults = 0;
+      const liveDiagnostic = (path: string, words: string) =>
+        perform({
+          action: {
+            type: "diagnostic",
+            message: `find: ${diagnosticPath(path)}: ${words}\n`,
+          },
+          path,
+          printfData: emptyPrintfData,
+        });
+      const emptyPrintfData: FindResult = {
+        path: searchPath,
+        name: searchPath,
+        size: 0,
+        mtime: 0,
+        mode: 0,
+        isDirectory: false,
+        depth: 0,
+        startingPoint: searchPath,
+      };
+      // the words for a failed read, or a throw for a failure find must not
+      // recover from
+      const readWords = (error: unknown): string => {
+        const words = describeUnreadableDirectory(error);
+        if (words === null) throw error;
+        return words;
+      };
+
+      async function walkLive(
+        item: WorkItem,
+        parentReal: string | undefined,
+      ): Promise<void> {
+        const { path: currentPath, depth } = item;
+        const followed = followsAt(depth);
+        traversalBudget.visit(depth);
+        const limit = maxDepth ?? ctx.limits.maxTraversalDepth;
+        if (depth > limit) return;
+        const readEntry = () =>
+          followed
+            ? ctx.fs.stat(currentPath).catch((error: unknown) => {
+                if (isMissing(error)) return ctx.fs.lstat(currentPath);
+                throw error;
+              })
+            : ctx.fs.lstat(currentPath);
+        let stat: Awaited<ReturnType<typeof ctx.fs.stat>>;
+        try {
+          stat = await readEntry();
+        } catch (error) {
+          if (followed && !isMissing(error)) {
+            await liveDiagnostic(relativeOf(currentPath), statWords(error));
+          }
+          return;
+        }
+        const isFile = stat.isFile;
+        const isDirectory = stat.isDirectory;
+        const name =
+          currentPath === basePath
+            ? searchPath.split("/").pop() || searchPath
+            : currentPath.split("/").pop() || "";
+        const relativePath = relativeOf(currentPath);
+
+        let ancestors: string[] | undefined;
+        if (follow === "L" && isDirectory) {
+          const parent = item.ancestors ?? [];
+          const real = await ctx.fs.realpath(currentPath);
+          if (parent.includes(real)) {
+            await perform({
+              action: {
+                type: "diagnostic",
+                message: `find: File system loop detected; the following directory is part of the cycle: ${diagnosticPath(relativePath)}\n`,
+              },
+              path: relativePath,
+              printfData: emptyPrintfData,
+            });
+            return;
+          }
+          ancestors = [...parent, real];
+        }
+
+        const descend = isDirectory && depth < limit;
+        const evaluated = minDepth === null || depth >= minDepth;
+
+        // the folder read now, after whatever ran before it
+        const readChildren = async (): Promise<{
+          children: WorkItem[];
+          real: string | undefined;
+        } | null> => {
+          let now: Awaited<ReturnType<typeof ctx.fs.stat>>;
+          try {
+            now = await readEntry();
+          } catch (error) {
+            await liveDiagnostic(relativePath, readWords(error));
+            return null;
+          }
+          if (!now.isDirectory) {
+            await liveDiagnostic(relativePath, "Not a directory");
+            return null;
+          }
+          let names: string[];
+          try {
+            names =
+              hasReaddirWithFileTypes && ctx.fs.readdirWithFileTypes
+                ? (await ctx.fs.readdirWithFileTypes(currentPath)).map(
+                    (entry) => entry.name,
+                  )
+                : await ctx.fs.readdir(currentPath);
+          } catch (error) {
+            await liveDiagnostic(relativePath, readWords(error));
+            return null;
+          }
+          traversalBudget.checkpoint();
+          traversalBudget.discover(names.length);
+          const real = hasDelete
+            ? await ctx.fs.realpath(currentPath)
+            : undefined;
+          return {
+            real,
+            children: names.map((entry, idx) => ({
+              path:
+                currentPath === "/" ? `/${entry}` : `${currentPath}/${entry}`,
+              depth: depth + 1,
+              ancestors,
+              resultIndex: idx,
+            })),
+          };
+        };
+
+        const walkChildren = async () => {
+          const read = await readChildren();
+          if (read === null) return;
+          for (const child of read.children) await walkLive(child, read.real);
+        };
+
+        const printfData: FindResult = {
+          path: relativePath,
+          name,
+          size: stat.size ?? 0,
+          mtime: stat.mtime?.getTime() ?? Date.now(),
+          mode: stat.mode ?? 0o644,
+          isDirectory,
+          depth,
+          startingPoint: searchPath,
+        };
+
+        const evaluate = async (): Promise<boolean> => {
+          // a live walk always has an expression: it holds the actions
+          if (!evaluated || expr === null) return false;
+          const result = await evaluateLive(
+            expr,
+            {
+              name,
+              relativePath,
+              isFile,
+              isDirectory,
+              isEmpty: false,
+              mtime: printfData.mtime,
+              size: printfData.size,
+              mode: printfData.mode,
+              newerRefTimes,
+            },
+            {
+              action: async (action) => {
+                traversalBudget.checkpoint();
+                liveResults++;
+                if (action.type !== "delete") {
+                  return perform({ action, path: relativePath, printfData });
+                }
+                return deleteEntry(relativePath, name, isDirectory, parentReal);
+              },
+              empty: async () => {
+                if (isFile) return (stat.size ?? 0) === 0;
+                if (!isDirectory) return false;
+                try {
+                  return (await ctx.fs.readdir(currentPath)).length === 0;
+                } catch (error) {
+                  await liveDiagnostic(relativePath, readWords(error));
+                  return false;
+                }
+              },
+            },
+          );
+          return result.pruned;
+        };
+
+        if (depthFirst) {
+          if (descend) await walkChildren();
+          await evaluate();
+        } else {
+          const pruned = await evaluate();
+          if (descend && !pruned) await walkChildren();
+        }
       }
 
       // Evaluate once in traversal order and retain only actions whose branch was
@@ -1074,8 +1449,18 @@ export const findCommand: RuntimeCommand = {
         return finalResult;
       }
 
-      const searchResult = await findIterative();
-      for (const effect of searchResult.effects) effects.push(effect);
+      // (1ctx find-exec) the live walk, or the batched one
+      let resultsFound = 0;
+      if (live) {
+        await walkLive({ path: basePath, depth: 0, resultIndex: 0 }, undefined);
+        resultsFound = liveResults;
+      } else {
+        const searchResult = await findIterative();
+        for (const effect of searchResult.effects) effects.push(effect);
+        resultsFound = searchResult.effects.filter(
+          (effect) => effect.action.type !== "diagnostic",
+        ).length;
+      }
 
       // Emit trace summary for this search path
       if (ctx.trace) {
@@ -1087,108 +1472,26 @@ export const findCommand: RuntimeCommand = {
           durationMs: totalMs,
           details: {
             path: searchPath,
-            resultsFound: searchResult.effects.filter(
-              (effect) => effect.action.type !== "diagnostic",
-            ).length,
+            resultsFound,
           },
         });
       }
     }
 
-    // Batch -exec nodes collect only paths for which that exact expression node
-    // was reached. All other effects retain entry and expression order.
-    const batchExecPaths = new Map<FindAction, string[]>();
-    for (const effect of effects) {
-      const { action, path: file } = effect;
-      switch (action.type) {
-        case "diagnostic":
-          appendStderr(action.message);
-          exitCode = 1;
-          break;
-        case "print":
-          appendStdout(`${file}\n`);
-          break;
-        case "print0":
-          appendStdout(`${file}\0`);
-          break;
-        case "printf":
-          appendStdout(formatFindPrintf(action.format, effect.printfData));
-          break;
-        case "delete": {
-          const fullPath = ctx.fs.resolvePath(ctx.cwd, file);
-          try {
-            await ctx.fs.rm(fullPath, { recursive: false });
-          } catch (e) {
-            // (1ctx readonly-errors) the words, never the backend's own path
-            const msg = isReadOnlyError(e)
-              ? "Read-only file system"
-              : fsErrorCode(e) === "EBUSY"
-                ? "Device or resource busy"
-                : e instanceof Error
-                ? e.message
-                : String(e);
-            appendStderr(`find: cannot delete '${file}': ${msg}\n`);
-            exitCode = 1;
-          }
-          break;
-        }
-        case "exec": {
-          if (!ctx.exec) {
-            return {
-              stdout: "",
-              stderr: "find: -exec not supported in this context\n",
-              exitCode: 1,
-            };
-          }
-          if (action.batchMode) {
-            const paths = batchExecPaths.get(action) ?? [];
-            paths.push(file);
-            batchExecPaths.set(action, paths);
-            break;
-          }
-          const cmdWithFile = action.command.map((part) =>
-            part === "{}" ? file : part,
-          );
-          const result = await ctx.exec(shellJoinArgs([cmdWithFile[0]]), {
-            // (1ctx exec-env) the command is a process: it sees the exported variables
-            env: { ...ctx.exportedEnv },
-            replaceEnv: true,
-            cwd: ctx.cwd,
-            signal: ctx.signal,
-            args: cmdWithFile.slice(1),
-          });
-          if (output) output.appendResult(result);
-          else {
-            appendStdout(result.stdout);
-            appendStderr(result.stderr);
-          }
-          if (result.exitCode !== 0) exitCode = result.exitCode;
-          break;
-        }
-      }
+    // (1ctx find-exec) the live walk performed its effects as it went
+    if (!live) {
+      for (const effect of effects) await perform(effect);
     }
 
     for (const [action, paths] of batchExecPaths) {
-      if (action.type !== "exec" || !ctx.exec || paths.length === 0) continue;
+      if (action.type !== "exec" || paths.length === 0) continue;
       const cmdWithFiles: string[] = [];
       for (const part of action.command) {
         if (part === "{}") cmdWithFiles.push(...paths);
         else cmdWithFiles.push(part);
       }
-      const result = await ctx.exec(shellJoinArgs([cmdWithFiles[0]]), {
-        // (1ctx exec-env) as above
-        env: { ...ctx.exportedEnv },
-        replaceEnv: true,
-        cwd: ctx.cwd,
-        signal: ctx.signal,
-        args: cmdWithFiles.slice(1),
-      });
-      if (output) output.appendResult(result);
-      else {
-        appendStdout(result.stdout);
-        appendStderr(result.stderr);
-      }
-      if (result.exitCode !== 0) exitCode = result.exitCode;
+      // (1ctx find-exec) a failed batch is find's exit 1, as GNU's
+      if ((await runCommand(cmdWithFiles)) !== 0) exitCode = 1;
     }
 
     return (
