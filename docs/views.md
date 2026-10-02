@@ -154,8 +154,10 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is
-  seen, and stops once every row settled. A tick while a read is out
-  skips, so a slow answer is never superseded by the next poll.
+  seen, every `REPO_FAILED_POLL_MS` while a row failed, so a refresh
+  from another tab shows, and stops once every row is ready. A tick
+  while a read is out skips, so a slow answer is never superseded by
+  the next poll.
 - **A failed read keeps the rows** with `RowsFailed` above them and
   polls on until a read succeeds; a 403 or 404 drops them.
 - **A change sends only what changed** (`patchBody()`) against the row

@@ -20,6 +20,8 @@ export const repoErrors = signal<ReadonlyMap<string, Failure>>(new Map());
 
 // how often a list with a row waiting or fetching is read again
 export const REPO_POLL_MS = 3000;
+// and one with a failed row: a refresh from another tab ends it
+export const REPO_FAILED_POLL_MS = 30_000;
 
 // who writes: an admin a team project's, an owner their personal one's
 export type RepoTarget = { projectId: string; personal: boolean };
@@ -191,15 +193,16 @@ export async function deleteRepo(target: RepoTarget, id: string) {
 }
 
 // while mounted: the list reads again every REPO_POLL_MS, only while a
-// row waits or fetches, or the last read of a held list failed, and the
-// tab is seen, since no frame says a fetch ended. A tick while a read
-// is out skips, so a slow server never has each answer superseded by
-// the next poll's
+// row waits or fetches, or the last read of a held list failed, and
+// every REPO_FAILED_POLL_MS while a row failed, and the tab is seen,
+// since no frame says a fetch ended. A tick while a read is out skips,
+// so a slow server never has each answer superseded by the next poll's
 export function watchRepos(
   projectId: string,
   tab: PollDriver = browserTab,
 ): () => void {
   let stopPoll: (() => void) | null = null;
+  let period = 0;
   let reading = false;
   const read = () => {
     if (reading) return;
@@ -210,14 +213,16 @@ export function watchRepos(
   };
   const stopEffect = effect(() => {
     const list = reposOf(projectId);
-    const busy =
-      unsettled(list) || (list !== null && repoErrorOf(projectId) !== null);
-    if (busy && stopPoll === null) {
-      stopPoll = pollWhileSeen(REPO_POLL_MS, read, tab);
-    } else if (!busy && stopPoll !== null) {
-      stopPoll();
-      stopPoll = null;
-    }
+    const wanted =
+      unsettled(list) || (list !== null && repoErrorOf(projectId) !== null)
+        ? REPO_POLL_MS
+        : list?.some((r) => r.state === "failed")
+          ? REPO_FAILED_POLL_MS
+          : 0;
+    if (wanted === period) return;
+    stopPoll?.();
+    stopPoll = wanted === 0 ? null : pollWhileSeen(wanted, read, tab);
+    period = wanted;
   });
   return () => {
     stopEffect();

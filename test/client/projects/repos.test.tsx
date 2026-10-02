@@ -21,6 +21,7 @@ import {
   changeRepo,
   deleteRepo,
   loadRepos,
+  REPO_FAILED_POLL_MS,
   REPO_POLL_MS,
   refreshRepo,
   repoErrorOf,
@@ -409,6 +410,26 @@ describe("the entity", () => {
     replies[1]!(Response.json({ repos: [repo()] }));
     await settle();
   });
+
+  test.serial(
+    "a failed row is read again slowly until it settles",
+    async () => {
+      const tab = pollTab(REPO_POLL_MS);
+      held("p2", [repo({ state: "failed", error: "host unreachable" })]);
+      const stop = watchRepos("p2", tab.tab);
+      expect(tab.timers()).toBe(1);
+      answer = () => Response.json({ repos: [repo()] });
+      for (let i = 1; i < REPO_FAILED_POLL_MS / REPO_POLL_MS; i++) tab.tick();
+      await settle();
+      expect(calls.length).toBe(0);
+      tab.tick();
+      await settle();
+      expect(calls.length).toBe(1);
+      expect(reposOf("p2")?.[0]?.state).toBe("ready");
+      expect(tab.timers()).toBe(0);
+      stop();
+    },
+  );
 
   test.serial("reads again only while a row waits or fetches", async () => {
     const tab = pollTab(REPO_POLL_MS);
