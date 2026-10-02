@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { CredentialKey } from "../../../shared/api/credentials.ts";
 import type {
   CreateRepoRequest,
   PatchRepoRequest,
   RepoView,
 } from "../../../shared/api/repos.ts";
-import type { CredentialSummary } from "../../../shared/contracts/credential.ts";
 import {
   DEFAULT_REPO_IGNORE,
   MAX_REPOS_PER_PROJECT,
@@ -16,6 +16,7 @@ import {
 import { isName } from "../../../shared/words.ts";
 import { commas, pluralCommas, sizeWords } from "../../lib/format.ts";
 import type { Option } from "../../ui/Select.model.ts";
+import { keyOptions } from "../admin/Credentials.model.ts";
 
 export type RepoDraft = {
   url: string;
@@ -23,8 +24,8 @@ export type RepoDraft = {
   ref: string;
   // "" until picked, asked only for a host that does not fix it
   kind: RepoKind | "";
-  // "" for none
-  credentialId: string;
+  // the http- key file, "" for none
+  keyName: string;
   ignore: string;
 };
 
@@ -33,7 +34,7 @@ export const draftOf = (row: RepoView | null): RepoDraft => ({
   name: row?.name ?? "",
   ref: row?.ref ?? "",
   kind: row?.kind ?? "",
-  credentialId: row?.credentialId ?? "",
+  keyName: row?.keyName ?? "",
   ignore: row?.ignore ?? "",
 });
 
@@ -95,7 +96,7 @@ export function createBody(d: RepoDraft, personal: boolean): CreateRepoRequest {
   if (d.name.trim() !== "") body.name = d.name.trim();
   if (d.ref.trim() !== "") body.ref = d.ref.trim();
   if (asksKind(d.url, personal) && d.kind !== "") body.kind = d.kind;
-  if (!personal && d.credentialId !== "") body.credentialId = d.credentialId;
+  if (!personal && d.keyName !== "") body.keyName = d.keyName;
   if (d.ignore.trim() !== "") body.ignore = d.ignore;
   return body;
 }
@@ -116,8 +117,8 @@ export function patchBody(
     body.kind = d.kind;
   }
   if (!personal) {
-    const credentialId = d.credentialId === "" ? null : d.credentialId;
-    if (credentialId !== row.credentialId) body.credentialId = credentialId;
+    const keyName = d.keyName === "" ? null : d.keyName;
+    if (keyName !== (row.keyName ?? null)) body.keyName = keyName;
   }
   const ignore = d.ignore.trim() === "" ? "" : d.ignore;
   if (ignore !== row.ignore) body.ignore = ignore;
@@ -133,13 +134,7 @@ export function repoFieldOf(message: string): string | undefined {
   }
   if (m.startsWith("kind")) return "kind";
   if (m.startsWith("ref")) return "ref";
-  if (
-    m.startsWith("credential") ||
-    m.startsWith("no such credential") ||
-    m.includes("takes no credential")
-  ) {
-    return "credentialId";
-  }
+  if (m.startsWith("keyname") || m.includes("takes no key")) return "keyName";
   if (m.startsWith("ignore")) return "ignore";
   return undefined;
 }
@@ -191,29 +186,12 @@ export function stateWords(repo: RepoView): StateWords {
 export const atCap = (list: readonly RepoView[]) =>
   list.length >= MAX_REPOS_PER_PROJECT;
 
-// None, then the credentials bound to the project; a named one no
-// longer bound stays as an option, so the draft shows what is saved
-export function credentialOptions(
-  all: readonly CredentialSummary[] | null,
-  projectId: string,
+// None, then the key files; a saved one gone or unusable stays, marked
+export function repoKeyOptions(
+  keys: readonly CredentialKey[],
   current: string,
 ): Option[] {
-  const bound = (all ?? []).filter((c) =>
-    c.projects.some((p) => p.id === projectId),
-  );
-  const options: Option[] = [
-    { value: "", label: "None" },
-    ...bound.map((c) => ({ value: c.id, label: c.name, detail: c.prefix })),
-  ];
-  if (current !== "" && !bound.some((c) => c.id === current)) {
-    const named = all?.find((c) => c.id === current);
-    options.push({
-      value: current,
-      label: named?.name ?? "Deleted credential",
-      detail: "Not bound to this project",
-    });
-  }
-  return options;
+  return [{ value: "", label: "None" }, ...keyOptions(keys, current)];
 }
 
 // the textarea grows to show the default list, or what is typed

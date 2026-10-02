@@ -46,9 +46,10 @@ export type RoutesDeps = {
   repos: ReposPort;
 };
 
-// the repositories that name a credential; built later, so a closure
+// the repositories that read a key file without a credential; built
+// later, so a closure
 export type ReposPort = {
-  usingCredential(credentialId: string): { projectId: string; name: string }[];
+  usingKeys(): { keyName: string; projectId: string; name: string }[];
 };
 
 export function summary(
@@ -120,11 +121,18 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/credentials",
       policy: "admin",
       handle() {
+        const using = deps.repos.usingKeys();
         const body: CredentialsResponse = {
           credentials: deps.store.list().map(show),
           keys: deps.keys().map((name) => ({
             name,
             usable: deps.readKey(name).ok,
+            repos: using.flatMap((repo) => {
+              const project = teamName(deps.projects, repo.projectId);
+              return repo.keyName === name && project !== null
+                ? [`${project}/${repo.name}`]
+                : [];
+            }),
           })),
         };
         return json(body);
@@ -174,14 +182,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         transact(deps.db, () => {
-          const using = deps.repos.usingCredential(ctx.params.id);
-          if (using.length > 0) {
-            const names = using.map(
-              (repo) =>
-                `${teamName(deps.projects, repo.projectId) ?? "personal"}/${repo.name}`,
-            );
-            throw new Conflict(`used by repository ${names.join(", ")}`);
-          }
           if (!deps.store.delete(ctx.params.id)) {
             throw new NotFound("no such credential");
           }

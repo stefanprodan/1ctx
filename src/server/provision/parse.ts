@@ -22,13 +22,7 @@ import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { object } from "./fields.ts";
-import {
-  type FinalCredentials,
-  repoKey,
-  repoName,
-  repositories,
-  repository,
-} from "./repository.ts";
+import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
@@ -57,12 +51,7 @@ export type ProjectDocs = (project: string) => {
 // now, for the checks that span objects
 export type CredentialsView = {
   key(name: string): KeyState;
-  list(): {
-    name: string;
-    prefix: string;
-    methods: string[];
-    projects: string[];
-  }[];
+  list(): { name: string; prefix: string; projects: string[] }[];
 };
 
 // a project doc read from the folder spec.knowledge names; bytes are
@@ -270,6 +259,17 @@ export function preflight(
         fail(field, `secret ${name}.key is missing or empty`);
       return value;
     };
+    // an http- key a credential or a repository reads at its request
+    const httpKey = (name: string) => {
+      const state = credentials.key(name);
+      if (state === "missing") fail("keyFrom", `secret ${name}.key is missing`);
+      if (state === "unusable") {
+        fail(
+          "keyFrom",
+          `secret ${name}.key must hold ${KEY_BYTES.min} to ${KEY_BYTES.max} visible ASCII characters`,
+        );
+      }
+    };
     const exists = inventory[doc.kind].includes(doc.name);
     switch (doc.kind) {
       case "User": {
@@ -328,18 +328,7 @@ export function preflight(
         break;
       case "Credential": {
         if (!exists) required(["keyFrom", "url", "header", "value"]);
-        const keyFrom = doc.spec.keyFrom;
-        if (keyFrom !== undefined) {
-          const state = credentials.key(keyFrom);
-          if (state === "missing")
-            fail("keyFrom", `secret ${keyFrom}.key is missing`);
-          if (state === "unusable") {
-            fail(
-              "keyFrom",
-              `secret ${keyFrom}.key must hold ${KEY_BYTES.min} to ${KEY_BYTES.max} visible ASCII characters`,
-            );
-          }
-        }
+        if (doc.spec.keyFrom !== undefined) httpKey(doc.spec.keyFrom);
         for (const name of doc.spec.projects ?? []) {
           if (name === PERSONAL_PROJECT_NAME) {
             fail("projects", "cannot name a personal project");
@@ -352,9 +341,7 @@ export function preflight(
         const key = repoKey(doc.spec.project, repoName(doc));
         if (!inventory.Repository.includes(key)) required(["url"]);
         reference("project", "Project", doc.spec.project);
-        if (typeof doc.spec.credential === "string") {
-          reference("credential", "Credential", doc.spec.credential);
-        }
+        if (typeof doc.spec.keyFrom === "string") httpKey(doc.spec.keyFrom);
         break;
       }
       case "Provider":
@@ -394,27 +381,18 @@ export function preflight(
         break;
     }
   }
-  const final = bindings(documents, credentials);
+  bindings(documents, credentials);
   repositories(
     documents.flatMap((doc) => (doc.kind === "Repository" ? [doc] : [])),
     inventory.Repository,
-    final,
   );
 }
 
 // the credentials each project would hold once applied: no more than the
 // cap, and no two whose prefixes overlap
-type Binding = {
-  name: string;
-  prefix: string;
-  methods: string[];
-  projects: string[];
-};
+type Binding = { name: string; prefix: string; projects: string[] };
 
-function bindings(
-  documents: Document[],
-  credentials: CredentialsView,
-): FinalCredentials {
+function bindings(documents: Document[], credentials: CredentialsView): void {
   const final = new Map<string, Binding & { source?: string }>(
     credentials.list().map((row) => [row.name, row]),
   );
@@ -424,7 +402,6 @@ function bindings(
     final.set(doc.name, {
       name: doc.name,
       prefix: doc.spec.url ?? held?.prefix ?? "",
-      methods: doc.spec.methods ?? held?.methods ?? ["GET", "HEAD"],
       projects: doc.spec.projects ?? held?.projects ?? [],
       source: doc.source,
     });
@@ -459,5 +436,4 @@ function bindings(
       byProject.set(project, list);
     }
   }
-  return final;
 }

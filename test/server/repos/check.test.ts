@@ -6,7 +6,7 @@ import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   checkRepo,
   desired,
-  type RepoCredential,
+  type KeysPort,
   refetches,
   repoAuth,
 } from "../../../src/server/repos/check.ts";
@@ -38,9 +38,12 @@ describe("the repository parsers", () => {
   });
 
   test("a change keeps only what it names", () => {
-    expect(parsePatchRepo({ ref: "main", credentialId: null })).toEqual({
+    expect(parsePatchRepo({ ref: "main", keyName: null })).toEqual({
       ref: "main",
-      credentialId: null,
+      keyName: null,
+    });
+    expect(parsePatchRepo({ keyName: "http-github" })).toEqual({
+      keyName: "http-github",
     });
     expect(parsePatchRepo({})).toEqual({});
     expect(words(() => parsePatchRepo({ name: "Widgets" }))).toContain(
@@ -49,9 +52,11 @@ describe("the repository parsers", () => {
     expect(words(() => parsePatchRepo({ kind: "gitea" }))).toBe(
       "kind must be github or gitlab",
     );
-    expect(words(() => parsePatchRepo({ credentialId: "a b" }))).toBe(
-      "credentialId must be a credential id or null",
-    );
+    for (const keyName of ["github", "http-", "http-A", "mcp-github", 3]) {
+      expect(words(() => parsePatchRepo({ keyName }))).toContain(
+        "keyName must be http- followed by",
+      );
+    }
     expect(words(() => parsePatchRepo({ ref: "a..b" }))).toContain(
       "ref must be",
     );
@@ -106,7 +111,7 @@ describe("the row a change asks for", () => {
       url: "https://github.com/acme/widgets",
       kind: "github",
       ref: "",
-      credentialId: null,
+      keyName: null,
       ignore: "",
     });
     expect(
@@ -156,7 +161,7 @@ describe("the row a change asks for", () => {
     for (const change of [
       { url: "https://github.com/acme/other" },
       { ref: "main" },
-      { credentialId: "c1" },
+      { keyName: "http-github" },
       { ignore: "*.md" },
     ]) {
       expect(refetches(held, { ...held, ...change })).toBe(true);
@@ -164,29 +169,19 @@ describe("the row a change asks for", () => {
   });
 });
 
-const credential = (fields: Partial<RepoCredential> = {}): RepoCredential => ({
-  id: "c1",
-  name: "github",
-  keyName: "http-github",
-  prefix: "https://api.github.com/repos/acme/",
-  header: "Authorization",
-  template: "Bearer {key}",
-  methods: ["GET", "HEAD"],
-  projectIds: ["team1"],
-  ...fields,
-});
-
+// key files by name: a value, or why it cannot be read
 const port = (
-  row: RepoCredential | null,
-  key: string | null = "k".repeat(20),
-) => ({
-  byId: (id: string) => (row !== null && row.id === id ? row : null),
-  readKey: () =>
-    key === null ? ({ ok: false } as const) : ({ ok: true, key } as const),
-  headerValue: (template: string, value: string) =>
-    template.replace("{key}", value),
+  files: Record<string, string | "missing" | "unusable"> = {},
+): KeysPort => ({
+  readKey(name) {
+    const file = files[name] ?? "missing";
+    return file === "missing" || file === "unusable"
+      ? { ok: false, reason: file }
+      : { ok: true, key: file };
+  },
 });
 
+const KEY = "k".repeat(20);
 const team = { id: "team1", kind: "team" as const };
 const personal = { id: "mine", kind: "personal" as const };
 
@@ -194,12 +189,13 @@ describe("who may add what", () => {
   const repo = (fields: Record<string, unknown> = {}) =>
     desired(null, { url: "https://github.com/acme/widgets", ...fields });
 
-  test("a personal project takes public hosts only, without a credential", () => {
-    checkRepo(personal, repo(), port(null));
+  test("a personal project takes public hosts only, without a key", () => {
+    checkRepo(personal, repo(), null, port());
     checkRepo(
       personal,
       desired(null, { url: "https://gitlab.com/acme/widgets" }),
-      port(null),
+      null,
+      port(),
     );
     expect(
       words(() =>
@@ -209,85 +205,100 @@ describe("who may add what", () => {
             url: "https://git.example.test/acme/widgets",
             kind: "github",
           }),
-          port(null),
+          null,
+          port(),
         ),
       ),
     ).toContain("github.com or gitlab.com");
     expect(
       words(() =>
-        checkRepo(personal, repo({ credentialId: "c1" }), port(credential())),
+        checkRepo(
+          personal,
+          repo({ keyName: "http-github" }),
+          null,
+          port({ "http-github": KEY }),
+        ),
       ),
-    ).toContain("takes no credential");
+    ).toBe("a personal project's repository takes no key");
   });
 
-  test("a team project's credential is bound, covers the API and allows GET", () => {
+  test("a team project's key names a usable file when it is saved", () => {
     checkRepo(
       team,
       desired(null, {
         url: "https://git.example.test/acme/widgets",
         kind: "gitlab",
       }),
-      port(null),
+      null,
+      port(),
     );
-    checkRepo(team, repo({ credentialId: "c1" }), port(credential()));
-    const cases: [RepoCredential | null, string][] = [
-      [null, "no such credential"],
-      [credential({ projectIds: ["other"] }), "not bound to this project"],
-      [
-        credential({ prefix: "https://api.github.com/repos/other/" }),
-        "does not cover https://api.github.com/repos/acme/widgets/",
-      ],
-      [credential({ methods: ["POST"] }), "does not allow GET"],
-    ];
-    for (const [row, message] of cases) {
-      expect(
-        words(() => checkRepo(team, repo({ credentialId: "c1" }), port(row))),
-      ).toContain(message);
-    }
+    const named = repo({ keyName: "http-github" });
+    checkRepo(team, named, null, port({ "http-github": KEY }));
+    expect(words(() => checkRepo(team, named, null, port()))).toBe(
+      "keyName http-github is missing",
+    );
+    expect(
+      words(() =>
+        checkRepo(team, named, null, port({ "http-github": "unusable" })),
+      ),
+    ).toBe("keyName http-github is unusable");
+    // a key gone since it was saved fails the lookup, never a rename
+    checkRepo(team, { ...named, name: "other" }, named, port());
   });
 });
 
 describe("the check at each lookup", () => {
   const row = {
-    projectId: "team1",
     url: "https://github.com/acme/widgets",
     kind: "github" as const,
-    credentialId: "c1",
+    keyName: "http-github",
   };
 
   test("a public repository sends no header", () => {
-    expect(repoAuth({ ...row, credentialId: null }, port(null))).toEqual({
+    expect(repoAuth({ ...row, keyName: null }, port())).toEqual({
       ok: true,
       header: null,
     });
   });
 
-  test("a credential that still passes signs to its prefix", () => {
-    expect(repoAuth(row, port(credential(), "k".repeat(20)))).toEqual({
+  test("a bearer for either host, sent only under the repository's API base", () => {
+    expect(repoAuth(row, port({ "http-github": KEY }))).toEqual({
       ok: true,
       header: {
-        name: "Authorization",
-        value: `Bearer ${"k".repeat(20)}`,
-        prefix: "https://api.github.com/repos/acme/",
+        name: "authorization",
+        value: `Bearer ${KEY}`,
+        prefix: "https://api.github.com/repos/acme/widgets/",
+      },
+    });
+    expect(
+      repoAuth(
+        {
+          url: "https://git.example.test/org/team/widgets",
+          kind: "gitlab",
+          keyName: "http-gitlab",
+        },
+        port({ "http-gitlab": KEY }),
+      ),
+    ).toEqual({
+      ok: true,
+      header: {
+        name: "authorization",
+        value: `Bearer ${KEY}`,
+        prefix:
+          "https://git.example.test/api/v4/projects/org%2Fteam%2Fwidgets/",
       },
     });
   });
 
-  test("deleted, unbound, narrowed, read-only or keyless is no access", () => {
+  test("a missing or unusable key is no access, a replaced one applies", () => {
     const refused = { ok: false, error: "no access" } as const;
-    expect(repoAuth(row, port(null))).toEqual(refused);
-    expect(repoAuth(row, port(credential({ projectIds: [] })))).toEqual(
-      refused,
-    );
-    expect(
-      repoAuth(
-        row,
-        port(credential({ prefix: "https://api.github.com/repos/other/" })),
-      ),
-    ).toEqual(refused);
-    expect(repoAuth(row, port(credential({ methods: ["HEAD"] })))).toEqual(
-      refused,
-    );
-    expect(repoAuth(row, port(credential(), null))).toEqual(refused);
+    expect(repoAuth(row, port())).toEqual(refused);
+    expect(repoAuth(row, port({ "http-github": "unusable" }))).toEqual(refused);
+    const files: Record<string, string> = { "http-github": KEY };
+    const live = port(files);
+    expect(repoAuth(row, live).ok).toBe(true);
+    files["http-github"] = "n".repeat(20);
+    const again = repoAuth(row, live);
+    expect(again.ok && again.header?.value).toBe(`Bearer ${"n".repeat(20)}`);
   });
 });

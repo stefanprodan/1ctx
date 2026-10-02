@@ -58,12 +58,7 @@ export type Credentials = {
   keyState(keyName: string): KeyState;
   // every credential by name, its prefix and its projects' names, for
   // provisioning's checks
-  bindings(): {
-    name: string;
-    prefix: string;
-    methods: string[];
-    projects: string[];
-  }[];
+  bindings(): { name: string; prefix: string; projects: string[] }[];
 };
 
 export function credentialsArea(deps: CredentialsDeps): Credentials {
@@ -79,7 +74,6 @@ export function credentialsArea(deps: CredentialsDeps): Credentials {
       store.list().map((row) => ({
         name: row.name,
         prefix: row.prefix,
-        methods: row.methods,
         projects: row.projectIds.flatMap((id) => {
           const name = teamName(deps.projects, id);
           return name === null ? [] : [name];

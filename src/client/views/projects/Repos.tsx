@@ -6,7 +6,11 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { RepoView } from "../../../shared/api/repos.ts";
 import { refWords } from "../../composer/Add.model.ts";
-import { credentials, credentialsError } from "../../data/credentials.ts";
+import {
+  credentialKeys,
+  credentials,
+  credentialsError,
+} from "../../data/credentials.ts";
 import {
   addRepo,
   changeRepo,
@@ -48,7 +52,6 @@ import {
   atCap,
   CAP_LINE,
   createBody,
-  credentialOptions,
   DELETE_ASK,
   draftOf,
   IGNORE_HINT,
@@ -60,6 +63,7 @@ import {
   patchBody,
   type RepoDraft,
   repoFieldOf,
+  repoKeyOptions,
   stateWords,
   URL_PLACEHOLDER,
   urlText,
@@ -255,7 +259,7 @@ export function RepoForm({
       if (field === "kind" && !asksKind(draft.value.url, target.personal)) {
         return undefined;
       }
-      if (field === "credentialId" && target.personal) return undefined;
+      if (field === "keyName" && target.personal) return undefined;
       return field;
     },
   );
@@ -376,11 +380,10 @@ export function RepoFields({
         </Labelled>
       )}
       {!target.personal && (
-        <CredentialField
-          projectId={target.projectId}
-          value={d.credentialId}
+        <KeyField
+          value={d.keyName}
           save={save}
-          onChange={(credentialId) => set({ credentialId })}
+          onChange={(keyName) => set({ keyName })}
         />
       )}
       <label class="field">
@@ -437,39 +440,37 @@ function Labelled({
   );
 }
 
-function CredentialField({
-  projectId,
+function KeyField({
   value,
   save,
   onChange,
 }: {
-  projectId: string;
   value: string;
   save: Save;
-  onChange: (credentialId: string) => void;
+  onChange: (keyName: string) => void;
 }) {
-  const options = credentialOptions(credentials.value, projectId, value);
+  const failed = credentialsError.value;
   return (
     <Labelled
-      label="Credential"
-      field="credentialId"
+      label="Key"
+      field="keyName"
       save={save}
       hint={
-        credentialsError.value !== null
-          ? `Credentials did not load: ${credentialsError.value.words}`
-          : credentials.value !== null && options.length === 1
-            ? "No credential is bound to this project."
+        failed !== null
+          ? `Keys did not load: ${failed.words}`
+          : credentials.value !== null && credentialKeys.value.length === 0
+            ? "No http- key files."
             : undefined
       }
     >
       <Select
-        label="Credential"
-        name="credentialId"
+        label="Key"
+        name="keyName"
         mono
         value={value}
-        options={options}
+        options={repoKeyOptions(credentialKeys.value, value)}
         disabled={save.busy}
-        invalid={save.fieldError("credentialId") !== null}
+        invalid={save.fieldError("keyName") !== null}
         onChange={onChange}
       />
     </Labelled>

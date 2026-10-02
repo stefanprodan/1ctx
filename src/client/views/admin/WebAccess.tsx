@@ -309,7 +309,7 @@ function Aside({ tab }: { tab: "general" | "credentials" }) {
       {tab === "credentials" && list !== null && (
         <KeyFilesSection
           files={credentialKeys.value.map((k) => k.name)}
-          reader={keyReader(list)}
+          reader={keyReader(list, credentialKeys.value)}
         />
       )}
     </>

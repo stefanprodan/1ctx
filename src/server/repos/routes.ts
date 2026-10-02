@@ -20,9 +20,9 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
-  type CredentialsPort,
   checkRepo,
   desired,
+  type KeysPort,
   type RepoProject,
   refetches,
 } from "./check.ts";
@@ -51,15 +51,16 @@ export type RoutesDeps = {
   clock: Clock;
   access: AccessPort;
   projects: ProjectsPort;
-  credentials: Pick<CredentialsPort, "byId">;
+  keys: KeysPort;
   capabilities: CapabilitiesPort;
   // after the commit: what is fetched changed, so fetch it now
   changed(repoId: string): void;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
+  // a writer sees the key: an admin, or an owner whose row takes none
   const answer = (row: Parameters<typeof view>[0]): RepoResponse => ({
-    repo: view(row),
+    repo: view(row, true),
   });
   const team = (id: string): RepoProject => {
     const project = deps.projects.byId(id);
@@ -87,7 +88,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   const create = (project: RepoProject, change: CreateRepoRequest) => {
     const made = transact(deps.db, () => {
       const fields = desired(null, change, project.kind === "personal");
-      checkRepo(project, fields, deps.credentials);
+      checkRepo(project, fields, null, deps.keys);
       if (deps.store.count(project.id) >= MAX_REPOS_PER_PROJECT) {
         throw new Conflict(
           `a project holds at most ${MAX_REPOS_PER_PROJECT} repositories`,
@@ -110,7 +111,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     const patched = transact(deps.db, () => {
       const before = find(project, id);
       const fields = desired(before, change, project.kind === "personal");
-      checkRepo(project, fields, deps.credentials);
+      checkRepo(project, fields, before, deps.keys);
       nameFree(project, fields.name, before.id);
       refetch = refetches(before, fields);
       const after = deps.store.update(before.id, fields, refetch, deps.clock());
@@ -144,8 +145,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const admin = ctx.principal!.role === "admin";
         const body: ReposResponse = {
-          repos: deps.store.forProject(project.id).map(view),
+          repos: deps.store
+            .forProject(project.id)
+            .map((row) => view(row, admin)),
         };
         return json(body);
       },

@@ -17,10 +17,6 @@ function seeded() {
       values ('u', 'casey', 'Casey Doe', 'casey@example.test', 'admin', 'x', 0);
     insert into projects (id, kind, name, owner_id, created_at)
       values ('p1', 'team', 'platform', 'u', 0), ('p2', 'team', 'finops', 'u', 0);
-    insert into credentials (id, name, key_name, prefix, header, template,
-        methods, created_at, updated_at)
-      values ('c1', 'github', 'http-github', 'https://api.github.com/',
-        'Authorization', 'Bearer {key}', '["GET"]', 0, 0);
   `);
   return { db, store: new ReposStore(db) };
 }
@@ -30,7 +26,7 @@ const fields = (over: Partial<RepoFields> = {}): RepoFields => ({
   url: "https://github.com/acme/widgets",
   kind: "github",
   ref: "",
-  credentialId: null,
+  keyName: null,
   ignore: "",
   ...over,
 });
@@ -61,9 +57,12 @@ test("a row is made pending, listed by name and found in its project only", () =
     expect(store.nameTaken("p1", "widgets")).toBe(true);
     expect(store.nameTaken("p1", "widgets", made.id)).toBe(false);
     expect(() => store.create("p1", fields(), 13)).toThrow(/UNIQUE/);
-    const shown = view(made);
+    const shown = view(made, false);
     expect(shown).not.toHaveProperty("etag");
     expect(shown).not.toHaveProperty("projectId");
+    // a key's name is an admin's to see
+    expect(shown).not.toHaveProperty("keyName");
+    expect(view(made, true)).toHaveProperty("keyName", null);
   } finally {
     db.close();
   }
@@ -72,7 +71,7 @@ test("a row is made pending, listed by name and found in its project only", () =
 test("a fetched row keeps what a change leaves out, and a refetch clears what the fetch found", () => {
   const { db, store } = seeded();
   try {
-    const { id } = store.create("p1", fields({ credentialId: "c1" }), 10);
+    const { id } = store.create("p1", fields({ keyName: "http-github" }), 10);
     store.setFetched(id, {
       state: "ready",
       error: null,
@@ -94,12 +93,13 @@ test("a fetched row keeps what a change leaves out, and a refetch clears what th
       bytes: 1024,
       ignored: 3,
     });
-    expect(store.usingCredential("c1")).toEqual([
-      { projectId: "p1", name: "widgets" },
+    store.create("p2", fields({ name: "charts" }), 11);
+    expect(store.usingKeys()).toEqual([
+      { keyName: "http-github", projectId: "p1", name: "widgets" },
     ]);
     store.update(
       id,
-      fields({ name: "renamed", credentialId: "c1" }),
+      fields({ name: "renamed", keyName: "http-github" }),
       false,
       30,
     );
@@ -112,7 +112,7 @@ test("a fetched row keeps what a change leaves out, and a refetch clears what th
     store.update(id, fields({ name: "renamed", ref: "main" }), true, 40);
     expect(store.byId(id)).toMatchObject({
       ref: "main",
-      credentialId: null,
+      keyName: null,
       state: "pending",
       error: null,
       etag: null,

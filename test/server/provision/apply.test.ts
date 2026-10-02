@@ -128,7 +128,7 @@ describe("provision through the composed app", () => {
           url: "https://github.com/acme/widgets",
           kind: "github",
           ref: "main",
-          credentialId: null,
+          keyName: null,
           ignore: "/*\n!/charts/\n",
           state: "pending",
         },

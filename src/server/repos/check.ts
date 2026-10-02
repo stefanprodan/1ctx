@@ -1,36 +1,23 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The rules a repository's row is held to with its project and its
-// credential at hand: on every save, and the credential's again at each
-// lookup, since it may have changed, been unbound or been deleted since.
+// The rules a repository's row is held to with its project and its key
+// at hand: on every save, and the key's again at each lookup, since its
+// file may have been replaced or removed since.
 
 import type {
   CreateRepoRequest,
   PatchRepoRequest,
 } from "../../shared/api/repos.ts";
-import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { adapter, covers, defaultName, normalizeUrl } from "./adapters.ts";
+import { adapter, defaultName, normalizeUrl } from "./adapters.ts";
 import type { RepoFields, RepoRow } from "./store.ts";
 
-// the credential row as repos reads it
-export type RepoCredential = {
-  id: string;
-  name: string;
-  keyName: string;
-  prefix: string;
-  header: string;
-  template: string;
-  methods: HttpMethod[];
-  projectIds: string[];
-};
-
-export type CredentialsPort = {
-  byId(id: string): RepoCredential | null;
-  // the key as it is now, read from its file
-  readKey(keyName: string): { ok: true; key: string } | { ok: false };
-  headerValue(template: string, key: string): string;
+export type KeysPort = {
+  // the http- key as it is now, read from its file
+  readKey(
+    keyName: string,
+  ): { ok: true; key: string } | { ok: false; reason: "missing" | "unusable" };
 };
 
 export type RepoProject = { id: string; kind: "personal" | "team" };
@@ -71,10 +58,10 @@ export function desired(
     url: parsed.value.url,
     kind,
     ref: change.ref ?? current?.ref ?? "",
-    credentialId:
-      change.credentialId === undefined
-        ? (current?.credentialId ?? null)
-        : change.credentialId,
+    keyName:
+      change.keyName === undefined
+        ? (current?.keyName ?? null)
+        : change.keyName,
     ignore: change.ignore ?? current?.ignore ?? "",
   };
 }
@@ -84,51 +71,32 @@ export const refetches = (before: RepoFields, after: RepoFields): boolean =>
   before.url !== after.url ||
   before.kind !== after.kind ||
   before.ref !== after.ref ||
-  before.credentialId !== after.credentialId ||
+  before.keyName !== after.keyName ||
   before.ignore !== after.ignore;
 
-// why a credential cannot sign this repository's lookup, null when it can
-function refusal(
-  projectId: string,
-  fields: Pick<RepoFields, "url" | "kind">,
-  credential: RepoCredential,
-): string | null {
-  if (!credential.projectIds.includes(projectId)) {
-    return `credential ${credential.name} is not bound to this project`;
-  }
-  const base = adapter(fields.url, fields.kind).apiBase;
-  if (!covers(credential.prefix, base)) {
-    return `credential ${credential.name} does not cover ${base}`;
-  }
-  if (!credential.methods.includes("GET")) {
-    return `credential ${credential.name} does not allow GET`;
-  }
-  return null;
-}
-
 // a personal project's repository is public and on a public host; a
-// credential must be the project's and cover the repository's API
+// key a save names must be a usable file, while one that goes missing
+// later only fails the lookup
 export function checkRepo(
   project: RepoProject,
   fields: RepoFields,
-  credentials: Pick<CredentialsPort, "byId">,
+  before: RepoFields | null,
+  keys: KeysPort,
 ): void {
   if (project.kind === "personal") {
     if (!publicHost(fields.url)) {
       throw new BadRequest(PERSONAL_HOST);
     }
-    if (fields.credentialId !== null) {
-      throw new BadRequest(
-        "a personal project's repository takes no credential",
-      );
+    if (fields.keyName !== null) {
+      throw new BadRequest("a personal project's repository takes no key");
     }
     return;
   }
-  if (fields.credentialId === null) return;
-  const credential = credentials.byId(fields.credentialId);
-  if (credential === null) throw new BadRequest("no such credential");
-  const why = refusal(project.id, fields, credential);
-  if (why !== null) throw new BadRequest(why);
+  if (fields.keyName === null || fields.keyName === before?.keyName) return;
+  const read = keys.readKey(fields.keyName);
+  if (!read.ok) {
+    throw new BadRequest(`keyName ${fields.keyName} is ${read.reason}`);
+  }
 }
 
 function publicHost(url: string): boolean {
@@ -136,35 +104,28 @@ function publicHost(url: string): boolean {
   return parsed.ok && parsed.value.kind !== null;
 }
 
-// the header a lookup or a fetch sends, and the prefix it may go to
+// the header a lookup or a fetch sends, and the API base it may go to
 export type RepoHeader = { name: string; value: string; prefix: string };
 
 export type RepoAuth =
   | { ok: true; header: RepoHeader | null }
   | { ok: false; error: "no access" };
 
-// at each lookup: the credential still there, bound to the project,
-// covering the API and allowing GET, its key readable now
+// at each lookup: the key read now, sent only under the repository's API
+// base; both hosts' APIs take a token as a bearer
 export function repoAuth(
-  repo: Pick<RepoRow, "projectId" | "url" | "kind" | "credentialId">,
-  credentials: CredentialsPort,
+  repo: Pick<RepoRow, "url" | "kind" | "keyName">,
+  keys: KeysPort,
 ): RepoAuth {
-  if (repo.credentialId === null) return { ok: true, header: null };
-  const credential = credentials.byId(repo.credentialId);
-  if (
-    credential === null ||
-    refusal(repo.projectId, repo, credential) !== null
-  ) {
-    return { ok: false, error: "no access" };
-  }
-  const read = credentials.readKey(credential.keyName);
+  if (repo.keyName === null) return { ok: true, header: null };
+  const read = keys.readKey(repo.keyName);
   if (!read.ok) return { ok: false, error: "no access" };
   return {
     ok: true,
     header: {
-      name: credential.header,
-      value: credentials.headerValue(credential.template, read.key),
-      prefix: credential.prefix,
+      name: "authorization",
+      value: `Bearer ${read.key}`,
+      prefix: adapter(repo.url, repo.kind).apiBase,
     },
   };
 }

@@ -13,6 +13,7 @@ import {
   type HttpMethod,
   type KeyState,
 } from "../../../shared/contracts/credential.ts";
+import { pluralCommas } from "../../lib/format.ts";
 import { configCredentialHref } from "../../lib/hrefs.ts";
 import { sameIds } from "../../lib/ids.ts";
 import type { Option } from "../../ui/Select.model.ts";
@@ -244,14 +245,29 @@ export function cardFieldOf(
   };
 }
 
+// a key is used by its credentials and by the repositories that read
+// it without one
 export function keyReader(
   list: readonly Pick<CredentialSummary, "name" | "keyName">[],
+  keys: readonly CredentialKey[],
 ): (file: string) => { label: string; href?: string; quiet?: boolean } {
   return (file) => {
     const users = list.filter((c) => c.keyName === file);
-    if (users.length === 0) return { label: "unused", quiet: true };
-    if (users.length > 1) return { label: `${users.length} credentials` };
-    const name = users[0]!.name;
-    return { label: name, href: configCredentialHref(name) };
+    const repos = keys.find((key) => key.name === file)?.repos ?? [];
+    if (users.length + repos.length === 0) {
+      return { label: "unused", quiet: true };
+    }
+    if (users.length === 1 && repos.length === 0) {
+      const name = users[0]!.name;
+      return { label: name, href: configCredentialHref(name) };
+    }
+    if (users.length === 0 && repos.length === 1) return { label: repos[0]! };
+    const parts = [
+      users.length > 0 &&
+        pluralCommas(users.length, "credential", "credentials"),
+      repos.length > 0 &&
+        pluralCommas(repos.length, "repository", "repositories"),
+    ];
+    return { label: parts.filter((part) => part !== false).join(", ") };
   };
 }

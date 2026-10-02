@@ -41,7 +41,7 @@ spec:
   url: https://github.com/acme/widgets.git
   name: widgets
   ref: main
-  credential: null
+  keyFrom: null
   ignore: |
     /*
     !/charts/

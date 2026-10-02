@@ -82,9 +82,9 @@ test("an admin saves a credential in canonical form and the list never holds a k
     expect(text).not.toContain(KEY);
     const answer = JSON.parse(text) as CredentialsResponse;
     expect(answer.keys).toEqual([
-      { name: "http-empty", usable: false },
-      { name: "http-quotes", usable: true },
-      { name: "http-short", usable: false },
+      { name: "http-empty", usable: false, repos: [] },
+      { name: "http-quotes", usable: true, repos: [] },
+      { name: "http-short", usable: false, repos: [] },
     ]);
     expect(answer.credentials).toEqual([credential]);
   } finally {

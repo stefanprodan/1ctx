@@ -102,8 +102,9 @@ type Ensured =
 const EMPTY: Prepared = { mounts: [], notices: [], release() {} };
 
 export class Mounts {
-  // by URL, ref and credential; a signed one by project too, since a
-  // credential is bound per project
+  // by URL, ref and key: an admin who names one key in two projects
+  // grants both the same access, and a signed and an unsigned lookup
+  // never share
   private readonly lookups = new Map<
     string,
     { at: number; answer: Promise<Lookup> }
@@ -239,9 +240,7 @@ export class Mounts {
   }
 
   private lookupKey(row: RepoRow): string {
-    const signer =
-      row.credentialId === null ? "" : `${row.credentialId}\n${row.projectId}`;
-    return `${row.url}\n${row.ref}\n${signer}`;
+    return `${row.url}\n${row.ref}\n${row.keyName ?? ""}`;
   }
 
   // the row's ETag when it was stored for this same lookup
@@ -289,7 +288,7 @@ export class Mounts {
   private lookup(row: RepoRow): Promise<Lookup> {
     const key = this.lookupKey(row);
     const now = this.deps.clock();
-    // an expired answer may hold a credential's header: never kept
+    // an expired answer may hold a key's header: never kept
     for (const [old, entry] of this.lookups) {
       if (now - entry.at >= REPO_LOOKUP_MS) this.lookups.delete(old);
     }

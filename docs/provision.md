@@ -61,11 +61,10 @@ what they name.
   held rows with the input laid on them.
 - **A `Repository` is a team project's, matched by `project` and
   name.** The name is `spec.name`, else `metadata.name`, so two projects
-  may each hold one named alike. `credential` names a credential, null
-  takes it off; `ignore` is a block string. Preflight checks one per
-  project and name, the per-project cap, and that a named credential
-  will be bound to the project, allow GET and cover the repository's
-  API.
+  may each hold one named alike. `keyFrom` names an `http-` key file,
+  null takes it off; `ignore` is a block string. Preflight checks one
+  per project and name, the per-project cap, and that the key file is
+  present and usable.
 - **A `Project`'s `knowledge` is a folder relative to its YAML file.**
   It is never read from stdin, may not leave the file's directory, and
   refuses a symlink. Docs are named by their path and checked with the

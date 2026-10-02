@@ -10,7 +10,11 @@ import { signal } from "@preact/signals";
 import { options } from "preact";
 import { render } from "preact-render-to-string";
 import { ApiError } from "../../../src/client/data/api.ts";
-import { credentials } from "../../../src/client/data/credentials.ts";
+import {
+  credentialKeys,
+  credentials,
+  credentialsError,
+} from "../../../src/client/data/credentials.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   addRepo,
@@ -29,13 +33,13 @@ import {
   asksKind,
   CAP_LINE,
   createBody,
-  credentialOptions,
   draftOf,
   IGNORE_PLACEHOLDER,
   nameOf,
   PUBLIC_HINT,
   patchBody,
   repoFieldOf,
+  repoKeyOptions,
   stateWords,
 } from "../../../src/client/views/projects/Repos.model.ts";
 import {
@@ -44,8 +48,8 @@ import {
   RepoRows,
   Repos,
 } from "../../../src/client/views/projects/Repos.tsx";
+import type { CredentialKey } from "../../../src/shared/api/credentials.ts";
 import type { RepoView } from "../../../src/shared/api/repos.ts";
-import type { CredentialSummary } from "../../../src/shared/contracts/credential.ts";
 import {
   DEFAULT_REPO_IGNORE,
   MAX_REPOS_PER_PROJECT,
@@ -64,7 +68,7 @@ function repo(changes: Partial<RepoView> = {}): RepoView {
     url: "https://github.com/stefanprodan/podinfo",
     kind: "github",
     ref: "",
-    credentialId: null,
+    keyName: null,
     ignore: "",
     state: "ready",
     error: null,
@@ -79,19 +83,10 @@ function repo(changes: Partial<RepoView> = {}): RepoView {
   };
 }
 
-const credential: CredentialSummary = {
-  id: "c1",
-  name: "github-acme",
-  keyName: "http-github",
-  key: "set" as CredentialSummary["key"],
-  prefix: "https://api.github.com/repos/acme/",
-  header: "Authorization",
-  template: "Bearer {key}",
-  methods: ["GET"],
-  projects: [{ id: "p2", name: "platform" }],
-  createdAt: 0,
-  updatedAt: 0,
-};
+const keys: CredentialKey[] = [
+  { name: "http-github", usable: true, repos: [] },
+  { name: "http-short", usable: false, repos: [] },
+];
 
 const team = { projectId: "p2", personal: false };
 const personal = { projectId: "p1", personal: true };
@@ -103,6 +98,8 @@ beforeEach(() => {
   me.value = null;
   me.value = admin();
   credentials.value = null;
+  credentialKeys.value = [];
+  credentialsError.value = null;
   answer = () => Response.json({ repos: [] });
 });
 
@@ -197,26 +194,26 @@ describe("the words", () => {
     expect(repoFieldOf("a repository named podinfo exists")).toBe("name");
     expect(repoFieldOf("kind is required for git.corp.dev")).toBe("kind");
     expect(repoFieldOf("ref must be at most 200 characters")).toBe("ref");
-    expect(repoFieldOf("credential gh is not bound to this project")).toBe(
-      "credentialId",
+    expect(repoFieldOf("keyName http-gh is missing")).toBe("keyName");
+    expect(repoFieldOf("a personal project's repository takes no key")).toBe(
+      "keyName",
     );
-    expect(repoFieldOf("no such credential")).toBe("credentialId");
     expect(
       repoFieldOf("a project holds at most 10 repositories"),
     ).toBeUndefined();
   });
 
-  test("credentials are those bound to the project, after None", () => {
-    const other = { ...credential, id: "c2", name: "other", projects: [] };
-    const all = [credential, other];
-    expect(credentialOptions(all, "p2", "").map((o) => o.value)).toEqual([
-      "",
-      "c1",
+  test("the keys are the http- files, after None", () => {
+    expect(repoKeyOptions(keys, "")).toEqual([
+      { value: "", label: "None" },
+      { value: "http-github", label: "http-github" },
+      { value: "http-short", label: "http-short", detail: "unusable" },
     ]);
-    // a saved one since unbound stays, so the draft shows it
-    expect(credentialOptions(all, "p2", "c2").at(-1)).toMatchObject({
-      value: "c2",
-      label: "other",
+    // a saved one since removed stays, so the draft shows it
+    expect(repoKeyOptions(keys, "http-gone").at(-1)).toEqual({
+      value: "http-gone",
+      label: "http-gone",
+      detail: "missing",
     });
   });
 });
@@ -233,7 +230,7 @@ describe("the bodies", () => {
           name: "b",
           ref: "main",
           kind: "gitlab",
-          credentialId: "c1",
+          keyName: "http-github",
           ignore: "/*\n!/charts/\n",
         },
         false,
@@ -243,18 +240,18 @@ describe("the bodies", () => {
       name: "b",
       ref: "main",
       kind: "gitlab",
-      credentialId: "c1",
+      keyName: "http-github",
       ignore: "/*\n!/charts/\n",
     });
   });
 
-  test("a personal create carries no credential and no kind", () => {
+  test("a personal create carries no key and no kind", () => {
     const body = createBody(
       {
         ...draftOf(null),
         url: "https://git.corp.dev/a/b",
         kind: "github",
-        credentialId: "c1",
+        keyName: "http-github",
       },
       true,
     );
@@ -262,18 +259,21 @@ describe("the bodies", () => {
   });
 
   test("a change sends only what changed", () => {
-    const row = repo({ credentialId: "c1", ignore: "*.md" });
+    const row = repo({ keyName: "http-github", ignore: "*.md" });
     expect(patchBody(draftOf(row), row, false)).toBeNull();
     expect(patchBody({ ...draftOf(row), name: "info" }, row, false)).toEqual({
       name: "info",
     });
     expect(
       patchBody(
-        { ...draftOf(row), credentialId: "", ignore: "  ", ref: "v6" },
+        { ...draftOf(row), keyName: "", ignore: "  ", ref: "v6" },
         row,
         false,
       ),
-    ).toEqual({ credentialId: null, ignore: "", ref: "v6" });
+    ).toEqual({ keyName: null, ignore: "", ref: "v6" });
+    // a member's answer names no key: nothing to change
+    const { keyName: _, ...unnamed } = repo();
+    expect(patchBody(draftOf(unnamed), unnamed, false)).toBeNull();
     // an emptied name keeps the saved one
     expect(patchBody({ ...draftOf(row), name: "" }, row, false)).toBeNull();
   });
@@ -439,8 +439,9 @@ describe("the list", () => {
 });
 
 describe("the form", () => {
-  test.serial("a team form asks the kind and the credential", () => {
-    credentials.value = [credential];
+  test.serial("a team form asks the kind and the key", () => {
+    credentials.value = [];
+    credentialKeys.value = keys;
     const save = new Save(async () => {});
     const html = render(
       <RepoFields
@@ -452,13 +453,28 @@ describe("the form", () => {
     );
     expect(html).toContain('aria-label="Host"');
     expect(html).toContain(">GitLab<");
-    expect(html).toContain(">Credential<");
+    expect(html).toContain(">Key<");
+    expect(html).toContain('name="keyName"');
     expect(html).toContain('placeholder="tools"');
     expect(html).toContain("*.png\n*.jpg");
   });
 
-  test.serial("a personal form has no credential nor kind", () => {
-    credentials.value = [credential];
+  test.serial("a key list that did not load says so", () => {
+    credentialsError.value = { words: "the server is down", status: null };
+    const html = render(
+      <RepoFields
+        draft={draftOf(null)}
+        save={new Save(async () => {})}
+        target={team}
+        set={() => {}}
+      />,
+    );
+    expect(html).toContain("Keys did not load: the server is down");
+  });
+
+  test.serial("a personal form has no key nor kind", () => {
+    credentials.value = [];
+    credentialKeys.value = keys;
     const html = render(
       <RepoForm
         target={personal}
@@ -467,7 +483,8 @@ describe("the form", () => {
       />,
     );
     expect(html).not.toContain('aria-label="Host"');
-    expect(html).not.toContain("Credential");
+    expect(html).not.toContain(">Key<");
+    expect(html).not.toContain("keyName");
     submitsInForms(html);
   });
 

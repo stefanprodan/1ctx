@@ -13,7 +13,7 @@ import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
 import { type BashArea, bashArea } from "./bash/index.ts";
-import { credentialsArea, headerValue, httpKeys } from "./credentials/index.ts";
+import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
 import {
@@ -285,9 +285,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: projects.store,
     key: httpKeys(options),
     capabilities,
-    repos: {
-      usingCredential: (credentialId) => repos.usingCredential(credentialId),
-    },
+    repos: { usingKeys: () => repos.usingKeys() },
   });
   const access: Access = accessArea({
     db,
@@ -341,11 +339,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     access,
     projects: projects.store,
-    credentials: {
-      byId: (id) => credentials.byId(id),
-      readKey: (keyName) => credentials.readKey(keyName),
-      headerValue,
-    },
+    keys: { readKey: (keyName) => credentials.readKey(keyName) },
     // a deleted repository was its project's, so only its rows are read
     capabilities: {
       forget(key, projectId) {

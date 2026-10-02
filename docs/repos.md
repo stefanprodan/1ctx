@@ -4,17 +4,17 @@ Governs `src/server/repos/`: the repositories a project mounts
 read-only for bash under `/repos/<name>`.
 
 A repository is a row in a project: a git host's URL, a ref, an
-optional credential, a name and ignore rules. The server fetches its
-tree as a tarball; an agent never fetches it. The routes and who may
-call them are in `docs/access.md`.
+optional `http-` key file, a name and ignore rules. The server fetches
+its tree as a tarball; an agent never fetches it. The routes and who
+may call them are in `docs/access.md`.
 
 ## The row
 
 - **Admins write a team project's; an owner their personal project's.**
   A team project's repository may be on any https host. A personal
   project's must be on `github.com` or `gitlab.com` exactly and takes
-  no credential, so a member never points the server at an internal
-  address. At most `MAX_REPOS_PER_PROJECT` to a project.
+  no key, so a member never points the server at an internal address.
+  At most `MAX_REPOS_PER_PROJECT` to a project.
 - **The name is the mount's folder.** By `isName`, unique in its
   project, the URL's last segment by default (lowercased, other
   characters as dashes). A name the URL cannot give is a 400 asking for
@@ -33,8 +33,8 @@ call them are in `docs/access.md`.
   the line: past that many, wildmatch (git's too) backtracks for
   minutes.
   The fetch matches each path and its parent folders while unpacking.
-- **A change to the URL, kind, ref, credential or ignore rules sets the
-  row `pending` and clears its error.** A rename does not; a refresh
+- **A change to the URL, kind, ref, key or ignore rules sets the row
+  `pending` and clears its error.** A rename does not; a refresh
   sets `pending`. The state is `pending`, `fetching`, `ready` or
   `failed`; the error is one word of `REPO_ERRORS`, never a host's
   text.
@@ -54,23 +54,25 @@ call them are in `docs/access.md`.
   public archive by ref (`codeload.github.com` for github.com, `HEAD`
   for the default branch) and the repository page.
 
-## Credentials
+## Keys
 
-- **A repository may name one of its project's credentials.** On save
-  the credential must be bound to the project, its prefix must cover
-  the adapter's API base (`covers()`, one origin and the path under the
-  prefix) and it must allow GET. A GitLab path is encoded, and a prefix
-  holds no escape, so a GitLab credential covers from `/api/v4/`.
-- **The same holds at each lookup.** `repoAuth()` re-reads the row and
-  the key and answers the header and the prefix it may go to, or
-  `no access` when the credential was deleted, unbound, narrowed, lost
-  GET or its key is unusable.
-- **Deleting a credential a repository names is a 409**
-  (`docs/tools.md`); unbinding or narrowing it is not, and the next
-  lookup fails.
-- **The key never reaches a command.** A repository's credential is
-  not one of a send's credentials and its `credential:` switch does not
-  govern it.
+- **A team project's repository may name an `http-` key file**
+  (`keyName`, the names a credential picks from), with no credential in
+  between. Only admins set it. A save that names a new key refuses a
+  file `missing` or `unusable` (`readKey()`, `isUsableKey()`); a key
+  gone later only fails the lookup.
+- **A key is sent as `Authorization: Bearer`,** which both hosts' APIs
+  accept, and only under the repository's API base (`covers()`).
+- **`repoAuth()` reads the key at each lookup,** so a replaced file
+  applies at the next one, and answers `no access` when it is missing
+  or unusable.
+- **The key never reaches a command.** It is not one of a send's
+  credentials, no `credential:` switch governs it and curl never signs
+  with it. Its name is in an admin's answer only; a member's list
+  carries no `keyName`.
+- **The credentials page counts it as used.** `GET /api/credentials`
+  lists each key file's repositories (`usingKeys()`, a port closed in
+  `compose.ts`); deleting a credential never asks about them.
 
 ## The lookup
 
@@ -79,32 +81,34 @@ call them are in `docs/access.md`.
   host's answer is the proof of access, so a tree another project
   fetched signed is never mounted by an unsigned row naming its commit.
 - **One lookup per repository a minute** (`REPO_LOOKUP_MS`), shared by
-  URL, ref and credential, and by project when signed, since a
-  credential is bound per project. Never shared between a signed and an
-  unsigned lookup. A failure is shared the same minute, and the cache
-  never mounts a tree past a failed lookup. A refresh or a change to
+  URL, ref and key: two projects whose admin named one key share it.
+  Never shared between a signed and an unsigned lookup. A failure is
+  shared the same minute, and the cache never mounts a tree past a
+  failed lookup. A refresh or a change to
   what is fetched drops the repository's lookup.
-- **Signed: the API.** `repoAuth()` again, then the adapter's lookup
-  with the last ETag; a 304 keeps the row's commit. The tarball then
-  comes from the API at that commit.
+- **Signed: the API.** `repoAuth()`, then the adapter's lookup with
+  the last ETag; a 304 keeps the row's commit. The tarball then comes
+  from the API at that commit. A renamed or moved private GitHub
+  repository answers a 301 off its API base, followed unsigned, so it
+  fails as `not found` until its URL is updated.
 - **Public: the archive.** A `GET` of the archive by ref is the lookup.
   It carries `If-None-Match` only when that ETag's commit is cached
   under the current ignore rules, so a 304 always has a tree to mount.
   A 200 is the tarball, and the commit is read from its first member;
   an archive naming none falls back to the API lookup, unsigned.
 - **The ETag on the row is scoped** to the lookup it came from (a short
-  hash of URL, ref and credential before it), so a changed ref never
+  hash of URL, ref and key before it), so a changed ref never
   sends an old one.
 
 ## The fetch
 
 - **A fetch runs whole in `repos/fetch.worker.ts`**: the request, the
   gunzip, the tar and the writes, through `streamTar()` in
-  `lib/archive.ts`. The job holds the URL, the credential's header and
-  prefix, the ignore text and the caps; the worker writes no SQLite and
+  `lib/archive.ts`. The job holds the URL, the key's header and the API
+  base, the ignore text and the caps; the worker writes no SQLite and
   answers counts or a closed word, never a host's text or a name.
 - **Redirects are followed by hand** (`repos/redirect.ts`): https only,
-  no userinfo, at most 3 hops, the header sent only under its prefix
+  no userinfo, at most 3 hops, the header sent only under the API base
   (`covers()`) and never again after the first hop off it.
 - **A job is bounded:** `REPO_FETCH_MS` in all and `REPO_STALL_MS`
   without a byte. The main thread terminates the worker at the deadline
@@ -121,7 +125,7 @@ call them are in `docs/access.md`.
   at the go. A slot granted after its job ended is given back.
 - **A tree that failed is not unpacked again** for a minute, one over
   the caps for `REPO_REFUSED_MS`, until a refresh. It is remembered per
-  credential and project, so one signer's failure is never another's,
+  key, so one signer's failure is never another's or an unsigned one's,
   and a job that ended waiting for its slots is not remembered. A
   public lookup that names such a commit, or one being fetched, stops
   at the commit.

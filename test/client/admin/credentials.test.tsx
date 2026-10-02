@@ -101,8 +101,8 @@ describe("the model", () => {
     "the key picks mark a file that cannot be used, and one gone",
     () => {
       const keys = [
-        { name: "http-finnhub", usable: true },
-        { name: "http-short", usable: false },
+        { name: "http-finnhub", usable: true, repos: [] },
+        { name: "http-short", usable: false, repos: [] },
       ];
       expect(keyOptions(keys, "")).toEqual([
         { value: "http-finnhub", label: "http-finnhub" },
@@ -235,7 +235,7 @@ describe("the entity", () => {
     answer = () =>
       Response.json({
         credentials: [credential({ id: "c2", name: "github" }), credential()],
-        keys: [{ name: "http-finnhub", usable: true }],
+        keys: [{ name: "http-finnhub", usable: true, repos: [] }],
       });
     await loadCredentials();
     expect(credentials.value?.map((c) => c.name)).toEqual([
@@ -243,7 +243,7 @@ describe("the entity", () => {
       "github",
     ]);
     expect(credentialKeys.value).toEqual([
-      { name: "http-finnhub", usable: true },
+      { name: "http-finnhub", usable: true, repos: [] },
     ]);
   });
 
@@ -372,12 +372,22 @@ describe("a card of the page", () => {
       credential({ id: "c2", name: "b", keyName: "http-shared" }),
       credential({ id: "c3", name: "c", keyName: "http-shared" }),
     ];
-    const reader = keyReader(list);
+    const reader = keyReader(list, [
+      { name: "http-finnhub", usable: true, repos: [] },
+      { name: "http-shared", usable: true, repos: ["platform/widgets"] },
+      { name: "http-repo", usable: true, repos: ["platform/widgets"] },
+      { name: "http-repos", usable: true, repos: ["a/b", "c/d"] },
+    ]);
     expect(reader("http-finnhub")).toEqual({
       label: "finnhub",
       href: "/admin/config/web/credentials/finnhub",
     });
-    expect(reader("http-shared")).toEqual({ label: "2 credentials" });
+    expect(reader("http-shared")).toEqual({
+      label: "2 credentials, 1 repository",
+    });
+    // a repository reads a key without a credential: it is used
+    expect(reader("http-repo")).toEqual({ label: "platform/widgets" });
+    expect(reader("http-repos")).toEqual({ label: "2 repositories" });
     expect(reader("http-none")).toEqual({ label: "unused", quiet: true });
   });
 });

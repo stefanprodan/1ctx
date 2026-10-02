@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The repository request parsers: a new repository and a change to
-// one. The rules that need the project or a credential are in check.ts.
+// one. The rules that need the project or a key file are in check.ts.
 
 import type {
   CreateRepoRequest,
@@ -20,13 +20,11 @@ import {
   MIN_NAME,
   NAME_CHARACTERS,
 } from "../../shared/words.ts";
+import { parseKeyName } from "../credentials/index.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { type Checked, checkRef, normalizeUrl } from "./adapters.ts";
 import { parseIgnore } from "./rules.ts";
-
-// a row id, as lib/ids.ts makes them
-const ID = /^[0-9a-z]{1,32}$/;
 
 function checked<T>(result: Checked<T>): T {
   if (!result.ok) throw new BadRequest(result.error);
@@ -55,13 +53,9 @@ export function parseKind(value: unknown) {
   return value;
 }
 
-export function parseCredentialId(value: unknown): string | null {
-  if (value === null) return null;
-  if (typeof value !== "string" || !ID.test(value)) {
-    throw new BadRequest("credentialId must be a credential id or null");
-  }
-  return value;
-}
+// an http- key file's name, as a credential names one, or null
+export const parseRepoKey = (value: unknown): string | null =>
+  value === null ? null : parseKeyName(value);
 
 function checkIgnoreSyntax(text: string): Checked<string> {
   const parsed = parseIgnore(text);
@@ -89,14 +83,14 @@ export function parseIgnoreText(value: unknown): string {
   return checked(checkIgnoreSyntax(value));
 }
 
-const FIELDS = ["url", "name", "kind", "ref", "credentialId", "ignore"];
+const FIELDS = ["url", "name", "kind", "ref", "keyName", "ignore"];
 
 const parsers = {
   url: parseRepoUrl,
   name: parseRepoName,
   kind: parseKind,
   ref: parseRef,
-  credentialId: parseCredentialId,
+  keyName: parseRepoKey,
   ignore: parseIgnoreText,
 };
 

@@ -60,10 +60,8 @@ export const hash = (text: string, length: number) =>
 // from a host, a repository or a tarball
 export const sourceOf = (url: string) => hash(url, 16);
 
-// who fetches: a failure of one credential's, or of a project's, is
-// never another's
-const signerOf = (row: RepoRow) =>
-  row.credentialId === null ? "" : `${row.credentialId}/${row.projectId}`;
+// who fetches: a failure with one key, or with none, is never another's
+const signerOf = (row: RepoRow) => row.keyName ?? "";
 
 export type FetchesDeps = {
   cache: RepoCache;

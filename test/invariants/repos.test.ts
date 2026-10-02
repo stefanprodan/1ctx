@@ -3,13 +3,16 @@
 //
 // A repository is a project's row: admins write a team project's on any
 // https host, an owner their personal project's on github.com or
-// gitlab.com without a credential. Names are unique in a project, ten to
-// a project. A credential must be the project's, cover the repository's
-// API and allow GET, and cannot be deleted while a repository names it.
-// Deleting a repository forgets its switch in its project.
+// gitlab.com without a key. Names are unique in a project, ten to a
+// project. A team project's may read an http- key file, which only an
+// admin sees named and no credential governs. Deleting a repository
+// forgets its switch in its project.
 
 import { expect, test } from "bun:test";
-import type { CredentialResponse } from "../../src/shared/api/credentials.ts";
+import type {
+  CredentialResponse,
+  CredentialsResponse,
+} from "../../src/shared/api/credentials.ts";
 import type {
   RepoResponse,
   ReposResponse,
@@ -27,7 +30,9 @@ const KEY = "0123456789abcdef-key";
 const WIDGETS = "https://github.com/acme/widgets";
 
 async function setup(): Promise<ChatApp & { teamId: string }> {
-  const chat = await chatApp({ secrets: { "http-github": KEY } });
+  const chat = await chatApp({
+    secrets: { "http-github": KEY, "http-short": "short" },
+  });
   chat.app.automationScheduler.stop();
   const team = await createTeam(chat.admin, "platform", [chat.memberId]);
   return { ...chat, teamId: team.id };
@@ -64,7 +69,7 @@ test("an admin writes a team project's repositories and its members read them", 
       url: WIDGETS,
       kind: "github",
       ref: "",
-      credentialId: null,
+      keyName: null,
       ignore: "",
       state: "pending",
       error: null,
@@ -82,6 +87,8 @@ test("an admin writes a team project's repositories and its members read them", 
     const listed = await chat.member.call("GET", base);
     expect(listed.status).toBe(200);
     const { repos } = (await listed.json()) as ReposResponse;
+    // a key's name is an admin's to see
+    expect(repos.some((row) => Object.hasOwn(row, "keyName"))).toBe(false);
     expect(repos.map((row) => [row.name, row.kind])).toEqual([
       ["charts", "gitlab"],
       ["widgets", "github"],
@@ -154,7 +161,7 @@ test("a personal project's repositories are its owner's, public and on a public 
         { url: "https://git.example.test/acme/widgets", kind: "github" },
         "github.com or gitlab.com",
       ],
-      [{ url: WIDGETS, credentialId: "c1" }, "takes no credential"],
+      [{ url: WIDGETS, keyName: "http-github" }, "takes no key"],
       [{ url: "http://github.com/acme/widgets" }, "https"],
     ] as const;
     for (const [body, words] of refused) {
@@ -245,90 +252,84 @@ test("a name is taken once in a project, and a project holds at most ten", async
   }
 });
 
-async function credential(
-  chat: ChatApp & { teamId: string },
-  fields: Record<string, unknown>,
-): Promise<string> {
-  const res = await chat.admin.call("POST", "/api/credentials", {
-    body: {
-      name: "github",
-      keyName: "http-github",
-      prefix: "https://api.github.com/repos/acme/",
-      header: "Authorization",
-      template: "Bearer {key}",
-      projectIds: [chat.teamId],
-      ...fields,
-    },
-  });
-  expect(res.status).toBe(201);
-  return ((await res.json()) as CredentialResponse).credential.id;
-}
-
-test("a credential is the project's, covers the API, allows GET and is kept while named", async () => {
+test("a team project's repository reads a key file, never through a credential", async () => {
   const chat = await setup();
   try {
     const base = `/api/projects/${chat.teamId}/repos`;
-    const id = await credential(chat, {});
     const repo = await made(chat.admin, base, {
       url: WIDGETS,
-      credentialId: id,
+      keyName: "http-github",
     });
-    expect(repo.credentialId).toBe(id);
+    expect(repo.keyName).toBe("http-github");
     expect(chat.app.repos.auth(chat.app.repos.byId(repo.id)!)).toEqual({
       ok: true,
       header: {
-        name: "Authorization",
+        name: "authorization",
         value: `Bearer ${KEY}`,
-        prefix: "https://api.github.com/repos/acme/",
+        prefix: "https://api.github.com/repos/acme/widgets/",
       },
     });
-    const elsewhere = await chat.admin.call("POST", base, {
+    const refused = [
+      ["http-nope", "keyName http-nope is missing"],
+      ["http-short", "keyName http-short is unusable"],
+      ["github", "keyName must be http- followed by"],
+    ] as const;
+    for (const [keyName, words] of refused) {
+      const res = await chat.admin.call("POST", base, {
+        body: { url: WIDGETS, name: "w2", keyName },
+      });
+      expect(res.status).toBe(400);
+      expect(await error(res)).toContain(words);
+    }
+
+    // the key files list counts it as used
+    const listed = (await (
+      await chat.admin.call("GET", "/api/credentials")
+    ).json()) as CredentialsResponse;
+    expect(listed.keys).toEqual([
+      { name: "http-github", usable: true, repos: ["platform/widgets"] },
+      { name: "http-short", usable: false, repos: [] },
+    ]);
+
+    // a credential on the same key comes and goes: repositories never
+    // hold one
+    const created = await chat.admin.call("POST", "/api/credentials", {
       body: {
-        url: "https://github.com/other/widgets",
-        name: "other",
-        credentialId: id,
+        name: "github",
+        keyName: "http-github",
+        prefix: "https://api.github.com/",
+        header: "Authorization",
+        template: "Bearer {key}",
+        projectIds: [chat.teamId],
       },
     });
-    expect(elsewhere.status).toBe(400);
-    expect(await error(elsewhere)).toBe(
-      "credential github does not cover https://api.github.com/repos/other/widgets/",
-    );
-    const missing = await chat.admin.call("POST", base, {
-      body: { url: WIDGETS, name: "w2", credentialId: "nosuchid" },
-    });
-    expect(await error(missing)).toBe("no such credential");
-    const gone = await chat.admin.call("DELETE", `/api/credentials/${id}`);
-    expect(gone.status).toBe(409);
-    expect(await error(gone)).toBe("used by repository platform/widgets");
-    // unbinding is allowed, and the next lookup has no access
-    const unbound = await chat.admin.call("PATCH", `/api/credentials/${id}`, {
-      body: { projectIds: [] },
-    });
-    expect(unbound.status).toBe(200);
+    const { credential } = (await created.json()) as CredentialResponse;
+    expect(
+      (await chat.admin.call("DELETE", `/api/credentials/${credential.id}`))
+        .status,
+    ).toBe(204);
+
+    // a key gone later fails the lookup, never a save that keeps it
+    delete chat.secrets["http-github"];
     expect(chat.app.repos.auth(chat.app.repos.byId(repo.id)!)).toEqual({
       ok: false,
       error: "no access",
     });
-    const save = await chat.admin.call("PATCH", `${base}/${repo.id}`, {
-      body: { ref: "main" },
+    const renamed = await chat.admin.call("PATCH", `${base}/${repo.id}`, {
+      body: { name: "gadgets" },
     });
-    expect(await error(save)).toBe(
-      "credential github is not bound to this project",
-    );
-    await chat.admin.call("PATCH", `/api/credentials/${id}`, {
-      body: { projectIds: [chat.teamId], methods: ["HEAD"] },
-    });
-    const head = await chat.admin.call("PATCH", `${base}/${repo.id}`, {
-      body: { ref: "main" },
-    });
-    expect(await error(head)).toBe("credential github does not allow GET");
+    expect(renamed.status).toBe(200);
+    chat.secrets["http-github"] = `${KEY}-rotated`;
+    const again = chat.app.repos.auth(chat.app.repos.byId(repo.id)!);
+    expect(again.ok && again.header?.value).toBe(`Bearer ${KEY}-rotated`);
+
     const off = await chat.admin.call("PATCH", `${base}/${repo.id}`, {
-      body: { credentialId: null },
+      body: { keyName: null },
     });
-    expect(off.status).toBe(200);
-    expect(
-      (await chat.admin.call("DELETE", `/api/credentials/${id}`)).status,
-    ).toBe(204);
+    expect(((await off.json()) as RepoResponse).repo).toMatchObject({
+      keyName: null,
+      state: "pending",
+    });
   } finally {
     await closed(chat);
   }

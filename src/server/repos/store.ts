@@ -10,8 +10,9 @@ import type {
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
-export type RepoRow = RepoView & {
+export type RepoRow = Omit<RepoView, "keyName"> & {
   projectId: string;
+  keyName: string | null;
   // the ETag of the last lookup or archive answer, sent back to get a 304
   etag: string | null;
 };
@@ -22,7 +23,7 @@ export type RepoFields = {
   url: string;
   kind: RepoKind;
   ref: string;
-  credentialId: string | null;
+  keyName: string | null;
   ignore: string;
 };
 
@@ -45,7 +46,7 @@ type Raw = {
   url: string;
   kind: RepoKind;
   ref: string;
-  credential_id: string | null;
+  key_name: string | null;
   ignore_rules: string;
   state: RepoState;
   error: RepoError | null;
@@ -66,7 +67,7 @@ const row = (raw: Raw): RepoRow => ({
   url: raw.url,
   kind: raw.kind,
   ref: raw.ref,
-  credentialId: raw.credential_id,
+  keyName: raw.key_name,
   ignore: raw.ignore_rules,
   state: raw.state,
   error: raw.error,
@@ -80,10 +81,11 @@ const row = (raw: Raw): RepoRow => ({
   updatedAt: raw.updated_at,
 });
 
-// the wire's view: the ETag and the project stay on the server
-export function view(repo: RepoRow): RepoView {
-  const { projectId: _projectId, etag: _etag, ...rest } = repo;
-  return rest;
+// the wire's view: the ETag and the project stay on the server, and a
+// key's name is an admin's to see
+export function view(repo: RepoRow, admin: boolean): RepoView {
+  const { projectId: _projectId, etag: _etag, keyName, ...rest } = repo;
+  return admin ? { ...rest, keyName } : rest;
 }
 
 export class ReposStore {
@@ -135,15 +137,19 @@ export class ReposStore {
     );
   }
 
-  // the repositories that name a credential, as project id and name
-  usingCredential(credentialId: string): { projectId: string; name: string }[] {
+  // the repositories that name a key file, in key and name order
+  usingKeys(): { keyName: string; projectId: string; name: string }[] {
     return this.db
-      .query<{ project_id: string; name: string }, [string]>(
-        `select project_id, name from repos where credential_id = ?
-         order by project_id, name`,
+      .query<{ key_name: string; project_id: string; name: string }, []>(
+        `select key_name, project_id, name from repos
+         where key_name is not null order by key_name, name`,
       )
-      .all(credentialId)
-      .map((found) => ({ projectId: found.project_id, name: found.name }));
+      .all()
+      .map((found) => ({
+        keyName: found.key_name,
+        projectId: found.project_id,
+        name: found.name,
+      }));
   }
 
   create(projectId: string, fields: RepoFields, now: number): RepoRow {
@@ -151,7 +157,7 @@ export class ReposStore {
     this.db
       .query(
         `insert into repos (id, project_id, name, url, kind, ref,
-           credential_id, ignore_rules, state, created_at, updated_at)
+           key_name, ignore_rules, state, created_at, updated_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       )
       .run(
@@ -161,7 +167,7 @@ export class ReposStore {
         fields.url,
         fields.kind,
         fields.ref,
-        fields.credentialId,
+        fields.keyName,
         fields.ignore,
         now,
         now,
@@ -180,7 +186,7 @@ export class ReposStore {
     this.db
       .query(
         `update repos set name = ?, url = ?, kind = ?, ref = ?,
-           credential_id = ?, ignore_rules = ?, updated_at = ?,
+           key_name = ?, ignore_rules = ?, updated_at = ?,
            state = case when ? then 'pending' else state end,
            error = case when ? then null else error end,
            etag = case when ? then null else etag end,
@@ -196,7 +202,7 @@ export class ReposStore {
         fields.url,
         fields.kind,
         fields.ref,
-        fields.credentialId,
+        fields.keyName,
         fields.ignore,
         now,
         ...Array<number>(8).fill(refetch ? 1 : 0),

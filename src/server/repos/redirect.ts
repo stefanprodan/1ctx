@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A repository's requests, redirects followed by hand: https only, no
-// userinfo, at most MAX_HOPS, and the credential's header sent only
-// under its prefix and never again after the first hop off it. GitHub's
+// userinfo, at most MAX_HOPS, and the key's header sent only under the
+// API base and never again after the first hop off it. GitHub's
 // tarball answers a redirect to codeload whose location carries its own
 // token, so a location is never logged or put in an error.
 

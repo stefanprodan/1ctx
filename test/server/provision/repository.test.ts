@@ -20,16 +20,6 @@ const repository = (name: string, spec: Record<string, unknown> = {}) =>
     ...spec,
   });
 
-const credential = (spec: Record<string, unknown> = {}) =>
-  object("Credential", "github", {
-    keyFrom: "http-github",
-    url: "https://api.github.com/repos/acme/",
-    header: "Authorization",
-    value: "Bearer {key}",
-    projects: ["platform"],
-    ...spec,
-  });
-
 const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
   Project: ["platform", "finops"],
@@ -84,7 +74,8 @@ describe("repository documents", () => {
       [{ ref: "a..b" }, "spec.ref"],
       [{ ignore: "x\n".repeat(201) }, "spec.ignore"],
       [{ name: "Widgets" }, "spec.name"],
-      [{ credential: 3 }, "spec.credential"],
+      [{ keyFrom: 3 }, "spec.keyFrom"],
+      [{ keyFrom: "github" }, "spec.keyFrom"],
       [{ extra: true }, "spec.extra is an unknown field"],
     ];
     for (const [spec, words] of refused) {
@@ -158,57 +149,21 @@ describe("repository documents", () => {
     );
   });
 
-  test("a credential will be bound, cover the API and allow GET", () => {
-    check(
-      documents(credential(), repository("widgets", { credential: "github" })),
-    );
-    const cases: [Record<string, unknown>, Record<string, unknown>, string][] =
-      [
-        [
-          { projects: ["finops"] },
-          {},
-          "spec.credential is not bound to platform",
-        ],
-        [
-          { url: "https://api.github.com/repos/other/" },
-          {},
-          "spec.credential does not cover https://api.github.com/repos/acme/widgets/",
-        ],
-        [{ methods: ["HEAD"] }, {}, "spec.credential does not allow GET"],
-        [
-          {},
-          { url: "https://gitlab.com/acme/widgets" },
-          "does not cover https://gitlab.com/api/v4/projects/acme%2Fwidgets/",
-        ],
-      ];
-    for (const [cred, repo, words] of cases) {
-      expect(() =>
-        check(
-          documents(
-            credential(cred),
-            repository("widgets", { credential: "github", ...repo }),
-          ),
-        ),
-      ).toThrow(words);
-    }
+  test("a key file is present and usable, and no credential is asked", () => {
+    check(documents(repository("widgets", { keyFrom: "http-github" })));
+    check(documents(repository("widgets", { keyFrom: null })));
     expect(() =>
-      check(documents(repository("widgets", { credential: "github" }))),
-    ).toThrow("spec.credential references missing Credential/github");
-    // a held credential, as the instance holds it
-    check(
-      documents(repository("widgets", { credential: "github" })),
-      {
-        list: () => [
-          {
-            name: "github",
-            prefix: "https://api.github.com/",
-            methods: ["GET"],
-            projects: ["platform"],
-          },
-        ],
-      },
-      { Credential: ["github"] },
+      check(documents(repository("widgets", { keyFrom: "http-github" })), {
+        key: () => "missing",
+      }),
+    ).toThrow(
+      "Repository/widgets: spec.keyFrom secret http-github.key is missing",
     );
+    expect(() =>
+      check(documents(repository("widgets", { keyFrom: "http-github" })), {
+        key: () => "unusable",
+      }),
+    ).toThrow("spec.keyFrom secret http-github.key must hold");
   });
 });
 
@@ -221,14 +176,13 @@ describe("repository apply", () => {
     try {
       const base = [
         object("Project", "platform", { description: "A team project." }),
-        credential(),
       ];
       const lines: string[] = [];
       const report = (line: string) => lines.push(line);
       await app.provision.apply(
         documents(
           ...base,
-          repository("widgets", { credential: "github", ref: "main" }),
+          repository("widgets", { keyFrom: "http-github", ref: "main" }),
         ),
         report,
       );
@@ -241,7 +195,7 @@ describe("repository apply", () => {
         ref: "main",
         state: "pending",
       });
-      expect(row?.credentialId).not.toBeNull();
+      expect(row?.keyName).toBe("http-github");
       app.repos.store.setFetched(row!.id, {
         state: "ready",
         error: null,
@@ -251,7 +205,7 @@ describe("repository apply", () => {
       await app.provision.apply(
         documents(
           ...base,
-          repository("widgets", { credential: "github", ref: "main" }),
+          repository("widgets", { keyFrom: "http-github", ref: "main" }),
         ),
         report,
       );
@@ -261,13 +215,13 @@ describe("repository apply", () => {
       await app.provision.apply(
         documents(
           ...base,
-          repository("widgets", { credential: null, ignore: "*.md\n" }),
+          repository("widgets", { keyFrom: null, ignore: "*.md\n" }),
         ),
         report,
       );
       expect(lines).toContain("updated repository/widgets");
       expect(app.repos.store.byId(row!.id)).toMatchObject({
-        credentialId: null,
+        keyName: null,
         ignore: "*.md\n",
         ref: "main",
         state: "pending",

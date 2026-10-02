@@ -98,7 +98,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   that path and `POST .../:repoId/refresh`, which answer 404 for a
   personal project, an admin's own included. An owner writes their
   personal project's under `/api/profile/project/repos`, so no route
-  lets a member write a team project's.
+  lets a member write a team project's. A key file's name (`keyName`)
+  is in an admin's answer only.
 - **Removing a member drops their waiting messages in the same
   transaction.**
 - **Anyone who may open a chat may archive it.** Rename and delete are

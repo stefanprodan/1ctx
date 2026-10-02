@@ -191,7 +191,7 @@ describe("the adapters", () => {
   });
 });
 
-describe("a credential's prefix", () => {
+describe("a prefix", () => {
   const base = "https://api.github.com/repos/acme/widgets/";
   test.each([
     ["https://api.github.com/", true],

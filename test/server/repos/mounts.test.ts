@@ -6,7 +6,6 @@ import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
   type JobRunner,
-  type RepoCredential,
   type RepoFields,
   type RepoLimits,
   reposArea,
@@ -36,16 +35,7 @@ const ARCHIVE = `${PAGE}/archive/HEAD.tar.gz`;
 const API = "https://git.test/api/v3/repos/acme/widgets/";
 const CODELOAD = "https://codeload.git.test/acme/widgets/legacy.tar.gz";
 
-const credential: RepoCredential = {
-  id: "c1",
-  name: "github",
-  keyName: "http-github",
-  prefix: "https://git.test/api/v3/repos/acme/",
-  header: "authorization",
-  template: "Bearer {key}",
-  methods: ["GET"],
-  projectIds: ["p1"],
-};
+const GITLAB = "https://git.test/api/v4/projects/acme%2Fwidgets/";
 
 type Options = {
   answers?: Record<string, HostAnswer>;
@@ -66,10 +56,6 @@ function setup(options: Options = {}) {
     insert into projects (id, kind, name, owner_id, created_at)
       values ('p1', 'team', 'platform', 'u', 0), ('p2', 'team', 'finops', 'u', 0),
         ('p3', 'team', 'empty', 'u', 0);
-    insert into credentials (id, name, key_name, prefix, header, template,
-        methods, created_at, updated_at)
-      values ('c1', 'github', 'http-github', '${credential.prefix}',
-        'authorization', 'Bearer {key}', '["GET"]', 0, 0);
   `);
   const dir = cacheDir();
   dirs.push(dir);
@@ -90,17 +76,18 @@ function setup(options: Options = {}) {
     jobs++;
     return base(job, onEvent, signal);
   };
-  const credentials = { current: credential as RepoCredential | null };
+  // the http- key files by name, as each lookup reads them
+  const keys: Record<string, string> = { "http-github": "secret-value" };
   const repos = reposArea({
     db,
     clock,
     access: { project: () => ({ id: "p1", kind: "team" }) },
     projects: { byId: () => null, personal: () => null },
-    credentials: {
-      byId: (id) =>
-        id === credentials.current?.id ? credentials.current : null,
-      readKey: () => ({ ok: true, key: "secret-value" }),
-      headerValue: (template, key) => template.replace("{key}", key),
+    keys: {
+      readKey: (name) =>
+        keys[name] === undefined
+          ? { ok: false, reason: "missing" }
+          : { ok: true, key: keys[name] },
     },
     capabilities: { forget() {} },
     cacheDir: options.cache === false ? null : dir,
@@ -121,7 +108,7 @@ function setup(options: Options = {}) {
         url: PAGE,
         kind: "github" as RepoKind,
         ref: "",
-        credentialId: null,
+        keyName: null,
         ignore: "",
         ...fields,
       },
@@ -134,7 +121,7 @@ function setup(options: Options = {}) {
     host,
     logs: logs.events,
     limits,
-    credentials,
+    keys,
     add,
     jobs: () => jobs,
     tick: (ms: number) => {
@@ -209,7 +196,7 @@ test("a public repository is looked up through its archive, once a minute", asyn
   expect(repos.byId(row.id)?.commit).toBe(NEXT_COMMIT);
 });
 
-test("a signed repository is looked up through the API and fetched unsigned off its prefix", async () => {
+test("a signed repository is looked up through the API and fetched unsigned off its base", async () => {
   const answers: Record<string, HostAnswer> = {
     [`${API}commits/main`]: (call) =>
       call.headers["if-none-match"] === '"l1"'
@@ -219,7 +206,7 @@ test("a signed repository is looked up through the API and fetched unsigned off 
     [`${CODELOAD}/${COMMIT}?token=short`]: tarResponse(tree()),
   };
   const { repos, host, add, tick } = setup({ answers });
-  add("p1", { ref: "main", credentialId: "c1" });
+  add("p1", { ref: "main", keyName: "http-github" });
   const first = await repos.prepare("p1");
   expect(first.mounts[0]?.commit).toBe(COMMIT);
   expect(
@@ -244,10 +231,13 @@ test("a signed and an unsigned lookup of one ref are never shared", async () => 
     [`${API}commits/HEAD`]: new Response(COMMIT),
   };
   const { repos, host, add } = setup({ answers });
-  add("p1", { credentialId: "c1" });
+  add("p1", { keyName: "http-github" });
   add("p2");
+  // one key named in two projects is one lookup: the admin chose both
+  add("p3", { keyName: "http-github" });
   await repos.prepare("p1");
   await repos.prepare("p2");
+  await repos.prepare("p3");
   // the signed one's tarball has no recorded answer, so it fails apart
   expect(host.calls.map((call) => call.url)).toEqual([
     `${API}commits/HEAD`,
@@ -256,14 +246,45 @@ test("a signed and an unsigned lookup of one ref are never shared", async () => 
   ]);
 });
 
+test("a GitLab key is a bearer too, never past the first hop off the base", async () => {
+  const away = "https://git.test/-/archive/widgets.tar.gz";
+  const back = `${GITLAB}repository/archive.tar.gz?sha=${COMMIT}&again=1`;
+  const answers: Record<string, HostAnswer> = {
+    [`${GITLAB}repository/commits/main`]: new Response(
+      JSON.stringify({ id: COMMIT }),
+    ),
+    [`${GITLAB}repository/archive.tar.gz?sha=${COMMIT}`]: redirect(away),
+    [away]: redirect(back),
+    [back]: tarResponse(tree()),
+  };
+  const { repos, host, add, tick, keys } = setup({ answers });
+  keys["http-gitlab"] = "gitlab-value";
+  add("p1", { ref: "main", kind: "gitlab", keyName: "http-gitlab" });
+  expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
+  expect(
+    host.calls.map((call) => [call.url, call.headers.authorization ?? null]),
+  ).toEqual([
+    [`${GITLAB}repository/commits/main`, "Bearer gitlab-value"],
+    [`${GITLAB}repository/archive.tar.gz?sha=${COMMIT}`, "Bearer gitlab-value"],
+    [away, null],
+    [back, null],
+  ]);
+
+  // a replaced key file applies at the next lookup
+  keys["http-gitlab"] = "rotated-value";
+  tick(60_001);
+  await repos.prepare("p1");
+  expect(host.calls.at(-1)?.headers.authorization).toBe("Bearer rotated-value");
+});
+
 test("a failed lookup mounts nothing and says why, logged once", async () => {
   const answers: Record<string, HostAnswer> = {
     [ARCHIVE]: new Response("gone", { status: 404 }),
   };
-  const { repos, add, tick, logs, credentials } = setup({ answers });
+  const { repos, add, tick, logs, keys } = setup({ answers });
   const missing = add("p1");
-  const signed = add("p1", { name: "private", credentialId: "c1" });
-  credentials.current = null;
+  const signed = add("p1", { name: "private", keyName: "http-github" });
+  delete keys["http-github"];
   const first = await repos.prepare("p1");
   expect(first.mounts).toEqual([]);
   expect(first.notices).toEqual([
@@ -293,7 +314,7 @@ test("a commit ref is looked up too, so a tree fetched signed is never mounted u
     [atCommit]: new Response("not found", { status: 404 }),
   };
   const { repos, host, add } = setup({ answers });
-  add("p1", { ref: "main", credentialId: "c1" });
+  add("p1", { ref: "main", keyName: "http-github" });
   expect((await repos.prepare("p1")).mounts[0]?.commit).toBe(COMMIT);
   const other = add("p2", { ref: COMMIT });
   const refused = await repos.prepare("p2");
@@ -614,7 +635,7 @@ test("a failure of one signer's is never another's", async () => {
     [atCommit]: tarResponse(tree()),
   };
   const { repos, add } = setup({ answers });
-  add("p1", { ref: "main", credentialId: "c1" });
+  add("p1", { ref: "main", keyName: "http-github" });
   expect((await repos.prepare("p1")).notices[0]?.reason).toBe("no access");
   add("p2", { ref: COMMIT });
   expect((await repos.prepare("p2")).mounts[0]?.commit).toBe(COMMIT);

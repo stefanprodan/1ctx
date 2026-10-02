@@ -4,7 +4,7 @@
 // The git hosts a repository may live on, pure: a URL's normalized form
 // and the URLs each host answers for it. Every path segment is held to
 // a plain charset, so no URL built here carries an escape it did not
-// make itself and a credential's prefix is compared as text.
+// make itself and the API base is compared as text.
 
 import {
   MAX_REPO_REF,
@@ -131,8 +131,8 @@ export const isCommit = (ref: string): boolean =>
 export type Adapter = {
   kind: RepoKind;
   host: string;
-  // the API's base for this repository, ending in /, which a credential's
-  // prefix must cover
+  // the API's base for this repository, ending in /: a key is sent only
+  // under it
   apiBase: string;
   // the commit a ref (or the default branch) points at
   lookupUrl(ref: string): string;
@@ -198,8 +198,8 @@ export function adapter(url: string, kind: RepoKind): Adapter {
     : gitlab(parsed.value);
 }
 
-// a credential's prefix, held by normalizePrefix(), covers a URL built
-// here: one origin, and the path under the prefix on a segment boundary
+// a prefix (an API base) covers a URL: one origin, and the path under
+// the prefix on a segment boundary
 export function covers(prefix: string, url: string): boolean {
   let a: URL;
   let b: URL;

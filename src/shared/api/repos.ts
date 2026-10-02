@@ -17,8 +17,9 @@ export type RepoView = {
   kind: RepoKind;
   // a branch, a tag or a commit; empty for the default branch
   ref: string;
-  // one of the project's credentials, null for a public repository
-  credentialId: string | null;
+  // the http- key file a private repository is fetched with, null for a
+  // public one; only an admin's answer carries it
+  keyName?: string | null;
   // .gitignore rules; empty for the default list
   ignore: string;
   state: RepoState;
@@ -47,10 +48,10 @@ export type CreateRepoRequest = {
   name?: string;
   kind?: RepoKind;
   ref?: string;
-  credentialId?: string | null;
+  keyName?: string | null;
   ignore?: string;
 };
 
-// PATCH: any field; a change to the url, kind, ref, credential or
-// ignore rules sets the row pending
+// PATCH: any field; a change to the url, kind, ref, key or ignore rules
+// sets the row pending
 export type PatchRepoRequest = Partial<CreateRepoRequest>;

@@ -3,15 +3,15 @@
 //
 // Repositories: git trees a project mounts read-only for bash, each a
 // row an admin writes for a team project, or an owner for their
-// personal project, public only. The server fetches them; a credential
-// a repository names signs only the server's requests.
+// personal project, public only. The server fetches them; an http- key
+// file a repository names signs only the server's requests.
 
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { type FreeSpace, RepoCache } from "./cache.ts";
-import { type CredentialsPort, type RepoAuth, repoAuth } from "./check.ts";
+import { type KeysPort, type RepoAuth, repoAuth } from "./check.ts";
 import type { JobRunner } from "./jobs.ts";
 import {
   Mounts,
@@ -38,9 +38,8 @@ export {
   type RepoUrl,
 } from "./adapters.ts";
 export {
-  type CredentialsPort,
+  type KeysPort,
   type RepoAuth,
-  type RepoCredential,
   type RepoHeader,
   repoAuth,
 } from "./check.ts";
@@ -80,7 +79,8 @@ export type ReposDeps = {
   clock: Clock;
   access: AccessPort;
   projects: ProjectsPort;
-  credentials: CredentialsPort;
+  // the http- key files, read at each lookup
+  keys: KeysPort;
   capabilities: CapabilitiesPort;
   // the cache directory; none, and nothing is fetched
   cacheDir: string | null;
@@ -103,8 +103,8 @@ export type Repos = {
   byId(id: string): RepoRow | null;
   // a project's, in name order, as the composer's switches list them
   switchable(projectId: string): { id: string; name: string; ref: string }[];
-  // the repositories that name a credential, which its delete refuses
-  usingCredential(credentialId: string): { projectId: string; name: string }[];
+  // the repositories that name a key file, for the key files list
+  usingKeys(): { keyName: string; projectId: string; name: string }[];
   // at each lookup: the header to send, or no access
   auth(repo: RepoRow): RepoAuth;
   // at a turn's start: the trees of the project's repositories on, each
@@ -121,7 +121,7 @@ export type Repos = {
 
 export function reposArea(deps: ReposDeps): Repos {
   const store = new ReposStore(deps.db);
-  const auth = (repo: RepoRow) => repoAuth(repo, deps.credentials);
+  const auth = (repo: RepoRow) => repoAuth(repo, deps.keys);
   const cache =
     deps.cacheDir === null
       ? null
@@ -150,7 +150,7 @@ export function reposArea(deps: ReposDeps): Repos {
       store
         .forProject(projectId)
         .map(({ id, name, ref }) => ({ id, name, ref })),
-    usingCredential: (credentialId) => store.usingCredential(credentialId),
+    usingKeys: () => store.usingKeys(),
     auth,
     prepare: (projectId, options) => mounts.prepare(projectId, options),
     start() {

@@ -142,7 +142,8 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **One `views/projects/Repos.tsx` draws both lists:** the team
   project's card on its admin page and the personal project's section
   on its Settings tab. `personal` picks the routes in `data/repos.ts`
-  and leaves out the credential and the kind.
+  and leaves out the key and the kind. The Key select lists the `http-`
+  files from `credentialKeys`, after None.
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is

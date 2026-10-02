@@ -160,9 +160,9 @@ words.
   prefixes overlap (`prefixesOverlap()`). Both are checked after the
   write, in the transaction that writes the links, so a 409 rolls it
   back.
-- **A credential a repository names cannot be deleted** (409, naming
-  the repositories). A repository reads its credential at each lookup
-  and never offers it to a command (`docs/repos.md`).
+- **A repository may read an `http-` key file without a credential**
+  (`docs/repos.md`). Curl never signs with it, and the Key files list
+  counts it as used.
 - **A send offers its project's credentials only with network.** The
   offer is empty with web off, outside a team project and in the memory
   phase. A chat's `credential:<id>` moves one to `credentialsOff`, so

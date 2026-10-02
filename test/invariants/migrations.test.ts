@@ -1379,14 +1379,10 @@ describe("the schema", () => {
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((row) => row.mounted_repos === null)).toBe(true);
       db.exec(`
-        insert into credentials (id, name, key_name, prefix, header,
-            template, methods, created_at, updated_at)
-          values ('c', 'gh', 'http-gh', 'https://api.github.com/', 'Authorization',
-            'Bearer {key}', '["GET"]', 0, 0);
-        insert into repos (id, project_id, name, url, kind, credential_id,
+        insert into repos (id, project_id, name, url, kind, key_name,
             created_at, updated_at)
           values ('r', 'p', 'widgets', 'https://github.com/acme/widgets',
-            'github', 'c', 0, 0);
+            'github', 'http-gh', 0, 0);
       `);
       expect(
         db.query("select ref, ignore_rules, state, error from repos").get(),
@@ -1398,7 +1394,6 @@ describe("the schema", () => {
         `insert into repos (id, project_id, name, url, kind, created_at,
            updated_at) values ('r2', 'p', 'widgets', 'https://x/a/b',
            'gitlab', 0, 0)`,
-        "delete from credentials where id = 'c'",
       ];
       for (const sql of refused) expect(() => db.exec(sql)).toThrow();
       db.exec("update repos set error = 'over the size cap', state = 'failed'");
