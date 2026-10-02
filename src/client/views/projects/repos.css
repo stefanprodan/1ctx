@@ -1,0 +1,35 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .repos-head {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .repos-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .repos-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .repos-ignore {
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
+  .repos-delete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .repos-ask {
+    margin-right: auto;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+}

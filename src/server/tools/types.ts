@@ -8,7 +8,12 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
-import type { CommandEnd, KeptFile, OpenedRecord } from "../bash/index.ts";
+import type {
+  CommandEnd,
+  JobRepo,
+  KeptFile,
+  OpenedRecord,
+} from "../bash/index.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
@@ -41,6 +46,15 @@ export type KeepPort = {
   files: number;
 };
 
+// The repositories a send mounted for each of its commands, under
+// /repos, and the caps it started on. notice() hands out what was left
+// out once, to the first command.
+export type SendRepos = {
+  mounts: readonly JobRepo[];
+  fileBytes: number;
+  notice(): string;
+};
+
 export type ToolContext = {
   web: WebSnapshot | null;
   actor: {
@@ -56,6 +70,7 @@ export type ToolContext = {
   budget: ToolBudget;
   caps: ToolCaps;
   keep?: KeepPort | null;
+  repos?: SendRepos | null;
 };
 
 export type ToolResult = {

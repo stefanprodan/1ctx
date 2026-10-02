@@ -11,7 +11,12 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { type KeyPort, type KeyRead, keyState, readKey } from "./key.ts";
-import { type ProjectsPort, routes, teamName } from "./routes.ts";
+import {
+  type ProjectsPort,
+  type ReposPort,
+  routes,
+  teamName,
+} from "./routes.ts";
 import { type CredentialRow, CredentialStore } from "./store.ts";
 
 export {
@@ -39,6 +44,7 @@ export type CredentialsDeps = {
   // the http- key files: their names, sizes and values
   key: KeyPort;
   capabilities: { forget(key: string): void };
+  repos: ReposPort;
 };
 
 export type Credentials = {
@@ -81,6 +87,7 @@ export function credentialsArea(deps: CredentialsDeps): Credentials {
       keys: () => deps.key.names(),
       readKey: read,
       capabilities: deps.capabilities,
+      repos: deps.repos,
     }),
   };
 }

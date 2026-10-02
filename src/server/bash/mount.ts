@@ -38,17 +38,26 @@ import type {
   CommandCause,
   CommandEnd,
   CommandPhase,
+  JobRepo,
 } from "./protocol.ts";
 import { acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import type { CommandWorkers } from "./worker.ts";
 
+// the repositories a send mounted, read-only under /repos
+export type CommandRepos = {
+  mounts: readonly JobRepo[];
+  fileBytes: number;
+  // what the command's result opens with: a repository left out and why
+  notice: string;
+};
 export type CommandCaps = {
   callTimeoutMs: number;
   resultCut: number;
   visuals: boolean;
   // false while the send has the project docs off: no /knowledge
   knowledge: boolean;
+  repos?: CommandRepos;
 } & (
   | { web?: null }
   | {
@@ -142,7 +151,9 @@ export async function run(
   const combined = AbortSignal.any([signal, deadline.signal]);
   let release: (() => void) | undefined;
   let releaseSession: (() => void) | undefined;
-  let notice = "";
+  const repos = caps.repos;
+  // a repository's notice stands even when the command never mounts
+  let notice = repos?.notice ?? "";
   // set once the command ran, so a refused save still shows its output
   let answer: Answer | undefined;
   let phase: CommandPhase = "queue";
@@ -172,9 +183,10 @@ export async function run(
     const scratch = { ...stored, entries: mountable.kept };
     const skipped = mountable.skipped;
     const left =
-      skipped.length === 0
+      (repos?.notice ?? "") +
+      (skipped.length === 0
         ? ""
-        : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`;
+        : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
     notice = left;
     const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
     const uploads = deps.knowledge.mountedUploads(sessionId);
@@ -231,6 +243,8 @@ export async function run(
           mtime: file.createdAt,
         })),
         kept: kept.map((entry) => entry.path),
+        repos: (repos?.mounts ?? []).map((repo) => ({ ...repo })),
+        repoFileBytes: repos?.fileBytes ?? 0,
       },
       {
         // MCP results past the cut, read from the database on first read

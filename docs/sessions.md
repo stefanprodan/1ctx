@@ -191,9 +191,9 @@ that agent answers the one turn (see Summons).
   is a part of what a send offers that a user may switch off for one
   chat or automation. Create, send and regenerate take a `capabilities`
   change of `disable` and `enable` keys (`web`, `visualize`,
-  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`).
-  The parser checks only an id's shape; unknown ids are kept and
-  ignored.
+  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`,
+  `repo:<id>`). The parser checks only an id's shape; unknown ids are
+  kept and ignored.
 - **The change is applied twice.** The policy resolves it before
   schemas are built, and `startSend` applies it again to the current
   row in its transaction, a turn's changes in message order, the later
@@ -204,7 +204,8 @@ that agent answers the one turn (see Summons).
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, MCP, skills), and last the MCP change note (`docs/mcp.md`).
+  memory, MCP, skills, repositories), the moved branches
+  (`docs/repos.md`), and last the MCP change note (`docs/mcp.md`).
   What is fixed per agent and project comes first; the user's line
   follows because it changes with a team chat's author.
 

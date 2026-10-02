@@ -3,8 +3,8 @@
 //
 // The plus menu's switches for the composer's chat and agent, over the
 // flips kept in data/capabilities.ts. A flip never sent goes when the
-// chat does; another project drops the credential flips, since the
-// credentials are the project's, and another agent the server and
+// chat does; another project drops the credential and repository flips,
+// since those are the project's, and another agent the server and
 // skill flips, since its servers and skills are other keys.
 
 import { useEffect, useRef } from "preact/hooks";
@@ -13,6 +13,7 @@ import {
   KNOWLEDGE,
   MCP,
   MEMORY,
+  REPO,
   SKILL,
   VISUALIZE,
   WEB,
@@ -22,12 +23,14 @@ import {
   dropFlips,
   dropKind,
   isOff,
+  repos,
   servers,
   skills,
   switchable,
 } from "../data/capabilities.ts";
 import {
   agentMoved,
+  reposItem,
   serversItem,
   skillsItem,
   switchItem,
@@ -52,6 +55,7 @@ export function useSwitches({
   useEffect(() => {
     if (agentMoved(lastProject.current, projectId)) {
       dropKind(chat, CREDENTIAL);
+      dropKind(chat, REPO);
     }
     lastProject.current = projectId;
   }, [chat, projectId]);
@@ -89,6 +93,11 @@ export function useSwitches({
     skills: skillsItem({
       tools: readable,
       skills: (agent === null ? undefined : skills.value[agent]) ?? [],
+      isOff: offKey,
+    }),
+    repos: reposItem({
+      tools: readable,
+      repos: repos.value,
       isOff: offKey,
     }),
   };

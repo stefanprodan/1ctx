@@ -109,6 +109,11 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
     line: "Large results kept as files for a chat.",
     names: ["mcpKeptBytes", "mcpKeptFiles"],
   },
+  {
+    title: "Repositories",
+    line: "Repository files kept on disk for bash.",
+    names: ["repoBytes", "repoFiles", "repoFileBytes", "repoCacheBytes"],
+  },
 ];
 
 type AnyTool = BuiltinToolSummary | WebToolSummary;

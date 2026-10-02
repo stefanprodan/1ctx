@@ -76,5 +76,30 @@
     .tabs-count {
       display: none;
     }
+    /* the side a tab is hidden past fades out, so the row reads as one
+       that slides; a mask reads only alpha, so any opaque token does */
+    .tabs-after {
+      mask-image: linear-gradient(
+        to right,
+        var(--fg) calc(100% - 32px),
+        transparent
+      );
+    }
+    .tabs-before {
+      mask-image: linear-gradient(
+        to left,
+        var(--fg) calc(100% - 32px),
+        transparent
+      );
+    }
+    .tabs-before.tabs-after {
+      mask-image: linear-gradient(
+        to right,
+        transparent,
+        var(--fg) 32px,
+        var(--fg) calc(100% - 32px),
+        transparent
+      );
+    }
   }
 }

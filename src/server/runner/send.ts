@@ -16,7 +16,8 @@ import type {
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
 import { unmarked } from "./context.ts";
-import type { KeepPort, SendPolicy, ToolBudget } from "./policy.ts";
+import type { KeepPort, SendPolicy, SendRepos, ToolBudget } from "./policy.ts";
+import type { RepoLines } from "./prompt.ts";
 
 export type RoundState = {
   messageId: string;
@@ -100,6 +101,9 @@ export type ActiveSend = {
   toolBudget: ToolBudget;
   // set at the start of a send that offers bash
   keep: KeepPort | null;
+  // the repositories its commands mount, set before the first round of a
+  // send that offers bash; release() lets go of their trees at its end
+  repos: (RepoLines & { tool: SendRepos; release(): void }) | null;
   // the last three rounds' call signatures, for the loop check
   signatures: string[];
   // the cap that forced the answer round, which asks for the answer in words
@@ -228,6 +232,7 @@ export function newSend(fields: {
       bashCalls: 0,
     },
     keep: null,
+    repos: null,
     signatures: [],
     answering: null,
     loopWarned: false,

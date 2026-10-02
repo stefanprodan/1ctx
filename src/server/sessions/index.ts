@@ -57,6 +57,7 @@ export {
   type ExportRow,
   markdownFilename,
 } from "./markdown.ts";
+export type { MountedRepos } from "./messages.ts";
 export {
   lineFrom,
   MAX_REGENERATE_BODY,

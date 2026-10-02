@@ -160,6 +160,58 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    // through the project access check: a project the caller may not
+    // see is the same 404
+    method: "GET",
+    path: "/api/projects/:id/repos",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/repos",
+    body: { url: "https://github.com/acme/widgets" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/projects/:id/repos/:repoId",
+    body: { ref: "main" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/repos/:repoId",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/repos/:repoId/refresh",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    // the caller's own personal project, whoever they are
+    method: "POST",
+    path: "/api/profile/project/repos",
+    body: { url: "https://github.com/acme/widgets" },
+    expect: { anonymous: 401, member: 201, admin: 201 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/profile/project/repos/:repoId",
+    body: { ref: "main" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/profile/project/repos/:repoId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/profile/project/repos/:repoId/refresh",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     // the literal ":id" names no project, and a project the caller may
     // not see answers the same 404
     method: "GET",

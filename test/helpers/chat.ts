@@ -12,6 +12,7 @@ import type { Db } from "../../src/server/db/index.ts";
 import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
+import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import type { Wire } from "../../src/shared/words.ts";
 import {
@@ -353,6 +354,9 @@ export async function chatApp(
     // a file the test reopens, for a restart over the same rows
     db?: Db;
     drainMs?: number;
+    // the repositories' cache and their fetches; none fetches nothing
+    cacheDir?: string;
+    repoJobs?: JobRunner;
   } = {},
 ): Promise<ChatApp> {
   const scripted = scriptedFetch(options.fetcher, options.window);
@@ -365,6 +369,8 @@ export async function chatApp(
     db: options.db,
     drainMs: options.drainMs,
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
+    cacheDir: options.cacheDir,
+    repoJobs: options.repoJobs,
   });
   const admin = app.client();
   await admin.login("admin", "hunter2-test");

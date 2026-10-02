@@ -16,9 +16,13 @@ import { type BashArea, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
-import { type KnowledgeArea, knowledgeArea } from "./knowledge/index.ts";
+import {
+  acquireProcess,
+  type KnowledgeArea,
+  knowledgeArea,
+} from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
-import { withUserAgent } from "./lib/fetcher.ts";
+import { userAgent, withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
@@ -44,6 +48,12 @@ import {
   provisionArea,
 } from "./provision/index.ts";
 import { renderMarkdown } from "./render/index.ts";
+import {
+  type JobRunner,
+  type Repos,
+  reposArea,
+  workerJobs,
+} from "./repos/index.ts";
 import {
   type DrainResult,
   type Runner,
@@ -88,6 +98,10 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's command worker entry; the real one by default
   commandWorker?: URL;
+  // the repositories' cache directory; none fetches nothing
+  cacheDir?: string | null;
+  // a test's repository fetches; the fetch worker by default
+  repoJobs?: JobRunner;
   // Provisioning validates before bootstrap and never repairs or schedules.
   activate?: boolean;
   // argon2id's cost; a test passes the least
@@ -104,6 +118,9 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  repos: Repos;
+  // the cache directory as startup found it
+  repoCache: { dir: string; trees: number; bytes: number } | null;
   bash: BashArea;
   sessions: SessionStore;
   automations: Automations["store"];
@@ -159,6 +176,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
+  let repos!: Repos;
   const users = usersArea({
     db,
     secret: (name) => secret("user-", name),
@@ -267,6 +285,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: projects.store,
     key: httpKeys(options),
     capabilities,
+    repos: { usingKeys: () => repos.usingKeys() },
   });
   const access: Access = accessArea({
     db,
@@ -290,6 +309,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     skills,
     mcp,
     credentials,
+    repos: { switchable: (projectId) => repos.switchable(projectId) },
     tools: {
       capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
@@ -314,6 +334,30 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
   const knowledge = knowledgeArea({ db, clock, limits, access });
+  repos = reposArea({
+    db,
+    clock,
+    access,
+    projects: projects.store,
+    keys: { readKey: (keyName) => credentials.readKey(keyName) },
+    // a deleted repository was its project's, so only its rows are read
+    capabilities: {
+      forget(key, projectId) {
+        sessions.store.forgetCapability(key, projectId);
+        automations.store.forgetCapability(key, projectId);
+      },
+    },
+    cacheDir: options.cacheDir ?? null,
+    // built here, at the compile root, so the binary finds its entry
+    jobs:
+      options.repoJobs ??
+      workerJobs(new URL("./repos/fetch.worker.ts", import.meta.url)),
+    fetch: fetcher,
+    limits: () => limits.current(),
+    log: log("repos"),
+    acquire: acquireProcess,
+    userAgent: userAgent(options.version),
+  });
   const bash = bashArea({
     db,
     clock,
@@ -391,6 +435,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     tools,
     knowledge,
     bash,
+    repos: {
+      prepare: (projectId, options) => repos.prepare(projectId, options),
+      switchable: (projectId) => repos.switchable(projectId),
+    },
     uploads: {
       checkUploads: (userId, projectId, ids) =>
         knowledge.checkUploads(userId, projectId, ids),
@@ -480,11 +528,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
   });
   let repaired = 0;
   let reconciled = 0;
+  let repoCache: App["repoCache"] = null;
   // from the first signal to the exit
   let draining = false;
   if (options.activate !== false) {
     await users.bootstrap();
     repaired = sessions.repair();
+    // before the queue, so a resumed send never sees a tree the cache drops
+    repoCache = repos.start();
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
@@ -503,6 +554,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...agents.routes,
     ...memory.routes,
     ...knowledge.routes,
+    ...repos.routes,
     ...sessions.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
@@ -533,6 +585,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         users,
         projects: projects.store,
         credentials: credentials.store,
+        repos: repos.store,
         providers: providers.store,
         deciders: deciders.store,
         skills: skills.store,
@@ -551,6 +604,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    repos,
+    repoCache,
     bash,
     sessions: sessions.store,
     automations: automations.store,
@@ -575,6 +630,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const scratchRows = bash.sweep(now);
         const digests = sessions.store.sweepDigests();
         const chats = sessions.sweep(now, limits.current());
+        repos.sweep();
         // an idle chat archived may hold messages that now cannot start
         if (chats.chats_archived > 0) runner.queue.wake();
         const notSent = sessions.sweepNotSent(now);
@@ -608,6 +664,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       // first: from here every message is queued for the next start
       runner.queue.close();
       automations.drain();
+      repos.close();
       const { drained } = await runner.drain(options.drainMs ?? 0, cut);
       skills.close();
       const result = await runner.shutdown(async () => {

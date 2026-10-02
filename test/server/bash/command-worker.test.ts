@@ -43,6 +43,8 @@ const job = (command: string, fields: Partial<Job> = {}): Job => ({
   scratch: [],
   uploads: [],
   kept: [],
+  repos: [],
+  repoFileBytes: 0,
   ...fields,
 });
 const hooks: CommandHooks = { kept: () => null, fetch: null };

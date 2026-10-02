@@ -29,12 +29,7 @@ import {
   runDeadlineMs,
   updateAutomation,
 } from "../../data/automations.ts";
-import {
-  credentials,
-  servers,
-  skills,
-  switchable,
-} from "../../data/capabilities.ts";
+import { switchable, switchablesOf } from "../../data/capabilities.ts";
 import { me } from "../../data/me.ts";
 import { startingAgent } from "../../data/project-agents.ts";
 import { project, projectError } from "../../data/projects.ts";
@@ -100,12 +95,9 @@ function Editor({
     );
     if (next !== draft.value) draft.value = next;
   }, [automation?.deadlineMs, limitMs]);
-  // the picked agent's servers and skills and the project's credentials,
-  // read when a call runs as the draft is
-  const serversOf = () => servers.value[draft.value.agentId] ?? [];
-  const skillsOf = () => skills.value[draft.value.agentId] ?? [];
-  const requestAt = (ms: number) =>
-    requestOf(draft.value, ms, serversOf(), skillsOf(), credentials.value);
+  // what the switches list, read when a call runs as the draft is
+  const shown = () => switchablesOf(draft.value.agentId);
+  const requestAt = (ms: number) => requestOf(draft.value, ms, shown());
   const request = requestAt(limitMs);
   const back =
     automation === null
@@ -261,17 +253,20 @@ function Editor({
         knowledge={kind(KNOWLEDGE)}
         knowledgeOn={d.knowledge}
         onKnowledge={() => set({ knowledge: !d.knowledge })}
-        servers={takesTools ? serversOf() : []}
+        servers={takesTools ? shown().servers : []}
         mcpOff={d.mcpOff}
         onServer={(key) => set({ mcpOff: toggledId(d.mcpOff, key) })}
-        skills={takesTools ? skillsOf() : []}
+        skills={takesTools ? shown().skills : []}
         skillsOff={d.skillsOff}
         onSkill={(key) => set({ skillsOff: toggledId(d.skillsOff, key) })}
-        credentials={credentials.value}
+        credentials={shown().credentials}
         credentialsOff={d.credentialsOff}
         onCredential={(key) =>
           set({ credentialsOff: toggledId(d.credentialsOff, key) })
         }
+        repos={takesTools ? shown().repos : []}
+        reposOff={d.reposOff}
+        onRepo={(key) => set({ reposOff: toggledId(d.reposOff, key) })}
         disabled={off}
       />
       <RestartSection on={d.rerunOnRestart} set={set} disabled={off} />

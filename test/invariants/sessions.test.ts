@@ -652,6 +652,7 @@ describe("GET /api/projects/:id/agents", () => {
       servers: {},
       skills: {},
       credentials: [],
+      repos: [],
     });
     const adminProject = chat.app.projects.personal(chat.adminId)!.id;
     expect(

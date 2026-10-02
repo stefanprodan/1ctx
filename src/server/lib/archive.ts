@@ -347,3 +347,121 @@ export async function readArchive(
     throw new BadRequest(`invalid ${format} archive: ${words}`);
   }
 }
+
+export type TarMember = {
+  name: string;
+  type: ArchiveMember["type"];
+  size: number;
+  mode: number;
+  // seconds since the epoch
+  mtime: number;
+  // a symlink's or a hard link's target, else empty
+  linkname: string;
+  // the pax records, the global header's included
+  pax: Readonly<Record<string, string>>;
+};
+
+// the stream again with its first bytes put back, once they are known
+async function sniffed(
+  input: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
+): Promise<{ gzip: boolean; stream: ReadableStream<Uint8Array> }> {
+  const reader = input.getReader();
+  const aborted = new Promise<never>((_, reject) => {
+    const stop = () => {
+      reject(signal.reason);
+      void reader.cancel(signal.reason).catch(() => {});
+    };
+    if (signal.aborted) stop();
+    else signal.addEventListener("abort", stop, { once: true });
+  });
+  aborted.catch(() => {});
+  const head: Uint8Array[] = [];
+  let size = 0;
+  let done = false;
+  while (size < 2 && !done) {
+    const next = await Promise.race([reader.read(), aborted]);
+    done = next.done;
+    if (next.value) {
+      head.push(next.value);
+      size += next.value.length;
+    }
+  }
+  const first = join(head, size);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (first.length > 0) controller.enqueue(first);
+      if (done) controller.close();
+    },
+    async pull(controller) {
+      const next = await reader.read();
+      if (next.done) controller.close();
+      else controller.enqueue(next.value);
+    },
+    cancel: (reason) => reader.cancel(reason),
+  });
+  return { gzip: first[0] === 0x1f && first[1] === 0x8b, stream };
+}
+
+// Reads a tar or tar.gz stream member by member as it arrives, keeping
+// what readArchive() drops: the pax records, link targets, modes and
+// times. visit reads a body or leaves it, and what it leaves is skipped.
+export async function streamTar(
+  input: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
+  visit: (member: TarMember, body: ReadableStream<Uint8Array>) => Promise<void>,
+): Promise<void> {
+  running(signal);
+  const stop = new AbortController();
+  const active = AbortSignal.any([signal, stop.signal]);
+  const pipes: Promise<{ ok: true } | { ok: false; error: unknown }>[] = [];
+  const pipe = (promise: Promise<void>) => {
+    pipes.push(
+      promise.then(
+        () => ({ ok: true as const }),
+        (error: unknown) => ({ ok: false as const, error }),
+      ),
+    );
+  };
+  const { gzip, stream: raw } = await sniffed(input, active);
+  let stream = raw;
+  if (gzip) {
+    const decompressor = new DecompressionStream("gzip");
+    const writable = decompressor.writable as WritableStream<Uint8Array>;
+    pipe(raw.pipeTo(writable, { signal: active }));
+    stream = decompressor.readable;
+  }
+  const decoder = createTarDecoder({ strict: true });
+  const reader = decoder.readable.getReader();
+  pipe(stream.pipeTo(decoder.writable, { signal: active }));
+  try {
+    for (;;) {
+      running(active);
+      const { done, value } = await reader.read();
+      if (done) break;
+      const { header, body } = value;
+      await visit(
+        {
+          name: header.name,
+          type: tarType(header),
+          size: header.size,
+          mode: header.mode ?? 0o644,
+          mtime: Math.floor((header.mtime?.getTime() ?? 0) / 1000),
+          linkname: header.linkname ?? "",
+          pax: header.pax ?? {},
+        },
+        body,
+      );
+      // a body read whole is closed, and cancelling it does nothing
+      if (!body.locked) await body.cancel();
+    }
+    for (const result of await Promise.all(pipes)) {
+      if (!result.ok) throw result.error;
+    }
+    running(active);
+  } finally {
+    stop.abort(new BadRequest("archive read stopped"));
+    await Promise.allSettled([reader.cancel(active.reason), ...pipes]);
+    reader.releaseLock();
+  }
+}

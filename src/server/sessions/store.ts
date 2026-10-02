@@ -44,7 +44,11 @@ import {
   addToolRows,
   finishReply,
   finishToolRow,
+  type MountedRepos,
+  mountedBefore,
   nextSeq,
+  readMountedRepos,
+  setMountedRepos,
   type ToolFinish,
 } from "./messages.ts";
 import { readOpenedFile } from "./opened-store.ts";
@@ -216,8 +220,22 @@ export class SessionStore {
     setDisabled(this.db, id, set);
   }
 
-  forgetCapability(key: string): void {
-    forget(this.db, key);
+  forgetCapability(key: string, projectId?: string): void {
+    forget(this.db, key, projectId);
+  }
+
+  // the commits a turn mounted, on its first message
+  setMountedRepos(messageId: string, mounted: MountedRepos): void {
+    setMountedRepos(this.db, messageId, mounted);
+  }
+
+  mountedRepos(messageId: string): MountedRepos | null {
+    return readMountedRepos(this.db, messageId);
+  }
+
+  // what the chat's turns before this send mounted, newest first
+  mountedBefore(sessionId: string, sendId: string): MountedRepos[] {
+    return mountedBefore(this.db, sessionId, sendId);
   }
 
   touch(

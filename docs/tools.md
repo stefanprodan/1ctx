@@ -114,7 +114,8 @@ words.
   `knowledge` and `memory` always.
 - **A delete forgets its key.** Deleting an MCP server, a skill or a
   credential forgets `mcp:`, `skill:` or `credential:<id>` in sessions
-  and automations in the same transaction. Unassigning forgets nothing.
+  and automations in the same transaction; deleting a repository forgets
+  `repo:<id>` in its project's alone. Unassigning forgets nothing.
 
 ## Visuals
 
@@ -159,6 +160,9 @@ words.
   prefixes overlap (`prefixesOverlap()`). Both are checked after the
   write, in the transaction that writes the links, so a 409 rolls it
   back.
+- **A repository may read an `http-` key file without a credential**
+  (`docs/repos.md`). Curl never signs with it, and the Key files list
+  counts it as used.
 - **A send offers its project's credentials only with network.** The
   offer is empty with web off, outside a team project and in the memory
   phase. A chat's `credential:<id>` moves one to `credentialsOff`, so

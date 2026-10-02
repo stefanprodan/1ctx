@@ -20,6 +20,16 @@ export type CommandEnd = { phase: CommandPhase; cause: CommandCause };
 // mtime is the stored time of the file's last change, in ms
 export type MountFile = { name: string; data: Uint8Array; mtime: number };
 export type ScratchEntry = { path: string; data: Uint8Array; mode: number };
+// a repository's tree, mounted read-only at /repos/<name>; the folder
+// is the server's, never a command's
+export type JobRepo = {
+  name: string;
+  folder: string;
+  // what the ignore rules kept, which the walk and read caps grow by
+  files: number;
+  dirs: number;
+  bytes: number;
+};
 
 export type Job = {
   command: string;
@@ -40,6 +50,9 @@ export type Job = {
   uploads: MountFile[];
   // the kept MCP files' paths; a read names its index
   kept: string[];
+  repos: JobRepo[];
+  // a repository file past it reads as File too large
+  repoFileBytes: number;
 };
 
 export type Changes = {

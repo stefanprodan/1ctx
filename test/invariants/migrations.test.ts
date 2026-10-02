@@ -51,6 +51,7 @@ const EXPECTED_IDS = [
   "0037-summoned",
   "0038-saved-paths",
   "0039-restart-runs",
+  "0040-repos",
 ] as const;
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
@@ -1251,7 +1252,7 @@ describe("the schema", () => {
             `select * from ${table} order by rowid`,
           )
           .all()
-          .map(({ rerun_on_restart: _, ...rest }) => rest),
+          .map(({ rerun_on_restart: _, mounted_repos: __, ...rest }) => rest),
       );
     const indexes = () =>
       db
@@ -1361,6 +1362,45 @@ describe("the schema", () => {
         db.query("select count(*) as n from queued_messages").get(),
       ).toEqual({ n: 0 });
       expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0040 adds repositories, held to their words, gone with the project", () => {
+    const db = seed(MIGRATIONS.slice(0, 39));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0040-repos"));
+      const rows = db
+        .query<{ mounted_repos: string | null }, []>(
+          "select mounted_repos from messages",
+        )
+        .all();
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.mounted_repos === null)).toBe(true);
+      db.exec(`
+        insert into repos (id, project_id, name, url, kind, key_name,
+            created_at, updated_at)
+          values ('r', 'p', 'widgets', 'https://github.com/acme/widgets',
+            'github', 'http-gh', 0, 0);
+      `);
+      expect(
+        db.query("select ref, ignore_rules, state, error from repos").get(),
+      ).toEqual({ ref: "", ignore_rules: "", state: "pending", error: null });
+      const refused = [
+        "update repos set kind = 'gitea'",
+        "update repos set state = 'done'",
+        "update repos set error = 'timeout'",
+        `insert into repos (id, project_id, name, url, kind, created_at,
+           updated_at) values ('r2', 'p', 'widgets', 'https://x/a/b',
+           'gitlab', 0, 0)`,
+      ];
+      for (const sql of refused) expect(() => db.exec(sql)).toThrow();
+      db.exec("update repos set error = 'over the size cap', state = 'failed'");
+      db.exec("delete from projects where id = 'p'");
+      expect(db.query("select count(*) as n from repos").get()).toEqual({
+        n: 0,
+      });
     } finally {
       db.close();
     }

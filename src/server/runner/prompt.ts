@@ -19,6 +19,7 @@ import {
   MEMORY,
   MEMORY_OFF_LINE,
   mcpOffLine,
+  reposOffLine,
   skillsOffLine,
   VISUALIZE,
   VISUALIZE_OFF_LINE,
@@ -88,6 +89,15 @@ function userLine(
   return `You talk to @${policy.username} (${policy.fullName}), in the ${policy.tz} time zone${said === "" ? "." : `: ${said}`}`;
 }
 
+// what a send's repositories add: the ones off that a turn read, and a
+// line per branch that moved since the chat's last turn
+export type RepoLines = {
+  off: readonly string[];
+  moved: readonly string[];
+};
+
+export const NO_REPO_LINES: RepoLines = { off: [], moved: [] };
+
 export function systemPrompt(
   policy: Pick<
     SendPolicy,
@@ -112,6 +122,7 @@ export function systemPrompt(
   >,
   now: number,
   mcpNote = "",
+  repos: RepoLines = NO_REPO_LINES,
 ): string {
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
@@ -167,6 +178,8 @@ export function systemPrompt(
   if (policy.skillsOff.length > 0) {
     parts.push(skillsOffLine(policy.skillsOff));
   }
+  if (repos.off.length > 0) parts.push(reposOffLine(repos.off));
+  if (repos.moved.length > 0) parts.push(repos.moved.join("\n"));
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
 }

@@ -22,12 +22,14 @@ import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { object } from "./fields.ts";
+import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
   "User",
   "Project",
   "Credential",
+  "Repository",
   "Provider",
   "Decider",
   "Skill",
@@ -64,6 +66,7 @@ export type Document = {
   } & (K extends "Project" ? { docs?: KnowledgeDoc[] } : unknown);
 }[Kind];
 
+export type { RepositorySpec } from "./repository.ts";
 export type {
   AgentSpec,
   CredentialSpec,
@@ -99,6 +102,7 @@ function document(value: unknown, source: string): Document {
       User: isUsername,
       Project: isName,
       Credential: isName,
+      Repository: isName,
       Provider: isName,
       Decider: isName,
       Skill: isSkillName,
@@ -122,6 +126,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.project(b.spec) };
       case "Credential":
         return { ...base, kind, spec: spec.credential(b.spec) };
+      case "Repository":
+        return { ...base, kind, spec: repository(b.spec) };
       case "Provider":
         return { ...base, kind, spec: spec.provider(b.spec) };
       case "Decider":
@@ -253,6 +259,17 @@ export function preflight(
         fail(field, `secret ${name}.key is missing or empty`);
       return value;
     };
+    // an http- key a credential or a repository reads at its request
+    const httpKey = (name: string) => {
+      const state = credentials.key(name);
+      if (state === "missing") fail("keyFrom", `secret ${name}.key is missing`);
+      if (state === "unusable") {
+        fail(
+          "keyFrom",
+          `secret ${name}.key must hold ${KEY_BYTES.min} to ${KEY_BYTES.max} visible ASCII characters`,
+        );
+      }
+    };
     const exists = inventory[doc.kind].includes(doc.name);
     switch (doc.kind) {
       case "User": {
@@ -311,24 +328,20 @@ export function preflight(
         break;
       case "Credential": {
         if (!exists) required(["keyFrom", "url", "header", "value"]);
-        const keyFrom = doc.spec.keyFrom;
-        if (keyFrom !== undefined) {
-          const state = credentials.key(keyFrom);
-          if (state === "missing")
-            fail("keyFrom", `secret ${keyFrom}.key is missing`);
-          if (state === "unusable") {
-            fail(
-              "keyFrom",
-              `secret ${keyFrom}.key must hold ${KEY_BYTES.min} to ${KEY_BYTES.max} visible ASCII characters`,
-            );
-          }
-        }
+        if (doc.spec.keyFrom !== undefined) httpKey(doc.spec.keyFrom);
         for (const name of doc.spec.projects ?? []) {
           if (name === PERSONAL_PROJECT_NAME) {
             fail("projects", "cannot name a personal project");
           }
           reference("projects", "Project", name);
         }
+        break;
+      }
+      case "Repository": {
+        const key = repoKey(doc.spec.project, repoName(doc));
+        if (!inventory.Repository.includes(key)) required(["url"]);
+        reference("project", "Project", doc.spec.project);
+        if (typeof doc.spec.keyFrom === "string") httpKey(doc.spec.keyFrom);
         break;
       }
       case "Provider":
@@ -369,6 +382,10 @@ export function preflight(
     }
   }
   bindings(documents, credentials);
+  repositories(
+    documents.flatMap((doc) => (doc.kind === "Repository" ? [doc] : [])),
+    inventory.Repository,
+  );
 }
 
 // the credentials each project would hold once applied: no more than the

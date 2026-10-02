@@ -95,6 +95,11 @@ export type CredentialsPort = {
   forProject(projectId: string): { id: string; name: string }[];
 };
 
+// a project's repositories in name order; built later, so a closure
+export type ReposPort = {
+  switchable(projectId: string): { id: string; name: string; ref: string }[];
+};
+
 export type RoutesDeps = {
   db: Db;
   store: AgentStore;
@@ -103,6 +108,7 @@ export type RoutesDeps = {
   mcp: McpPort;
   tools: CapabilitiesPort;
   credentials: CredentialsPort;
+  repos: ReposPort;
   access: AccessPort;
   sessions: () => SessionsPort;
   automations: () => AutomationsPort;
@@ -382,6 +388,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           credentials: deps.credentials
             .forProject(project.id)
             .map(({ id, name }) => ({ id, name })),
+          repos: deps.repos.switchable(project.id),
         };
         return json(body);
       },

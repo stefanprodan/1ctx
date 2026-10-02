@@ -286,6 +286,7 @@ async function runCalls(
       caps: send.policy.toolCaps,
       web: send.policy.web,
       keep: send.keep,
+      repos: send.repos?.tool ?? null,
     };
     let result: ToolResult;
     try {

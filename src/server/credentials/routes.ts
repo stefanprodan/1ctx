@@ -43,6 +43,13 @@ export type RoutesDeps = {
   keys(): string[];
   readKey(name: string): KeyRead;
   capabilities: { forget(key: string): void };
+  repos: ReposPort;
+};
+
+// the repositories that read a key file without a credential; built
+// later, so a closure
+export type ReposPort = {
+  usingKeys(): { keyName: string; projectId: string; name: string }[];
 };
 
 export function summary(
@@ -114,11 +121,18 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/credentials",
       policy: "admin",
       handle() {
+        const using = deps.repos.usingKeys();
         const body: CredentialsResponse = {
           credentials: deps.store.list().map(show),
           keys: deps.keys().map((name) => ({
             name,
             usable: deps.readKey(name).ok,
+            repos: using.flatMap((repo) => {
+              const project = teamName(deps.projects, repo.projectId);
+              return repo.keyName === name && project !== null
+                ? [`${project}/${repo.name}`]
+                : [];
+            }),
           })),
         };
         return json(body);

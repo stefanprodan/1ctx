@@ -179,11 +179,21 @@ export function makeBashTool(
         };
       }
       ctx.budget.bashCalls++;
+      const repos = ctx.repos ?? null;
       const caps = {
         callTimeoutMs: ctx.caps.callTimeoutMs,
         resultCut: ctx.caps.resultCut,
         visuals,
         knowledge: docs,
+        ...(repos === null
+          ? {}
+          : {
+              repos: {
+                mounts: repos.mounts,
+                fileBytes: repos.fileBytes,
+                notice: repos.notice(),
+              },
+            }),
       };
       const signing =
         ctx.web === null

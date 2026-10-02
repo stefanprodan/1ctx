@@ -117,5 +117,6 @@ export {
   keptPath,
   writeKeptFiles,
 } from "./kept.ts";
+export type { CommandRepos } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";
-export type { CommandEnd } from "./protocol.ts";
+export type { CommandEnd, JobRepo } from "./protocol.ts";

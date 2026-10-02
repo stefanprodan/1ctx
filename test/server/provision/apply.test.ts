@@ -80,7 +80,7 @@ describe("provision through the composed app", () => {
       expect(lines[0]).toBe("bootstrapped user/admin from user-admin.key");
       // the bootstrapped admin is not an object in the file, so it is
       // said on its own line and counted nowhere
-      expect(counts.created).toBe(8);
+      expect(counts.created).toBe(9);
       expect(counts.created + counts.updated + counts.unchanged).toBe(
         docs.length,
       );
@@ -91,6 +91,7 @@ describe("provision through the composed app", () => {
         "user",
         "project",
         "credential",
+        "repository",
         "provider",
         "decider",
         "skill",
@@ -119,6 +120,17 @@ describe("provision through the composed app", () => {
           template: "{key}",
           methods: ["GET"],
           projectIds: [projectId],
+        },
+      ]);
+      expect(app.repos.store.forProject(projectId)).toMatchObject([
+        {
+          name: "widgets",
+          url: "https://github.com/acme/widgets",
+          kind: "github",
+          ref: "main",
+          keyName: null,
+          ignore: "/*\n!/charts/\n",
+          state: "pending",
         },
       ]);
       expect(app.providers.list()[0]).toMatchObject({

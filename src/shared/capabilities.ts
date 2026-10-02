@@ -10,7 +10,8 @@
 // which only a chat is offered. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
 // agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
-// HTTP credential is `credential:<credential id>`.
+// HTTP credential is `credential:<credential id>`, a repository
+// `repo:<repo id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";
@@ -19,6 +20,7 @@ export const MEMORY = "memory";
 export const MCP = "mcp";
 export const SKILL = "skill";
 export const CREDENTIAL = "credential";
+export const REPO = "repo";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
@@ -27,6 +29,7 @@ export const mcpKey = (serverId: string) => `${MCP}:${serverId}`;
 export const skillKey = (skillId: string) => `${SKILL}:${skillId}`;
 export const credentialKey = (credentialId: string) =>
   `${CREDENTIAL}:${credentialId}`;
+export const repoKey = (repoId: string) => `${REPO}:${repoId}`;
 
 function idOf(kind: string, key: string): string | null {
   if (!key.startsWith(`${kind}:`)) return null;
@@ -42,6 +45,9 @@ export const skillOf = (key: string) => idOf(SKILL, key);
 
 // the credential a key names, null for any other key
 export const credentialOf = (key: string) => idOf(CREDENTIAL, key);
+
+// the repository a key names, null for any other key
+export const repoOf = (key: string) => idOf(REPO, key);
 
 export const MAX_CAPABILITY_KEY = 64;
 export const MAX_DISABLED_CAPABILITIES = 64;
@@ -59,7 +65,8 @@ export function isCapabilityKey(value: unknown): value is string {
       value === MEMORY ||
       serverOf(value) !== null ||
       skillOf(value) !== null ||
-      credentialOf(value) !== null)
+      credentialOf(value) !== null ||
+      repoOf(value) !== null)
   );
 }
 
@@ -171,4 +178,10 @@ export function mcpOffLine(names: readonly string[]): string {
 // loaded before the flip left its body in the history
 export function skillsOffLine(names: readonly string[]): string {
   return `The user turned these skills off for this chat: ${[...names].sort().join(", ")}. Do not load or follow them.`;
+}
+
+// the line after that while a chat has repositories off that an earlier
+// turn read: what it read is in the history
+export function reposOffLine(names: readonly string[]): string {
+  return `The user turned these repositories off for this chat: ${[...names].sort().join(", ")}. Do not use what you read from them.`;
 }

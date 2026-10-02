@@ -1,0 +1,2052 @@
+{
+  "git": "git version 2.55.0",
+  "tree": [
+    {
+      "path": ".github",
+      "dir": true
+    },
+    {
+      "path": ".github/workflows",
+      "dir": true
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "dir": false
+    },
+    {
+      "path": ".gitlab-ci.yml",
+      "dir": false
+    },
+    {
+      "path": "README.md",
+      "dir": false
+    },
+    {
+      "path": "build",
+      "dir": true
+    },
+    {
+      "path": "build/out.o",
+      "dir": false
+    },
+    {
+      "path": "build/keep.txt",
+      "dir": false
+    },
+    {
+      "path": "build/sub",
+      "dir": true
+    },
+    {
+      "path": "build/sub/deep.o",
+      "dir": false
+    },
+    {
+      "path": "src",
+      "dir": true
+    },
+    {
+      "path": "src/build",
+      "dir": false
+    },
+    {
+      "path": "src/main.go",
+      "dir": false
+    },
+    {
+      "path": "src/main_test.go",
+      "dir": false
+    },
+    {
+      "path": "src/lib",
+      "dir": true
+    },
+    {
+      "path": "src/lib/util.go",
+      "dir": false
+    },
+    {
+      "path": "src/lib/build",
+      "dir": true
+    },
+    {
+      "path": "src/lib/build/gen.go",
+      "dir": false
+    },
+    {
+      "path": "docs",
+      "dir": true
+    },
+    {
+      "path": "docs/a.md",
+      "dir": false
+    },
+    {
+      "path": "docs/img",
+      "dir": true
+    },
+    {
+      "path": "docs/img/logo.png",
+      "dir": false
+    },
+    {
+      "path": "docs/img/Shot.PNG",
+      "dir": false
+    },
+    {
+      "path": "docs/img/pic.jpg",
+      "dir": false
+    },
+    {
+      "path": "doc",
+      "dir": false
+    },
+    {
+      "path": "charts",
+      "dir": true
+    },
+    {
+      "path": "charts/app",
+      "dir": true
+    },
+    {
+      "path": "charts/app/Chart.yaml",
+      "dir": false
+    },
+    {
+      "path": "charts/app/templates",
+      "dir": true
+    },
+    {
+      "path": "charts/app/templates/deploy.yaml",
+      "dir": false
+    },
+    {
+      "path": "other",
+      "dir": true
+    },
+    {
+      "path": "other/x.yaml",
+      "dir": false
+    },
+    {
+      "path": "foo",
+      "dir": true
+    },
+    {
+      "path": "foo/bar",
+      "dir": true
+    },
+    {
+      "path": "foo/bar/baz.txt",
+      "dir": false
+    },
+    {
+      "path": "foobar",
+      "dir": true
+    },
+    {
+      "path": "foobar/x",
+      "dir": false
+    },
+    {
+      "path": "foo2",
+      "dir": true
+    },
+    {
+      "path": "foo2/bar",
+      "dir": false
+    },
+    {
+      "path": "fooa",
+      "dir": true
+    },
+    {
+      "path": "fooa/b",
+      "dir": true
+    },
+    {
+      "path": "fooa/b/bar",
+      "dir": false
+    },
+    {
+      "path": "foobar.txt",
+      "dir": false
+    },
+    {
+      "path": "a",
+      "dir": true
+    },
+    {
+      "path": "a/b",
+      "dir": true
+    },
+    {
+      "path": "a/b/c",
+      "dir": true
+    },
+    {
+      "path": "a/b/c/d",
+      "dir": true
+    },
+    {
+      "path": "a/b/c/d/e.txt",
+      "dir": false
+    },
+    {
+      "path": "a/x",
+      "dir": true
+    },
+    {
+      "path": "a/x/b",
+      "dir": true
+    },
+    {
+      "path": "a/x/b/f.txt",
+      "dir": false
+    },
+    {
+      "path": "a/b/e.txt",
+      "dir": false
+    },
+    {
+      "path": "a/c",
+      "dir": false
+    },
+    {
+      "path": "#hash.txt",
+      "dir": false
+    },
+    {
+      "path": "!bang.txt",
+      "dir": false
+    },
+    {
+      "path": "trail ",
+      "dir": false
+    },
+    {
+      "path": "trail",
+      "dir": false
+    },
+    {
+      "path": "sp ace.txt",
+      "dir": false
+    },
+    {
+      "path": "[ab].txt",
+      "dir": false
+    },
+    {
+      "path": "a.txt",
+      "dir": false
+    },
+    {
+      "path": "b.txt",
+      "dir": false
+    },
+    {
+      "path": "c.txt",
+      "dir": false
+    },
+    {
+      "path": "Z.txt",
+      "dir": false
+    },
+    {
+      "path": "7.txt",
+      "dir": false
+    },
+    {
+      "path": "-.txt",
+      "dir": false
+    },
+    {
+      "path": "].txt",
+      "dir": false
+    },
+    {
+      "path": "^.txt",
+      "dir": false
+    },
+    {
+      "path": "!.txt",
+      "dir": false
+    },
+    {
+      "path": "star*.txt",
+      "dir": false
+    },
+    {
+      "path": "starx.txt",
+      "dir": false
+    },
+    {
+      "path": "q?.txt",
+      "dir": false
+    },
+    {
+      "path": "qx.txt",
+      "dir": false
+    },
+    {
+      "path": "back\\slash.txt",
+      "dir": false
+    },
+    {
+      "path": "ü.txt",
+      "dir": false
+    },
+    {
+      "path": "é",
+      "dir": true
+    },
+    {
+      "path": "é/ndir",
+      "dir": true
+    },
+    {
+      "path": "é/ndir/x.txt",
+      "dir": false
+    },
+    {
+      "path": "日本.md",
+      "dir": false
+    },
+    {
+      "path": "vendor",
+      "dir": true
+    },
+    {
+      "path": "vendor/pkg",
+      "dir": true
+    },
+    {
+      "path": "vendor/pkg/a.go",
+      "dir": false
+    },
+    {
+      "path": "node_modules",
+      "dir": true
+    },
+    {
+      "path": "node_modules/x",
+      "dir": true
+    },
+    {
+      "path": "node_modules/x/index.js",
+      "dir": false
+    },
+    {
+      "path": "sub",
+      "dir": true
+    },
+    {
+      "path": "sub/node_modules",
+      "dir": true
+    },
+    {
+      "path": "sub/node_modules/y.js",
+      "dir": false
+    },
+    {
+      "path": "media",
+      "dir": true
+    },
+    {
+      "path": "media/a.jpeg",
+      "dir": false
+    },
+    {
+      "path": "media/c.gif",
+      "dir": false
+    },
+    {
+      "path": "media/d.ico",
+      "dir": false
+    },
+    {
+      "path": "media/e.webp",
+      "dir": false
+    },
+    {
+      "path": "media/v.mp4",
+      "dir": false
+    },
+    {
+      "path": "media/m.mov",
+      "dir": false
+    },
+    {
+      "path": "media/s.mp3",
+      "dir": false
+    },
+    {
+      "path": "fonts",
+      "dir": true
+    },
+    {
+      "path": "fonts/f.woff",
+      "dir": false
+    },
+    {
+      "path": "fonts/g.woff2",
+      "dir": false
+    },
+    {
+      "path": "fonts/h.ttf",
+      "dir": false
+    },
+    {
+      "path": "dist",
+      "dir": true
+    },
+    {
+      "path": "dist/z.zip",
+      "dir": false
+    },
+    {
+      "path": "dist/t.tar.gz",
+      "dir": false
+    },
+    {
+      "path": "dist/t.tgz",
+      "dir": false
+    },
+    {
+      "path": "dist/j.jar",
+      "dir": false
+    },
+    {
+      "path": "dist/x.gz",
+      "dir": false
+    },
+    {
+      "path": "dist/png",
+      "dir": false
+    },
+    {
+      "path": "dist/dir.png",
+      "dir": true
+    },
+    {
+      "path": "dist/dir.png/inner.txt",
+      "dir": false
+    },
+    {
+      "path": "empty",
+      "dir": true
+    },
+    {
+      "path": "deep",
+      "dir": true
+    },
+    {
+      "path": "deep/empty",
+      "dir": true
+    }
+  ],
+  "cases": [
+    {
+      "name": "default list",
+      "ignore": "*.png\n*.jpg\n*.jpeg\n*.gif\n*.ico\n*.webp\n*.mp4\n*.mov\n*.mp3\n*.woff\n*.woff2\n*.ttf\n*.zip\n*.tar.gz\n*.tgz\n*.jar\n",
+      "ignored": [
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/z.zip",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4"
+      ]
+    },
+    {
+      "name": "folder only",
+      "ignore": "build/\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "src/lib/build",
+        "src/lib/build/gen.go"
+      ]
+    },
+    {
+      "name": "file or folder",
+      "ignore": "build\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "src/build",
+        "src/lib/build",
+        "src/lib/build/gen.go"
+      ]
+    },
+    {
+      "name": "anchored",
+      "ignore": "/build\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o"
+      ]
+    },
+    {
+      "name": "anchored folder",
+      "ignore": "/build/\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o"
+      ]
+    },
+    {
+      "name": "anchored by a middle slash",
+      "ignore": "src/build\n",
+      "ignored": [
+        "src/build"
+      ]
+    },
+    {
+      "name": "middle slash folder only",
+      "ignore": "src/build/\n",
+      "ignored": []
+    },
+    {
+      "name": "nested name anywhere",
+      "ignore": "build/\n!build/keep.txt\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "src/lib/build",
+        "src/lib/build/gen.go"
+      ]
+    },
+    {
+      "name": "negation of a file",
+      "ignore": "*.go\n!*_test.go\n",
+      "ignored": [
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "vendor/pkg/a.go"
+      ]
+    },
+    {
+      "name": "one folder mounted",
+      "ignore": "/*\n!/charts/\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "one nested folder mounted",
+      "ignore": "/*\n!/charts/\n/charts/*\n!/charts/app/\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "negation under an ignored folder",
+      "ignore": "charts/\n!charts/app/Chart.yaml\n",
+      "ignored": [
+        "charts",
+        "charts/app",
+        "charts/app/Chart.yaml",
+        "charts/app/templates",
+        "charts/app/templates/deploy.yaml"
+      ]
+    },
+    {
+      "name": "negation of the folder's contents",
+      "ignore": "charts/*\n!charts/app/\n",
+      "ignored": []
+    },
+    {
+      "name": "leading double star",
+      "ignore": "**/build\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "src/build",
+        "src/lib/build",
+        "src/lib/build/gen.go"
+      ]
+    },
+    {
+      "name": "leading double star folder",
+      "ignore": "**/node_modules/\n",
+      "ignored": [
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "sub/node_modules",
+        "sub/node_modules/y.js"
+      ]
+    },
+    {
+      "name": "middle double star",
+      "ignore": "a/**/e.txt\n",
+      "ignored": [
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "middle double star zero folders",
+      "ignore": "a/**/b\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b",
+        "a/x/b/f.txt"
+      ]
+    },
+    {
+      "name": "two middle double stars",
+      "ignore": "a/**/b/**/e.txt\n",
+      "ignored": [
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "trailing double star",
+      "ignore": "a/**\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt"
+      ]
+    },
+    {
+      "name": "trailing double star with negation",
+      "ignore": "a/**\n!a/b/e.txt\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt"
+      ]
+    },
+    {
+      "name": "inner double star",
+      "ignore": "**/c/**\n",
+      "ignored": [
+        "a/b/c/d",
+        "a/b/c/d/e.txt"
+      ]
+    },
+    {
+      "name": "double star alone",
+      "ignore": "**\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "charts",
+        "charts/app",
+        "charts/app/Chart.yaml",
+        "charts/app/templates",
+        "charts/app/templates/deploy.yaml",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "anchored double star",
+      "ignore": "/**\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "charts",
+        "charts/app",
+        "charts/app/Chart.yaml",
+        "charts/app/templates",
+        "charts/app/templates/deploy.yaml",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "triple star",
+      "ignore": "***/e.txt\n",
+      "ignored": [
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "double star as a star",
+      "ignore": "a**t\n",
+      "ignored": [
+        "a.txt"
+      ]
+    },
+    {
+      "name": "double star after a name",
+      "ignore": "foo**/bar\n",
+      "ignored": [
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2/bar"
+      ]
+    },
+    {
+      "name": "double star after a slash name",
+      "ignore": "foo/b**\n",
+      "ignored": [
+        "foo/bar",
+        "foo/bar/baz.txt"
+      ]
+    },
+    {
+      "name": "anchored double star after a name",
+      "ignore": "/foo**\n",
+      "ignored": [
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x"
+      ]
+    },
+    {
+      "name": "double star extension",
+      "ignore": "**.txt\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        "7.txt",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build/keep.txt",
+        "c.txt",
+        "dist/dir.png/inner.txt",
+        "foo/bar/baz.txt",
+        "foobar.txt",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "star*.txt",
+        "starx.txt",
+        "é/ndir/x.txt",
+        "ü.txt"
+      ]
+    },
+    {
+      "name": "double star mid name in a path",
+      "ignore": "a/b**/e.txt\n",
+      "ignored": [
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "star everything",
+      "ignore": "*\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "charts",
+        "charts/app",
+        "charts/app/Chart.yaml",
+        "charts/app/templates",
+        "charts/app/templates/deploy.yaml",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "star folders only",
+      "ignore": "*/\n",
+      "ignored": [
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        "a",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "charts",
+        "charts/app",
+        "charts/app/Chart.yaml",
+        "charts/app/templates",
+        "charts/app/templates/deploy.yaml",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "src",
+        "src/build",
+        "src/lib",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "src/lib/util.go",
+        "src/main.go",
+        "src/main_test.go",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "star in the middle",
+      "ignore": "a/*/e.txt\n",
+      "ignored": [
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "star not across slashes",
+      "ignore": "a/*.txt\n",
+      "ignored": []
+    },
+    {
+      "name": "star then slash",
+      "ignore": "*/x.txt\n",
+      "ignored": []
+    },
+    {
+      "name": "star twice",
+      "ignore": "f*o*r\n",
+      "ignored": [
+        "foobar",
+        "foobar/x"
+      ]
+    },
+    {
+      "name": "question mark",
+      "ignore": "?.txt\n",
+      "ignored": [
+        "!.txt",
+        "-.txt",
+        "7.txt",
+        "Z.txt",
+        "].txt",
+        "^.txt",
+        "a.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "b.txt",
+        "c.txt",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "two question marks",
+      "ignore": "??.txt\n",
+      "ignored": [
+        "q?.txt",
+        "qx.txt",
+        "ü.txt"
+      ]
+    },
+    {
+      "name": "question mark not a slash",
+      "ignore": "a?c\n",
+      "ignored": []
+    },
+    {
+      "name": "class",
+      "ignore": "[ab].txt\n",
+      "ignored": [
+        "a.txt",
+        "b.txt"
+      ]
+    },
+    {
+      "name": "negated class with bang",
+      "ignore": "[!ab].txt\n",
+      "ignored": [
+        "!.txt",
+        "-.txt",
+        "7.txt",
+        "Z.txt",
+        "].txt",
+        "^.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "c.txt",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "negated class with caret",
+      "ignore": "[^ab].txt\n",
+      "ignored": [
+        "!.txt",
+        "-.txt",
+        "7.txt",
+        "Z.txt",
+        "].txt",
+        "^.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "c.txt",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "range",
+      "ignore": "[a-c].txt\n",
+      "ignored": [
+        "a.txt",
+        "b.txt",
+        "c.txt"
+      ]
+    },
+    {
+      "name": "range and literal dash",
+      "ignore": "[a-].txt\n",
+      "ignored": [
+        "-.txt",
+        "a.txt"
+      ]
+    },
+    {
+      "name": "dash first",
+      "ignore": "[-a].txt\n",
+      "ignored": [
+        "-.txt",
+        "a.txt"
+      ]
+    },
+    {
+      "name": "bracket first",
+      "ignore": "[]].txt\n",
+      "ignored": [
+        "].txt"
+      ]
+    },
+    {
+      "name": "escaped bracket",
+      "ignore": "[\\]].txt\n",
+      "ignored": [
+        "].txt"
+      ]
+    },
+    {
+      "name": "posix class alpha",
+      "ignore": "[[:alpha:]].txt\n",
+      "ignored": [
+        "Z.txt",
+        "a.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "b.txt",
+        "c.txt",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "posix classes",
+      "ignore": "[[:digit:][:upper:]].txt\n",
+      "ignored": [
+        "7.txt",
+        "Z.txt"
+      ]
+    },
+    {
+      "name": "posix class punct",
+      "ignore": "[[:punct:]].txt\n",
+      "ignored": [
+        "!.txt",
+        "-.txt",
+        "].txt",
+        "^.txt"
+      ]
+    },
+    {
+      "name": "not a posix class",
+      "ignore": "[[:a].txt\n",
+      "ignored": [
+        "a.txt"
+      ]
+    },
+    {
+      "name": "slash in a class",
+      "ignore": "a[/]c\n",
+      "ignored": []
+    },
+    {
+      "name": "literal brackets",
+      "ignore": "\\[ab\\].txt\n",
+      "ignored": [
+        "[ab].txt"
+      ]
+    },
+    {
+      "name": "escaped hash",
+      "ignore": "\\#hash.txt\n",
+      "ignored": [
+        "#hash.txt"
+      ]
+    },
+    {
+      "name": "hash comment",
+      "ignore": "#hash.txt\n",
+      "ignored": []
+    },
+    {
+      "name": "escaped bang",
+      "ignore": "\\!bang.txt\n",
+      "ignored": [
+        "!bang.txt"
+      ]
+    },
+    {
+      "name": "bang alone",
+      "ignore": "!\n",
+      "ignored": []
+    },
+    {
+      "name": "escaped star",
+      "ignore": "star\\*.txt\n",
+      "ignored": [
+        "star*.txt"
+      ]
+    },
+    {
+      "name": "escaped question mark",
+      "ignore": "q\\?.txt\n",
+      "ignored": [
+        "q?.txt"
+      ]
+    },
+    {
+      "name": "escaped backslash",
+      "ignore": "back\\\\slash.txt\n",
+      "ignored": [
+        "back\\slash.txt"
+      ]
+    },
+    {
+      "name": "escaped letter",
+      "ignore": "\\a.txt\n",
+      "ignored": [
+        "a.txt"
+      ]
+    },
+    {
+      "name": "trailing spaces dropped",
+      "ignore": "README.md   \ntrail \n",
+      "ignored": [
+        "README.md",
+        "trail"
+      ]
+    },
+    {
+      "name": "escaped trailing space",
+      "ignore": "trail\\ \n",
+      "ignored": [
+        "trail "
+      ]
+    },
+    {
+      "name": "inner space",
+      "ignore": "sp ace.txt\n",
+      "ignored": [
+        "sp ace.txt"
+      ]
+    },
+    {
+      "name": "crlf lines",
+      "ignore": "build/\r\n*.md\r\n",
+      "ignored": [
+        "README.md",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "docs/a.md",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "blank and space lines",
+      "ignore": "\n   \n\t\nbuild\n",
+      "ignored": [
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "src/build",
+        "src/lib/build",
+        "src/lib/build/gen.go"
+      ]
+    },
+    {
+      "name": "no final newline",
+      "ignore": "*.md",
+      "ignored": [
+        "README.md",
+        "docs/a.md",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "case sensitive",
+      "ignore": "*.png\n",
+      "ignored": [
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "docs/img/logo.png"
+      ]
+    },
+    {
+      "name": "upper case",
+      "ignore": "*.PNG\n",
+      "ignored": [
+        "docs/img/Shot.PNG"
+      ]
+    },
+    {
+      "name": "prefix is not a match",
+      "ignore": "doc\n",
+      "ignored": [
+        "doc"
+      ]
+    },
+    {
+      "name": "dotfiles",
+      "ignore": ".*\n",
+      "ignored": [
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml"
+      ]
+    },
+    {
+      "name": "dot folder",
+      "ignore": ".github/\n",
+      "ignored": [
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "name": "nested path",
+      "ignore": "a/b\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "anchored nested folder",
+      "ignore": "/a/b/\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "double slash",
+      "ignore": "a//b\n",
+      "ignored": []
+    },
+    {
+      "name": "root slash",
+      "ignore": "/\n",
+      "ignored": []
+    },
+    {
+      "name": "non ascii name",
+      "ignore": "ü.txt\n",
+      "ignored": [
+        "ü.txt"
+      ]
+    },
+    {
+      "name": "non ascii folder",
+      "ignore": "é/\n",
+      "ignored": [
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt"
+      ]
+    },
+    {
+      "name": "non ascii glob",
+      "ignore": "*.md\n!日本.md\n",
+      "ignored": [
+        "README.md",
+        "docs/a.md"
+      ]
+    },
+    {
+      "name": "file under folder pattern",
+      "ignore": "dist/*.png\n",
+      "ignored": [
+        "dist/dir.png",
+        "dist/dir.png/inner.txt"
+      ]
+    },
+    {
+      "name": "folder named like a file",
+      "ignore": "*.png/\n",
+      "ignored": [
+        "dist/dir.png",
+        "dist/dir.png/inner.txt"
+      ]
+    },
+    {
+      "name": "re-ignore after negation",
+      "ignore": "*.txt\n!a.txt\na.*\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        "7.txt",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a.txt",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build/keep.txt",
+        "c.txt",
+        "dist/dir.png/inner.txt",
+        "docs/a.md",
+        "foo/bar/baz.txt",
+        "foobar.txt",
+        "media/a.jpeg",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "star*.txt",
+        "starx.txt",
+        "vendor/pkg/a.go",
+        "é/ndir/x.txt",
+        "ü.txt"
+      ]
+    },
+    {
+      "name": "empty folders",
+      "ignore": "empty/\n",
+      "ignored": [
+        "deep/empty",
+        "empty"
+      ]
+    },
+    {
+      "name": "flux style",
+      "ignore": "/*\n!/charts/\n!/src/\n/src/**/build/\n*.yaml\n!Chart.yaml\n",
+      "ignored": [
+        "!.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "-.txt",
+        ".github",
+        ".github/workflows",
+        ".github/workflows/ci.yml",
+        ".gitlab-ci.yml",
+        "7.txt",
+        "README.md",
+        "Z.txt",
+        "[ab].txt",
+        "].txt",
+        "^.txt",
+        "a",
+        "a.txt",
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt",
+        "b.txt",
+        "back\\slash.txt",
+        "build",
+        "build/keep.txt",
+        "build/out.o",
+        "build/sub",
+        "build/sub/deep.o",
+        "c.txt",
+        "charts/app/templates/deploy.yaml",
+        "deep",
+        "deep/empty",
+        "dist",
+        "dist/dir.png",
+        "dist/dir.png/inner.txt",
+        "dist/j.jar",
+        "dist/png",
+        "dist/t.tar.gz",
+        "dist/t.tgz",
+        "dist/x.gz",
+        "dist/z.zip",
+        "doc",
+        "docs",
+        "docs/a.md",
+        "docs/img",
+        "docs/img/Shot.PNG",
+        "docs/img/logo.png",
+        "docs/img/pic.jpg",
+        "empty",
+        "fonts",
+        "fonts/f.woff",
+        "fonts/g.woff2",
+        "fonts/h.ttf",
+        "foo",
+        "foo/bar",
+        "foo/bar/baz.txt",
+        "foo2",
+        "foo2/bar",
+        "fooa",
+        "fooa/b",
+        "fooa/b/bar",
+        "foobar",
+        "foobar.txt",
+        "foobar/x",
+        "media",
+        "media/a.jpeg",
+        "media/c.gif",
+        "media/d.ico",
+        "media/e.webp",
+        "media/m.mov",
+        "media/s.mp3",
+        "media/v.mp4",
+        "node_modules",
+        "node_modules/x",
+        "node_modules/x/index.js",
+        "other",
+        "other/x.yaml",
+        "q?.txt",
+        "qx.txt",
+        "sp ace.txt",
+        "src/lib/build",
+        "src/lib/build/gen.go",
+        "star*.txt",
+        "starx.txt",
+        "sub",
+        "sub/node_modules",
+        "sub/node_modules/y.js",
+        "trail",
+        "trail ",
+        "vendor",
+        "vendor/pkg",
+        "vendor/pkg/a.go",
+        "é",
+        "é/ndir",
+        "é/ndir/x.txt",
+        "ü.txt",
+        "日本.md"
+      ]
+    },
+    {
+      "name": "escaped slash",
+      "ignore": "a\\/b\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "double star before an escaped slash",
+      "ignore": "**\\/e.txt\n",
+      "ignored": [
+        "a/b/c/d/e.txt",
+        "a/b/e.txt"
+      ]
+    },
+    {
+      "name": "double star after a literal folder",
+      "ignore": "foo/**/baz.txt\n",
+      "ignored": [
+        "foo/bar/baz.txt"
+      ]
+    },
+    {
+      "name": "star before a class",
+      "ignore": "*[0-9].txt\n",
+      "ignored": [
+        "7.txt"
+      ]
+    },
+    {
+      "name": "star then question mark",
+      "ignore": "a/*?\n",
+      "ignored": [
+        "a/b",
+        "a/b/c",
+        "a/b/c/d",
+        "a/b/c/d/e.txt",
+        "a/b/e.txt",
+        "a/c",
+        "a/x",
+        "a/x/b",
+        "a/x/b/f.txt"
+      ]
+    },
+    {
+      "name": "folder then star",
+      "ignore": "src/*\n!src/lib/\n",
+      "ignored": [
+        "src/build",
+        "src/main.go",
+        "src/main_test.go"
+      ]
+    },
+    {
+      "name": "negated folder then file",
+      "ignore": "build/\n!build/\n",
+      "ignored": []
+    }
+  ]
+}

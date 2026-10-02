@@ -6,8 +6,9 @@
 import type { CredentialSummary, HttpMethod } from "../contracts/credential.ts";
 
 // a key file the form may pick: its name and whether its value passes
-// the key's rule, never the value
-export type CredentialKey = { name: string; usable: boolean };
+// the key's rule, never the value, and the repositories that read it
+// without a credential, as project/name
+export type CredentialKey = { name: string; usable: boolean; repos: string[] };
 
 // GET /api/credentials
 export type CredentialsResponse = {

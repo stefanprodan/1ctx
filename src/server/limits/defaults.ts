@@ -85,12 +85,22 @@ export type ChatCaps = {
   archivedDeleteDays: number;
 };
 
+// a repository's tree as the ignore rules keep it, read at each fetch,
+// and the cache of every tree, read at each fetch and sweep
+export type RepoCaps = {
+  repoBytes: number;
+  repoFiles: number;
+  repoFileBytes: number;
+  repoCacheBytes: number;
+};
+
 export type Limits = LoopLimits &
   ToolCaps &
   KnowledgeCaps &
   SendCaps &
   QueueCaps &
-  ChatCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  ChatCaps &
+  RepoCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -396,6 +406,34 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     max: 1825,
     unit: "days",
     scope: "chats",
+  },
+  repoBytes: {
+    default: 256 * 1024 * 1024,
+    min: 1024 * 1024,
+    max: 2 * 1024 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
+  },
+  repoFiles: {
+    default: 50_000,
+    min: 100,
+    max: 500_000,
+    unit: "count",
+    scope: "repos",
+  },
+  repoFileBytes: {
+    default: 4 * 1024 * 1024,
+    min: 64 * 1024,
+    max: 64 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
+  },
+  repoCacheBytes: {
+    default: 10 * 1024 * 1024 * 1024,
+    min: 1024 * 1024 * 1024,
+    max: 1024 * 1024 * 1024 * 1024,
+    unit: "bytes",
+    scope: "repos",
   },
 };
 

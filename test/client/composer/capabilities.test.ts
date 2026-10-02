@@ -182,6 +182,22 @@ describe("pending capability flips", () => {
     });
   });
 
+  test.serial("a repository flip turns it off and back on in a chat", () => {
+    flip(null, [], "repo:r1");
+    expect(isOff(null, [], "repo:r1")).toBe(true);
+    expect(changeOf(null)).toEqual({ capabilities: { disable: ["repo:r1"] } });
+    // another agent keeps it, another project drops it
+    dropKind(null, "mcp");
+    dropKind(null, "skill");
+    expect(isOff(null, [], "repo:r1")).toBe(true);
+    dropKind(null, "repo");
+    expect(changeOf(null)).toEqual({});
+    // in a chat that has it off, the switch on is an enable
+    flip("s1", ["repo:r1"], "repo:r1");
+    expect(isOff("s1", ["repo:r1"], "repo:r1")).toBe(false);
+    expect(changeOf("s1")).toEqual({ capabilities: { enable: ["repo:r1"] } });
+  });
+
   test.serial("leaving the chat gives up what was never sent", () => {
     flip("s1", [], WEB);
     // another chat's composer leaving changes nothing here

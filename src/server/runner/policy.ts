@@ -37,6 +37,7 @@ import type { UserRow } from "../users/index.ts";
 export type {
   KeepPort,
   Offered,
+  SendRepos,
   ToolBudget,
   ToolCaps,
   ToolContext,

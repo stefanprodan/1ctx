@@ -182,3 +182,51 @@ export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
       ).changes > 0
   );
 }
+
+// the commit each repository was mounted at in a turn, kept on the
+// turn's first message: repository id to commit
+export type MountedRepos = Record<string, string>;
+
+export function setMountedRepos(
+  db: Db,
+  messageId: string,
+  mounted: MountedRepos,
+): void {
+  db.query("update messages set mounted_repos = ? where id = ?").run(
+    JSON.stringify(mounted),
+    messageId,
+  );
+}
+
+export function readMountedRepos(
+  db: Db,
+  messageId: string,
+): MountedRepos | null {
+  const row = db
+    .query<{ mounted_repos: string | null }, [string]>(
+      "select mounted_repos from messages where id = ?",
+    )
+    .get(messageId);
+  return row?.mounted_repos
+    ? (JSON.parse(row.mounted_repos) as MountedRepos)
+    : null;
+}
+
+// each earlier send's mounted commits, newest first, from its first
+// message: the sends of a chat are few where its messages are many
+export function mountedBefore(
+  db: Db,
+  sessionId: string,
+  sendId: string,
+): MountedRepos[] {
+  return db
+    .query<{ mounted_repos: string }, [string, string]>(
+      `select messages.mounted_repos from sends
+       join messages on messages.id = sends.first_message_id
+       where sends.session_id = ? and sends.id != ?
+         and messages.mounted_repos is not null
+       order by sends.started_at desc, sends.rowid desc`,
+    )
+    .all(sessionId, sendId)
+    .map((row) => JSON.parse(row.mounted_repos) as MountedRepos);
+}

@@ -16,6 +16,7 @@ export type InventorySources = {
     byId(id: string): { name: string } | null;
   };
   credentials: Named;
+  repos: { forProject(projectId: string): { name: string }[] };
   providers: Named;
   deciders: Named;
   skills: { summaries(agentNames: () => string[]): { name: string }[] };
@@ -31,6 +32,13 @@ export function inventoryOf(sources: InventorySources): Inventory {
       .teamProjectIds()
       .map((id) => sources.projects.byId(id)!.name),
     Credential: sources.credentials.list().map((row) => row.name),
+    // a repository is known by its team project and its name
+    Repository: sources.projects.teamProjectIds().flatMap((id) => {
+      const project = sources.projects.byId(id)!.name;
+      return sources.repos
+        .forProject(id)
+        .map((row) => `${project}/${row.name}`);
+    }),
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
     Skill: sources.skills.summaries(() => []).map((row) => row.name),

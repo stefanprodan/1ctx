@@ -5,6 +5,7 @@ import type { IndexEntry } from "../../shared/contracts/skill.ts";
 import { sourceForm } from "../../shared/skills.ts";
 import { isSkillName, type SkillSource } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { normalizePath, validPath } from "../lib/paths.ts";
 import { MAX_INDEX_BYTES, MAX_INDEX_ENTRIES } from "./limits.ts";
 
 export type ResolvedSource = {
@@ -20,31 +21,7 @@ export type Picked = {
   files: Map<string, Uint8Array>;
 };
 
-// GNU tar commonly prefixes every member with "./". Empty and ".."
-// segments stay in place so validation still refuses unsafe paths.
-export function normalizePath(path: string): string {
-  return path
-    .split("/")
-    .filter((part) => part !== ".")
-    .join("/");
-}
-
-export function validPath(path: string): boolean {
-  if (path === "" || path.startsWith("/") || path.includes("\\")) return false;
-  for (const char of path) {
-    const code = char.codePointAt(0)!;
-    if (
-      char === "<" ||
-      char === ">" ||
-      code < 0x20 ||
-      (code >= 0x7f && code <= 0x9f)
-    ) {
-      return false;
-    }
-  }
-  const parts = path.split("/");
-  return parts.every((part) => part !== "" && part !== "." && part !== "..");
-}
+export { normalizePath, validPath } from "../lib/paths.ts";
 
 export function resolve(url: string, select = ""): ResolvedSource {
   const form = sourceForm(url);
