@@ -31,6 +31,10 @@ export type MountedPort = {
 
 const short = (commit: string) => commit.slice(0, 7);
 
+// a line that names a repository reads as a checkout, so the model ran
+// git in one: say once what a mount is
+const REPOS_HEAD = "Repositories, each the files of one commit, no .git:";
+
 const refWords = (ref: string) =>
   ref === "" ? "default branch" : isCommit(ref) ? short(ref) : ref;
 
@@ -145,6 +149,7 @@ export async function mountRepos(
             ...bash,
             description: [
               bash.description,
+              REPOS_HEAD,
               ...prepared.mounts.map(repoLine),
             ].join("\n"),
           }

@@ -41,6 +41,7 @@ import {
 
 const URL = "https://github.com/acme/widgets";
 const ARCHIVE = adapter(URL, "github").archiveUrl("");
+const HEAD = "Repositories, each the files of one commit, no .git:";
 const LINE =
   "/repos/widgets: github.com/acme/widgets at default branch (3e0ff8a), read-only, some paths ignored";
 
@@ -176,6 +177,7 @@ describe("a send's repositories", () => {
     try {
       const { script, sessionId } = await startChat(chat);
       expect(bashOf(script)).not.toContain("/repos");
+      expect(bashOf(script)).not.toContain(HEAD);
       expect(prepared).toHaveLength(1);
       expect(prepared[0]!.mounts).toEqual([]);
       const answer = await bash(chat, script, "ls / | grep -c repos");
@@ -193,7 +195,7 @@ describe("a send's repositories", () => {
     const { chat } = counted;
     try {
       const { script, sessionId } = await startChat(chat);
-      expect(bashOf(script)).toEndWith(`\n${LINE}`);
+      expect(bashOf(script)).toEndWith(`\n${HEAD}\n${LINE}`);
       expect(firstMounted(chat, sessionId)).toEqual({
         [counted.repoId]: COMMIT,
       });
@@ -213,7 +215,7 @@ describe("a send's repositories", () => {
     try {
       const automation = await createAutomation(chat);
       const run = await startRun(chat, automation.id);
-      expect(bashOf(run.main)).toEndWith(`\n${LINE}`);
+      expect(bashOf(run.main)).toEndWith(`\n${HEAD}\n${LINE}`);
       run.main.reply("done");
       await settleRun(chat, run.sessionId);
       expect(firstMounted(chat, run.sessionId)).toEqual({
@@ -348,6 +350,7 @@ describe("a send's repositories", () => {
     try {
       const { script, sessionId } = await startChat(chat);
       expect(bashOf(script)).not.toContain("/repos");
+      expect(bashOf(script)).not.toContain(HEAD);
       const first = await bash(chat, script, "echo one");
       expect(toolOf(first)).toBe(
         "repo widgets is unavailable: not found\none\n\nexit 0",
