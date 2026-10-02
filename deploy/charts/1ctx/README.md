@@ -31,10 +31,11 @@ Deployment, Service and claim `onectx`.
 | `trustProxy` | `true` | Take the client address and scheme from the `X-Forwarded-*` headers of the ingress controller. |
 | `secureCookie` | `true` | Mark the login cookie `Secure`. Turn it off only when 1ctx is served over plain http. |
 | `secrets.existingSecret` | `1ctx` | The Secret mounted at `/secrets`. The chart never makes it. |
-| `persistence.size` | `100Gi` | The claim for the database and the repositories' cache. |
+| `persistence.size` | `100Gi` | The claim for the database. |
 | `persistence.storageClass` | `""` | Empty takes the cluster's default class. |
 | `persistence.existingClaim` | `""` | A claim made outside the chart; the chart then renders none. |
 | `persistence.keep` | `true` | Keep the claim when the release is removed. |
+| `cache.sizeLimit` | `12Gi` | The repositories' cache, an `emptyDir` at `/cache`. Keep it above the `repoCacheBytes` limit (10 GiB by default) and room for an unpack, or the kubelet evicts the pod. |
 | `resources` | requests 2 CPU and 2Gi, limits 4 CPU and 8Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
 | `service.type` | `ClusterIP` | |
 | `service.port` | `80` | The Service port, sent to the container's 11236. |
@@ -58,7 +59,7 @@ Deployment, Service and claim `onectx`.
 | `nodeSelector` | `{}` | |
 | `tolerations` | `[]` | |
 | `affinity` | `{}` | |
-| `extraArgs` | `[]` | Server flags appended to the chart's, such as `--cache /cache`. |
+| `extraArgs` | `[]` | Server flags appended to the chart's. |
 
 `values.schema.json` types every key and refuses any other, so a
 misspelt value fails the install instead of being ignored.
@@ -106,10 +107,16 @@ probe takes over.
 
 ## Persistence
 
-The claim holds `1ctx.sqlite` and `repos/`, the repositories' cache. It
-carries `helm.sh/resource-policy: keep`, so removing the release keeps
-it, and a reinstall under the same release name and namespace reuses it
-with its data.
+The claim holds `1ctx.sqlite`. It carries
+`helm.sh/resource-policy: keep`, so removing the release keeps it, and a
+reinstall under the same release name and namespace reuses it with its
+data.
+
+The repositories' cache is an `emptyDir` at `/cache`, not on the claim:
+it is refetched when lost, so a restart only costs fetches. The server's
+free space check reads the node's disk, so `cache.sizeLimit` must stay
+above the admin's `repoCacheBytes` limit and room for one unpack; past
+the size limit the kubelet evicts the pod.
 
 To remove the data with the release, set `persistence.keep: false`, let
 the upgrade apply it, then remove the release. With

@@ -76,6 +76,13 @@
         "keep": { "type": "boolean" }
       }
     },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sizeLimit": { "type": "string", "minLength": 1 }
+      }
+    },
     "resources": {
       "type": "object",
       "additionalProperties": false,

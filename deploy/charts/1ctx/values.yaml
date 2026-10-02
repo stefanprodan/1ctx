@@ -25,7 +25,7 @@ secrets:
   existingSecret: 1ctx
 
 persistence:
-  # the database and the repositories' cache
+  # the database
   size: 100Gi
   # empty takes the cluster's default class
   storageClass: ""
@@ -33,6 +33,14 @@ persistence:
   existingClaim: ""
   # keep the claim when the release is removed
   keep: true
+
+# the repositories' cache, an emptyDir: it is refetched when lost, so it
+# never takes the claim's space or its backups
+cache:
+  # past it the kubelet evicts the pod, and the server's free space
+  # check reads the node's disk, not this: keep it above the
+  # repoCacheBytes limit (10 GiB by default) and room for an unpack
+  sizeLimit: 12Gi
 
 resources:
   requests:
