@@ -46,7 +46,10 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **The scheduler is a loop of passes on the clock port.** Never
   `Bun.cron(handler)`. A pass replaces missed occurrences, fires the
   due rows oldest first, sweeps retention hourly, and sleeps until the
-  earliest `next_at` or a minute.
+  earliest `next_at` or a minute. It yields a macrotask after each
+  fire, so a burst of due rows never holds requests and the socket;
+  the stop, drain and caps are read again after each yield. One loop
+  runs at a time: a start drops a loop a stop left mid-pass.
 - **`wake()` is level-triggered.** It bumps a generation the sleep
   compares, so a wake with no sleeper is not lost. A store write, a
   freed send place and a moved send cap wake it; the dispatcher of

@@ -192,6 +192,34 @@ describe("automation scheduler", () => {
     await chat.app.shutdown();
   });
 
+  test("a pass yields to the event loop between fires", async () => {
+    const chat = await chatApp();
+    chat.app.automationScheduler.stop();
+    const ids: string[] = [];
+    for (const name of ["first", "second", "third"]) {
+      ids.push((await createAutomation(chat, { name })).id);
+    }
+    chat.app.users.setDisabled(chat.memberId, true);
+    for (const id of ids) {
+      chat.app.db
+        .query("update automations set next_at = ? where id = ?")
+        .run(chat.app.now.value, id);
+    }
+    const handled = () =>
+      ids.filter(
+        (id) => chat.app.automations.byId(id)?.lastEventOutcome === "skipped",
+      ).length;
+    let seen = -1;
+    setImmediate(() => {
+      seen = handled();
+    });
+    await chat.app.automationScheduler.pass();
+    expect(handled()).toBe(ids.length);
+    expect(seen).toBeGreaterThan(0);
+    expect(seen).toBeLessThan(ids.length);
+    await chat.app.shutdown();
+  });
+
   test("the loop waits for next_at and not one millisecond before", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

@@ -408,6 +408,8 @@ export function scheduler(deps: Deps): Scheduler {
       if (!keepGoing() || waits.processFull) break;
       if (waits.projectFull(row.projectId)) continue;
       await fire(row.id);
+      // a fire is synchronous, so a burst must not hold every request
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
     if (!keepGoing()) return;
     if (now - lastSweep >= SWEEP_MS) {
@@ -438,11 +440,13 @@ export function scheduler(deps: Deps): Scheduler {
     if (!woken) waits.expire(deps.clock(), PASS_MS);
   };
 
-  const loop = async () => {
-    while (running) {
+  let epoch = 0; // a stop and a start mid-pass leave one loop, not two
+  const loop = async (mine: number) => {
+    const live = () => running && epoch === mine;
+    while (live()) {
       const seen = waits.generation;
-      await pass(() => running);
-      if (running) await wait(seen);
+      await pass(live);
+      if (live()) await wait(seen);
     }
   };
 
@@ -453,7 +457,7 @@ export function scheduler(deps: Deps): Scheduler {
       const reconciled = reconcile();
       cut = cutRuns(deps, deps.clock());
       unsubscribe ??= subscribe(onSession, deps.log);
-      void loop().catch((err) =>
+      void loop(++epoch).catch((err) =>
         deps.log.error("scheduler stopped", errorFields(err)),
       );
       return reconciled;
