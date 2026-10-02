@@ -6,13 +6,25 @@
 // at the command, nothing under /repos ever saved, and the walk and read
 // caps grown by what the tree holds.
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  setDefaultTimeout,
+  test,
+} from "bun:test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { JobRepo } from "../../../src/server/bash/protocol.ts";
 import { callCaps, run, type Setup, scratchState, setup } from "./helpers.ts";
+
+// every command starts a worker and walks a real tree: a loaded CI
+// runner takes seconds for what a laptop does at once
+setDefaultTimeout(90_000);
+const caps: CommandCaps = { ...callCaps, callTimeoutMs: 30_000 };
 
 const DIRS = 30;
 const PER_DIR = 40;
@@ -66,9 +78,9 @@ afterAll(async () => {
 const withRepos = (
   fields: Partial<JobRepo> = {},
   notice = "",
-  caps: CommandCaps = callCaps,
+  given: CommandCaps = caps,
 ): CommandCaps => ({
-  ...caps,
+  ...given,
   repos: { mounts: [{ ...tree, ...fields }], fileBytes: 2048, notice },
 });
 
@@ -93,7 +105,7 @@ describe("a repository mounted beside scratch", () => {
 
   test("without a mount there is no /repos", async () => {
     const s = setup();
-    expect(await output(s, "ls /repos", callCaps)).toContain(
+    expect(await output(s, "ls /repos", caps)).toContain(
       "No such file or directory",
     );
   });
@@ -167,7 +179,7 @@ describe("a repository mounted beside scratch", () => {
     const s = setup();
     await run(s, "cd /repos/widgets/src", withRepos());
     expect(await output(s, "pwd")).toBe("/repos/widgets/src\n\nexit 0");
-    expect(await output(s, "pwd", callCaps)).toBe(
+    expect(await output(s, "pwd", caps)).toBe(
       "started in /knowledge: /repos/widgets/src no longer exists\n/knowledge\n\nexit 0",
     );
   });
@@ -199,10 +211,8 @@ describe("a repository mounted beside scratch", () => {
 });
 
 describe("the caps grow with the mount", () => {
-  // a loaded runner walks 1,500 folders in seconds: the default deadline
   const mount = (dirs: number): CommandCaps => ({
-    ...callCaps,
-    callTimeoutMs: 20_000,
+    ...caps,
     repos: {
       mounts: [{ ...folders, dirs }],
       fileBytes: 2048,
@@ -225,7 +235,7 @@ describe("the caps grow with the mount", () => {
       expect((await run(s, walk, mount(FOLDERS))).content).toBe(
         `${out}\n\nexit 0`,
       );
-    }, 30_000);
+    });
   }
 
   test("a walk of the whole tree fits once its files count", async () => {
