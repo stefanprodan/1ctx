@@ -38,6 +38,8 @@ describe("log format", () => {
   test("keeps field order, formats milliseconds and reports bad fields", () => {
     const fields = {
       count: 1_000_000,
+      ratio: 0.00002,
+      share: 1234567.5,
       duration: 123.5,
       enabled: true,
       empty: undefined,
@@ -47,7 +49,7 @@ describe("log format", () => {
       object: null,
     } as unknown as LogFields;
     expect(format(at, "web", "warn", "request", fields)).toBe(
-      "time=2026-09-21T22:39:12.345Z level=WARN msg=request area=web count=1e+06 duration=124ms enabled=true bad_fields=4",
+      "time=2026-09-21T22:39:12.345Z level=WARN msg=request area=web count=1000000 ratio=2e-05 share=1.2345675e+06 duration=124ms enabled=true bad_fields=4",
     );
     expect(format(at, "web", "info", "quick", { duration: 0.49 })).toEndWith(
       "duration=0ms",

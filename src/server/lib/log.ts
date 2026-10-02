@@ -123,8 +123,11 @@ function stringValue(value: string): string {
   return needsQuote(value) ? quote(value) : value;
 }
 
+// a count or a byte total is whole, as slog prints an int; a fraction
+// takes Go's float form
 function numberValue(value: number): string {
   if (Object.is(value, -0)) return "-0";
+  if (Number.isSafeInteger(value)) return String(value);
   const absolute = Math.abs(value);
   if (absolute !== 0 && (absolute >= 1e6 || absolute < 1e-4)) {
     return value.toExponential().replace(/e([+-])(\d)$/, "e$10$2");
