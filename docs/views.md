@@ -154,9 +154,12 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is
-  seen, and stops once every row settled.
-- **A change sends only what changed** (`patchBody()`): a rename alone
-  never fetches the tree again.
+  seen, and stops once every row settled. A tick while a read is out
+  skips, so a slow answer is never superseded by the next poll.
+- **A change sends only what changed** (`patchBody()`) against the row
+  as Change opened it: a rename alone never fetches the tree again, and
+  a field another admin changed since is never sent back. A row gone
+  from the list closes its form.
 
 ## Knowledge
 

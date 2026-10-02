@@ -59,6 +59,8 @@ import {
   ignoreRows,
   KIND_OPTIONS,
   nameOf,
+  type OpenRepo,
+  openOf,
   patchBody,
   type RepoDraft,
   repoFieldOf,
@@ -69,9 +71,6 @@ import {
   urlText,
 } from "./Repos.model.ts";
 import "./repos.css";
-
-// the open form: a new repository, a row's id, or none
-const NEW = "new";
 
 export function Repos({
   projectId,
@@ -86,16 +85,16 @@ export function Repos({
   // false for a team's member, who reads the rows and changes none
   edit?: boolean;
 }) {
-  const open = useSignal<string | null>(null);
+  const open = useSignal<OpenRepo>(null);
   useEffect(() => watchRepos(projectId), [projectId]);
   const list = reposOf(projectId);
   const full = edit && list !== null && atCap(list);
   const add = edit && list !== null && !full && (
     <RowsAdd
       label="Add repository"
-      disabled={open.value !== null}
+      disabled={openOf(open.value, list) !== null}
       onClick={() => {
-        open.value = NEW;
+        open.value = "new";
       }}
     />
   );
@@ -141,7 +140,7 @@ export function RepoRows({
 }: {
   target: RepoTarget;
   list: RepoView[] | null;
-  open: Signal<string | null>;
+  open: Signal<OpenRepo>;
   edit?: boolean;
 }) {
   // Refresh writes at once, and a refusal shows on its row
@@ -156,28 +155,28 @@ export function RepoRows({
   };
   const notice = actions.notice();
   // a member never has an editor, though one was open when edit turned off
-  const opened = edit ? open.value : null;
+  const opened = edit ? openOf(open.value, list) : null;
   return (
     <>
-      {opened === NEW && (
+      {opened === "new" && (
         <RowsNew>
           <RepoForm target={target} row={null} onClose={close} />
         </RowsNew>
       )}
-      {list.length === 0 && opened !== NEW && (
+      {list.length === 0 && opened !== "new" && (
         <RowsNote>No repositories yet.</RowsNote>
       )}
       {list.map((repo) =>
-        opened === repo.id ? (
+        opened !== null && opened !== "new" && opened.id === repo.id ? (
           <RowsNew key={repo.id}>
-            <RepoForm target={target} row={repo} onClose={close} />
+            <RepoForm target={target} row={opened} onClose={close} />
           </RowsNew>
         ) : (
           <RepoLine
             key={repo.id}
             repo={repo}
             edit={edit}
-            locked={open.value !== null || actions.busy}
+            locked={opened !== null || actions.busy}
             failed={
               notice !== null && acting.value === repo.id
                 ? noticeOf(notice)
@@ -188,7 +187,7 @@ export function RepoRows({
               void actions.act("refresh", () => refreshRepo(target, repo.id));
             }}
             onChange={() => {
-              open.value = repo.id;
+              open.value = repo;
             }}
           />
         ),
@@ -253,23 +252,21 @@ export function RepoForm({
   onClose,
 }: {
   target: RepoTarget;
+  // as it was when the form opened: a change is measured against it, so
+  // a field another admin changed since is never sent back
   row: RepoView | null;
   onClose: () => void;
 }) {
   const draft = useSignal<RepoDraft>(draftOf(row));
   const asking = useSignal(false);
   const form = useRef<HTMLFormElement>(null);
-  // the row the poll last brought, so a change is measured against it
-  const latest = useRef(row);
-  latest.current = row;
   const save = useSave(
     async () => {
-      const was = latest.current;
-      if (was === null) {
+      if (row === null) {
         await addRepo(target, createBody(draft.value, target.personal));
       } else {
-        const body = patchBody(draft.value, was, target.personal);
-        if (body !== null) await changeRepo(target, was.id, body);
+        const body = patchBody(draft.value, row, target.personal);
+        if (body !== null) await changeRepo(target, row.id, body);
       }
       onClose();
     },

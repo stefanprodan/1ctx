@@ -38,6 +38,16 @@ export const draftOf = (row: RepoView | null): RepoDraft => ({
   ignore: row?.ignore ?? "",
 });
 
+// the open form: a new repository, the row as it was when Change
+// opened it, or none
+export type OpenRepo = RepoView | "new" | null;
+
+// a row gone from the list, deleted in another tab, closes its form
+export function openOf(open: OpenRepo, list: readonly RepoView[]): OpenRepo {
+  if (open === null || open === "new") return open;
+  return list.some((r) => r.id === open.id) ? open : null;
+}
+
 export const KIND_OPTIONS: { value: RepoKind; label: string }[] = [
   { value: "github", label: "GitHub" },
   { value: "gitlab", label: "GitLab" },

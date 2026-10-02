@@ -36,6 +36,7 @@ import {
   draftOf,
   IGNORE_PLACEHOLDER,
   nameOf,
+  openOf,
   PUBLIC_HINT,
   patchBody,
   repoFieldOf,
@@ -337,6 +338,39 @@ describe("the entity", () => {
     expect(reposOf("p2")).toEqual([]);
   });
 
+  test.serial("a failed reload drops the list it held", async () => {
+    held("p2", [repo()]);
+    answer = () => Response.json({ error: "gone" }, { status: 500 });
+    await loadRepos("p2");
+    expect(reposOf("p2")).toBeNull();
+    expect(repoErrorOf("p2")?.words).toBe("gone");
+    const html = render(<Repos projectId="p2" personal={false} />);
+    expect(html).toContain("Gone.");
+    expect(html).not.toContain("podinfo");
+  });
+
+  test.serial("a poll waits for its answer before the next", async () => {
+    const tab = pollTab(REPO_POLL_MS);
+    held("p2", [repo({ state: "pending" })]);
+    const replies: ((response: Response) => void)[] = [];
+    answer = () => new Promise<Response>((resolve) => replies.push(resolve));
+    const stop = watchRepos("p2", tab.tab);
+    tab.tick();
+    await settle();
+    tab.tick();
+    await settle();
+    expect(replies).toHaveLength(1);
+    replies[0]!(Response.json({ repos: [repo({ state: "fetching" })] }));
+    await settle();
+    expect(reposOf("p2")?.[0]?.state).toBe("fetching");
+    tab.tick();
+    await settle();
+    expect(replies).toHaveLength(2);
+    stop();
+    replies[1]!(Response.json({ repos: [repo()] }));
+    await settle();
+  });
+
   test.serial("reads again only while a row waits or fetches", async () => {
     const tab = pollTab(REPO_POLL_MS);
     held("p2", [repo()]);
@@ -423,7 +457,11 @@ describe("the list", () => {
     expect(adding).toContain(">Add<");
     submitsInForms(adding);
     const changing = render(
-      <RepoRows target={team} list={reposOf("p2")} open={signal("r1")} />,
+      <RepoRows
+        target={team}
+        list={reposOf("p2")}
+        open={signal(reposOf("p2")![0]!)}
+      />,
     );
     expect(changing).toContain(
       'value="https://github.com/stefanprodan/podinfo"',
@@ -439,6 +477,49 @@ describe("the list", () => {
 });
 
 describe("the form", () => {
+  test.serial("Save sends what was typed, not what changed since", async () => {
+    const opened = repo({ ref: "main" });
+    held("p2", [repo({ ref: "release", updatedAt: 2 })]);
+    answer = () => Response.json({ repo: repo() });
+    const previous = options.vnode;
+    let onInput: ((e: Event) => void) | undefined;
+    let onSubmit: ((e: Event) => void) | undefined;
+    options.vnode = (v) => {
+      previous?.(v);
+      const props = v.props as Record<string, unknown>;
+      if (v.type === "input" && props.name === "name") {
+        onInput = props.onInput as (e: Event) => void;
+      }
+      if (v.type === "form") onSubmit = props.onSubmit as (e: Event) => void;
+    };
+    try {
+      render(
+        <RepoRows target={team} list={reposOf("p2")} open={signal(opened)} />,
+      );
+    } finally {
+      options.vnode = previous;
+    }
+    onInput?.({ currentTarget: { value: "info" } } as unknown as Event);
+    onSubmit?.(new Event("submit", { cancelable: true }));
+    await settle();
+    expect(sent(0)).toEqual({
+      url: "/api/projects/p2/repos/r1",
+      method: "PATCH",
+      body: { name: "info" },
+    });
+  });
+
+  test.serial("a row deleted elsewhere closes its form", () => {
+    const other = repo({ id: "r2", name: "flux2" });
+    const open = signal<RepoView | "new" | null>(repo());
+    expect(openOf(open.value, [other])).toBeNull();
+    expect(openOf(open.value, [repo(), other])).toEqual(repo());
+    expect(openOf("new", [])).toBe("new");
+    const html = render(<RepoRows target={team} list={[other]} open={open} />);
+    expect(html).not.toContain(">Cancel<");
+    expect(html).not.toContain("disabled");
+  });
+
   test.serial("a team form asks the kind and the key", () => {
     credentials.value = [];
     credentialKeys.value = keys;

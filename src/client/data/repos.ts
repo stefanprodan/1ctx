@@ -62,9 +62,11 @@ const turnOf = (projectId: string) => {
   return next;
 };
 
-function setList(projectId: string, list: RepoView[]): void {
+function setList(projectId: string, list: RepoView[] | null): void {
+  if (list === null && !repoLists.value.has(projectId)) return;
   const next = new Map(repoLists.value);
-  next.set(projectId, list);
+  if (list === null) next.delete(projectId);
+  else next.set(projectId, list);
   repoLists.value = next;
 }
 
@@ -86,6 +88,8 @@ export async function loadRepos(projectId: string): Promise<void> {
     setError(projectId, null);
   } catch (err) {
     if (owner !== forUser || turns.get(projectId) !== mine) return;
+    // rows the server no longer answers for are never left to act on
+    setList(projectId, null);
     setError(projectId, failure(err));
   }
 }
@@ -179,20 +183,25 @@ export async function deleteRepo(target: RepoTarget, id: string) {
 
 // while mounted: the list reads again every REPO_POLL_MS, only while a
 // row waits or fetches and the tab is seen, since no frame says a fetch
-// ended
+// ended. A tick while a read is out skips, so a slow server never has
+// each answer superseded by the next poll's
 export function watchRepos(
   projectId: string,
   tab: PollDriver = browserTab,
 ): () => void {
   let stopPoll: (() => void) | null = null;
+  let reading = false;
+  const read = () => {
+    if (reading) return;
+    reading = true;
+    void loadRepos(projectId).finally(() => {
+      reading = false;
+    });
+  };
   const stopEffect = effect(() => {
     const busy = unsettled(reposOf(projectId));
     if (busy && stopPoll === null) {
-      stopPoll = pollWhileSeen(
-        REPO_POLL_MS,
-        () => void loadRepos(projectId),
-        tab,
-      );
+      stopPoll = pollWhileSeen(REPO_POLL_MS, read, tab);
     } else if (!busy && stopPoll !== null) {
       stopPoll();
       stopPoll = null;
