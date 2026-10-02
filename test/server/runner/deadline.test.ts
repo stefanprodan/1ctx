@@ -106,6 +106,26 @@ describe("send deadlines", () => {
     await chat.app.shutdown();
   });
 
+  test("a finished send is not kept alive by its deadline", async () => {
+    const chat = await chatApp();
+    // in a function, so no local of the test reaches the send
+    const finish = async () => {
+      const started = await startChat(chat);
+      const send = chat.app.runner.registry.get(started.sessionId);
+      started.script.reply("done");
+      await settle(chat.app, started.sessionId);
+      return new WeakRef(send ?? {});
+    };
+    const held = [await finish(), await finish(), await finish()];
+    // rings the round's quiet timers, which the fake clock cannot cancel,
+    // and stays well short of the deadline
+    chat.app.now.value += 2 * STREAM_IDLE_MS;
+    for (let i = 0; i < 5; i++) await tick();
+    Bun.gc(true);
+    expect(held.filter((ref) => ref.deref() !== undefined).length).toBe(0);
+    await chat.app.shutdown();
+  });
+
   test("a lowered run limit tightens a stored deadline", async () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { deadlineMs: 600_000 });

@@ -6,7 +6,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { after, type Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
@@ -305,7 +305,6 @@ export type MemoryPhaseDeps = PhaseRowsDeps & {
   };
   log: Log;
   historyOf(send: ActiveSend): Message[];
-  pause(ms: number): Promise<void>;
 };
 
 export async function memoryPhase(
@@ -329,12 +328,9 @@ export async function memoryPhase(
   };
   send.ending.signal.addEventListener("abort", stop, { once: true });
   if (send.ending.signal.aborted) stop();
-  let done = false;
   // the phase runs past the turn's deadline, within its own window
   const deadline = deps.clock() + send.policy.limits.memoryPhaseMs;
-  void deps.pause(send.policy.limits.memoryPhaseMs).then(() => {
-    if (!done) stop();
-  });
+  const disarm = after(deps.clock, send.policy.limits.memoryPhaseMs, stop);
   // the phase counts its own rounds and calls; the send's budget is the
   // run's and never cuts the phase
   const spend: PhaseSpend = { calls: 0, toolMs: 0, resultBytes: 0 };
@@ -397,7 +393,7 @@ export async function memoryPhase(
       send.round.slotMarked = true;
     }
   } finally {
-    done = true;
+    disarm();
     send.ending.signal.removeEventListener("abort", stop);
   }
 }
