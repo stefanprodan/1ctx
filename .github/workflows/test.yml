@@ -86,3 +86,30 @@ jobs:
         run: |
           expected="v$(bun -e 'console.log(require("./package.json").version)')"
           make image-smoke VERSION="$expected"
+      - name: Check Docker Compose files
+        env:
+          ONECTX_VERSION: dev
+        run: |
+          docker compose -f deploy/docker/compose.yaml config --quiet
+          docker compose -f deploy/docker/compose.yaml \
+            -f deploy/docker/compose.dev.yaml config --quiet
+      # flux-schema renders charts with Helm 4
+      - name: Setup Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - name: Lint Helm chart
+        run: helm lint --strict deploy/charts/1ctx
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@b9c17924adb533d3617ec7de97a7b0f4acc07b39 # v2.9.6
+        with:
+          version: 2.9.6
+          plugins: |
+            schema@0.15.0
+      - name: Validate Kubernetes manifests
+        uses: fluxcd/flux-schema/actions/validate@fac00ee3cb2fb0bd904c77e9e7727e98ba8a3c05 # v0.15.0
+        with:
+          path: deploy
+          exclude: |
+            deploy/docker
+          helm-charts: "true"

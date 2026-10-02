@@ -139,6 +139,10 @@ Flux. Its README holds the values; these are the rules.
   runs `make lint` and `make vendor-test`. Only the Linux job runs the
   test files in parallel and `make image-smoke` for amd64. Nothing in CI
   runs the arm64 image; it is smoke-tested by hand on an arm64 machine.
+- **The Linux job checks `deploy/`.** It runs `docker compose config` on
+  both Compose files, `helm lint --strict` on the chart, and `flux-schema`
+  on the chart's default render and `deploy/flux/`, CEL rules included.
+  Helm is set up at 4, which `flux-schema` needs.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a
