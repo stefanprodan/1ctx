@@ -79,7 +79,7 @@ import {
   PosixFatalError,
   ReturnError,
 } from "./errors.js";
-import { expandWord, expandWordWithGlob } from "./expansion.js";
+import { expandWordWithGlob } from "./expansion.js"; // (1ctx argv-command-word)
 import { advanceFd } from "./fd-table.js";
 import { executeFunctionDef } from "./functions.js";
 import { failure, OK, result, testResult } from "./helpers/result.js";
@@ -774,7 +774,10 @@ export class Interpreter {
       }
     }
 
-    let commandName = await expandWord(this.ctx, node.name);
+    // (1ctx argv-command-word) The command word splits and globs as an
+    // argument does: its first word is the command, the rest lead the args.
+    const nameWords = await expandWordWithGlob(this.ctx, node.name);
+    let commandName = nameWords.values[0] ?? "";
 
     const args: string[] = [];
     const quotedArgs: boolean[] = [];
@@ -841,6 +844,10 @@ export class Interpreter {
         }
       }
     } else {
+      // (1ctx argv-command-word)
+      for (const value of nameWords.values.slice(1)) {
+        appendArgument(value, nameWords.quoted);
+      }
       // Expand args even if command name is empty (they may have side effects)
       for (const arg of node.args) {
         const expanded = await expandWordWithGlob(this.ctx, arg);
@@ -850,13 +857,9 @@ export class Interpreter {
       }
     }
 
-    const commandIsOnlyExpansions = node.name.parts.every(
-      (part) =>
-        part.type === "CommandSubstitution" ||
-        part.type === "ParameterExpansion" ||
-        part.type === "ArithmeticExpansion",
-    );
-    if (!commandName && commandIsOnlyExpansions && args.length > 0) {
+    // (1ctx argv-command-word) No word at all, not an empty one.
+    const commandIsOnlyExpansions = nameWords.values.length === 0;
+    if (commandIsOnlyExpansions && args.length > 0) {
       commandName = args.shift() as string;
       quotedArgs.shift();
     }

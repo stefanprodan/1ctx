@@ -123,6 +123,21 @@ Before: upstream answered those with its browser bundle's words, "not
 available in browser environments ... use the Node.js bundle", and
 models went looking for `node`.
 
+### argv-command-word: the command word splits and globs as an argument
+Files: `src/interpreter/interpreter.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`
+
+Now: the command word is expanded as an argument is, split on `IFS`,
+brace-expanded and globbed; its first word is the command and the rest
+lead the arguments. `"$@"` or `"${a[@]}"` with nothing in it gives no
+word, so the next word is the command, or nothing runs and the status
+is 0; a quoted empty word is still `: command not found`.
+
+Before: the command word was one string, so a wrapper such as
+`f(){ "$@"; }; f echo a b` said `echo a b: command not found`, as did
+`x="echo hi"; $x`, and an empty `"$@"` was not found, 127.
+
 ### exec-env: a command another command runs gets the exported variables
 Files: `src/Bash.ts`, `src/commands/env/env.ts`,
   `src/commands/bash/bash.ts`, `src/commands/time/time.ts`,
