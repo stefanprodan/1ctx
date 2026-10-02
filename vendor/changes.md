@@ -867,6 +867,58 @@ Before:
   rg, grep, the glob walks and the identity checks did not reproduce a
   leak, so their settle is defensive.
 
+### find-exec: -exec, -delete and -name as GNU find
+Files: `src/commands/find/find.ts`, `src/commands/find/matcher.ts`,
+  `src/commands/find/parser.ts`, `scripts/find-record.ts`,
+  `scripts/record-cases.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/find-gnu.test.ts`,
+  `test/vendor/just-bash/symlinks.test.ts`
+
+Now:
+
+- **The live walk.** an expression with `-exec ;` or `-delete` walks
+  one entry at a time and runs each action when evaluation reaches it,
+  as GNU findutils 4.11 does: `-exec ;` is true when its command exits
+  0 and never changes find's exit, `-delete` is false when it fails, and
+  `-empty` reads a folder when reached, so `-empty -delete` removes the
+  folders it emptied. An entry is stat'ed on arrival and a folder again
+  right before it is read, after any command ran: one removed is `No
+  such file or directory` and one swapped for a link `Not a directory`,
+  exit 1, and neither is read. `-delete` removes by the type it met and
+  refuses an entry whose folder's real path changed since the read.
+  Every other expression keeps the batched walk.
+- **-exec.** `{}` is replaced inside a larger argument too, with no
+  shell reading; `+` ends the command only right after `{}`, and an
+  argument holding `{}` more than once with `+` is GNU's error. A
+  failed `+` batch is exit 1.
+- **-name.** a backslash escapes, through the same compiler as `-path`.
+- **The small gaps.** `-mindepth` leaves `-prune` unevaluated above it;
+  without `-empty` the whole expression decides `-prune` before the
+  read; `''` and `file/` fail as GNU's; a missing starting point keeps
+  its slash in messages and in what is printed (`find d/` prints `d/`);
+  `-newer` with a missing reference fails before the walk;
+  an unknown predicate is quoted `` `-x' ``.
+- **The recorder.** a fixture may record stderr and the tree a run
+  leaves, which the find fixture compares.
+
+Before:
+
+- **The live walk.** every action ran after the walk: `-exec ;` was
+  always true and passed its command's exit on as find's, a failed
+  `-delete` was true, and `-empty -delete` left the folders it emptied.
+  A first draft that ran actions in order trusted a folder's type from
+  before a command ran, so a command that swapped a folder for a link
+  sent the walk, and `-delete`, outside the root.
+- **-exec.** `-exec mv {} {}.bak ;` made a literal `{}.bak`, and any
+  `+` ended the command.
+- **-name.** `-name '*\.ts'` matched nothing.
+- **The small gaps.** `-mindepth 2 -prune` printed nothing; `find ''`
+  walked the current folder; `find file/` printed the file; `-newer`
+  with a missing reference was silent; one extra folder read for a
+  prune whose left side held an action or metadata test.
+- **The recorder.** it compared stdout and changed files only.
+
 ## grep
 
 ### grep: grep's options, BRE, ERE and -P as GNU grep 3.12

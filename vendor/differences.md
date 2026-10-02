@@ -267,22 +267,19 @@ and `-t` lines the fixture does not compare. Where they part:
 
 ## Where our find still differs from GNU find
 
-`test/vendor/just-bash/find-diagnostics.test.ts`,
+`test/fixtures/just-bash/find-gnu.json`, recorded by
+`scripts/find-record.ts`, `test/vendor/just-bash/find-diagnostics.test.ts`,
 `find-path.test.ts` and `find-prune.test.ts` hold our find to what GNU
 findutils 4.11.0 answered. Where they part:
 
+- A folder's entries come in name order; GNU's in the order the file
+  system reads them. The fixture compares such cases sorted.
 - `-size` reads a folder's size as 0, where GNU reads the size the
   file system gives it.
-- `-prune` with `-mindepth` prunes a folder above the minimum depth,
-  where GNU does not evaluate the expression there:
-  `find . -mindepth 2 -prune` prints nothing, GNU what is at depth 2.
-- A missing starting point loses its trailing slash in the message
-  (`find: 'nope': No such file or directory` for `nope/`).
-- `find ''` walks the current folder, printing an empty line and each
-  path with a leading `/`, where GNU says `No such file or directory`.
-- `find file/` prints the file, where GNU says `Not a directory`.
-- `-newer` with a missing reference file is silent, exit 0; GNU fails.
-- An unknown predicate is quoted `'-x'`, where GNU writes `` `-x' ``.
+- `-delete` removes by path. When a command moved the folder an entry
+  was read from, ours refuses it, `No such file or directory`, where
+  GNU removes it from the folder it read, wherever that went.
+- `-execdir`, `-ok`, `-okdir` and `-quit` are unknown predicates.
 - The reads for `-empty` are planned from its presence anywhere in the
   expression, not from whether evaluation reaches it, so an unreadable
   folder can be reported where a short circuit or `-maxdepth` keeps GNU

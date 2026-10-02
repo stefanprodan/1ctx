@@ -99,13 +99,21 @@
 (fail) file gzip > should report gzip compressed data for an archive member
 (fail) file gzip > should report the gzip MIME type with -i
 (fail) file gzip > should still consult file-type when the compression method is not deflate
+(fail) find -exec > -exec command {} ; > should propagate command exit codes
+(fail) find actions > -delete > should delete empty directories
+(fail) find actions > -delete > should not delete non-empty directories
 (fail) find basic > multiple search paths > should handle non-existent paths gracefully
 (fail) find basic > should return error for non-existent path
+(fail) find basic > unknown option handling > should error on unknown long option
+(fail) find basic > unknown option handling > should error on unknown predicate
+(fail) find fail-closed parsing > rejects find /dir -exec \; before side effects
+(fail) find fail-closed parsing > rejects find /dir -exec echo + before side effects
 (fail) find over an unreadable directory > does not call a directory it could not read empty
 (fail) find over an unreadable directory > keeps that order under -depth
 (fail) find over an unreadable directory > names the directory it could not read and keeps going
 (fail) find over an unreadable directory > reports a directory below -mindepth all the same
 (fail) find over an unreadable directory > reports every unreadable directory in traversal order
+(fail) find predicates > -newer FILE > should return nothing when reference file does not exist
 (fail) fromBuffer without Buffer (browser fallback) > base64 matches Node output across chunk boundaries
 (fail) fromBuffer without Buffer (browser fallback) > base64 never passes more than 8192 arguments to String.fromCharCode
 (fail) fromBuffer without Buffer (browser fallback) > binary matches Node output across chunk boundaries
