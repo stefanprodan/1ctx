@@ -4142,6 +4142,209 @@
       "stdout": "",
       "exit": 2,
       "stderr": true
+    },
+    {
+      "name": "longest: match takes the longer alternative",
+      "args": [
+        "BEGIN { match(\"foobar\", /foo|foobar/); print RSTART, RLENGTH }"
+      ],
+      "stdout": "1 6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: match takes the longer of a group",
+      "args": [
+        "BEGIN { match(\"xabcabc\", /(abc|abcabc)/); print RSTART, RLENGTH }"
+      ],
+      "stdout": "2 6\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: match with a star after an alternative",
+      "args": [
+        "BEGIN { match(\"aaab\", /a|a*b/); print RSTART, RLENGTH }"
+      ],
+      "stdout": "1 4\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: sub replaces the longest match",
+      "args": [
+        "BEGIN { s = \"foobar\"; sub(/foo|foobar/, \"X\", s); print s }"
+      ],
+      "stdout": "X\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: gsub replaces each longest match",
+      "args": [
+        "BEGIN { s = \"abab ab\"; gsub(/ab|abab/, \"X\", s); print s }"
+      ],
+      "stdout": "X X\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: split on the longest separator",
+      "args": [
+        "BEGIN { n = split(\"a12b\", p, /1|12/); print n, p[1], p[2] }"
+      ],
+      "stdout": "2 a b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: a field separator takes the longest",
+      "args": [
+        "BEGIN { FS = \"1|12\" } { print NF, $2 }"
+      ],
+      "stdin": "a12b\n",
+      "stdout": "2 b\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "longest: ~ is unaffected",
+      "args": [
+        "BEGIN { print (\"foobar\" ~ /foo|foobar/) }"
+      ],
+      "stdout": "1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: match takes the shortest with *?",
+      "args": [
+        "BEGIN { print match(\"a<b>c<d>\", /<.*?>/), RLENGTH }"
+      ],
+      "stdout": "2 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: gsub with +? removes each tag",
+      "args": [
+        "BEGIN { s = \"a<b>c<d>\"; n = gsub(/<.+?>/, \"\", s); print n, s }"
+      ],
+      "stdout": "2 ac\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: ?? and intervals with ?",
+      "args": [
+        "BEGIN { print match(\"xa\", /xa??/), RLENGTH, match(\"xaaaa\", /xa{2,3}?/), RLENGTH, match(\"xaaaa\", /xa{2,}?/), RLENGTH, match(\"xaaa\", /xa{2}?/), RLENGTH }"
+      ],
+      "stdout": "1 1 1 3 1 3 1 3\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: a lazy part stops where the rest matches",
+      "args": [
+        "BEGIN { print match(\"afoobfoo\", /.*?foo/), RLENGTH, match(\"aaab\", /a*?b/), RLENGTH }"
+      ],
+      "stdout": "1 4 1 4\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: a greedy part after a lazy one",
+      "args": [
+        "BEGIN { print match(\"aabb\", /a*?b*/), RLENGTH, match(\"aabb\", /a+?b*/), RLENGTH }"
+      ],
+      "stdout": "1 0 1 1\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: gensub keeps the shortest group",
+      "args": [
+        "BEGIN { s = \"k=\\\"a\\\" j=\\\"b\\\"\"; print gensub(/\"(.*?)\"/, \"<\\\\1>\", \"g\", s) }"
+      ],
+      "stdout": "k=<a> j=<b>\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: split on a lazy separator",
+      "args": [
+        "BEGIN { n = split(\"a<b>c<d>e\", p, /<.*?>/); print n, p[1], p[2], p[3] }"
+      ],
+      "stdout": "3 a c e\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: a lazy field separator",
+      "args": [
+        "-F",
+        "<.*?>",
+        "{ print NF, $1, $2, $3 }"
+      ],
+      "stdin": "a<b>c<d>e\n",
+      "stdout": "3 a c e\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: a lazy record separator",
+      "args": [
+        "BEGIN { RS = \"<.*?>\" } { print NR \": \" $0, RT }"
+      ],
+      "stdin": "a<b>c<d>e<f>",
+      "stdout": "1: a <b>\n2: c <d>\n3: e <f>\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: gsub with a*? and a+?",
+      "args": [
+        "BEGIN { s = \"aaa\"; t = s; print gsub(/a*?/, \"-\", s), s, gsub(/a+?/, \"-\", t), t }"
+      ],
+      "stdout": "4 -a-a-a- 3 ---\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "lazy: escaped and bracketed ? stay literal",
+      "args": [
+        "BEGIN { s = \"a*?b\"; t = s; print gsub(/\\*\\?/, \"_\", s), s, gsub(/[*]?/, \"_\", t), t }"
+      ],
+      "stdout": "1 a_b 4 _a_?_b_\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "empty match: none right after a match",
+      "args": [
+        "BEGIN { s = \"abc\"; t = s; u = s; print gsub(/b*|c/, \"[&]\", s), s, gsub(/b*/, \"[&]\", t), t, gensub(/b*|c/, \"[&]\", \"g\", u) }"
+      ],
+      "stdout": "3 []a[b][c] 3 []a[b]c[] []a[b][c]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "empty match: lazy and right after a match",
+      "args": [
+        "BEGIN { s = \"abbc\"; print gsub(/b*?c?/, \"[&]\", s), s }"
+      ],
+      "stdout": "4 []a[]b[]b[c]\n",
+      "exit": 0,
+      "stderr": false
+    },
+    {
+      "name": "empty match: gensub's numbered form counts each",
+      "args": [
+        "BEGIN { s = \"abc\"; for (i = 1; i <= 4; i++) print i, gensub(/b*/, \"[&]\", i, s), gensub(/b*|c/, \"[&]\", i, s) }"
+      ],
+      "stdout": "1 []abc []abc\n2 a[b]c a[b]c\n3 ab[]c ab[c]\n4 abc[] abc[]\n",
+      "exit": 0,
+      "stderr": false
     }
   ]
 }

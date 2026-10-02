@@ -468,6 +468,7 @@ Files: `src/commands/awk/awk2.ts`, `src/commands/awk/ast.ts`,
   `src/commands/awk/check.ts` (new), `src/commands/awk/format.ts` (new),
   `src/commands/awk/lexer.ts`, `src/commands/awk/options.ts` (new),
   `src/commands/awk/parser2.ts`, `src/commands/awk/parser2-print.ts`,
+  `src/commands/awk/regex.ts` (new),
   `src/commands/awk/interpreter/context.ts`,
   `src/commands/awk/interpreter/expressions.ts`,
   `src/commands/awk/interpreter/fields.ts`,
@@ -602,6 +603,14 @@ Now:
   and a BOM survives, except through a link, which keeps the read and
   rewrite. The output's UTF-8 length is kept as it grows, for `printf`'s
   limit.
+- **Longest match.** `match`, `sub`, `gsub`, `gensub`, `split`, a regex
+  `FS` and a regex `RS` take the leftmost-longest match, as POSIX awk
+  does: `match("foobar", /foo|foobar/)` sets `RLENGTH` 6. A pattern with
+  a shortest-match operator (`*?`, `+?`, `??`, `{n,m}?`, POSIX 2024's,
+  which gawk 5.4 reads) matches leftmost-first instead, so
+  `match("a<b>c<d>", /<.*?>/)` sets `RLENGTH` 3. `sub`, `gsub` and
+  `gensub`'s `"g"` skip an empty match right where a match ended, as
+  gawk: `gsub(/b*|c/, "[&]")` on `abc` gives `[]a[b][c]`.
 
 Before:
 
@@ -653,6 +662,12 @@ Before:
 - **Output files.** each `print > f` re-read and re-wrote the whole
   file, a failed append replaced the file with its text, and each
   `printf` measured the whole output, so 10k lines took over a second.
+- **Longest match.** every one took the first alternative that matched,
+  as JavaScript does: `match("foobar", /foo|foobar/)` set `RLENGTH` 3
+  and `sub(/foo|foobar/, "X")` left `bar`. Taking the longest everywhere
+  then ignored `*?`, which models write out of PCRE habit:
+  `gsub(/<.+?>/, "")` on `a<b>c<d>` left `a` where gawk leaves `ac`. An
+  empty match after a match was replaced too, `[]a[b][c][]`.
 
 ## curl
 

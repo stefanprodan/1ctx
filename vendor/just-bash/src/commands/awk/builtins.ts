@@ -8,9 +8,12 @@ import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { utf8ByteLength } from "../../encoding.js";
 import { rethrowFatalExecutionError } from "../../fatal-execution-error.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
-import { createUserRegex, type UserRegex } from "../../regex/index.js";
+import type { UserRegex } from "../../regex/index.js";
 import type { AwkExpr } from "./ast.js";
 import { chars, charLength, charSlice, charsBefore } from "./chars.js";
+// (1ctx awk) the matching functions match as gawk: leftmost-longest, or
+// leftmost-first when the pattern has a shortest-match operator
+import { awkRegex } from "./regex.js";
 import { DEFAULT_AWK_STRING_LIMIT, formatPrintf } from "./format.js";
 import type { AwkRuntimeContext } from "./interpreter/context.js";
 import {
@@ -73,13 +76,20 @@ function boundedRegexReplace(
   shouldReplace: (matchNumber: number) => boolean,
   replacer: (match: RegExpMatchArray) => string,
   maxBytes: number,
+  numbered = false,
 ): { value: string; replacements: number } {
   const output = createAwkStringBuilder(maxBytes);
   let cursor = 0;
   let matchNumber = 0;
   let replacements = 0;
+  let lastEnd = -1;
   for (const match of regex.matchAll(target)) {
     const index = match.index ?? 0;
+    // (1ctx awk) as gawk, no empty match right where a match ended:
+    // gsub(/b*|c/, "[&]") on abc is []a[b][c]; gensub's numbered form
+    // counts it
+    if (!numbered && match[0] === "" && index === lastEnd) continue;
+    lastEnd = index + match[0].length;
     matchNumber++;
     output.append(target.slice(cursor, index));
     if (shouldReplace(matchNumber)) {
@@ -287,7 +297,7 @@ async function awkSplit(
     const sepExpr = args[2];
     sep =
       sepExpr.type === "regex"
-        ? { kind: "regex", regex: createUserRegex(sepExpr.pattern) }
+        ? { kind: "regex", regex: awkRegex(sepExpr.pattern) }
         : compileSeparator(
             toAwkString(await evaluator.evalExpr(sepExpr), ctx.CONVFMT),
           );
@@ -480,7 +490,7 @@ async function awkSub(
   const text = getTargetValue(target, ctx);
 
   try {
-    const regex = createUserRegex(pattern, "g");
+    const regex = awkRegex(pattern, "g");
     const replaced = boundedRegexReplace(
       text,
       regex,
@@ -512,7 +522,7 @@ async function awkGsub(
   const text = getTargetValue(target, ctx);
 
   try {
-    const regex = createUserRegex(pattern, "g");
+    const regex = awkRegex(pattern, "g");
     const replaced = boundedRegexReplace(
       text,
       regex,
@@ -596,7 +606,7 @@ async function awkMatch(
   // array error is not
   let regex: UserRegex | undefined;
   try {
-    regex = createUserRegex(pattern);
+    regex = awkRegex(pattern);
   } catch (e) {
     if (!(e instanceof SyntaxError)) throw e;
   }
@@ -658,7 +668,7 @@ async function awkGensub(
     const occurrenceNum = isGlobal ? 0 : parseInt(how, 10) || 1;
 
     if (isGlobal) {
-      const regex = createUserRegex(pattern, "g");
+      const regex = awkRegex(pattern, "g");
       return boundedRegexReplace(
         target,
         regex,
@@ -673,7 +683,7 @@ async function awkGensub(
         awkStringLimit(ctx),
       ).value;
     } else {
-      const regex = createUserRegex(pattern, "g");
+      const regex = awkRegex(pattern, "g");
       return boundedRegexReplace(
         target,
         regex,
@@ -686,6 +696,7 @@ async function awkGensub(
             awkStringLimit(ctx),
           ),
         awkStringLimit(ctx),
+        true,
       ).value;
     }
   } catch (error) {

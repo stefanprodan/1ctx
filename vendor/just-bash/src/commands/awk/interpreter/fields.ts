@@ -5,8 +5,9 @@
  */
 
 import { ExecutionLimitError } from "../../../interpreter/errors.js";
-import { createUserRegex, type UserRegex } from "../../../regex/index.js";
+import type { UserRegex } from "../../../regex/index.js";
 import { chars } from "../chars.js";
+import { awkRegex } from "../regex.js";
 import type { AwkRuntimeContext } from "./context.js";
 import { toStr } from "./type-coercion.js";
 import type { AwkValue } from "./types.js";
@@ -28,7 +29,8 @@ export function compileSeparator(fs: string): FieldSeparator {
   if (fs === " ") return SPACE_SEPARATOR;
   if (fs === "") return { kind: "chars" };
   if (fs.length === 1) return { kind: "char", char: fs };
-  return { kind: "regex", regex: createUserRegex(fs) };
+  // (1ctx awk) a field separator matches as match() does
+  return { kind: "regex", regex: awkRegex(fs) };
 }
 
 /**

@@ -140,6 +140,10 @@ they part:
 
 - An `RS` that can match the empty string (`X*`) is refused; gawk's
   records for one are erratic.
+- A regex with a shortest-match operator (`*?`, `+?`, `??`, `{n,m}?`)
+  matches as Perl does, taking the first alternative that matches, where
+  gawk's MinRX still takes the longest one: `match("bb", /a*?(b|bb)/)`
+  sets `RLENGTH` 1, gawk 2. RE2 has no mode that does both.
 - `BEGINFILE`, `ENDFILE`, `PROCINFO`, `IGNORECASE`, `FPAT`,
   `FIELDWIDTHS`, `@include`, `@load`, `@namespace` and `|&` are refused;
   a call to a gawk builtin we lack (`strtonum`, `typeof`, `isarray`,
