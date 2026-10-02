@@ -231,6 +231,8 @@ fixture under `test/fixtures/structure/`.
   (a signal, `globalThis.fetch`) or counts bus events is `test.serial`.
   Linux CI runs the files in parallel, each in a fresh global, so a
   test sets what it reads itself. Local runs take the files one by one.
+  A test's clock counts its neighbours' work, so the default timeout
+  is 20 s.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - **UI copy is short and plain.** No em-dashes anywhere. A send (one
