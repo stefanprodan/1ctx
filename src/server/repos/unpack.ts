@@ -108,13 +108,13 @@ export type JobIo = {
   signal?: AbortSignal;
 };
 
-// a member the volume cannot hold beside another, as a case-insensitive
-// or normalizing one: dropped, never a failed fetch
+// a name the volume cannot hold, beside another (folded by case or
+// normalizing) or at all (its length or encoding): dropped, never failed
 class Dropped extends Error {}
 
 const clash = (error: unknown) =>
   error instanceof Dropped ||
-  ["EEXIST", "ENOTDIR"].includes(
+  ["EEXIST", "ENOTDIR", "ENAMETOOLONG", "EILSEQ"].includes(
     (error as NodeJS.ErrnoException | null)?.code ?? "",
   );
 

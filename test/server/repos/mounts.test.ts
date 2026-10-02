@@ -750,3 +750,39 @@ test("a fetch that ends after its row changed leaves the row alone", async () =>
     commit: NEXT_COMMIT,
   });
 });
+
+test("a tree over the caps for one signer is over them for another", async () => {
+  let refuse = () => {};
+  const refused = new Promise<void>((resolve) => {
+    refuse = resolve;
+  });
+  const answers: Record<string, HostAnswer> = {
+    [`${API}commits/main`]: new Response(COMMIT),
+    [`${API}tarball/${COMMIT}`]: async () => {
+      await refused;
+      return tarResponse(tree(COMMIT, 20));
+    },
+  };
+  const { repos, host, add, keys } = setup({
+    answers,
+    limits: { repoFiles: 5 },
+  });
+  keys["http-a"] = "key-a";
+  keys["http-b"] = "key-b";
+  add("p1", { ref: "main", keyName: "http-a" });
+  const b = add("p2", { ref: "main", keyName: "http-b" });
+  expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
+    "fetching",
+  );
+  const second = repos.prepare("p2", { waitMs: 5_000 });
+  await Bun.sleep(5);
+  refuse();
+  expect((await second).notices).toEqual([
+    { repoId: b.id, name: "widgets", reason: "over the size cap" },
+  ]);
+  expect(
+    host.calls
+      .filter((call) => call.url === `${API}tarball/${COMMIT}`)
+      .map((call) => call.headers.authorization),
+  ).toEqual(["Bearer key-a"]);
+});

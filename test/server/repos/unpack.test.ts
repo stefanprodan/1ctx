@@ -495,6 +495,16 @@ test("names one volume cannot hold apart are dropped, not a failed fetch", async
   expect(readFileSync(join(files, "README"), "utf8")).toBe("upper");
 });
 
+test("a folder name the volume cannot hold is dropped, not a failed fetch", async () => {
+  const long = "d".repeat(300);
+  const { result, files } = await run([
+    { name: `${long}/f`, body: "x" },
+    { name: "kept", body: "y" },
+  ]);
+  expect(result).toMatchObject({ ok: true, meta: { files: 1, dropped: 1 } });
+  expect(readdirSync(files)).toEqual(["kept"]);
+});
+
 test("a link to its own folder or the one above is kept", async () => {
   const { result, files } = await run([
     { name: "a/f", body: "x" },

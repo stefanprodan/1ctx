@@ -83,10 +83,9 @@ may call them are in `docs/access.md`.
 - **One lookup per repository a minute** (`REPO_LOOKUP_MS`), shared by
   kind, URL, ref and key: two projects whose admin named one key share
   it. Never shared between a signed and an unsigned lookup, nor between
-  two kinds' endpoints. A failure is
-  shared the same minute, and the cache never mounts a tree past a
-  failed lookup. A refresh or a change to
-  what is fetched drops the repository's lookup.
+  two kinds' endpoints. A failure is shared the same minute, and the
+  cache never mounts a tree past a failed lookup. A refresh or a change
+  to what is fetched drops the repository's lookup.
 - **Signed: the API.** `repoAuth()`, then the adapter's lookup with
   the last ETag; a 304 keeps the row's commit. The tarball then comes
   from the API at that commit. A renamed or moved private GitHub
@@ -123,15 +122,17 @@ may call them are in `docs/access.md`.
   `prepare()` itself takes no slot, so a caller holding one cannot
   deadlock it; a fetch waiting for a slot is past the turn's wait.
   Another signer's turn joins the fetch for its tree, which its own
-  lookup proved, and on a failure fetches with its own key. A
-  job waits at most `REPO_SLOT_WAIT_MS`, and its deadline starts again
-  at the go. A slot granted after its job ended is given back.
+  lookup proved, and takes its tree or `over the size cap`; on any
+  other failure it fetches once with its own key. A job waits at most
+  `REPO_SLOT_WAIT_MS`, and its deadline starts again at the go. A slot
+  granted after its job ended is given back.
 - **A tree that failed is not unpacked again** for a minute, one over
   the caps for `REPO_REFUSED_MS`, until a refresh. It is remembered per
-  key, so one signer's failure is never another's or an unsigned one's,
-  and a job that ended waiting for its slots is not remembered. A
-  public lookup that names such a commit, or one being fetched, stops
-  at the commit.
+  key, so a remembered failure is never another signer's or an
+  unsigned one's (only a running fetch's `over the size cap` is handed
+  on, above), and a job that ended waiting for its slots is not
+  remembered. A public lookup that names such a commit, or one being
+  fetched, stops at the commit.
 - **The row follows the fetch:** `pending`, `fetching` while one runs,
   `ready` or `failed` with its word. A create, a refresh and a change
   to what is fetched start a lookup and a fetch at once, so the admin
@@ -155,9 +156,9 @@ may call them are in `docs/access.md`.
   `.`, `..` or empty segment, no backslash or control character. A bad
   name, a duplicate or a member under a file or a link fails the fetch.
   A name the volume cannot hold beside another (`README` and `readme`,
-  or the folders `Docs` and `docs`, on a case-insensitive one) is
-  dropped and counted, a folder with every member under it, never
-  merged.
+  or the folders `Docs` and `docs`, on a case-insensitive one), or at
+  all (past its name length or encoding), is dropped and counted, a
+  folder with every member under it, never merged.
 - **The commit is the first member's pax `comment=`,** 40 or 64 hex.
   When the job knows the commit, a different one fails it `not found`.
 - **Files keep their mode with the owner's read bit,** and every file
@@ -195,8 +196,8 @@ may call them are in `docs/access.md`.
   at once and removed in the background. A mounted folder is held until
   its turn releases it. A fetch first checks the volume (`statfs`) for
   `repoBytes`, a block per `repoFiles` and 1 GiB free, else `cache
-  full`, then evicts. The
-  hourly sweep evicts and clears what a job left in `tmp/`.
+  full`, then evicts. The hourly sweep evicts and clears what a job
+  left in `tmp/`.
 
 ## The port
 

@@ -88,9 +88,13 @@ export async function loadRepos(projectId: string): Promise<void> {
     setError(projectId, null);
   } catch (err) {
     if (owner !== forUser || turns.get(projectId) !== mine) return;
-    // rows the server no longer answers for are never left to act on
-    setList(projectId, null);
-    setError(projectId, failure(err));
+    const failed = failure(err);
+    // rows the server no longer answers for are never left to act on; a
+    // network or server failure keeps them, and the poll reads again
+    if (failed.status === 403 || failed.status === 404) {
+      setList(projectId, null);
+    }
+    setError(projectId, failed);
   }
 }
 
@@ -100,8 +104,13 @@ const byName = (a: RepoView, b: RepoView) =>
 // a write's answer lands over any load out, which may predate it
 function keep(projectId: string, repo: RepoView, forUser: string | null) {
   if (owner !== forUser) return;
+  const list = reposOf(projectId);
+  // one row is not the list: read the whole
+  if (list === null) {
+    void loadRepos(projectId);
+    return;
+  }
   turnOf(projectId);
-  const list = reposOf(projectId) ?? [];
   setList(
     projectId,
     [...list.filter((r) => r.id !== repo.id), repo].sort(byName),
@@ -182,9 +191,10 @@ export async function deleteRepo(target: RepoTarget, id: string) {
 }
 
 // while mounted: the list reads again every REPO_POLL_MS, only while a
-// row waits or fetches and the tab is seen, since no frame says a fetch
-// ended. A tick while a read is out skips, so a slow server never has
-// each answer superseded by the next poll's
+// row waits or fetches, or the last read of a held list failed, and the
+// tab is seen, since no frame says a fetch ended. A tick while a read
+// is out skips, so a slow server never has each answer superseded by
+// the next poll's
 export function watchRepos(
   projectId: string,
   tab: PollDriver = browserTab,
@@ -199,7 +209,9 @@ export function watchRepos(
     });
   };
   const stopEffect = effect(() => {
-    const busy = unsettled(reposOf(projectId));
+    const list = reposOf(projectId);
+    const busy =
+      unsettled(list) || (list !== null && repoErrorOf(projectId) !== null);
     if (busy && stopPoll === null) {
       stopPoll = pollWhileSeen(REPO_POLL_MS, read, tab);
     } else if (!busy && stopPoll !== null) {

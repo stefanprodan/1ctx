@@ -74,6 +74,17 @@ test("startup clears tmp/, indexes every tree and drops a folder with no tree.js
   expect(again.get("s1", COMMIT, "k")?.meta.disk).toBe(100);
 });
 
+test("startup drops a tree whose tree.json has no size on disk", () => {
+  const { dir } = setup();
+  const folder = join(dir, "trees", "s1", `${COMMIT}-k`);
+  mkdirSync(join(folder, "files"), { recursive: true });
+  const { disk: _disk, ...old } = meta(COMMIT, 100);
+  writeFileSync(join(folder, "tree.json"), JSON.stringify(old));
+  const again = new RepoCache(dir, () => Date.now());
+  expect(again.start()).toEqual({ trees: 0, bytes: 0 });
+  expect(existsSync(folder)).toBe(false);
+});
+
 test("eviction takes the least recently read and never a held folder", () => {
   const { cache, publish, tick } = setup();
   const old = publish("s1", COMMIT, 100);

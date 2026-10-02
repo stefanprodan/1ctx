@@ -158,6 +158,7 @@ export function RepoRows({
   const opened = edit ? openOf(open.value, list) : null;
   return (
     <>
+      {error !== null && <RowsFailed failure={error} />}
       {opened === "new" && (
         <RowsNew>
           <RepoForm target={target} row={null} onClose={close} />

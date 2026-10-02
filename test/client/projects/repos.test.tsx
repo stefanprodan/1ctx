@@ -316,6 +316,7 @@ describe("the entity", () => {
       init?.method === "DELETE"
         ? new Response(null, { status: 204 })
         : Response.json({ repo: row });
+    held("p1", []);
     await addRepo(personal, { url: row.url });
     await changeRepo(personal, "r1", { ref: "main" });
     await refreshRepo(personal, "r1");
@@ -338,15 +339,53 @@ describe("the entity", () => {
     expect(reposOf("p2")).toEqual([]);
   });
 
-  test.serial("a failed reload drops the list it held", async () => {
+  test.serial("a reload refused drops the list it held", async () => {
     held("p2", [repo()]);
-    answer = () => Response.json({ error: "gone" }, { status: 500 });
+    answer = () => Response.json({ error: "gone" }, { status: 404 });
     await loadRepos("p2");
     expect(reposOf("p2")).toBeNull();
     expect(repoErrorOf("p2")?.words).toBe("gone");
     const html = render(<Repos projectId="p2" personal={false} />);
     expect(html).toContain("Gone.");
     expect(html).not.toContain("podinfo");
+  });
+
+  test.serial(
+    "a reload that fails for a while keeps the rows and polls",
+    async () => {
+      const tab = pollTab(REPO_POLL_MS);
+      held("p2", [repo({ state: "pending" })]);
+      answer = () => Response.json({ error: "busy" }, { status: 503 });
+      const stop = watchRepos("p2", tab.tab);
+      tab.tick();
+      await settle();
+      expect(reposOf("p2")?.[0]?.state).toBe("pending");
+      expect(repoErrorOf("p2")?.status).toBe(503);
+      const html = render(<Repos projectId="p2" personal={false} />);
+      expect(html).toContain("Busy.");
+      expect(html).toContain("podinfo");
+      // the last read failed, so the next tick reads again even when settled
+      held("p2", [repo()]);
+      answer = () => Response.json({ repos: [repo()] });
+      tab.tick();
+      await settle();
+      expect(calls.length).toBe(2);
+      expect(repoErrorOf("p2")).toBeNull();
+      expect(tab.timers()).toBe(0);
+      stop();
+    },
+  );
+
+  test.serial("a write's answer with no list held reads the list", async () => {
+    const other = repo({ id: "r2", name: "flux2" });
+    answer = (_url, init) =>
+      init?.method === "POST"
+        ? Response.json({ repo: repo() }, { status: 201 })
+        : Response.json({ repos: [repo(), other] });
+    await addRepo(team, { url: repo().url });
+    await settle();
+    expect(reposOf("p2")).toEqual([repo(), other]);
+    expect(calls.map((_, i) => sent(i).method)).toEqual(["POST", "GET"]);
   });
 
   test.serial("a poll waits for its answer before the next", async () => {

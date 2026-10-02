@@ -152,16 +152,22 @@ export class Fetches {
     row: RepoRow,
     commit: string,
     header: RepoHeader | null,
+    // past one wait on another signer's fetch, never a second
+    joined = false,
   ): Promise<Tree> {
     const ignore = ignoreKey(row.ignore);
     const folder = this.deps.cache.folder(sourceOf(row), commit, ignore);
     const running = this.inFlight.get(folder);
-    if (running !== undefined) {
-      if (running.signer === signerOf(row)) return running.tree;
+    if (running?.signer === signerOf(row)) return running.tree;
+    // past one wait on another signer, this one fetches on its own
+    if (running !== undefined && !joined) {
       // another signer's tree is this commit's, which this row's own
-      // lookup proved; its failure says nothing of this signer
+      // lookup proved, and so are its caps; any other failure says
+      // nothing of this signer, who then fetches once on its own
       return running.tree.then((done) =>
-        done.ok ? done : this.byCommit(row, commit, header),
+        done.ok || done.error === "over the size cap"
+          ? done
+          : this.byCommit(row, commit, header, true),
       );
     }
     const refused = this.refusal(folder, row);
