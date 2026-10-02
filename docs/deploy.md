@@ -153,3 +153,6 @@ Flux. Its README holds the values; these are the rules.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.
+- **The release pushes the Helm chart beside the image.** Its version is
+  the tag without the `v` and its `appVersion` the tag, at
+  `oci://ghcr.io/stefanprodan/charts/1ctx`, with provenance attested.
