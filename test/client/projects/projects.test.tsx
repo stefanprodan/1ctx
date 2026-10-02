@@ -689,7 +689,9 @@ describe("the pages", () => {
       expect(html).not.toContain(PUBLIC_HINT);
       expect(html).toContain(">github.com/stefanprodan/podinfo<");
       expect(html).toContain(">default branch<");
-      expect(html).toContain(">Ready at 3f2a1c9, 364 files<");
+      expect(html).toContain(
+        '>Ready at 3f2a1c9</span>, <span class="repos-fact">364 files<',
+      );
       expect(html).not.toContain("Add repository");
       expect(html).not.toContain(">Refresh<");
       expect(html).not.toContain(">Change<");

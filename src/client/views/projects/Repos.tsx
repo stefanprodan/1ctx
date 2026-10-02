@@ -46,6 +46,7 @@ import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { TextField } from "../admin/CredentialFields.tsx";
+import { StateFacts } from "./RepoFacts.tsx";
 import {
   asksKind,
   atCap,
@@ -221,7 +222,7 @@ function RepoLine({
         sub={urlText(repo.url)}
         lines={[
           { text: refWords(repo.ref) },
-          { text: state.text, bad: state.bad },
+          { text: <StateFacts text={state.text} />, bad: state.bad },
         ]}
       />
       {edit && (

@@ -480,15 +480,18 @@ describe("the list", () => {
     // the URL, the ref and the state each take a line, never cut
     const line = (text: string, bad = false) =>
       `<span class="rows-sub rows-sub-wrap${bad ? " rows-bad" : ""}">${text}</span>`;
+    // the state's facts each hold together, so a wrap falls between them
+    const facts = (...parts: string[]) =>
+      parts.map((p) => `<span class="repos-fact">${p}</span>`).join(", ");
     expect(html).toContain(
       line("github.com/stefanprodan/podinfo") +
         line("default branch") +
-        line("Ready at 3f2a1c9, 364 files"),
+        line(facts("Ready at 3f2a1c9", "364 files")),
     );
     expect(html).toContain(
       line("git.corp.dev/fluxcd/flux2") +
         line("v2.4.0") +
-        line("Failed: not found", true),
+        line(facts("Failed: not found"), true),
     );
     expect(html).toContain("Fetching");
     expect(html.match(/>Change</g)).toHaveLength(3);

@@ -1,6 +1,9 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  .repos-fact {
+    white-space: nowrap;
+  }
   .repos-head {
     display: flex;
     justify-content: flex-end;
