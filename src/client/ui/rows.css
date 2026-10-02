@@ -272,6 +272,10 @@
     font-size: var(--text-label);
     color: var(--faint);
   }
+  .rows-sub-wrap {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
   .rows-meta {
     flex-shrink: 1;
     min-width: 0;
@@ -632,6 +636,10 @@
        beside it wraps to its own line */
     .rows-title {
       min-width: min(160px, 100%);
+    }
+    /* details that wrap read best whole width, the end under them */
+    .rows-title:has(> .rows-sub-wrap) {
+      min-width: 100%;
     }
     .rows-line-end > .rows-toggle {
       flex: 1 1 0;

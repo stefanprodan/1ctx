@@ -159,14 +159,14 @@ export const shortCommit = (commit: string) => commit.slice(0, 7);
 // the URL as text, without the scheme every one carries
 export const urlText = (url: string) => url.replace(/^https:\/\//, "");
 
-export type StateWords = { text: string; short: string; bad: boolean };
+export type StateWords = { text: string; bad: boolean };
 
 export function stateWords(repo: RepoView): StateWords {
   switch (repo.state) {
     case "pending":
-      return { text: "Waiting to fetch", short: "Waiting", bad: false };
+      return { text: "Waiting to fetch", bad: false };
     case "fetching":
-      return { text: "Fetching", short: "Fetching", bad: false };
+      return { text: "Fetching", bad: false };
     case "failed": {
       // past a cap the fetch stores what it had seen when it stopped
       const counts =
@@ -179,7 +179,6 @@ export function stateWords(repo: RepoView): StateWords {
       const seen = counts.length > 0 ? ` at ${counts.join(", ")}` : "";
       return {
         text: repo.error === null ? "Failed" : `Failed: ${repo.error}${seen}`,
-        short: "Failed",
         bad: true,
       };
     }
@@ -193,7 +192,7 @@ export function stateWords(repo: RepoView): StateWords {
       if (repo.ignored !== null && repo.ignored > 0) {
         parts.push(`${commas(repo.ignored)} ignored`);
       }
-      return { text: parts.join(", "), short: "Ready", bad: false };
+      return { text: parts.join(", "), bad: false };
     }
   }
 }

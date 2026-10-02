@@ -37,7 +37,6 @@ import {
   RowsFailed,
   RowsLine,
   RowsList,
-  RowsMeta,
   RowsNew,
   RowsNote,
   RowsTitle,
@@ -218,11 +217,13 @@ function RepoLine({
       <RowsTitle
         name={repo.name}
         mono
-        sub={`${urlText(repo.url)} · ${refWords(repo.ref)}`}
+        wrap
+        sub={urlText(repo.url)}
+        lines={[
+          { text: refWords(repo.ref) },
+          { text: state.text, bad: state.bad },
+        ]}
       />
-      <RowsMeta bad={state.bad} short={state.short}>
-        {state.text}
-      </RowsMeta>
       {edit && (
         <RowsEnd error={failed}>
           <button

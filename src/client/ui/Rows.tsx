@@ -369,13 +369,21 @@ export function RowsTitle({
   mono,
   bad,
   subWide,
+  lines,
+  wrap,
 }: {
   name: ComponentChildren;
   sub?: ComponentChildren;
   mono?: boolean;
   bad?: boolean;
   subWide?: boolean;
+  // more lines under the sub, each its own fact
+  lines?: { text: ComponentChildren; bad?: boolean }[];
+  // the sub lines wrap whole rather than ellipsize, for details that
+  // mean nothing cut
+  wrap?: boolean;
 }) {
+  const subClass = `rows-sub${wrap ? " rows-sub-wrap" : ""}`;
   return (
     <span class="rows-title">
       <span class={`rows-name${mono ? " rows-name-mono" : ""}`}>
@@ -385,11 +393,16 @@ export function RowsTitle({
       </span>
       {sub !== undefined && (
         <span
-          class={`rows-sub${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}`}
+          class={`${subClass}${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}`}
         >
           {sub}
         </span>
       )}
+      {lines?.map((line, i) => (
+        <span key={i} class={`${subClass}${line.bad ? " rows-bad" : ""}`}>
+          {line.text}
+        </span>
+      ))}
     </span>
   );
 }

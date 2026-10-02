@@ -150,7 +150,6 @@ describe("the words", () => {
     const failed = stateWords(repo({ state: "failed", error: "no access" }));
     expect(failed).toEqual({
       text: "Failed: no access",
-      short: "Failed",
       bad: true,
     });
     expect(
@@ -476,10 +475,19 @@ describe("the list", () => {
     const html = render(<Repos projectId="p2" personal={false} />);
     expect(html).toContain(">Repositories<");
     expect(html).toContain("Add repository");
-    expect(html).toContain("github.com/stefanprodan/podinfo · default branch");
-    expect(html).toContain("git.corp.dev/fluxcd/flux2 · v2.4.0");
-    expect(html).toContain("Ready at 3f2a1c9, 364 files");
-    expect(html).toContain("Failed: not found");
+    // the URL, the ref and the state each take a line, never cut
+    const line = (text: string, bad = false) =>
+      `<span class="rows-sub rows-sub-wrap${bad ? " rows-bad" : ""}">${text}</span>`;
+    expect(html).toContain(
+      line("github.com/stefanprodan/podinfo") +
+        line("default branch") +
+        line("Ready at 3f2a1c9, 364 files"),
+    );
+    expect(html).toContain(
+      line("git.corp.dev/fluxcd/flux2") +
+        line("v2.4.0") +
+        line("Failed: not found", true),
+    );
     expect(html).toContain("Fetching");
     expect(html.match(/>Change</g)).toHaveLength(3);
     expect(html.match(/>Refresh</g)).toHaveLength(3);
