@@ -167,4 +167,78 @@ describe("command admission", () => {
       }
     },
   );
+  test.serial(
+    "a call that times out waiting for its chat's turn is busy and says to combine steps",
+    async () => {
+      const s = setup();
+      const release = await acquireSession(s.session.id, freshSignal());
+      try {
+        // the registry's own timer, as it ends a call
+        expect(
+          await run(s, "echo no > /tmp/no", callCaps, AbortSignal.timeout(50)),
+        ).toEqual({
+          error: true,
+          content:
+            "command not run: this chat's earlier commands used the 4 s call timeout, combine steps into fewer commands",
+          ended: { phase: "queue", cause: "busy" },
+        });
+        expect(scratchState(s).revision).toBe(0);
+      } finally {
+        release();
+        s.db.close();
+      }
+    },
+  );
+
+  test.serial(
+    "a command that waited and then hit the deadline says how long it had",
+    async () => {
+      const s = setup();
+      const release = await acquireSession(s.session.id, freshSignal());
+      const pending = run(s, "while :; do sleep 0.05; done", {
+        ...callCaps,
+        callTimeoutMs: 2000,
+      });
+      try {
+        await Bun.sleep(1200);
+        release();
+        const result = await pending;
+        expect(result.ended).toEqual({ phase: "run", cause: "deadline" });
+        expect(result.content).toMatch(
+          /^waited \d+ s behind this chat's earlier commands, so the command had \d+ s to run\n/,
+        );
+        expect(result.content).toEndWith("exit 124");
+      } finally {
+        release();
+        await pending;
+        s.db.close();
+      }
+    },
+  );
+  test.serial(
+    "a parallel call whose chat's turn comes at its deadline ends busy unmounted",
+    async () => {
+      const s = setup();
+      const caps = { ...callCaps, callTimeoutMs: 1500 };
+      const first = run(s, "while :; do sleep 0.05; done", caps);
+      const second = run(s, "echo b > /tmp/b", caps);
+      try {
+        expect((await first).ended).toEqual({
+          phase: "run",
+          cause: "deadline",
+        });
+        expect(await second).toEqual({
+          error: true,
+          content:
+            "command not run: this chat's earlier commands used the 2 s call timeout, combine steps into fewer commands",
+          ended: { phase: "queue", cause: "busy" },
+        });
+        expect(s.phases.filter((seen) => seen.phase === "run")).toHaveLength(1);
+        expect(scratchState(s).revision).toBe(0);
+      } finally {
+        await Promise.all([first, second]);
+        s.db.close();
+      }
+    },
+  );
 });

@@ -14,7 +14,8 @@ import type { OpenedRecord } from "./open.ts";
 
 // where a failed command ended, and why, as the tool log counts them
 export type CommandPhase = "queue" | "mount" | "run" | "diff" | "commit";
-export type CommandCause = "deadline" | "abort" | "limit" | "error";
+// busy: the call's deadline passed before the command held its slots
+export type CommandCause = "deadline" | "abort" | "limit" | "error" | "busy";
 export type CommandEnd = { phase: CommandPhase; cause: CommandCause };
 
 // mtime is the stored time of the file's last change, in ms

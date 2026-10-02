@@ -97,6 +97,18 @@ type MountDeps = {
   onPhase?(sessionId: string, phase: "run" | "diff"): void;
 };
 
+const seconds = (ms: number) => Math.round(ms / 1000);
+// less left than this after the queues and the command is not started:
+// a worker barely loads in it
+const MIN_RUN_MS = 100;
+// the call's deadline passed in a queue; neither words invite a retry at
+// once, which would rejoin the queue at its back
+function busy(waitedMs: number, timeoutMs: number, ownChat: boolean) {
+  return ownChat
+    ? `command not run: this chat's earlier commands used the ${seconds(timeoutMs)} s call timeout, combine steps into fewer commands`
+    : `command not run: waited ${seconds(waitedMs)} s for a free slot, the server is busy`;
+}
+
 // what the worker answered, held to the mounted trees: no doc changes
 // with the docs off, a delete names a mounted doc, no name twice, and
 // scratch removes only what it mounted and writes no more files than
@@ -159,19 +171,49 @@ export async function run(
   let phase: CommandPhase = "queue";
   // the worker's word when neither signal fired: a shutdown is an abort
   let ended: CommandCause = "error";
+  // a command that waited for its slots and then ran out of time says
+  // so first, so the model does not read its command as too slow
+  let late = "";
+  // when the chat's turn came; the longer of its wait and the process
+  // slot's names who held the command up
+  let turnAt: number | undefined;
+  const ownChat = (now: number) =>
+    (turnAt ?? now) - started >= now - (turnAt ?? now);
+  const busyResult = (): CommandResult => {
+    const now = Date.now();
+    return {
+      content: notice + busy(now - started, caps.callTimeoutMs, ownChat(now)),
+      error: true,
+      ended: { phase: "queue", cause: "busy" },
+    };
+  };
   const cause = (): CommandCause => {
-    if (deadline.signal.aborted) return "deadline";
-    if (!signal.aborted) return ended;
-    // the tool's own timer ends the call as the deadline does
     const reason = signal.reason;
-    return reason instanceof DOMException && reason.name === "TimeoutError"
-      ? "deadline"
-      : "abort";
+    // the tool's own timer ends the call as the deadline does
+    const timedOut =
+      deadline.signal.aborted ||
+      (signal.aborted &&
+        reason instanceof DOMException &&
+        reason.name === "TimeoutError");
+    if (timedOut) return phase === "queue" ? "busy" : "deadline";
+    return signal.aborted ? "abort" : ended;
   };
   try {
     releaseSession = await acquireSession(sessionId, combined);
+    turnAt = Date.now();
     release = await acquireProcess(combined);
     combined.throwIfAborted();
+    const now = Date.now();
+    const waitedMs = now - started;
+    // the slots came with the call's time spent: running would only end
+    // at once at the deadline
+    if (caps.callTimeoutMs - waitedMs < MIN_RUN_MS) return busyResult();
+    if (waitedMs > 1000) {
+      const behind = ownChat(now)
+        ? "behind this chat's earlier commands"
+        : "for a free slot";
+      late = `waited ${seconds(waitedMs)} s ${behind}, so the command had ${Math.max(0, seconds(caps.callTimeoutMs) - seconds(waitedMs))} s to run\n`;
+    }
     phase = "mount";
     const storage = deps.current();
     const docs = caps.knowledge;
@@ -276,6 +318,7 @@ export async function run(
     combined.throwIfAborted();
     // the exit decides, whatever changes came with it
     if (answer.exitCode === 124 || answer.exitCode === 126) {
+      if (answer.exitCode === 124) notice = late + notice;
       const printed = refused(
         answer.stdout,
         answer.stderr,
@@ -351,6 +394,9 @@ export async function run(
       opened,
     };
   } catch (error) {
+    const why = cause();
+    if (why === "busy") return busyResult();
+    if (why === "deadline") notice = late + notice;
     const cut = caps.resultCut - notice.length;
     const result = answer
       ? refused(answer.stdout, answer.stderr, answer.exitCode, error, cut)
@@ -358,7 +404,7 @@ export async function run(
     return {
       ...result,
       content: notice + result.content,
-      ended: { phase, cause: cause() },
+      ended: { phase, cause: why },
     };
   } finally {
     clearTimeout(timer);

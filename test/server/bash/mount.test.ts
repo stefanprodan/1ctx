@@ -405,7 +405,7 @@ describe("bash command mounts", () => {
   });
 
   test.serial(
-    "at most PROCESS_SLOTS mounts run process-wide; queued commands time out or wait",
+    "at most PROCESS_SLOTS mounts run process-wide; queued commands wait or end busy",
     async () => {
       const first = setup();
       const second = setup();
@@ -437,7 +437,10 @@ describe("bash command mounts", () => {
           second.makeSession().id,
         );
         expect(expired.error).toBe(true);
-        expect(expired.ended).toEqual({ phase: "queue", cause: "deadline" });
+        expect(expired.ended).toEqual({ phase: "queue", cause: "busy" });
+        expect(expired.content).toMatch(
+          /^command not run: waited \d+ s for a free slot, the server is busy$/,
+        );
         expect(finished).toBe(false);
         expect(second.knowledge.list(second.projectId).files).toEqual([]);
         controllers[0]!.abort("free the slot");
