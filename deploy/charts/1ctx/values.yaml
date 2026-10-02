@@ -1,0 +1,89 @@
+image:
+  repository: ghcr.io/stefanprodan/1ctx
+  # empty takes the chart's appVersion
+  tag: ""
+  # sha256:..., referenced instead of the tag when set
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# seconds a stop lets running chats and runs end, 0 to 3600; the pod's
+# grace period is this plus 15
+drain: 10
+
+# take the client address and scheme from the X-Forwarded-* headers of
+# the ingress controller in front
+trustProxy: true
+
+# mark the login cookie Secure, for 1ctx served over TLS
+secureCookie: true
+
+secrets:
+  # the Secret mounted at /secrets, never made by the chart: user-admin.key
+  # and the <kind>-<name>.key files
+  existingSecret: 1ctx
+
+persistence:
+  # the database and the repositories' cache
+  size: 100Gi
+  # empty takes the cluster's default class
+  storageClass: ""
+  # a claim made outside the chart; the chart then renders none
+  existingClaim: ""
+  # keep the claim when the release is removed
+  keep: true
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 8Gi
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls:
+    enabled: false
+    # empty is the objects' name plus -tls
+    secretName: ""
+
+httpRoute:
+  enabled: false
+  # the Gateway API Gateways to attach to, as name, namespace and
+  # sectionName
+  parentRefs: []
+  hostnames: []
+  annotations: {}
+  labels: {}
+
+provision:
+  # a ConfigMap of YAML objects made outside the chart
+  existingConfigMap: ""
+  # file name to YAML text, rendered into the chart's own ConfigMap
+  files: {}
+
+serviceAccount:
+  create: true
+  # empty is the release's name when created, default otherwise
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# appended to the server's flags
+extraArgs: []
