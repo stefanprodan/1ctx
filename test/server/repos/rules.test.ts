@@ -39,17 +39,45 @@ test("the default list is what an empty text applies", () => {
     "*.gif",
     "*.ico",
     "*.webp",
+    "*.bmp",
+    "*.tiff",
+    "*.psd",
     "*.mp4",
     "*.mov",
+    "*.webm",
+    "*.avi",
+    "*.mkv",
     "*.mp3",
+    "*.wav",
+    "*.ogg",
+    "*.flac",
     "*.woff",
     "*.woff2",
     "*.ttf",
+    "*.otf",
+    "*.eot",
     "*.zip",
-    "*.tar.gz",
-    "*.tgz",
     "*.jar",
+    "*.war",
+    "*.7z",
+    "*.rar",
+    "*.exe",
+    "*.dll",
+    "*.so",
+    "*.dylib",
+    "*.a",
+    "*.o",
+    "*.class",
+    "*.pyc",
+    "*.wasm",
+    "*.pdf",
+    "*.sqlite",
+    "*.db",
   ]);
+  // archives bash's tar and zcat open stay in the tree
+  for (const kept of ["*.tar.gz", "*.tgz", "*.gz", "*.tar"]) {
+    expect(DEFAULT_REPO_IGNORE).not.toContain(kept);
+  }
   expect(effectiveIgnore("")).toBe(`${DEFAULT_REPO_IGNORE.join("\n")}\n`);
   expect(effectiveIgnore("  \n\n")).toBe(effectiveIgnore(""));
   expect(effectiveIgnore("*.md\n")).toBe("*.md\n");

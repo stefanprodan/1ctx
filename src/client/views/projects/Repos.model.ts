@@ -8,7 +8,6 @@ import type {
   RepoView,
 } from "../../../shared/api/repos.ts";
 import {
-  DEFAULT_REPO_IGNORE,
   MAX_REPOS_PER_PROJECT,
   PUBLIC_REPO_HOSTS,
   type RepoKind,
@@ -54,8 +53,12 @@ export const KIND_OPTIONS: { value: RepoKind; label: string }[] = [
 ];
 
 export const URL_PLACEHOLDER = "https://github.com/owner/name";
-export const IGNORE_PLACEHOLDER = DEFAULT_REPO_IGNORE.join("\n");
-export const IGNORE_HINT = "In .gitignore format. Replaces the default list.";
+// one default from each kind the hint names, the box's four lines
+export const IGNORE_PLACEHOLDER = ["*.png", "*.mp4", "*.woff2", "*.zip"].join(
+  "\n",
+);
+export const IGNORE_HINT =
+  "In .gitignore format. Replaces the default list of images, media, fonts, zip archives and binaries.";
 export const PUBLIC_HINT =
   "Read-only clones of public repositories for agents.";
 export const TEAM_HINT = "Read-only clones for agents, managed by admins.";
@@ -208,10 +211,9 @@ export function repoKeyOptions(
   return [{ value: "", label: "None" }, ...keyOptions(keys, current)];
 }
 
-// the textarea grows to show the default list, or what is typed
+// four lines, growing with what is typed; the hint names the defaults
 export function ignoreRows(typed: string): number {
-  const lines = (text: string) => text.split("\n").length;
-  return Math.max(lines(IGNORE_PLACEHOLDER), lines(typed)) + 1;
+  return Math.max(4, typed.split("\n").length + 1);
 }
 
 export const DELETE_ASK = "Delete this repository?";

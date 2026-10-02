@@ -30,6 +30,18 @@
       "dir": false
     },
     {
+      "path": "build/lib.so",
+      "dir": false
+    },
+    {
+      "path": "testdata",
+      "dir": true
+    },
+    {
+      "path": "testdata/fixture.tar.gz",
+      "dir": false
+    },
+    {
       "path": "build/keep.txt",
       "dir": false
     },
@@ -449,13 +461,14 @@
   "cases": [
     {
       "name": "default list",
-      "ignore": "*.png\n*.jpg\n*.jpeg\n*.gif\n*.ico\n*.webp\n*.mp4\n*.mov\n*.mp3\n*.woff\n*.woff2\n*.ttf\n*.zip\n*.tar.gz\n*.tgz\n*.jar\n",
+      "ignore": "*.png\n*.jpg\n*.jpeg\n*.gif\n*.ico\n*.webp\n*.bmp\n*.tiff\n*.psd\n*.mp4\n*.mov\n*.webm\n*.avi\n*.mkv\n*.mp3\n*.wav\n*.ogg\n*.flac\n*.woff\n*.woff2\n*.ttf\n*.otf\n*.eot\n*.zip\n*.jar\n*.war\n*.7z\n*.rar\n*.exe\n*.dll\n*.so\n*.dylib\n*.a\n*.o\n*.class\n*.pyc\n*.wasm\n*.pdf\n*.sqlite\n*.db\n",
       "ignored": [
+        "build/lib.so",
+        "build/out.o",
+        "build/sub/deep.o",
         "dist/dir.png",
         "dist/dir.png/inner.txt",
         "dist/j.jar",
-        "dist/t.tar.gz",
-        "dist/t.tgz",
         "dist/z.zip",
         "docs/img/logo.png",
         "docs/img/pic.jpg",
@@ -477,6 +490,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -490,6 +504,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -504,6 +519,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o"
@@ -515,6 +531,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o"
@@ -538,6 +555,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -588,6 +606,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -655,6 +674,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",
@@ -700,6 +721,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -767,6 +789,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",
@@ -801,6 +825,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -920,6 +945,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -992,6 +1018,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",
@@ -1037,6 +1065,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1109,6 +1138,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",
@@ -1243,6 +1274,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1315,6 +1347,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",
@@ -1346,6 +1380,7 @@
         "a/x/b/f.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1410,6 +1445,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "vendor",
         "vendor/pkg",
         "vendor/pkg/a.go",
@@ -1689,6 +1726,7 @@
         "README.md",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1704,6 +1742,7 @@
       "ignored": [
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1912,6 +1951,7 @@
         "back\\slash.txt",
         "build",
         "build/keep.txt",
+        "build/lib.so",
         "build/out.o",
         "build/sub",
         "build/sub/deep.o",
@@ -1974,6 +2014,8 @@
         "sub",
         "sub/node_modules",
         "sub/node_modules/y.js",
+        "testdata",
+        "testdata/fixture.tar.gz",
         "trail",
         "trail ",
         "vendor",

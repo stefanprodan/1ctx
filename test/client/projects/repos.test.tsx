@@ -180,8 +180,10 @@ describe("the words", () => {
     expect(nameOf("not a url")).toBe("");
   });
 
-  test("the ignore placeholder is the default list", () => {
-    expect(IGNORE_PLACEHOLDER.split("\n")).toEqual([...DEFAULT_REPO_IGNORE]);
+  test("the ignore placeholder is four of the defaults", () => {
+    const shown = IGNORE_PLACEHOLDER.split("\n");
+    expect(shown).toHaveLength(4);
+    for (const rule of shown) expect(DEFAULT_REPO_IGNORE).toContain(rule);
   });
 
   test("a server refusal finds its field", () => {
@@ -605,7 +607,7 @@ describe("the form", () => {
     expect(html).toContain(">Key<");
     expect(html).toContain('name="keyName"');
     expect(html).toContain('placeholder="tools"');
-    expect(html).toContain("*.png\n*.jpg");
+    expect(html).toContain("*.png\n*.mp4\n*.woff2\n*.zip");
   });
 
   test.serial("a key list that did not load says so", () => {
@@ -658,7 +660,7 @@ describe("the form", () => {
       /<textarea[^>]*name="ignore"[^>]*aria-invalid="true"[\s\S]*?class="field-error" role="alert">Ignore line 3: unclosed \[/,
     );
     // the hint gives way to the refusal
-    expect(html).not.toContain("Replaces the default list.");
+    expect(html).not.toContain("Replaces the default list");
   });
 
   test.serial("Add posts what was typed and closes", async () => {
