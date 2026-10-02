@@ -84,7 +84,8 @@ describe("curl data options", () => {
 
     expect(result.exitCode).toBe(0);
     expect(lastRequest).toEqual({
-      url: "https://api.example.com/query?fixed=1&a=1&b=hello+world%2a&c=3#section",
+      // (1ctx curl-urlencode) curl writes uppercase hex
+      url: "https://api.example.com/query?fixed=1&a=1&b=hello+world%2A&c=3#section",
       options: expect.objectContaining({
         method: "GET",
       }),
@@ -146,6 +147,7 @@ describe("curl data options", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(lastRequest?.options.body).toBe("a=1&q=a+b%2a&c=3");
+    // (1ctx curl-urlencode) curl writes uppercase hex
+    expect(lastRequest?.options.body).toBe("a=1&q=a+b%2A&c=3");
   });
 });

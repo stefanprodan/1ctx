@@ -4,11 +4,31 @@
 
 import type { FormField } from "./types.js";
 
+// (1ctx curl-urlencode) curl writes its escapes in uppercase hex, %2A
 export function encodeCurlData(value: string): string {
   return encodeURIComponent(value)
-    .replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16)}`)
-    .replace(/%20/g, "+")
-    .replace(/%[0-9A-F]{2}/g, (percentEscape) => percentEscape.toLowerCase());
+    .replace(
+      /[!'()*]/g,
+      (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+    )
+    .replace(/%20/g, "+");
+}
+
+/**
+ * (1ctx curl-bytes) encodeCurlData over bytes: each one outside A-Z, a-z,
+ * 0-9 and `-._~` as `%XX`, a space as `+`, so a byte that is not UTF-8 is
+ * encoded as itself, as curl does.
+ */
+export function encodeCurlBytes(bytes: Uint8Array): string {
+  let encoded = "";
+  for (const byte of bytes) {
+    const char = String.fromCharCode(byte);
+    if (/[A-Za-z0-9\-._~]/.test(char)) encoded += char;
+    else if (byte === 0x20) encoded += "+";
+    // (1ctx curl-urlencode) in uppercase hex, as curl writes it
+    else encoded += `%${byte.toString(16).padStart(2, "0").toUpperCase()}`;
+  }
+  return encoded;
 }
 
 /**
@@ -70,17 +90,18 @@ export function parseFormField(spec: string): FormField | null {
  */
 export function generateMultipartBody(
   fields: FormField[],
-  fileContents: Map<string, string>,
-): { body: string; boundary: string } {
+  // (1ctx curl-bytes) a file's bytes make the body bytes
+  fileContents: Map<string, string | Uint8Array>,
+): { body: string | Uint8Array<ArrayBuffer>; boundary: string } {
   const boundary = `----CurlFormBoundary${Date.now().toString(36)}`;
-  const parts: string[] = [];
+  const parts: (string | Uint8Array)[] = [];
 
   for (const field of fields) {
-    let value = field.value;
+    let value: string | Uint8Array = field.value;
 
     // Replace file references with content
-    if (value.startsWith("@") || value.startsWith("<")) {
-      const filePath = value.slice(1);
+    if (field.value.startsWith("@") || field.value.startsWith("<")) {
+      const filePath = field.value.slice(1);
       value = fileContents.get(filePath) ?? "";
     }
 
@@ -93,10 +114,30 @@ export function generateMultipartBody(
     } else {
       part += `Content-Disposition: form-data; name="${field.name}"\r\n`;
     }
-    part += `\r\n${value}\r\n`;
-    parts.push(part);
+    if (typeof value === "string") {
+      part += `\r\n${value}\r\n`;
+      parts.push(part);
+    } else {
+      parts.push(`${part}\r\n`, value, "\r\n");
+    }
   }
 
   parts.push(`--${boundary}--\r\n`);
-  return { body: parts.join(""), boundary };
+  if (parts.every((part) => typeof part === "string")) {
+    return { body: parts.join(""), boundary };
+  }
+  // (1ctx curl-bytes) the text in UTF-8, the files as they are
+  const encoder = new TextEncoder();
+  const chunks = parts.map((part) =>
+    typeof part === "string" ? encoder.encode(part) : part,
+  );
+  const body = new Uint8Array(
+    chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0),
+  );
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { body, boundary };
 }

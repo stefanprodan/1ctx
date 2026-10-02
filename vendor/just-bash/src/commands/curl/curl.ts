@@ -22,7 +22,8 @@ import type {
   RuntimeCommandContext,
 } from "../../types.js";
 import { hasHelpFlag, showHelp } from "../help.js";
-import { encodeCurlData, generateMultipartBody } from "./form.js";
+// (1ctx curl-bytes)
+import { encodeCurlBytes, generateMultipartBody } from "./form.js";
 import { curlHelp } from "./help.js";
 import { parseOptions } from "./parse.js";
 import {
@@ -79,15 +80,26 @@ async function resolveData(
         }
         continue;
       }
+      // (1ctx curl-bytes) the file's bytes, never its text decoded, so a
+      // byte that is not UTF-8 is sent as it is, not as U+FFFD
       const content =
         part.file.path === "-"
-          ? decodeBytesToUtf8(stdinConsumed ? EMPTY_BYTES : ctx.stdin)
-          : await ctx.fs.readFile(ctx.fs.resolvePath(ctx.cwd, part.file.path));
+          ? toBuffer(
+              latin1FromBytes(stdinConsumed ? EMPTY_BYTES : ctx.stdin),
+              "binary",
+            )
+          : await ctx.fs.readFileBuffer(
+              ctx.fs.resolvePath(ctx.cwd, part.file.path),
+            );
       if (part.file.path === "-") stdinConsumed = true;
       if (part.file.mode === "ascii") {
-        parts.push(content.replace(/[\x00\r\n]/g, ""));
+        const kept = textOrBytes(
+          content.filter((byte) => byte !== 0 && byte !== 0x0d && byte !== 0x0a),
+        );
+        if (typeof kept !== "string") hasBinaryData = true;
+        parts.push(kept);
       } else {
-        const encoded = encodeCurlData(content);
+        const encoded = encodeCurlBytes(content);
         parts.push(part.file.name ? `${part.file.name}=${encoded}` : encoded);
       }
     } else {
@@ -121,6 +133,18 @@ async function resolveData(
   return body;
 }
 
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
+
+// (1ctx curl-bytes) a file's text when it is UTF-8, so a text body stays
+// text, and its bytes otherwise, sent as they are
+function textOrBytes(bytes: Uint8Array): string | Uint8Array {
+  try {
+    return strictUtf8.decode(bytes);
+  } catch {
+    return bytes;
+  }
+}
+
 /**
  * Prepare request body from options, reading files if needed. `resolvedData`
  * is the already-joined `-d`/`--data*` payload (see resolveData).
@@ -133,21 +157,25 @@ async function prepareRequestBody(
   // Handle -T/--upload-file
   if (options.uploadFile) {
     const filePath = ctx.fs.resolvePath(ctx.cwd, options.uploadFile);
-    const content = await ctx.fs.readFile(filePath);
-    return { body: content };
+    // (1ctx curl-bytes) uploaded as it is
+    const content = textOrBytes(await ctx.fs.readFileBuffer(filePath));
+    return {
+      body: typeof content === "string" ? content : new Uint8Array(content),
+    };
   }
 
   // Handle -F/--form multipart data
   if (options.formFields.length > 0) {
-    const fileContents = new Map<string, string>();
+    // (1ctx curl-bytes) a file's bytes, sent as they are
+    const fileContents = new Map<string, string | Uint8Array>();
 
     // Read any file references
     for (const field of options.formFields) {
       if (field.value.startsWith("@") || field.value.startsWith("<")) {
         const filePath = ctx.fs.resolvePath(ctx.cwd, field.value.slice(1));
         try {
-          const content = await ctx.fs.readFile(filePath);
-          fileContents.set(field.value.slice(1), content);
+          const content = await ctx.fs.readFileBuffer(filePath);
+          fileContents.set(field.value.slice(1), textOrBytes(content));
         } catch {
           // File not found, use empty string
           fileContents.set(field.value.slice(1), "");

@@ -188,6 +188,22 @@ or a heredoc (`N<<`) holds bytes, as stdin does, and a write through
 Before: a descriptor held decoded text, so `cat <&3` wrote `ţ` as one
 wrong byte.
 
+### revoke-pending: a stopped command's pending calls reject at once
+Files: `src/interpreter/builtin-dispatch.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/revoke-pending.test.ts`
+
+Now: when a command is stopped (timeout, an abort, its deadline) and
+its context revoked, every call it made that is still pending rejects
+at once, so the command unwinds inside the cleanup grace and only it
+fails: `timeout 0.01 cat file` over a slow lazy file answers 124 and
+the script goes on. The call's own result is dropped when it lands.
+
+Before: a pending call, such as the read of a large MCP result kept as
+a lazy file, held the command past the grace, so the execution scope
+was poisoned and the whole script ended, `bash: execution aborted`,
+exit 124. Upstream's #506 and #397 do not cover it.
+
 ### globstar: a trailing ** lists everything below, as bash
 Files: `src/shell/glob.ts`
 Upstream: not reported
@@ -696,6 +712,58 @@ output still avoids stringifying the body.
 Before: upstream 3.6.0 appended `-w` in both `buildOutput()` and the
 verbose file-output branch, so `-v -o file -w X` printed `X` twice,
 also with `-D -` or `-O`.
+
+### curl-bytes: a file curl sends goes as its bytes
+Files: `src/commands/curl/curl.ts`, `src/commands/curl/form.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`
+
+Now: `-d @file`, `--data-urlencode @file`, `-F f=@file` and `-T file`
+read the file's bytes. A file that is UTF-8 goes as text as before; one
+that is not goes as bytes, `-d` dropping NUL, CR and LF from them, and
+`--data-urlencode` encodes each byte (`%FF`), as curl does.
+
+Before: each read the file as UTF-8 text, so a byte that is not UTF-8,
+such as `0xff`, was sent as U+FFFD's three bytes; only `--data-binary
+@file` was byte-exact.
+
+### curl-urlencode: --data-urlencode writes uppercase hex, as curl
+Files: `src/commands/curl/form.ts`,
+  `src/commands/curl/tests/data-at-file.test.ts`,
+  `src/commands/curl/tests/data-options.test.ts`,
+  `src/commands/curl/tests/form.test.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`
+
+Now: `--data-urlencode` writes each escape in uppercase hex, `%2A` and
+`%C3%A9`, in the body and in the query under `-G`, inline or from a
+file, as curl 8.21 does. The upstream tests that pinned lowercase pin
+uppercase.
+
+Before: every escape was lowercased, `%2a`, which no curl writes; a
+server that compares a signed or cached query byte for byte saw a
+different string.
+
+### curl-timeout: -m and --connect-timeout read seconds as curl does
+Files: `src/commands/curl/parse.ts`,
+  `src/commands/curl/tests/parse.test.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/curl.test.ts`,
+  `test/server/bash/worker-boundary.test.ts`
+
+Now: `-m`, `-m<secs>`, `--max-time` and `--connect-timeout` (with `=`
+too) read seconds as curl 8.21's secs2ms: digits, then an optional `.`
+and digits, the rest ignored, in whole milliseconds, so `1.0001` is
+1000 ms and `1e300` is 1 s. 0, or under a millisecond, is no limit, and
+a value past what a timer holds is clamped to it; the fetch's own
+deadline still caps it. A missing, negative or non-numeric value is
+curl's `option -m: expected a proper numerical parameter`, exit 2. `-m`
+wins over `--connect-timeout` whatever their order.
+
+Before: the seconds went through `parseFloat` times 1000, so `-m
+1.0001` asked for 1000.1 ms, which the command worker's protocol takes
+for a malformed request: the whole bash command failed and nothing
+after curl ran. `-m abc` and `-m -1` were ignored with exit 0.
 
 ## diff
 

@@ -87,9 +87,8 @@ from jq 1.8.2 for the dialect rules. Where they part:
 ## Where our curl still differs from curl
 
 `test/vendor/just-bash/curl.test.ts` pins write-out once across stdout,
-file and header-dump output, and ports upstream's three stdin-byte
-tests to Bun, whose vitest lacks `vi.stubGlobal` and
-`vi.unstubAllGlobals`. Where the command parts from curl:
+file and header-dump output, and holds upstream's three stdin-byte
+tests with Bun's own mocks. Where the command parts from curl:
 
 - `-V` and `--version` answer `curl 8.21.0 (just-bash, compatible)`,
   the supported protocols and a sandbox description, not curl's build
@@ -104,11 +103,6 @@ tests to Bun, whose vitest lacks `vi.stubGlobal` and
 - Once stripped, caller Authorization and Cookie stay stripped for the
   rest of the chain; curl 8.21 sends them again on a return to the
   first host.
-- `-d @file` reads UTF-8 text: invalid bytes such as `0xff`, `0xfe`
-  and `0x80` become U+FFFD, unchanged from 3.4.2. `-F f=@file` also
-  decodes UTF-8 before constructing its multipart body, replacing
-  invalid bytes but keeping NUL, CR and LF. Neither is binary-safe;
-  `--data-binary @file` preserves bytes.
 - A redirect to a URL containing `user:pass@` is followed with that
   userinfo intact at fetch. These are server-selected credentials,
   not a 1ctx managed secret.

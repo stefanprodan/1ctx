@@ -243,6 +243,27 @@ describe("the command worker", () => {
     ]);
   });
 
+  test("a request of the wrong shape fails the job at once", async () => {
+    const logs = collectLogs();
+    const workers = commandWorkers(FORGED, logs.logFactory("k"));
+    const started = performance.now();
+    const settled = await workers.run(
+      job("request"),
+      hooks,
+      stops(AbortSignal.timeout(30_000)),
+    );
+    expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "k",
+        msg: "command answer malformed",
+        fields: { chat: "chat", phase: "run" },
+      },
+    ]);
+  });
+
   test("a worker that ends itself mid-job fails it once", async () => {
     const workers = commandWorkers(FORGED, silent);
     const settled = await workers.run(

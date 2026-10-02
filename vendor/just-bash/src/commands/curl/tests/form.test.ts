@@ -64,7 +64,8 @@ describe("curl form data", () => {
         "curl --data-urlencode 'data=a&b=c' https://api.example.com/post",
       );
 
-      expect(lastRequest?.options.body).toBe("data=a%26b%3dc");
+      // (1ctx curl-urlencode) curl writes uppercase hex
+      expect(lastRequest?.options.body).toBe("data=a%26b%3Dc");
     });
 
     it("appends multiple --data-urlencode values", async () => {

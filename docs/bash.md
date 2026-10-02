@@ -33,9 +33,11 @@ of that shell that shows a file on the chat page.
   commands of `bash/commands.ts`, no host filesystem and
   `defenseInDepth: true`. File bytes are transferred, never cloned.
 - **The worker is untrusted.** Code inside can post messages. The
-  server drops a message of another id or type, one after its job
-  settled, or a repeated request number. An answer of the wrong shape
-  fails the job at once (`command answer malformed`).
+  server drops a message of another id or an unknown type, one after its
+  job settled, or a repeated request number. A message of a known type
+  in the wrong shape, an answer, a phase or a request it could not
+  serve, fails the job at once (`command answer malformed`), never
+  leaving the worker to wait out the deadline.
 - **The server re-derives every decision.** Names by the knowledge and
   scratch rules over the stored rows, deletes only of mounted files,
   scratch totals from its own rows, an opened record only as `open`

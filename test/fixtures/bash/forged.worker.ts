@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A command worker gone wrong, as a command able to post would make it,
-// picked by the job's command. forge: answers for another id, a phase
-// and a type outside the protocol, a read past the kept list and one
-// request number sent twice, then one well-formed answer that says how
-// many kept replies came back, and a second answer after it. malformed:
-// an answer of this job in the wrong shape. close: the worker ends
+// picked by the job's command. forge: answers for another id, a type
+// outside the protocol, a read past the kept list and one request number
+// sent twice, then one well-formed answer that says how many kept
+// replies came back, and a second answer after it. malformed: an answer
+// of this job in the wrong shape. request: a read request of this job in
+// the wrong shape, then nothing. close: the worker ends
 // itself mid-job. prompt: a good answer at once. refused: a refusal that
 // still carries a doc change.
 
@@ -115,13 +116,17 @@ self.onmessage = (event: MessageEvent) => {
     self.postMessage({ type: "done", id, answer: { stdout: 1 } });
     return;
   }
+  if (command === "request") {
+    self.postMessage({ type: "phase", id, phase: "run", notice: "" });
+    self.postMessage({ type: "kept", id, request: 0, index: -1 });
+    return;
+  }
   if (command === "close") {
     self.postMessage({ type: "phase", id, phase: "run", notice: "" });
     setTimeout(() => process.exit(0), 50);
     return;
   }
   self.postMessage({ type: "done", id: "another", answer: answer("other") });
-  self.postMessage({ type: "phase", id, phase: "commit", notice: "" });
   self.postMessage({ type: "shout", id });
   self.postMessage({ type: "kept", id, request: 0, index: 99 });
   self.postMessage({ type: "kept", id, request: 1, index: 0 });

@@ -252,9 +252,11 @@ function isFetchRequest(value: unknown): value is FetchRequest {
 
 export const MALFORMED = "malformed";
 
-// the message for this job, MALFORMED for an answer of this job that
-// does not check out, or null for anything else: another id, an unknown
-// type, a field missing, extra or of the wrong kind
+// the message for this job, MALFORMED for a message of this job and of a
+// known type that does not check out (a field missing, extra or of the
+// wrong kind), or null for another id or an unknown type. A request the
+// server cannot read would leave the worker waiting on an answer until
+// the deadline, so it ends the job as a bad answer does.
 export function fromWorker(
   value: unknown,
   id: string,
@@ -266,26 +268,24 @@ export function fromWorker(
         (value.phase === "run" || value.phase === "diff") &&
         isString(value.notice)
         ? (value as FromWorker)
-        : null;
+        : MALFORMED;
     case "kept":
       return keys(value, ["type", "id", "request", "index"]) &&
         isCount(value.request) &&
         isCount(value.index)
         ? (value as FromWorker)
-        : null;
+        : MALFORMED;
     case "abort":
       return keys(value, ["type", "id", "request"]) && isCount(value.request)
         ? (value as FromWorker)
-        : null;
+        : MALFORMED;
     case "fetch":
       return keys(value, ["type", "id", "request", "url", "options"]) &&
         isCount(value.request) &&
         isString(value.url) &&
         isFetchRequest(value.options)
         ? (value as FromWorker)
-        : null;
-    // an end of this job that does not check out ends it all the same,
-    // rather than leaving it to the deadline
+        : MALFORMED;
     case "done":
       return keys(value, ["type", "id", "answer"]) && isAnswer(value.answer)
         ? (value as FromWorker)

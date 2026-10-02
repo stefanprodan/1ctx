@@ -180,6 +180,35 @@ describe("the bridge keeps the shell's behaviour", () => {
     expect(aborted).toBe(true);
   });
 
+  test("a fractional or huge curl timeout reaches the fetch whole", async () => {
+    const seen: (number | undefined)[] = [];
+    const ok: SecureFetch = async (url, options) => {
+      seen.push(options?.timeoutMs);
+      return {
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        body: new Uint8Array(),
+        url,
+      };
+    };
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const settled = await workers.run(
+      job(
+        "curl -s -m 1.0001 https://x.test/; curl -s -m 1e300 https://x.test/; " +
+          "curl -s --connect-timeout 0.5 https://x.test/; " +
+          "curl -s -m 99999999999 https://x.test/; echo after=$?",
+      ),
+      { kept: () => null, fetch: ok },
+      stops(),
+    );
+    expect(settled).toMatchObject({
+      ok: true,
+      answer: { stdout: "after=0\n", exitCode: 0 },
+    });
+    expect(seen).toEqual([1000, 1000, 500, 2 ** 31 - 1]);
+  });
+
   test("a kept file that cannot be read fails the read", async () => {
     const workers = commandWorkers(COMMAND_WORKER, silent);
     const path = "/mcp/0001-result/result.txt";
