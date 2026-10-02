@@ -1,0 +1,22 @@
+{{- if not .Values.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "1ctx.fullname" . }}
+  labels:
+    {{- include "1ctx.labels" . | nindent 4 }}
+  {{- if .Values.persistence.keep }}
+  # removing the release must never take the database with it
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

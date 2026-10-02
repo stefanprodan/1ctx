@@ -1,0 +1,155 @@
+{{- $provision := include "1ctx.provisionConfigMap" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "1ctx.fullname" . }}
+  labels:
+    {{- include "1ctx.labels" . | nindent 4 }}
+spec:
+  # SQLite on a ReadWriteOnce volume has one writer, so the old pod stops
+  # before the new one starts
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "1ctx.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "1ctx.labels" . | nindent 8 }}
+      {{- if or .Values.provision.files .Values.podAnnotations }}
+      annotations:
+        {{- if .Values.provision.files }}
+        # provisioning runs only at start, so an edit rolls the pod
+        checksum/provision: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "1ctx.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      # a Service named onectx would inject ONECTX_* variables, the
+      # server's own namespace
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # the server waits up to the drain for chats and runs, then needs
+      # time to close the database
+      terminationGracePeriodSeconds: {{ add (int .Values.drain) 15 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        # a recursive chown of a large volume on every start would delay it
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: server
+          image: {{ include "1ctx.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # these replace the image's CMD whole
+          args:
+            - --listen
+            - 0.0.0.0:11236
+            - --db
+            - /data/1ctx.sqlite
+            - --secrets
+            - /secrets
+            - --drain
+            - {{ int .Values.drain | quote }}
+            {{- if $provision }}
+            - --provision
+            - /provision
+            {{- end }}
+            {{- if .Values.trustProxy }}
+            - --trust-proxy
+            {{- end }}
+            {{- if .Values.secureCookie }}
+            - --secure-cookie
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 11236
+              protocol: TCP
+          # the server migrates and applies /provision before it listens
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
+          # health stays up while draining, so a stop is never cut short
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            # mounted whole: a subPath mount never sees a rotated key
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+            {{- if $provision }}
+            - name: provision
+              mountPath: /provision
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "1ctx.claimName" . }}
+        - name: secrets
+          secret:
+            secretName: {{ .Values.secrets.existingSecret }}
+            # owned by the fsGroup, so 65532 reads every key
+            defaultMode: 0440
+        {{- if $provision }}
+        - name: provision
+          configMap:
+            name: {{ $provision }}
+            defaultMode: 0440
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

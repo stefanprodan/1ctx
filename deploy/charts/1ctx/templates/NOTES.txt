@@ -1,0 +1,31 @@
+{{- $name := include "1ctx.fullname" . -}}
+{{- $provision := include "1ctx.provisionConfigMap" . -}}
+1ctx {{ include "1ctx.version" . }} is installed as {{ $name }} in the namespace {{ .Release.Namespace }}.
+
+The pod starts once the Secret {{ .Values.secrets.existingSecret }} exists in {{ .Release.Namespace }}.
+It holds user-admin.key, the first admin's password, and the provider,
+search and MCP keys as <kind>-<name>.key files. The chart never makes it:
+keep it in Git encrypted with SOPS for Flux to decrypt, or sync it with
+External Secrets.
+{{- if $provision }}
+
+At every start the server applies the YAML objects in the ConfigMap
+{{ $provision }} before it listens; a failed apply stops the pod.
+{{- end }}
+
+Inside the cluster 1ctx answers at http://{{ $name }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}.
+{{- if .Values.ingress.enabled }}
+The Ingress serves it at {{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}.
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+The HTTPRoute attaches it to the Gateway{{ with .Values.httpRoute.hostnames }} for {{ join ", " . }}{{ end }}.
+{{- end }}
+{{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
+Set ingress.enabled or httpRoute.enabled to reach it from outside.
+{{- end }}
+Sign in as admin with the password in user-admin.key.
+{{- if and .Values.secureCookie (not (or .Values.ingress.tls.enabled .Values.httpRoute.enabled)) }}
+
+secureCookie is on, so browsers send the login cookie over https only.
+Serve 1ctx over https, or set secureCookie to false.
+{{- end }}

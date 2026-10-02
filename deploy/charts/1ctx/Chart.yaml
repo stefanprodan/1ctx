@@ -1,0 +1,17 @@
+apiVersion: v2
+name: 1ctx
+description: One continuous context for agents.
+type: application
+# the release sets both from the tag: version without the v, appVersion with it
+version: 0.0.1
+appVersion: "v0.0.1"
+home: https://1ctx.dev
+icon: https://1ctx.dev/icon.svg
+sources:
+  - https://github.com/stefanprodan/1ctx
+maintainers:
+  - name: Stefan Prodan
+    url: https://github.com/stefanprodan
+keywords:
+  - agents
+  - llm

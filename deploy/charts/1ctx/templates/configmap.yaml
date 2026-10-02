@@ -1,0 +1,13 @@
+{{- if .Values.provision.files }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "1ctx.provisionConfigMap" . }}
+  labels:
+    {{- include "1ctx.labels" . | nindent 4 }}
+data:
+  {{- range $name, $text := .Values.provision.files }}
+  {{ $name }}: |
+    {{- $text | nindent 4 }}
+  {{- end }}
+{{- end }}

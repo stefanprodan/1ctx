@@ -92,9 +92,43 @@ never written in a tracked file.
 
 ## Docker Compose
 
-- **`deploy/compose.yaml` runs a release by `ONECTX_VERSION`, the tag.**
+- **`deploy/docker/compose.yaml` runs a release by `ONECTX_VERSION`,
+  the tag.**
   `compose.dev.yaml`, layered over it with `ONECTX_VERSION=dev`, builds
   from the checkout and never pulls.
+
+## Kubernetes
+
+`deploy/charts/1ctx/` is the Helm chart, `deploy/flux/` installs it with
+Flux. Its README holds the values; these are the rules.
+
+- **The templates fix what the server needs, never as values.** One
+  replica with the `Recreate` strategy, since SQLite on a ReadWriteOnce
+  volume has one writer. The image's user 65532, a read-only root, no
+  capabilities, no service account token, no `/tmp` volume. Adding a
+  value for any of these needs a reason the server gives.
+- **The chart never makes the Secret.** It names one
+  (`secrets.existingSecret`) and mounts it whole at `/secrets`, never by
+  `subPath`, which would never see a rotated key. No doc tells the
+  reader to run `kubectl`: every step is a value, a file in Git or a
+  Flux object.
+- **The claim the chart renders is kept by default**
+  (`helm.sh/resource-policy: keep`), so removing the release never
+  removes the database. `fsGroupChangePolicy: OnRootMismatch` spares a
+  large volume a chown on every start.
+- **Probes follow the drain.** A startup probe on `/api/health` allows
+  ten minutes for the migrations and `/provision`; liveness reads
+  `/api/health`, readiness `/api/ready`. `terminationGracePeriodSeconds`
+  is the drain plus 15.
+- **`provision.files` rolls the pod through a checksum annotation.** An
+  `existingConfigMap` applies on the next rollout; `--provision` is
+  passed only when one of them is set.
+- **An Ingress and a Gateway API `HTTPRoute` are both optional.** The
+  Gateway is the cluster's; the chart only attaches a route.
+- **A Service name must start with a letter.** The names helper spells
+  a leading `1ctx` as `onectx`.
+- **`values.schema.json` refuses unknown keys.** A new value is typed
+  there, in `values.yaml` and in the README's table in one change.
 
 ## Release and CI
 

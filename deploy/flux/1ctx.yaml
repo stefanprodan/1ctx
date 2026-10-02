@@ -1,0 +1,43 @@
+# The 1ctx Helm chart from GHCR, upgraded to each 0.x release. The Secret
+# 1ctx in the same namespace holds user-admin.key and the provider, search
+# and MCP keys; the chart never makes it.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: 1ctx
+  namespace: 1ctx
+spec:
+  interval: 1h
+  url: oci://ghcr.io/stefanprodan/charts/1ctx
+  ref:
+    # a 1.0 release may break what 0.x kept, so it waits for a review
+    semver: "0.x"
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: 1ctx
+  namespace: 1ctx
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: 1ctx
+  # the startup probe allows a migration ten minutes
+  timeout: 15m
+  values:
+    secrets:
+      existingSecret: 1ctx
+    persistence:
+      storageClass: standard
+    httpRoute:
+      enabled: true
+      parentRefs:
+        - name: public
+          namespace: gateway
+          sectionName: https
+      hostnames:
+        - 1ctx.example.com
