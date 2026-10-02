@@ -56,9 +56,16 @@ export const fail = (error: RepoError): Failure => ({
 export const hash = (text: string, length: number) =>
   new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, length);
 
+// the kind whose endpoints a row reaches: github.com and gitlab.com fix
+// it, any other host takes the row's
+export const kindOf = (row: Pick<RepoRow, "url" | "kind">) =>
+  adapter(row.url, row.kind).kind;
+
 // the cache's folder name for a repository: no disk path part comes
-// from a host, a repository or a tarball
-export const sourceOf = (url: string) => hash(url, 16);
+// from a host, a repository or a tarball. One URL as two kinds is two
+// repositories, each tree proved by its own endpoints
+export const sourceOf = (row: Pick<RepoRow, "url" | "kind">) =>
+  hash(`${kindOf(row)} ${row.url}`, 16);
 
 // who fetches: a failure with one key, or with none, is never another's
 const signerOf = (row: RepoRow) => row.keyName ?? "";
@@ -83,8 +90,11 @@ export type FetchRequest = {
 };
 
 export class Fetches {
-  // a tree being fetched, by its folder
-  private readonly inFlight = new Map<string, Promise<Tree>>();
+  // a tree being fetched, by its folder, and who fetches it
+  private readonly inFlight = new Map<
+    string,
+    { tree: Promise<Tree>; signer: string }
+  >();
   // a fetch that failed, by its folder and caps, not tried again a while
   private readonly refused = new Map<
     string,
@@ -96,8 +106,8 @@ export class Fetches {
   constructor(private readonly deps: FetchesDeps) {}
 
   // a refresh tries a refused tree again at once
-  forget(url: string): void {
-    const source = sourceOf(url);
+  forget(row: RepoRow): void {
+    const source = sourceOf(row);
     for (const key of this.refused.keys()) {
       if (key.includes(`/${source}/`)) this.refused.delete(key);
     }
@@ -138,11 +148,22 @@ export class Fetches {
   }
 
   // a tree by commit: joined when in flight, else fetched
-  byCommit(row: RepoRow, commit: string, header: RepoHeader | null) {
+  byCommit(
+    row: RepoRow,
+    commit: string,
+    header: RepoHeader | null,
+  ): Promise<Tree> {
     const ignore = ignoreKey(row.ignore);
-    const folder = this.deps.cache.folder(sourceOf(row.url), commit, ignore);
+    const folder = this.deps.cache.folder(sourceOf(row), commit, ignore);
     const running = this.inFlight.get(folder);
-    if (running !== undefined) return running;
+    if (running !== undefined) {
+      if (running.signer === signerOf(row)) return running.tree;
+      // another signer's tree is this commit's, which this row's own
+      // lookup proved; its failure says nothing of this signer
+      return running.tree.then((done) =>
+        done.ok ? done : this.byCommit(row, commit, header),
+      );
+    }
     const refused = this.refusal(folder, row);
     if (refused !== null) return Promise.resolve(refused);
     const host = adapter(row.url, row.kind);
@@ -163,10 +184,12 @@ export class Fetches {
   // a tree's fetch, joined by the turns that need it; a failure is
   // not tried again for a while, one over the caps for longer
   track(folder: string, tree: Promise<Tree>, row: RepoRow): Promise<Tree> {
-    this.inFlight.set(folder, tree);
+    this.inFlight.set(folder, { tree, signer: signerOf(row) });
     const key = this.refusedKey(folder, row);
     void tree.then((done) => {
-      if (this.inFlight.get(folder) === tree) this.inFlight.delete(folder);
+      if (this.inFlight.get(folder)?.tree === tree) {
+        this.inFlight.delete(folder);
+      }
       if (done.ok || done.queued || this.deps.signal.aborted) return;
       const hold =
         done.error === "over the size cap" ? REPO_REFUSED_MS : REPO_LOOKUP_MS;
@@ -222,7 +245,7 @@ export class Fetches {
         return false;
       }
       queued = false;
-      if (!cache.roomFor(limits.repoBytes)) {
+      if (!cache.roomFor(limits)) {
         full = true;
         return false;
       }
@@ -234,7 +257,7 @@ export class Fetches {
       this.running.add(id);
       const started = performance.now();
       const ignore = ignoreKey(row.ignore);
-      const source = sourceOf(row.url);
+      const source = sourceOf(row);
       const done = await this.deps.jobs(
         {
           id,

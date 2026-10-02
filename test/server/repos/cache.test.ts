@@ -20,12 +20,13 @@ afterAll(() => {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
-const meta = (commit: string, bytes: number): TreeMeta => ({
+const meta = (commit: string, disk: number): TreeMeta => ({
   commit,
   time: 1,
   files: 1,
   dirs: 0,
-  bytes,
+  bytes: 0,
+  disk,
   large: 0,
   ignored: 0,
   dropped: 0,
@@ -39,12 +40,12 @@ function setup(free = Number.MAX_SAFE_INTEGER) {
   const cache = new RepoCache(dir, clock, () => free);
   cache.start();
   // a tree published as a job publishes it
-  const publish = (source: string, commit: string, bytes: number) => {
+  const publish = (source: string, commit: string, disk: number) => {
     const folder = cache.folder(source, commit, "k");
     mkdirSync(join(folder, "files"), { recursive: true });
     writeFileSync(
       join(folder, "tree.json"),
-      JSON.stringify(meta(commit, bytes)),
+      JSON.stringify(meta(commit, disk)),
     );
     return cache.get(source, commit, "k")!;
   };
@@ -70,7 +71,7 @@ test("startup clears tmp/, indexes every tree and drops a folder with no tree.js
   expect(again.start()).toEqual({ trees: 2, bytes: 150 });
   expect(readdirSync(join(dir, "tmp"))).toEqual([]);
   expect(existsSync(join(dir, "trees", "s3", `${COMMIT}-k`))).toBe(false);
-  expect(again.get("s1", COMMIT, "k")?.meta.bytes).toBe(100);
+  expect(again.get("s1", COMMIT, "k")?.meta.disk).toBe(100);
 });
 
 test("eviction takes the least recently read and never a held folder", () => {
@@ -101,10 +102,19 @@ test("a hold on a folder gone from the disk forgets it", () => {
   expect(cache.get("s1", COMMIT, "k")).toBeNull();
 });
 
-test("a fetch needs repoBytes and a GiB free on the volume", () => {
-  const { cache } = setup(REPO_FREE_BYTES + 1_000);
-  expect(cache.roomFor(1_000)).toBe(true);
-  expect(cache.roomFor(1_001)).toBe(false);
+test("a tree's files and folders count on disk, so empty ones still evict", () => {
+  const { cache, publish } = setup();
+  publish("s1", COMMIT, 50_000 * 4096);
+  publish("s1", NEXT_COMMIT, 50_000 * 4096);
+  expect(cache.bytes()).toBe(2 * 50_000 * 4096);
+  expect(cache.evict(0)).toEqual({ trees: 2, bytes: 2 * 50_000 * 4096 });
+});
+
+test("a fetch needs repoBytes, a block per file and a GiB free on the volume", () => {
+  const { cache } = setup(REPO_FREE_BYTES + 1_000 + 2 * 4096);
+  expect(cache.roomFor({ repoBytes: 1_000, repoFiles: 2 })).toBe(true);
+  expect(cache.roomFor({ repoBytes: 1_001, repoFiles: 2 })).toBe(false);
+  expect(cache.roomFor({ repoBytes: 1_000, repoFiles: 3 })).toBe(false);
   const elsewhere = cacheDir();
   dirs.push(elsewhere);
   const failing = new RepoCache(
@@ -114,7 +124,7 @@ test("a fetch needs repoBytes and a GiB free on the volume", () => {
       throw new Error("statfs failed");
     },
   );
-  expect(failing.roomFor(1)).toBe(false);
+  expect(failing.roomFor({ repoBytes: 1, repoFiles: 1 })).toBe(false);
 });
 
 test("the sweep clears a stale job folder, never a running one", () => {

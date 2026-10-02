@@ -221,37 +221,52 @@ export class ReposStore {
     return this.byId(id);
   }
 
-  // what a lookup or a fetch found; the fields left out keep their value
-  setFetched(id: string, fetched: RepoFetched): void {
+  // what a lookup or a fetch found; the fields left out keep their value.
+  // With `of`, only while the row still fetches what it was fetched as,
+  // so a fetch that ends after a change never writes over it; false when
+  // nothing was written
+  setFetched(
+    id: string,
+    fetched: RepoFetched,
+    of?: Pick<RepoFields, "url" | "kind" | "ref" | "keyName" | "ignore">,
+  ): boolean {
     const has = (key: keyof RepoFetched) => Object.hasOwn(fetched, key);
-    this.db
-      .query(
-        `update repos set state = ?, error = ?,
+    const match = of
+      ? [of.url, of.kind, of.ref, of.keyName, of.ignore]
+      : [null, null, null, null, null];
+    return (
+      this.db
+        .query(
+          `update repos set state = ?, error = ?,
            etag = case when ? then ? else etag end,
            commit_id = case when ? then ? else commit_id end,
            fetched_at = case when ? then ? else fetched_at end,
            files = case when ? then ? else files end,
            bytes = case when ? then ? else bytes end,
            ignored = case when ? then ? else ignored end
-         where id = ?`,
-      )
-      .run(
-        fetched.state,
-        fetched.error,
-        has("etag") ? 1 : 0,
-        fetched.etag ?? null,
-        has("commit") ? 1 : 0,
-        fetched.commit ?? null,
-        has("fetchedAt") ? 1 : 0,
-        fetched.fetchedAt ?? null,
-        has("files") ? 1 : 0,
-        fetched.files ?? null,
-        has("bytes") ? 1 : 0,
-        fetched.bytes ?? null,
-        has("ignored") ? 1 : 0,
-        fetched.ignored ?? null,
-        id,
-      );
+         where id = ? and (? = 0 or (url = ? and kind = ? and ref = ?
+           and key_name is ? and ignore_rules = ?))`,
+        )
+        .run(
+          fetched.state,
+          fetched.error,
+          has("etag") ? 1 : 0,
+          fetched.etag ?? null,
+          has("commit") ? 1 : 0,
+          fetched.commit ?? null,
+          has("fetchedAt") ? 1 : 0,
+          fetched.fetchedAt ?? null,
+          has("files") ? 1 : 0,
+          fetched.files ?? null,
+          has("bytes") ? 1 : 0,
+          fetched.bytes ?? null,
+          has("ignored") ? 1 : 0,
+          fetched.ignored ?? null,
+          id,
+          of ? 1 : 0,
+          ...match,
+        ).changes > 0
+    );
   }
 
   // at startup: a fetch the process was running when it stopped

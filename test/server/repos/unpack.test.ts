@@ -216,6 +216,20 @@ test("a name past 100 bytes comes whole", async () => {
   expect(readFileSync(join(files, long), "utf8")).toBe("x");
 });
 
+test("each kept file, folder and link counts a block on disk", async () => {
+  const { result } = await run([
+    { name: "empty", body: "" },
+    { name: "d/also-empty", body: "" },
+    { name: "d/big", body: "x".repeat(4097) },
+    { name: "d/link", type: "symlink", linkname: "big" },
+  ]);
+  // empty, also-empty, big's two blocks, the folder d and the link
+  expect(result).toMatchObject({
+    ok: true,
+    meta: { files: 3, bytes: 4097, disk: 6 * 4096 },
+  });
+});
+
 test("a file past the file cap is kept and counted", async () => {
   const { result, files } = await run([{ name: "big.bin", size: 2_000 }]);
   expect(result).toMatchObject({ ok: true, meta: { files: 1, large: 1 } });
@@ -361,6 +375,7 @@ test("a job that loses the publish to a concurrent one removes its own", async (
           files: 7,
           dirs: 0,
           bytes: 7,
+          disk: 4096,
           large: 0,
           ignored: 0,
           dropped: 0,
@@ -458,12 +473,26 @@ test("names one volume cannot hold apart are dropped, not a failed fetch", async
     { name: "Docs/a.md", body: "a" },
     { name: "docs/b.md", body: "b" },
   ]);
-  expect(result).toMatchObject({ ok: true });
-  const meta = (result as { meta: { files: number; dropped: number } }).meta;
   // a case-insensitive volume drops the second of each, a sensitive one
   // keeps all four
-  expect(meta.files + meta.dropped).toBe(4);
-  expect(readdirSync(files).length).toBe(meta.dropped === 0 ? 4 : 2);
+  const probe = cacheDir();
+  dirs.push(probe);
+  mkdirSync(join(probe, "Case"));
+  const insensitive = existsSync(join(probe, "case"));
+  if (!insensitive) {
+    expect(result).toMatchObject({ ok: true, meta: { files: 4, dropped: 0 } });
+    expect(readdirSync(files).sort()).toEqual([
+      "Docs",
+      "README",
+      "docs",
+      "readme",
+    ]);
+    return;
+  }
+  expect(result).toMatchObject({ ok: true, meta: { files: 2, dropped: 2 } });
+  expect(readdirSync(files).sort()).toEqual(["Docs", "README"]);
+  expect(readdirSync(join(files, "Docs"))).toEqual(["a.md"]);
+  expect(readFileSync(join(files, "README"), "utf8")).toBe("upper");
 });
 
 test("a link to its own folder or the one above is kept", async () => {

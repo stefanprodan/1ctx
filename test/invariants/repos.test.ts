@@ -156,6 +156,8 @@ test("a personal project's repositories are its owner's, public and on a public 
       ignore: "/*\n!/docs/\n",
     });
     expect(repo).toMatchObject({ name: "cli", kind: "gitlab" });
+    // a member's answer to a write is the member's list row: no keyName
+    expect(Object.hasOwn(repo, "keyName")).toBe(false);
     const refused = [
       [
         { url: "https://git.example.test/acme/widgets", kind: "github" },
@@ -205,10 +207,16 @@ test("a personal project's repositories are its owner's, public and on a public 
     const patched = await chat.member.call("PATCH", `${mine}/${repo.id}`, {
       body: { ref: "main" },
     });
-    expect(((await patched.json()) as RepoResponse).repo.ref).toBe("main");
-    expect(
-      (await chat.member.call("POST", `${mine}/${repo.id}/refresh`)).status,
-    ).toBe(200);
+    const patchedRepo = ((await patched.json()) as RepoResponse).repo;
+    expect(patchedRepo.ref).toBe("main");
+    expect(Object.hasOwn(patchedRepo, "keyName")).toBe(false);
+    const refreshed = await chat.member.call(
+      "POST",
+      `${mine}/${repo.id}/refresh`,
+    );
+    expect(refreshed.status).toBe(200);
+    const refreshedRepo = ((await refreshed.json()) as RepoResponse).repo;
+    expect(Object.hasOwn(refreshedRepo, "keyName")).toBe(false);
     expect(
       (await chat.member.call("DELETE", `${mine}/${repo.id}`)).status,
     ).toBe(204);

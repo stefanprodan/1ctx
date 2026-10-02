@@ -3,9 +3,9 @@
 //
 // The cache directory: trees/<source>/<commit>-<ignore>/ per tree,
 // tmp/ for the jobs unpacking. An index in memory holds each tree's
-// bytes and when it was last mounted; a folder mounted by a running turn
-// is held and never evicted. The trees can always be fetched again, so
-// backups leave the directory out.
+// size on disk and when it was last mounted; a folder mounted by a
+// running turn is held and never evicted. The trees can always be
+// fetched again, so backups leave the directory out.
 
 import {
   mkdirSync,
@@ -21,6 +21,7 @@ import { join } from "node:path";
 import type { Clock } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import {
+  BLOCK,
   readMeta,
   type TreeMeta,
   tmpDir,
@@ -96,7 +97,7 @@ export class RepoCache {
 
   bytes(): number {
     let total = 0;
-    for (const entry of this.index.values()) total += entry.meta.bytes;
+    for (const entry of this.index.values()) total += entry.meta.disk;
     return total;
   }
 
@@ -153,10 +154,12 @@ export class RepoCache {
     return (this.holds.get(folder) ?? 0) > 0;
   }
 
-  // whether a fetch of up to repoBytes leaves the volume room
-  roomFor(repoBytes: number): boolean {
+  // whether a tree at the caps, each file a block more, leaves the
+  // volume room
+  roomFor(caps: { repoBytes: number; repoFiles: number }): boolean {
+    const most = caps.repoBytes + caps.repoFiles * BLOCK;
     try {
-      return this.free(this.dir) >= repoBytes + REPO_FREE_BYTES;
+      return this.free(this.dir) >= most + REPO_FREE_BYTES;
     } catch {
       return false;
     }
@@ -184,9 +187,9 @@ export class RepoCache {
       this.index.delete(entry.folder);
       this.touched.delete(entry.folder);
       void rm(away, { recursive: true, force: true }).catch(() => {});
-      total -= entry.meta.bytes;
+      total -= entry.meta.disk;
       trees++;
-      bytes += entry.meta.bytes;
+      bytes += entry.meta.disk;
     }
     return { trees, bytes };
   }

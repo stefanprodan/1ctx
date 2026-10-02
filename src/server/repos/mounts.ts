@@ -18,6 +18,7 @@ import {
   Fetches,
   fail,
   hash,
+  kindOf,
   type RepoLimits,
   sourceOf,
   type Tree,
@@ -102,9 +103,9 @@ type Ensured =
 const EMPTY: Prepared = { mounts: [], notices: [], release() {} };
 
 export class Mounts {
-  // by URL, ref and key: an admin who names one key in two projects
-  // grants both the same access, and a signed and an unsigned lookup
-  // never share
+  // by kind, URL, ref and key: an admin who names one key in two
+  // projects grants both the same access, a signed and an unsigned
+  // lookup never share, and neither do two kinds' endpoints
   private readonly lookups = new Map<
     string,
     { at: number; answer: Promise<Lookup> }
@@ -221,7 +222,7 @@ export class Mounts {
     const row = this.deps.store.byId(repoId);
     if (row === null) return;
     this.lookups.delete(this.lookupKey(row));
-    this.fetches!.forget(row.url);
+    this.fetches!.forget(row);
     void this.ensure(row).then((done) => done.ok && done.release());
   }
 
@@ -240,7 +241,7 @@ export class Mounts {
   }
 
   private lookupKey(row: RepoRow): string {
-    return `${row.url}\n${row.ref}\n${row.keyName ?? ""}`;
+    return `${kindOf(row)}\n${row.url}\n${row.ref}\n${row.keyName ?? ""}`;
   }
 
   // the row's ETag when it was stored for this same lookup
@@ -258,7 +259,7 @@ export class Mounts {
       const cache = this.deps.cache!;
       const looked = await this.lookup(row);
       if (!looked.ok) return this.failed(row, looked);
-      const source = sourceOf(row.url);
+      const source = sourceOf(row);
       const ignore = ignoreKey(row.ignore);
       let commit = looked.commit;
       let missedPin: string | null = null;
@@ -329,7 +330,7 @@ export class Mounts {
   // commit its first member names, and the tarball when that is new
   private archiveLookup(row: RepoRow, host: Adapter): Promise<Lookup> {
     const cache = this.deps.cache!;
-    const source = sourceOf(row.url);
+    const source = sourceOf(row);
     const ignore = ignoreKey(row.ignore);
     const stored = this.storedEtag(row);
     const etag =
@@ -419,7 +420,7 @@ export class Mounts {
   private state(row: RepoRow, state: "fetching"): void {
     if (row.state === state || this.closing.signal.aborted) return;
     row.state = state;
-    this.deps.store.setFetched(row.id, { state, error: null });
+    this.deps.store.setFetched(row.id, { state, error: null }, row);
   }
 
   private ready(
@@ -446,16 +447,20 @@ export class Mounts {
       commit: meta.commit,
       etag,
     });
-    this.deps.store.setFetched(row.id, {
-      state: "ready",
-      error: null,
-      etag,
-      commit: meta.commit,
-      fetchedAt: this.deps.clock(),
-      files: meta.files,
-      bytes: meta.bytes,
-      ignored: meta.ignored,
-    });
+    this.deps.store.setFetched(
+      row.id,
+      {
+        state: "ready",
+        error: null,
+        etag,
+        commit: meta.commit,
+        fetchedAt: this.deps.clock(),
+        files: meta.files,
+        bytes: meta.bytes,
+        ignored: meta.ignored,
+      },
+      row,
+    );
   }
 
   // a row's first failure with this word is written and logged
@@ -469,11 +474,13 @@ export class Mounts {
       row.state = "failed";
       row.error = failure.error;
       // over the size cap, the row says what was counted against the caps
-      this.deps.store.setFetched(row.id, {
-        state: "failed",
-        error: failure.error,
-        ...(failure.seen ?? {}),
-      });
+      const written = this.deps.store.setFetched(
+        row.id,
+        { state: "failed", error: failure.error, ...(failure.seen ?? {}) },
+        row,
+      );
+      // a row changed since: its own fetch says how that went
+      if (!written) return failure;
       logFetchFailed(this.deps.log, {
         repoId: row.id,
         host: adapter(row.url, row.kind).host,

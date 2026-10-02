@@ -58,10 +58,11 @@ export type RoutesDeps = {
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  // a writer sees the key: an admin, or an owner whose row takes none
-  const answer = (row: Parameters<typeof view>[0]): RepoResponse => ({
-    repo: view(row, true),
-  });
+  // the row as the writer's list shows it: a key's name is an admin's
+  const answer = (
+    row: Parameters<typeof view>[0],
+    admin: boolean,
+  ): RepoResponse => ({ repo: view(row, admin) });
   const team = (id: string): RepoProject => {
     const project = deps.projects.byId(id);
     if (project === null || project.kind !== "team") {
@@ -85,7 +86,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
   };
 
-  const create = (project: RepoProject, change: CreateRepoRequest) => {
+  const create = (
+    project: RepoProject,
+    change: CreateRepoRequest,
+    admin: boolean,
+  ) => {
     const made = transact(deps.db, () => {
       const fields = desired(null, change, project.kind === "personal");
       checkRepo(project, fields, null, deps.keys);
@@ -96,7 +101,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       }
       nameFree(project, fields.name);
       return {
-        result: answer(deps.store.create(project.id, fields, deps.clock())),
+        result: answer(
+          deps.store.create(project.id, fields, deps.clock()),
+          admin,
+        ),
       };
     });
     deps.changed(made.repo.id);
@@ -106,6 +114,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     project: RepoProject,
     id: string,
     change: PatchRepoRequest,
+    admin: boolean,
   ) => {
     let refetch = false;
     const patched = transact(deps.db, () => {
@@ -115,7 +124,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       nameFree(project, fields.name, before.id);
       refetch = refetches(before, fields);
       const after = deps.store.update(before.id, fields, refetch, deps.clock());
-      return { result: answer(after!) };
+      return { result: answer(after!, admin) };
     });
     if (refetch) deps.changed(patched.repo.id);
     return patched;
@@ -129,10 +138,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     });
     return new Response(null, { status: 204 });
   };
-  const refresh = (project: RepoProject, id: string) => {
+  const refresh = (project: RepoProject, id: string, admin: boolean) => {
     const marked = transact(deps.db, () => {
       const row = find(project, id);
-      return { result: answer(deps.store.markPending(row.id, deps.clock())!) };
+      const marked = deps.store.markPending(row.id, deps.clock())!;
+      return { result: answer(marked, admin) };
     });
     deps.changed(marked.repo.id);
     return marked;
@@ -161,7 +171,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const project = team(ctx.params.id);
         const change = parseCreateRepo(await jsonBody(req));
-        return json(create(project, change), 201);
+        return json(create(project, change, true), 201);
       },
     },
     {
@@ -171,7 +181,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const project = team(ctx.params.id);
         const change = parsePatchRepo(await jsonBody(req));
-        return json(patch(project, ctx.params.repoId, change));
+        return json(patch(project, ctx.params.repoId, change, true));
       },
     },
     {
@@ -187,7 +197,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects/:id/repos/:repoId/refresh",
       policy: "admin",
       handle(_req, ctx) {
-        return json(refresh(team(ctx.params.id), ctx.params.repoId));
+        return json(refresh(team(ctx.params.id), ctx.params.repoId, true));
       },
     },
     {
@@ -197,7 +207,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const project = personal(ctx.principal!);
         const change = parseCreateRepo(await jsonBody(req));
-        return json(create(project, change), 201);
+        const admin = ctx.principal!.role === "admin";
+        return json(create(project, change, admin), 201);
       },
     },
     {
@@ -207,7 +218,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const project = personal(ctx.principal!);
         const change = parsePatchRepo(await jsonBody(req));
-        return json(patch(project, ctx.params.repoId, change));
+        const admin = ctx.principal!.role === "admin";
+        return json(patch(project, ctx.params.repoId, change, admin));
       },
     },
     {
@@ -223,7 +235,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/profile/project/repos/:repoId/refresh",
       policy: "authenticated",
       handle(_req, ctx) {
-        return json(refresh(personal(ctx.principal!), ctx.params.repoId));
+        const admin = ctx.principal!.role === "admin";
+        return json(
+          refresh(personal(ctx.principal!), ctx.params.repoId, admin),
+        );
       },
     },
   ];

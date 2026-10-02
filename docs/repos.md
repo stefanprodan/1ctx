@@ -68,8 +68,8 @@ may call them are in `docs/access.md`.
   or unusable.
 - **The key never reaches a command.** It is not one of a send's
   credentials, no `credential:` switch governs it and curl never signs
-  with it. Its name is in an admin's answer only; a member's list
-  carries no `keyName`.
+  with it. Its name is in an admin's answer only; a member's list and
+  a member's answer to a write carry no `keyName`.
 - **The credentials page counts it as used.** `GET /api/credentials`
   lists each key file's repositories (`usingKeys()`, a port closed in
   `compose.ts`); deleting a credential never asks about them.
@@ -81,8 +81,9 @@ may call them are in `docs/access.md`.
   host's answer is the proof of access, so a tree another project
   fetched signed is never mounted by an unsigned row naming its commit.
 - **One lookup per repository a minute** (`REPO_LOOKUP_MS`), shared by
-  URL, ref and key: two projects whose admin named one key share it.
-  Never shared between a signed and an unsigned lookup. A failure is
+  kind, URL, ref and key: two projects whose admin named one key share
+  it. Never shared between a signed and an unsigned lookup, nor between
+  two kinds' endpoints. A failure is
   shared the same minute, and the cache never mounts a tree past a
   failed lookup. A refresh or a change to
   what is fetched drops the repository's lookup.
@@ -97,7 +98,7 @@ may call them are in `docs/access.md`.
   A 200 is the tarball, and the commit is read from its first member;
   an archive naming none falls back to the API lookup, unsigned.
 - **The ETag on the row is scoped** to the lookup it came from (a short
-  hash of URL, ref and key before it), so a changed ref never
+  hash of kind, URL, ref and key before it), so a changed ref never
   sends an old one.
 
 ## The fetch
@@ -120,7 +121,9 @@ may call them are in `docs/access.md`.
   and a process slot (`acquireProcess()`) only for an unpack, so a
   lookup never waits behind other fetches and commands keep the rest.
   `prepare()` itself takes no slot, so a caller holding one cannot
-  deadlock it; a fetch waiting for a slot is past the turn's wait. A
+  deadlock it; a fetch waiting for a slot is past the turn's wait.
+  Another signer's turn joins the fetch for its tree, which its own
+  lookup proved, and on a failure fetches with its own key. A
   job waits at most `REPO_SLOT_WAIT_MS`, and its deadline starts again
   at the go. A slot granted after its job ended is given back.
 - **A tree that failed is not unpacked again** for a minute, one over
@@ -134,6 +137,9 @@ may call them are in `docs/access.md`.
   to what is fetched start a lookup and a fetch at once, so the admin
   page shows the outcome. At startup `fetching` goes back to `pending`
   and every `pending` row is fetched the same way, so no row waits.
+  A fetch writes the row only while it still has the URL, kind, ref,
+  key and ignore rules fetched, so one that ends after a change never
+  writes over it.
 - **Caps:** `repoBytes` and `repoFiles` count what the ignore rules
   keep; the worker also stops at 4 times `repoBytes` compressed or 4
   times `repoFiles` members. Past any: `over the size cap`. Past a kept
@@ -148,8 +154,10 @@ may call them are in `docs/access.md`.
   `validPath()` (`lib/paths.ts`, the skills' rule): no leading `/`, no
   `.`, `..` or empty segment, no backslash or control character. A bad
   name, a duplicate or a member under a file or a link fails the fetch.
-  A name the volume cannot hold beside another (`README` and `readme`
-  on a case-insensitive one) is dropped and counted.
+  A name the volume cannot hold beside another (`README` and `readme`,
+  or the folders `Docs` and `docs`, on a case-insensitive one) is
+  dropped and counted, a folder with every member under it, never
+  merged.
 - **The commit is the first member's pax `comment=`,** 40 or 64 hex.
   When the job knows the commit, a different one fails it `not found`.
 - **Files keep their mode with the owner's read bit,** and every file
@@ -168,20 +176,26 @@ may call them are in `docs/access.md`.
 - **`--cache <dir>`, by default `repos/` beside the database.** It can
   be lost: a tree missing is fetched again. Backups leave it out.
 - **`trees/<source>/<commit>-<ignore>/`** holds `tree.json` and
-  `files/`. `<source>` is a hash of the URL and `<ignore>` of the
-  effective rules (`ignoreKey()`), so no path part comes from a host, a
-  repository or a tarball. Two projects at one commit with the same
+  `files/`. `<source>` is a hash of the kind and the URL and `<ignore>`
+  of the effective rules (`ignoreKey()`), so no path part comes from a
+  host, a repository or a tarball, and one URL as two kinds never
+  shares a tree. Two projects at one commit with the same
   rules share a folder, each after its own lookup.
 - **A tree is published whole:** a job unpacks into `tmp/<job id>/`
   and renames it into `trees/`; when that exists, a concurrent job won
   and the loser removes its own. Startup removes `tmp/` and indexes the
   trees; a folder without `tree.json` is removed.
+- **A tree counts its size on disk** (`disk` in `tree.json`): each
+  kept file rounded up to 4 KiB blocks, an empty one a block, and a
+  block per folder and link, so a tree of empty files still counts.
+  `repoBytes` still caps the files' bytes alone.
 - **Eviction by last mount, never under a turn.** The index keeps when
   each tree was last mounted (and the folder's time, moved at most
   hourly). Past `repoCacheBytes` the least recent go, each renamed out
   at once and removed in the background. A mounted folder is held until
   its turn releases it. A fetch first checks the volume (`statfs`) for
-  `repoBytes` plus 1 GiB free, else `cache full`, then evicts. The
+  `repoBytes`, a block per `repoFiles` and 1 GiB free, else `cache
+  full`, then evicts. The
   hourly sweep evicts and clears what a job left in `tmp/`.
 
 ## The port

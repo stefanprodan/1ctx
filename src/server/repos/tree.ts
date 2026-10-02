@@ -16,6 +16,10 @@ export type TreeMeta = {
   // the folders under files/, which a walk visits as it does files
   dirs: number;
   bytes: number;
+  // what the cache counts toward repoCacheBytes: each kept file rounded
+  // up to whole blocks, an empty one a block, and a block per folder and
+  // link, so a tree of empty files still costs what it takes
+  disk: number;
   // files past fileBytes, kept and unreadable
   large: number;
   // files and links the ignore rules kept out
@@ -23,6 +27,13 @@ export type TreeMeta = {
   // links out of the tree, hard links to nothing kept, other members
   dropped: number;
 };
+
+// a volume's usual allocation unit
+export const BLOCK = 4096;
+// what a file takes on disk in whole blocks; an empty one, a folder or a
+// link (onDisk(0)) still takes one
+export const onDisk = (bytes: number) =>
+  Math.max(1, Math.ceil(bytes / BLOCK)) * BLOCK;
 
 export const treesDir = (cacheDir: string) => join(cacheDir, "trees");
 export const tmpDir = (cacheDir: string) => join(cacheDir, "tmp");
@@ -45,6 +56,7 @@ export function readMeta(folder: string): TreeMeta | null {
         meta.files,
         meta.dirs,
         meta.bytes,
+        meta.disk,
         meta.large,
         meta.ignored,
         meta.dropped,

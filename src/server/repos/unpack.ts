@@ -14,7 +14,6 @@ import {
   fchmodSync,
   constants as fs,
   futimesSync,
-  lstatSync,
   mkdirSync,
   openSync,
   renameSync,
@@ -32,7 +31,7 @@ import { isCommit } from "./adapters.ts";
 import type { RepoHeader } from "./check.ts";
 import { follow, statusError } from "./redirect.ts";
 import { effectiveIgnore, ignored, parseIgnore } from "./rules.ts";
-import { readMeta, type TreeMeta, tmpDir, treeFolder } from "./tree.ts";
+import { onDisk, readMeta, type TreeMeta, tmpDir, treeFolder } from "./tree.ts";
 
 export {
   readMeta,
@@ -174,6 +173,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
     files: 0,
     dirs: 0,
     bytes: 0,
+    disk: 0,
     large: 0,
     ignored: 0,
     dropped: 0,
@@ -255,17 +255,14 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
         try {
           mkdirSync(join(files, prefix), { mode: 0o755 });
         } catch (error) {
-          // another name of this folder on a case-insensitive volume
-          const code = (error as NodeJS.ErrnoException).code;
-          if (
-            code !== "EEXIST" ||
-            !lstatSync(join(files, prefix)).isDirectory()
-          ) {
-            throw new Dropped();
-          }
+          // every name this job made is in kinds, so one there already is
+          // another spelling the volume folds into it: never merged
+          if (clash(error)) throw new Dropped();
+          throw error;
         }
         kinds.set(prefix, "dir");
         dirs.push(prefix);
+        meta.disk += onDisk(0);
       }
     };
     const claim = (path: string) => {
@@ -374,6 +371,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           closeSync(fd);
         }
         written.add(path);
+        meta.disk += onDisk(member.size);
         return;
       }
       const link =
@@ -389,6 +387,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           return;
         }
         kinds.set(path, "link");
+        meta.disk += onDisk(0);
         return;
       }
       if (member.type === "link") {
@@ -421,6 +420,7 @@ export async function runJob(job: FetchJob, io: JobIo): Promise<JobResult> {
           kinds.set(path, "file");
           utimesSync(join(files, path), time, time);
           written.add(path);
+          meta.disk += onDisk(size);
           return;
         }
       }

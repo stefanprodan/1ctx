@@ -5,6 +5,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
+  adapter,
   type JobRunner,
   type RepoFields,
   type RepoLimits,
@@ -392,7 +393,7 @@ test("a mounted folder is held until the turn releases it", async () => {
   expect(existsSync(folder)).toBe(false);
   expect(logs.at(-1)).toMatchObject({
     msg: "repo cache swept",
-    fields: { trees: 1, bytes: 1, kept: 0, kept_bytes: 0 },
+    fields: { trees: 1, bytes: 4096, kept: 0, kept_bytes: 0 },
   });
 });
 
@@ -639,4 +640,113 @@ test("a failure of one signer's is never another's", async () => {
   expect((await repos.prepare("p1")).notices[0]?.reason).toBe("no access");
   add("p2", { ref: COMMIT });
   expect((await repos.prepare("p2")).mounts[0]?.commit).toBe(COMMIT);
+});
+
+test("a signer joins another's fetch for its tree, never its failure", async () => {
+  let deny = () => {};
+  const denied = new Promise<void>((resolve) => {
+    deny = resolve;
+  });
+  const answers: Record<string, HostAnswer> = {
+    [`${API}commits/main`]: new Response(COMMIT),
+    [`${API}tarball/${COMMIT}`]: async (call) => {
+      if (call.headers.authorization !== "Bearer key-a") {
+        return tarResponse(tree());
+      }
+      await denied;
+      return new Response("no", { status: 403 });
+    },
+  };
+  const { repos, host, add, keys } = setup({ answers });
+  keys["http-a"] = "key-a";
+  keys["http-b"] = "key-b";
+  const a = add("p1", { ref: "main", keyName: "http-a" });
+  const b = add("p2", { ref: "main", keyName: "http-b" });
+  expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
+    "fetching",
+  );
+  const second = repos.prepare("p2", { waitMs: 5_000 });
+  await Bun.sleep(5);
+  deny();
+  const mounted = await second;
+  expect(mounted.mounts[0]?.commit).toBe(COMMIT);
+  mounted.release();
+  expect(
+    host.calls
+      .filter((call) => call.url === `${API}tarball/${COMMIT}`)
+      .map((call) => call.headers.authorization),
+  ).toEqual(["Bearer key-a", "Bearer key-b"]);
+  expect(repos.byId(a.id)?.error).toBe("no access");
+  expect(repos.byId(b.id)).toMatchObject({ state: "ready", error: null });
+});
+
+test("one URL as two kinds is two lookups and two trees", async () => {
+  const github = adapter(PAGE, "github");
+  const gitlab = adapter(PAGE, "gitlab");
+  const answers: Record<string, HostAnswer> = {
+    [github.archiveUrl("")]: tarResponse(
+      tarball([{ name: "github.txt", body: "x" }], { comment: COMMIT }),
+    ),
+    [gitlab.archiveUrl("")]: tarResponse(
+      tarball([{ name: "gitlab.txt", body: "x" }], { comment: COMMIT }),
+    ),
+  };
+  const { repos, host, add } = setup({ answers });
+  add("p1", { kind: "github" });
+  add("p2", { kind: "gitlab" });
+  const first = await repos.prepare("p1");
+  const second = await repos.prepare("p2");
+  expect(readdirSync(first.mounts[0]!.folder)).toEqual(["github.txt"]);
+  expect(readdirSync(second.mounts[0]!.folder)).toEqual(["gitlab.txt"]);
+  expect(host.calls.map((call) => call.url)).toEqual([
+    github.archiveUrl(""),
+    gitlab.archiveUrl(""),
+  ]);
+  first.release();
+  second.release();
+});
+
+test("a fetch that ends after its row changed leaves the row alone", async () => {
+  const github = adapter(PAGE, "github");
+  let go = () => {};
+  const gate = new Promise<void>((resolve) => {
+    go = resolve;
+  });
+  const answers: Record<string, HostAnswer> = {
+    [github.archiveUrl("old")]: async () => {
+      await gate;
+      return tarResponse(
+        tarball([{ name: "old.txt", body: "x" }], { comment: COMMIT }),
+      );
+    },
+    [github.archiveUrl("new")]: tarResponse(tree(NEXT_COMMIT)),
+  };
+  const { repos, add, dir } = setup({ answers });
+  const row = add("p1", { ref: "old" });
+  expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
+    "fetching",
+  );
+  repos.store.update(
+    row.id,
+    { ...row, ref: "new", keyName: null, ignore: "" },
+    true,
+    2_000_000,
+  );
+  const fresh = await repos.prepare("p1");
+  expect(fresh.mounts[0]?.commit).toBe(NEXT_COMMIT);
+  fresh.release();
+  const before = repos.byId(row.id);
+  go();
+  const published = new Bun.Glob(`trees/*/${COMMIT}-*/tree.json`);
+  for (let i = 0; i < 200; i++) {
+    if ([...published.scanSync(dir)].length > 0) break;
+    await Bun.sleep(5);
+  }
+  await Bun.sleep(20);
+  expect(repos.byId(row.id)).toEqual(before);
+  expect(before).toMatchObject({
+    ref: "new",
+    state: "ready",
+    commit: NEXT_COMMIT,
+  });
 });
