@@ -257,11 +257,13 @@ export function createRuntimeContext(
  * at the end and a low one at the start are one code point once joined.
  */
 export function addOutput(ctx: AwkRuntimeContext, text: string): void {
-  const last = ctx.output.charCodeAt(ctx.output.length - 1);
   const first = text.charCodeAt(0);
+  // only then: a read of the output's last character flattens it, a copy
+  // of everything printed so far on every print
+  if (first >= 0xdc00 && first <= 0xdfff) {
+    const last = ctx.output.charCodeAt(ctx.output.length - 1);
+    if (last >= 0xd800 && last <= 0xdbff) ctx.outputBytes -= 2;
+  }
   ctx.output += text;
   ctx.outputBytes += utf8ByteLength(text);
-  if (last >= 0xd800 && last <= 0xdbff && first >= 0xdc00 && first <= 0xdfff) {
-    ctx.outputBytes -= 2;
-  }
 }
