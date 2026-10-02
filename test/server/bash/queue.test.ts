@@ -6,6 +6,7 @@ import {
   acquireSession,
   heldSessions,
 } from "../../../src/server/bash/queue.ts";
+import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { callCaps, freshSignal, run, scratchState, setup } from "./helpers.ts";
 
@@ -122,7 +123,9 @@ describe("command admission", () => {
       expect((await run(s, "echo kept > /tmp/file")).error).toBe(false);
       const before = scratchState(s);
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
+        Array.from({ length: PROCESS_SLOTS }, () =>
+          acquireProcess(freshSignal()),
+        ),
       );
       const controller = new AbortController();
       const pending = run(s, "true", callCaps, controller.signal);

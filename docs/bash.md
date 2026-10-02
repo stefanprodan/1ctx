@@ -110,7 +110,10 @@ of that shell that shows a file on the chat page.
   or 126, or a throw discards both writable trees. Any other exit,
   nonzero included, commits in one transaction (`bash/commit.ts`): docs
   through `commitDocs`, then scratch. An overflow rolls both back.
-- **At most four commands hold mounts at once.** The per-chat queue
+- **A process slot per core holds a mount.** `PROCESS_SLOTS` is the
+  cores read at start (a container's CPU limit, floored), at least 4
+  (a command waiting on the network holds one idle) and at most 16,
+  logged at `startup`. The per-chat queue
   (`bash/queue.ts`) is taken before a process slot (`acquireProcess()`,
   shared with uploads) and released after it.
 - **Written doc paths go on the tool row.** `finishTool` stores them as

@@ -14,6 +14,7 @@ import { TOUCH_AFTER_MS } from "./access/index.ts";
 import { compose } from "./compose.ts";
 import { httpKeys, MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
 import { type Db, open } from "./db/index.ts";
+import { PROCESS_SLOTS } from "./knowledge/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { wallClock } from "./lib/clock.ts";
 import {
@@ -201,6 +202,7 @@ log.info("startup", {
   provision_unchanged: applied?.unchanged,
   flags: flags || "none",
   drain,
+  process_slots: PROCESS_SLOTS,
   providers: app.providers.list().length,
   agents: app.agents.list().length,
   mcp_servers: app.mcp.list().length,

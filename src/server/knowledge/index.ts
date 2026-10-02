@@ -351,6 +351,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
 
 export { checkFile, checkNames, checkTotals } from "./check.ts";
 export type { Change } from "./commit.ts";
+export { PROCESS_SLOTS } from "./limits.ts";
 export { acquireProcess } from "./queue.ts";
 export type { MountedDoc } from "./store.ts";
 export type { MountedUploads } from "./uploads.ts";

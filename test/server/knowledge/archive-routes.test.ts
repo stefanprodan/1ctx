@@ -4,8 +4,8 @@
 import { expect, test } from "bun:test";
 import {
   ARCHIVE_DEADLINE_MS,
-  KNOWLEDGE_COMMANDS_IN_FLIGHT,
   MAX_ARCHIVE_UPLOAD,
+  PROCESS_SLOTS,
 } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { serve } from "../../../src/server/web/serve.ts";
@@ -138,7 +138,7 @@ function stalledBody() {
   };
 }
 
-async function holdSlots(count = KNOWLEDGE_COMMANDS_IN_FLIGHT) {
+async function holdSlots(count = PROCESS_SLOTS) {
   const slots: (() => void)[] = [];
   for (let i = 0; i < count; i++) {
     slots.push(await acquireProcess(new AbortController().signal));
@@ -405,7 +405,7 @@ test.serial(
   "a stalled upload holds its slot and guard until deadline cancellation settles",
   async () => {
     const s = await setup();
-    const slots = await holdSlots(KNOWLEDGE_COMMANDS_IN_FLIGHT - 1);
+    const slots = await holdSlots(PROCESS_SLOTS - 1);
     const body = stalledBody();
     const stop = new AbortController();
     const probeStop = new AbortController();
@@ -458,7 +458,7 @@ for (const phase of ["queued", "reading"] as const) {
     async () => {
       const s = await setup();
       const slots = await holdSlots(
-        KNOWLEDGE_COMMANDS_IN_FLIGHT - (phase === "reading" ? 1 : 0),
+        PROCESS_SLOTS - (phase === "reading" ? 1 : 0),
       );
       const body = stalledBody();
       const stop = new AbortController();

@@ -4,8 +4,8 @@
 import { expect, test } from "bun:test";
 import {
   ARCHIVE_DEADLINE_MS,
-  KNOWLEDGE_COMMANDS_IN_FLIGHT,
   MAX_ARCHIVE_UPLOAD,
+  PROCESS_SLOTS,
 } from "../../../src/server/knowledge/limits.ts";
 import {
   acquireProcess,
@@ -16,7 +16,7 @@ import { Conflict } from "../../../src/server/lib/errors.ts";
 import { setup } from "./helpers.ts";
 import { setupUploads, staged, stalledBody } from "./uploads-helpers.ts";
 
-async function holdSlots(count = KNOWLEDGE_COMMANDS_IN_FLIGHT) {
+async function holdSlots(count = PROCESS_SLOTS) {
   const releases: (() => void)[] = [];
   for (let i = 0; i < count; i++) {
     releases.push(await acquireProcess(new AbortController().signal));
@@ -298,7 +298,7 @@ test.serial(
   "deadline cleanup settles before releasing the stage's slot and guard",
   async () => {
     const s = await setupUploads();
-    const slots = await holdSlots(KNOWLEDGE_COMMANDS_IN_FLIGHT - 1);
+    const slots = await holdSlots(PROCESS_SLOTS - 1);
     const body = stalledBody();
     const stop = new AbortController();
     const probeStop = new AbortController();
