@@ -1,5 +1,5 @@
 {
-  "recordedWith": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)\nCopyright (C) 2022 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\nThis is free software; you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.",
+  "recordedWith": "GNU bash, version 5.2.21(1)-release (aarch64-unknown-linux-gnu)\nCopyright (C) 2022 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\nThis is free software; you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.",
   "env": {
     "LC_ALL": "C"
   },
@@ -620,6 +620,141 @@
         "a/lb -> b",
         "a/lf -> b/f"
       ]
+    },
+    {
+      "name": "a wrapper function runs \"$@\" as a command",
+      "args": [
+        "-c",
+        "f(){ \"$@\"; }; f echo a b"
+      ],
+      "stdout": "a b\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "unquoted $@ as the command word",
+      "args": [
+        "-c",
+        "f(){ $@; }; f echo a b"
+      ],
+      "stdout": "a b\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "\"$@\" keeps each argument whole",
+      "args": [
+        "-c",
+        "set -- printf \"%s|\" \"a  b\" c; \"$@\"; echo"
+      ],
+      "stdout": "a  b|c|\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "\"${a[@]}\" as the command word",
+      "args": [
+        "-c",
+        "a=(echo p q); \"${a[@]}\""
+      ],
+      "stdout": "p q\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "a variable holding a command and its argument",
+      "args": [
+        "-c",
+        "x=\"echo  a  b\"; $x"
+      ],
+      "stdout": "a b\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "a command word split on IFS",
+      "args": [
+        "-c",
+        "IFS=:; x=\"echo:a\"; $x"
+      ],
+      "stdout": "a\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "an empty \"$@\" runs nothing",
+      "args": [
+        "-c",
+        "set --; \"$@\"; echo \"st=$?\""
+      ],
+      "stdout": "st=0\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "an empty \"$@\" leaves the next word as the command",
+      "args": [
+        "-c",
+        "set --; \"$@\" echo z"
+      ],
+      "stdout": "z\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "a quoted empty argument is not found",
+      "args": [
+        "-c",
+        "set -- \"\"; \"$@\"; echo \"st=$?\""
+      ],
+      "stdout": "st=127\n",
+      "exit": 0,
+      "warned": true,
+      "tree": []
+    },
+    {
+      "name": "\"$@\" joined to a prefix",
+      "args": [
+        "-c",
+        "set -- echo a; \"pre$@\" b; echo \"st=$?\""
+      ],
+      "stdout": "st=127\n",
+      "exit": 0,
+      "warned": true,
+      "tree": []
+    },
+    {
+      "name": "a command word from brace expansion",
+      "args": [
+        "-c",
+        "{echo,hi}"
+      ],
+      "stdout": "hi\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "a command word from a glob",
+      "args": [
+        "-c",
+        "touch echo-me; ech?-me; echo \"st=$?\""
+      ],
+      "stdout": "st=127\n",
+      "exit": 0,
+      "warned": true,
+      "tree": [
+        "echo-me"
+      ]
+    },
+    {
+      "name": "a wrapper's status is the command's",
+      "args": [
+        "-c",
+        "f(){ \"$@\"; }; f false; echo \"st=$?\"; f true && echo yes"
+      ],
+      "stdout": "st=1\nyes\n",
+      "exit": 0,
+      "tree": []
     }
   ]
 }
