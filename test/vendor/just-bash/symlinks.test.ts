@@ -4,7 +4,8 @@
 // rm and find over symbolic links, as GNU coreutils 9.11 rm and GNU
 // findutils 4.11 find answer on Linux: rm removes a link, never what it
 // names, unless a trailing slash resolves it; find follows links under -L
-// everywhere and under -H in the starting points only, -P the default.
+// everywhere and under -H in the starting points only, -P the default. A
+// loop of links refuses a redirect, a read or a write in bash 5.3's words.
 
 import { describe, expect, test } from "bun:test";
 import { Bash } from "just-bash";
@@ -76,7 +77,7 @@ const find: Case[] = [
   ["find -H a/broken", "a/broken\n", "", 0],
   ["find -L -- la -maxdepth 0 -type d", "la\n", "", 0],
   ["find -- a -maxdepth 0", "a\n", "", 0],
-  ["find -HL la", "", "find: unknown predicate '-HL'\n", 1],
+  ["find -HL la", "", "find: unknown predicate `-HL'\n", 1],
   ["find -L . -maxdepth 1 -type d", ".\n./a\n./la\n", "", 0],
 ];
 
@@ -125,6 +126,8 @@ async function looped(script: string) {
 
 const eloop = (path: string) =>
   `find: '${path}': Too many levels of symbolic links\n`;
+const tooMany = (lead: string) =>
+  `${lead}: Too many levels of symbolic links\n`;
 
 const loopCases: Case[] = [
   ["find /d", "/d\n/d/a\n/d/b\n/d/f\n", "", 0],
@@ -132,6 +135,14 @@ const loopCases: Case[] = [
   ["find -L /d -type f", "/d/f\n", eloop("/d/a") + eloop("/d/b"), 1],
   ["find -L /d/a", "", eloop("/d/a"), 1],
   ["rm /d/a; ls /d", "b\nf\n", "", 0],
+  ["echo y > /d/a; echo rc=$?", "rc=1\n", tooMany("bash: /d/a"), 0],
+  ["echo y >> /d/a/f; echo rc=$?", "rc=1\n", tooMany("bash: /d/a/f"), 0],
+  ["exec 3> /d/a; echo rc=$?", "rc=1\n", tooMany("bash: /d/a"), 0],
+  ["cat < /d/a; echo rc=$?", "rc=1\n", tooMany("bash: /d/a"), 0],
+  ["cat /d/a", "", tooMany("cat: /d/a"), 1],
+  ["touch /d/a", "", tooMany("touch: cannot touch '/d/a'"), 1],
+  ["echo y | tee /d/b", "y\n", tooMany("tee: /d/b"), 1],
+  ["chmod 600 /d/a", "", tooMany("chmod: cannot access '/d/a'"), 1],
 ];
 
 describe("links through links", () => {

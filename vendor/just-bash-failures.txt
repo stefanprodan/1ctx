@@ -12,6 +12,8 @@
 (fail) DNS rebinding integration (real DNS) > denyPrivateRanges + allow-list works with real DNS
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
 (fail) Documentation TypeScript examples > should have valid TypeScript syntax in all examples
+(fail) InMemoryFs Security - Symlink Handling > symlink + write operations > should overwrite symlink with file on appendFile
+(fail) InMemoryFs Security - Symlink Handling > symlink + write operations > should overwrite symlink with file on writeFile
 (fail) OverlayFs Security - Path Traversal Prevention > directory traversal via operations > should not allow mkdir outside root
 (fail) Python/SQLite Information Disclosure > python3 sys.path should not expose host or Node internal paths
 (fail) README validation > command list completeness > should list all registered commands
@@ -137,6 +139,7 @@
 (fail) lazy provider under defense-in-depth (#253) > keeps untrusted command execution blocked after materialization
 (fail) lazy provider under defense-in-depth (#253) > materializes a provider that reads process.env during exec
 (fail) lazy provider under defense-in-depth (#253) > materializes a provider that settles on a macrotask during exec
+(fail) ls > -F flag (classify) > should show directory mode for symlinks to directories in long format
 (fail) preserves invalid UTF-8 bytes in binary stdin request bodies
 (fail) process substitution - read-only /dev/fd is not scratch space > behaves the same whether or not a substitution ran first
 (fail) process substitution - read-only /dev/fd is not scratch space > refuses a write even with a descriptor still live

@@ -17,6 +17,7 @@ const WORDS: Record<string, string> = Object.assign(Object.create(null), {
   ENOSPC: "No space left on device",
   EFBIG: "File too large",
   EBUSY: "Device or resource busy",
+  ELOOP: "Too many levels of symbolic links",
 });
 
 /** The errno an error carries, from its code or its message's lead. */
@@ -47,11 +48,13 @@ export function fsErrorSyscall(error: unknown): string | undefined {
 
 /**
  * Why a file could not be read, in GNU's words: too large for the read
- * limit, or else missing, which is what the commands said before.
+ * limit, a looping link, or else missing, which is what the commands said
+ * before.
  */
 export function readErrorWords(error: unknown): string {
-  return fsErrorCode(error) === "EFBIG"
-    ? "File too large"
+  const code = fsErrorCode(error);
+  return code === "EFBIG" || code === "ELOOP"
+    ? WORDS[code]
     : "No such file or directory";
 }
 
@@ -59,12 +62,18 @@ const CREATING = new Set(["write", "append", "open", "mkdir", "symlink", "link"]
 
 /**
  * GNU's words for a write a file system refused: read-only, or a path that
- * cannot be made (a missing or file parent, a folder written to), as a
- * read-only overlay reports before EROFS. Undefined for anything else.
+ * cannot be made (a missing or file parent, a folder written to, a looping
+ * link), as a read-only overlay reports before EROFS. Undefined for
+ * anything else.
  */
 export function writeRefusalWords(error: unknown): string | undefined {
   const code = fsErrorCode(error);
-  if (code === "EROFS" || code === "ENOTDIR" || code === "EISDIR") {
+  if (
+    code === "EROFS" ||
+    code === "ENOTDIR" ||
+    code === "EISDIR" ||
+    code === "ELOOP"
+  ) {
     return fsErrorWords(error);
   }
   if (code === "ENOENT" && CREATING.has(fsErrorSyscall(error) ?? "")) {

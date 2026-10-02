@@ -410,6 +410,23 @@ the work units each costs. Where they part:
 - `Symbolic links` names its files in `‘’` whatever the locale, and a
   name GNU would escape in them is printed as it is.
 
+## Where our shell still differs from bash on links and bytes
+
+`test/fixtures/just-bash/bash-gnu.json`, recorded by
+`scripts/bash-record.ts` from GNU bash 5.2 and coreutils 9.4 in the C
+locale, holds short scripts through linked folders, `ls -l`, `readlink
+-f`, `**` and byte escapes, and the tree each leaves;
+`test/vendor/just-bash/bash-gnu.test.ts` holds ours to it. Where they
+part:
+
+- A variable holds text: `x=$(printf '\351')` and `printf -v x '\351'`
+  keep a lone byte, one that spells no UTF-8 character, as the character
+  U+00E9, which `printf %s "$x"` writes as two bytes; bash keeps the
+  byte. `${#x}` counts a character `printf -v` decoded as one, where
+  bash in the C locale counts its bytes.
+- `find d/ -printf %f` prints `d`, GNU `d/`.
+- `od` ignores `-t`, so the fixture reads bytes through `base64`.
+
 ## Where our read and mapfile still differ from bash
 
 `test/vendor/just-bash/read-utf8.test.ts` holds them to bash 5.3 in a

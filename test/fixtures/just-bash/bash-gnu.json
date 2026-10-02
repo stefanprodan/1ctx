@@ -1,0 +1,625 @@
+{
+  "recordedWith": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)\nCopyright (C) 2022 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\nThis is free software; you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.",
+  "env": {
+    "LC_ALL": "C"
+  },
+  "tree": true,
+  "files": {},
+  "cases": [
+    {
+      "name": "mkdir through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; mkdir la/new; ls d"
+      ],
+      "stdout": "new\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/new/",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "mkdir -p through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; mkdir -p la/x/y; ls d/x"
+      ],
+      "stdout": "y\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/x/",
+        "d/x/y/",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "a write through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > la/f; cat d/f"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/f",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "an append through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > d/f; echo y >> la/f; cat d/f"
+      ],
+      "stdout": "x\ny\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/f",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "a write through a link to a file",
+      "args": [
+        "-c",
+        "echo x > t; ln -s t l; echo y > l; cat t"
+      ],
+      "stdout": "y\n",
+      "exit": 0,
+      "tree": [
+        "l -> t",
+        "t"
+      ]
+    },
+    {
+      "name": "cp into a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > s; cp s la/c; cat d/c"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/c",
+        "la -> d",
+        "s"
+      ]
+    },
+    {
+      "name": "cp -r into a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; mkdir s; echo x > s/f; cp -r s la/c; cat d/c/f"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/c/",
+        "d/c/f",
+        "la -> d",
+        "s/",
+        "s/f"
+      ]
+    },
+    {
+      "name": "mv into a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > s; mv s la/m; cat d/m"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/m",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "mv out of a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > d/f; mv la/f out; cat out"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "la -> d",
+        "out"
+      ]
+    },
+    {
+      "name": "chmod through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > d/f; chmod 600 la/f; stat -c %a d/f"
+      ],
+      "stdout": "600\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/f",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "chmod through a link to a file",
+      "args": [
+        "-c",
+        "echo x > t; ln -s t l; chmod 600 l; stat -c %a t"
+      ],
+      "stdout": "600\n",
+      "exit": 0,
+      "tree": [
+        "l -> t",
+        "t"
+      ]
+    },
+    {
+      "name": "a link made in a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; ln -s target la/l; readlink d/l"
+      ],
+      "stdout": "target\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/l -> target",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "a hard link made in a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > s; ln s la/h; cat d/h"
+      ],
+      "stdout": "x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/h",
+        "la -> d",
+        "s"
+      ]
+    },
+    {
+      "name": "readlink through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; ln -s t d/l; readlink la/l"
+      ],
+      "stdout": "t\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/l -> t",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "rm through a linked folder",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; echo x > d/f; rm la/f; ls d"
+      ],
+      "stdout": "",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "find a linked folder with a slash",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d la; touch d/x; find la/"
+      ],
+      "stdout": "la/\nla/x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/x",
+        "la -> d"
+      ]
+    },
+    {
+      "name": "find a folder with a slash",
+      "args": [
+        "-c",
+        "mkdir d; touch d/x; find d/"
+      ],
+      "stdout": "d/\nd/x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/x"
+      ]
+    },
+    {
+      "name": "readlink -f through a dot link",
+      "args": [
+        "-c",
+        "mkdir d; ln -s . d/self; touch d/f; readlink -f d/self/f | sed \"s|^$PWD/||\""
+      ],
+      "stdout": "d/f\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/f",
+        "d/self -> ."
+      ]
+    },
+    {
+      "name": "readlink -f through two links",
+      "args": [
+        "-c",
+        "mkdir -p a/b; ln -s a/b c; ln -s c e; touch a/b/f; readlink -f e/f | sed \"s|^$PWD/||\""
+      ],
+      "stdout": "a/b/f\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/f",
+        "c -> a/b",
+        "e -> c"
+      ]
+    },
+    {
+      "name": "ls -l modes",
+      "args": [
+        "-c",
+        "mkdir d; echo x > d/f; chmod 600 d/f; echo y > d/x; chmod 755 d/x; mkdir d/sub; chmod 700 d/sub; ls -l d | tail -n +2 | awk '{print $1, $NF}'"
+      ],
+      "stdout": "-rw------- f\ndrwx------ sub\n-rwxr-xr-x x\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "d/f",
+        "d/sub/",
+        "d/x"
+      ]
+    },
+    {
+      "name": "ls -l a link",
+      "args": [
+        "-c",
+        "echo x > f; ln -s f l; ls -l l | awk '{print substr($1, 1, 1), $(NF-2), $(NF-1), $NF}'"
+      ],
+      "stdout": "l l -> f\n",
+      "exit": 0,
+      "tree": [
+        "f",
+        "l -> f"
+      ]
+    },
+    {
+      "name": "** after a folder",
+      "args": [
+        "-c",
+        "mkdir -p a/b/c; touch a/b/c/f a/g; echo a/**"
+      ],
+      "stdout": "a/b a/g\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "** after a folder under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b/c; touch a/b/c/f a/g; echo a/**"
+      ],
+      "stdout": "a/ a/b a/b/c a/b/c/f a/g\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "** alone under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b/c; touch a/b/c/f a/g; echo **"
+      ],
+      "stdout": "a a/b a/b/c a/b/c/f a/g\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "** then a name under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b/c; touch a/b/c/f a/f; echo a/**/f"
+      ],
+      "stdout": "a/b/c/f a/f\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/f"
+      ]
+    },
+    {
+      "name": "printf an octal byte",
+      "args": [
+        "-c",
+        "printf '\\351' | base64"
+      ],
+      "stdout": "6Q==\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "printf a hex byte",
+      "args": [
+        "-c",
+        "printf '\\xe9' | base64"
+      ],
+      "stdout": "6Q==\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "printf %b with a byte",
+      "args": [
+        "-c",
+        "printf '%b' '\\351\\xe9' | base64"
+      ],
+      "stdout": "6ek=\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "echo -e with bytes",
+      "args": [
+        "-c",
+        "echo -e '\\xe9\\0351' | base64"
+      ],
+      "stdout": "6ekK\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "printf a byte and text",
+      "args": [
+        "-c",
+        "printf 'a\\351b\\n' | base64"
+      ],
+      "stdout": "YeliCg==\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "printf a UTF-8 escape",
+      "args": [
+        "-c",
+        "printf '\\u00e9' | base64"
+      ],
+      "stdout": "w6k=\n",
+      "exit": 0,
+      "tree": [],
+      "env": {
+        "LC_ALL": "C.UTF-8"
+      }
+    },
+    {
+      "name": "** after an absolute folder",
+      "args": [
+        "-c",
+        "mkdir -p a/b/c; touch a/b/c/f a/g; echo \"$PWD\"/a/** | sed \"s|$PWD/||g\""
+      ],
+      "stdout": "a/b a/g\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "** after an absolute folder under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b/c; touch a/b/c/f a/g; echo \"$PWD\"/a/** | sed \"s|$PWD/||g\""
+      ],
+      "stdout": "a/ a/b a/b/c a/b/c/f a/g\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/c/",
+        "a/b/c/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "a write to a looping link",
+      "args": [
+        "-c",
+        "ln -s l l; echo y > l; echo rc=$?"
+      ],
+      "stdout": "rc=1\n",
+      "exit": 0,
+      "warned": true,
+      "tree": [
+        "l -> l"
+      ]
+    },
+    {
+      "name": "an append to a looping link",
+      "args": [
+        "-c",
+        "ln -s l l; echo y >> l; echo rc=$?"
+      ],
+      "stdout": "rc=1\n",
+      "exit": 0,
+      "warned": true,
+      "tree": [
+        "l -> l"
+      ]
+    },
+    {
+      "name": "a write through a looping link",
+      "args": [
+        "-c",
+        "ln -s l l; echo y > l/f; echo rc=$?"
+      ],
+      "stdout": "rc=1\n",
+      "exit": 0,
+      "warned": true,
+      "tree": [
+        "l -> l"
+      ]
+    },
+    {
+      "name": "stderr to a looping link",
+      "args": [
+        "-c",
+        "ln -s l l; ls nowhere 2> l; echo rc=$?"
+      ],
+      "stdout": "rc=1\n",
+      "exit": 0,
+      "warned": true,
+      "tree": [
+        "l -> l"
+      ]
+    },
+    {
+      "name": "printf -v with UTF-8 bytes",
+      "args": [
+        "-c",
+        "printf -v x '\\xc3\\xa9 \\xe2\\x9c\\x93 \\xf0\\x9f\\x98\\x80'; echo \"$x\" > f; cat f"
+      ],
+      "stdout": "é ✓ 😀\n",
+      "exit": 0,
+      "tree": [
+        "f"
+      ]
+    },
+    {
+      "name": "printf -v %b with UTF-8 bytes",
+      "args": [
+        "-c",
+        "printf -v x '%b' '\\303\\251'; printf '%s\\n' \"$x\""
+      ],
+      "stdout": "é\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "printf -v into an array with UTF-8 bytes",
+      "args": [
+        "-c",
+        "printf -v a[1] 'a\\xc3\\xa9b'; echo \"${a[1]}\""
+      ],
+      "stdout": "aéb\n",
+      "exit": 0,
+      "tree": []
+    },
+    {
+      "name": "ls -ld a linked folder with a slash",
+      "args": [
+        "-c",
+        "mkdir d; chmod 750 d; ln -s d l; ls -ld l/ | awk '{print $1, $NF}'; ls -ld l | awk '{print substr($1, 1, 1), $(NF-2), $(NF-1), $NF}'"
+      ],
+      "stdout": "drwxr-x--- l/\nl l -> d\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "l -> d"
+      ]
+    },
+    {
+      "name": "ls -dF a linked folder with a slash",
+      "args": [
+        "-c",
+        "mkdir d; ln -s d l; ls -dF l/ l; ls -ldF l/ | awk '{print $1, $NF}'"
+      ],
+      "stdout": "l@\nl//\ndrwxr-xr-x l//\n",
+      "exit": 0,
+      "tree": [
+        "d/",
+        "l -> d"
+      ]
+    },
+    {
+      "name": "**/ under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b .h/i; touch a/b/f a/g; echo **/; echo a/**/; shopt -s dotglob; echo **/"
+      ],
+      "stdout": "a/ a/b/\na/ a/b/\n.h/ .h/i/ a/ a/b/\n",
+      "exit": 0,
+      "tree": [
+        ".h/",
+        ".h/i/",
+        "a/",
+        "a/b/",
+        "a/b/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "**/** under globstar",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b; touch a/b/f a/g; echo a/**/**; echo **/**; echo a/**/**/; echo **/b/**"
+      ],
+      "stdout": "a a/b a/b/f a/g\na a/b a/b/f a/g\na/ a/b/\na/b a/b/f\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/f",
+        "a/g"
+      ]
+    },
+    {
+      "name": "**/ names a linked folder",
+      "args": [
+        "-c",
+        "shopt -s globstar; mkdir -p a/b; touch a/b/f; ln -s b a/lb; ln -s b/f a/lf; echo **/; echo a/**"
+      ],
+      "stdout": "a/ a/b/ a/lb/\na/ a/b a/b/f a/lb a/lf\n",
+      "exit": 0,
+      "tree": [
+        "a/",
+        "a/b/",
+        "a/b/f",
+        "a/lb -> b",
+        "a/lf -> b/f"
+      ]
+    }
+  ]
+}

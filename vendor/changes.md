@@ -188,6 +188,24 @@ or a heredoc (`N<<`) holds bytes, as stdin does, and a write through
 Before: a descriptor held decoded text, so `cat <&3` wrote `ţ` as one
 wrong byte.
 
+### globstar: a trailing ** lists everything below, as bash
+Files: `src/shell/glob.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`
+
+Now: under `shopt -s globstar` a pattern that ends in `**` matches every
+file and folder below the folder before it, and that folder itself with
+its slash (`a/**` gives `a/ a/b a/b/f`), as bash 5 does; `**` alone
+lists everything below the current folder. A pattern that ends in `**/`
+matches only the folders, each with its slash (`a/**/` gives `a/ a/b/`),
+a link to a folder among them. After more than one `**` (`a/**/**`,
+`a/**/c/**`) the folder a trailing `**` follows has no slash, as bash
+names it. It descends into no link and leaves dot entries out unless
+`dotglob` is set.
+
+Before: the walk matched the empty name after `**` against nothing, so
+`echo a/**` and `echo **` under globstar printed the pattern itself.
+
 ## Filesystem
 
 ### fs-children: a directory keeps its children, paths resolve unwalked
@@ -240,6 +258,42 @@ Before:
   never saw a link on disk: `cd -P`, `find -L` and `rg -L` took
   `/repos/r/a` for a folder of its own. A link in the middle of a path
   dropped the components after it.
+
+## Every command
+
+### fs-links: a write through a linked folder lands in it
+Files: `src/fs/in-memory-fs/in-memory-fs.ts`,
+  `src/commands/readlink/readlink.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`,
+  `test/vendor/just-bash/awk.test.ts`
+
+Now:
+
+- **InMemoryFs.** every call resolves the linked folders above the last
+  name, as the kernel does, and the last name as its call would: a
+  write, an append and `chmod` follow it, so `echo y > link` writes the
+  file the link names; `mkdir`, `cp`, `mv`, `symlink`, `link` and
+  `readlink` act on the name itself. `mkdir -p` stands on a link to a
+  folder, and a file copied onto a link to a file is written through it.
+  A loop of links refuses the call with ELOOP, which a redirect and the
+  commands report as `Too many levels of symbolic links`
+  (`readonly-errors`), the script going on.
+- **readlink -f.** it resolves the components in turn, as GNU does: a
+  link's target goes in front of the components still to go, so `..`
+  after a link climbs from where it led and a link to `.` resolves.
+  Every component but the last must exist; a missing folder, a file in
+  the middle or a loop answers nothing, exit 1.
+
+Before:
+
+- **InMemoryFs.** only `readdir`, `rm`, reads and stats followed a
+  linked folder; `mkdir la/new`, a write, `cp`, `mv`, `chmod`, `ln` and
+  `readlink` through one stored the entry under the link's own path,
+  where nothing could read it, and a write to a link replaced it.
+- **readlink -f.** it followed only the last component, so `d/self/f`
+  through `self -> .` printed itself, and a path it could not resolve
+  printed the path, exit 0.
 
 ## Every command
 
@@ -320,37 +374,44 @@ Files: `src/fs/error-words.ts` (new), `src/fs/overlay-fs/overlay-fs.ts`,
   `src/commands/tac/tac.ts`, `src/commands/tar/tar.ts`,
   `src/commands/tee/tee.ts`, `src/commands/time/time.ts`,
   `src/commands/touch/touch.ts`, `src/commands/xan/csv.ts`,
-  `src/commands/xan/xan-data.ts`, `src/commands/yq/yq.ts`
+  `src/commands/xan/xan-data.ts`, `src/commands/yq/yq.ts`,
+  `src/fs/mountable-fs/mountable-fs.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/readonly-errors.test.ts`,
   `test/vendor/just-bash/overlay-mount.test.ts`,
-  `test/vendor/just-bash/awk.test.ts`
+  `test/vendor/just-bash/awk.test.ts`,
+  `test/vendor/just-bash/symlinks.test.ts`,
+  `test/vendor/just-bash/bash-gnu.test.ts`
 
 Now:
 
 - **Redirects.** a refused open (`>`, `>>`, `>|`, `&>`, `&>>`, `N>`,
   `>&file`, `<>`, `exec N>`) answers `bash: <target as typed>: <words>`
   (`Read-only file system`, `Not a directory`, `Is a directory`, `No such
-  file or directory`, ...) with exit 1 and the command not run, as
-  upstream's open PR #127 does. `<>` refuses a read-only file by setting
-  the time it already has, which changes nothing elsewhere. A refused
-  write after the open is `bash: <command>: write error: <words>`. A
+  file or directory`, `Too many levels of symbolic links`, ...) with exit
+  1 and the command not run, as upstream's open PR #127 does. `<>`
+  refuses a read-only file by setting the time it already has, which
+  changes nothing elsewhere. A refused write after the open is `bash:
+  <command>: write error: <words>`. A
   full file system (ENOSPC) and an unknown error still throw, so a full
   mount still ends the job.
 - **Writing commands.** each names the path as typed with GNU's words,
   never the backend's message and its mount-relative path: `sed -i`
   (`couldn't open temporary file <dir>/sedXXXXXX`, exit 4), sed's `w`
   file (`couldn't open file F`, exit 4, where it wrote nothing before),
-  `chmod` (`changing permissions of`), `mkdir`, `mv` (`cannot remove` the
-  source after a copy across mounts, `cannot create regular file` or
-  `directory`, `cannot move ... to`, a mount point `Device or resource
-  busy`), `cp` (`cannot create regular file` or `directory`), `touch`,
+  `chmod` (`changing permissions of`, `cannot access` a looping link),
+  `mkdir`, `mv` (`cannot remove` the source after a copy across mounts,
+  `cannot create regular file` or `directory`, `cannot move ... to`, a
+  mount point `Device or resource busy`), `cp` (`cannot create regular
+  file` or `directory`), `touch`,
   `ln`, `rmdir`, `tee`, `split`, `sort -o` (`open failed:`), `tar`
   (`Cannot open:`, `Cannot mkdir:`), `gzip`, `yq -i`, `curl` (`(23)`),
   `find -delete`, `time -o` and awk's `print >` (`cannot redirect to`).
 - **Reads.** a file over the read limit (EFBIG) is `<cmd>: <path>: File
   too large` in every command that reads files, `rg: <path>: File too
   large (os error 27)` and exit 2 in rg, which skipped it silently.
+  A looping link (ELOOP) is `Too many levels of symbolic links` in a
+  redirect and in a command that reads through `readErrorWords`.
 - **The fallback.** a command that lets a read-only refusal or EFBIG
   through says `<command>: Read-only file system` or `File too large`.
 - **OverlayFs.** a read-only overlay checks a path before refusing it: an
@@ -1222,6 +1283,54 @@ Before:
   `-o json` showed a `<<` key.
 - **eval-all.** the idioms that sort or count documents across a stream,
   or merge files, were refused with a pointer to `-s`.
+
+## Regular expressions
+
+### ls-long: ls -l prints each entry's own mode and a link's target
+Files: `src/commands/ls/ls.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`,
+  `test/vendor/just-bash/overlay-read.test.ts`
+
+Now: every line of `ls -l` comes from lstat, as GNU's: a file or folder
+shows its own permission bits, and a link shows `lrwxrwxrwx`, its
+target's length as its size and `-> target` after its name, with the
+mark `-F` gives after the target. An operand typed with a trailing slash
+(`ls -ld l/`) shows, and `-F` marks, what its link leads to.
+
+Before: every line read `-rw-r--r--` or `drwxr-xr-x` whatever the mode,
+and a link showed its target's mode and no target.
+
+### stat-mode: stat prints the permission bits
+Files: `src/commands/stat/stat.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/overlay-read.test.ts`
+
+Now: `%a` and the default format's access mode are the permission bits,
+special bits included (`4755`), as GNU's.
+
+Before: they printed the mode as the file system gave it, so a file of
+`OverlayFs`, whose mode carries the file type, read `100644`.
+
+## printf and echo
+
+### printf-bytes: a byte escape writes the byte
+Files: `src/commands/printf/raw-bytes.ts` (new),
+  `src/commands/printf/escapes.ts`, `src/commands/printf/printf.ts`,
+  `src/commands/echo/echo.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/bash-gnu.test.ts`
+
+Now: a byte escape above 0x7f (`\351`, `\xe9`, `%b`'s `\0351`, `echo
+-e '\xe9'`) is held as a lone surrogate, U+DC80 plus the byte less 0x80,
+which no UTF-8 text decodes to, and written as the byte itself, the rest
+of the output in UTF-8, as bash writes it. A variable holds text, so
+`printf -v` turns held bytes that spell a UTF-8 character (`\xc3\xa9`)
+into that character, and a lone byte into the character of its value.
+
+Before: such an escape became the character of its value, written as two
+UTF-8 bytes, so `printf '\351'` wrote `c3 a9` and a file a script built
+byte by byte came out wrong.
 
 ## Regular expressions
 

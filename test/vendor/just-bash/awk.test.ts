@@ -331,8 +331,9 @@ describe("awk output files and speed", () => {
     const r = await run(
       `ln -s out alias; awk 'BEGIN { print "a" > "out"; print "b" > "out"; print "c" >> "alias"; close("out"); close("alias") }'; cat alias out`,
     );
+    // the append lands in the file the link names, so both names show it
     expect([r.stdout, r.stderr, r.exitCode]).toEqual([
-      "a\nb\nc\na\nb\n",
+      "a\nb\nc\na\nb\nc\n",
       "",
       0,
     ]);

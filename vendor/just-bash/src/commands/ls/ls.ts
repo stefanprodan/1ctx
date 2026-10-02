@@ -13,6 +13,8 @@ import type {
 } from "../../types.js";
 import { parseArgs } from "../../utils/args.js";
 import { DEFAULT_BATCH_SIZE } from "../../utils/constants.js";
+// (1ctx ls-long)
+import { formatMode } from "../format-mode.js";
 import { hasHelpFlag, showHelp } from "../help.js";
 
 // (1ctx fs-children) output that keeps its byte count, so an append never
@@ -102,7 +104,52 @@ function formatHumanSize(bytes: number): string {
   return g < 10 ? `${g.toFixed(1)}G` : `${Math.round(g)}G`;
 }
 
+// (1ctx ls-long) an operand's own entry, or, with a trailing slash, what
+// its link leads to, as the slash makes the kernel follow it
+function operandInfo(
+  ctx: RuntimeCommandContext,
+  fullPath: string,
+  typed: string,
+): Promise<FsStat> {
+  return typed.endsWith("/") ? ctx.fs.stat(fullPath) : ctx.fs.lstat(fullPath);
+}
+
 // Format date for ls -l output (e.g., "Jan  1 00:00" or "Jan  1  2024")
+/**
+ * (1ctx ls-long) One line of ls -l, from lstat as GNU's: a link is shown as
+ * itself, `lrwxrwxrwx`, sized by its target and followed by `-> target`,
+ * and every other entry by its own permission bits. Under -F a link's
+ * mark follows its target. An operand typed with a trailing slash names
+ * what a link leads to, so it is shown from stat.
+ */
+async function longLine(
+  ctx: RuntimeCommandContext,
+  fullPath: string,
+  name: string,
+  suffix: string,
+  humanReadable: boolean,
+): Promise<string> {
+  const info = await operandInfo(ctx, fullPath, name);
+  let link = "";
+  if (info.isSymbolicLink) {
+    link = ` -> ${await ctx.fs.readlink(fullPath)}`;
+    // -F marks what the link leads to, after its target, never the link
+    if (suffix !== "") {
+      link += await ctx.fs.stat(fullPath).then(classifySuffix, () => "");
+      suffix = "";
+    }
+  }
+  const mode = info.isSymbolicLink
+    ? "lrwxrwxrwx"
+    : formatMode(info.mode, info.isDirectory);
+  const size = info.size ?? 0;
+  const sizeStr = humanReadable
+    ? formatHumanSize(size).padStart(5)
+    : String(size).padStart(5);
+  const dateStr = formatDate(info.mtime ?? new Date(0));
+  return `${mode} 1 user user ${sizeStr} ${dateStr} ${name}${suffix}${link}\n`;
+}
+
 function formatDate(date: Date): string {
   const months = [
     "Jan",
@@ -242,25 +289,20 @@ export const lsCommand: RuntimeCommand = {
         traversalBudget.visit(0);
         const fullPath = ctx.fs.resolvePath(ctx.cwd, path);
         try {
-          const stat = await ctx.fs.stat(fullPath);
+          await ctx.fs.stat(fullPath);
           if (longFormat) {
-            const mode = stat.isDirectory ? "drwxr-xr-x" : "-rw-r--r--";
+            // (1ctx ls-long)
             const suffix = classifyFiles
-              ? classifySuffix(await ctx.fs.lstat(fullPath))
+              ? classifySuffix(await operandInfo(ctx, fullPath, path))
               : "";
-            const size = stat.size ?? 0;
-            const sizeStr = humanReadable
-              ? formatHumanSize(size).padStart(5)
-              : String(size).padStart(5);
-            const mtime = stat.mtime ?? new Date(0);
-            const dateStr = formatDate(mtime);
-            // (1ctx fs-children)
+            // (1ctx fs-children ls-long)
             stdout.add(
-              `${mode} 1 user user ${sizeStr} ${dateStr} ${path}${suffix}\n`,
+              await longLine(ctx, fullPath, path, suffix, humanReadable),
             );
           } else {
+            // (1ctx ls-long)
             const suffix = classifyFiles
-              ? classifySuffix(await ctx.fs.lstat(fullPath))
+              ? classifySuffix(await operandInfo(ctx, fullPath, path))
               : "";
             stdout.add(`${path}${suffix}\n`); // (1ctx fs-children)
           }
@@ -492,18 +534,20 @@ async function listPath(
 
     if (!stat.isDirectory) {
       // It's a file, just show it
+      // (1ctx ls-long)
       const fileSuffix = classifyFiles
-        ? classifySuffix(await ctx.fs.lstat(fullPath))
+        ? classifySuffix(await operandInfo(ctx, fullPath, path))
         : "";
       if (longFormat) {
-        const size = stat.size ?? 0;
-        const sizeStr = humanReadable
-          ? formatHumanSize(size).padStart(5)
-          : String(size).padStart(5);
-        const mtime = stat.mtime ?? new Date(0);
-        const dateStr = formatDate(mtime);
         return {
-          stdout: `-rw-r--r-- 1 user user ${sizeStr} ${dateStr} ${path}${fileSuffix}\n`,
+          // (1ctx ls-long)
+          stdout: await longLine(
+            ctx,
+            fullPath,
+            path,
+            fileSuffix,
+            humanReadable,
+          ),
           stderr: "",
           exitCode: 0,
         };
@@ -597,20 +641,19 @@ async function listPath(
             const entryPath =
               fullPath === "/" ? `/${entry}` : `${fullPath}/${entry}`;
             try {
-              const entryStat = await ctx.fs.stat(entryPath);
-              const mode = entryStat.isDirectory ? "drwxr-xr-x" : "-rw-r--r--";
               const suffix = classifyFiles
                 ? classifySuffix(await ctx.fs.lstat(entryPath))
                 : "";
-              const size = entryStat.size ?? 0;
-              const sizeStr = humanReadable
-                ? formatHumanSize(size).padStart(5)
-                : String(size).padStart(5);
-              const mtime = entryStat.mtime ?? new Date(0);
-              const dateStr = formatDate(mtime);
               return {
                 name: entry,
-                line: `${mode} 1 user user ${sizeStr} ${dateStr} ${entry}${suffix}\n`,
+                // (1ctx ls-long)
+                line: await longLine(
+                  ctx,
+                  entryPath,
+                  entry,
+                  suffix,
+                  humanReadable,
+                ),
               };
             } catch {
               return {
