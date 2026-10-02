@@ -41,9 +41,9 @@ import {
 
 const URL = "https://github.com/acme/widgets";
 const ARCHIVE = adapter(URL, "github").archiveUrl("");
-const HEAD = "Repositories, each the files of one commit, no .git:";
+const HEAD = "Repositories, read-only files with no git history:";
 const LINE =
-  "/repos/widgets: github.com/acme/widgets at default branch (3e0ff8a), read-only, some paths ignored";
+  "/repos/widgets: github.com/acme/widgets at default branch (3e0ff8a)";
 
 const dirs: string[] = [];
 afterAll(() => {

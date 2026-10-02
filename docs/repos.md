@@ -218,14 +218,14 @@ start answers `{ mounts, notices, release }`:
 - **Regenerate pins what the turn it replaces stored;** a fork's first
   turn is a new message, so it looks up afresh.
 - **The model is told.** The bash description ends with a line saying
-  a repository is the files of one commit with no `.git`, since a
+  the repositories are read-only files with no git history, since a
   named repository reads as a checkout and models ran git in one, then
-  a line per mounted repository (`repoLine()`), `, some paths ignored`
-  when the rules kept a file out. A repository at another commit than
-  the newest earlier turn of the chat that mounted it gets `repo
-  <name>: <ref> moved from <a> to <b>` in the system prompt, that send
-  only. A repository off that an earlier turn of the chat mounted gets
-  `reposOffLine()`; one never mounted is not named.
+  a line per mounted repository (`repoLine()`): its URL, ref and
+  commit. A repository at another commit than the newest earlier turn
+  of the chat that mounted it gets `repo <name>: <ref> moved from <a>
+  to <b>` in the system prompt, that send only. A repository off that
+  an earlier turn of the chat mounted gets `reposOffLine()`; one never
+  mounted is not named.
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 

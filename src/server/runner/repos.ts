@@ -33,19 +33,18 @@ const short = (commit: string) => commit.slice(0, 7);
 
 // a line that names a repository reads as a checkout, so the model ran
 // git in one: say once what a mount is
-const REPOS_HEAD = "Repositories, each the files of one commit, no .git:";
+const REPOS_HEAD = "Repositories, read-only files with no git history:";
 
 const refWords = (ref: string) =>
   ref === "" ? "default branch" : isCommit(ref) ? short(ref) : ref;
 
-// /repos/podinfo: github.com/stefanprodan/podinfo at master (8d01e44), read-only
+// /repos/podinfo: github.com/stefanprodan/podinfo at master (8d01e44)
 export function repoLine(mount: RepoMount): string {
   const where = mount.url.replace(/^https:\/\//, "");
   const at = isCommit(mount.ref)
     ? short(mount.commit)
     : `${refWords(mount.ref)} (${short(mount.commit)})`;
-  const ignored = mount.ignored > 0 ? ", some paths ignored" : "";
-  return `/repos/${mount.name}: ${where} at ${at}, read-only${ignored}`;
+  return `/repos/${mount.name}: ${where} at ${at}`;
 }
 
 // what the first command says of the repositories left out
