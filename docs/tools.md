@@ -51,7 +51,10 @@ words.
   (`runner/text-calls.ts`) with finish reason `tool_text`.
 - **Results that outgrow the window are cut largest first.** A cut
   keeps each result's `tail` (bash's exit and receipts, MCP's path
-  lines) and adds a cut line, before storage.
+  lines) and adds a cut line, before storage. The room ends at
+  `compactsAt()`; tails past it still go to the answer round with
+  `context_limit`, since the reserve above holds them, and never fail
+  the send.
 - **A round's calls run in parallel.** Each runs under the call
   timeout plus its tool's `graceMs` and the send's signal. Each call's
   end is one transaction, one revision, one envelope.

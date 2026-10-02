@@ -36,7 +36,7 @@ test("results are cut largest first and the stored suffix stays intact", () => {
     { content: "small", error: false },
   ];
   const fitted = fitResults(calls, results, 500);
-  expect(fitted).toMatchObject({ cut: true, fits: true });
+  expect(fitted).toMatchObject({ cut: true });
   expect(fitted.results[1]).toEqual(results[1]);
   expect(fitted.results[0]).toMatchObject({ error: true });
   expect(fitted.results[0]!.content).toEndWith(`${tail}\n${CONTEXT_CUT}`);
@@ -58,28 +58,26 @@ test("result counting includes JSON escapes and framing at the exact boundary", 
   expect(fitResults(calls, results, exact)).toEqual({
     results,
     cut: false,
-    fits: true,
   });
   const fitted = fitResults(calls, results, exact - 1);
-  expect(fitted).toMatchObject({ cut: true, fits: true });
+  expect(fitted).toMatchObject({ cut: true });
   expect(
     fitted.results.reduce((sum, result, i) => sum + size(i, result.content), 0),
   ).toBeLessThan(exact);
   expect(fitResults(calls, results, null)).toEqual({
     results,
     cut: false,
-    fits: true,
   });
 });
 
-test("a protected tail too large for the room is kept and reported as not fitting", () => {
+test("a protected tail too large for the room is kept with the cut line", () => {
   const tail = "exit 0\nwrote file.md (rev 1, 1 lines)";
   const fitted = fitResults(
     [calls[0]!],
     [{ content: "read ".repeat(1000) + tail, error: false, tail: tail.length }],
     1,
   );
-  expect(fitted).toMatchObject({ cut: true, fits: false });
+  expect(fitted).toMatchObject({ cut: true });
   expect(fitted.results[0]!.content).toEndWith(`${tail}\n${CONTEXT_CUT}`);
 });
 

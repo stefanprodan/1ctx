@@ -155,35 +155,50 @@ test("an unknown window leaves calls and results alone", async () => {
   }
 });
 
-test("protected receipts that cannot fit are stored before the send fails explicitly", async () => {
+test("result tails past the window threshold are stored and the turn answers", async () => {
   const chat = await chatApp({ window: 20_000 });
   try {
     const { script, sessionId } = await startChat(chat);
-    script.toolRound(
-      [
-        {
-          id: "write",
-          name: "bash",
-          arguments: JSON.stringify({ command: "echo saved > kept.md" }),
-        },
-      ],
-      { prompt: 14_999, completion: 0 },
-    );
+    const calls = Array.from({ length: 4 }, (_, index) => ({
+      id: `write-${index}`,
+      name: "bash",
+      arguments: JSON.stringify({
+        command: `echo saved > kept-${index}.md`,
+      }),
+    }));
+    script.toolRound(calls, { prompt: 14_999, completion: 0 });
     script.end();
-    expect((await settleRun(chat, sessionId))?.status).toBe("failed");
-    expect(chat.app.sessions.lastSend(sessionId)?.error).toBe(
-      "the result tails do not fit the context",
-    );
-    expect(
-      chat.app.sessions.messages(sessionId).find((row) => row.kind === "tool"),
-    ).toMatchObject({
-      status: "done",
-      content: "exit 0\nwrote kept.md (rev 1, 1 lines)",
+    // four commands one after another, each in its own worker
+    const answer = await waitScript(chat.scripted, 2, 800);
+    expect(asksAnswer(answer.body)).toBe(true);
+    expect(chat.app.sessions.messages(sessionId)[1]).toMatchObject({
+      slot: "work",
+      finishReason: "context_limit",
     });
-    expect(
-      chat.app.knowledge.store.byName(chat.projectId, "kept.md")?.text,
-    ).toBe("saved\n");
-    expect(chat.scripted.scripts).toHaveLength(1);
+    const results = chat.app.sessions
+      .messages(sessionId)
+      .filter((row) => row.kind === "tool");
+    for (const [index, result] of results.entries()) {
+      expect(result).toMatchObject({
+        status: "done",
+        content: `exit 0\nwrote kept-${index}.md (rev 1, 1 lines)`,
+      });
+      expect(
+        chat.app.knowledge.store.byName(chat.projectId, `kept-${index}.md`)
+          ?.text,
+      ).toBe("saved\n");
+    }
+    expect(results).toHaveLength(4);
+    answer.content("The files are saved.");
+    answer.finish();
+    answer.usage({ prompt: 15_300, completion: 100 });
+    answer.end();
+    const summary = await waitScript(chat.scripted, 3);
+    summary.reply("## Goal\nFiles are saved.");
+    expect((await settleRun(chat, sessionId))?.status).toBe("done");
+    expect(chat.scripted.requests.every((request) => request.accepted)).toBe(
+      true,
+    );
   } finally {
     await chat.app.shutdown();
     chat.app.db.close();

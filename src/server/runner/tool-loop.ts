@@ -332,11 +332,10 @@ async function runCalls(
     if (send.cause !== null || immediate) return;
     const fitted = fitResults(calls, results, room);
     cut = fitted.cut;
+    // tails past the room still go to the answer round: the reserve
+    // above the threshold holds them, and failing would lose the turn
     for (let i = 0; i < calls.length; i++) {
       store(calls[i]!, fitted.results[i]!);
-    }
-    if (!fitted.fits) {
-      throw new Error("the result tails do not fit the context");
     }
   });
   send.tools = task;
