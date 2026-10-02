@@ -12,7 +12,9 @@ them on schedules (automations), with shared knowledge and memory.
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
   and only `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
   patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
-  and unknown types are not read as regular files; re2js's matches a
+  and unknown types are not read as regular files, and cancelling an
+  entry's body never drops the next entry's, which hung the stream;
+  re2js's matches a
   Unicode class with no fold table as itself under `(?i)`, where 1.4.0
   threw.
 - **just-bash is ours.** Its source lives in `vendor/just-bash/` and we

@@ -5,8 +5,10 @@ import { expect, test } from "bun:test";
 import {
   type ArchiveMember,
   readArchive,
+  streamTar,
 } from "../../../src/server/lib/archive.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
+import { tarball } from "../../helpers/repos.ts";
 
 const fixtures = new URL("../../fixtures/archives/", import.meta.url);
 const decoder = new TextDecoder();
@@ -126,6 +128,34 @@ test("an unknown tar type flag stays other even when explicitly selected", async
   });
   expect(manifest[1]!.data).toBeUndefined();
   expect(text(manifest[2]!)).toBe("backslash\n");
+});
+
+test("a streamed tar member skipped after its body queued leaves the next one whole", async () => {
+  // the next member's body runs past the first chunk, so it is still
+  // streaming when the skipped one before it is cancelled
+  const after = "b".repeat(4_000);
+  const tar = tarball(
+    [
+      { name: "icon.png", body: "x".repeat(600) },
+      { name: "after.txt", body: after },
+      { name: "last.txt", body: "c" },
+    ],
+    { gzip: false },
+  );
+  const cut = new TextDecoder("latin1").decode(tar).indexOf(after) + 1_000;
+  const input = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(tar.slice(0, cut));
+      controller.enqueue(tar.slice(cut));
+      controller.close();
+    },
+  });
+  const read: Record<string, string> = {};
+  await streamTar(input, signal(), async (member, body) => {
+    if (member.type !== "file" || member.name.endsWith(".png")) return;
+    read[member.name.split("/").pop()!] = await new Response(body).text();
+  });
+  expect(read).toEqual({ "after.txt": after, "last.txt": "c" });
 });
 
 test("duplicate tar members retain distinct indexes, order and bodies", async () => {

@@ -23,3 +23,29 @@ index f070101af323befb6c265076cb4569eb71b96e28..4f5faad087b80a057b308b3c5e38bb97
    /** User ID of the entry owner. */
    uid?: number;
    /** Group ID of the entry owner. */
+diff --git a/dist/web/index.js b/dist/web/index.js
+index 63a213a7ca36d9f3a62afc96cc8d33b569212a82..244b362882f9342202a62504e2699d80722cc9c8 100644
+--- a/dist/web/index.js
++++ b/dist/web/index.js
+@@ -244,16 +244,20 @@ function createTarDecoder(options = {}) {
+ 						eofReached = true;
+ 						break;
+ 					}
++					let entryController = null;
+ 					controller.enqueue({
+ 						header,
+ 						body: new ReadableStream({
+ 							start(c) {
++								entryController = c;
+ 								if (header.size === 0) c.close();
+ 								else bodyController = c;
+ 							},
+ 							pull: pump,
+ 							cancel() {
+-								bodyController = null;
++								// a body closed with chunks still queued can be
++								// cancelled after the decoder moved to the next entry
++								if (bodyController === entryController) bodyController = null;
+ 								pump();
+ 							}
+ 						})
