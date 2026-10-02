@@ -48,6 +48,22 @@ Before: none of them was exported.
 
 ## Build and trim
 
+### vitest-shim: the suite stubs globals and variables on Bun
+Files: `src/vitest-setup.ts`
+Upstream: not reported
+Tests: none, it lets 19 of upstream's tests run under `make vendor-test`
+
+Now: the setup file every upstream test file preloads adds
+`vi.stubGlobal`, `vi.unstubAllGlobals`, `vi.stubEnv` and
+`vi.unstubAllEnvs` where Bun's vi lacks them, with vitest's meaning: a
+stub sets the value, and unstubbing puts back what each name held before
+its first stub.
+
+Before: the 19 tests that stub `Buffer`, `fetch` or a variable failed on
+Bun alone and sat in the expected failures, so what they cover, the
+browser fallbacks, `file` on gzip, curl's stdin bytes and lazy files
+under the box, went unchecked.
+
 ### trim: the removed commands leave the registry
 Files: `src/commands/registry.ts`, `src/commands/fuzz-flags.ts`
 Upstream: not reported
@@ -275,8 +291,6 @@ Before:
   `/repos/r/a` for a folder of its own. A link in the middle of a path
   dropped the components after it.
 
-## Every command
-
 ### fs-links: a write through a linked folder lands in it
 Files: `src/fs/in-memory-fs/in-memory-fs.ts`,
   `src/commands/readlink/readlink.ts`
@@ -315,7 +329,8 @@ Before:
 
 ### version-flags: every command answers its tool's version flag
 Files: `src/commands/version.ts` (new), `src/commands/registry.ts`,
-  `src/commands/mktemp/mktemp.ts`, `src/commands/yes/yes.ts`
+  `src/commands/mktemp/mktemp.ts`, `src/commands/yes/yes.ts`,
+  `src/commands/mktemp/mktemp.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/fixes.test.ts`,
   `test/vendor/just-bash/new-commands.test.ts`
@@ -1073,7 +1088,9 @@ Files: `src/commands/search-engine/gnu-regex.ts` (new),
   `src/commands/grep/grep.patterns-from-file-validation.test.ts`,
   `src/commands/grep/grep.ts`, `src/commands/search-engine/matcher.ts`,
   upstream's grep tests, `src/commands/search-engine/pcre.ts` (new),
-  `src/commands/search-engine/unicode-sets.ts`
+  `src/commands/search-engine/unicode-sets.ts`,
+  `src/commands/grep/grep.basic.test.ts`,
+  `src/commands/grep/grep.patterns-from-file.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/grep-gnu.test.ts`,
   `test/vendor/just-bash/grep.test.ts`,
@@ -1524,7 +1541,22 @@ Files: `src/commands/rg/rg-options.ts`, `src/commands/rg/rg.ts`,
   `src/commands/search-engine/regex.ts`,
   `src/commands/search-engine/index.ts`,
   `src/commands/rg/file-types.ts`, `src/commands/rg/file-types-data.ts`
-  (new), our `scripts/rg-record.ts`
+  (new), our `scripts/rg-record.ts`,
+  `src/commands/rg/imported-tests/binary.test.ts`,
+  `src/commands/rg/imported-tests/feature.test.ts`,
+  `src/commands/rg/imported-tests/misc.test.ts`,
+  `src/commands/rg/imported-tests/regression.test.ts`,
+  `src/commands/rg/rg-parser-threads.test.ts`,
+  `src/commands/rg/rg.basic.test.ts`,
+  `src/commands/rg/rg.edge-cases.test.ts`,
+  `src/commands/rg/rg.filtering.test.ts`,
+  `src/commands/rg/rg.flags.test.ts`,
+  `src/commands/rg/rg.max-count.test.ts`,
+  `src/commands/rg/rg.no-filename.test.ts`,
+  `src/commands/rg/rg.output.test.ts`,
+  `src/commands/rg/rg.pattern-file-limits.security.test.ts`,
+  `src/commands/rg/rg.patterns.test.ts`,
+  `src/commands/rg/rg.ripgrep-compat.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/rg-ripgrep.test.ts`,
   `test/vendor/just-bash/rg.test.ts`,
@@ -1723,7 +1755,8 @@ Files: `src/commands/xargs/xargs.ts`,
   `src/commands/xargs/xargs-input.ts`,
   `src/commands/xargs/xargs-plan.ts`,
   `src/commands/xargs/xargs-quote.ts` (the last four new), upstream's
-  xargs tests and `src/commands/resource-limits.security.test.ts`
+  xargs tests and `src/commands/resource-limits.security.test.ts`,
+  `src/commands/xargs/xargs.test.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/xargs-gnu.test.ts`,
   `test/vendor/just-bash/xargs.test.ts`

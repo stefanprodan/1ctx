@@ -176,6 +176,34 @@ describe("the record of our just-bash changes", () => {
     expect(unknown).toEqual([]);
   });
 
+  test("no marker names an id twice", () => {
+    const twice = found
+      .filter((m) => new Set(m.ids).size !== m.ids.length)
+      .map((m) => m.file);
+    expect(twice).toEqual([]);
+  });
+
+  test("every marker sits in a file its entry lists", () => {
+    const files = new Map(
+      entries.map((e) => [
+        e.id,
+        new Set(paths(e.fields.find(([n]) => n === "Files")?.[1] ?? "")),
+      ]),
+    );
+    const outside: string[] = [];
+    for (const m of found) {
+      // the path as Files writes it: from the package, or scripts/
+      const path = m.file
+        .slice(0, m.file.lastIndexOf(":"))
+        .replace(/^vendor\/just-bash\//, "");
+      for (const id of new Set(m.ids)) {
+        const listed = files.get(id);
+        if (listed && !listed.has(path)) outside.push(`${id}: ${m.file}`);
+      }
+    }
+    expect([...new Set(outside)]).toEqual([]);
+  });
+
   test("every entry has a marker, or says it has none", () => {
     const marked = new Set(found.flatMap((m) => m.ids));
     const problems: string[] = [];

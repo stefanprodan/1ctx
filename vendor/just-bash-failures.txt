@@ -51,7 +51,6 @@
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when xan is used but not available
 (fail) browser bundle safety > helpful error messages for excluded commands > should show helpful error when yq is used but not available
 (fail) browser bundle safety > sqlite3 in Node.js > sqlite3 should be available by default in Node.js
-(fail) consumes stdin once across ordered data references
 (fail) diff > error handling > should error on unknown option
 (fail) diff > error handling > should error on unknown short option
 (fail) diff > filename quoting in -u/-c headers > should escape a double quote, and quote in -c headers too
@@ -96,11 +95,6 @@
 (fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for only the second file missing its final newline
 (fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for two changes close enough for GNU to merge them
 (fail) diff unified format (-u) vs GNU diffutils 3.12 > unified format (-u) > matches GNU for two hunks far enough apart to stay separate
-(fail) file gzip > should not decompress gzip input
-(fail) file gzip > should report gzip compressed data
-(fail) file gzip > should report gzip compressed data for an archive member
-(fail) file gzip > should report the gzip MIME type with -i
-(fail) file gzip > should still consult file-type when the compression method is not deflate
 (fail) find -exec > -exec command {} ; > should propagate command exit codes
 (fail) find actions > -delete > should delete empty directories
 (fail) find actions > -delete > should not delete non-empty directories
@@ -116,12 +110,6 @@
 (fail) find over an unreadable directory > reports a directory below -mindepth all the same
 (fail) find over an unreadable directory > reports every unreadable directory in traversal order
 (fail) find predicates > -newer FILE > should return nothing when reference file does not exist
-(fail) fromBuffer without Buffer (browser fallback) > base64 matches Node output across chunk boundaries
-(fail) fromBuffer without Buffer (browser fallback) > base64 never passes more than 8192 arguments to String.fromCharCode
-(fail) fromBuffer without Buffer (browser fallback) > binary matches Node output across chunk boundaries
-(fail) fromBuffer without Buffer (browser fallback) > binary never passes more than 8192 arguments to String.fromCharCode
-(fail) fromBuffer without Buffer (browser fallback) > latin1 matches Node output across chunk boundaries
-(fail) fromBuffer without Buffer (browser fallback) > latin1 never passes more than 8192 arguments to String.fromCharCode
 (fail) jq > JSON stream parsing (concatenated JSON) > should handle concatenated pretty-printed JSON objects with -s
 (fail) jq operators > type conversion > should parse a number with surrounding whitespace
 (fail) jq operators > type conversion > should reject tonumber on whitespace-only input " "
@@ -141,11 +129,7 @@
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec when backgrounded without wait
 (fail) js-exec recursion guard bypass probes > blocks nested js-exec when launched in background through bash -c
 (fail) js-exec recursion guard bypass probes > does not expose an exec bridge to Promise microtasks
-(fail) lazy provider under defense-in-depth (#253) > keeps untrusted command execution blocked after materialization
-(fail) lazy provider under defense-in-depth (#253) > materializes a provider that reads process.env during exec
-(fail) lazy provider under defense-in-depth (#253) > materializes a provider that settles on a macrotask during exec
 (fail) ls > -F flag (classify) > should show directory mode for symlinks to directories in long format
-(fail) preserves invalid UTF-8 bytes in binary stdin request bodies
 (fail) process substitution - read-only /dev/fd is not scratch space > behaves the same whether or not a substitution ran first
 (fail) process substitution - read-only /dev/fd is not scratch space > refuses a write even with a descriptor still live
 (fail) process substitution - read-only /dev/fd is not scratch space > refuses a write to an unallocated descriptor
@@ -169,11 +153,8 @@
 (fail) query date builtin validation > rejects non-finite timestamps before todate
 (fail) query date builtin validation > rejects timestamps outside the Date range
 (fail) query date builtin validation > rejects unsupported strptime formats instead of fallback parsing
-(fail) query format builtins in browser mode > decodes browser base64 bytes using defined UTF-8 replacement
-(fail) query format builtins in browser mode > encodes Unicode as UTF-8 before browser base64 conversion
 (fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
 (fail) runtime error-forwarding leak probes > sqlite3 open-directory error does not expose host/internal markers
-(fail) supports text and binary stdin request bodies without Buffer
 (fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
 (fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension
 (fail) tar > xz compression (-J) > should preserve xz compression by default
