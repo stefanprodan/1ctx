@@ -150,7 +150,6 @@ describe("the words", () => {
     const failed = stateWords(repo({ state: "failed", error: "no access" }));
     expect(failed).toEqual({
       text: "Failed: no access",
-      short: "Failed",
       bad: true,
     });
     expect(
@@ -181,8 +180,10 @@ describe("the words", () => {
     expect(nameOf("not a url")).toBe("");
   });
 
-  test("the ignore placeholder is the default list", () => {
-    expect(IGNORE_PLACEHOLDER.split("\n")).toEqual([...DEFAULT_REPO_IGNORE]);
+  test("the ignore placeholder is four of the defaults", () => {
+    const shown = IGNORE_PLACEHOLDER.split("\n");
+    expect(shown).toHaveLength(4);
+    for (const rule of shown) expect(DEFAULT_REPO_IGNORE).toContain(rule);
   });
 
   test("a server refusal finds its field", () => {
@@ -476,10 +477,19 @@ describe("the list", () => {
     const html = render(<Repos projectId="p2" personal={false} />);
     expect(html).toContain(">Repositories<");
     expect(html).toContain("Add repository");
-    expect(html).toContain("github.com/stefanprodan/podinfo · default branch");
-    expect(html).toContain("git.corp.dev/fluxcd/flux2 · v2.4.0");
-    expect(html).toContain("Ready at 3f2a1c9, 364 files");
-    expect(html).toContain("Failed: not found");
+    // the URL, the ref and the state each take a line, never cut
+    const line = (text: string, bad = false) =>
+      `<span class="rows-sub rows-sub-wrap${bad ? " rows-bad" : ""}">${text}</span>`;
+    expect(html).toContain(
+      line("github.com/stefanprodan/podinfo") +
+        line("default branch") +
+        line("Ready at 3f2a1c9, 364 files"),
+    );
+    expect(html).toContain(
+      line("git.corp.dev/fluxcd/flux2") +
+        line("v2.4.0") +
+        line("Failed: not found", true),
+    );
     expect(html).toContain("Fetching");
     expect(html.match(/>Change</g)).toHaveLength(3);
     expect(html.match(/>Refresh</g)).toHaveLength(3);
@@ -597,7 +607,7 @@ describe("the form", () => {
     expect(html).toContain(">Key<");
     expect(html).toContain('name="keyName"');
     expect(html).toContain('placeholder="tools"');
-    expect(html).toContain("*.png\n*.jpg");
+    expect(html).toContain("*.png\n*.mp4\n*.woff2\n*.zip");
   });
 
   test.serial("a key list that did not load says so", () => {
@@ -650,7 +660,7 @@ describe("the form", () => {
       /<textarea[^>]*name="ignore"[^>]*aria-invalid="true"[\s\S]*?class="field-error" role="alert">Ignore line 3: unclosed \[/,
     );
     // the hint gives way to the refusal
-    expect(html).not.toContain("Replaces the default list.");
+    expect(html).not.toContain("Replaces the default list");
   });
 
   test.serial("Add posts what was typed and closes", async () => {

@@ -8,7 +8,6 @@ import type {
   RepoView,
 } from "../../../shared/api/repos.ts";
 import {
-  DEFAULT_REPO_IGNORE,
   MAX_REPOS_PER_PROJECT,
   PUBLIC_REPO_HOSTS,
   type RepoKind,
@@ -54,8 +53,12 @@ export const KIND_OPTIONS: { value: RepoKind; label: string }[] = [
 ];
 
 export const URL_PLACEHOLDER = "https://github.com/owner/name";
-export const IGNORE_PLACEHOLDER = DEFAULT_REPO_IGNORE.join("\n");
-export const IGNORE_HINT = "In .gitignore format. Replaces the default list.";
+// one default from each kind the hint names, the box's four lines
+export const IGNORE_PLACEHOLDER = ["*.png", "*.mp4", "*.woff2", "*.zip"].join(
+  "\n",
+);
+export const IGNORE_HINT =
+  "In .gitignore format. Replaces the default list of images, media, fonts, zip archives and binaries.";
 export const PUBLIC_HINT =
   "Read-only clones of public repositories for agents.";
 export const TEAM_HINT = "Read-only clones for agents, managed by admins.";
@@ -159,14 +162,14 @@ export const shortCommit = (commit: string) => commit.slice(0, 7);
 // the URL as text, without the scheme every one carries
 export const urlText = (url: string) => url.replace(/^https:\/\//, "");
 
-export type StateWords = { text: string; short: string; bad: boolean };
+export type StateWords = { text: string; bad: boolean };
 
 export function stateWords(repo: RepoView): StateWords {
   switch (repo.state) {
     case "pending":
-      return { text: "Waiting to fetch", short: "Waiting", bad: false };
+      return { text: "Waiting to fetch", bad: false };
     case "fetching":
-      return { text: "Fetching", short: "Fetching", bad: false };
+      return { text: "Fetching", bad: false };
     case "failed": {
       // past a cap the fetch stores what it had seen when it stopped
       const counts =
@@ -179,7 +182,6 @@ export function stateWords(repo: RepoView): StateWords {
       const seen = counts.length > 0 ? ` at ${counts.join(", ")}` : "";
       return {
         text: repo.error === null ? "Failed" : `Failed: ${repo.error}${seen}`,
-        short: "Failed",
         bad: true,
       };
     }
@@ -193,7 +195,7 @@ export function stateWords(repo: RepoView): StateWords {
       if (repo.ignored !== null && repo.ignored > 0) {
         parts.push(`${commas(repo.ignored)} ignored`);
       }
-      return { text: parts.join(", "), short: "Ready", bad: false };
+      return { text: parts.join(", "), bad: false };
     }
   }
 }
@@ -209,10 +211,9 @@ export function repoKeyOptions(
   return [{ value: "", label: "None" }, ...keyOptions(keys, current)];
 }
 
-// the textarea grows to show the default list, or what is typed
+// four lines, growing with what is typed; the hint names the defaults
 export function ignoreRows(typed: string): number {
-  const lines = (text: string) => text.split("\n").length;
-  return Math.max(lines(IGNORE_PLACEHOLDER), lines(typed)) + 1;
+  return Math.max(4, typed.split("\n").length + 1);
 }
 
 export const DELETE_ASK = "Delete this repository?";

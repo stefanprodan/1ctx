@@ -57,6 +57,9 @@ open row's body or a meta. The shared shapes are below.
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
   row (`feed/Row.tsx`) is the one row outside Rows.
+- **Details that mean nothing cut wrap.** `RowsTitle`'s `wrap` stacks
+  the sub and its `lines` whole, one fact each (a repository's URL,
+  ref and state), and on a phone puts the row's end under them.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
 - **A paged list ends in `ShowMore`** from `feed/FeedCard.tsx` while

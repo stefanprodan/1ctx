@@ -33,6 +33,10 @@ may call them are in `docs/access.md`.
   the line: past that many, wildmatch (git's too) backtracks for
   minutes.
   The fetch matches each path and its parent folders while unpacking.
+- **An empty text is `DEFAULT_REPO_IGNORE`: what no bash command
+  reads.** Images, media, fonts, zip formats and binaries go. Tar,
+  gzip, bzip2, xz and zstd archives stay, since `tar` and `zcat` open
+  them.
 - **A change to the URL, kind, ref, key or ignore rules sets the row
   `pending` and clears its error.** A rename does not; a refresh
   sets `pending`. The state is `pending`, `fetching`, `ready` or

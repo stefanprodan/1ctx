@@ -19,6 +19,8 @@ const TREE = [
   ".gitlab-ci.yml",
   "README.md",
   "build/out.o",
+  "build/lib.so",
+  "testdata/fixture.tar.gz",
   "build/keep.txt",
   "build/sub/deep.o",
   "src/build",

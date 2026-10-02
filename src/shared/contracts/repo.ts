@@ -10,10 +10,16 @@ export const MAX_REPO_REF = 200;
 // the ignore rules, in .gitignore format
 export const MAX_REPO_IGNORE_LINES = 200;
 export const MAX_REPO_IGNORE_BYTES = 8 * 1024;
-// what an empty ignore text stands for: files an agent never reads
+// what an empty ignore text stands for: files an agent never reads.
+// Tar, gzip, bzip2, xz and zstd archives stay, since bash's tar and
+// zcat open them; bash has no unzip, so zip formats go
 export const DEFAULT_REPO_IGNORE: readonly string[] = (
-  "*.png *.jpg *.jpeg *.gif *.ico *.webp *.mp4 *.mov *.mp3 " +
-  "*.woff *.woff2 *.ttf *.zip *.tar.gz *.tgz *.jar"
+  "*.png *.jpg *.jpeg *.gif *.ico *.webp *.bmp *.tiff *.psd " +
+  "*.mp4 *.mov *.webm *.avi *.mkv *.mp3 *.wav *.ogg *.flac " +
+  "*.woff *.woff2 *.ttf *.otf *.eot " +
+  "*.zip *.jar *.war *.7z *.rar " +
+  "*.exe *.dll *.so *.dylib *.a *.o *.class *.pyc *.wasm " +
+  "*.pdf *.sqlite *.db"
 ).split(" ");
 
 // the hosts a member may add to their personal project, each its kind
