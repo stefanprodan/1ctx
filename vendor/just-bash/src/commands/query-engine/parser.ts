@@ -288,7 +288,9 @@ function tokenize(input: string): Token[] {
           num += advance();
         }
       }
-      tokens.push({ type: "NUMBER", value: Number(num), pos: start });
+      // the spelling, for yq to write back as mikefarah does (1ctx yq-documents)
+      const text = String(Number(num)) === num ? undefined : num;
+      tokens.push({ type: "NUMBER", value: Number(num), pos: start, text });
       continue;
     }
 
@@ -325,6 +327,17 @@ function tokenize(input: string): Token[] {
               str += "\\(";
               interpDepth = 1;
               break; // Keep for string interpolation
+            case "u": {
+              // jq's \uXXXX, a surrogate pair as two escapes; upstream
+              // kept the letter u (1ctx query-dialect)
+              const hex = input.slice(pos, pos + 4);
+              if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
+                throw new Error(`Invalid \\uXXXX escape at position ${pos - 2}`);
+              }
+              str += String.fromCharCode(Number.parseInt(hex, 16));
+              pos += 4;
+              break;
+            }
             default:
               str += escaped;
           }
@@ -938,6 +951,10 @@ class Parser {
     }
     if (this.check("NUMBER")) {
       const tok = this.advance();
+      // (1ctx yq-documents)
+      if (tok.text !== undefined) {
+        return { type: "Literal", value: tok.value, text: tok.text };
+      }
       return { type: "Literal", value: tok.value };
     }
     if (this.check("STRING")) {
@@ -1116,6 +1133,14 @@ class Parser {
       // Variable reference
       if (name.startsWith("$")) {
         return { type: "VarRef", name };
+      }
+
+      // `@sh "echo \(.x)"`: each interpolation through the format, the
+      // text as written (1ctx jq-format-strings)
+      if (name.startsWith("@") && this.check("STRING")) {
+        const text = this.advance().value as string;
+        if (!text.includes("\\(")) return { type: "Literal", value: text };
+        return { ...this.parseStringInterpolation(text), format: name };
       }
 
       // Function call with args

@@ -1,6 +1,7 @@
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
-import type { QueryValue } from "./value-operations.js";
+// (1ctx jq-compare jq-infinity)
+import { jqJson, type QueryValue, sortedKeys } from "./value-operations.js";
 
 export interface JsonOutputOptions {
   compact?: boolean;
@@ -8,6 +9,8 @@ export interface JsonOutputOptions {
   sortKeys?: boolean;
   indent?: number;
   useTab?: boolean;
+  /** every character past ASCII as \uXXXX, jq's -a (1ctx jq-inputs) */
+  ascii?: boolean;
   limitKind?: "output_size" | "string_length";
 }
 
@@ -45,12 +48,13 @@ function appendJsonValue(
     return;
   }
   if (typeof value === "number") {
-    output.append(Number.isFinite(value) ? String(value) : "null");
+    // an infinity is the largest double, as jq writes it (1ctx jq-infinity)
+    output.append(Number.isNaN(value) ? "null" : jqJson(value));
     return;
   }
   if (typeof value === "string") {
     if (options.raw && depth === 0) output.append(value);
-    else appendJsonString(output, value);
+    else appendJsonString(output, value, options.ascii);
     return;
   }
 
@@ -74,7 +78,8 @@ function appendJsonValue(
   }
 
   let keys = Object.keys(value as object);
-  if (options.sortKeys) keys = keys.sort();
+  // by code point, as jq sorts them (1ctx jq-compare)
+  if (options.sortKeys) keys = sortedKeys(keys);
   output.append("{");
   for (let index = 0; index < keys.length; index++) {
     const key = keys[index];
@@ -82,7 +87,7 @@ function appendJsonValue(
       compact ? (index === 0 ? "" : ",") : index === 0 ? "\n" : ",\n",
     );
     if (!compact) output.repeat(indentUnit, depth + 1);
-    appendJsonString(output, key);
+    appendJsonString(output, key, options.ascii);
     output.append(compact ? ":" : ": ");
     appendJsonValue(
       output,
@@ -98,7 +103,11 @@ function appendJsonValue(
   output.append("}");
 }
 
-function appendJsonString(output: BoundedStringBuilder, value: string): void {
+function appendJsonString(
+  output: BoundedStringBuilder,
+  value: string,
+  ascii = false,
+): void {
   output.append('"');
   let start = 0;
   for (let index = 0; index < value.length; index++) {
@@ -111,7 +120,9 @@ function appendJsonString(output: BoundedStringBuilder, value: string): void {
     else if (code === 10) escaped = "\\n";
     else if (code === 12) escaped = "\\f";
     else if (code === 13) escaped = "\\r";
-    else if (code < 32) escaped = `\\u${code.toString(16).padStart(4, "0")}`;
+    else if (code < 32 || (ascii && code > 126)) {
+      escaped = `\\u${code.toString(16).padStart(4, "0")}`;
+    }
     if (!escaped) continue;
     output.append(value.slice(start, index)).append(escaped);
     start = index + 1;

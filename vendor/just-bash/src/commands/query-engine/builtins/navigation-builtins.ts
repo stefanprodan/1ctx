@@ -143,88 +143,88 @@ export function evalNavigationBuiltin(
 
     case "walk": {
       if (args.length === 0) return [value];
+      // jq's `def w: if object then map_values(w) elif array then map(w)
+      // end | f`, without the stack: an array takes every output of its
+      // children, an object a key's first and drops a key with none, and
+      // f's outputs on a leaf are kept, where upstream dropped them and
+      // took f's first output (1ctx jq-walk)
       const limits = resourceLimits(ctx);
-      const scheduled = new WeakSet<object>();
-      const transformed = new WeakMap<object, QueryValue>();
-      const stack: Array<{
+      type Frame = {
         value: QueryValue;
         depth: number;
-        expanded: boolean;
-      }> = [{ value, depth: 0, expanded: false }];
-      let rootResult: QueryValue = value;
+        keys: string[] | null;
+        next: number;
+        built: QueryValue[] | Record<string, unknown> | null;
+        key?: string;
+      };
+      const frameOf = (v: QueryValue, depth: number, key?: string): Frame => {
+        if (depth > limits.maxDepth) {
+          throw new ExecutionLimitError(
+            `query depth limit exceeded (${limits.maxDepth})`,
+            "recursion",
+          );
+        }
+        if (Array.isArray(v)) {
+          return { value: v, depth, keys: null, next: 0, built: [], key };
+        }
+        const record = v !== null && typeof v === "object" ? asQueryRecord(v) : null;
+        if (record) {
+          const keys = Object.keys(record).filter(isSafeKey);
+          return {
+            value: v,
+            depth,
+            keys,
+            next: 0,
+            built: Object.create(null) as Record<string, unknown>,
+            key,
+          };
+        }
+        return { value: v, depth, keys: null, next: 0, built: null, key };
+      };
+      const stack: Frame[] = [frameOf(value, 0)];
+      let rootResult: QueryValue[] = [];
       let iterations = 0;
       while (stack.length > 0) {
-        const frame = stack.pop();
-        if (!frame) break;
         if (++iterations > limits.maxIterations) {
           throw new ExecutionLimitError(
             `query iteration limit exceeded (${limits.maxIterations})`,
             "iterations",
           );
         }
-        if (frame.depth > limits.maxDepth) {
-          throw new ExecutionLimitError(
-            `query depth limit exceeded (${limits.maxDepth})`,
-            "recursion",
-          );
+        const frame = stack[stack.length - 1];
+        if (Array.isArray(frame.value) && frame.next < frame.value.length) {
+          stack.push(frameOf(frame.value[frame.next++], frame.depth + 1));
+          continue;
         }
-        const container =
-          frame.value !== null && typeof frame.value === "object"
-            ? (frame.value as object)
-            : null;
-        if (!frame.expanded && container) {
-          if (scheduled.has(container)) continue;
-          scheduled.add(container);
-          stack.push({ ...frame, expanded: true });
+        if (frame.keys && frame.next < frame.keys.length) {
+          const key = frame.keys[frame.next++];
           const record = asQueryRecord(frame.value);
-          const children = Array.isArray(frame.value)
-            ? frame.value
-            : Object.keys(record ?? {}).map((key) => {
-                return record?.[key];
-              });
-          if (stack.length > limits.maxResults - children.length) {
+          stack.push(frameOf(record?.[key] as QueryValue, frame.depth + 1, key));
+          continue;
+        }
+        stack.pop();
+        const outputs = evaluate(
+          frame.built === null ? frame.value : (frame.built as QueryValue),
+          args[0],
+          ctx,
+        );
+        // a list takes all of f's outputs, a map the first (1ctx jq-walk)
+        const parent = stack[stack.length - 1];
+        if (!parent) {
+          rootResult = outputs;
+        } else if (Array.isArray(parent.built)) {
+          if (parent.built.length + outputs.length > limits.maxResults) {
             throwTraversalLimit(
               `query traversal queue limit exceeded (${limits.maxResults})`,
             );
           }
-          for (let i = children.length - 1; i >= 0; i--) {
-            stack.push({
-              value: children[i],
-              depth: frame.depth + 1,
-              expanded: false,
-            });
-          }
-          continue;
+          parent.built.push(...outputs);
+        } else if (parent.built && outputs.length > 0) {
+          safeSet(parent.built, frame.key as string, outputs[0]);
         }
-
-        let childResult: QueryValue = frame.value;
-        if (Array.isArray(frame.value)) {
-          childResult = frame.value.map((child) =>
-            child !== null && typeof child === "object"
-              ? (transformed.get(child) ?? child)
-              : child,
-          );
-        } else if (container) {
-          const objectResult: Record<string, unknown> = Object.create(null);
-          const record = asQueryRecord(frame.value);
-          for (const key of Object.keys(record ?? {})) {
-            if (!isSafeKey(key)) continue;
-            const child = record?.[key];
-            safeSet(
-              objectResult,
-              key,
-              child !== null && typeof child === "object"
-                ? (transformed.get(child) ?? child)
-                : child,
-            );
-          }
-          childResult = objectResult;
-        }
-        const evaluated = evaluate(childResult, args[0], ctx)[0];
-        if (container) transformed.set(container, evaluated);
-        if (frame.depth === 0) rootResult = evaluated;
       }
-      return [rootResult];
+      // every output of f at the top (1ctx jq-walk)
+      return rootResult;
     }
 
     case "transpose": {

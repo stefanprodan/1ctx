@@ -11,7 +11,11 @@
 import { BoundedStringBuilder } from "../../bounded-builder.js";
 import { decodeBytesToUtf8, utf8ByteLength } from "../../encoding.js";
 // (1ctx readonly-errors)
-import { writeRefusalWords, readErrorWords } from "../../fs/error-words.js";
+import {
+  fsErrorWords,
+  readErrorWords,
+  writeRefusalWords,
+} from "../../fs/error-words.js";
 import { sanitizeErrorMessage } from "../../fs/sanitize-error.js";
 import { processEnv } from "../../helpers/env.js";
 import { ExecutionLimitError } from "../../interpreter/errors.js";
@@ -29,12 +33,19 @@ import type YAML from "yaml";
 import { hasHelpFlag, showHelp, unknownOption } from "../help.js";
 import {
   type EvaluateOptions,
+  evaluate,
   parse,
   type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
 import { stripsComments } from "../query-engine/builtins/dialect-builtins.js";
 import type { AstNode } from "../query-engine/parser.js";
+// (1ctx yq)
+import {
+  isRootPath,
+  type PathTag,
+  pathKeys,
+} from "../query-engine/path-tag.js";
 import { getValueDepth } from "../query-engine/value-operations.js";
 import {
   defaultFormatOptions,
@@ -50,7 +61,7 @@ import {
   parseInput,
 } from "./formats.js";
 import { evaluateAll, evaluateDocument, type Input } from "./documents.js";
-import { preservingText, spelledFor11 } from "./preserve.js";
+import { hasTagDirective, preservingText, spelledFor11 } from "./preserve.js";
 
 const yqHelp = {
   name: "yq",
@@ -126,7 +137,8 @@ EXAMPLES:
     "-r, --raw-output         output strings without quotes (json only)",
     "-c, --compact            compact output (json only)",
     "-e, --exit-status        set exit status based on output",
-    "-s, --slurp              read entire input into array",
+    // mikefarah's -s (1ctx yq-split)
+    "-s, --split-exp=EXP      write each result to EXP.yml, $index counting them",
     "-n, --null-input         don't read any input",
     "-j, --tojson             JSON output, the same as -o json",
     "-N, --no-doc             no --- between the results of different documents",
@@ -162,17 +174,37 @@ type RunOne = (
   args: string[],
   ctx: RuntimeCommandContext,
   file: number,
+  nested: boolean,
+  budget: Budget,
 ) => Promise<ExecResult>;
+
+// one iteration budget for a whole command: every file and every -s name
+// (1ctx yq-split)
+type Budget = NonNullable<EvaluateOptions["budget"]>;
+
+/** A result as printed, for -s to write to its own file (1ctx yq-split) */
+interface Chunk {
+  value: QueryValue;
+  key: Key;
+  text: string;
+}
+
+// a file's chunks, for the run over several files to name and write
+const chunksOf = new WeakMap<ExecResult, Chunk[]>();
 
 // the keys of a run's first and last result, for the --- between files
 const edges = new WeakMap<ExecResult, [Key, Key]>();
 
+// -e when nothing, or only null and false, came out, in mikefarah's words
+// (1ctx yq-documents)
+const NO_MATCHES = "Error: no matches found\n";
 const TOJSON_WARNING =
   "Flag --tojson has been deprecated, please use -o=json instead\n";
 
 interface YqOptions extends FormatOptions {
   exitStatus: boolean;
-  slurp: boolean;
+  /** -s: each result written to the file this names, mikefarah's --split-exp (1ctx yq-split) */
+  splitExp?: string;
   nullInput: boolean;
   /** no --- between documents, mikefarah's -N (1ctx yq) */
   noDoc: boolean;
@@ -184,11 +216,35 @@ interface YqOptions extends FormatOptions {
   frontMatter: boolean;
   /** ea: the filter runs once over every document (1ctx yq) */
   evalAll: boolean;
+  /** the numbers the filter spells otherwise than their value (1ctx yq-documents) */
+  literals?: Map<number, string>;
+}
+
+/** Each number the filter writes as other than its value: 0600, 1e3. (1ctx yq-documents) */
+function numberLiterals(ast: unknown): Map<number, string> {
+  const found = new Map<number, string>();
+  const walk = (node: unknown): void => {
+    if (node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    const { type, value, text } = node as Record<string, unknown>;
+    if (type === "Literal" && typeof value === "number") {
+      if (typeof text === "string") found.set(value, text);
+      else if (!found.has(value)) found.set(value, String(value));
+    }
+    for (const child of Object.values(node)) walk(child);
+  };
+  walk(ast);
+  return found;
 }
 
 interface ParsedArgs {
   options: YqOptions;
   filter: string;
+  /** where the filter sits in args, -1 when none was given (1ctx yq-split) */
+  filterAt: number;
   files: string[];
   /** where each file sits in args, to run one file at a time (1ctx yq) */
   fileAt: number[];
@@ -214,7 +270,6 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
   const options: YqOptions = {
     ...defaultFormatOptions,
     exitStatus: false,
-    slurp: false,
     nullInput: false,
     noDoc: false,
     tojson: false,
@@ -228,6 +283,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
 
   let filter = ".";
   let filterSet = false;
+  let filterAt = -1;
   let command = false;
   const files: string[] = [];
   const fileAt: number[] = [];
@@ -307,8 +363,14 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       options.compact = true;
     } else if (a === "-e" || a === "--exit-status") {
       options.exitStatus = true;
-    } else if (a === "-s" || a === "--slurp") {
-      options.slurp = true;
+    } else if (a === "-s" || a === "--split-exp") {
+      // mikefarah's -s splits results into files; jq's slurp is `ea '[.]'`
+      // (1ctx yq-split)
+      const value = args[++i];
+      if (value === undefined) return splitMissing();
+      options.splitExp = value;
+    } else if (a.startsWith("--split-exp=")) {
+      options.splitExp = a.slice(12);
     } else if (a === "-n" || a === "--null-input") {
       options.nullInput = true;
     } else if (a === "-j" || a === "--tojson") {
@@ -369,11 +431,19 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
       }
     } else if (a.startsWith("-")) {
       // Handle combined short options like -rc
-      for (const c of a.slice(1)) {
+      const letters = a.slice(1);
+      for (let k = 0; k < letters.length; k++) {
+        const c = letters[k];
         if (c === "r") options.raw = true;
         else if (c === "c") options.compact = true;
         else if (c === "e") options.exitStatus = true;
-        else if (c === "s") options.slurp = true;
+        else if (c === "s") {
+          // the rest of the cluster or the next argument (1ctx yq-split)
+          const value = k + 1 < letters.length ? letters.slice(k + 1) : args[++i];
+          if (value === undefined) return splitMissing();
+          options.splitExp = value;
+          break;
+        }
         else if (c === "n") options.nullInput = true;
         else if (c === "j") options.tojson = true;
         else if (c === "N") options.noDoc = true;
@@ -395,6 +465,7 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
     } else if (!filterSet) {
       filter = a;
       filterSet = true;
+      filterAt = i;
     } else {
       files.push(a);
       fileAt.push(i);
@@ -409,10 +480,19 @@ function parseArgs(args: string[]): ParsedArgs | ExecResult {
   return {
     options,
     filter,
+    filterAt,
     files,
     fileAt,
     inputFormatExplicit,
     outputFormatExplicit,
+  };
+}
+
+function splitMissing(): ExecResult {
+  return {
+    stdout: "",
+    stderr: "yq: -s/--split-exp needs an expression\n",
+    exitCode: 1,
   };
 }
 
@@ -424,6 +504,9 @@ export const yqCommand: RuntimeCommand = {
     ctx: RuntimeCommandContext,
     // the file's place among several, for the --- between files (1ctx yq)
     file = 0,
+    // run for one file of several, which names and writes -s files (1ctx yq-split)
+    nested = false,
+    budget: Budget = { operations: 0, callDepth: 0 },
   ): Promise<ExecResult> {
     assertDefenseContext(ctx.requireDefenseContext, "yq", "execution entry");
     const withDefenseContext = <T>(
@@ -436,6 +519,36 @@ export const yqCommand: RuntimeCommand = {
 
     const parsed = parseArgs(args);
     if ("exitCode" in parsed) return parsed;
+    // a first argument that names a file is a file, the filter `.`, as
+    // mikefarah reads `yq app.yaml` (1ctx yq-split)
+    if (
+      parsed.filterAt !== -1 &&
+      (await withDefenseContext("file check", () =>
+        ctx.fs
+          .stat(ctx.fs.resolvePath(ctx.cwd, parsed.filter))
+          .then((info) => info.isFile, () => false),
+      ))
+    ) {
+      parsed.files.unshift(parsed.filter);
+      parsed.fileAt.unshift(parsed.filterAt);
+      parsed.filter = ".";
+      parsed.filterAt = -1;
+    }
+    // mikefarah's refusals, in his words (1ctx yq-split)
+    if (parsed.options.nullInput && parsed.files.length > 0) {
+      return {
+        stdout: "",
+        stderr: "Error: cannot pass files in when using null-input flag\n",
+        exitCode: 1,
+      };
+    }
+    if (parsed.options.splitExp !== undefined && parsed.options.inplace) {
+      return {
+        stdout: "",
+        stderr: "Error: write in place cannot be used with split file\n",
+        exitCode: 1,
+      };
+    }
     // mikefarah's words for -j, said once for every file (1ctx yq)
     const warning = parsed.options.tojson ? TOJSON_WARNING : "";
 
@@ -449,19 +562,12 @@ export const yqCommand: RuntimeCommand = {
     } = parsed;
 
     if (options.evalAll) {
-      return runEvalAll(parsed, ctx, withDefenseContext, warning);
+      return runEvalAll(parsed, ctx, withDefenseContext, warning, budget);
     }
 
     // mikefarah's yq reads every file in turn; this one read the first and
     // dropped the rest without a word (1ctx yq)
     if (files.length > 1) {
-      if (options.slurp || options.nullInput) {
-        return {
-          stdout: "",
-          stderr: "yq: -s and -n read one file\n",
-          exitCode: 1,
-        };
-      }
       if (options.inplace && files.includes("-")) {
         return {
           stdout: "",
@@ -473,6 +579,7 @@ export const yqCommand: RuntimeCommand = {
       let stderr = "";
       let misses = 0;
       const seen = new Set<string>();
+      const chunks: Chunk[] = [];
       // the first file picks the output format for them all, as mikefarah's
       const first =
         !inputFormatExplicit &&
@@ -492,19 +599,50 @@ export const yqCommand: RuntimeCommand = {
         }
         const one = args.filter((_, i) => !fileAt.includes(i) || i === at);
         if (!options.inplace && !outputFormatExplicit) one.unshift("-o", first);
-        const result = await (yqCommand.execute as RunOne)(one, ctx, file);
+        const result = await (yqCommand.execute as RunOne)(
+          one,
+          ctx,
+          file,
+          true,
+          budget,
+        );
         const [head, tail] = edges.get(result) ?? [null, null];
-        const own = result.stderr.replaceAll(TOJSON_WARNING, "");
-        stderr += own;
+        // -s: this file's results go on, the --- where the file changes as
+        // on stdout (1ctx yq-split)
+        const own = chunksOf.get(result) ?? [];
+        if (own.length > 0) {
+          const before = chunks[chunks.length - 1];
+          // a file that opens with --- carries its own (1ctx yq-documents)
+          if (
+            before &&
+            first === "yaml" &&
+            !options.noDoc &&
+            moved(before.key, own[0].key) &&
+            !own[0].text.startsWith("---\n")
+          ) {
+            own[0] = { ...own[0], text: `---\n${own[0].text}` };
+          }
+          chunks.push(...own);
+        }
+        // -e's word is said once, for the whole run (1ctx yq-documents)
+        const said = result.stderr
+          .replaceAll(TOJSON_WARNING, "")
+          .replaceAll(NO_MATCHES, "");
+        stderr += said;
         // a file that matched nothing leaves it and the loop goes on; an
         // error says so on stderr and ends it
         const miss =
           result.exitCode === 1 &&
-          (own === "" || own.includes("no matches found"));
+          (said === "" || said.includes("no matches found"));
         if (miss) misses++;
         if (result.stdout !== "") {
+          // a file that opens with --- prints its own, as mikefarah's
+          // prints one (1ctx yq-documents)
           const yaml =
-            first === "yaml" && !options.noDoc && moved(last, head);
+            first === "yaml" &&
+            !options.noDoc &&
+            moved(last, head) &&
+            !result.stdout.startsWith("---\n");
           stdout += (stdout !== "" && yaml ? "---\n" : "") + result.stdout;
           last = tail;
         }
@@ -512,10 +650,20 @@ export const yqCommand: RuntimeCommand = {
           return { stdout, stderr: warning + stderr, exitCode: result.exitCode };
         }
       }
+      const missedAll =
+        misses > 0 &&
+        misses === (options.inplace ? seen.size : fileAt.length);
+      if (options.splitExp !== undefined) {
+        const refused = await writeSplit(chunks, options, ctx, withDefenseContext, budget);
+        if (refused) return refused;
+      }
       return {
         stdout,
-        stderr: warning + stderr,
-        exitCode: misses > 0 && misses === (options.inplace ? seen.size : fileAt.length) ? 1 : 0,
+        stderr:
+          warning +
+          stderr +
+          (missedAll && options.exitStatus && !options.inplace ? NO_MATCHES : ""),
+        exitCode: missedAll ? 1 : 0,
       };
     }
 
@@ -591,6 +739,7 @@ export const yqCommand: RuntimeCommand = {
         maxTokens: ctx.limits.maxQueryTokens,
         maxSourceLength: ctx.limits.maxStringLength,
       });
+      options.literals = numberLiterals(ast);
       // the documents as written, parsed once and only when a result
       // prints through them or -i writes them (1ctx yq)
       let parsed: YAML.Document[] | null = null;
@@ -614,7 +763,7 @@ export const yqCommand: RuntimeCommand = {
         env: processEnv(ctx),
         coverage: ctx.coverage,
         requireDefenseContext: ctx.requireDefenseContext,
-        budget: { operations: 0, callDepth: 0 },
+        budget,
         // mikefarah's rules where they part from jq's (1ctx query-dialect)
         dialect: "yq",
       };
@@ -639,13 +788,17 @@ export const yqCommand: RuntimeCommand = {
           { ...evalOptions, source: { document, file, filename, loads } },
         )) {
           if (value !== undefined) {
-            records.push({
-              value,
-              document,
-              computed: state === "computed",
-              index,
-              source,
-            });
+            pushRecord(
+              records,
+              {
+                value,
+                document,
+                computed: state === "computed",
+                index,
+                source,
+              },
+              ctx.limits.maxQueryElements,
+            );
           }
         }
       };
@@ -663,16 +816,6 @@ export const yqCommand: RuntimeCommand = {
           };
         }
         run(fm.frontMatter, 0);
-      } else if (options.slurp) {
-        // Parse all documents into array
-        let items: QueryValue[];
-        if (options.inputFormat === "yaml") {
-          // YAML supports multiple documents separated by ---
-          items = parseAllYamlDocuments(input, dataLimits);
-        } else {
-          items = [parseInput(input, options, dataLimits)];
-        }
-        run(items, 0);
       } else {
         // mikefarah's yq runs the filter on each document of a YAML stream,
         // where this one refused a stream it was not told to slurp (1ctx yq)
@@ -722,6 +865,7 @@ export const yqCommand: RuntimeCommand = {
           maxDepth: ctx.limits.maxQueryDepth,
           // `... comments=""` writes the documents afresh, without them
           plain: hasNode(ast, stripsComments),
+          literals: options.literals,
         });
         if (text === null) {
           return {
@@ -750,7 +894,10 @@ export const yqCommand: RuntimeCommand = {
         };
       }
 
-      const finalOutput = printRecords(records, options, ctx, file, {
+      const chunks: Chunk[] | undefined =
+        options.splitExp === undefined ? undefined : [];
+      const printed = printRecords(records, options, ctx, file, {
+        chunks,
         plain: hasNode(ast, stripsComments),
         nodeOf: (record) =>
           documentValues.length > 0
@@ -774,7 +921,7 @@ export const yqCommand: RuntimeCommand = {
         // (1ctx readonly-errors)
         await writeInPlace(files[0], () =>
           withDefenseContext("in-place write", () =>
-            ctx.fs.writeFile(filePath, finalOutput),
+            ctx.fs.writeFile(filePath, printed),
           ),
         );
         return {
@@ -784,13 +931,22 @@ export const yqCommand: RuntimeCommand = {
         };
       }
 
+      // -s writes the results to their files, here or for the run over
+      // several files, and prints nothing (1ctx yq-split)
+      const finalOutput = chunks ? "" : printed;
+      if (chunks && !nested) {
+        const refused = await writeSplit(chunks, options, ctx, withDefenseContext, budget);
+        if (refused) return refused;
+      }
+      const miss = options.exitStatus && missed(records);
       const result =
         failure !== null
           ? { ...failed(failure), stdout: finalOutput }
           : {
               stdout: finalOutput,
-              stderr: warning,
-              exitCode: options.exitStatus && missed(records) ? 1 : 0,
+              // -e says why it failed, as mikefarah's (1ctx yq-documents)
+              stderr: warning + (miss ? NO_MATCHES : ""),
+              exitCode: miss ? 1 : 0,
             };
       if (records.length > 0) {
         edges.set(result, [
@@ -798,6 +954,7 @@ export const yqCommand: RuntimeCommand = {
           keyOf(records[records.length - 1], file),
         ]);
       }
+      if (chunks) chunksOf.set(result, chunks);
       return result;
     } catch (e) {
       return failed(e);
@@ -877,13 +1034,14 @@ async function runEvalAll(
   ctx: RuntimeCommandContext,
   withDefenseContext: <T>(phase: string, op: () => Promise<T>) => Promise<T>,
   warning: string,
+  budget: Budget,
 ): Promise<ExecResult> {
   const { options, filter, files, inputFormatExplicit, outputFormatExplicit } =
     parsed;
-  if (options.slurp || options.frontMatter) {
+  if (options.frontMatter) {
     return {
       stdout: "",
-      stderr: "yq: eval-all reads every document itself, without -s or -f\n",
+      stderr: "yq: eval-all reads every document itself, without -f\n",
       exitCode: 1,
     };
   }
@@ -946,6 +1104,15 @@ async function runEvalAll(
         inputFormatExplicit || name === "-"
           ? options.inputFormat
           : (detectFormatFromExtension(name) ?? options.inputFormat);
+      // one stream: %YAML opens only the first file, as mikefarah's
+      // parser takes it (1ctx yq-documents)
+      if (
+        file > 0 &&
+        format === "yaml" &&
+        /^(?:(?:#[^\n]*|[ \t]*|%[^\n]*)\n)*%YAML[ \t]/.test(text)
+      ) {
+        throw new Error(`${name}: found incompatible YAML document`);
+      }
       const values =
         format === "yaml"
           ? parseAllYamlDocuments(text, dataLimits)
@@ -967,6 +1134,7 @@ async function runEvalAll(
       maxTokens: ctx.limits.maxQueryTokens,
       maxSourceLength: ctx.limits.maxStringLength,
     });
+    options.literals = numberLiterals(ast);
     const loads = await readLoads(ast, ctx, withDefenseContext);
     const evalOptions: EvaluateOptions = {
       limits: {
@@ -980,26 +1148,33 @@ async function runEvalAll(
       env: processEnv(ctx),
       coverage: ctx.coverage,
       requireDefenseContext: ctx.requireDefenseContext,
-      budget: { operations: 0, callDepth: 0 },
+      budget,
       dialect: "yq",
     };
     const records: Result[] = [];
     for (const result of evaluateAll(inputs, ast, evalOptions, loads)) {
       if (result.value === undefined) continue;
-      records.push({
-        value: result.value,
-        document: result.input.document,
-        computed: result.state === "computed",
-        index: result.index,
-        file: result.input.file,
-        source: result.source,
-      });
+      pushRecord(
+        records,
+        {
+          value: result.value,
+          document: result.input.document,
+          computed: result.state === "computed",
+          index: result.index,
+          file: result.input.file,
+          source: result.source,
+        },
+        ctx.limits.maxQueryElements,
+      );
     }
 
     if (!options.inplace) {
       const plain = hasNode(ast, stripsComments);
-      return {
-        stdout: printRecords(records, options, ctx, 0, {
+      // (1ctx yq-split)
+      const chunks: Chunk[] | undefined =
+        options.splitExp === undefined ? undefined : [];
+      const printed = printRecords(records, options, ctx, 0, {
+          chunks,
           plain,
           nodeOf: (record) => {
             const source = read[record.file ?? 0];
@@ -1010,8 +1185,16 @@ async function runEvalAll(
                 }
               : undefined;
           },
-        }),
-        stderr: warning,
+        });
+      if (chunks) {
+        const refused = await writeSplit(chunks, options, ctx, withDefenseContext, budget);
+        if (refused) return refused;
+      }
+      return {
+        stdout: chunks ? "" : printed,
+        // (1ctx yq-documents)
+        stderr:
+          warning + (options.exitStatus && missed(records) ? NO_MATCHES : ""),
         exitCode: options.exitStatus && missed(records) ? 1 : 0,
       };
     }
@@ -1042,6 +1225,7 @@ async function runEvalAll(
                 formatOutput(value, { ...options, yaml11: true }, maxBytes),
               maxDepth: ctx.limits.maxQueryDepth,
               plain: hasNode(ast, stripsComments),
+              literals: options.literals,
             })
           : printRecords(own, { ...options, outputFormat: written }, ctx, 0);
       if (text === null) {
@@ -1137,7 +1321,19 @@ interface Result {
   /** the file it was read from, in an eval-all run */
   file?: number;
   /** the node of its document it was made from, whose comments it keeps */
-  source?: (string | number)[];
+  source?: PathTag;
+}
+
+// (1ctx yq) the results of every document of a run, held to the element
+// limit as jq holds its own
+function pushRecord(records: Result[], record: Result, max: number): void {
+  if (records.length >= max) {
+    throw new ExecutionLimitError(
+      `query result element limit exceeded (${max})`,
+      "array_elements",
+    );
+  }
+  records.push(record);
 }
 
 /** The parsed document a record was read from, and its value. (1ctx yq) */
@@ -1186,18 +1382,33 @@ function keptText(
   }
   const node = nodeOf(record);
   if (!node) return null;
+  const source = pathKeys(record.source);
   return preservingText(
     node.document,
-    valueAt(node.value, record.source),
+    valueAt(node.value, source),
     record.value,
-    record.source,
+    source,
     {
       indent: options.indent === 0 ? 4 : Math.max(options.indent, 2),
       pretty: options.prettyPrint,
       stripComments,
       own,
+      literals: options.literals,
     },
   );
+}
+
+/**
+ * The --- a file's first document opened with, which mikefarah writes back
+ * before that document's root when it comes out first; upstream and our
+ * writers dropped it (1ctx yq-documents)
+ */
+function leadingMarker(document: YAML.Document | undefined, text: string): string {
+  if (document?.directives?.docStart !== true) return "";
+  // mikefarah drops it with a %TAG line
+  if (hasTagDirective(document)) return "";
+  // a head comment or a directive above it already carries it
+  return /^(?:#[^\n]*\n|%[^\n]*\n)*---(\n|$)/.test(text) ? "" : "---\n";
 }
 
 /** The file and the document a result counts as read from. (1ctx yq) */
@@ -1231,6 +1442,8 @@ function printRecords(
     /** every comment dropped: `... comments=""` */
     plain: boolean;
     nodeOf: (record: Result) => Node | undefined;
+    /** -s: each result's text, its --- first, gathered here too (1ctx yq-split) */
+    chunks?: Chunk[];
   },
 ): string {
   const maxOutputSize = Math.min(
@@ -1252,7 +1465,7 @@ function printRecords(
   // a document printed whole once is edited in place, not cloned
   const wholes = new Map<string, number>();
   for (const record of records) {
-    if (record.source?.length === 0) {
+    if (record.source !== undefined && isRootPath(record.source)) {
       const key = `${record.file ?? file}:${record.document}`;
       wholes.set(key, (wholes.get(key) ?? 0) + 1);
     }
@@ -1317,9 +1530,32 @@ function printRecords(
     if (options.nulOutput && text.includes("\0")) {
       throw new Error("a result holds a NUL, which -0 cannot print");
     }
+    // eval-all reads every file as one stream: only the first file's
+    // first document keeps the --- it opened with (1ctx yq-documents)
+    const later = record.file !== undefined && record.file > 0;
+    if (
+      kept && later && record.document === 0 && record.index === undefined &&
+      !record.computed && record.source !== undefined &&
+      isRootPath(record.source)
+    ) {
+      text = text.replace(/^((?:#[^\n]*\n)*)---\n/, "$1");
+    }
+    const lead =
+      kept && marker && !later && lastKey === null && record.document === 0 &&
+      record.index === undefined && !record.computed &&
+      value !== null && typeof value === "object" &&
+      record.source !== undefined && isRootPath(record.source)
+        ? leadingMarker(kept.nodeOf(record)?.document, text)
+        : "";
+    // -N drops the --- a head comment carries too (1ctx yq-split)
+    if (options.noDoc && options.outputFormat === "yaml") {
+      text = text.replace(/^((?:#[^\n]*\n|%[^\n]*\n)*)---\n/, "$1");
+    }
     output.append(between);
+    output.append(lead);
     output.append(text);
     output.append(end);
+    kept?.chunks?.push({ value, key, text: between + lead + text + end });
     lastKey = key;
   }
   return output.build();
@@ -1332,7 +1568,7 @@ export const flagsForFuzzing: CommandFuzzInfo = {
   flags: [
     { flag: "-r", type: "boolean" },
     { flag: "-c", type: "boolean" },
-    { flag: "-s", type: "boolean" },
+    { flag: "-s", type: "value", valueHint: "string" },
     { flag: "-i", type: "value", valueHint: "string" },
     { flag: "-o", type: "value", valueHint: "string" },
   ],
@@ -1355,6 +1591,8 @@ function inPlaceText(
     maxDepth: number;
     /** every comment dropped: `... comments=""` */
     plain?: boolean;
+    /** numbers as the filter wrote them (1ctx yq-documents) */
+    literals?: Map<number, string>;
   },
 ): string | null {
   const groups: Result[][] = documents.map(() => []);
@@ -1378,6 +1616,7 @@ function inPlaceText(
     let part = preservingText(documents[index], documentValues[index], last, [], {
       stripComments: opts.plain,
       own: true,
+      literals: opts.literals,
     });
     if (part === null) {
       // written afresh from values: refused when that would change what a
@@ -1388,10 +1627,108 @@ function inPlaceText(
     // the markers are written here, where the document moves
     const key = keyOf(record, 0);
     if (lastKey !== null) text += moved(lastKey, key) ? "\n---\n" : "\n";
-    text += part.replace(/^---\n/, "");
+    const body = part.replace(/^---\n/, "");
+    // the first document's own --- (1ctx yq-documents)
+    if (lastKey === null && index === 0) {
+      text += leadingMarker(documents[0], body);
+    }
+    text += body;
     lastKey = key;
   }
   return `${text}\n`;
+}
+
+/**
+ * mikefarah's -s: each result written to the file its expression names,
+ * `$index` counting the results, `.yml` after it (`.json`, `.properties`
+ * for those outputs), its folders made, a later result of the same name
+ * writing over an earlier; upstream had no split and read -s as slurp
+ * (1ctx yq-split)
+ */
+async function writeSplit(
+  chunks: Chunk[],
+  options: YqOptions,
+  ctx: RuntimeCommandContext,
+  withDefenseContext: <T>(phase: string, op: () => Promise<T>) => Promise<T>,
+  budget: Budget,
+): Promise<ExecResult | null> {
+  let ast: AstNode;
+  try {
+    ast = parse(options.splitExp ?? ".", {
+      maxDepth: ctx.limits.maxQueryDepth,
+      maxTokens: ctx.limits.maxQueryTokens,
+      maxSourceLength: ctx.limits.maxStringLength,
+    });
+  } catch (e) {
+    return {
+      stdout: "",
+      stderr: `Error: bad split document expression: ${sanitizeErrorMessage((e as Error).message)}\n`,
+      exitCode: 1,
+    };
+  }
+  const extension =
+    options.outputFormat === "json"
+      ? "json"
+      : options.outputFormat === "props"
+        ? "properties"
+        : "yml";
+  // the file being written, for an error of the file system
+  let writing = "";
+  try {
+    for (const [index, chunk] of chunks.entries()) {
+      writing = "";
+      const name = await withDefenseContext("split name", async () => {
+        const named = evaluate(chunk.value, ast, {
+          limits: {
+            maxIterations: ctx.limits.maxJqIterations,
+            maxStringLength: ctx.limits.maxStringLength,
+            maxOutputSize: ctx.limits.maxOutputSize,
+            maxArrayElements: ctx.limits.maxQueryElements,
+            maxDepth: ctx.limits.maxQueryDepth,
+          },
+          env: processEnv(ctx),
+          namedArgs: new Map([["index", index]]),
+          requireDefenseContext: ctx.requireDefenseContext,
+          budget,
+          dialect: "yq",
+        })[0];
+        // a map or list names nothing, as in mikefarah's
+        if (named === null || named === undefined) return "null";
+        return typeof named === "object" ? "" : String(named);
+      });
+      // a name with an extension keeps it, as Go's filepath.Ext reads it
+      const base = name.slice(name.lastIndexOf("/") + 1);
+      const file = base.includes(".") ? name : `${name}.${extension}`;
+      const path = ctx.fs.resolvePath(ctx.cwd, file);
+      writing = file;
+      await writeInPlace(file, () =>
+        withDefenseContext("split write", async () => {
+          const folder = path.slice(0, path.lastIndexOf("/"));
+          if (folder) await ctx.fs.mkdir(folder, { recursive: true });
+          await ctx.fs.writeFile(path, chunk.text);
+        }),
+      );
+    }
+  } catch (e) {
+    if (
+      e instanceof SecurityViolationError ||
+      e instanceof ExecutionLimitError ||
+      e instanceof InPlaceRefusal
+    ) {
+      return failed(e);
+    }
+    // mikefarah's words for an error of the name expression, and the
+    // file's for a write the file system refused, never a parse error
+    const words = writing ? fsErrorWords(e) : undefined;
+    return {
+      stdout: "",
+      stderr: words
+        ? `yq: ${writing}: ${words}\n`
+        : `Error: ${sanitizeErrorMessage((e as Error).message)}\n`,
+      exitCode: 1,
+    };
+  }
+  return null;
 }
 
 /** -e: nothing came out, or only null and false. */

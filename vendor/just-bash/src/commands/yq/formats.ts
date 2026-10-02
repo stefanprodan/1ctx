@@ -325,6 +325,13 @@ export function parseAllYamlDocuments(
         `document ${index + 1}: ${problem.message.split("\n")[0]}`,
       );
     }
+    // mikefarah's parser takes %YAML on the first document alone, and our
+    // writers would print it between two documents (1ctx yq-documents)
+    if (index > 0 && doc.directives?.yaml.explicit) {
+      throw new Error(
+        `document ${index + 1}: found incompatible YAML document`,
+      );
+    }
     values.push(
       sanitizeParsedData(doc.toJS({ maxAliasCount: 100 }), {
         ...limits,

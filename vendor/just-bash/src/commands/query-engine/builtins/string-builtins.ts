@@ -57,6 +57,41 @@ function countLiteralSplit(
  * Handle string builtins that need evaluate function for arguments.
  * Returns null if the builtin name is not a string builtin handled here.
  */
+/**
+ * The pieces of a string around each match, one list for each pattern and
+ * flags the arguments give, as split/2 binds them.
+ */
+function regexSplit(
+  value: string,
+  args: AstNode[],
+  ctx: EvalContext,
+  evaluate: EvalFn,
+): string[][] {
+  const out: string[][] = [];
+  for (const pattern of evaluate(value, args[0], ctx)) {
+    // (1ctx regex-builtins) a bad pattern is jq's error, never no output, and
+    // null flags are none
+    const given = args.length > 1 ? evaluate(value, args[1], ctx) : ["g"];
+    for (const each of given) {
+      const flags = each === null ? "" : String(each);
+      // Ensure global flag is set for split
+      const regex = createUserRegex(
+        String(pattern),
+        flags.includes("g") ? flags : `${flags}g`,
+      );
+      let count = 1;
+      for (const match of regex.matchAll(value)) {
+        count += Math.max(1, match.length);
+        assertResultCount(ctx, count);
+      }
+      const split = regex.split(value);
+      assertResultCount(ctx, out.length + split.length);
+      out.push(split);
+    }
+  }
+  return out;
+}
+
 export function evalStringBuiltin(
   value: QueryValue,
   name: string,
@@ -106,6 +141,8 @@ export function evalStringBuiltin(
 
     case "split": {
       if (typeof value !== "string" || args.length === 0) return [null];
+      // split/2 is splits gathered, as jq defines it (1ctx regex-builtins)
+      if (args.length > 1) return regexSplit(value, args, ctx, evaluate);
       const seps = evaluate(value, args[0], ctx);
       const sep = String(seps[0]);
       assertResultCount(ctx, countLiteralSplit(value, sep, resultLimit(ctx)));
@@ -115,28 +152,7 @@ export function evalStringBuiltin(
     case "splits": {
       // Split string by regex, return each part as separate output
       if (typeof value !== "string" || args.length === 0) return [];
-      const patterns = evaluate(value, args[0], ctx);
-      const pattern = String(patterns[0]);
-      try {
-        const flags =
-          args.length > 1 ? String(evaluate(value, args[1], ctx)[0]) : "g";
-        // Ensure global flag is set for split
-        const regex = createUserRegex(
-          pattern,
-          flags.includes("g") ? flags : `${flags}g`,
-        );
-        let count = 1;
-        for (const match of regex.matchAll(value)) {
-          count += Math.max(1, match.length);
-          assertResultCount(ctx, count);
-        }
-        const split = regex.split(value);
-        assertResultCount(ctx, split.length);
-        return split;
-      } catch (error) {
-        if (error instanceof ExecutionLimitError) throw error;
-        return [];
-      }
+      return regexSplit(value, args, ctx, evaluate).flat();
     }
 
     case "scan": {
@@ -144,44 +160,37 @@ export function evalStringBuiltin(
       if (typeof value !== "string" || args.length === 0) return [];
       const patterns = evaluate(value, args[0], ctx);
       const pattern = String(patterns[0]);
-      try {
-        const flags =
-          args.length > 1 ? String(evaluate(value, args[1], ctx)[0]) : "";
-        // Ensure global flag is set for matchAll
-        const regex = createUserRegex(
-          pattern,
-          flags.includes("g") ? flags : `${flags}g`,
-        );
-        const results: QueryValue[] = [];
-        for (const m of regex.matchAll(value)) {
-          assertResultCount(ctx, results.length + 1);
-          if (m.length > 1) {
-            // Has capture groups - return array of captured groups (excluding full match)
-            assertResultCount(ctx, m.length - 1);
-            results.push(m.slice(1));
-          } else {
-            // No capture groups - return full match string
-            results.push(m[0]);
-          }
+      // (1ctx regex-builtins) a bad pattern is jq's error, never no output
+      const flags =
+        args.length > 1 ? String(evaluate(value, args[1], ctx)[0]) : "";
+      // Ensure global flag is set for matchAll
+      const regex = createUserRegex(
+        pattern,
+        flags.includes("g") ? flags : `${flags}g`,
+      );
+      const results: QueryValue[] = [];
+      for (const m of regex.matchAll(value)) {
+        assertResultCount(ctx, results.length + 1);
+        if (m.length > 1) {
+          // Has capture groups - return array of captured groups (excluding full match)
+          assertResultCount(ctx, m.length - 1);
+          results.push(m.slice(1));
+        } else {
+          // No capture groups - return full match string
+          results.push(m[0]);
         }
-        return results;
-      } catch (error) {
-        if (error instanceof ExecutionLimitError) throw error;
-        return [];
       }
+      return results;
     }
 
     case "test": {
       if (typeof value !== "string" || args.length === 0) return [false];
       const patterns = evaluate(value, args[0], ctx);
       const pattern = String(patterns[0]);
-      try {
-        const flags =
-          args.length > 1 ? String(evaluate(value, args[1], ctx)[0]) : "";
-        return [createUserRegex(pattern, flags).test(value)];
-      } catch {
-        return [false];
-      }
+      // (1ctx regex-builtins) a bad pattern is jq's error, never no output
+      const flags =
+        args.length > 1 ? String(evaluate(value, args[1], ctx)[0]) : "";
+      return [createUserRegex(pattern, flags).test(value)];
     }
 
     case "match": {

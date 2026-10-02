@@ -123,6 +123,11 @@
 (fail) fromBuffer without Buffer (browser fallback) > latin1 matches Node output across chunk boundaries
 (fail) fromBuffer without Buffer (browser fallback) > latin1 never passes more than 8192 arguments to String.fromCharCode
 (fail) jq > JSON stream parsing (concatenated JSON) > should handle concatenated pretty-printed JSON objects with -s
+(fail) jq operators > type conversion > should parse a number with surrounding whitespace
+(fail) jq operators > type conversion > should reject tonumber on whitespace-only input " "
+(fail) jq operators > type conversion > should reject tonumber on whitespace-only input "\t\n"
+(fail) jq prototype pollution defense > from_entries with dangerous keys > should handle from_entries with name/Name/k variants for dangerous keys
+(fail) jq prototype pollution defense > fromstream with dangerous keys > should filter dangerous keys when reconstructing from stream
 (fail) js-exec exploit regressions > blocks breakout chains and command-injection attempts
 (fail) js-exec exploit regressions > keeps queued execution bounded after a concurrent timeout
 (fail) js-exec host runtime breakout probes > does not allow child_process.spawnSync('node', ...) to execute host Node.js
@@ -157,6 +162,13 @@
 (fail) process substitution - read-only filesystem > writes to >(cmd) through a command argument
 (fail) process substitution - read-only filesystem > writes to >(cmd) through a redirection
 (fail) published package declarations > includes declaration trees referenced by public declarations
+(fail) query builtin prospective resource limits > bounds flattened map and map_values generator output
+(fail) query date builtin validation > rejects ISO-shaped dates that normalize to another date
+(fail) query date builtin validation > rejects non-finite timestamps before gmtime
+(fail) query date builtin validation > rejects non-finite timestamps before strftime("%Y")
+(fail) query date builtin validation > rejects non-finite timestamps before todate
+(fail) query date builtin validation > rejects timestamps outside the Date range
+(fail) query date builtin validation > rejects unsupported strptime formats instead of fallback parsing
 (fail) query format builtins in browser mode > decodes browser base64 bytes using defined UTF-8 replacement
 (fail) query format builtins in browser mode > encodes Unicode as UTF-8 before browser base64 conversion
 (fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
@@ -187,6 +199,7 @@
 (fail) yq > error handling > should handle invalid YAML
 (fail) yq > format auto-detection > should auto-detect JSON from .json extension
 (fail) yq > join-output mode > should not print newlines with -j
+(fail) yq > slurp mode > should slurp multiple YAML documents
 (fail) yq format strings > edge cases > @base64 on array returns null
 (fail) yq format strings > edge cases > @base64 on non-string returns null
 (fail) yq format strings > edge cases > @csv on non-array returns null

@@ -12,6 +12,14 @@ import recorded from "../../fixtures/just-bash/yq-mikefarah.json" with {
 };
 import { recordedCases } from "./recorded.ts";
 
+// Cases we still answer differently; a listed case that passes fails.
+const KNOWN = new Set<string>([
+  // mikefarah carries a key's head comment into the list of keys
+  "every key under .. collected",
+  // an edit through an alias is refused, where mikefarah edits the anchor
+  'anchors: -i .other += ["d"]',
+]);
+
 describe("yq as mikefarah's", () => {
-  recordedCases("yq", recorded as Fixture);
+  recordedCases("yq", recorded as Fixture, KNOWN);
 });

@@ -14,7 +14,13 @@ import {
   safeSet,
   sanitizeParsedData,
 } from "../safe-object.js";
-import { getValueDepth, type QueryValue } from "../value-operations.js";
+// (1ctx jq-compare jq-infinity)
+import {
+  getValueDepth,
+  jqJson,
+  type QueryValue,
+  sortedKeys,
+} from "../value-operations.js";
 
 // Default max depth for nested structures
 const DEFAULT_MAX_JQ_DEPTH = 2000;
@@ -94,7 +100,8 @@ export function evalObjectBuiltin(
     case "keys":
       if (Array.isArray(value)) return [value.map((_, i) => i)];
       if (value && typeof value === "object")
-        return [Object.keys(value).sort()];
+        // by code point, as jq sorts them (1ctx jq-compare)
+        return [sortedKeys(Object.keys(value))];
       return [null];
 
     case "keys_unsorted":
@@ -262,7 +269,8 @@ export function evalObjectBuiltin(
       if (getValueDepth(value, maxDepth + 1) > maxDepth) {
         return [null];
       }
-      return [JSON.stringify(value)];
+      // (1ctx jq-infinity)
+      return [jqJson(value)];
     }
 
     case "fromjson": {
@@ -295,10 +303,25 @@ export function evalObjectBuiltin(
 
     case "tostring":
       if (typeof value === "string") return [value];
-      return [JSON.stringify(value)];
+      // (1ctx jq-infinity)
+      return [jqJson(value)];
 
     case "tonumber":
       if (typeof value === "number") return [value];
+      if (typeof value === "string" && ctx.dialect !== "yq") {
+        // jq reads a decimal number, signed, or nan, inf or infinity in any
+        // case, and nothing around it; Number() took blanks, hex and
+        // binary (1ctx jq-tonumber)
+        const special = /^([+-]?)(nan|inf|infinity)$/i.exec(value);
+        if (special) {
+          if (special[2].toLowerCase() === "nan") return [Number.NaN];
+          return [special[1] === "-" ? -Infinity : Infinity];
+        }
+        if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(value)) {
+          return [Number(value)];
+        }
+        throw new Error(`${JSON.stringify(value)} cannot be parsed as a number`);
+      }
       if (typeof value === "string") {
         const n = value.trim() === "" ? Number.NaN : Number(value);
         if (Number.isNaN(n)) {
@@ -335,15 +358,24 @@ export function evalObjectBuiltin(
       // tostream outputs [path, leaf_value] pairs for each leaf, plus [[]] at end
       const results: QueryValue[] = [];
       const maxDepth = ctx.limits.maxDepth ?? DEFAULT_MAX_JQ_DEPTH;
+      // jq closes each non-empty container after its last child with the
+      // path of that child, `[[path]]`, and closes nothing at the top;
+      // upstream gave one `[[]]` at the end (1ctx jq-tostream)
       const stack: Array<{
         value: QueryValue;
         path: (string | number)[];
+        close?: boolean;
       }> = [{ value, path: [] }];
       const seen = new WeakSet<object>();
       let iterations = 0;
       while (stack.length > 0) {
         const entry = stack.pop();
         if (!entry) break;
+        if (entry.close) {
+          assertResultPush(ctx, results.length);
+          results.push([entry.path]);
+          continue;
+        }
         if (++iterations > ctx.limits.maxIterations) {
           throw new ExecutionLimitError(
             `query iteration limit exceeded (${ctx.limits.maxIterations})`,
@@ -380,6 +412,11 @@ export function evalObjectBuiltin(
                 "array_elements",
               );
             }
+            stack.push({
+              value: null,
+              path: [...entry.path, v.length - 1],
+              close: true,
+            });
             for (let i = v.length - 1; i >= 0; i--) {
               stack.push({ value: v[i], path: [...entry.path, i] });
             }
@@ -404,6 +441,12 @@ export function evalObjectBuiltin(
                 "array_elements",
               );
             }
+            // the map's close (1ctx jq-tostream)
+            stack.push({
+              value: null,
+              path: [...entry.path, keys[keys.length - 1]],
+              close: true,
+            });
             for (let i = keys.length - 1; i >= 0; i--) {
               const key = keys[i];
               // @banned-pattern-ignore: Object.keys returns own properties only
@@ -415,9 +458,6 @@ export function evalObjectBuiltin(
           }
         }
       }
-      // End marker: [[]] (empty path array wrapped in array)
-      assertResultPush(ctx, results.length);
-      results.push([[]]);
       return results;
     }
 
@@ -434,24 +474,37 @@ export function evalObjectBuiltin(
       let result: QueryValue = null;
       let iterations = 0;
 
+      // jq's fromstream: a value is out when an event closes a top-level
+      // one, `[[k]]` or `[[], v]`, and the next starts afresh; upstream
+      // merged every event into one value (1ctx jq-tostream)
+      const emitted: QueryValue[] = [];
+      let done = false;
       for (const item of streamItems) {
-        if (!Array.isArray(item)) continue;
-        if (
-          item.length === 1 &&
-          Array.isArray(item[0]) &&
-          item[0].length === 0
-        ) {
-          // End marker [[]] - skip
+        if (done) {
+          result = null;
+          done = false;
+        }
+        if (!Array.isArray(item)) {
+          const kind = item === null ? "null" : typeof item;
+          throw new Error(`Cannot index ${kind} with number`);
+        }
+        const path = item[0];
+        if (item.length !== 2) {
+          done = Array.isArray(path) && path.length === 1;
+          if (done) emitted.push(result);
           continue;
         }
-        if (item.length !== 2) continue;
-        const [path, val] = item;
-        if (!Array.isArray(path)) continue;
+        const val = item[1];
+        if (!Array.isArray(path)) {
+          throw new Error("Path must be specified as an array");
+        }
         validateStreamPath(path, ctx);
 
         // Set value at path, creating structure as needed
         if (path.length === 0) {
           result = val;
+          done = true;
+          emitted.push(result);
           continue;
         }
 
@@ -528,7 +581,8 @@ export function evalObjectBuiltin(
         }
       }
 
-      return [result];
+      // (1ctx jq-tostream)
+      return emitted;
     }
 
     case "truncate_stream": {

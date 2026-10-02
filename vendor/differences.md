@@ -26,7 +26,10 @@ a comma, `sub` replaces every match with Go's `${name}` and `$1`;
 `max` and `split` of null answer nothing, and `with_entries` on a list
 keys the map by index; a string and a number or boolean concatenate
 with `+`, a null in `-`, `*`, `/` or `%` drops the result; a step
-into a string, number or boolean (`.name.x`) answers nothing.
+into a string, number or boolean (`.name.x`) answers nothing; `.[]`
+over null answers nothing, in path mode too, so a stream edit skips the
+documents without the key, and `?` guards the whole path before it,
+where jq stops on both and guards only the last step.
 
 In both, toward jq 1.8: `capture` without a match answers nothing,
 `match` names its groups and gives their offsets, `sub` in jq takes
@@ -50,39 +53,62 @@ define.
 jq 1.8, and `jq-1.8.test.ts` the cases `scripts/jq-record.ts` recorded
 from jq 1.8.2 for the dialect rules. Where they part:
 
-- Iterating null yields nothing, in path mode too, as in mikefarah's
-  yq: `.items[] |= f` or `del(.spec.containers[] | ...)` over a stream
-  skips the documents without the key, where jq stops with an error.
-  Iterating a number, a string or a boolean is still jq's error.
 - Regular expressions are RE2's, not Oniguruma's: the one-letter class
   `\pN` matches digits where jq 1.8 matches nothing; write `\p{N}` for
   both.
-- The value evaluator keeps some of upstream's leniencies:
-  `map_values(f)` keeps every output of `f`, `walk` never reaches
-  scalars, `?` covers the whole path before it (`.a.b?`) rather than
-  its last step, `$__loc__` is always on line 1, and an error inside
-  one input drops that input's earlier outputs.
 - The regular expressions are RE2's: no `x` flag, no lookaround, no
   backreferences.
-- mikefarah's names above are accepted.
+- An error inside one input drops that input's earlier outputs (jq
+  prints them before the error); the other inputs still run. The error
+  reads `jq: error (at <stdin>): ...`, without jq's line number.
+- `$__loc__` is always on line 1 and `input_line_number` always 1.
+- Generators are not lazy: `first`, `limit` and `isempty` stop early
+  only through comma and parentheses, and take `inputs` one at a time
+  only as a whole part of them. A pipe or a function runs whole, so an
+  error past the results they keep fails the call:
+  `first(.[] | if . > 1 then error else . end)` and
+  `first(inputs | select(.ok))` over a later input that does not parse
+  exit 5 where jq answers the first result, and a file that cannot be
+  read there exits 2.
+- A builtin at an arity jq lacks (`ltrimstr`, `tojson(1)`) fails when it
+  runs, not before the program starts.
+- A filter that does not compile exits 5 with `jq: parse error: ...`,
+  where jq exits 3 with a compile error.
+- A string literal reads `\uXXXX` but no other escape upstream lacks:
+  `\b` and `\f` are their letter, an unknown escape is its letter where
+  jq fails, and a lone surrogate is kept where jq writes U+FFFD or fails.
+- `\\(` in a string literal starts an interpolation, where jq reads a
+  backslash and a parenthesis.
+- An object pattern takes no string key: `. as {"a b": $x}` is a parse
+  error.
+- A `def` of a builtin's name and arity loses to the builtin, so
+  `def length: 5; length` is the builtin's answer.
+- A `$x` parameter also binds `x` to each value, where jq leaves `x` the
+  whole filter. In path mode a filter argument sees a variable the body binds over the
+  caller's of the same name.
+- `%` keeps its operands' fractions (`5.9 % 2.1` is 1.7, `5 % 0.5` is
+  0), where jq cuts them to integers first.
+- nan compares as JavaScript's NaN, so `nan < 1` is false and a list
+  holding nan sorts out of order; jq orders nan below every number.
+- `.a[.k]?` as a path reads `.k` from `.a`, where jq reads it from the
+  input.
+- mikefarah's names above are accepted, and a few jq 1.8 no longer
+  defines (`leaf_paths`, `ascii`); `have_literal_numbers`,
+  `have_decnum` and `--seq` are not.
 - `//` in path mode drops an error on its left (`(error("x") // .z) = 1`
   writes `.z`); jq 1.8 raises it.
 - `last(f)`, `limit(n; f)` and `nth(n; f)` also work as paths, which
   jq 1.8 refuses; `setpath` with several paths and values orders its
   outputs path first.
-- Numbers are JavaScript's: integers past 2^53 lose precision.
-- A `\uXXXX` escape in a filter's string is read as `uXXXX`; `\t` and
-  `\n` work.
+- Numbers are JavaScript's: integers past 2^53 lose precision, and a
+  literal is not kept as written (`1.0`, `1E+3` and `100000000000000000001`
+  print as `1`, `1000` and `100000000000000000000`); `-0` prints as `0`;
+  `[nan] == [nan]` is true; `infinite % 3` is 0 where jq gives 1.
 - A `break` in the right side of an assignment outputs nothing, where jq
-  outputs the results before it; the filter form of a `$x` parameter
-  yields only the bound value (`def f($x): x`).
-- `tonumber`, and yq's `to_number`, take a number with blanks around it
-  (`" 42 "` is 42) and read `"0x10"` as 16 and `"Infinity"` as null;
-  jq 1.8 refuses the first two and gives the largest double for the
-  last.
-- `[1,2] | to_entries | from_entries` is `{"0":1,"1":2}`; jq fails.
-- A user `def` cannot override a builtin: `def length: 5; [1] | length`
-  is 1, where jq answers 5.
+  outputs the results before it.
+- `strflocaltime`'s `%Z` is Intl's name for the zone, so outside the
+  United States it reads `GMT+9` where jq reads `JST`.
+- yq's `to_number` still takes blanks around a number and hex.
 
 ## Where our curl still differs from curl
 
@@ -474,18 +500,59 @@ for one of the reasons below. Where they part:
   file left as it was, when a plain scalar of it reads differently for
   YAML 1.1 and 1.2 (`0644`, `yes`), since the fresh spelling would
   change what Kubernetes reads.
-- `!!binary` reads as an object of bytes. A merge key is written back
-  without the `!!merge` tag mikefarah adds.
-- `-i` over several files writes each as it goes, so a later file that
-  does not parse leaves the earlier ones written; mikefarah reads all
-  first. A file with a duplicate key does not parse here.
-- An alias is a copy: editing an anchor's target leaves the aliased
-  places at the old value, and a plain write re-emits anchors.
+- `!!binary` reads as an object of bytes.
+- A string literal reads jq's escapes, `\uXXXX` decoded and `\a`, `\v`
+  and an unknown escape as their letter, where mikefarah reads Go's
+  control letters and keeps any other escape, `\u00e9` too, as written.
+- A comment between `%YAML` and `---` moves above the directive. A
+  document that opens `--- # c` keeps the comment on its own line,
+  where mikefarah joins it to the next (`# ckind: N`).
+- `-i` over several files edits each file in place and writes each as
+  it goes, so a later file that does not parse leaves the earlier ones
+  written. mikefarah reads all first and writes every result into the
+  first file, leaving the others as they were; ours keeps each file's
+  own results in it on purpose. A file with a duplicate key does not
+  parse here.
+- An alias is a copy in a value the filter computes; `-i` edits an
+  anchor's target in place, so its aliases and merge keys read the
+  edit, as mikefarah's do. A key a merge key brings in is set on the map
+  that merges it (`.web.mem = 9` adds `mem: 9` under `web`), as the YAML
+  spec reads it; mikefarah writes it into the anchor, which his own
+  warning calls off the spec. An edit through an alias (`other: *l`,
+  `.other += ["d"]`) is refused; mikefarah edits the anchor. A plain
+  write re-emits anchors. `..` meets an aliased node once, at its
+  anchor, where mikefarah visits the alias too.
+- A list of keys (`[.. | key]`) prints without the head comments
+  mikefarah carries over from the keys.
 - In `eval-all` a variable holds one document at a time, where
   mikefarah's holds the whole list. `ireduce` counts as computed for
   the `---` lines, where mikefarah keeps its accumulator's document.
-- An `-i` whose filter outputs nothing leaves the file and exits 1;
-  mikefarah empties it.
+- An `-i` whose filter outputs nothing, a `del` of every document
+  among them, leaves the file and exits 1; mikefarah empties it.
+- A written number keeps the spelling the filter gives it (`= 600`
+  writes `600`, `= 0755` writes `0755`); any other takes the spelling an
+  equal number has anywhere in the document, nodes the edit deleted or
+  overwrote included, so copies keep `0644`. mikefarah's spelling goes
+  with the node, so three cases are wrong. A plain number written over
+  a node that holds the same value spelled otherwise leaves the node as
+  it was: `.defaultMode = 400` over `0400` keeps `0400`, which a YAML
+  1.1 reader like Kubernetes reads as 256, where mikefarah writes `400`.
+  A computed or `env` number
+  equal to one the document spells otherwise takes that spelling:
+  `periodSeconds += 590` beside `defaultMode: 0600` writes `0600`, which
+  a YAML 1.1 reader like Kubernetes reads as 384, where mikefarah writes
+  `600`. A copy equal to a number the filter writes takes the filter's
+  spelling: `.mode = .defaultMode | .other = 644` over a `0644` writes
+  `mode: 644`. Telling them apart would need the query engine to carry
+  each number's spelling, out of scope for this fork.
+- After a `select` that matches nothing, `[...]` outputs nothing;
+  mikefarah collects an empty list and prints a blank line or `[]` for
+  each such document.
+- `-I` sets the indentation of what is written afresh only: an `-i`
+  edit keeps the file's own, where mikefarah reindents the file.
+- An item of a list an edit set keeps its quotes when it did not change
+  (`args: ["sleep", "3600"]`); mikefarah writes the new list's items
+  plain (`[sleep, "3600"]`).
 - Our values carry no style, comments, tags or anchors: `style`,
   `anchor`, `line_comment` and the like answer `""`, `line` and
   `column` 0.
@@ -525,6 +592,8 @@ for one of the reasons below. Where they part:
   string; `length` of a number is its absolute value, not its digits;
   a string printed afresh is double-quoted where mikefarah single-quotes
   (`'!!str'`).
-- `-s` is slurp, not mikefarah's split into files; a missing file exits
-  2 where every other error exits 1 as his does; `--version` names
-  just-bash and the syntax.
+- A missing file exits 2 where every other error exits 1 as his does;
+  `--version` names just-bash and the syntax.
+- `-s` names a file without touching the result: mikefarah's
+  expression writes a key it reads into the document (`-s '.spec'`
+  adds `spec: null` to a document without one).

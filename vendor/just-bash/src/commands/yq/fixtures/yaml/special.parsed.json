@@ -10,7 +10,7 @@
     "float": 3.14159,
     "negative": -17,
     "scientific": 15000000000,
-    "infinity": null,
+    "infinity": 1.7976931348623157e+308,
     "nan": null
   },
   "booleans": {

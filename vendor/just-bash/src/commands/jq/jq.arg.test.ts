@@ -65,7 +65,8 @@ describe("jq named-argument flags", () => {
       const env = new Bash();
       const result = await env.exec("jq -n --argjson x notjson '$x'");
       expect(result.stdout).toBe("");
-      expect(result.stderr).toBe("jq: invalid JSON text passed to --argjson\n");
+      // jq's pointer to its help follows (1ctx jq-inputs)
+      expect(result.stderr).toStartWith("jq: invalid JSON text passed to --argjson\n");
       expect(result.exitCode).toBe(2);
     });
   });
@@ -139,7 +140,8 @@ describe("jq named-argument flags", () => {
       const env = new Bash();
       const result = await env.exec("jq -n --arg x");
       expect(result.stdout).toBe("");
-      expect(result.stderr).toBe(
+      // jq's pointer to its help follows (1ctx jq-inputs)
+      expect(result.stderr).toStartWith(
         "jq: --arg takes two parameters (e.g. --arg varname value)\n",
       );
       expect(result.exitCode).toBe(2);

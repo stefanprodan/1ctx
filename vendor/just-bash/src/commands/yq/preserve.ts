@@ -57,21 +57,127 @@ function numberText(value: number): string {
 function scalar(value: QueryValue): YAML.Scalar {
   if (typeof value === "string") {
     const node = new YAML.Scalar(value);
-    if (ambiguous(value)) node.type = "QUOTE_DOUBLE";
+    // several lines are a literal block, as go-yaml writes them, unless a
+    // line ends in a blank or a character needs an escape (1ctx yq-documents)
+    if (value.includes("\n") && !/[ \t]\n|[ \t]$|[^\t\n\x20-\x7e\u00a0-\ufffd]/u.test(value)) {
+      node.type = "BLOCK_LITERAL";
+    } else if (ambiguous(value)) node.type = "QUOTE_DOUBLE";
     return node;
   }
   const node = new YAML.Scalar(
     value === null
       ? "null"
       : typeof value === "number"
-        ? numberText(value)
+        ? (spelled(value) ?? numberText(value))
         : String(value),
   );
   node.type = "PLAIN";
   return node;
 }
 
+// A number the document spells so a YAML 1.1 reader reads it otherwise
+// (`0644`, octal there): a copy of it keeps that spelling, as mikefarah
+// copies the node, where `644` changed a file mode (1ctx yq-documents)
+let numbers: {
+  doc: YAML.Document;
+  literals?: Map<number, string>;
+  spellings?: Map<number, string>;
+  /** the spellings of nodes the edit deleted, so a moved value keeps its own */
+  removed?: Map<number, string>;
+} | null = null;
+
+// every number under `node` a YAML 1.1 reader reads otherwise, into `into`
+function collectSpellings(node: unknown, into: Map<number, string>): void {
+  YAML.visit(node as YAML.Node, {
+    Scalar(_, scalar) {
+      if (scalar.type !== "PLAIN" || typeof scalar.value !== "string") return;
+      const text = scalar.value;
+      const read = YAML.parse(text);
+      if (typeof read === "number" && YAML.parse(text, { version: "1.1" }) !== read) {
+        into.set(read, text);
+      }
+    },
+  });
+}
+
+function spelled(value: number): string | undefined {
+  if (!numbers) return undefined;
+  // a number the filter wrote keeps its spelling, `.mode = 0600`
+  const literal = numbers.literals?.get(value);
+  if (literal !== undefined) return literal;
+  if (!numbers.spellings) {
+    numbers.spellings = new Map<number, string>();
+    collectSpellings(numbers.doc, numbers.spellings);
+  }
+  return numbers.spellings.get(value) ?? numbers.removed?.get(value);
+}
+
+// a node about to be deleted or overwritten: its spellings stay known for
+// a value moved from it (`.mode = .defaultMode | del(.defaultMode)`), as
+// mikefarah's node carries its own (1ctx yq-documents)
+function forget(doc: YAML.Document, path: Key[]): void {
+  if (!numbers || numbers.spellings) return;
+  const node = doc.getIn(path, true);
+  if (YAML.isNode(node)) {
+    numbers.removed ??= new Map<number, string>();
+    collectSpellings(node, numbers.removed);
+  }
+}
+
+function deleteAt(doc: YAML.Document, path: Key[]): void {
+  forget(doc, path);
+  doc.deleteIn(path);
+}
+
+// The document an edit is applied to and the values it was read as, so a
+// map or list the filter copied from it (`.items += [.items[0]]`,
+// `{"x": .}`) is written as its node, spelling and comments kept, as
+// mikefarah copies nodes; rebuilt from values, `0644` became `644`
+// (1ctx yq-documents)
+let source: { doc: YAML.Document; index: Map<object, Key[]> } | null = null;
+
+/**
+ * Where each map and list of `before` sits, when `after` holds one of them
+ * somewhere else; null when nothing was copied, the usual edit, which then
+ * costs no copy of the document.
+ */
+function copiesOf(before: QueryValue, after: QueryValue): Map<object, Key[]> | null {
+  const index = new Map<object, Key[]>();
+  const walk = (v: QueryValue, at: Key[]) => {
+    if (v === null || typeof v !== "object" || index.has(v)) return;
+    index.set(v, at);
+    if (Array.isArray(v)) v.forEach((item, i) => walk(item, [...at, i]));
+    else for (const [key, item] of Object.entries(v)) walk(item, [...at, key]);
+  };
+  walk(before, []);
+  const moved = (v: QueryValue, at: Key[]): boolean => {
+    if (v === null || typeof v !== "object") return false;
+    const was = index.get(v);
+    // a map or list left where it was holds nothing copied
+    if (was) return !same(was, at);
+    if (Array.isArray(v)) return v.some((item, i) => moved(item, [...at, i]));
+    return Object.entries(v).some(([key, item]) => moved(item, [...at, key]));
+  };
+  return moved(after, []) ? index : null;
+}
+
+function copied(value: object): YAML.Node | null {
+  const at = source?.index.get(value);
+  if (!source || !at) return null;
+  const node = at.length === 0 ? source.doc.contents : source.doc.getIn(at, true);
+  if (!YAML.isCollection(node)) return null;
+  const clone = node.clone() as YAML.Node;
+  // it must still read as the value, aliases and all
+  const doc = new YAML.Document(undefined, { schema: "failsafe" });
+  doc.contents = clone as typeof doc.contents;
+  return same(YAML.parse(doc.toString(), { merge: true }), value) ? clone : null;
+}
+
 function build(value: QueryValue): YAML.Node {
+  if (value !== null && typeof value === "object") {
+    const node = copied(value);
+    if (node) return node;
+  }
   if (Array.isArray(value)) {
     const seq = new YAML.YAMLSeq();
     for (const item of value) seq.items.push(build(item));
@@ -102,6 +208,7 @@ function put(
   touched: Touch[],
 ): void {
   touched.push({ path, whole: true });
+  forget(doc, path);
   const current = doc.getIn(path, true);
   if (YAML.isScalar(current) && !isMap(value) && !Array.isArray(value)) {
     const next = scalar(value);
@@ -172,7 +279,7 @@ function applyChanges(
     const headComment = YAML.isNode(head) ? head.commentBefore : undefined;
     for (const key of Object.keys(was)) {
       if (!Object.hasOwn(now, key)) {
-        doc.deleteIn([...path, key]);
+        deleteAt(doc, [...path, key]);
         touched.push({ path, whole: false });
       }
     }
@@ -200,10 +307,25 @@ function applyChanges(
         throw new Error("not a map");
       }
     }
-    // keys in another order are not carried over: the check says so
     const kept = Object.keys(was).filter((key) => Object.hasOwn(now, key));
     const added = Object.keys(now).filter((key) => !Object.hasOwn(was, key));
     if (!same([...kept, ...added], Object.keys(now))) {
+      // keys in another order (sort_keys): the pairs follow, each with its
+      // comments, where the whole document was written afresh without
+      // them; the check confirms it (1ctx yq-documents)
+      const order = new Map(Object.keys(now).map((key, i) => [key, i]));
+      const name = (pair: YAML.Pair) =>
+        String(YAML.isScalar(pair.key) ? pair.key.value : pair.key);
+      if (
+        YAML.isMap(parent) &&
+        parent.items.every((pair) => order.has(name(pair as YAML.Pair)))
+      ) {
+        parent.items.sort(
+          (a, b) =>
+            (order.get(name(a as YAML.Pair)) as number) -
+            (order.get(name(b as YAML.Pair)) as number),
+        );
+      }
       touched.push({ path, whole: false });
     }
     return;
@@ -222,7 +344,7 @@ function applyChanges(
       applyChanges(doc, [...path, i], was[i], now[i], touched);
     }
     for (let i = was.length - 1; i >= now.length; i--) {
-      doc.deleteIn([...path, i]);
+      deleteAt(doc, [...path, i]);
       touched.push({ path, whole: false });
     }
     for (let i = was.length; i < now.length; i++) {
@@ -328,6 +450,8 @@ export interface Spelling {
   stripComments?: boolean;
   /** the document is the caller's to change, so it is not cloned */
   own?: boolean;
+  /** numbers the filter wrote, as written: 0600 (1ctx yq-documents) */
+  literals?: Map<number, string>;
 }
 
 function stripComments(doc: YAML.Document): void {
@@ -370,6 +494,19 @@ function prettify(node: YAML.Node): void {
   });
 }
 
+const DEFAULT_TAGS: Record<string, string> = {
+  "!": "!",
+  "!!": "tag:yaml.org,2002:",
+};
+
+/** Whether a document declares a tag handle of its own with %TAG. */
+export function hasTagDirective(doc: YAML.Document): boolean {
+  const tags = doc.directives?.tags ?? {};
+  return Object.entries(tags).some(
+    ([handle, prefix]) => DEFAULT_TAGS[handle] !== prefix,
+  );
+}
+
 /**
  * The text of the node at `path` with `after` in place of `before`, its
  * comments and every untouched scalar kept as written, or null when the
@@ -399,11 +536,34 @@ export function preservingText(
       copy = new YAML.Document(undefined, { schema: "failsafe" });
       copy.contents = node.clone() as typeof copy.contents;
     }
+    // mikefarah writes no %TAG: a tag of one is spelled out in full, and
+    // the document's --- goes with it (1ctx yq-documents)
+    const tagged = hasTagDirective(copy);
+    if (tagged && copy.directives) {
+      copy.directives.tags = { ...DEFAULT_TAGS };
+      copy.directives.docStart = null;
+    }
     const touched: Touch[] = [];
-    applyChanges(copy, [], before, after, touched);
+    const index = copiesOf(before, after);
+    source = index ? { doc: copy.clone(), index } : null;
+    numbers = { doc: source?.doc ?? copy, literals: spelling.literals };
+    try {
+      applyChanges(copy, [], before, after, touched);
+    } finally {
+      source = null;
+      numbers = null;
+    }
+    // a merge key is written tagged, as mikefarah writes it (1ctx yq-anchors)
+    YAML.visit(copy, {
+      Pair(_, pair) {
+        if (YAML.isScalar(pair.key) && pair.key.value === "<<") {
+          pair.key.tag = "tag:yaml.org,2002:merge";
+        }
+      },
+    });
     if (spelling.stripComments) stripComments(copy);
     if (spelling.pretty && copy.contents) prettify(copy.contents);
-    const text = copy
+    let text = copy
       .toString({
         flowCollectionPadding: false,
         indent: spelling.indent ?? 2,
@@ -411,10 +571,13 @@ export function preservingText(
       })
       .replace(/^---\n/, "")
       .replace(/\n+$/, "")
+      // mikefarah writes no closing ... (1ctx yq-documents)
+      .replace(/\n\.\.\.$/, "")
       // a head comment sits on the line above, as mikefarah writes it
       .replace(/^((?:#[^\n]*\n)+)\n/, "$1")
       // a foot comment follows the last line, as mikefarah writes it
       .replace(/\n\n(?=(#[^\n]*\n?)+$)/, "\n");
+    if (tagged) text = text.replace(/^((?:%[^\n]*\n)*)---\n/, "$1");
     // what is written must read back as the result: the nodes the edit
     // wrote, or the whole text where an anchor or a merge key could
     // reach past them (merge keys read merged, as the values were)
@@ -422,10 +585,19 @@ export function preservingText(
     if (!/[&*]|<<:/.test(text)) {
       return readsBack(copy, after, touched) ? text : null;
     }
+    // with anchors the text must still read, and each place the edit
+    // wrote must read as written; a place an alias or a merge key shares
+    // shows the edit, as mikefarah's aliases are references, where the
+    // whole document was held to our copies and the edit refused
+    // (1ctx yq-anchors)
     const reread = YAML.parseDocument(text, { merge: true });
     if (reread.errors.length > 0) return null;
-    if (!same(reread.toJS({ maxAliasCount: 100 }) as QueryValue, after)) {
-      return null;
+    const read = reread.toJS({ maxAliasCount: 100 }) as QueryValue;
+    for (const { path, whole } of touched) {
+      // a key a merge key brings back reads again where it was dropped
+      if (whole && !same(valueAt(read, path), valueAt(after, path))) {
+        return null;
+      }
     }
     return text;
   } catch {

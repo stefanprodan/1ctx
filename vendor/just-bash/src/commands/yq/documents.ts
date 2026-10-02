@@ -16,19 +16,28 @@
  * answers for the whole filter; only the tags are added.
  */
 
+import { ExecutionLimitError } from "../../interpreter/errors.js";
 import {
+  assertQueryResultCapacity,
   bindPattern,
+  chargeQueryWork,
   createContext,
   type EvalContext,
   type EvaluateOptions,
   evalBinaryOp,
   evaluate,
   extractPathFromAst,
+  type QueryEvaluationBudget,
   type QuerySource,
   type QueryValue,
 } from "../query-engine/index.js";
 import { missingPath } from "../query-engine/builtins/dialect-builtins.js";
 import type { AstNode, DestructurePattern } from "../query-engine/parser.js";
+import {
+  type PathTag,
+  pathUnder,
+  ROOT_PATH,
+} from "../query-engine/path-tag.js";
 import { asQueryRecord } from "../query-engine/safe-object.js";
 import { isTruthy } from "../query-engine/value-operations.js";
 
@@ -46,9 +55,18 @@ export interface Tagged {
   /** the very node splitDoc made a document, not one inside it */
   splitRoot?: boolean;
   /** its path from the root, where known, for key and path */
-  path?: (string | number)[];
+  path?: PathTag;
   /** the node of the document it was made from, whose comments it keeps */
-  source?: (string | number)[];
+  source?: PathTag;
+}
+
+// (1ctx yq) every list of results the walker gathers is held to the
+// element limit, as the engine holds its own: a pipe or a comma of results
+// each under it multiplied past it. A leaf's own values reach the limit
+// before this check sees them.
+function gather(ctx: EvalContext, target: Tagged[], items: Tagged[]): void {
+  assertQueryResultCapacity(ctx, target.length, items.length);
+  for (const item of items) target.push(item);
 }
 
 type Vars = ReadonlyMap<string, State>;
@@ -203,12 +221,33 @@ function arithmetic(op: string, left: Tagged, right: Tagged): State {
   return replaced(left.state);
 }
 
+// the nodes walk() answers itself rather than handing to the engine
+const SPLIT = new Set<string>([
+  "Pipe",
+  "Comma",
+  "Paren",
+  "Array",
+  "BinaryOp",
+  "VarBind",
+  "Cond",
+  "Recurse",
+]);
+
 function walk(
   ast: AstNode,
   input: Tagged,
   ctx: EvalContext,
   vars: Vars,
 ): Tagged[] {
+  // (1ctx yq) a node the walker splits costs what the engine charges for
+  // evaluating it, so both run out of iterations alike
+  if (
+    SPLIT.has(ast.type) &&
+    (ast.type !== "Array" || ast.elements) &&
+    (ast.type !== "BinaryOp" || ast.op === "//" || ARITHMETIC.has(ast.op))
+  ) {
+    chargeQueryWork(ctx);
+  }
   switch (ast.type) {
     case "Pipe": {
       const lefts = walk(ast.left, input, ctx, vars);
@@ -229,9 +268,14 @@ function walk(
       // way round, since his add copies the node's own index
       const keeps = keepsSplit(ast.right);
       const sameNode = keepsSplit(ast.right) && !isPathOnly(ast.right);
-      return lefts.flatMap((left) =>
-        walk(ast.right, left, { ...right, sourceNode: left }, vars).map(
-          (result) => {
+      const results: Tagged[] = [];
+      for (const left of lefts) {
+        const rights = walk(
+          ast.right,
+          left,
+          { ...right, sourceNode: left },
+          vars,
+        ).map((result) => {
             if (left.index === undefined || result.index !== undefined) {
               return result;
             }
@@ -248,15 +292,16 @@ function walk(
               index: left.index,
               splitRoot: sameNode ? left.splitRoot : false,
             };
-          },
-        ),
-      );
+        });
+        gather(ctx, results, rights);
+      }
+      return results;
     }
-    case "Comma":
-      return [
-        ...walk(ast.left, input, ctx, vars),
-        ...walk(ast.right, input, ctx, vars),
-      ];
+    case "Comma": {
+      const results = walk(ast.left, input, ctx, vars);
+      gather(ctx, results, walk(ast.right, input, ctx, vars));
+      return results;
+    }
     case "Paren":
       return walk(ast.expr, input, ctx, vars);
     case "Array": {
@@ -264,7 +309,7 @@ function walk(
       if (!ast.elements) break;
       const items = walk(ast.elements, input, ctx, vars).map((r) => r.value);
       const state = replaced(input.state);
-      const path = state === "computed" ? [] : (input.path ?? []);
+      const path = state === "computed" ? ROOT_PATH : (input.path ?? ROOT_PATH);
       return [{ value: items, state, path }];
     }
     case "BinaryOp": {
@@ -303,6 +348,7 @@ function walk(
             (isMap(left.value) || Array.isArray(left.value))
               ? left.source
               : undefined;
+          assertQueryResultCapacity(ctx, results.length, values.length);
           for (const value of values) results.push({ value, state, source });
         }
       }
@@ -313,7 +359,9 @@ function walk(
         ? [ast.pattern]
         : [{ type: "var", name: ast.name }];
       if (ast.alternatives) patterns.push(...ast.alternatives);
-      return walk(ast.value, input, ctx, vars).flatMap((bound) => {
+      const results: Tagged[] = [];
+      for (const bound of walk(ast.value, input, ctx, vars)) {
+        chargeQueryWork(ctx);
         for (const pattern of patterns) {
           const inner = bindPattern(ctx, pattern, bound.value);
           if (inner === null) continue;
@@ -321,32 +369,37 @@ function walk(
           patternNames(pattern, names);
           const states = new Map(vars);
           for (const name of names) states.set(name, bound.state);
-          return walk(ast.body, input, { ...inner, sourceNode: input }, states);
+          gather(
+            ctx,
+            results,
+            walk(ast.body, input, { ...inner, sourceNode: input }, states),
+          );
+          break;
         }
-        return [];
-      });
+      }
+      return results;
     }
-    case "Cond":
-      return evaluate(input.value, ast.cond, ctx).flatMap((cond) => {
-        if (isTruthy(cond)) return walk(ast.then, input, ctx, vars);
-        for (const elif of ast.elifs) {
-          if (evaluate(input.value, elif.cond, ctx).some(isTruthy)) {
-            return walk(elif.then, input, ctx, vars);
+    case "Cond": {
+      const results: Tagged[] = [];
+      for (const cond of evaluate(input.value, ast.cond, ctx)) {
+        chargeQueryWork(ctx);
+        let branch: Tagged[] | undefined;
+        if (isTruthy(cond)) branch = walk(ast.then, input, ctx, vars);
+        else {
+          for (const elif of ast.elifs) {
+            if (evaluate(input.value, elif.cond, ctx).some(isTruthy)) {
+              branch = walk(elif.then, input, ctx, vars);
+              break;
+            }
           }
         }
-        return ast.else ? walk(ast.else, input, ctx, vars) : [input];
-      });
-    case "Recurse": {
-      // .. answers the input itself first, then the nodes inside it
-      const values = evaluate(input.value, ast, ctx);
-      const paths = pathsOf(input, ast, ctx, values.length, step(input.state));
-      return values.map((value, index) => ({
-        value,
-        state: index === 0 ? input.state : step(input.state),
-        path: paths?.[index],
-        source: paths?.[index],
-      }));
+        branch ??= ast.else ? walk(ast.else, input, ctx, vars) : [input];
+        gather(ctx, results, branch);
+      }
+      return results;
     }
+    case "Recurse":
+      return recurse(input, ctx);
   }
   const state = classify(ast, input.state, input.value, vars);
   const values = evaluate(input.value, ast, ctx);
@@ -366,6 +419,62 @@ function walk(
     path: paths?.[index],
     source: pathOnly ? paths?.[index] : source,
   }));
+}
+
+/**
+ * `..` as the engine answers it, the input first and then every node
+ * inside it once, each tagged under its parent as it is met, so no path
+ * pass is needed. (1ctx yq)
+ */
+function recurse(input: Tagged, ctx: EvalContext): Tagged[] {
+  const results: Tagged[] = [];
+  const seen = new WeakSet<object>();
+  const inside = step(input.state);
+  const stack: { value: QueryValue; depth: number; path: PathTag }[] = [
+    { value: input.value, depth: 0, path: input.path ?? ROOT_PATH },
+  ];
+  for (let entry = stack.pop(); entry; entry = stack.pop()) {
+    const { value, depth, path } = entry;
+    chargeQueryWork(ctx);
+    if (depth > ctx.limits.maxDepth) {
+      throw new ExecutionLimitError(
+        `query depth limit exceeded (${ctx.limits.maxDepth})`,
+        "recursion",
+      );
+    }
+    if (value && typeof value === "object") {
+      if (seen.has(value as object)) continue;
+      seen.add(value as object);
+    }
+    assertQueryResultCapacity(ctx, results.length);
+    results.push({
+      value,
+      state: depth === 0 ? input.state : inside,
+      path,
+      source: path,
+    });
+    if (Array.isArray(value)) {
+      for (let index = value.length - 1; index >= 0; index--) {
+        stack.push({
+          value: value[index],
+          depth: depth + 1,
+          path: pathUnder(path, [index]),
+        });
+      }
+    } else {
+      const record = asQueryRecord(value);
+      if (record === null) continue;
+      const keys = Object.keys(record);
+      for (let index = keys.length - 1; index >= 0; index--) {
+        stack.push({
+          value: record[keys[index]],
+          depth: depth + 1,
+          path: pathUnder(path, [keys[index]]),
+        });
+      }
+    }
+  }
+  return results;
 }
 
 // a path step or a function returning its input keeps a split document's
@@ -405,7 +514,11 @@ function constructs(ast: AstNode): boolean {
     case "Foreach":
       return true;
     case "Call":
-      return COMPUTED.has(ast.name) && ast.name !== "with_entries";
+      // (1ctx yq) path builds a list of keys, never styled as its node
+      return (
+        (COMPUTED.has(ast.name) && ast.name !== "with_entries") ||
+        ast.name === "path"
+      );
     default:
       return false;
   }
@@ -433,26 +546,41 @@ function isPathOnly(ast: AstNode): boolean {
 // chain gives them: path() of a path step under the input's, the input's
 // own for a replacement or a function that returns its input, and a fresh
 // root for a value computed from nothing
+// (1ctx yq) The path passes of one command share a budget of their own,
+// as large as the user's and apart from it: charged to the user's, a path
+// pass doubled the cost of every path step, and given a fresh one per
+// pass, their total had no bound. Once it is spent the paths are unknown.
+const pathBudgets = new WeakMap<QueryEvaluationBudget, QueryEvaluationBudget>();
+
+function pathBudget(ctx: EvalContext): QueryEvaluationBudget {
+  let budget = pathBudgets.get(ctx.budget);
+  if (budget === undefined) {
+    budget = { operations: 0, callDepth: 0 };
+    pathBudgets.set(ctx.budget, budget);
+  }
+  return budget;
+}
+
 function pathsOf(
   input: Tagged,
   ast: AstNode,
   ctx: EvalContext,
   count: number,
   state: State,
-): ((string | number)[] | undefined)[] | undefined {
-  const base = input.path ?? [];
+): (PathTag | undefined)[] | undefined {
+  const base = input.path ?? ROOT_PATH;
   if (!isPathOnly(ast)) {
-    const own = state === "computed" ? [] : base;
+    const own = state === "computed" ? ROOT_PATH : base;
     return Array.from({ length: count }, () => own);
   }
   try {
     const paths = evaluate(
       input.value,
       { type: "Call", name: "path", args: [ast] },
-      ctx,
+      { ...ctx, budget: pathBudget(ctx) },
     );
     if (paths.length !== count) return undefined;
-    return paths.map((p) => [...base, ...(p as (string | number)[])]);
+    return paths.map((p) => pathUnder(base, p as (string | number)[]));
   } catch {
     return undefined;
   }
@@ -470,8 +598,8 @@ export function evaluateDocument(
   const ctx = { ...createContext(options), root: document, currentPath: [] };
   return walk(
     ast,
-    { value: document, state: "document", path: [], source: [] },
-    { ...ctx, sourceNode: { value: document, path: [] } },
+    { value: document, state: "document", path: ROOT_PATH, source: ROOT_PATH },
+    { ...ctx, sourceNode: { value: document, path: ROOT_PATH } },
     new Map(),
   );
 }
@@ -542,16 +670,22 @@ export function evaluateAll(
         );
       }
     }
-    return from.flatMap((item) =>
-      evaluateDocumentFrom(item, node, optionsFor(item.input)),
-    );
+    // (1ctx yq) held to the element limit across documents
+    const results: InputResult[] = [];
+    for (const item of from) {
+      const next = evaluateDocumentFrom(item, node, optionsFor(item.input));
+      assertQueryResultCapacity(limits, results.length, next.length);
+      for (const result of next) results.push(result);
+    }
+    return results;
   };
+  const limits = createContext(options);
   const start = inputs.map(
     (input): InputResult => ({
       value: input.value,
       state: "document",
-      path: [],
-      source: [],
+      path: ROOT_PATH,
+      source: ROOT_PATH,
       input,
     }),
   );

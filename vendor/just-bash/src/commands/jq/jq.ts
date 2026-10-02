@@ -100,8 +100,9 @@ function parseJsonSlice(
 function parseJsonStream(
   input: string,
   limits: { maxDepth: number; maxElements: number },
+  // the values before a parse error stay here, for -n's input (1ctx jq-inputs)
+  results: unknown[] = [],
 ): unknown[] {
-  const results: unknown[] = [];
   const appendResult = (value: unknown): void => {
     if (results.length >= limits.maxElements) {
       throw new ExecutionLimitError(
@@ -218,8 +219,16 @@ function parseJsonStream(
  * jq uses exit code 2 for command-line option errors.
  */
 function jqArgError(message: string): ExecResult {
-  return { stdout: "", stderr: `jq: ${message}\n`, exitCode: 2 };
+  // with jq's pointer to its help (1ctx jq-inputs)
+  return {
+    stdout: "",
+    stderr: `jq: ${message}\n${JQ_USAGE_HINT}`,
+    exitCode: 2,
+  };
 }
+
+const JQ_USAGE_HINT =
+  "Use jq --help for help with command-line options,\nor see the jq manpage, or online docs at https://jqlang.org\n";
 
 const jqHelp = {
   name: "jq",
@@ -278,6 +287,11 @@ export const jqCommand: RuntimeCommand = {
     let joinOutput = false;
     let sortKeys = false;
     let useTab = false;
+    // (1ctx jq-inputs)
+    let stream = false;
+    let ascii = false;
+    let nulOutput = false;
+    let indent = 2;
     let filter = ".";
     let filterSet = false;
     let positionalMode: "none" | "args" | "jsonargs" = "none";
@@ -336,14 +350,34 @@ export const jqCommand: RuntimeCommand = {
       else if (a === "-s" || a === "--slurp") slurp = true;
       else if (a === "-n" || a === "--null-input") nullInput = true;
       else if (a === "-j" || a === "--join-output") joinOutput = true;
-      else if (a === "-a" || a === "--ascii") {
-        /* ignored */
+      else if (a === "-a" || a === "--ascii-output" || a === "--ascii") {
+        ascii = true;
       } else if (a === "-S" || a === "--sort-keys") sortKeys = true;
+      else if (a === "--stream") stream = true;
+      else if (a === "--raw-output0") nulOutput = true;
+      else if (a === "--indent") {
+        // jq's range, -1 is a tab, and the last of --indent, --tab and -c
+        // wins (1ctx jq-inputs)
+        if (args[i + 1] === undefined) {
+          return jqArgError("--indent takes one parameter");
+        }
+        const n = Number(args[i + 1]);
+        if (!/^[+-]?\d+$/.test(args[i + 1]) || n < -1 || n > 7) {
+          return jqArgError("--indent takes a number between -1 and 7");
+        }
+        useTab = n === -1;
+        if (n !== -1) indent = n;
+        compact = false;
+        i += 1;
+      }
       else if (a === "-C" || a === "--color") {
         /* ignored */
       } else if (a === "-M" || a === "--monochrome") {
         /* ignored */
-      } else if (a === "--tab") useTab = true;
+      } else if (a === "--tab") {
+        useTab = true;
+        compact = false;
+      }
       else if (a === "--arg") {
         const name = args[i + 1];
         const value = args[i + 2];
@@ -415,9 +449,8 @@ export const jqCommand: RuntimeCommand = {
           else if (c === "s") slurp = true;
           else if (c === "n") nullInput = true;
           else if (c === "j") joinOutput = true;
-          else if (c === "a") {
-            /* ignored */
-          } else if (c === "S") sortKeys = true;
+          else if (c === "a") ascii = true;
+          else if (c === "S") sortKeys = true;
           else if (c === "C") {
             /* ignored */
           } else if (c === "M") {
@@ -465,11 +498,33 @@ export const jqCommand: RuntimeCommand = {
     // Build list of inputs: stdin or files. jq parses JSON, so the input
     // bytes are decoded to UTF-8 before parsing — without this, multi-byte
     // sequences inside string values get re-encoded twice and emit mojibake.
-    let inputs: { source: string; content: string }[] = [];
-    if (nullInput) {
-      // No input
-    } else if (files.length === 0 || (files.length === 1 && files[0] === "-")) {
+    let inputs: { source: string; content: string; missing?: string }[] = [];
+    // -n still reads them, for input and inputs, and a file that cannot be
+    // read is told only when input reaches it, as jq does (1ctx jq-inputs)
+    if (files.length === 0 || (files.length === 1 && files[0] === "-")) {
       inputs.push({ source: "stdin", content: decodeBytesToUtf8(ctx.stdin) });
+    } else if (nullInput) {
+      for (const file of files) {
+        const result = await withDefenseContext("file read", () =>
+          readFiles(ctx, [file], { cmdName: "jq", stopOnError: true }),
+        );
+        const read = result.files[0];
+        inputs.push(
+          result.exitCode !== 0 || !read
+            ? {
+                source: file,
+                content: "",
+                missing: result.stderr.replace(
+                  /^jq: /,
+                  "jq: error: Could not open file ",
+                ),
+              }
+            : {
+                source: read.filename || "stdin",
+                content: decodeBytesToUtf8(read.content),
+              },
+        );
+      }
     } else {
       // Read all files in parallel using shared utility
       const result = await withDefenseContext("file read", () =>
@@ -499,6 +554,16 @@ export const jqCommand: RuntimeCommand = {
       });
       let values: QueryValue[] = [];
 
+      // debug and stderr write here, and an input's error is told here
+      // while the next input still runs, as jq goes on; the exit status is
+      // the last input's (1ctx jq-stderr)
+      const stderrParts: string[] = [];
+      let stderrBytes = 0;
+      let lastFailed = false;
+      // under -n: a file input could not read, and the input last reached,
+      // which an error names (1ctx jq-inputs)
+      let fileFailed = false;
+      let current: string | null = null;
       const evalOptions: EvaluateOptions = {
         limits: ctx.limits
           ? {
@@ -516,7 +581,50 @@ export const jqCommand: RuntimeCommand = {
         coverage: ctx.coverage,
         requireDefenseContext: ctx.requireDefenseContext,
         budget: { operations: 0, callDepth: 0 },
+        log: (text) => {
+          stderrBytes += utf8ByteLength(text);
+          if (stderrBytes > ctx.limits.maxOutputSize) {
+            throw new ExecutionLimitError(
+              `output size limit exceeded (${ctx.limits.maxOutputSize} bytes)`,
+              "string_length",
+            );
+          }
+          stderrParts.push(text);
+        },
       };
+      const run = (input: QueryValue, source: string | null): void => {
+        try {
+          appendValues(
+            values,
+            evaluate(input, ast, {
+              ...evalOptions,
+              source: {
+                document: 0,
+                file: 0,
+                filename: source,
+                loads: new Map(),
+              },
+            }),
+          );
+          lastFailed = false;
+        } catch (e) {
+          if (
+            e instanceof SecurityViolationError ||
+            e instanceof ExecutionLimitError
+          ) {
+            throw e;
+          }
+          const msg = sanitizeErrorMessage((e as Error).message);
+          if (msg.includes("Unknown function") || msg.endsWith("is not defined")) {
+            throw e;
+          }
+          const where = source ?? current ?? "<unknown>";
+          evalOptions.log?.(`jq: error (at ${where}): ${msg}\n`);
+          lastFailed = true;
+        }
+      };
+      const named = (source: string) => (source === "stdin" ? "<stdin>" : source);
+      const last = named(inputs[inputs.length - 1]?.source ?? "stdin");
       const appendValues = (target: QueryValue[], next: QueryValue[]): void => {
         if (next.length > ctx.limits.maxQueryElements - target.length) {
           throw new ExecutionLimitError(
@@ -527,64 +635,132 @@ export const jqCommand: RuntimeCommand = {
         for (const value of next) target.push(value);
       };
 
-      if (nullInput) {
-        values = evaluate(null, ast, evalOptions);
-      } else if (rawInput && slurp) {
+      // every input is queued and run in turn, and input and inputs take
+      // the next ones from the same queue, as jq reads them; -n runs once
+      // on null, --stream queues each value's events; under -n a file that
+      // could not be read and a parse error wait in the queue until input
+      // reaches them (1ctx jq-inputs)
+      type Queued = {
+        value: QueryValue;
+        source: string | null;
+        error?: string;
+        missing?: string;
+      };
+      const queue: Queued[] = [];
+      const enqueue = (
+        value: QueryValue,
+        source: string | null,
+        held: Partial<Queued> = {},
+      ): void => {
+        if (queue.length >= ctx.limits.maxQueryElements) {
+          throw new ExecutionLimitError(
+            `query result element limit exceeded (${ctx.limits.maxQueryElements})`,
+            "array_elements",
+          );
+        }
+        queue.push({ value, source, ...held });
+      };
+      const held = (e: unknown): string => {
+        if (
+          !nullInput ||
+          e instanceof SecurityViolationError ||
+          e instanceof ExecutionLimitError
+        ) {
+          throw e;
+        }
+        return sanitizeErrorMessage((e as Error).message);
+      };
+      for (const { source, missing } of inputs) {
+        if (missing !== undefined && slurp) {
+          enqueue(null, named(source), { missing });
+        }
+      }
+      const events = (value: QueryValue): QueryValue[] =>
+        evaluate(value, { type: "Call", name: "tostream", args: [] }, evalOptions);
+      if (rawInput && slurp) {
         // Raw slurp: the entire concatenated input becomes one JSON string.
-        const rawText = inputs.map(({ content }) => content).join("");
-        values = evaluate(rawText, ast, evalOptions);
+        enqueue(inputs.map(({ content }) => content).join(""), last);
       } else if (rawInput) {
         // Raw input: real jq concatenates all inputs into a single stream and
         // splits on newlines, so a line can span a file boundary when a file
-        // lacks a trailing newline. Scan incrementally, carrying only the
-        // unterminated trailing fragment across inputs, instead of building the
-        // full concatenated string and a complete array of lines. A trailing
-        // newline does not yield a final empty string, but interior blank
-        // lines are preserved.
+        // lacks a trailing newline. A trailing newline does not yield a final
+        // empty string, but interior blank lines are preserved.
         let remainder = "";
-        for (const { content } of inputs) {
+        for (const { content, source, missing } of inputs) {
+          if (missing !== undefined) enqueue(null, named(source), { missing });
           const text = remainder + content;
           let start = 0;
           let nl = text.indexOf("\n", start);
           while (nl !== -1) {
-            appendValues(
-              values,
-              evaluate(text.slice(start, nl), ast, evalOptions),
-            );
+            enqueue(text.slice(start, nl), named(source));
             start = nl + 1;
             nl = text.indexOf("\n", start);
           }
           remainder = text.slice(start);
         }
-        if (remainder !== "") {
-          appendValues(values, evaluate(remainder, ast, evalOptions));
-        }
-      } else if (slurp) {
-        // Slurp mode: combine all inputs into single array
-        // Use JSON stream parser to handle concatenated JSON (not just NDJSON)
-        const items: QueryValue[] = [];
-        for (const { content } of inputs) {
-          const trimmed = content.trim();
-          if (trimmed) {
-            appendValues(items, parseJsonStream(trimmed, jsonLimits));
-          }
-        }
-        values = evaluate(items, ast, evalOptions);
+        if (remainder !== "") enqueue(remainder, last);
       } else {
-        // Process each input file separately
         // Use JSON stream parser to handle concatenated JSON (e.g., cat file1.json file2.json | jq .)
-        for (const { content } of inputs) {
+        const items: QueryValue[] = [];
+        let slurpError: string | undefined;
+        for (const { content, source, missing } of inputs) {
+          if (missing !== undefined && !slurp) {
+            enqueue(null, named(source), { missing });
+          }
           const trimmed = content.trim();
           if (!trimmed) continue;
-
-          const jsonValues = parseJsonStream(trimmed, jsonLimits);
-          for (const jsonValue of jsonValues) {
-            appendValues(values, evaluate(jsonValue, ast, evalOptions));
+          const parsed: unknown[] = [];
+          let error: string | undefined;
+          try {
+            parseJsonStream(trimmed, jsonLimits, parsed);
+          } catch (e) {
+            error = held(e);
           }
+          for (const jsonValue of parsed as QueryValue[]) {
+            for (const value of stream ? events(jsonValue) : [jsonValue]) {
+              if (slurp) appendValues(items, [value]);
+              else enqueue(value, named(source));
+            }
+          }
+          if (error !== undefined && slurp) slurpError ??= error;
+          else if (error !== undefined) {
+            enqueue(null, named(source), { error });
+          }
+        }
+        if (slurp) {
+          enqueue(slurpError === undefined ? items : null, last, {
+            error: slurpError,
+          });
+        }
+      }
+      let at = 0;
+      evalOptions.input = () => {
+        while (at < queue.length) {
+          const next = queue[at++];
+          current = next.source;
+          if (next.missing !== undefined) {
+            evalOptions.log?.(next.missing);
+            fileFailed = true;
+          } else if (next.error !== undefined) {
+            throw new Error(next.error);
+          } else return next;
+        }
+        return undefined;
+      };
+      if (nullInput) {
+        run(null, null);
+      } else {
+        while (at < queue.length) {
+          const { value, source } = queue[at++];
+          run(value, source);
         }
       }
 
-      const separator = joinOutput ? "" : "\n";
+      // each output ends with a newline, nothing under -j, a NUL under
+      // --raw-output0; -j and --raw-output0 print strings raw, and -a
+      // prints every string as JSON (1ctx jq-inputs)
+      const end = nulOutput ? "\0" : joinOutput ? "" : "\n";
+      const rawStrings = (raw || joinOutput || nulOutput) && !ascii;
       const maxStringLength = Math.min(
         ctx.limits.maxStringLength,
         ctx.limits.maxOutputSize,
@@ -592,10 +768,7 @@ export const jqCommand: RuntimeCommand = {
       const formatted: string[] = [];
       let outputBytes = 0;
       for (const value of values) {
-        const separatorBytes = formatted.length > 0 ? separator.length : 0;
-        const finalNewlineBytes = joinOutput ? 0 : 1;
-        const remainingBytes =
-          maxStringLength - outputBytes - separatorBytes - finalNewlineBytes;
+        const remainingBytes = maxStringLength - outputBytes - end.length;
         if (remainingBytes < 0) {
           throw new ExecutionLimitError(
             `output size limit exceeded (${maxStringLength} bytes)`,
@@ -611,40 +784,54 @@ export const jqCommand: RuntimeCommand = {
             "recursion",
           );
         }
+        if (nulOutput && typeof value === "string" && value.includes("\0")) {
+          stderrParts.push(
+            "jq: error (at <stdin>:0): Cannot dump a string containing NUL with --raw-output0 option\n",
+          );
+          lastFailed = true;
+          break;
+        }
         const text = formatJsonValue(value, remainingBytes, {
           compact,
-          raw,
+          raw: rawStrings,
           sortKeys,
           useTab,
+          indent,
+          ascii,
           limitKind: "string_length",
         });
         const textBytes = utf8ByteLength(text);
-        if (
-          outputBytes + separatorBytes + textBytes + finalNewlineBytes >
-          maxStringLength
-        ) {
+        if (outputBytes + textBytes + end.length > maxStringLength) {
           throw new ExecutionLimitError(
             `output size limit exceeded (${maxStringLength} bytes)`,
             "string_length",
           );
         }
-        outputBytes += separatorBytes + textBytes;
-        formatted.push(text);
+        outputBytes += textBytes + end.length;
+        formatted.push(text + end);
       }
-      const output = formatted.join(separator);
+      const output = formatted.join("");
 
-      const exitCode =
-        exitStatus &&
-        (values.length === 0 ||
-          values.every((v) => v === null || v === undefined || v === false))
-          ? 1
-          : 0;
+      // -e reads the last output: 1 for null or false, 4 for none
+      // (1ctx jq-stderr)
+      const final = values[values.length - 1];
+      const exitCode = fileFailed
+        ? 2
+        : lastFailed
+          ? 5
+        : !exitStatus
+          ? 0
+          : values.length === 0
+            ? 4
+            : final === null || final === undefined || final === false
+              ? 1
+              : 0;
 
       // jq emits text; the pipeline handles encoding.
-      const stdoutText = output ? (joinOutput ? output : `${output}\n`) : "";
+      const stdoutText = output;
       return {
         stdout: stdoutText,
-        stderr: "",
+        stderr: stderrParts.join(""),
         exitCode,
       };
     } catch (e) {
@@ -660,7 +847,7 @@ export const jqCommand: RuntimeCommand = {
         };
       }
       const msg = sanitizeErrorMessage((e as Error).message);
-      if (msg.includes("Unknown function")) {
+      if (msg.includes("Unknown function") || msg.endsWith("is not defined")) {
         return {
           stdout: "",
           stderr: `jq: error: ${msg}\n`,

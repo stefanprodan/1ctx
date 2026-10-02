@@ -4035,14 +4035,6 @@
       "exit": 0,
       "written": {
         "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 3\ntags: [a, b]\n"
-      },
-      "accept": {
-        "stdout": "",
-        "exit": 0,
-        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds.",
-        "written": {
-          "anchors.yaml": "# shared defaults\nbase: &base\n  image: nginx\n  replicas: 1 # one by default\nweb:\n  <<: *base\n  replicas: 3\ntags: [a, b]\n"
-        }
       }
     },
     {
@@ -4056,12 +4048,6 @@
       "exit": 0,
       "written": {
         "anchors.yaml": "# shared defaults\nbase: &base\n  image: httpd\n  replicas: 1 # one by default\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
-      },
-      "accept": {
-        "stdout": "",
-        "exit": 1,
-        "reason": "An alias is a copy: an edit of an anchor's target that its aliases would read differently is refused, the file left as it was.",
-        "written": {}
       }
     },
     {
@@ -4153,12 +4139,7 @@
         "anchors.yaml"
       ],
       "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n",
-      "exit": 0,
-      "accept": {
-        "stdout": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n",
-        "exit": 0,
-        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
-      }
+      "exit": 0
     },
     {
       "name": "mikefarah: tag setter",
@@ -5201,14 +5182,6 @@
       "exit": 0,
       "written": {
         "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  !!merge <<: *base\n  replicas: 2\ntags: [a, b]\n"
-      },
-      "accept": {
-        "stdout": "",
-        "exit": 0,
-        "written": {
-          "anchors.yaml": "base: &base\n  image: nginx\n  replicas: 1\nweb:\n  <<: *base\n  replicas: 2\ntags: [a, b]\n"
-        },
-        "reason": "A merge key is written as it was, without the !!merge tag mikefarah adds."
       }
     },
     {
@@ -6618,6 +6591,959 @@
       ],
       "stdout": "# head one\na: 2 # one\n---\n# sep\n# head two\nb: [1, 2]\na: 2\n---\nc: \"x\"\na: 2\n---\nmeta: {z: 1, a: 2} # m\nlist: [b, a]\na: 2\n",
       "exit": 0
+    },
+    {
+      "name": "path of a node with a comment",
+      "args": [
+        ".metadata.labels | path",
+        "commented.yaml"
+      ],
+      "stdout": "- metadata\n- labels\n",
+      "exit": 0
+    },
+    {
+      "name": "path of a flow list",
+      "args": [
+        ".spec.template.spec.containers[0].args | path",
+        "commented.yaml"
+      ],
+      "stdout": "- spec\n- template\n- spec\n- containers\n- 0\n- args\n",
+      "exit": 0
+    },
+    {
+      "name": "every path under ..",
+      "args": [
+        ".. | path",
+        "commented.yaml"
+      ],
+      "stdout": "[]\n- apiVersion\n- kind\n- metadata\n- metadata\n- name\n- metadata\n- labels\n- metadata\n- labels\n- app\n- metadata\n- labels\n- tier\n- spec\n- spec\n- replicas\n- spec\n- template\n- spec\n- template\n- spec\n- spec\n- template\n- spec\n- containers\n- spec\n- template\n- spec\n- containers\n- 0\n- spec\n- template\n- spec\n- containers\n- 0\n- name\n- spec\n- template\n- spec\n- containers\n- 0\n- image\n- spec\n- template\n- spec\n- containers\n- 0\n- args\n- spec\n- template\n- spec\n- containers\n- 0\n- args\n- 0\n- spec\n- template\n- spec\n- containers\n- 0\n- args\n- 1\n- tags\n- tags\n- 0\n- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "every key under ..",
+      "args": [
+        ".. | key",
+        "commented.yaml"
+      ],
+      "stdout": "apiVersion\nkind\nmetadata\nname\nlabels\napp\ntier\nspec\nreplicas\ntemplate\nspec\ncontainers\n0\nname\nimage\nargs\n0\n1\ntags\n0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "every key under .. collected",
+      "args": [
+        "[.. | key]",
+        "commented.yaml"
+      ],
+      "stdout": "- apiVersion\n- kind\n- metadata\n- name\n- labels\n- app\n- tier\n- spec\n- replicas\n# the template\n- template\n- spec\n- containers\n- 0\n- name\n- image\n- args\n- 0\n- 1\n- tags\n# foot\n\n- 0\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "the paths of the strings",
+      "args": [
+        ".. | select(tag == \"!!str\") | path",
+        "commented.yaml"
+      ],
+      "stdout": "- apiVersion\n- kind\n- metadata\n- name\n- metadata\n- labels\n- app\n- metadata\n- labels\n- tier\n- spec\n- template\n- spec\n- containers\n- 0\n- name\n- spec\n- template\n- spec\n- containers\n- 0\n- image\n- spec\n- template\n- spec\n- containers\n- 0\n- args\n- 0\n- spec\n- template\n- spec\n- containers\n- 0\n- args\n- 1\n- tags\n- 0\n- tags\n- 1\n",
+      "exit": 0
+    },
+    {
+      "name": "every node under .. keeps its comments",
+      "args": [
+        "..",
+        "commented.yaml"
+      ],
+      "stdout": "# app deployment\napiVersion: apps/v1\nkind: Deployment # the kind\nmetadata:\n  name: web\n  labels: {app: web, tier: \"frontend\"} # flow labels\nspec:\n  replicas: 3 # scaled\n  # the template\n  template:\n    spec:\n      containers:\n        - name: web\n          image: \"nginx:1.27\"\n          args: [a, \"b\"]\ntags:\n  - x # first\n  - \"y\"\n# foot\napps/v1\nDeployment\nname: web\nlabels: {app: web, tier: \"frontend\"} # flow labels\nweb\n{app: web, tier: \"frontend\"} # flow labels\nweb\nfrontend\nreplicas: 3 # scaled\n# the template\ntemplate:\n  spec:\n    containers:\n      - name: web\n        image: \"nginx:1.27\"\n        args: [a, \"b\"]\n3\nspec:\n  containers:\n    - name: web\n      image: \"nginx:1.27\"\n      args: [a, \"b\"]\ncontainers:\n  - name: web\n    image: \"nginx:1.27\"\n    args: [a, \"b\"]\n- name: web\n  image: \"nginx:1.27\"\n  args: [a, \"b\"]\nname: web\nimage: \"nginx:1.27\"\nargs: [a, \"b\"]\nweb\nnginx:1.27\n[a, \"b\"]\na\nb\n- x # first\n- \"y\"\nx\ny\n",
+      "exit": 0
+    },
+    {
+      "name": "the keys under a node",
+      "args": [
+        ".spec | .. | key",
+        "commented.yaml"
+      ],
+      "stdout": "spec\nreplicas\ntemplate\nspec\ncontainers\n0\nname\nimage\nargs\n0\n1\n",
+      "exit": 0
+    },
+    {
+      "name": "sub: a group by number in braces",
+      "args": [
+        "-n",
+        "\"web\" | sub(\"(w)eb\", \"${1}x\")"
+      ],
+      "stdout": "wx\n",
+      "exit": 0
+    },
+    {
+      "name": "sub: a missing group in braces is empty",
+      "args": [
+        "-n",
+        "\"web\" | sub(\"(w)eb\", \"${9}x\")"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "sub: a missing name in braces is empty",
+      "args": [
+        "-n",
+        "\"web\" | sub(\"(w)eb\", \"${nope}x\")"
+      ],
+      "stdout": "x\n",
+      "exit": 0
+    },
+    {
+      "name": "sub: an empty match beside an emoji",
+      "args": [
+        "-n",
+        "\"😀b\" | sub(\"\", \"x\")"
+      ],
+      "stdout": "x😀xbx\n",
+      "exit": 0
+    },
+    {
+      "name": "-i deletes a whole document",
+      "args": [
+        "-i",
+        "del(select(.kind == \"A\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "kind: A\n---\n# keep\nkind: B\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "# keep\nkind: B\n"
+      }
+    },
+    {
+      "name": "-i deletes the first document after a leading ---",
+      "args": [
+        "-i",
+        "del(select(.kind == \"A\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "kind: B\n"
+      }
+    },
+    {
+      "name": "-i deletes a middle document",
+      "args": [
+        "-i",
+        "del(select(.kind == \"B\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "kind: A\n---\nkind: B\n---\n# c\nkind: C\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "kind: A\n---\n# c\nkind: C\n"
+      }
+    },
+    {
+      "name": "-i deletes the last document",
+      "args": [
+        "-i",
+        "del(select(.kind == \"C\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "kind: A\n---\nkind: B\n---\n# c\nkind: C\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "kind: A\n---\nkind: B\n"
+      }
+    },
+    {
+      "name": "-i deletes every document",
+      "args": [
+        "-i",
+        "del(select(.kind))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "kind: A\n---\n# keep\nkind: B\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": ""
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "an edit that leaves no document keeps the file and fails, as one that matched nothing does, so a wrong select never empties a manifest",
+        "written": {}
+      }
+    },
+    {
+      "name": "-i keeps a leading ---",
+      "args": [
+        "-i",
+        ".x = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "---\nkind: A\nx: 1\n---\nkind: B\nx: 1\n"
+      }
+    },
+    {
+      "name": "-i keeps a leading --- before a comment",
+      "args": [
+        "-i",
+        ".x = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\n# head\nkind: A\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "---\n# head\nkind: A\nx: 1\n"
+      }
+    },
+    {
+      "name": "-i drops a trailing ...",
+      "args": [
+        "-i",
+        ".x = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n...\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "---\nkind: A\nx: 1\n---\nkind: B\nx: 1\n"
+      }
+    },
+    {
+      "name": "-i with select keeps a leading ---",
+      "args": [
+        "-i",
+        "select(.kind == \"B\").x = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\nx: 1\n"
+      }
+    },
+    {
+      "name": "stdout keeps a leading ---",
+      "args": [
+        ".x = 1",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n"
+      },
+      "stdout": "---\nkind: A\nx: 1\n---\nkind: B\nx: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "stdout drops a deleted document",
+      "args": [
+        "del(select(.kind == \"A\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "kind: A\n---\n# keep\nkind: B\n"
+      },
+      "stdout": "# keep\nkind: B\n",
+      "exit": 0
+    },
+    {
+      "name": "stdout deletes the first document after a leading ---",
+      "args": [
+        "del(select(.kind == \"A\"))",
+        "m.yaml"
+      ],
+      "files": {
+        "m.yaml": "---\nkind: A\n---\nkind: B\n"
+      },
+      "stdout": "kind: B\n",
+      "exit": 0
+    },
+    {
+      "name": "anchors: -i .base.mem = 8",
+      "args": [
+        "-i",
+        ".base.mem = 8",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 8\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      }
+    },
+    {
+      "name": "anchors: -i .web.cpu = 5",
+      "args": [
+        "-i",
+        ".web.cpu = 5",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "warned": true,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 5\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 5\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+        },
+        "reason": "The same file, without the warning mikefarah prints about his own merge-key flag."
+      }
+    },
+    {
+      "name": "anchors: -i .web.mem = 9",
+      "args": [
+        "-i",
+        ".web.mem = 9",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "warned": true,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 9\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\n  mem: 9\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+        },
+        "reason": "A key a merge key brings in is set on the map that merges it, as the YAML spec reads it; mikefarah writes it into the anchor, which his warning says is off the spec."
+      }
+    },
+    {
+      "name": "anchors: -i .list += [\"c\"]",
+      "args": [
+        "-i",
+        ".list += [\"c\"]",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b, c]\nother: *l\n"
+      }
+    },
+    {
+      "name": "anchors: -i .other += [\"d\"]",
+      "args": [
+        "-i",
+        ".other += [\"d\"]",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      }
+    },
+    {
+      "name": "anchors: -i .newkey = \"x\"",
+      "args": [
+        "-i",
+        ".newkey = \"x\"",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\nnewkey: x\n"
+      }
+    },
+    {
+      "name": "anchors: -i del(.web.cpu)",
+      "args": [
+        "-i",
+        "del(.web.cpu)",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "warned": true,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+        },
+        "reason": "The same file, without the warning mikefarah prints about his own merge-key flag."
+      }
+    },
+    {
+      "name": "anchors: -i .web.replicas = 2",
+      "args": [
+        "-i",
+        ".web.replicas = 2",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "warned": true,
+      "written": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\n  replicas: 2\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 0,
+        "written": {
+          "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\n  replicas: 2\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n"
+        },
+        "reason": "The same file, without the warning mikefarah prints about his own merge-key flag."
+      }
+    },
+    {
+      "name": "anchors: a whole document with merge keys",
+      "args": [
+        ".",
+        "v.yaml"
+      ],
+      "files": {
+        "v.yaml": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  <<: *b\n  cpu: 4\nworker:\n  <<: *b\nlist: &l [a, b]\nother: *l\n"
+      },
+      "stdout": "# values\nbase: &b\n  cpu: 1 # cores\n  mem: 2\nweb:\n  !!merge <<: *b\n  cpu: 4\nworker:\n  !!merge <<: *b\nlist: &l [a, b]\nother: *l\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: -i under %YAML",
+      "args": [
+        "-i",
+        ".a = 2",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "d.yaml": "%YAML 1.2\n---\na: 2\n"
+      }
+    },
+    {
+      "name": "directives: %YAML on stdout",
+      "args": [
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "%YAML 1.2\n---\na: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: -i under a comment and %YAML",
+      "args": [
+        "-i",
+        ".a = 2",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "# top\n%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "d.yaml": "# top\n%YAML 1.2\n---\na: 2\n"
+      }
+    },
+    {
+      "name": "directives: a comment and %YAML on stdout",
+      "args": [
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "# top\n%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "# top\n%YAML 1.2\n---\na: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: -N after %YAML",
+      "args": [
+        "-N",
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%YAML 1.2\n---\na: 1\n---\nb: 2\n"
+      },
+      "stdout": "%YAML 1.2\na: 1\nb: 2\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: -i a stream under %YAML",
+      "args": [
+        "-i",
+        ".a = 5",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%YAML 1.2\n---\na: 1\n---\nb: 2\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "d.yaml": "%YAML 1.2\n---\na: 5\n---\nb: 2\na: 5\n"
+      }
+    },
+    {
+      "name": "directives: ea under %YAML",
+      "args": [
+        "ea",
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "%YAML 1.2\n---\na: 1\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: %TAG spelled out",
+      "args": [
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%TAG !e! tag:example.com,2000:\n---\na: !e!x 1\n"
+      },
+      "stdout": "a: !<tag:example.com,2000:x> 1\n",
+      "exit": 0
+    },
+    {
+      "name": "directives: -i under %TAG",
+      "args": [
+        "-i",
+        ".b = 3",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "%TAG !e! tag:example.com,2000:\n---\na: !e!x 1\n"
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "d.yaml": "a: !<tag:example.com,2000:x> 1\nb: 3\n"
+      }
+    },
+    {
+      "name": "directives: %YAML on a later document",
+      "args": [
+        ".",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "a: 1\n...\n%YAML 1.2\n---\nb: 2\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A document that does not parse fails the whole input, so -i never writes a half-read file; mikefarah prints the documents before it."
+      },
+      "stdout": "a: 1\n",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "directives: -i with %YAML on a later document",
+      "args": [
+        "-i",
+        ".x = 1",
+        "d.yaml"
+      ],
+      "files": {
+        "d.yaml": "a: 1\n...\n%YAML 1.2\n---\nb: 2\n"
+      },
+      "accept": {
+        "stdout": "",
+        "exit": 1,
+        "reason": "A document that does not parse fails the whole input, so -i never writes a half-read file; mikefarah prints the documents before it."
+      },
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "directives: ea with %YAML in a later file",
+      "args": [
+        "ea",
+        ".",
+        "a.yaml",
+        "d.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "d.yaml": "%YAML 1.2\n---\na: 1\n"
+      },
+      "stdout": "",
+      "exit": 1,
+      "error": true
+    },
+    {
+      "name": "files: a second file that opens with ---",
+      "args": [
+        ".",
+        "a.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\n---\nkind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: two files that open with ---",
+      "args": [
+        ".",
+        "b.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "---\nkind: C\n---\nkind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: streams that open with ---",
+      "args": [
+        ".",
+        "c.yaml",
+        "d.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\n---\nkind: B\n---\nkind: C\n---\nkind: D\n",
+      "exit": 0
+    },
+    {
+      "name": "files: select over files that open with ---",
+      "args": [
+        "select(.kind != \"A\")",
+        "d.yaml",
+        "d.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "---\nkind: C\n---\nkind: D\n---\nkind: C\n---\nkind: D\n",
+      "exit": 0
+    },
+    {
+      "name": "files: -P over a file that opens with ---",
+      "args": [
+        "-P",
+        ".",
+        "a.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\n---\nkind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: a head comment above --- in a second file",
+      "args": [
+        ".",
+        "a.yaml",
+        "e.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\n---\n# head\n---\nkind: E\n",
+      "exit": 0
+    },
+    {
+      "name": "files: -N over files that open with ---",
+      "args": [
+        "-N",
+        ".",
+        "a.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\nkind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: -s over a file that opens with ---",
+      "args": [
+        "-s",
+        "\"o\" + $index",
+        "a.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n",
+        "o0.yml": "",
+        "o1.yml": ""
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "o0.yml": "kind: A\n",
+        "o1.yml": "---\nkind: C\n"
+      }
+    },
+    {
+      "name": "files: -s to one file over files that open with ---",
+      "args": [
+        "-s",
+        "\"o\"",
+        "e.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n",
+        "o.yml": ""
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "o.yml": "---\nkind: C\n"
+      }
+    },
+    {
+      "name": "files: ea over a later file that opens with ---",
+      "args": [
+        "ea",
+        ".",
+        "b.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "---\nkind: C\n---\nkind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: ea drops a later file's --- under its comment",
+      "args": [
+        "ea",
+        ".",
+        "a.yaml",
+        "e.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: A\n---\n# head\nkind: E\n",
+      "exit": 0
+    },
+    {
+      "name": "files: ea select from a later file that opens with ---",
+      "args": [
+        "ea",
+        "select(.kind == \"C\")",
+        "a.yaml",
+        "b.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n"
+      },
+      "stdout": "kind: C\n",
+      "exit": 0
+    },
+    {
+      "name": "files: ea -s over a later file with a head comment",
+      "args": [
+        "ea",
+        "-s",
+        "\"o\" + $index",
+        "b.yaml",
+        "e.yaml"
+      ],
+      "files": {
+        "a.yaml": "kind: A\n",
+        "b.yaml": "---\nkind: C\n",
+        "c.yaml": "kind: A\n---\nkind: B\n",
+        "d.yaml": "---\nkind: C\n---\nkind: D\n",
+        "e.yaml": "# head\n---\nkind: E\n",
+        "o0.yml": "",
+        "o1.yml": ""
+      },
+      "stdout": "",
+      "exit": 0,
+      "written": {
+        "o0.yml": "---\nkind: C\n",
+        "o1.yml": "---\n# head\nkind: E\n"
+      }
+    },
+    {
+      "name": "sub skips an empty match after a match",
+      "args": [
+        "-n",
+        "\"abbc\" | sub(\"b*\"; \"-\")"
+      ],
+      "stdout": "-a-c-\n",
+      "exit": 0
+    },
+    {
+      "name": "match skips an empty match after a match",
+      "args": [
+        "-n",
+        "-o",
+        "json",
+        "-I0",
+        "\"abc\" | [match(\"b*\"; \"g\") | .offset]"
+      ],
+      "stdout": "[0,1,3]\n",
+      "exit": 0
+    },
+    {
+      "name": "string unicode escape kept",
+      "args": [
+        "-n",
+        "\"caf\\u00e9\""
+      ],
+      "stdout": "caf\\u00e9\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "café\n",
+        "exit": 0,
+        "reason": "yq string literals read jq's escapes: \\uXXXX is decoded and an unknown escape is its letter, where mikefarah keeps both as written."
+      }
+    },
+    {
+      "name": "string control escapes",
+      "args": [
+        "-n",
+        "\"a\\bb\\fc\\vd\\ae\" | length"
+      ],
+      "stdout": "9\n",
+      "exit": 0
+    },
+    {
+      "name": "string unknown escapes kept",
+      "args": [
+        "-n",
+        "\"\\q\\/\\0\\x41\""
+      ],
+      "stdout": "\\q\\/\\0\\x41\n",
+      "exit": 0,
+      "accept": {
+        "stdout": "q/0x41\n",
+        "exit": 0,
+        "reason": "yq string literals read jq's escapes: \\uXXXX is decoded and an unknown escape is its letter, where mikefarah keeps both as written."
+      }
     }
   ]
 }

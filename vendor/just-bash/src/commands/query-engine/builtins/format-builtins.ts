@@ -5,7 +5,7 @@
  */
 
 import type { QueryValue } from "../value-operations.js";
-import { getValueDepth } from "../value-operations.js";
+import { getValueDepth, jqJson } from "../value-operations.js"; // (1ctx jq-infinity)
 
 // Default max depth for nested structures
 const DEFAULT_MAX_JQ_DEPTH = 2000;
@@ -124,7 +124,8 @@ export function evalFormatBuiltin(
       if (getValueDepth(value, effectiveMaxDepth + 1) > effectiveMaxDepth) {
         return [null];
       }
-      return [JSON.stringify(value)];
+      // (1ctx jq-infinity)
+      return [jqJson(value)];
     }
 
     case "@html":

@@ -69,7 +69,7 @@ describe("yq over several documents", () => {
   test("whole documents come back apart", async () => {
     const result = await yq("yq '.' /m.yaml");
     expect(result.stdout.split("\n---\n")).toHaveLength(3);
-    const again = await yq("yq -s 'length' /m.yaml", result.stdout);
+    const again = await yq("yq ea '[.] | length' /m.yaml", result.stdout);
     expect(again.stdout).toBe("3\n");
   });
 
@@ -83,8 +83,8 @@ describe("yq over several documents", () => {
     expect(result.stdout).toBe("ConfigMap\n---\nDeployment\n---\nService\n");
   });
 
-  test("slurp still reads one array", async () => {
-    const result = await yq("yq -s '.[1].spec.replicas' /m.yaml");
+  test("eval-all reads the stream as one list", async () => {
+    const result = await yq("yq ea '[.] | .[1].spec.replicas' /m.yaml");
     expect(result.stdout).toBe("2\n");
   });
 
@@ -92,12 +92,12 @@ describe("yq over several documents", () => {
     const result = await yq(`yq -i '.metadata.labels.team = "web"' /m.yaml`);
     expect(result.exitCode).toBe(0);
     const teams = await yq(
-      "yq -s '[.[].metadata.labels.team]' -o json -c /m.yaml",
+      "yq ea '[.] | [.[].metadata.labels.team]' -o json -I0 /m.yaml",
       result.file,
     );
     expect(teams.stdout).toBe('["web","web","web"]\n');
     const apps = await yq(
-      "yq -s '[.[].metadata.labels.app]' -o json -c /m.yaml",
+      "yq ea '[.] | [.[].metadata.labels.app]' -o json -I0 /m.yaml",
       result.file,
     );
     expect(apps.stdout).toBe('[null,"backend",null]\n');
@@ -106,7 +106,7 @@ describe("yq over several documents", () => {
   test("scalar results written in place stay separate documents", async () => {
     const result = await yq("yq -i '.a' /m.yaml", "a: 1\n---\na: 2\n");
     expect(result.file).toBe("1\n---\n2\n");
-    const again = await yq("yq -s 'length' /m.yaml", result.file);
+    const again = await yq("yq ea '[.] | length' /m.yaml", result.file);
     expect(again.stdout).toBe("2\n");
   });
 
@@ -139,11 +139,11 @@ describe("yq over several documents", () => {
     expect(result.stderr).toContain("document limit exceeded (2)");
   });
 
-  test("json input, a -p json and slurp go to the built-in", async () => {
+  test("json input, a -p json and eval-all go to the built-in", async () => {
     const json = await yq("yq -p json -o json -c '.a' /m.yaml", '{"a":1}');
     expect(json.stdout).toBe("1\n");
-    const slurp = await yq("yq -s 'length' /m.yaml");
-    expect(slurp.stdout).toBe("3\n");
+    const all = await yq("yq ea '[.] | length' /m.yaml");
+    expect(all.stdout).toBe("3\n");
   });
 
   test("an in-place edit keeps comments, quoting and untouched style", async () => {
@@ -173,7 +173,8 @@ describe("yq over several documents", () => {
       "yq -i 'to_entries | reverse | from_entries' /m.yaml",
       "a: 1 # one\nb: 2\n",
     );
-    expect(result.file).toBe("b: 2\na: 1\n");
+    // each key keeps its comment, as mikefarah's does
+    expect(result.file).toBe("b: 2\na: 1 # one\n");
   });
 
   test("combined flags with -i still write in place", async () => {
@@ -308,14 +309,21 @@ describe("yq over several documents", () => {
 
   test("an edit that rewrites a document whole is refused when a YAML 1.1 reader would read it differently", async () => {
     const reorder = "yq -i 'to_entries | reverse | from_entries' /m.yaml";
-    const refused = await yq(reorder, "b: 2\nmode: 0644\n");
+    const refused = await yq(
+      "yq -i 'to_entries' /m.yaml",
+      "b: 2\nmode: 0644\n",
+    );
     expect(refused.exitCode).toBe(1);
     expect(refused.stderr).toContain("the file is left as it was");
     expect(refused.file).toBe("b: 2\nmode: 0644\n");
+    // a reorder moves the nodes, so 0644 stays as written
+    expect((await yq(reorder, "b: 2\nmode: 0644\n")).file).toBe(
+      "mode: 0644\nb: 2\n",
+    );
     const merged = "d: &d {cpu: 1}\na: {<<: *d, x: 1}\n";
     expect((await yq(reorder, merged)).file).toBe(merged);
     const written = await yq(reorder, "b: 2\na: 1 # c\n");
-    expect(written.file).toBe("a: 1\nb: 2\n");
+    expect(written.file).toBe("a: 1 # c\nb: 2\n");
   });
 });
 
@@ -583,5 +591,207 @@ describe("the dialect's builtins hold to the element limit", () => {
     const over = await exec(tools.jq('"aa" | [gsub("a"; "x", "y")] | length'));
     expect(over.exitCode).toBe(126);
     expect(over.stderr).toContain("query result element limit exceeded (3)");
+  });
+});
+
+// (1ctx yq) the walker gathers pipe, comma and eval-all results held to
+// the element limit, and tags them with compact paths
+describe("yq's result limits", () => {
+  // 900 nested maps, each beside 20 scalars; and one list aliased often
+  function deep(): string {
+    let value: unknown = 1;
+    for (let i = 0; i < 900; i++) {
+      const level: Record<string, unknown> = { k: value };
+      for (let j = 0; j < 20; j++) level[`s${j}`] = j;
+      value = level;
+    }
+    return JSON.stringify(value);
+  }
+  const shared = `a: &a [${Array.from({ length: 1000 }, (_, i) => i).join(",")}]\nb: [${Array(90).fill("*a").join(",")}]\n`;
+  const items = JSON.stringify({
+    items: Array.from({ length: 30_000 }, (_, i) => ({ v: [i, i + 1] })),
+  });
+
+  function shell(limits: Record<string, number>) {
+    const fs = new InMemoryFs();
+    fs.writeFileSync("/deep.json", deep());
+    fs.writeFileSync("/shared.yaml", shared);
+    fs.writeFileSync("/items.json", items);
+    fs.writeFileSync(
+      "/three.yaml",
+      [0, 1, 2]
+        .map((d) => `[${Array.from({ length: 300 }, (_, i) => d * 300 + i)}]`)
+        .join("\n---\n"),
+    );
+    return new Bash({ fs, cwd: "/", executionLimits: limits });
+  }
+
+  test("a pipe's fan-out stops at the limit", async () => {
+    const bash = shell({ maxQueryElements: 1000 });
+    const under = await bash.exec(
+      "yq -n -o json -I0 '[range(30) | range(30)] | length'",
+    );
+    expect(under).toMatchObject({ stdout: "900\n", exitCode: 0 });
+    const over = await bash.exec("yq -n '[range(40) | range(40)]'");
+    expect(over.exitCode).toBe(126);
+    expect(over.stderr).toContain("query result element limit exceeded (1000)");
+  });
+
+  test("a comma's results stop at the limit", async () => {
+    const bash = shell({ maxQueryElements: 1000 });
+    const over = await bash.exec("yq -n '[range(600), range(600)]'");
+    expect(over.exitCode).toBe(126);
+    expect(over.stderr).toContain("query result element limit exceeded (1000)");
+  });
+
+  test("results across documents stop at the limit", async () => {
+    const bash = shell({ maxQueryElements: 1000 });
+    const each = await bash.exec("yq '.[], .[]' /three.yaml");
+    expect(each.exitCode).toBe(126);
+    expect(each.stderr).toContain("query result element limit exceeded (1000)");
+    const all = await bash.exec("yq ea '.[], .[]' /three.yaml");
+    expect(all.exitCode).toBe(126);
+    expect(all.stderr).toContain("query result element limit exceeded (1000)");
+  });
+
+  test("path passes do not spend the user's iterations", async () => {
+    const bash = shell({ maxJqIterations: 100_000 });
+    const result = await bash.exec(
+      "yq -p json '.items[].v[]' /items.json | wc -l",
+    );
+    expect(result).toMatchObject({ stdout: "60000\n", exitCode: 0 });
+  });
+
+  test("shared references stop at the iteration limit", async () => {
+    const bash = shell({ maxJqIterations: 100_000 });
+    const started = performance.now();
+    const result = await bash.exec(
+      "yq '[range(1500) as $x | ..[]]' /shared.yaml",
+    );
+    expect(result.exitCode).toBe(126);
+    expect(result.stderr).toContain("too many iterations (100000)");
+    expect(performance.now() - started).toBeLessThan(5_000);
+  });
+
+  test("-s names share the command's iterations", async () => {
+    const bash = shell({ maxJqIterations: 100_000 });
+    // each name costs well under the limit, all of them well over it
+    const name =
+      '"o/" + ([range(20000)] | map(.+1) | length | tostring) + "-" + ($index|tostring)';
+    const one = await bash.exec(`yq -n -s '${name}' '1'`);
+    expect(one).toMatchObject({ stderr: "", exitCode: 0 });
+    const many = await bash.exec(`yq -n -s '${name}' 'range(500)'`);
+    expect(many.exitCode).toBe(126);
+    expect(many.stderr).toContain("too many iterations (100000)");
+  });
+
+  test("files share the command's iterations", async () => {
+    const bash = shell({ maxJqIterations: 100_000 });
+    const filter = "[range(10000)] | map(.+1) | length";
+    const one = await bash.exec(`yq '${filter}' /shared.yaml`);
+    expect(one).toMatchObject({ stdout: "10000\n", exitCode: 0 });
+    const three = await bash.exec(
+      `yq '${filter}' /shared.yaml /shared.yaml /shared.yaml`,
+    );
+    expect(three.exitCode).toBe(126);
+    expect(three.stderr).toContain("too many iterations (100000)");
+  });
+
+  test("paths and keys over a deep document", async () => {
+    const bash = shell({ maxJqIterations: 1_000_000 });
+    const count = await bash.exec("yq -p json '[..] | length' /deep.json");
+    expect(count).toMatchObject({ stdout: "18901\n", exitCode: 0 });
+    const keys = await bash.exec("yq -p json '[.. | key] | length' /deep.json");
+    expect(keys).toMatchObject({ stdout: "18900\n", exitCode: 0 });
+    const last = await bash.exec(
+      "yq -p json -o json -I0 '[.. | path] | [(map(length) | max), .[1], (.[901] | length)]' /deep.json",
+    );
+    // pre-order: the k chain first, the innermost value at depth 900
+    expect(last).toMatchObject({
+      stdout: '[900,["k"],900]\n',
+      exitCode: 0,
+    });
+  });
+
+  test("the root has no key", async () => {
+    const bash = shell({});
+    const root = await bash.exec("echo 'a: {b: 1}' | yq 'key'");
+    expect(root).toMatchObject({ stdout: "", exitCode: 0 });
+    const inner = await bash.exec("echo 'a: {b: 1}' | yq '.a.b | key'");
+    expect(inner).toMatchObject({ stdout: "b\n", exitCode: 0 });
+  });
+});
+
+// mikefarah's -s, each result to its own file, as his v4.53.3 writes them
+describe("split", () => {
+  const stack =
+    "# stack\n---\nkind: Deployment\nmetadata:\n  name: web\n---\nkind: Service\nmetadata:\n  name: web\n";
+  const split = async (command: string) => {
+    const fs = new InMemoryFs({}, {});
+    fs.writeFileSync("/w/all.yaml", stack);
+    const result = await new Bash({ fs, cwd: "/w" }).exec(command);
+    return { ...result, fs };
+  };
+
+  test("-s writes each document to the file its expression names", async () => {
+    const result = await split(
+      "yq -s '.kind + \"-\" + .metadata.name' all.yaml",
+    );
+    expect(result).toMatchObject({ stdout: "", stderr: "", exitCode: 0 });
+    expect(await result.fs.readFile("/w/Deployment-web.yml")).toBe(
+      "# stack\n---\nkind: Deployment\nmetadata:\n  name: web\n",
+    );
+    expect(await result.fs.readFile("/w/Service-web.yml")).toBe(
+      "---\nkind: Service\nmetadata:\n  name: web\n",
+    );
+  });
+
+  test("$index counts, folders are made, a name's own extension stays", async () => {
+    const result = await split('yq -s \'"out/" + $index + ".yaml"\' all.yaml');
+    expect(result.exitCode).toBe(0);
+    expect(await result.fs.readdir("/w/out")).toEqual(["0.yaml", "1.yaml"]);
+    expect(await result.fs.readFile("/w/out/1.yaml")).toBe(
+      "---\nkind: Service\nmetadata:\n  name: web\n",
+    );
+  });
+
+  test("JSON output is written to .json, -N drops the ---", async () => {
+    const json = await split("yq -o json -s '.kind' all.yaml");
+    expect(await json.fs.readFile("/w/Service.json")).toBe(
+      '{\n  "kind": "Service",\n  "metadata": {\n    "name": "web"\n  }\n}\n',
+    );
+    const plain = await split("yq -N -s '.kind' all.yaml");
+    expect(await plain.fs.readFile("/w/Deployment.yml")).toBe(
+      "# stack\nkind: Deployment\nmetadata:\n  name: web\n",
+    );
+  });
+
+  test("a failing name says Error:, a full disk names the file", async () => {
+    const failing = await split("yq -s 'error(\"boom\")' all.yaml");
+    expect(failing).toMatchObject({ stderr: "Error: boom\n", exitCode: 1 });
+    // room for the stack and 20 bytes more than the shell starts with
+    const probe = new InMemoryFs({}, {});
+    new Bash({ fs: probe, cwd: "/w" });
+    const base = (probe as unknown as { retainedBytes: number }).retainedBytes;
+    const fs = new InMemoryFs({}, { maxTotalBytes: base + stack.length + 20 });
+    const bash = new Bash({ fs, cwd: "/w" });
+    fs.writeFileSync("/w/all.yaml", stack);
+    const full = await bash.exec("yq -s '\"out/\" + $index' all.yaml");
+    expect(full).toMatchObject({
+      stderr: "yq: out/0.yml: No space left on device\n",
+      exitCode: 1,
+    });
+  });
+
+  test("a lone file argument is the file, and mikefarah's refusals", async () => {
+    expect((await split("yq all.yaml")).stdout).toBe(stack);
+    const inPlace = await split("yq -s '.kind' -i all.yaml");
+    expect(inPlace.stderr).toBe(
+      "Error: write in place cannot be used with split file\n",
+    );
+    const nullInput = await split("yq -n all.yaml");
+    expect(nullInput.stderr).toBe(
+      "Error: cannot pass files in when using null-input flag\n",
+    );
   });
 });

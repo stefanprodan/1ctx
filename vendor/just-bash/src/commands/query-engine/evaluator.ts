@@ -34,6 +34,10 @@ import {
 } from "./builtins/dialect-builtins.js";
 import type { AstNode, DestructurePattern } from "./parser.js";
 import { applyAssignment } from "./path-expressions.js";
+// (1ctx yq)
+import type { PathTag } from "./path-tag.js";
+// (1ctx jq-iterate-null jq-format-strings)
+import { iterated, jqJson } from "./jq-text.js";
 import {
   asQueryRecord,
   isSafeKey,
@@ -140,10 +144,7 @@ export interface EvalContext {
   root?: QueryValue;
   /** Current path from root for parent navigation */
   currentPath?: (string | number)[];
-  funcs?: Map<
-    string,
-    { params: string[]; body: AstNode; closure?: Map<string, unknown> }
-  >;
+  funcs?: Map<string, UserFunction>; // (1ctx jq-closures)
   labels?: Set<string>;
   /** Feature coverage writer for fuzzing instrumentation */
   coverage?: FeatureCoverageWriter;
@@ -154,14 +155,29 @@ export interface EvalContext {
   /** the document and file a yq run reads, for di, fi, filename, load (1ctx query-dialect) */
   source?: QuerySource;
   /** a value the yq walker handed on, and its path from the root (1ctx query-dialect) */
-  sourceNode?: { value: QueryValue; path?: (string | number)[] };
+  sourceNode?: { value: QueryValue; path?: PathTag };
+  /** where debug and stderr write (1ctx jq-stderr) */
+  log?: (text: string) => void;
+  /** the next input, for input and inputs (1ctx jq-inputs) */
+  input?: () => { value: QueryValue } | undefined;
 }
+
+/** A function the query defined and its scope (1ctx jq-closures) */
+type UserFunction = {
+  params: string[];
+  body: AstNode;
+  closure?: Map<string, unknown>;
+  vars?: Map<string, QueryValue>;
+  /** a filter argument, which never sees itself (1ctx jq-closures) */
+  argument?: boolean;
+};
 
 /** Where a yq run's input comes from. (1ctx query-dialect) */
 export interface QuerySource {
   document: number;
   file: number;
-  filename: string;
+  /** null without input (1ctx jq-stderr) */
+  filename: string | null;
   /** the files load() names, read before the run: text, or why not */
   loads: Map<string, { text: string } | { error: string }>;
 }
@@ -268,6 +284,8 @@ export function createContext(options?: EvaluateOptions): EvalContext {
     budget: options?.budget ?? { operations: 0, callDepth: 0 },
     dialect: options?.dialect,
     source: options?.source,
+    log: options?.log,
+    input: options?.input,
   };
 }
 
@@ -295,6 +313,8 @@ function withVar(
     dialect: ctx.dialect,
     source: ctx.source,
     sourceNode: ctx.sourceNode,
+    log: ctx.log,
+    input: ctx.input,
   };
 }
 
@@ -504,6 +524,10 @@ export interface EvaluateOptions {
   /** mikefarah's yq rules where they part from jq's (1ctx query-dialect) */
   dialect?: Dialect;
   source?: QuerySource;
+  /** where debug and stderr write (1ctx jq-stderr) */
+  log?: (text: string) => void;
+  /** the next input, for input and inputs (1ctx jq-inputs) */
+  input?: () => { value: QueryValue } | undefined;
 }
 
 /**
@@ -628,8 +652,11 @@ function evaluateNode(
 
     case "Index": {
       const bases = ast.base ? evaluate(value, ast.base, ctx) : [value];
+      // the index reads the input of the whole term, `.a[.k]` the .k
+      // beside .a, as jq and mikefarah's yq do; upstream read .a.k
+      // (1ctx jq-index-input)
+      const indices = evaluate(value, ast.index, ctx);
       return boundedFlatMap(ctx, bases, (v) => {
-        const indices = evaluate(v, ast.index, ctx);
         return boundedFlatMap(ctx, indices, (idx) => {
           // an index into a scalar: nothing in mikefarah's yq, jq's error
           // (1ctx query-dialect)
@@ -703,6 +730,11 @@ function evaluateNode(
       return boundedFlatMap(ctx, bases, (v) => {
         if (Array.isArray(v)) return v;
         if (v && typeof v === "object") return Object.values(v);
+        // jq stops on a scalar or null, where upstream and mikefarah's
+        // yq answer nothing (1ctx jq-iterate-null)
+        if (ctx.dialect !== "yq") {
+          throw new Error(`Cannot iterate over ${iterated(v)}`);
+        }
         return [];
       });
     }
@@ -987,6 +1019,33 @@ function evaluateNode(
     }
 
     case "Optional": {
+      const step = ast.expr;
+      // jq's `?` after a step guards that step alone, so `.[].b?` keeps
+      // the .b of the elements that have one; the step runs on the whole
+      // term's input over each base, as a literal; mikefarah's yq guards
+      // the whole path (1ctx jq-optional-step)
+      if (
+        ctx.dialect !== "yq" &&
+        (step.type === "Field" ||
+          step.type === "Index" ||
+          step.type === "Slice" ||
+          step.type === "Iterate") &&
+        step.base
+      ) {
+        const bases = evaluate(value, step.base, ctx);
+        return boundedFlatMap(ctx, bases, (b) => {
+          try {
+            return evaluate(
+              value,
+              { ...step, base: { type: "Literal", value: b } },
+              ctx,
+            );
+          } catch (error) {
+            if (error instanceof ExecutionLimitError) throw error;
+            return [];
+          }
+        });
+      }
       try {
         return evaluate(value, ast.expr, ctx);
       } catch (error) {
@@ -996,21 +1055,35 @@ function evaluateNode(
     }
 
     case "StringInterp": {
-      const output = new BoundedStringBuilder(
-        ctx.limits.maxStringLength,
-        "query string interpolation",
-        () =>
-          new ExecutionLimitError(
-            `string size limit exceeded (${ctx.limits.maxStringLength} bytes)`,
+      // one string per combination of the interpolations' outputs, the
+      // first varying fastest, as jq builds them; upstream joined every
+      // output into one string. A format (`@sh "..."`) renders each
+      // value (1ctx jq-format-strings)
+      const limit = ctx.limits.maxStringLength;
+      let built: { text: string; bytes: number }[] = [{ text: "", bytes: 0 }];
+      const append = (
+        into: { text: string; bytes: number }[],
+        from: { text: string; bytes: number },
+        piece: string,
+      ) => {
+        const bytes = from.bytes + utf8ByteLength(piece);
+        if (bytes > limit) {
+          throw new ExecutionLimitError(
+            `string size limit exceeded (${limit} bytes)`,
             "string_length",
-          ),
-      );
+          );
+        }
+        into.push({ text: from.text + piece, bytes });
+      };
       for (const part of ast.parts) {
+        const next: { text: string; bytes: number }[] = [];
         if (typeof part === "string") {
-          output.append(part);
+          for (const from of built) append(next, from, part);
+          built = next;
           continue;
         }
         const vals = evaluate(value, part, ctx);
+        assertQueryResultCapacity(ctx, 0, vals.length * built.length);
         for (const v of vals) {
           chargeQueryWork(ctx);
           if (getValueDepth(v, ctx.limits.maxDepth + 1) > ctx.limits.maxDepth) {
@@ -1019,10 +1092,22 @@ function evaluateNode(
               "recursion",
             );
           }
-          output.append(typeof v === "string" ? v : JSON.stringify(v));
+          let piece: string;
+          if (ast.format) {
+            const formatted = evaluate(
+              v,
+              { type: "Call", name: ast.format, args: [] },
+              ctx,
+            )[0];
+            piece = typeof formatted === "string" ? formatted : "";
+          } else {
+            piece = typeof v === "string" ? v : jqJson(v);
+          }
+          for (const from of built) append(next, from, piece);
         }
+        built = next;
       }
-      return [output.build()];
+      return built.map((b) => b.text);
     }
 
     case "UpdateOp": {
@@ -1111,6 +1196,7 @@ function evaluateNode(
         params: ast.params,
         body: ast.funcBody,
         closure: new Map(ctx.funcs ?? []),
+        vars: ctx.vars,
       });
       const newCtx: EvalContext = { ...ctx, funcs: newFuncs };
       return evaluate(value, ast.body, newCtx);
@@ -1139,6 +1225,8 @@ export function evalBinaryOp(
   right: AstNode,
   ctx: EvalContext,
 ): QueryValue[] {
+  // (1ctx jq-compare)
+  const order = ctx.dialect === "yq" ? compare : compareJq;
   // Short-circuit for 'and' and 'or'
   if (op === "and") {
     const leftVals = evaluate(value, left, ctx);
@@ -1306,14 +1394,16 @@ export function evalBinaryOp(
           return equalOperands(l, r, ctx.dialect);
         case "!=":
           return !equalOperands(l, r, ctx.dialect);
+        // jq orders every pair of values, where upstream ordered only two
+        // numbers or two strings (1ctx jq-compare)
         case "<":
-          return compare(l, r) < 0;
+          return order(l, r) < 0;
         case "<=":
-          return compare(l, r) <= 0;
+          return order(l, r) <= 0;
         case ">":
-          return compare(l, r) > 0;
+          return order(l, r) > 0;
         case ">=":
-          return compare(l, r) >= 0;
+          return order(l, r) >= 0;
         default:
           return null;
       }
@@ -1629,7 +1719,7 @@ function evalBuiltin(
       // Check for user-defined function by name/arity
       const funcKey = `${name}/${args.length}`;
       const userFunc = ctx.funcs?.get(funcKey) as
-        | { params: string[]; body: AstNode; closure?: Map<string, unknown> }
+        | UserFunction // (1ctx jq-closures)
         | undefined;
       if (userFunc) {
         // User-defined function: bind parameters
@@ -1640,42 +1730,31 @@ function evalBuiltin(
         // This ensures that functions capture the scope at definition time.
         const baseFuncs = (userFunc.closure ?? ctx.funcs ?? new Map()) as Map<
           string,
-          { params: string[]; body: AstNode; closure?: Map<string, unknown> }
+          UserFunction // (1ctx jq-closures)
         >;
         const newFuncs = new Map(baseFuncs);
         // Also add the current function itself so recursion works
-        newFuncs.set(funcKey, userFunc);
+        // an argument named as its caller's def must not call itself (1ctx jq-closures)
+        if (!userFunc.argument) newFuncs.set(funcKey, userFunc);
         for (let i = 0; i < userFunc.params.length; i++) {
           const paramName = userFunc.params[i];
           const argExpr = args[i];
           if (argExpr) {
-            // Evaluate the argument in the calling context, then store as a literal
-            // This implements call-by-value semantics
-            const argVals = evaluate(value, argExpr, ctx);
-            // Store as a function that returns all the values
-            let bodyNode: AstNode;
-            if (argVals.length === 0) {
-              bodyNode = { type: "Call", name: "empty", args: [] };
-            } else if (argVals.length === 1) {
-              bodyNode = { type: "Literal", value: argVals[0] };
-            } else {
-              // Multiple values - build a right-associative Comma chain
-              bodyNode = {
-                type: "Literal",
-                value: argVals[argVals.length - 1],
-              };
-              for (let j = argVals.length - 2; j >= 0; j--) {
-                bodyNode = {
-                  type: "Comma",
-                  left: { type: "Literal", value: argVals[j] },
-                  right: bodyNode,
-                };
-              }
-            }
-            newFuncs.set(`${paramName}/0`, { params: [], body: bodyNode });
+            // a filter argument runs where the body calls it, in the
+            // caller's scope, as jq's closures; upstream pasted in its
+            // outputs on the call's input (1ctx jq-closures)
+            newFuncs.set(`${paramName}/0`, {
+              params: [],
+              body: argExpr,
+              closure: ctx.funcs,
+              vars: ctx.vars,
+              argument: true,
+            });
           }
         }
-        const newCtx: EvalContext = { ...ctx, funcs: newFuncs };
+        // (1ctx jq-closures)
+        const vars = userFunc.vars ?? ctx.vars;
+        const newCtx: EvalContext = { ...ctx, funcs: newFuncs, vars };
         // `def f($x)` is `def f(x): x as $x`: the body runs once per value,
         // with $x bound, which upstream left unbound (null) (1ctx jq-paths)
         const dollars = userFunc.params.filter((p) => p.startsWith("$"));

@@ -70,6 +70,8 @@ export interface Token {
   type: TokenType;
   value?: string | number;
   pos: number;
+  /** a number as written when that differs from its value: 0600, 1e3 (1ctx yq-documents) */
+  text?: string;
 }
 
 // ============================================================================
@@ -148,6 +150,8 @@ export interface CommaNode {
 export interface LiteralNode {
   type: "Literal";
   value: unknown;
+  /** a number as written when that differs from its value (1ctx yq-documents) */
+  text?: string;
 }
 
 export interface ArrayNode {
@@ -251,6 +255,8 @@ export interface OptionalNode {
 export interface StringInterpNode {
   type: "StringInterp";
   parts: (string | AstNode)[];
+  /** `@sh "..."`: the format each interpolation goes through (1ctx jq-format-strings) */
+  format?: string;
 }
 
 export interface UpdateOpNode {

@@ -24,6 +24,20 @@ export interface UserRegexLimits {
 }
 
 /**
+ * (1ctx regex-builtins) Where the search goes on after an empty match at
+ * `end`: past one code point, so it never lands between the halves of a
+ * surrogate pair, where a replacement would split them.
+ */
+export function stepPastEmpty(input: string, end: number): number {
+  const code = input.charCodeAt(end);
+  if (code >= 0xd800 && code <= 0xdbff) {
+    const next = input.charCodeAt(end + 1);
+    if (next >= 0xdc00 && next <= 0xdfff) return end + 2;
+  }
+  return end + 1;
+}
+
+/**
  * Type for replacement callback functions.
  * Matches the signature of String.prototype.replace callback.
  */
@@ -198,9 +212,17 @@ export class UserRegex implements RegexLike {
         const end = replacement.indexOf("}", index + 2);
         if (end !== -1) {
           const name = replacement.slice(index + 2, end);
-          const groupIndex = namedGroups?.[name];
-          if (groupIndex !== undefined) {
-            output.append(matcher.group(groupIndex) ?? "");
+          // (1ctx regex-builtins) Go's ${1} is a group by number, and a
+          // name no group has is empty
+          const groupIndex = /^\d+$/.test(name)
+            ? Number(name)
+            : namedGroups?.[name];
+          if (/^\w+$/.test(name)) {
+            output.append(
+              groupIndex !== undefined && groupIndex <= groupCount
+                ? (matcher.group(groupIndex) ?? "")
+                : "",
+            );
             index = end;
             continue;
           }
@@ -366,9 +388,9 @@ export class UserRegex implements RegexLike {
     // Update lastIndex for global regex
     if (this._global) {
       this._lastIndex = matcher.end(0);
-      // Handle zero-length matches
+      // Handle zero-length matches (1ctx regex-builtins)
       if (matcher.start(0) === matcher.end(0)) {
-        this._lastIndex++;
+        this._lastIndex = stepPastEmpty(input, this._lastIndex);
       }
     }
 
@@ -400,9 +422,9 @@ export class UserRegex implements RegexLike {
       this.assertResultCount(matches.length + 1);
       matches.push(matchStr);
       pos = matcher.end(0);
-      // Handle zero-length matches
+      // Handle zero-length matches (1ctx regex-builtins)
       if (matcher.start(0) === matcher.end(0)) {
-        pos++;
+        pos = stepPastEmpty(input, pos);
       }
       if (pos > input.length) break;
     }
@@ -415,7 +437,13 @@ export class UserRegex implements RegexLike {
    * @param input - The string to search in
    * @param replacement - A string or callback function
    */
-  replace(input: string, replacement: string | ReplaceCallback): string {
+  replace(
+    input: string,
+    replacement: string | ReplaceCallback,
+    // (1ctx regex-builtins) Go's rule: an empty match where the last one
+    // ended is skipped, as mikefarah's yq replaces
+    goEmpty = false,
+  ): string {
     // Reset lastIndex for global regexes
     if (this._global) {
       this._lastIndex = 0;
@@ -430,14 +458,19 @@ export class UserRegex implements RegexLike {
       let lastEnd = 0;
       let position = 0;
       let count = 0;
+      let previousEnd = -1;
       while (matcher.find(position)) {
-        this.assertResultCount(++count);
         const start = matcher.start(0);
         const end = matcher.end(0);
-        output.append(input.slice(lastEnd, start));
-        output.append(this.expandReplacement(matcher, replacement));
-        lastEnd = end;
-        position = end > start ? end : end + 1;
+        if (!goEmpty || start !== end || start !== previousEnd) {
+          this.assertResultCount(++count);
+          output.append(input.slice(lastEnd, start));
+          output.append(this.expandReplacement(matcher, replacement));
+          lastEnd = end;
+        }
+        previousEnd = end;
+        // (1ctx regex-builtins)
+        position = end > start ? end : stepPastEmpty(input, end);
         if (!this._global || position > input.length) break;
       }
       output.append(input.slice(lastEnd));
@@ -500,9 +533,9 @@ export class UserRegex implements RegexLike {
 
       lastEnd = matchEnd;
       pos = lastEnd;
-      // Handle zero-length matches
+      // Handle zero-length matches (1ctx regex-builtins)
       if (matchStart === matchEnd) {
-        pos++;
+        pos = stepPastEmpty(input, pos);
       }
 
       if (!this._global) break;
@@ -532,12 +565,21 @@ export class UserRegex implements RegexLike {
     const matcher = this._re2.matcher(input);
     let lastEnd = 0;
     let searchFrom = 0;
-    while (result.length < effectiveLimit && matcher.find(searchFrom)) {
+    // an empty match at the end steps past it, with nothing left to find
+    // (1ctx regex-builtins)
+    while (
+      result.length < effectiveLimit &&
+      searchFrom <= input.length &&
+      matcher.find(searchFrom)
+    ) {
       this.assertResultCount(result.length + 1);
       result.push(input.slice(lastEnd, matcher.start(0)));
       lastEnd = matcher.end(0);
+      // (1ctx regex-builtins)
       searchFrom =
-        matcher.end(0) > matcher.start(0) ? matcher.end(0) : matcher.end(0) + 1;
+        matcher.end(0) > matcher.start(0)
+          ? matcher.end(0)
+          : stepPastEmpty(input, matcher.end(0));
     }
     if (result.length < effectiveLimit) result.push(input.slice(lastEnd));
     return result;
@@ -635,9 +677,9 @@ export class UserRegex implements RegexLike {
       yield execResult;
 
       pos = matcher.end(0);
-      // Prevent infinite loop on zero-length matches
+      // Prevent infinite loop on zero-length matches (1ctx regex-builtins)
       if (matcher.start(0) === matcher.end(0)) {
-        pos++;
+        pos = stepPastEmpty(input, pos);
       }
       if (pos > input.length) break;
     }
@@ -762,7 +804,13 @@ export class ConstantRegex implements RegexLike {
     return input.match(this._regex);
   }
 
-  replace(input: string, replacement: string | ReplaceCallback): string {
+  replace(
+    input: string,
+    replacement: string | ReplaceCallback,
+    // (1ctx regex-builtins) Go's rule: an empty match where the last one
+    // ended is skipped, as mikefarah's yq replaces
+    goEmpty = false,
+  ): string {
     if (this._regex.global) {
       this._regex.lastIndex = 0;
     }
