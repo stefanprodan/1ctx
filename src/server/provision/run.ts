@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One routine for `1ctx provision` and the server's --provision: check
-// the objects against a snapshot, then apply them through an app over
-// the real file, closed again before anything else opens it.
+// the objects on the file inside a transaction that is rolled back,
+// then apply them through an app over it, closed again before anything
+// else opens it.
 
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { type Db, heldByAnother, inspect, open } from "../db/index.ts";
+import { type Db, heldByAnother, inspect, open, release } from "../db/index.ts";
 import type { Counts } from "./apply.ts";
 import { readSources } from "./input.ts";
 import { loadKnowledge } from "./knowledge.ts";
@@ -62,7 +63,7 @@ export async function provisionPaths(
       await check.shutdown();
     }
   } finally {
-    snapshot.close();
+    release(snapshot);
   }
 
   if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });

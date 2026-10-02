@@ -9,7 +9,9 @@ import { existsSync } from "node:fs";
 import { type BusEvent, publish } from "../lib/bus.ts";
 import type { Migration } from "./migration.ts";
 import { MIGRATIONS } from "./migrations/index.ts";
-import { snapshot } from "./snapshot.ts";
+import { release, snapshot } from "./snapshot.ts";
+
+export { release };
 
 export type Db = Database;
 
@@ -46,14 +48,14 @@ export function heldByAnother(path: string): boolean {
   }
 }
 
+// The caller ends it with release(), which undoes the migrations.
 export function inspect(path: string): Db {
   const db = snapshot(path);
   try {
-    db.exec("pragma foreign_keys = on");
     migrate(db);
     return db;
   } catch (error) {
-    db.close();
+    release(db);
     throw error;
   }
 }
