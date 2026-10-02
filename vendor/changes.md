@@ -1944,10 +1944,13 @@ Tests: `test/vendor/just-bash/jq-1.8.test.ts`
 Now: `@sh "echo \(.x)"` and the other formats render each
 interpolated value through the format; an interpolation with several
 outputs makes one string each, the first varying fastest; jq's `@text`
-writes any value but a string as JSON.
+writes any value but a string as JSON, and its `@uri`, `@html`, `@urid`
+and `@base64d` format that JSON text.
 
 Before: a format before a string was a parse error, the outputs of an
-interpolation were joined into one string, and `@text` of null was "".
+interpolation were joined into one string, `@text` of null was "", and
+`@uri` and the others gave null for a non-string, so
+`@uri "/pulls/\(.number)"` dropped the number.
 
 ### jq-infinity: an infinity prints as the largest double
 Files: `src/commands/query-engine/jq-text.ts`,

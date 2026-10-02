@@ -24,6 +24,7 @@ import { type AstNode, parse } from "../parser.js";
 import { lastPathKey, type PathTag, pathKeys } from "../path-tag.js";
 // (1ctx jq-stderr jq-inputs jq-arity jq-math)
 import { evalIoBuiltin } from "./io-builtins.js";
+import { evalFormatBuiltin } from "./format-builtins.js"; // (1ctx jq-format-strings)
 import { JQ_BUILTIN_NAMES, JQ_BUILTINS } from "./jq-builtins.js";
 import { iterated } from "../jq-text.js";
 import { asQueryRecord, safeSet, sanitizeParsedData } from "../safe-object.js";
@@ -35,6 +36,17 @@ import {
   jqJson,
   type QueryValue,
 } from "../value-operations.js";
+
+// jq formats a non-string's tostring, where upstream answered null
+// (1ctx jq-format-strings)
+function jqFormatText(
+  value: QueryValue,
+  name: string,
+  yq: boolean,
+): QueryValue[] | null {
+  if (yq || typeof value === "string") return null;
+  return evalFormatBuiltin(jqJson(value), name);
+}
 
 type EvalFn = (
   value: QueryValue,
@@ -1271,7 +1283,12 @@ export function evalDialectBuiltin(
           `cannot encode ${yamlTag(value)} as URI, can only operate on strings`,
         );
       }
-      return null;
+      return jqFormatText(value, name, yq);
+    // (1ctx jq-format-strings)
+    case "@html":
+    case "@urid":
+    case "@base64d":
+      return jqFormatText(value, name, yq);
     case "tostring":
       // mikefarah spells a map or a list as YAML
       if (yq && value !== null && typeof value === "object") {

@@ -1954,6 +1954,66 @@
       "stdin": "{\"a\":1}\n",
       "stdout": "{\"a\":5}\n",
       "exit": 0
+    },
+    {
+      "name": "formats: @uri interpolates a number",
+      "args": [
+        "-c",
+        "@uri \"/pulls/\\(.n)\""
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "\"/pulls/42\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: @html interpolates a number",
+      "args": [
+        "-c",
+        "@html \"<p>\\(.n)</p>\""
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "\"<p>42</p>\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: @uri of each kind of value",
+      "args": [
+        "-c",
+        ".n, .f, .t, .z, .o, .arr | @uri"
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "\"42\"\n\"1.5\"\n\"true\"\n\"null\"\n\"%7B%22a%22%3A%22%3Cb%3E%22%7D\"\n\"%5B1%2C%22x%26y%22%5D\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: @html of each kind of value",
+      "args": [
+        "-c",
+        ".n, .t, .z, .o, .arr | @html"
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "\"42\"\n\"true\"\n\"null\"\n\"{&quot;a&quot;:&quot;&lt;b&gt;&quot;}\"\n\"[1,&quot;x&amp;y&quot;]\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: @urid of a number",
+      "args": [
+        "-c",
+        ".n | @urid"
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "\"42\"\n",
+      "exit": 0
+    },
+    {
+      "name": "formats: @base64d of a number",
+      "args": [
+        "-c",
+        ".n | @base64d | explode"
+      ],
+      "stdin": "{\"n\":42,\"f\":1.5,\"t\":true,\"z\":null,\"o\":{\"a\":\"<b>\"},\"arr\":[1,\"x&y\"]}\n",
+      "stdout": "[65533]\n",
+      "exit": 0
     }
   ]
 }
