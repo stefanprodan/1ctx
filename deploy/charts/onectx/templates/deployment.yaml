@@ -1,10 +1,10 @@
-{{- $provision := include "1ctx.provisionConfigMap" . -}}
+{{- $provision := include "onectx.provisionConfigMap" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "1ctx.fullname" . }}
+  name: {{ include "onectx.fullname" . }}
   labels:
-    {{- include "1ctx.labels" . | nindent 4 }}
+    {{- include "onectx.labels" . | nindent 4 }}
 spec:
   # SQLite on a ReadWriteOnce volume has one writer, so the old pod stops
   # before the new one starts
@@ -13,11 +13,11 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "1ctx.selectorLabels" . | nindent 6 }}
+      {{- include "onectx.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "1ctx.labels" . | nindent 8 }}
+        {{- include "onectx.labels" . | nindent 8 }}
       {{- if or .Values.provision.files .Values.podAnnotations }}
       annotations:
         {{- if .Values.provision.files }}
@@ -29,7 +29,7 @@ spec:
         {{- end }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "1ctx.serviceAccountName" . }}
+      serviceAccountName: {{ include "onectx.serviceAccountName" . }}
       automountServiceAccountToken: false
       # a Service named onectx would inject ONECTX_* variables, the
       # server's own namespace
@@ -52,7 +52,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: server
-          image: {{ include "1ctx.image" . }}
+          image: {{ include "onectx.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # these replace the image's CMD whole
           args:
@@ -133,7 +133,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "1ctx.claimName" . }}
+            claimName: {{ include "onectx.claimName" . }}
         - name: cache
           {{- with .Values.cache.sizeLimit }}
           emptyDir:

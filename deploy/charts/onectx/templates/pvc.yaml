@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "1ctx.fullname" . }}
+  name: {{ include "onectx.fullname" . }}
   labels:
-    {{- include "1ctx.labels" . | nindent 4 }}
+    {{- include "onectx.labels" . | nindent 4 }}
   {{- if .Values.persistence.keep }}
   # removing the release must never take the database with it
   annotations:

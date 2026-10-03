@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "1ctx.provisionConfigMap" . }}
+  name: {{ include "onectx.provisionConfigMap" . }}
   labels:
-    {{- include "1ctx.labels" . | nindent 4 }}
+    {{- include "onectx.labels" . | nindent 4 }}
 data:
   {{- range $name, $text := .Values.provision.files }}
   {{ $name }}: |
