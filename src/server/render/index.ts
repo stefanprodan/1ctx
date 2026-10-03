@@ -3,5 +3,6 @@
 //
 // Server-side Markdown rendering and syntax highlighting.
 
+export { stableEnd } from "./blocks.ts";
 export { highlight, MAX_BYTES } from "./highlight.ts";
 export { escapeHtml, renderMarkdown, tableAlign } from "./markdown.ts";

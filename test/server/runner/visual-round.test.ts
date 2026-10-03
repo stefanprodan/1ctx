@@ -77,7 +77,7 @@ describe("visual rounds", () => {
         });
         expect(snapshot.live?.drafts?.[0]?.html).toBe("<p>\ud83d\ude80");
         chat.app.now.value += 1000;
-        script.content(" Ready.");
+        script.content(" Ready.\n\n");
         await tick();
         const stream = conn.frames.filter(
           (f) => f.type === "visual" || f.type === "delta" || f.type === "html",

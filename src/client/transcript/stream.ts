@@ -34,12 +34,14 @@ function thinking(message: Message, reasoning: string, content: string) {
   };
 }
 
+// a streaming row's checkpoint holds no html, so its text is all tail
+// until a render frame covers it
 export function liveOf(message: Message): Live {
   return {
     content: message.content,
     reasoning: message.reasoning,
     html: message.html,
-    htmlAt: message.content.length,
+    htmlAt: message.html === "" ? 0 : message.content.length,
     ...thinking(message, message.reasoning, message.content),
   };
 }

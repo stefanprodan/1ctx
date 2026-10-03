@@ -54,7 +54,7 @@ describe("socket fixtures for delivery", () => {
     toolRound(chat.scripted.scripts[0], [call("c1")]);
     await settle(chat, 4);
     const r2 = await waitScript(chat.scripted, 2);
-    r2.content("answering now");
+    r2.content("answering now\n\n");
     await tick();
     await tick();
     const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);

@@ -447,7 +447,7 @@ describe("the socket", () => {
     chat.app.socket.open(conn);
     const { detail, script, sessionId } = await startChat(chat);
     chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
-    script.content("x");
+    script.content("x\n\n");
     await tick();
     expect(frames(conn, "html")).toEqual([]);
     chat.app.now.value += 1_000;
