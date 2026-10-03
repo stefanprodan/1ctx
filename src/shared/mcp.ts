@@ -4,14 +4,13 @@
 // The pure rules of MCP, shared by the server and the page so the
 // admin's preview is the bytes a send carries: the wire name, the
 // split of a server's tools by patterns, the lean schema the wire
-// gets, the instructions block and the digest of what a send offered,
-// the catalog of discovery mode and the mode the token cap picks.
+// gets and how a text is cut, the instructions block and the digest of
+// what a send offered. The catalog is in mcp-catalog.ts.
 // Environment neutral: no Bun, no DOM, no packages. The hash is an
 // argument, so the server passes Bun's and the page a stub.
 
 import type { AgentServer } from "./contracts/mcp.ts";
-import { escapeText } from "./skills.ts";
-import { isRecord, type McpMode } from "./words.ts";
+import { isRecord } from "./words.ts";
 
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export const WIRE_PREFIX = "mcp__";
@@ -166,11 +165,18 @@ function resolveRef(root: unknown, ref: string): unknown {
   return node;
 }
 
+// a cut text ends in an ellipsis inside the cap, so the model never
+// reads a cut as the whole text; a cut never splits a surrogate pair
+export function cutText(text: string, cap: number): string {
+  if (text.length <= cap) return text;
+  let end = cap - 1;
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return `${text.slice(0, end).trimEnd()}…`;
+}
+
 export function wireDescription(text: string): string {
-  const trimmed = text.trim();
-  return trimmed.length <= MAX_WIRE_DESCRIPTION
-    ? trimmed
-    : trimmed.slice(0, MAX_WIRE_DESCRIPTION);
+  return cutText(text.trim(), MAX_WIRE_DESCRIPTION);
 }
 
 export function wireSchema(schema: unknown): unknown {
@@ -181,6 +187,19 @@ export function wireSchema(schema: unknown): unknown {
     delete out.definitions;
   }
   return out;
+}
+
+// what sits beside a $ref joins what it inlined: discovery adds an
+// empty `properties` to every schema, which must not erase the target's
+function mergeBeside(key: string, inlined: unknown, beside: unknown): unknown {
+  if (beside === undefined) return inlined;
+  if (SCHEMA_MAPS.has(key) && isRecord(inlined) && isRecord(beside)) {
+    return { ...inlined, ...beside };
+  }
+  if (key === "required" && Array.isArray(inlined) && Array.isArray(beside)) {
+    return [...new Set([...inlined, ...beside])];
+  }
+  return beside;
 }
 
 function leanSchema(
@@ -201,7 +220,7 @@ function leanSchema(
       const rest = leanSchema({ ...node, $ref: undefined }, root, path, state);
       if (isRecord(inlined) && isRecord(rest)) {
         for (const key of Object.keys(rest)) {
-          if (rest[key] !== undefined) inlined[key] = rest[key];
+          inlined[key] = mergeBeside(key, inlined[key], rest[key]);
         }
       }
       return inlined;
@@ -422,60 +441,4 @@ export function offeredServers(
     });
   }
   return out;
-}
-
-// decision 19: the catalog of discovery mode, and the mode a send runs in
-export const MCP_CATALOG_FROM_TOKENS = 6000;
-export const MAX_CATALOG = 16_000;
-export const MAX_CATALOG_LINE = 160;
-export const CATALOG_LEAD =
-  "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its parameters, then mcp_call with the name and the arguments. Each line is a tool's name and what it does.";
-const CATALOG_OPEN = `${CATALOG_LEAD}\n\n<available_mcp_tools>\n`;
-const CATALOG_CLOSE = "</available_mcp_tools>";
-
-// the first sentence of a description, on one line, cut at the line cap
-export function firstSentence(text: string): string {
-  const line = text.replace(/\s+/g, " ").trim();
-  const end = line.search(/[.!?](\s|$)/);
-  const sentence = end === -1 ? line : line.slice(0, end + 1);
-  return sentence.length <= MAX_CATALOG_LINE
-    ? sentence
-    : sentence.slice(0, MAX_CATALOG_LINE);
-}
-
-// one line per tool, servers in the order given while they fit; a
-// server that does not fit is left out whole with every later one,
-// since the enum and the catalog must agree
-export function mcpCatalog(servers: PromptServer[]): {
-  text: string;
-  included: string[];
-  leftOut: string[];
-} {
-  let text = CATALOG_OPEN;
-  const included: string[] = [];
-  const leftOut: string[] = [];
-  for (const server of servers) {
-    const lines = server.tools
-      .map(
-        (t) => `${t.wireName}: ${escapeText(firstSentence(t.description))}\n`,
-      )
-      .join("");
-    if (
-      leftOut.length === 0 &&
-      text.length + lines.length + CATALOG_CLOSE.length <= MAX_CATALOG
-    ) {
-      text += lines;
-      included.push(server.name);
-    } else {
-      leftOut.push(server.name);
-    }
-  }
-  if (included.length === 0) return { text: "", included, leftOut };
-  return { text: text + CATALOG_CLOSE, included, leftOut };
-}
-
-// tokens: the offered MCP schemas on the wire, counted by the server
-export function resolveMode(mode: McpMode, tokens: number): "all" | "catalog" {
-  if (mode !== "auto") return mode;
-  return tokens <= MCP_CATALOG_FROM_TOKENS ? "all" : "catalog";
 }

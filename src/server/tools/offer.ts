@@ -16,12 +16,8 @@ import {
 } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import {
-  mcpCatalog,
-  type PromptServer,
-  promptSnapshot,
-  resolveMode,
-} from "../../shared/mcp.ts";
+import { type PromptServer, promptSnapshot } from "../../shared/mcp.ts";
+import { mcpCatalog, resolveMode } from "../../shared/mcp-catalog.ts";
 import { catalog } from "../../shared/skills.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { McpMode, SearchProvider } from "../../shared/words.ts";

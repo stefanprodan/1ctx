@@ -17,7 +17,7 @@ import type {
   DirectoryUsersResponse,
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
-import { firstSentence } from "../../src/shared/mcp.ts";
+import { firstSentence } from "../../src/shared/mcp-catalog.ts";
 import { hashPassword } from "../helpers/app.ts";
 import {
   type ChatApp,

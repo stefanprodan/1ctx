@@ -13,7 +13,7 @@ import {
 } from "../../src/shared/capabilities.ts";
 import type { AgentServer } from "../../src/shared/contracts/mcp.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
-import { CATALOG_LEAD } from "../../src/shared/mcp.ts";
+import { CATALOG_LEAD } from "../../src/shared/mcp-catalog.ts";
 import type { McpMode } from "../../src/shared/words.ts";
 import { collectLogs } from "../helpers/app.ts";
 import {

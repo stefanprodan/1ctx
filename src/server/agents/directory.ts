@@ -21,7 +21,7 @@ import type {
   DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { firstSentence } from "../../shared/mcp.ts";
+import { firstSentence } from "../../shared/mcp-catalog.ts";
 import { WEB_TOOLS } from "../../shared/words.ts";
 import { parseNoQuery } from "../access/index.ts";
 import type { Clock } from "../lib/clock.ts";
