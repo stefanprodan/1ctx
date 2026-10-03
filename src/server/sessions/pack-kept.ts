@@ -13,12 +13,13 @@ import { type Db, transact } from "../db/index.ts";
 import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 
-// raw input a batch packs, one file past it alone; provisional, set by
-// the event loop stall measured on the smallest pod
-export const KEPT_BATCH_BYTES = 4 * 1024 * 1024;
+// raw input a batch packs, one file past it alone: 2 MiB blocked for
+// 30 ms at p99 on real kept files (4 MiB reached 50), under the 50 ms a
+// batch may stall the event loop on a slower pod
+export const KEPT_BATCH_BYTES = 2 * 1024 * 1024;
 
-// raw input a pass packs, several times the heavy case's hourly growth;
-// provisional, set by measurement
+// raw input a pass packs, several times the heavy case's hourly growth
+// (about 185 MB); about 4 s of batches at 240 MB/s
 export const KEPT_PASS_BYTES = 1024 * 1024 * 1024;
 
 export const KEPT_PASS_MS = HOUR_MS;
