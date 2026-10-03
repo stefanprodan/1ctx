@@ -7,7 +7,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { MESSAGE_BYTES, scan } from "../../../src/server/overview/scan.ts";
+import {
+  MESSAGE_BYTES,
+  SLOT_MS,
+  scan,
+} from "../../../src/server/overview/scan.ts";
 import { STORAGE_TABLES } from "../../../src/server/overview/storage.ts";
 import type {
   StorageAreaKey,
@@ -124,6 +128,60 @@ describe("the storage scan", () => {
     expect(added).toBe(10 + 3 * 5);
     const rows = result.slots.reduce((sum, [, , count]) => sum + count, 0);
     expect(rows).toBe(1 + 3);
+  });
+  // messages has a slot column, which a group by name would pick
+  test("puts each row on the quarter hour of its message", async () => {
+    const chat = await chatApp();
+    const first = await settledChat(chat);
+    const second = await settledChat(chat);
+    const day = 86_400_000;
+    const since = 10 * day;
+    const early = since + 5 * SLOT_MS + 1_000;
+    const late = since + day + 2 * SLOT_MS + 1_000;
+    const ids = (sessionId: string) =>
+      chat.app.db
+        .query<{ id: string }, [string]>(
+          "select id from messages where session_id = ? order by seq",
+        )
+        .all(sessionId)
+        .map((row) => row.id);
+    const [outside, ...firstIds] = ids(first);
+    const secondIds = ids(second);
+    const stamp = chat.app.db.query(
+      "update messages set created_at = ? where id = ?",
+    );
+    stamp.run(since - 1, outside!);
+    for (const id of firstIds) stamp.run(early, id);
+    for (const id of secondIds) stamp.run(late, id);
+    chat.app.db
+      .query(
+        `insert into opened_files (message_id, position, path, kind, bytes,
+           lines, text) values (?, 0, '/tmp/a.md', 'markdown', 7, 1, 'abcdefg')`,
+      )
+      .run(firstIds[0]!);
+    chat.app.db
+      .query(
+        `insert into mcp_kept_files (message_id, position, session_id, folder,
+           dir, name, bytes, text)
+         values (?, 0, ?, 1, '0001-list', 'result.txt', 11, 'abcdefghijk')`,
+      )
+      .run(secondIds[0]!, second);
+    const bytesOf = (list: string[]) =>
+      chat.app.db
+        .query<{ bytes: number }, string[]>(
+          `select sum(${MESSAGE_BYTES}) as bytes from messages
+             where id in (${list.map(() => "?").join(", ")})`,
+        )
+        .get(...list)!.bytes;
+    const result = scan(chat.app.db, { now: chat.app.now.value, since });
+    expect(result.slots).toEqual([
+      [Math.floor(early / SLOT_MS), bytesOf(firstIds) + 7, firstIds.length + 1],
+      [
+        Math.floor(late / SLOT_MS),
+        bytesOf(secondIds) + 11,
+        secondIds.length + 1,
+      ],
+    ]);
   });
 });
 
