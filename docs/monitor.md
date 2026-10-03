@@ -67,6 +67,11 @@ admin's attention, the server's load), Usage by month and Storage.
 - **The worker sums by quarter hour of UTC, never by zone.** Every
   zone's midnight falls on a quarter hour, so one read serves any zone
   and the days are laid on in `overview.ts` and `storage.ts`.
+- **A group by alias never matches a column the query reads.** SQLite
+  resolves a `group by` name to an input column before an alias, so a
+  query over `messages`, which has `slot`, groups by `q`. A sum over
+  text columns takes each row's length in a materialized CTE first,
+  since a sorting `group by` carries the raw text into the sorter.
 - **A new table needs an entry in `STORAGE_TABLES`.** A test checks
   the map against the schema both ways.
 - **`cache.ts` keeps one read in flight per key.** Storage keeps its
