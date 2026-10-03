@@ -36,9 +36,11 @@ const KEPT_PACK_LEVEL = 3;
 export const KEPT_PACKABLE = `mcp_kept_files.packed = 0
   and mcp_kept_files.bytes >= ${KEPT_PACK_FROM}`;
 
-// packed: a frame of what was data, or of what was text
-const PACKED_DATA = 1;
-const PACKED_TEXT = 2;
+// a session's files to try, in packing order, read from the covering
+// candidate index alone
+export const KEPT_PENDING = `select message_id, position, bytes
+  from mcp_kept_files where session_id = ? and ${KEPT_PACKABLE}
+  order by folder, position`;
 
 // fixed, so no frame or file name reaches a log or a body
 export const KEPT_UNPACK_ERROR = "a packed kept file did not decode";
@@ -135,7 +137,7 @@ export function readKept(
     .get(messageId, position);
   if (row === null) return null;
   // only ended sessions are packed, and they never mount
-  if (row.packed > 0) throw new Error(KEPT_PACKED_READ);
+  if (row.packed === 1) throw new Error(KEPT_PACKED_READ);
   return row.data ?? new Uint8Array();
 }
 
@@ -144,14 +146,16 @@ export function readKept(
  * order and each session's by folder, compressed until the next file
  * would take the raw input past maxBytes; the first file is taken
  * whatever its size. A frame no smaller than the file leaves it raw for
- * good. The caller decides which sessions have ended.
+ * good. The caller decides which sessions have ended; finished counts
+ * the sessions, from the first, left with nothing to try.
  */
 export function packKeptBatch(
   db: Db,
   sessionIds: readonly string[],
   maxBytes: number,
-): KeptBatch {
-  const batch: KeptBatch = {
+): KeptBatch & { finished: number } {
+  const batch = {
+    finished: 0,
     files: 0,
     packed: 0,
     refused: 0,
@@ -161,25 +165,21 @@ export function packKeptBatch(
   const pending = db.query<
     { message_id: string; position: number; bytes: number },
     [string]
-  >(
-    `select message_id, position, bytes from mcp_kept_files
-     where session_id = ? and ${KEPT_PACKABLE} order by folder, position`,
-  );
-  // text read as its stored bytes, so an unpack writes them back as is
-  const read = db.query<
-    { raw: Uint8Array | null; text: number },
-    [string, number]
-  >(
-    `select coalesce(cast(text as blob), data) as raw, text is not null as text
-     from mcp_kept_files where message_id = ? and position = ? and packed = 0`,
+  >(KEPT_PENDING);
+  // text as its stored bytes: every reader takes a file as bytes, so a
+  // frame of them unpacks to the same file. pending just read the flag
+  // in this transaction, and reading it again walks the blobs
+  const read = db.query<{ raw: Uint8Array | null }, [string, number]>(
+    `select coalesce(cast(text as blob), data) as raw from mcp_kept_files
+     where message_id = ? and position = ?`,
   );
   const write = db.query(
-    `update mcp_kept_files set packed = ?, text = null, data = ?
-     where message_id = ? and position = ? and packed = 0`,
+    `update mcp_kept_files set packed = 1, text = null, data = ?
+     where message_id = ? and position = ?`,
   );
   const refuse = db.query(
     `update mcp_kept_files set packed = -1
-     where message_id = ? and position = ? and packed = 0`,
+     where message_id = ? and position = ?`,
   );
   for (const sessionId of sessionIds) {
     for (const file of pending.all(sessionId)) {
@@ -199,15 +199,11 @@ export function packKeptBatch(
         batch.refused++;
         continue;
       }
-      write.run(
-        row.text === 1 ? PACKED_TEXT : PACKED_DATA,
-        frame,
-        file.message_id,
-        file.position,
-      );
+      write.run(frame, file.message_id, file.position);
       batch.packed++;
       batch.bytesOut += frame.byteLength;
     }
+    batch.finished++;
   }
   return batch;
 }
@@ -270,7 +266,7 @@ export function startKept(
 }
 
 // fork: the kept files of the copied rows, under their new ids; a fork
-// is live, so a packed file is written raw, as it was before packing
+// is live, so a packed file is written raw, its bytes in data
 export function copyKeptFiles(
   db: Db,
   sourceSessionId: string,
@@ -281,7 +277,7 @@ export function copyKeptFiles(
     `insert into mcp_kept_files (message_id, position, session_id, folder,
        dir, name, bytes, text, data, packed)
      select ?, position, ?, folder, dir, name, bytes, text, data, packed
-     from mcp_kept_files where message_id = ? and packed < 1`,
+     from mcp_kept_files where message_id = ? and packed <> 1`,
   );
   const packed = db.query<
     {
@@ -291,20 +287,13 @@ export function copyKeptFiles(
       name: string;
       bytes: number;
       data: Uint8Array;
-      packed: number;
     },
     [string]
   >(
-    `select position, folder, dir, name, bytes, data, packed
-     from mcp_kept_files where message_id = ? and packed > 0`,
+    `select position, folder, dir, name, bytes, data
+     from mcp_kept_files where message_id = ? and packed = 1`,
   );
-  // the cast writes the stored bytes back as text, untouched
-  const insertText = db.query(
-    `insert into mcp_kept_files (message_id, position, session_id, folder,
-       dir, name, bytes, text, data)
-     values (?, ?, ?, ?, ?, ?, ?, cast(? as text), null)`,
-  );
-  const insertData = db.query(
+  const insert = db.query(
     `insert into mcp_kept_files (message_id, position, session_id, folder,
        dir, name, bytes, text, data)
      values (?, ?, ?, ?, ?, ?, ?, null, ?)`,
@@ -313,7 +302,6 @@ export function copyKeptFiles(
     copy.run(to, targetSessionId, from);
     for (const row of packed.all(from)) {
       const raw = unpackKept(row.data, row.bytes);
-      const insert = row.packed === PACKED_TEXT ? insertText : insertData;
       insert.run(
         to,
         row.position,

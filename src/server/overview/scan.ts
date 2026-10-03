@@ -102,7 +102,7 @@ export const MESSAGE_BYTES =
 // a kept file's stored bytes: the frame when packed, else the raw size;
 // quotas count bytes, the raw size, either way
 export const KEPT_BYTES =
-  "case when k.packed > 0 then length(k.data) else k.bytes end";
+  "case when k.packed = 1 then length(k.data) else k.bytes end";
 
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 

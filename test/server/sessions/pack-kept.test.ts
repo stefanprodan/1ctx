@@ -4,19 +4,29 @@
 // The kept files job: which sessions it packs, its batches and pass
 // budget, where a pass resumes, and how a stop ends it.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { writeKeptFiles } from "../../../src/server/bash/index.ts";
+import { KEPT_PENDING } from "../../../src/server/bash/kept.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   KEPT_BATCH_BYTES,
+  KEPT_PASS_MS,
+  KEPT_PICK,
+  KEPT_STILL,
   type KeptPackDeps,
   keptPacker,
 } from "../../../src/server/sessions/pack-kept.ts";
+import { sweepChats } from "../../../src/server/sessions/sweep.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import { settleRun } from "../../helpers/automations.ts";
-import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  setLimits,
+  startChat,
+} from "../../helpers/chat.ts";
 import { type Setup, setup } from "../knowledge/helpers.ts";
 
 const KEPT = DEFAULT_LIMITS.archivedDeleteDays;
@@ -163,7 +173,7 @@ describe("the kept files job", () => {
       const pass = await packer(s, { log: logFactory("sessions") }).pass();
       expect(pass).toMatchObject({ batches: 1, files: 3, packed: 3 });
       for (const id of Object.values(packs))
-        expect(packedOf(s, id)).toEqual([2]);
+        expect(packedOf(s, id)).toEqual([1]);
       for (const id of Object.values(skips))
         expect(packedOf(s, id)).toEqual([0]);
       // no session that can still send holds a packed file
@@ -216,10 +226,10 @@ describe("the kept files job", () => {
         files: 3,
         bytesIn: 3 * SIZE,
       });
-      expect(packedOf(s, older)).toEqual([2, 2, 2]);
+      expect(packedOf(s, older)).toEqual([1, 1, 1]);
       expect(packedOf(s, newer)).toEqual([0, 0]);
       expect(await job.pass()).toMatchObject({ batches: 1, files: 2 });
-      expect(packedOf(s, newer)).toEqual([2, 2]);
+      expect(packedOf(s, newer)).toEqual([1, 1]);
     } finally {
       s.db.close();
     }
@@ -235,7 +245,7 @@ describe("the kept files job", () => {
       // the first batch ran in the call; the next waits on a timer
       s.db.query("update sessions set status = 'running' where id = ?").run(id);
       expect(await pass).toMatchObject({ batches: 1, files: 1 });
-      expect(packedOf(s, id)).toEqual([2, 0, 0]);
+      expect(packedOf(s, id)).toEqual([1, 0, 0]);
     } finally {
       s.db.close();
     }
@@ -252,9 +262,9 @@ describe("the kept files job", () => {
       expect(job.pass()).toBe(pass);
       await job.stop();
       expect(await pass).toMatchObject({ batches: 1, files: 1 });
-      expect(packedOf(s, id)).toEqual([2, 0, 0, 0]);
+      expect(packedOf(s, id)).toEqual([1, 0, 0, 0]);
       expect(await job.pass()).toMatchObject({ batches: 0 });
-      expect(packedOf(s, id)).toEqual([2, 0, 0, 0]);
+      expect(packedOf(s, id)).toEqual([1, 0, 0, 0]);
     } finally {
       s.db.close();
     }
@@ -278,6 +288,135 @@ describe("the kept files job", () => {
       expect(events.map((event) => [event.level, event.msg])).toEqual([
         ["warn", "kept packing failed"],
       ]);
+    } finally {
+      s.db.close();
+    }
+  });
+});
+
+describe("the kept files job at its edges", () => {
+  test("a session exactly at its cut is packed and kept, one past it is neither", async () => {
+    const s = setup();
+    try {
+      const now = s.now.value;
+      const cut = now - KEPT * DAY_MS;
+      const task = automation(s, 30);
+      const taskCut = now - 30 * DAY_MS;
+      const at = (
+        fields: Parameters<typeof session>[1],
+        column: "archived_at" | "last_activity_at",
+        value: number,
+      ) => {
+        const id = session(s, fields);
+        s.db
+          .query(`update sessions set ${column} = ? where id = ?`)
+          .run(value, id);
+        keep(s, id);
+        return id;
+      };
+      const chat = { archivedDays: 0 };
+      const orphan = { origin: "automation" as const };
+      const run = { origin: "automation" as const, automationId: task };
+      const onCut = [
+        at(chat, "archived_at", cut),
+        at(orphan, "last_activity_at", cut),
+        at(run, "last_activity_at", taskCut),
+      ];
+      const pastCut = [
+        at(chat, "archived_at", cut - 1),
+        at(orphan, "last_activity_at", cut - 1),
+        at(run, "last_activity_at", taskCut - 1),
+      ];
+      expect(await packer(s).pass()).toMatchObject({ files: 3 });
+      for (const id of onCut) expect(packedOf(s, id)).toEqual([1]);
+      for (const id of pastCut) expect(packedOf(s, id)).toEqual([0]);
+
+      // the deleters take exactly the ones the job left
+      const expired = s.sessions.expiredRuns(now).map((row) => row.id);
+      expect(expired).toEqual([pastCut[2]]);
+      const swept = sweepChats(
+        {
+          db: s.db,
+          store: s.sessions,
+          scratch: { drop() {}, held: () => new Set() },
+          log: silent,
+        },
+        now,
+        {
+          archiveIdleDays: DEFAULT_LIMITS.archiveIdleDays,
+          archivedDeleteDays: KEPT,
+        },
+      );
+      expect(swept).toMatchObject({ chats_deleted: 1, runs_deleted: 1 });
+      for (const id of onCut) expect(s.sessions.byId(id)).not.toBeNull();
+      expect(s.sessions.byId(pastCut[0]!)).toBeNull();
+      expect(s.sessions.byId(pastCut[1]!)).toBeNull();
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test.serial(
+    "start runs a pass now and hourly on an unref'd timer, and not after stop",
+    async () => {
+      const s = setup();
+      const every = spyOn(globalThis, "setInterval");
+      try {
+        const id = session(s, { archivedDays: 1 });
+        keep(s, id);
+        const job = packer(s);
+        job.start();
+        expect(packedOf(s, id)).toEqual([1]);
+        await job.pass();
+        const hourly = every.mock.calls.findIndex(
+          ([, ms]) => ms === KEPT_PASS_MS,
+        );
+        expect(hourly).toBeGreaterThanOrEqual(0);
+        const timer = every.mock.results[hourly]!.value as ReturnType<
+          typeof setInterval
+        >;
+        expect(timer.hasRef()).toBe(false);
+        job.start();
+        expect(
+          every.mock.calls.filter(([, ms]) => ms === KEPT_PASS_MS),
+        ).toHaveLength(1);
+
+        await job.stop();
+        const late = session(s, { archivedDays: 1 });
+        keep(s, late);
+        job.start();
+        expect(
+          every.mock.calls.filter(([, ms]) => ms === KEPT_PASS_MS),
+        ).toHaveLength(1);
+        await Bun.sleep(5);
+        expect(packedOf(s, late)).toEqual([0]);
+      } finally {
+        every.mockRestore();
+        s.db.close();
+      }
+    },
+  );
+
+  test("the job's queries read the candidate index", () => {
+    const s = setup();
+    try {
+      const plan = (sql: string, ...args: (string | number)[]) =>
+        s.db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail)
+          .join(" | ");
+      expect(plan(KEPT_PENDING, "x")).toContain(
+        "COVERING INDEX mcp_kept_files_packable (session_id=?)",
+      );
+      expect(plan(KEPT_PICK, 0, 0, 10)).toContain(
+        "COVERING INDEX mcp_kept_files_packable",
+      );
+      expect(plan(KEPT_STILL, 0, 0, "x")).toContain(
+        "SEARCH sessions USING INDEX sqlite_autoindex_sessions_1 (id=?)",
+      );
     } finally {
       s.db.close();
     }
@@ -328,7 +467,7 @@ describe("the kept files job in the app", () => {
         )
         .all(id)
         .map((row) => row.packed),
-    ).toEqual([2, 2, 2, 2, 0, 0]);
+    ).toEqual([1, 1, 1, 1, 0, 0]);
   });
 
   test("a live chat's files are never packed", async () => {
@@ -387,22 +526,14 @@ describe("the kept files job in the app", () => {
     ]);
     const files = (sessionId: string) =>
       db
-        .query<
-          {
-            name: string;
-            text: string | null;
-            data: Uint8Array | null;
-            packed: number;
-          },
-          [string]
-        >(
-          `select name, text, data, packed from mcp_kept_files
-           where session_id = ? order by position`,
+        .query<{ name: string; bytes: Uint8Array; packed: number }, [string]>(
+          `select name, coalesce(cast(text as blob), data) as bytes, packed
+           from mcp_kept_files where session_id = ? order by position`,
         )
         .all(sessionId);
     const before = files(id);
     expect(await chat.app.packKept()).toMatchObject({ packed: 2 });
-    expect(files(id).map((file) => file.packed)).toEqual([2, 1]);
+    expect(files(id).map((file) => file.packed)).toEqual([1, 1]);
     const fork = () =>
       chat.member.call("POST", `/api/sessions/${id}/fork`, {
         body: { messageId: answer, agentId: chat.agentId },
@@ -429,6 +560,44 @@ describe("the kept files job in the app", () => {
     expect(JSON.stringify(failed)).toContain(
       "a packed kept file did not decode",
     );
+    await chat.app.shutdown();
+  });
+
+  test("a refused start on a packed chat trims nothing", async () => {
+    const chat = await chatApp();
+    // a start would drop the first folder to fit ten files
+    await setLimits(chat, { mcpKeptFiles: 10 });
+    const id = await archivedChat(chat);
+    const messageId = chat.app.db
+      .query<{ id: string }, [string]>(
+        "select id from messages where session_id = ? limit 1",
+      )
+      .get(id)!.id;
+    writeKeptFiles(
+      chat.app.db,
+      messageId,
+      Array.from({ length: 11 }, (_, i) => ({
+        folder: i < 10 ? 1 : 2,
+        dir: i < 10 ? "0001-get" : "0002-get",
+        name: `part-${i}.txt`,
+        text: "k".repeat(SIZE),
+        data: null,
+        bytes: SIZE,
+      })),
+    );
+    expect(await chat.app.packKept()).toMatchObject({ packed: 11 });
+    const rows = () =>
+      chat.app.db
+        .query("select * from mcp_kept_files where session_id = ?")
+        .all(id);
+    const before = rows();
+    const refused = await chat.member.call(
+      "POST",
+      `/api/sessions/${id}/messages`,
+      { body: { message: "more" } },
+    );
+    expect(refused.status).toBe(409);
+    expect(rows()).toEqual(before);
     await chat.app.shutdown();
   });
 });

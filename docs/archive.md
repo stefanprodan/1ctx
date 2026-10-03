@@ -49,13 +49,17 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 - **Kept MCP files are packed by their own job** (`sessions/pack-kept.ts`),
   never by an archive or the sweep, since a chat may keep
   `mcpKeptBytes`. It starts after startup's sweep, then hourly, one pass
-  at a time; `shutdown()` stops it first, so no batch starts after.
+  at a time. `shutdown()` stops it before the drain's first await, so no
+  batch starts after.
+- **A pass picks its sessions once,** oldest first, at most a few
+  thousand: archived chats and ended runs, none running, skipping those
+  due for deletion (a chat archived past `archivedDeleteDays`, an
+  orphaned run past the same cut, a run past its task's retention). Each
+  `>=` mirrors its deleter's `<`. A pass picks again only after a list
+  that packed something.
 - **A batch is one synchronous transaction** of at most
-  `KEPT_BATCH_BYTES` raw input, or one larger file. It picks its
-  sessions inside it, oldest first: archived chats and runs, none
-  running, skipping those due for deletion (a chat archived past
-  `archivedDeleteDays`, an orphaned run past the same cut, a run past
-  its task's retention). The next batch is a fresh timer task; a pass
+  `KEPT_BATCH_BYTES` raw input, or one larger file. It rechecks its own
+  sessions by key first. The next batch is a fresh timer task; a pass
   stops at `KEPT_PASS_BYTES` or when nothing is left. Fork unpacks what
   it copies (`docs/bash.md`).
 - **No sweep vacuums.** SQLite reuses freed pages.

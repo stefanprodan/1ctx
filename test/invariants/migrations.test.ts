@@ -1413,7 +1413,7 @@ describe("the schema", () => {
     }
   });
 
-  test("0041 adds the packed flag, held to its words, and the candidate index", () => {
+  test("0041 adds the packed flag with no check and the covering candidate index", () => {
     const db = seed(MIGRATIONS.slice(0, 40));
     try {
       db.exec(`
@@ -1433,18 +1433,22 @@ describe("the schema", () => {
         { position: 0, packed: 0 },
         { position: 1, packed: 0 },
       ]);
-      const refused = [
-        "update mcp_kept_files set packed = 3 where position = 1",
-        "update mcp_kept_files set packed = 1 where position = 0",
-        "update mcp_kept_files set packed = 2 where position = 0",
-      ];
-      for (const sql of refused) expect(() => db.exec(sql)).toThrow();
-      db.exec(`
-        update mcp_kept_files set packed = -1 where position = 0;
-        update mcp_kept_files set packed = 1 where position = 1;
-        update mcp_kept_files set text = null, data = x'01', packed = 2
-          where position = 0;
-      `);
+      // a check would read every row's blobs on a large file
+      const table = db
+        .query<{ sql: string }, []>(
+          "select sql from sqlite_schema where name = 'mcp_kept_files'",
+        )
+        .get()!.sql;
+      expect(table).toContain("packed integer not null default 0,");
+      expect(table).not.toMatch(/check[^,]*packed/);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from pragma_index_info('mcp_kept_files_packable') order by seqno",
+          )
+          .all()
+          .map((column) => column.name),
+      ).toEqual(["session_id", "folder", "position", "message_id", "bytes"]);
       expect(
         db
           .query(
@@ -1454,6 +1458,10 @@ describe("the schema", () => {
       ).toEqual({
         sql: expect.stringContaining("where packed = 0 and bytes >= 1024"),
       });
+      db.exec("delete from messages where id = 'm2'");
+      expect(
+        db.query("select count(*) as n from mcp_kept_files").get(),
+      ).toEqual({ n: 0 });
     } finally {
       db.close();
     }

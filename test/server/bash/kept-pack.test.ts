@@ -96,14 +96,32 @@ const stored = (s: Setup, sessionId: string): Stored[] =>
     )
     .all(sessionId);
 
-// what a fork must reproduce: the row without its owner's ids
-const content = (rows: Stored[]) =>
-  rows.map(({ message_id: _m, session_id: _s, ...rest }) => rest);
+// every file's bytes as the mount reads them, in order
+const bytesOf = (s: Setup, messageId: string, count: number) =>
+  Array.from({ length: count }, (_, i) => readKept(s.db, messageId, i));
+
+// what the flag promises, with no check on the table to hold it
+const broken = (s: Setup) =>
+  s.db
+    .query<{ n: number }, []>(
+      `select count(*) as n from mcp_kept_files
+       where packed not in (-1, 0, 1)
+         or (packed = 1 and (text is not null or data is null))`,
+    )
+    .get()!.n;
 
 const BIG = 1 << 30;
 
+// a text file of NULs, of bytes that are not UTF-8 and of astral
+// characters, each over the threshold, stored as the bytes given
+const ODD = [
+  new Uint8Array(2048),
+  new Uint8Array(2048).map((_, i) => [0xff, 0xfe, 0xc3, 0x28][i % 4]!),
+  new TextEncoder().encode("𝔘𝔫𝔦𝔠𝔬𝔡𝔢 🕰️\n".repeat(100)),
+];
+
 describe("packing kept files", () => {
-  test("text, Unicode and binary files round-trip through a fork", () => {
+  test("every file reads back byte for byte through a fork", () => {
     const s = setup();
     try {
       const row = toolRow(s);
@@ -111,39 +129,42 @@ describe("packing kept files", () => {
         textFile(1, "result.txt", YAML),
         textFile(1, "unicode.txt", UNICODE),
         dataFile(1, "image.bin", BINARY),
+        ...ODD.map((bytes, i) => ({
+          ...textFile(1, `odd${i}.txt`, "x"),
+          bytes: bytes.byteLength,
+        })),
       ]);
-      const before = stored(s, s.session.id);
+      const store = s.db.query(
+        "update mcp_kept_files set text = cast(? as text) where message_id = ? and position = ?",
+      );
+      for (const [i, bytes] of ODD.entries()) store.run(bytes, row, 3 + i);
+      const count = 3 + ODD.length;
+      const before = bytesOf(s, row, count);
+      expect(before.slice(3)).toEqual(ODD);
+      const names = stored(s, s.session.id).map((file) => [
+        file.name,
+        file.bytes,
+      ]);
       const batch = packKeptBatch(s.db, [s.session.id], BIG);
-      expect(batch).toMatchObject({ files: 3, packed: 3, refused: 0 });
+      expect(batch).toMatchObject({ files: count, packed: count, refused: 0 });
       const packed = stored(s, s.session.id);
-      expect(packed.map((file) => [file.packed, file.text])).toEqual([
-        [2, null],
-        [2, null],
-        [1, null],
-      ]);
+      expect(packed.every((f) => f.packed === 1 && f.text === null)).toBe(true);
+      expect(broken(s)).toBe(0);
       expect(batch.bytesOut).toBe(
         packed.reduce((sum, file) => sum + file.data!.byteLength, 0),
       );
       expect(batch.bytesIn).toBe(
-        before.reduce((sum, file) => sum + file.bytes, 0),
+        before.reduce((sum, bytes) => sum + bytes!.byteLength, 0),
       );
 
       const fork = s.makeSession();
       const copy = toolRow(s, fork.id);
       copyKeptFiles(s.db, s.session.id, fork.id, new Map([[row, copy]]));
       const forked = stored(s, fork.id);
-      expect(content(forked)).toEqual(content(before));
-      expect(forked.every((file) => file.message_id === copy)).toBe(true);
-      expect(
-        s.db
-          .query<{ kind: string }, [string]>(
-            `select typeof(text) || '/' || typeof(data) as kind
-             from mcp_kept_files where session_id = ? order by position`,
-          )
-          .all(fork.id)
-          .map((r) => r.kind),
-      ).toEqual(["text/null", "text/null", "null/blob"]);
-      expect(new TextDecoder().decode(readKept(s.db, copy, 1)!)).toBe(UNICODE);
+      expect(forked.map((file) => [file.name, file.bytes])).toEqual(names);
+      expect(forked.every((f) => f.packed === 0)).toBe(true);
+      expect(bytesOf(s, copy, count)).toEqual(before);
+      expect(broken(s)).toBe(0);
     } finally {
       s.db.close();
     }
@@ -162,7 +183,7 @@ describe("packing kept files", () => {
         packed: 1,
       });
       expect(stored(s, s.session.id).map((file) => file.packed)).toEqual([
-        0, 2,
+        0, 1,
       ]);
     } finally {
       s.db.close();
@@ -183,7 +204,8 @@ describe("packing kept files", () => {
         refused: 1,
       });
       const once = stored(s, s.session.id);
-      expect(once.map((file) => file.packed)).toEqual([-1, 2]);
+      expect(once.map((file) => file.packed)).toEqual([-1, 1]);
+      expect(broken(s)).toBe(0);
       expect(once[0]!.data).toEqual(NOISE);
       expect(packKeptBatch(s.db, [s.session.id], BIG)).toMatchObject({
         files: 0,
@@ -231,7 +253,7 @@ describe("packing kept files", () => {
       expect(single).toMatchObject({ files: 1, bytesIn: size });
       // the rest, oldest folder first, across the batches
       expect(stored(s, s.session.id).map((file) => file.packed)).toEqual([
-        2, 2, 2, 0, 0,
+        1, 1, 1, 0, 0,
       ]);
     } finally {
       s.db.close();
@@ -290,7 +312,7 @@ describe("packing kept files", () => {
         writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
         s.db
           .query(
-            "update mcp_kept_files set text = null, data = ?, packed = 2 where message_id = ?",
+            "update mcp_kept_files set text = null, data = ?, packed = 1 where message_id = ?",
           )
           .run(frame, row);
         const fork = s.makeSession();
@@ -315,21 +337,6 @@ describe("packing kept files", () => {
       writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
       packKeptBatch(s.db, [s.session.id], BIG);
       expect(() => readKept(s.db, row, 0)).toThrow(KEPT_PACKED_READ);
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("the row refuses a packed flag over raw text", () => {
-    const s = setup();
-    try {
-      const row = toolRow(s);
-      writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
-      for (const packed of [1, 2, 3]) {
-        expect(() =>
-          s.db.query("update mcp_kept_files set packed = ?").run(packed),
-        ).toThrow();
-      }
     } finally {
       s.db.close();
     }

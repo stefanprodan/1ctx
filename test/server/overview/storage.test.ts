@@ -198,7 +198,7 @@ describe("the storage scan", () => {
         `insert into mcp_kept_files (message_id, position, session_id, folder,
            dir, name, bytes, text, data, packed)
          values (?, 0, ?, 1, '0001-get', 'raw.txt', 11, 'abcdefghijk', null, 0),
-           (?, 1, ?, 1, '0001-get', 'packed.txt', 5000, null, ?, 2)`,
+           (?, 1, ?, 1, '0001-get', 'packed.txt', 5000, null, ?, 1)`,
       )
       .run(messageId, sessionId, messageId, sessionId, frame);
     const result = scan(chat.app.db, { now: chat.app.now.value, since: 0 });
