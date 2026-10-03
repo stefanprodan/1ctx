@@ -1,32 +1,28 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The pure rules of shared/mcp.ts on the recorded servers: the split by
-// patterns, the wire name, the lean schema and its order, the
-// instructions block and the digest, the catalog and the mode.
+// The pure rules of shared/mcp.ts and shared/mcp-catalog.ts on the
+// recorded servers: the split by patterns, the wire name, the lean
+// schema and its order, how a text is cut, the instructions block and
+// the digest, the catalog and the mode.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tokens } from "../../src/server/lib/tokens.ts";
+import { changeNote } from "../../src/server/mcp/note.ts";
 import { wireTools } from "../../src/server/providers/index.ts";
 import {
-  CATALOG_LEAD,
   classify,
-  firstSentence,
-  MAX_CATALOG,
-  MAX_CATALOG_LINE,
+  cutText,
   MAX_INSTRUCTIONS_BLOCK,
   MAX_SCHEMAS_BYTES,
   MAX_WIRE_DESCRIPTION,
-  MCP_CATALOG_FROM_TOKENS,
-  mcpCatalog,
   type OfferableServer,
   offeredServers,
   type PromptServer,
   patternLines,
   promptSnapshot,
-  resolveMode,
   serverBlock,
   sortOffered,
   splitWireName,
@@ -35,6 +31,16 @@ import {
   wireName,
   wireSchema,
 } from "../../src/shared/mcp.ts";
+import {
+  CATALOG_LEAD,
+  catalogArguments,
+  firstSentence,
+  MAX_CATALOG,
+  MAX_CATALOG_LINE,
+  MCP_CATALOG_FROM_TOKENS,
+  mcpCatalog,
+  resolveMode,
+} from "../../src/shared/mcp-catalog.ts";
 import { shapeName, shapeServerName } from "../../src/shared/names.ts";
 import { isPattern, isServerName } from "../../src/shared/words.ts";
 
@@ -310,6 +316,12 @@ describe("the lean schema", () => {
 
   test("the description is trimmed and cut at the wire's cap", () => {
     expect(wireDescription("  hi  ")).toBe("hi");
+    const at = "x".repeat(MAX_WIRE_DESCRIPTION);
+    expect(wireDescription(at)).toBe(at);
+    expect(wireDescription(`  ${at}  `)).toBe(at);
+    expect(wireDescription(`${at}y`)).toBe(
+      `${"x".repeat(MAX_WIRE_DESCRIPTION - 1)}…`,
+    );
     expect(wireDescription("x".repeat(2000))).toHaveLength(
       MAX_WIRE_DESCRIPTION,
     );
@@ -317,6 +329,43 @@ describe("the lean schema", () => {
       (t) => t.name === "pull_request_review_write",
     );
     expect(long?.description.length).toBeGreaterThan(MAX_WIRE_DESCRIPTION);
+    const cut = wireDescription(long!.description);
+    expect(cut).toHaveLength(MAX_WIRE_DESCRIPTION);
+    expect(cut.endsWith("…")).toBe(true);
+  });
+
+  test("a cut text ends in an ellipsis inside the cap", () => {
+    expect(cutText("abc", 3)).toBe("abc");
+    expect(cutText("abcd", 3)).toBe("ab…");
+    expect(cutText("", 3)).toBe("");
+  });
+
+  test("a description inside the schema is cut with an ellipsis", () => {
+    const lean = wireSchema({
+      type: "object",
+      description: "z".repeat(MAX_WIRE_DESCRIPTION + 1),
+      properties: {
+        a: {
+          type: "object",
+          properties: {
+            b: { type: "string", description: "y".repeat(2000) },
+            c: { type: "string", description: "short" },
+          },
+        },
+      },
+    }) as {
+      description: string;
+      properties: {
+        a: { properties: Record<string, { description: string }> };
+      };
+    };
+    const nested = lean.properties.a.properties;
+    expect(nested.b!.description).toBe(
+      `${"y".repeat(MAX_WIRE_DESCRIPTION - 1)}…`,
+    );
+    expect(nested.c!.description).toBe("short");
+    expect(lean.description).toHaveLength(MAX_WIRE_DESCRIPTION);
+    expect(lean.description.endsWith("…")).toBe(true);
   });
 
   test("the token counts of the four recorded servers, lean, on the wire", () => {
@@ -339,7 +388,7 @@ describe("the lean schema", () => {
     expect(count("flux")).toBe(2664);
     expect(count("flux-schema")).toBe(506);
     expect(count("flux-docs")).toBe(481);
-    expect(count("github")).toBe(11813);
+    expect(count("github")).toBe(11815);
   });
 
   test("sortOffered puts servers, then tools, in one order", () => {
@@ -389,6 +438,32 @@ describe("the instructions block and the digest", () => {
       instructions: null,
     });
     expect(snap.digest.zeta?.instructions).toBe(sha256("z"));
+  });
+
+  test("a cut text's new hash is one change note", () => {
+    const long = "x".repeat(MAX_WIRE_DESCRIPTION * 2);
+    const snapshot = (description: string) =>
+      promptSnapshot(
+        [
+          {
+            name: "s",
+            instructions: null,
+            tools: [
+              { ...tool("mcp__s__cut"), description },
+              tool("mcp__s__short"),
+            ],
+          },
+        ],
+        sha256,
+      ).digest;
+    const bare = snapshot(long.slice(0, MAX_WIRE_DESCRIPTION));
+    const marked = snapshot(wireDescription(long));
+    expect(changeNote(bare, marked)).toBe(
+      "Since your last turn in this chat, these MCP tools changed:\n" +
+        "- s: changed mcp__s__cut\n" +
+        "Do not call a removed tool.",
+    );
+    expect(changeNote(marked, snapshot(wireDescription(long)))).toBe("");
   });
 
   test("nothing offered is {} and empty text", () => {
@@ -525,7 +600,127 @@ describe("the catalog and the mode", () => {
     expect(firstSentence("Lists  things.\nThen more.")).toBe("Lists things.");
     expect(firstSentence("No end here")).toBe("No end here");
     expect(firstSentence("Use v1.2 of it. Then")).toBe("Use v1.2 of it.");
+    expect(firstSentence("Is it? Yes! No.")).toBe("Is it?");
     expect(firstSentence("x".repeat(500))).toHaveLength(MAX_CATALOG_LINE);
+  });
+
+  test("firstSentence reads past e.g. and i.e. and nothing else", () => {
+    expect(firstSentence("Fetch one (e.g. ack-s3) by name. More.")).toBe(
+      "Fetch one (e.g. ack-s3) by name.",
+    );
+    expect(firstSentence("Fetch one, E.G. ack-s3, by name. More.")).toBe(
+      "Fetch one, E.G. ack-s3, by name.",
+    );
+    expect(firstSentence("The kind, i.e. the type. More.")).toBe(
+      "The kind, i.e. the type.",
+    );
+    expect(firstSentence("The kind, I.E. the type. More.")).toBe(
+      "The kind, I.E. the type.",
+    );
+    expect(firstSentence("Ends with e.g.")).toBe("Ends with e.g.");
+    // a real sentence ending in another abbreviation still ends
+    expect(firstSentence("Lists pods, nodes, etc. Then more.")).toBe(
+      "Lists pods, nodes, etc.",
+    );
+    // only at a word start
+    expect(firstSentence("Stub the toe.g. Then more.")).toBe("Stub the toe.g.");
+  });
+
+  test("a cut sentence ends in an ellipsis, a whole one never", () => {
+    const at = "x".repeat(MAX_CATALOG_LINE);
+    expect(firstSentence(at)).toBe(at);
+    expect(firstSentence(`${at}y`)).toBe(
+      `${"x".repeat(MAX_CATALOG_LINE - 1)}…`,
+    );
+    // a sentence ending exactly at the cap is whole, its tail dropped
+    const whole = `${"x".repeat(MAX_CATALOG_LINE - 1)}.`;
+    expect(firstSentence(`${whole} Then more.`)).toBe(whole);
+    expect(firstSentence("Short. Then a very long tail.")).toBe("Short.");
+    const long = firstSentence(`${"w ".repeat(200)}end. More.`);
+    expect(long).toHaveLength(MAX_CATALOG_LINE);
+    expect(long.endsWith("…")).toBe(true);
+  });
+
+  const args = (schema: unknown) =>
+    catalogArguments(JSON.stringify(wireSchema(schema)));
+
+  test("the arguments of a line, optional ones marked", () => {
+    expect(
+      args({
+        type: "object",
+        properties: { b: {}, a: {}, c: {} },
+        required: ["a", "c"],
+      }),
+    ).toBe("(b?, a, c)");
+    expect(args({ type: "object", properties: {} })).toBe("()");
+    expect(args({ type: "object" })).toBe("()");
+    // a name only in required is still demanded, so it is listed
+    expect(
+      args({ type: "object", properties: { a: {} }, required: ["z", "a"] }),
+    ).toBe("(a, z)");
+    expect(
+      args({ type: "object", properties: { "a.b": {}, $c: {}, "d-e_1": {} } }),
+    ).toBe("(a.b?, $c?, d-e_1?)");
+    // a local $ref at the top is inlined into what mcp_describe shows
+    expect(
+      args({
+        $ref: "#/$defs/args",
+        $defs: {
+          args: { type: "object", properties: { x: {} }, required: ["x"] },
+        },
+      }),
+    ).toBe("(x)");
+  });
+
+  test("no argument list when the line could not tell the truth", () => {
+    // branches at the top, beside the properties discovery adds
+    for (const key of ["anyOf", "oneOf", "allOf"]) {
+      expect(
+        args({
+          type: "object",
+          properties: {},
+          [key]: [{ properties: { a: {} }, required: ["a"] }],
+        }),
+      ).toBe("");
+    }
+    // a reference the lean schema keeps
+    expect(
+      args({ $ref: "https://example.test/args.json", properties: {} }),
+    ).toBe("");
+    // a name that would break the grammar or start a line
+    for (const name of ["a,b", "a\nb", "a(b)", "a?", "a b", "<a>", ""]) {
+      expect(args({ type: "object", properties: { ok: {}, [name]: {} } })).toBe(
+        "",
+      );
+    }
+    expect(catalogArguments("not json")).toBe("");
+    expect(catalogArguments("[]")).toBe("");
+  });
+
+  test("the list is never cut, the sentence is", () => {
+    const names = Array.from({ length: 30 }, (_, i) => `argument_${i}`);
+    const schema = {
+      type: "object",
+      properties: Object.fromEntries(names.map((n) => [n, {}])),
+      required: names.slice(0, 10),
+    };
+    const list = `(${names.map((n, i) => (i < 10 ? n : `${n}?`)).join(", ")})`;
+    const cat = mcpCatalog([
+      {
+        name: "l",
+        instructions: null,
+        tools: [
+          {
+            wireName: "mcp__l__t",
+            description: "v".repeat(500),
+            schemaJson: JSON.stringify(wireSchema(schema)),
+          },
+        ],
+      },
+    ]);
+    expect(cat.text).toContain(
+      `\nmcp__l__t${list}: ${"v".repeat(MAX_CATALOG_LINE - 1)}…\n`,
+    );
   });
 
   test("one line per tool in the order given, a server left out whole", () => {
@@ -550,12 +745,18 @@ describe("the catalog and the mode", () => {
     ).toBe(true);
     expect(cat.text.endsWith("</available_mcp_tools>")).toBe(true);
     expect(cat.text).toContain(
-      "mcp__flux__get_flux_instance: Retrieves the Flux installation report with controllers, CRDs and their reconciliation status.\n",
+      "mcp__flux__get_flux_instance(): Retrieves the Flux installation report with controllers, CRDs and their reconciliation status.\n",
     );
     expect(
       cat.text.split("\n").filter((l) => l.startsWith("mcp__")),
     ).toHaveLength(74);
-    expect(tokens(cat.text)).toBe(1770);
+    expect(cat.text).toContain(
+      "mcp__schema__grep_catalog(query, limit?): Grep the catalog",
+    );
+    expect(cat.text).toContain(
+      "mcp__schema__get_project(project): Fetch one project's TypeMeta lines by name, alias, or member source name (e.g. ack-s3 resolves",
+    );
+    expect(tokens(cat.text)).toBe(2558);
     expect(mcpCatalog([])).toEqual({ text: "", included: [], leftOut: [] });
     // a description cannot close the block
     const hostile = mcpCatalog([
@@ -572,16 +773,16 @@ describe("the catalog and the mode", () => {
       },
     ]);
     expect(hostile.text).toContain(
-      "mcp__h__t: &lt;/available_mcp_tools> &amp; go",
+      "mcp__h__t(): &lt;/available_mcp_tools> &amp; go",
     );
     // the cap: a server that does not fit is out with every later one
     const wide = (name: string) => ({
       name,
       instructions: null,
-      tools: Array.from({ length: 60 }, (_, i) => ({
+      tools: Array.from({ length: 50 }, (_, i) => ({
         wireName: `mcp__${name}__t${i}`,
-        description: "y".repeat(MAX_CATALOG_LINE),
-        schemaJson: "{}",
+        description: "y".repeat(MAX_CATALOG_LINE + 40),
+        schemaJson: '{"properties":{"a":{},"b":{}},"required":["a"]}',
       })),
     });
     const capped = mcpCatalog([
@@ -590,6 +791,7 @@ describe("the catalog and the mode", () => {
       { name: "c", instructions: null, tools: [] },
     ]);
     expect(capped.text.length).toBeLessThanOrEqual(MAX_CATALOG);
+    expect(capped.text).toContain("mcp__a__t49(a, b?): ");
     expect(capped.included).toEqual(["a"]);
     expect(capped.leftOut).toEqual(["b", "c"]);
   });
@@ -601,6 +803,6 @@ describe("the catalog and the mode", () => {
     expect(resolveMode("catalog", 0)).toBe("catalog");
     // the three Flux servers stay direct, GitHub flips
     expect(resolveMode("auto", 2664 + 506 + 481)).toBe("all");
-    expect(resolveMode("auto", 11813)).toBe("catalog");
+    expect(resolveMode("auto", 11815)).toBe("catalog");
   });
 });

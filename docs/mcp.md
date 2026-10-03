@@ -1,9 +1,9 @@
 # MCP
 
-Governs `src/server/mcp/`, `shared/mcp.ts`, MCP tools in a send
-(`tools/offer.ts`, `tools/builtin/mcp.ts`, `runner/policy.ts`) and how
-an MCP result becomes files (`tools/kept.ts`). Kept files' storage and
-mount are in `docs/bash.md`.
+Governs `src/server/mcp/`, `shared/mcp.ts`, `shared/mcp-catalog.ts`,
+MCP tools in a send (`tools/offer.ts`, `tools/builtin/mcp.ts`,
+`runner/policy.ts`) and how an MCP result becomes files
+(`tools/kept.ts`). Kept files' storage and mount are in `docs/bash.md`.
 
 An MCP server is a remote tool server an admin adds by URL; its tools
 reach the model in the sends of agents linked to it.
@@ -49,10 +49,21 @@ reach the model in the sends of agents linked to it.
 - **The `tools` array is byte-stable across a session.** Schemas are
   lean (`wireSchema`, `wireDescription`, description cut at 1,024),
   sorted by server then name, after the built-ins and the skill tools.
+- **A cut text ends in `…`** inside its cap, so the model never reads it
+  as whole: a wire description and the catalog's sentence. The stored
+  cap at discovery stays bare.
 - **`mcpMode` picks schemas or a catalog.** `all` puts every schema on
   the wire. `catalog` offers `mcp_describe` and `mcp_call` and one
   prompt line per tool. `auto` is `all` while the schemas count at most
   `MCP_CATALOG_FROM_TOKENS`.
+- **A catalog line is `name(args): sentence`**, so a model that skips
+  `mcp_describe` does not guess names. The args are the lean schema's
+  top-level names, then any `required` name `properties` lacks, an
+  optional one marked `?`; types stay with `mcp_describe`. No list
+  when the top level has `anyOf`, `oneOf`, `allOf` or a kept `$ref`, or
+  a name is outside `[A-Za-z0-9_.$-]`, since it would lie or break the
+  line. Only the sentence is cut, at `MAX_CATALOG_LINE`; it reads past
+  `e.g.` and `i.e.`.
 - **History never names a function the `tools` array lacks.** In catalog
   mode the tool loop rewrites a call of an offered wire name to
   `mcp_call` before its row is written.

@@ -7,7 +7,7 @@ import { mcpArea } from "../../../src/server/mcp/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import { mcpKey } from "../../../src/shared/capabilities.ts";
-import { MCP_CATALOG_FROM_TOKENS } from "../../../src/shared/mcp.ts";
+import { MCP_CATALOG_FROM_TOKENS } from "../../../src/shared/mcp-catalog.ts";
 import { fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { link, seedServer } from "../mcp/switches.helpers.ts";
