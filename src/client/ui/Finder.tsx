@@ -5,9 +5,10 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useId, useRef } from "preact/hooks";
 import { navigate } from "../app/router.ts";
-import { NARROW } from "../app/shell.ts";
+import { fixedFrame, NARROW } from "../app/shell.ts";
 import { Icon } from "../lib/icons.tsx";
 import { touch } from "../lib/touch.ts";
+import { type Place, placeOf } from "./Finder.model.ts";
 import { ListboxSearch, useActiveInView } from "./Listbox.tsx";
 import {
   clampHighlight,
@@ -17,11 +18,6 @@ import {
   type Option,
 } from "./Select.model.ts";
 import "./finder.css";
-
-// the page head's gutter on a phone
-const GUTTER = 16;
-
-type Place = { top: number; left: number; width: number; maxHeight: number };
 
 export type FinderOption = Option & {
   sub?: string;
@@ -101,26 +97,15 @@ export function Finder({
   // never cuts it
   const place = useSignal<Place | null>(null);
   const measure = () => {
-    const b = button.current?.getBoundingClientRect();
-    if (!b) return;
-    const room = window.innerWidth - 2 * GUTTER;
-    const width = matchMedia(NARROW).matches
-      ? room
-      : Math.min(wide ? 380 : 280, room);
-    const left = align === "right" ? b.right - width : b.left;
-    const top = b.bottom + 4;
-    place.value = {
-      top,
-      left: Math.max(
-        GUTTER,
-        Math.min(left, window.innerWidth - GUTTER - width),
-      ),
-      width,
-      maxHeight: Math.max(
-        160,
-        Math.min(360, window.innerHeight - top - GUTTER),
-      ),
-    };
+    const el = button.current;
+    if (!el) return;
+    place.value = placeOf({
+      button: el.getBoundingClientRect(),
+      frame: fixedFrame(el),
+      view: { width: window.innerWidth, height: window.innerHeight },
+      width: matchMedia(NARROW).matches ? null : wide ? 380 : 280,
+      align,
+    });
   };
 
   useEffect(() => {

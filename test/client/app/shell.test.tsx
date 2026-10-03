@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 describe("the shell on a wide window", () => {
-  test("shows the rail and no strip", () => {
+  test.serial("shows the rail and no strip", () => {
     const html = render(<App />);
     expect(html).toContain('class="rail"');
     expect(html).not.toContain("shell-strip");
@@ -71,20 +71,23 @@ describe("the shell on a wide window", () => {
     expect(html).toContain('aria-label="Hide the menu"');
   });
 
-  test("hiding the rail folds it to the strip and keeps the choice", () => {
-    hideRail();
-    expect(railHidden.value).toBe(true);
-    expect(store.get("rail")).toBe("hidden");
-    const html = render(<App />);
-    expect(html).not.toContain('class="rail"');
-    expect(html).toContain("shell-strip");
-    expect(html).toContain("shell-show");
-    expect(html).not.toContain("shell-show-float");
-    showRail();
-    expect(store.has("rail")).toBe(false);
-  });
+  test.serial(
+    "hiding the rail folds it to the strip and keeps the choice",
+    () => {
+      hideRail();
+      expect(railHidden.value).toBe(true);
+      expect(store.get("rail")).toBe("hidden");
+      const html = render(<App />);
+      expect(html).not.toContain('class="rail"');
+      expect(html).toContain("shell-strip");
+      expect(html).toContain("shell-show");
+      expect(html).not.toContain("shell-show-float");
+      showRail();
+      expect(store.has("rail")).toBe(false);
+    },
+  );
 
-  test("a hidden rail never becomes a drawer", () => {
+  test.serial("a hidden rail never becomes a drawer", () => {
     hideRail();
     expect(render(<App />)).not.toContain("rail-drawer");
   });

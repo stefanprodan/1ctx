@@ -95,6 +95,17 @@ export function watchViewport(): void {
   view.addEventListener("scroll", apply);
 }
 
+// where a fixed panel's frame starts in the window: the shell's corner
+// while watchViewport moves it, since a transform holds fixed children
+export function fixedFrame(el: Element): { top: number; left: number } {
+  const shell = el.closest(".shell");
+  if (shell === null || getComputedStyle(shell).transform === "none") {
+    return { top: 0, left: 0 };
+  }
+  const box = shell.getBoundingClientRect();
+  return { top: box.top, left: box.left };
+}
+
 export const lastAdmin = signal(MONITOR_HREF);
 export const lastWork = signal("/");
 

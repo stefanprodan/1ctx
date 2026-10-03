@@ -90,7 +90,7 @@
     z-index: 1;
     min-width: 240px;
     max-width: 420px;
-    /* dvh keeps the keyboard's room on iOS; the shell's height does not */
+    /* the shell's height while a keyboard is up, else dvh */
     max-height: min(290px, 0.4 * var(--shell-height, 100dvh));
     overflow-y: auto;
   }
