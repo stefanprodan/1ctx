@@ -49,17 +49,22 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 - **Kept MCP files are packed by their own job** (`sessions/pack-kept.ts`),
   never by an archive or the sweep, since a chat may keep
   `mcpKeptBytes`. It starts after startup's sweep, then hourly, one pass
-  at a time. `shutdown()` stops it before the drain's first await, so no
-  batch starts after.
-- **A pass picks its sessions once,** oldest first, at most a few
-  thousand: archived chats and ended runs, none running, skipping those
-  due for deletion (a chat archived past `archivedDeleteDays`, an
-  orphaned run past the same cut, a run past its task's retention). Each
-  `>=` mirrors its deleter's `<`. A pass picks again only after a list
-  that packed something.
-- **A batch is one synchronous transaction** of at most
-  `KEPT_BATCH_BYTES` raw input, or one larger file. It rechecks its own
-  sessions by key first. The next batch is a fresh timer task; a pass
-  stops at `KEPT_PASS_BYTES` or when nothing is left. Fork unpacks what
-  it copies (`docs/bash.md`).
+  at a time. `shutdown()` stops it before the drain's first await: a
+  batch already reading writes before `stop()` resolves, none starts
+  after.
+- **A pass walks the sessions with files to try by id** (`walkKept()`),
+  a chunk at a time over the covering candidate index, keeping its
+  cursor until the end or `KEPT_PASS_BYTES`. Ids are random, so there
+  is no age order. A walked session is checked by key (`KEPT_STILL`):
+  archived chats and ended runs, none running, skipping those due for
+  deletion (a chat archived past `archivedDeleteDays`, an orphaned run
+  past the same cut, a run past its task's retention). Each `>=`
+  mirrors its deleter's `<`.
+- **A batch reads, compresses, then writes.** It copies files' bytes up
+  to `KEPT_BATCH_BYTES`, or one larger file, at most one walk step;
+  awaits each file's compression on Bun's thread pool, one at a time;
+  then writes in one short transaction that rechecks each session by
+  key and writes a row only `where packed = 0`, counting the rest as
+  skipped. The main thread only reads, copies and writes. Fork unpacks
+  what it copies (`docs/bash.md`).
 - **No sweep vacuums.** SQLite reuses freed pages.

@@ -70,8 +70,9 @@ admin's attention, the server's load), Usage by month and Storage.
 - **A group by alias never matches a column the query reads.** SQLite
   resolves a `group by` name to an input column before an alias, so a
   query over `messages`, which has `slot`, groups by `q`. A sum over
-  text columns takes each row's length in a materialized CTE first,
-  since a sorting `group by` carries the raw text into the sorter.
+  text or blob columns takes each row's size in a materialized CTE
+  first, since a sorting `group by` carries the raw value into the
+  sorter.
 - **A new table needs an entry in `STORAGE_TABLES`.** A test checks
   the map against the schema both ways.
 - **`cache.ts` keeps one read in flight per key.** Storage keeps its

@@ -112,16 +112,20 @@ export {
   scrubKeys,
 } from "./credentials.ts";
 export {
+  compressKept,
   copyKeptFiles,
   KEPT_PACK_FROM,
-  KEPT_PACKABLE,
   KEPT_PACKED_READ,
   KEPT_UNPACK_ERROR,
-  type KeptBatch,
   type KeptFile,
+  type KeptPending,
+  type KeptWrite,
   keptPath,
-  packKeptBatch,
+  pendingKept,
+  readKeptRaw,
+  walkKept,
   writeKeptFiles,
+  writeKeptFrame,
 } from "./kept.ts";
 export type { CommandRepos } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";

@@ -46,15 +46,21 @@ export const KEPT_PENDING = `select message_id, position, bytes
 export const KEPT_UNPACK_ERROR = "a packed kept file did not decode";
 export const KEPT_PACKED_READ = "a packed kept file was read";
 
-export type KeptBatch = {
-  // files tried, packed and left raw for good, and their raw and
-  // stored bytes
-  files: number;
-  packed: number;
-  refused: number;
-  bytesIn: number;
-  bytesOut: number;
+// the sessions holding files to try, walked by id from after a cursor,
+// over the covering candidate index alone; ids are random, so the walk
+// has no age order
+export const KEPT_WALK = `select distinct session_id from mcp_kept_files
+  where ${KEPT_PACKABLE} and session_id > ?
+  order by session_id limit ?`;
+
+// a file to try, by key, with its raw size
+export type KeptPending = {
+  messageId: string;
+  position: number;
+  bytes: number;
 };
+
+export type KeptWrite = "packed" | "refused" | "skipped";
 
 // the file's place under /mcp
 export function keptPath(dir: string, name: string): string {
@@ -141,71 +147,78 @@ export function readKept(
   return row.data ?? new Uint8Array();
 }
 
-/**
- * In the caller's transaction: the raw files of the sessions, in their
- * order and each session's by folder, compressed until the next file
- * would take the raw input past maxBytes; the first file is taken
- * whatever its size. A frame no smaller than the file leaves it raw for
- * good. The caller decides which sessions have ended; finished counts
- * the sessions, from the first, left with nothing to try.
- */
-export function packKeptBatch(
+export function walkKept(db: Db, after: string, limit: number): string[] {
+  return db
+    .query<{ session_id: string }, [string, number]>(KEPT_WALK)
+    .all(after, limit)
+    .map((row) => row.session_id);
+}
+
+// the session's files to try, in packing order
+export function pendingKept(db: Db, sessionId: string): KeptPending[] {
+  return db
+    .query<{ message_id: string; position: number; bytes: number }, [string]>(
+      KEPT_PENDING,
+    )
+    .all(sessionId)
+    .map((row) => ({
+      messageId: row.message_id,
+      position: row.position,
+      bytes: row.bytes,
+    }));
+}
+
+// a file's stored bytes, text as its bytes: every reader takes a file
+// as bytes, so a frame of them unpacks to the same file
+export function readKeptRaw(
   db: Db,
-  sessionIds: readonly string[],
-  maxBytes: number,
-): KeptBatch & { finished: number } {
-  const batch = {
-    finished: 0,
-    files: 0,
-    packed: 0,
-    refused: 0,
-    bytesIn: 0,
-    bytesOut: 0,
-  };
-  const pending = db.query<
-    { message_id: string; position: number; bytes: number },
-    [string]
-  >(KEPT_PENDING);
-  // text as its stored bytes: every reader takes a file as bytes, so a
-  // frame of them unpacks to the same file. pending just read the flag
-  // in this transaction, and reading it again walks the blobs
-  const read = db.query<{ raw: Uint8Array | null }, [string, number]>(
-    `select coalesce(cast(text as blob), data) as raw from mcp_kept_files
-     where message_id = ? and position = ?`,
-  );
-  const write = db.query(
-    `update mcp_kept_files set packed = 1, text = null, data = ?
-     where message_id = ? and position = ?`,
-  );
-  const refuse = db.query(
-    `update mcp_kept_files set packed = -1
-     where message_id = ? and position = ?`,
-  );
-  for (const sessionId of sessionIds) {
-    for (const file of pending.all(sessionId)) {
-      if (batch.files > 0 && batch.bytesIn + file.bytes > maxBytes) {
-        return batch;
-      }
-      const row = read.get(file.message_id, file.position);
-      if (row === null) continue;
-      const raw = row.raw ?? new Uint8Array();
-      batch.files++;
-      batch.bytesIn += file.bytes;
-      const frame = Bun.zstdCompressSync(raw, { level: KEPT_PACK_LEVEL });
-      // a size that disagrees with the bytes would fail every fork's
-      // check, so such a file stays raw
-      if (frame.byteLength >= raw.byteLength || raw.byteLength !== file.bytes) {
-        refuse.run(file.message_id, file.position);
-        batch.refused++;
-        continue;
-      }
-      write.run(frame, file.message_id, file.position);
-      batch.packed++;
-      batch.bytesOut += frame.byteLength;
-    }
-    batch.finished++;
-  }
-  return batch;
+  messageId: string,
+  position: number,
+): Uint8Array | null {
+  const row = db
+    .query<{ raw: Uint8Array | null }, [string, number]>(
+      `select coalesce(cast(text as blob), data) as raw from mcp_kept_files
+       where message_id = ? and position = ?`,
+    )
+    .get(messageId, position);
+  return row === null ? null : (row.raw ?? new Uint8Array());
+}
+
+// on Bun's thread pool, so the event loop runs while a large file
+// compresses
+export function compressKept(raw: Uint8Array): Promise<Uint8Array> {
+  return Bun.zstdCompress(raw, { level: KEPT_PACK_LEVEL });
+}
+
+/**
+ * In the caller's transaction: the frame stored over the raw file, or
+ * the file left raw for good when the frame is no smaller or the bytes
+ * read disagree with its size, which would fail every fork's check.
+ * Only a row still at 0 is written, a test the record header answers
+ * without the blobs; skipped when the row changed or went.
+ */
+export function writeKeptFrame(
+  db: Db,
+  file: KeptPending,
+  rawLength: number,
+  frame: Uint8Array,
+): KeptWrite {
+  const keep = frame.byteLength >= rawLength || rawLength !== file.bytes;
+  const changes = keep
+    ? db
+        .query(
+          `update mcp_kept_files set packed = -1
+           where message_id = ? and position = ? and packed = 0`,
+        )
+        .run(file.messageId, file.position).changes
+    : db
+        .query(
+          `update mcp_kept_files set packed = 1, text = null, data = ?
+           where message_id = ? and position = ? and packed = 0`,
+        )
+        .run(frame, file.messageId, file.position).changes;
+  if (changes === 0) return "skipped";
+  return keep ? "refused" : "packed";
 }
 
 function unpackKept(frame: Uint8Array, bytes: number): Uint8Array {

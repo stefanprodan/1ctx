@@ -6,14 +6,13 @@
 
 import { describe, expect, spyOn, test } from "bun:test";
 import { writeKeptFiles } from "../../../src/server/bash/index.ts";
-import { KEPT_PENDING } from "../../../src/server/bash/kept.ts";
+import { KEPT_PENDING, KEPT_WALK } from "../../../src/server/bash/kept.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   KEPT_BATCH_BYTES,
   KEPT_PASS_MS,
-  KEPT_PICK,
   KEPT_STILL,
   type KeptPackDeps,
   keptPacker,
@@ -197,6 +196,7 @@ describe("the kept files job", () => {
             files: 3,
             packed: 3,
             refused: 0,
+            skipped: 0,
             bytes_in: 3 * SIZE,
             bytes_out: pass.bytesOut,
             duration: expect.any(Number),
@@ -213,45 +213,111 @@ describe("the kept files job", () => {
     }
   });
 
-  test("a pass stops at its budget, oldest session first, and the next resumes", async () => {
+  test("a pass stops at its budget and the next resumes where the walk left", async () => {
     const s = setup();
     try {
-      const newer = session(s, { archivedDays: 1 });
-      const older = session(s, { archivedDays: 2 });
-      keep(s, newer, 2);
-      keep(s, older, 3);
+      const first = session(s, { archivedDays: 1 });
+      const second = session(s, { archivedDays: 2 });
+      keep(s, first, 2);
+      keep(s, second, 3);
+      const packedAll = () =>
+        [...packedOf(s, first), ...packedOf(s, second)].filter((p) => p === 1)
+          .length;
       const job = packer(s, { batchBytes: 2 * SIZE, passBytes: 3 * SIZE });
       expect(await job.pass()).toMatchObject({
         batches: 2,
         files: 3,
+        packed: 3,
         bytesIn: 3 * SIZE,
       });
-      expect(packedOf(s, older)).toEqual([1, 1, 1]);
-      expect(packedOf(s, newer)).toEqual([0, 0]);
+      expect(packedAll()).toBe(3);
       expect(await job.pass()).toMatchObject({ batches: 1, files: 2 });
-      expect(packedOf(s, newer)).toEqual([1, 1]);
+      expect(packedAll()).toBe(5);
     } finally {
       s.db.close();
     }
   });
 
-  test("a batch rechecks its sessions, so one that runs again is left", async () => {
+  test("a batch takes one file past its budget alone", async () => {
+    const s = setup();
+    try {
+      const id = session(s, { archivedDays: 1 });
+      keep(s, id, 1, 3 * SIZE);
+      keep(s, id, 2);
+      const job = packer(s, { batchBytes: SIZE });
+      expect(await job.pass()).toMatchObject({
+        batches: 3,
+        files: 3,
+        packed: 3,
+        bytesIn: 5 * SIZE,
+      });
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("the walk goes past a chunk of sessions that cannot be packed", async () => {
+    const s = setup();
+    try {
+      // more live chats than one step of the walk reads
+      for (let i = 0; i < 300; i++) keep(s, session(s, {}), 1, 1024);
+      const id = session(s, { archivedDays: 1 });
+      keep(s, id);
+      expect(await packer(s).pass()).toMatchObject({ files: 1, packed: 1 });
+      expect(packedOf(s, id)).toEqual([1]);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a batch rechecks its sessions at its write, so one that runs again is left", async () => {
     const s = setup();
     try {
       const id = session(s, { archivedDays: 1 });
       keep(s, id, 3);
       const job = packer(s, { batchBytes: SIZE });
       const pass = job.pass();
-      // the first batch ran in the call; the next waits on a timer
+      // the first batch read in the call and waits on its compression
       s.db.query("update sessions set status = 'running' where id = ?").run(id);
-      expect(await pass).toMatchObject({ batches: 1, files: 1 });
-      expect(packedOf(s, id)).toEqual([1, 0, 0]);
+      expect(await pass).toMatchObject({
+        batches: 1,
+        files: 1,
+        packed: 0,
+        skipped: 1,
+      });
+      expect(packedOf(s, id)).toEqual([0, 0, 0]);
     } finally {
       s.db.close();
     }
   });
 
-  test("a stop ends the pass before its next batch and keeps it stopped", async () => {
+  test("a session deleted while its batch compresses is skipped", async () => {
+    const s = setup();
+    try {
+      const id = session(s, { archivedDays: 1 });
+      keep(s, id, 2);
+      const other = session(s, { archivedDays: 1 });
+      keep(s, other);
+      const { events, logFactory } = collectLogs();
+      const job = packer(s, { log: logFactory("sessions") });
+      const pass = job.pass();
+      s.db.query("delete from sessions where id = ?").run(id);
+      const done = await pass;
+      expect(done).toMatchObject({
+        batches: 1,
+        files: 3,
+        packed: 1,
+        skipped: 2,
+      });
+      expect(events.filter((event) => event.level === "warn")).toEqual([]);
+      expect(packedOf(s, id)).toEqual([]);
+      expect(packedOf(s, other)).toEqual([1]);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a stop lets the running batch write and starts no other", async () => {
     const s = setup();
     try {
       const id = session(s, { archivedDays: 1 });
@@ -261,8 +327,8 @@ describe("the kept files job", () => {
       // one pass at a time: a second call joins the first
       expect(job.pass()).toBe(pass);
       await job.stop();
-      expect(await pass).toMatchObject({ batches: 1, files: 1 });
       expect(packedOf(s, id)).toEqual([1, 0, 0, 0]);
+      expect(await pass).toMatchObject({ batches: 1, files: 1 });
       expect(await job.pass()).toMatchObject({ batches: 0 });
       expect(packedOf(s, id)).toEqual([1, 0, 0, 0]);
     } finally {
@@ -270,24 +336,32 @@ describe("the kept files job", () => {
     }
   });
 
-  test("a failing batch ends the pass with a warning", async () => {
+  test("a failing write rolls its batch back and the next pass packs", async () => {
     const s = setup();
     try {
       const id = session(s, { archivedDays: 1 });
-      keep(s, id);
+      keep(s, id, 3);
+      const before = s.db
+        .query("select * from mcp_kept_files order by folder")
+        .all();
+      // the second write of a batch raises
+      s.db.exec(`
+        create trigger kept_fail before update on mcp_kept_files
+        when (select count(*) from mcp_kept_files where packed <> 0) >= 1
+        begin select raise(abort, 'kept write failed'); end;
+      `);
       const { events, logFactory } = collectLogs();
-      const job = packer(s, {
-        log: logFactory("sessions"),
-        limits: {
-          current: () => {
-            throw new Error("limits unreadable");
-          },
-        },
-      });
-      expect(await job.pass()).toMatchObject({ files: 0 });
+      const job = packer(s, { log: logFactory("sessions") });
+      expect(await job.pass()).toMatchObject({ files: 0, packed: 0 });
+      expect(
+        s.db.query("select * from mcp_kept_files order by folder").all(),
+      ).toEqual(before);
       expect(events.map((event) => [event.level, event.msg])).toEqual([
         ["warn", "kept packing failed"],
       ]);
+      s.db.exec("drop trigger kept_fail");
+      expect(await job.pass()).toMatchObject({ files: 3, packed: 3 });
+      expect(packedOf(s, id)).toEqual([1, 1, 1]);
     } finally {
       s.db.close();
     }
@@ -366,8 +440,8 @@ describe("the kept files job at its edges", () => {
         keep(s, id);
         const job = packer(s);
         job.start();
-        expect(packedOf(s, id)).toEqual([1]);
         await job.pass();
+        expect(packedOf(s, id)).toEqual([1]);
         const hourly = every.mock.calls.findIndex(
           ([, ms]) => ms === KEPT_PASS_MS,
         );
@@ -411,8 +485,9 @@ describe("the kept files job at its edges", () => {
       expect(plan(KEPT_PENDING, "x")).toContain(
         "COVERING INDEX mcp_kept_files_packable (session_id=?)",
       );
-      expect(plan(KEPT_PICK, 0, 0, 10)).toContain(
-        "COVERING INDEX mcp_kept_files_packable",
+      const walk = plan(KEPT_WALK, "", 256);
+      expect(walk).toBe(
+        "SEARCH mcp_kept_files USING COVERING INDEX mcp_kept_files_packable (session_id>?)",
       );
       expect(plan(KEPT_STILL, 0, 0, "x")).toContain(
         "SEARCH sessions USING INDEX sqlite_autoindex_sessions_1 (id=?)",

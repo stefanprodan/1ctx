@@ -3,29 +3,39 @@
 //
 // The kept MCP files of archived chats and ended runs, packed by a job
 // of their own: a chat may keep up to mcpKeptBytes, too much for a click
-// or for the synchronous sweep. Small batches, each its own transaction,
-// the event loop let run between them. A pass picks its sessions once;
-// each batch rechecks its own by key inside its transaction, so what it
-// writes ended and is not due for deletion at that moment.
+// or for the synchronous sweep. A pass walks the sessions holding files
+// to try by id, over the covering candidate index, a chunk at a time,
+// and packs them in small batches. A batch copies its files' bytes,
+// compresses them one at a time on Bun's thread pool, then writes in one
+// short transaction that rechecks each session by key, so what it
+// writes ended and is not due for deletion at that moment. The main
+// thread only reads, copies and writes; the event loop runs between
+// every step.
 
-import { KEPT_PACKABLE, type KeptBatch, packKeptBatch } from "../bash/index.ts";
+import {
+  compressKept,
+  type KeptPending,
+  pendingKept,
+  readKeptRaw,
+  walkKept,
+  writeKeptFrame,
+} from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 
-// raw input a batch packs, one file past it alone: 2 MiB blocked for
-// 30 ms at p99 on real kept files (4 MiB reached 50), under the 50 ms a
-// batch may stall the event loop on a slower pod
+// raw input a batch reads, one file past it alone; 4 MiB stalled the
+// event loop 50 ms at p99 on the load database's clone, 2 MiB 30 ms
 export const KEPT_BATCH_BYTES = 2 * 1024 * 1024;
 
-// raw input a pass packs, several times the heavy case's hourly growth
-// (about 185 MB); about 4 s of batches at 240 MB/s
+// raw input a pass packs, several times the heavy case's hourly growth;
+// provisional, set by measurement
 export const KEPT_PASS_BYTES = 1024 * 1024 * 1024;
 
 export const KEPT_PASS_MS = HOUR_MS;
 
-// the sessions one batch rechecks; it stops sooner at its bytes
-const SESSIONS_PER_BATCH = 64;
+// the sessions one step of the walk reads from the index
+const WALK_CHUNK = 256;
 
 export type KeptPackDeps = {
   db: Db;
@@ -37,84 +47,128 @@ export type KeptPackDeps = {
   passBytes?: number;
 };
 
-export type KeptPass = KeptBatch & { batches: number };
+export type KeptPass = {
+  // batches that read files; files read, packed, left raw for good and
+  // skipped since their session or row changed; raw bytes read and
+  // frame bytes written
+  batches: number;
+  files: number;
+  packed: number;
+  refused: number;
+  skipped: number;
+  bytesIn: number;
+  bytesOut: number;
+};
 
 export type KeptPacker = {
   // one pass to its end; a call while one runs gets that one
   pass(): Promise<KeptPass>;
   // a pass now, then hourly
   start(): void;
-  // no batch starts after it; resolves once a running pass let go
+  // no batch starts after it; resolves once a running batch wrote
   stop(): Promise<void>;
 };
 
-// ended and not due for deletion: a chat archived within
+// ended and not due for deletion, by key: a chat archived within
 // archivedDeleteDays, an orphaned run inside the same cut (the sweep's),
 // a task's run within its retention (the scheduler's); each a >= where
 // its deleter has a <
-const ELIGIBLE = `sessions.status <> 'running'
-  and ((sessions.origin = 'chat' and sessions.archived_at >= ?1)
-    or (sessions.origin = 'automation' and sessions.automation_id is null
-      and sessions.last_activity_at >= ?1)
-    or (sessions.origin = 'automation' and automations.id is not null
-      and sessions.last_activity_at >=
-        ?2 - automations.retention_days * ${DAY_MS}))`;
-
-// a pass's list, oldest first, of sessions with a file to try; a long
-// backlog is picked again once the list is done
-export const KEPT_PICK = `select sessions.id as id from sessions
-  left join automations on automations.id = sessions.automation_id
-  where sessions.id in (select session_id from mcp_kept_files
-      where ${KEPT_PACKABLE})
-    and ${ELIGIBLE}
-  order by sessions.last_activity_at, sessions.id limit ?3`;
-
-// a batch's recheck of one picked session, by its key
 export const KEPT_STILL = `select sessions.id as id from sessions
   left join automations on automations.id = sessions.automation_id
-  where sessions.id = ?3 and ${ELIGIBLE}`;
-
-// the sessions a pass picks at most at once
-const PASS_SESSIONS = 2000;
+  where sessions.id = ?3 and sessions.status <> 'running'
+    and ((sessions.origin = 'chat' and sessions.archived_at >= ?1)
+      or (sessions.origin = 'automation' and sessions.automation_id is null
+        and sessions.last_activity_at >= ?1)
+      or (sessions.origin = 'automation' and automations.id is not null
+        and sessions.last_activity_at >=
+          ?2 - automations.retention_days * ${DAY_MS}))`;
 
 type Deps = Pick<KeptPackDeps, "db" | "clock" | "limits">;
 
-function cuts(deps: Deps): [number, number] {
+// where a pass's walk stands: the last id read, the eligible sessions
+// of the chunk not yet done, and whether the index has more
+type Walk = { after: string; queue: string[]; done: boolean };
+
+type Read = KeptPending & { sessionId: string; raw: Uint8Array };
+
+function stillCheck(deps: Deps): (sessionId: string) => boolean {
   const now = deps.clock();
-  return [now - deps.limits.current().archivedDeleteDays * DAY_MS, now];
+  const cut = now - deps.limits.current().archivedDeleteDays * DAY_MS;
+  const query = deps.db.query<{ id: string }, [number, number, string]>(
+    KEPT_STILL,
+  );
+  return (sessionId) => query.get(cut, now, sessionId) !== null;
 }
 
-// the sessions a pass works through, oldest first
-export function pickKept(deps: Deps, limit = PASS_SESSIONS): string[] {
-  return deps.db
-    .query<{ id: string }, [number, number, number]>(KEPT_PICK)
-    .all(...cuts(deps), limit)
-    .map((row) => row.id);
+function step(deps: Deps, walk: Walk): void {
+  const ids = walkKept(deps.db, walk.after, WALK_CHUNK);
+  if (ids.length < WALK_CHUNK) walk.done = true;
+  if (ids.length > 0) walk.after = ids[ids.length - 1]!;
+  const still = stillCheck(deps);
+  walk.queue = ids.filter(still);
 }
 
 /**
- * One batch in its own transaction: the head of the list rechecked by
- * key, what no longer qualifies dropped, the rest packed from the
- * oldest. The sessions it did not finish go back on the list.
+ * A batch's files, copied in order until the next would take the raw
+ * input past maxBytes; the first is taken whatever its size. At most
+ * one step of the walk, so a stretch of live sessions never holds the
+ * thread; a session whose files are all taken leaves the queue.
  */
-export function packKeptOnce(
-  deps: Deps,
-  list: string[],
-  maxBytes: number,
-): KeptBatch {
-  return transact(deps.db, () => {
-    const [cut, now] = cuts(deps);
-    const still = deps.db.query<{ id: string }, [number, number, string]>(
-      KEPT_STILL,
-    );
-    const ids: string[] = [];
-    while (list.length > 0 && ids.length < SESSIONS_PER_BATCH) {
-      const id = list.shift()!;
-      if (still.get(cut, now, id) !== null) ids.push(id);
+export function readBatch(deps: Deps, walk: Walk, maxBytes: number): Read[] {
+  const files: Read[] = [];
+  let bytes = 0;
+  let stepped = false;
+  for (;;) {
+    if (walk.queue.length === 0) {
+      if (walk.done || stepped) return files;
+      step(deps, walk);
+      stepped = true;
+      continue;
     }
-    const { finished, ...batch } = packKeptBatch(deps.db, ids, maxBytes);
-    list.unshift(...ids.slice(finished));
-    return { result: batch };
+    const sessionId = walk.queue[0]!;
+    for (const file of pendingKept(deps.db, sessionId)) {
+      if (files.length > 0 && bytes + file.bytes > maxBytes) return files;
+      const raw = readKeptRaw(deps.db, file.messageId, file.position);
+      if (raw === null) continue;
+      files.push({ ...file, sessionId, raw });
+      bytes += file.bytes;
+    }
+    walk.queue.shift();
+  }
+}
+
+// the batch's frames written, in one transaction that rechecks each
+// session; a session that no longer qualifies leaves the queue
+function writeBatch(
+  deps: Deps,
+  walk: Walk,
+  files: Read[],
+  frames: Uint8Array[],
+): Omit<KeptPass, "batches" | "files" | "bytesIn"> {
+  return transact(deps.db, () => {
+    const out = { packed: 0, refused: 0, skipped: 0, bytesOut: 0 };
+    const still = stillCheck(deps);
+    const checked = new Map<string, boolean>();
+    files.forEach((file, i) => {
+      let ok = checked.get(file.sessionId);
+      if (ok === undefined) {
+        ok = still(file.sessionId);
+        checked.set(file.sessionId, ok);
+      }
+      if (!ok) {
+        out.skipped++;
+        return;
+      }
+      const frame = frames[i]!;
+      const written = writeKeptFrame(deps.db, file, file.raw.byteLength, frame);
+      out[written]++;
+      if (written === "packed") out.bytesOut += frame.byteLength;
+    });
+    const gone = new Set(
+      [...checked].filter(([, ok]) => !ok).map(([id]) => id),
+    );
+    walk.queue = walk.queue.filter((id) => !gone.has(id));
+    return { result: out };
   });
 }
 
@@ -135,34 +189,35 @@ export function keptPacker(deps: KeptPackDeps): KeptPacker {
       files: 0,
       packed: 0,
       refused: 0,
+      skipped: 0,
       bytesIn: 0,
       bytesOut: 0,
     };
+    const walk: Walk = { after: "", queue: [], done: false };
     try {
-      let list: string[] = [];
-      // a list that packed nothing is not picked again in the pass
-      let pick = true;
       while (!stopped && total.bytesIn < passBytes) {
-        if (list.length === 0) {
-          if (!pick) break;
-          list = pickKept(deps);
-          pick = false;
-          if (list.length === 0) break;
-        }
-        const batch = packKeptOnce(
+        const files = readBatch(
           deps,
-          list,
+          walk,
           Math.min(batchBytes, passBytes - total.bytesIn),
         );
-        if (batch.files > 0) {
-          pick = true;
-          total.batches++;
-          total.files += batch.files;
-          total.packed += batch.packed;
-          total.refused += batch.refused;
-          total.bytesIn += batch.bytesIn;
-          total.bytesOut += batch.bytesOut;
+        if (files.length === 0) {
+          if (walk.done && walk.queue.length === 0) break;
+          await nextTask();
+          continue;
         }
+        // one at a time, so a batch holds about its own bytes twice
+        const frames: Uint8Array[] = [];
+        for (const file of files) frames.push(await compressKept(file.raw));
+        // a batch begun before a stop still writes, before stop resolves
+        const written = writeBatch(deps, walk, files, frames);
+        total.batches++;
+        total.files += files.length;
+        total.bytesIn += files.reduce((sum, file) => sum + file.bytes, 0);
+        total.packed += written.packed;
+        total.refused += written.refused;
+        total.skipped += written.skipped;
+        total.bytesOut += written.bytesOut;
         await nextTask();
       }
     } catch (err) {
@@ -175,6 +230,7 @@ export function keptPacker(deps: KeptPackDeps): KeptPacker {
         files: total.files,
         packed: total.packed,
         refused: total.refused,
+        skipped: total.skipped,
         bytes_in: total.bytesIn,
         bytes_out: total.bytesOut,
         duration: performance.now() - started,

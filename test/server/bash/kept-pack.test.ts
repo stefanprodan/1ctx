@@ -6,15 +6,19 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  compressKept,
   copyKeptFiles,
   KEPT_PACK_FROM,
   KEPT_PACKED_READ,
   KEPT_UNPACK_ERROR,
   type KeptFile,
-  packKeptBatch,
+  pendingKept,
+  readKeptRaw,
   writeKeptFiles,
+  writeKeptFrame,
 } from "../../../src/server/bash/index.ts";
 import { readKept } from "../../../src/server/bash/kept.ts";
+import { transact } from "../../../src/server/db/index.ts";
 import { type Setup, setup } from "./helpers.ts";
 
 let rows = 0;
@@ -110,7 +114,32 @@ const broken = (s: Setup) =>
     )
     .get()!.n;
 
-const BIG = 1 << 30;
+// every file of the sessions to try, compressed and written, as the
+// sessions job does it a batch at a time
+async function packAll(s: Setup, sessionIds: string[]) {
+  const out = {
+    files: 0,
+    packed: 0,
+    refused: 0,
+    skipped: 0,
+    bytesIn: 0,
+    bytesOut: 0,
+  };
+  for (const sessionId of sessionIds) {
+    for (const file of pendingKept(s.db, sessionId)) {
+      const raw = readKeptRaw(s.db, file.messageId, file.position)!;
+      const frame = await compressKept(raw);
+      const written = transact(s.db, () => ({
+        result: writeKeptFrame(s.db, file, raw.byteLength, frame),
+      }));
+      out.files++;
+      out.bytesIn += file.bytes;
+      out[written]++;
+      if (written === "packed") out.bytesOut += frame.byteLength;
+    }
+  }
+  return out;
+}
 
 // a text file of NULs, of bytes that are not UTF-8 and of astral
 // characters, each over the threshold, stored as the bytes given
@@ -121,7 +150,7 @@ const ODD = [
 ];
 
 describe("packing kept files", () => {
-  test("every file reads back byte for byte through a fork", () => {
+  test("every file reads back byte for byte through a fork", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
@@ -145,7 +174,7 @@ describe("packing kept files", () => {
         file.name,
         file.bytes,
       ]);
-      const batch = packKeptBatch(s.db, [s.session.id], BIG);
+      const batch = await packAll(s, [s.session.id]);
       expect(batch).toMatchObject({ files: count, packed: count, refused: 0 });
       const packed = stored(s, s.session.id);
       expect(packed.every((f) => f.packed === 1 && f.text === null)).toBe(true);
@@ -170,7 +199,7 @@ describe("packing kept files", () => {
     }
   });
 
-  test("a file under 1 KiB stays raw and one of 1 KiB is packed", () => {
+  test("a file under 1 KiB stays raw and one of 1 KiB is packed", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
@@ -178,7 +207,7 @@ describe("packing kept files", () => {
         textFile(1, "small.txt", "a".repeat(KEPT_PACK_FROM - 1)),
         textFile(1, "edge.txt", "a".repeat(KEPT_PACK_FROM)),
       ]);
-      expect(packKeptBatch(s.db, [s.session.id], BIG)).toMatchObject({
+      expect(await packAll(s, [s.session.id])).toMatchObject({
         files: 1,
         packed: 1,
       });
@@ -190,7 +219,7 @@ describe("packing kept files", () => {
     }
   });
 
-  test("an incompressible file is left raw for good and packing again does nothing", () => {
+  test("an incompressible file is left raw for good and packing again does nothing", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
@@ -198,7 +227,7 @@ describe("packing kept files", () => {
         dataFile(1, "noise.bin", NOISE),
         textFile(1, "result.txt", YAML),
       ]);
-      expect(packKeptBatch(s.db, [s.session.id], BIG)).toMatchObject({
+      expect(await packAll(s, [s.session.id])).toMatchObject({
         files: 2,
         packed: 1,
         refused: 1,
@@ -207,7 +236,7 @@ describe("packing kept files", () => {
       expect(once.map((file) => file.packed)).toEqual([-1, 1]);
       expect(broken(s)).toBe(0);
       expect(once[0]!.data).toEqual(NOISE);
-      expect(packKeptBatch(s.db, [s.session.id], BIG)).toMatchObject({
+      expect(await packAll(s, [s.session.id])).toMatchObject({
         files: 0,
       });
       expect(stored(s, s.session.id)).toEqual(once);
@@ -216,14 +245,14 @@ describe("packing kept files", () => {
     }
   });
 
-  test("a file whose bytes disagree with its size stays raw", () => {
+  test("a file whose bytes disagree with its size stays raw", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
       writeKeptFiles(s.db, row, [
         { ...textFile(1, "r.txt", YAML), bytes: 2048 },
       ]);
-      expect(packKeptBatch(s.db, [s.session.id], BIG)).toMatchObject({
+      expect(await packAll(s, [s.session.id])).toMatchObject({
         refused: 1,
       });
       expect(stored(s, s.session.id)[0]).toMatchObject({
@@ -235,47 +264,25 @@ describe("packing kept files", () => {
     }
   });
 
-  test("a batch stops before its bytes, but always takes one file", () => {
+  test("a write over a row that changed or went is skipped", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
-      const size = 2048;
-      writeKeptFiles(
-        s.db,
-        row,
-        [1, 2, 3, 4, 5].map((n) =>
-          textFile(n, "result.txt", String(n).repeat(size)),
-        ),
-      );
-      const first = packKeptBatch(s.db, [s.session.id], size * 2 + 1);
-      expect(first).toMatchObject({ files: 2, bytesIn: size * 2 });
-      const single = packKeptBatch(s.db, [s.session.id], 10);
-      expect(single).toMatchObject({ files: 1, bytesIn: size });
-      // the rest, oldest folder first, across the batches
-      expect(stored(s, s.session.id).map((file) => file.packed)).toEqual([
-        1, 1, 1, 0, 0,
-      ]);
+      writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
+      const [file] = pendingKept(s.db, s.session.id);
+      const raw = readKeptRaw(s.db, row, 0)!;
+      const frame = await compressKept(raw);
+      const write = () => writeKeptFrame(s.db, file!, raw.byteLength, frame);
+      expect(write()).toBe("packed");
+      expect(write()).toBe("skipped");
+      s.db.query("delete from messages where id = ?").run(row);
+      expect(write()).toBe("skipped");
     } finally {
       s.db.close();
     }
   });
 
-  test("a batch moves to the next session when one runs out", () => {
-    const s = setup();
-    try {
-      const other = s.makeSession();
-      writeKeptFiles(s.db, toolRow(s), [textFile(1, "a.txt", YAML)]);
-      writeKeptFiles(s.db, toolRow(s, other.id), [textFile(1, "b.txt", YAML)]);
-      expect(packKeptBatch(s.db, [s.session.id, other.id], BIG)).toMatchObject({
-        files: 2,
-        packed: 2,
-      });
-    } finally {
-      s.db.close();
-    }
-  });
-
-  test("a fork copies raw and refused files as they are", () => {
+  test("a fork copies raw and refused files as they are", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
@@ -284,7 +291,7 @@ describe("packing kept files", () => {
         dataFile(1, "noise.bin", NOISE),
         textFile(1, "result.txt", YAML),
       ]);
-      packKeptBatch(s.db, [s.session.id], BIG);
+      await packAll(s, [s.session.id]);
       const fork = s.makeSession();
       const copy = toolRow(s, fork.id);
       copyKeptFiles(s.db, s.session.id, fork.id, new Map([[row, copy]]));
@@ -301,7 +308,7 @@ describe("packing kept files", () => {
     }
   });
 
-  test("a frame that does not decode fails the fork with a fixed error", () => {
+  test("a frame that does not decode fails the fork with a fixed error", async () => {
     const s = setup();
     try {
       for (const frame of [
@@ -330,26 +337,26 @@ describe("packing kept files", () => {
     }
   });
 
-  test("a packed file is never read", () => {
+  test("a packed file is never read", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
       writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
-      packKeptBatch(s.db, [s.session.id], BIG);
+      await packAll(s, [s.session.id]);
       expect(() => readKept(s.db, row, 0)).toThrow(KEPT_PACKED_READ);
     } finally {
       s.db.close();
     }
   });
 
-  test("packed files go with their row and their session", () => {
+  test("packed files go with their row and their session", async () => {
     const s = setup();
     try {
       const row = toolRow(s);
       writeKeptFiles(s.db, row, [textFile(1, "result.txt", YAML)]);
       const other = s.makeSession();
       writeKeptFiles(s.db, toolRow(s, other.id), [textFile(1, "b.txt", YAML)]);
-      packKeptBatch(s.db, [s.session.id, other.id], BIG);
+      await packAll(s, [s.session.id, other.id]);
       s.db.query("delete from messages where id = ?").run(row);
       expect(stored(s, s.session.id)).toEqual([]);
       s.db.query("delete from sessions where id = ?").run(other.id);

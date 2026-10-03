@@ -159,8 +159,10 @@ of that shell that shows a file on the chat page.
 - **Kept files are rows owned by the tool row.** `mcp_kept_files`,
   written in `finishTool`'s transaction and cascading with the message.
 - **Only an ended session's files are packed, and no live read
-  decodes.** The sessions job (`docs/archive.md`) calls
-  `packKeptBatch()`: a raw file of `KEPT_PACK_FROM` bytes or more
+  decodes.** The sessions job (`docs/archive.md`) walks sessions by id
+  with `walkKept()`, reads with `pendingKept()` and `readKeptRaw()`,
+  compresses off the main thread with `compressKept()` and stores with
+  `writeKeptFrame()`: a raw file of `KEPT_PACK_FROM` bytes or more
   becomes a zstd frame of its stored bytes (text cast to a blob) in
   `data`, `text` null, `packed` 1; a frame no smaller leaves it raw at
   -1 for good. Every reader takes a file as bytes, so text and data are
