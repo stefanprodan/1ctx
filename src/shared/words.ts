@@ -203,13 +203,15 @@ export function isAvatar(value: unknown): value is Avatar {
 }
 
 // the wire a provider speaks: OpenRouter, an OpenAI-compatible server,
-// a server that refuses any field outside the OpenAI spec, or Google AI
-// Studio with its native catalog and compatible chat endpoint
+// a server that refuses any field outside the OpenAI spec, Google AI
+// Studio with its native catalog and compatible chat endpoint, or
+// OpenCode Go, which routes a session by its headers
 export const WIRES = [
   "openrouter",
   "openai-compatible",
   "openai-strict",
   "gemini",
+  "opencode",
 ] as const;
 export type Wire = (typeof WIRES)[number];
 export function isWire(value: unknown): value is Wire {
@@ -224,6 +226,9 @@ export const EFFORTS = {
   // Groq refuses minimal, on every model tried
   "openai-strict": ["low", "medium", "high"],
   gemini: ["low", "medium", "high"],
+  // max passes on every family tried but Qwen, which refuses it in its
+  // own words
+  opencode: ["low", "medium", "high", "max"],
 } as const satisfies Record<Wire, readonly string[]>;
 export type Effort = (typeof EFFORTS)[Wire][number];
 export function isEffort(wire: Wire, value: unknown): value is Effort {

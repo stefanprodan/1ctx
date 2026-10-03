@@ -366,7 +366,7 @@ async function streamRound(
   }
   visuals?.flush();
   if (round.usage === null) {
-    round.tokens = requestTokens(req);
+    round.tokens = requestTokens(send.policy.wire, req);
     round.spent = round.tokens;
   } else {
     round.tokens = round.usage.promptTokens + round.usage.completionTokens;

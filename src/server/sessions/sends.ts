@@ -111,13 +111,23 @@ export function bumpSendCounters(
 export function sendTurns(
   db: Db,
   sessionId: string,
-): Map<string, { agentId: string; agentName: string; summoned: boolean }> {
+): Map<
+  string,
+  { agentId: string; agentName: string; summoned: boolean; providerId: string }
+> {
   const rows = db
     .query<
-      { id: string; agent_id: string; name: string; summoned: number },
+      {
+        id: string;
+        agent_id: string;
+        name: string;
+        summoned: number;
+        provider_id: string;
+      },
       [string]
     >(
-      `select sends.id, sends.agent_id, agents.name, sends.summoned
+      `select sends.id, sends.agent_id, agents.name, sends.summoned,
+         sends.provider_id
        from sends join agents on agents.id = sends.agent_id
        where sends.session_id = ?`,
     )
@@ -129,6 +139,7 @@ export function sendTurns(
         agentId: row.agent_id,
         agentName: row.name,
         summoned: row.summoned === 1,
+        providerId: row.provider_id,
       },
     ]),
   );

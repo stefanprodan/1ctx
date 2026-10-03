@@ -656,6 +656,76 @@ describe("a model its catalog does not describe", () => {
   );
 });
 
+describe("an opencode agent", () => {
+  const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+  // an ids-only catalog, as OpenCode Go answers
+  const go = async () => {
+    const { client } = await setup();
+    const { provider } = await (
+      await client.call("POST", "/api/providers", {
+        body: { name: "go", wire: "opencode", baseUrl: NIM_URL, keyName: null },
+      })
+    ).json();
+    const save = (body: Record<string, unknown>) =>
+      client.call("POST", "/api/agents", {
+        body: {
+          name: "go",
+          providerId: provider.id,
+          model: MODEL,
+          ...defaults,
+          ...body,
+        },
+      });
+    return { provider, save };
+  };
+
+  test("takes max and the window the admin states", async () => {
+    const { provider, save } = await go();
+    expect(provider.wire).toBe("opencode");
+    const res = await save({
+      thinking: "on",
+      effort: "max",
+      contextLength: 1_000_000,
+      tools: true,
+    });
+    expect(res.status).toBe(201);
+    expect((await res.json()).agent).toMatchObject({
+      thinking: "on",
+      effort: "max",
+      upstream: null,
+      skip4Bit: false,
+      model: {
+        id: MODEL,
+        contextLength: 1_000_000,
+        tools: true,
+        reasoningKnown: false,
+        described: false,
+      },
+    });
+  });
+
+  test("refuses another wire's levels and OpenRouter's host fields", async () => {
+    const { save } = await go();
+    for (const effort of ["minimal", "xhigh"]) {
+      const res = await save({ thinking: "on", effort });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "effort must be one of low, medium, high, max",
+      });
+    }
+    for (const [field, value] of [
+      ["upstream", "deepinfra/fp4"],
+      ["skip4Bit", true],
+    ] as const) {
+      const res = await save({ [field]: value });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: `${field} is only for an OpenRouter provider`,
+      });
+    }
+  });
+});
+
 describe("a preferred upstream", () => {
   const GLM = "z-ai/glm-5.3-flash";
   const strict = async (client: Awaited<ReturnType<typeof setup>>["client"]) =>

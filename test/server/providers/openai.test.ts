@@ -109,7 +109,6 @@ describe("OpenAI chat body", () => {
         {
           role: "assistant",
           content: null,
-          reasoning_content: "I should check",
           tool_calls: [
             {
               id: "call_time",

@@ -116,12 +116,8 @@ describe("OpenRouter chat body", () => {
     expect(body).not.toHaveProperty("reasoning_effort");
     expect(body.stream).toBe(true);
     expect(body.tools).toHaveLength(1);
-    // earlier reasoning goes back as OpenRouter's field
-    expect(body.messages[2]).toMatchObject({
-      role: "assistant",
-      reasoning: "greet back",
-    });
-    expect(body.messages[2].reasoning_content).toBeUndefined();
+    // plain reasoning never goes back here, only the structured items
+    expect(body.messages[2]).toEqual({ role: "assistant", content: "hello" });
     expect(
       (buildChatBody({ ...request, reasoningEffort: "high" }) as any).reasoning,
     ).toEqual({ effort: "high" });
@@ -209,7 +205,7 @@ describe("OpenRouter chat body", () => {
     expect(withCacheBreakpoints([])).toEqual([]);
   });
 
-  test("gives DeepSeek an empty reasoning on every assistant turn that has none", () => {
+  test("gives DeepSeek an empty reasoning on every assistant turn without the items", () => {
     const body = buildChatBody({
       ...request,
       model: "deepseek/deepseek-v4-flash-0731",
@@ -225,7 +221,7 @@ describe("OpenRouter chat body", () => {
       undefined,
       "",
       undefined,
-      "greet",
+      "",
       undefined,
     ]);
     expect(
@@ -564,7 +560,8 @@ describe("an OpenAI-compatible provider", () => {
     const body = JSON.parse(sent);
     expect(body.stream_options).toEqual({ include_usage: true });
     expect(body.reasoning).toBeUndefined();
-    expect(body.messages[2].reasoning_content).toBe("greet back");
+    // past plain reasoning goes back on the opencode wire alone
+    expect(body.messages[2]).toEqual({ role: "assistant", content: "hello" });
     // no finish before the end is the wire's own error, not the key's
     expect(events).toEqual([{ kind: "error", message: "stream ended early" }]);
   });
