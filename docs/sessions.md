@@ -14,7 +14,7 @@ it and the agent's reply), the whole of a run, or a compaction. A send
 is one or more rounds, each one request to the model and the tool calls
 it answers with. What only runs and automations do is in
 `docs/automations.md`; the tool loop in `docs/tools.md`; memory in
-`docs/memory.md`.
+`docs/memory.md`; archive, packing and the sweep in `docs/archive.md`.
 
 An envelope is the `session` socket frame (`shared/socket.ts`) one
 session transaction publishes: the summary with its revision, the rows
@@ -268,7 +268,7 @@ that agent answers the one turn (see Summons).
 - **Fork copies through a settled turn,** never memory phase rows, into
   a chat the caller owns on a live agent. Source ids are recorded
   without foreign keys. Usage and the attention mark are not copied. A
-  packed row (see Packing) is unpacked into `content`, since a fork is
+  packed row (`docs/archive.md`) is unpacked into `content`, since a fork is
   live.
 - **Fork copies the upload tree in the same transaction.** Files last
   written by an unsent user turn are restaged for the caller under a
@@ -283,49 +283,6 @@ that agent answers the one turn (see Summons).
   The foreign keys take the dependents.
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.
-
-## Archive and agent retirement
-
-- **An archived chat is read-only for good.** There is no unarchive;
-  Fork is the way on. A run is never archived.
-- **Where archive is refused.** A send and regenerate in `startSend`'s
-  transaction, compact in `startCompact`'s, never in `startSummary`,
-  so a send an agent delete stops ends as a stop. `runner.send`,
-  `regenerate` and `compact` refuse before resolving the agent, so a
-  retired agent's chat is the 409 "the chat is archived". Rename is
-  refused twice, before the body and in its transaction. Stop stays
-  allowed.
-- **Deleting an agent retires it.** The row stays, since history names
-  it. One transaction archives its chats (reason `agent`, never a run)
-  through `SessionStore.archive()` and suspends its automations. After
-  the commit the scheduler wakes and the runner stops every send whose
-  policy names the agent. Every `AgentStore` read skips a retired agent.
-  The same transaction nulls its provider and default mark and deletes
-  its skill and server links and users' picks of it; a new per-agent
-  table joins that list.
-
-## Packing and the sweep
-
-- **Packing never touches a running session,** whose next round and
-  memory phase read `content`. A tool row of `PACK_FROM` bytes or more
-  gets `packed` (zstd), `packed_bytes` and `content` ''. A manual or
-  idle archive packs in its transaction; an agent delete packs nothing;
-  the sweep packs the rest once they end.
-- **`MESSAGE_COLUMNS` never selects `packed`,** so opening a chat loads
-  no blob. Only the result route and Fork decompress, each by id. The
-  context builder and the memory packet never meet a packed row.
-- **The sweep is an ordered list of steps** (`sessions/sweep.ts`), run
-  hourly and at startup. Each step takes at most `CHATS_PER_STEP`
-  sessions, one transaction each that rechecks the row. Order: archive
-  idle chats, pack archived chats and free their scratch, pack ended
-  runs, delete old archived chats and orphaned runs.
-- **Scratch is skipped while a command holds it,** since a chat
-  archived mid-send writes scratch until the stop lands. Scratch is the
-  bash area's (`docs/bash.md`), reached through its port; the step
-  finds chats with scratch left by joining `session_scratch` directly.
-- **Runs are packed by the sweep, never at their end,** so a finish
-  adds no write.
-- **No sweep vacuums.** SQLite reuses freed pages.
 
 ## Queries and indexes
 

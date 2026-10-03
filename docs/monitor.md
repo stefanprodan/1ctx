@@ -42,7 +42,7 @@ admin's attention, the server's load), Usage by month and Storage.
 - **`cost` is the rounds' alone.** Decisions are summed into their own
   fields. A cost total is 0 with no rows and null when rows came and
   none was priced.
-- **Nothing vacuums** (`docs/sessions.md`). The file stays at its peak
+- **Nothing vacuums** (`docs/archive.md`). The file stays at its peak
   size and storage reports the pages a delete freed as free.
 
 ## Windows
