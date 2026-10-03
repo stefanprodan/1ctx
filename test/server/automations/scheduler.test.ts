@@ -269,6 +269,47 @@ describe("automation scheduler", () => {
     await chat.app.shutdown();
   });
 
+  test("a stop and a start leave one loop that a wake still reaches", async () => {
+    const chat = await chatApp();
+    const scheduler = chat.app.automationScheduler;
+    scheduler.stop();
+    await tick();
+    const automation = await createAutomation(chat);
+    const store = chat.app.automations;
+    const earliest = store.earliest.bind(store);
+    let waits = 0;
+    store.earliest = (after) => {
+      waits++;
+      return earliest(after);
+    };
+    try {
+      scheduler.start();
+      await tick();
+      scheduler.stop();
+      scheduler.start();
+      await tick();
+
+      chat.app.db
+        .query("update automations set next_at = ? where id = ?")
+        .run(chat.app.now.value, automation.id);
+      scheduler.wake();
+      await tick();
+      expect(chat.scripted.scripts).toHaveLength(1);
+      expect(chat.app.automations.byId(automation.id)?.lastEventOutcome).toBe(
+        "run",
+      );
+
+      waits = 0;
+      chat.app.now.value += 60_000;
+      await tick();
+      expect(waits).toBe(1);
+    } finally {
+      store.earliest = earliest;
+      scheduler.stop();
+      await chat.app.shutdown();
+    }
+  });
+
   test("re-reads rows edited or deleted after the pass snapshot", async () => {
     const chat = await chatApp();
     chat.app.automationScheduler.stop();

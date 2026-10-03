@@ -435,8 +435,8 @@ export function scheduler(deps: Deps): Scheduler {
     const waking = new Promise<boolean>((resolve) => {
       wakeWait = () => resolve(true);
     });
+    // left for wake() to clear: a loop started since may have set its own
     const woken = await Promise.race([sleeper.then(() => false), waking]);
-    wakeWait = null;
     if (!woken) waits.expire(deps.clock(), PASS_MS);
   };
 
