@@ -1,9 +1,9 @@
 # Archive, packing and the sweep
 
 Governs what happens to a session once it ends:
-`src/server/sessions/archive.ts`, `pack.ts` and `sweep.ts`, and an
-agent's retirement. The rest of the sessions area is in
-`docs/sessions.md`.
+`src/server/sessions/archive.ts`, `pack.ts`, `pack-kept.ts` and
+`sweep.ts`, and an agent's retirement. The rest of the sessions area is
+in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 
 ## Archive and agent retirement
 
@@ -46,4 +46,16 @@ agent's retirement. The rest of the sessions area is in
   finds chats with scratch left by joining `session_scratch` directly.
 - **Runs are packed by the sweep, never at their end,** so a finish
   adds no write.
+- **Kept MCP files are packed by their own job** (`sessions/pack-kept.ts`),
+  never by an archive or the sweep, since a chat may keep
+  `mcpKeptBytes`. It starts after startup's sweep, then hourly, one pass
+  at a time; `shutdown()` stops it first, so no batch starts after.
+- **A batch is one synchronous transaction** of at most
+  `KEPT_BATCH_BYTES` raw input, or one larger file. It picks its
+  sessions inside it, oldest first: archived chats and runs, none
+  running, skipping those due for deletion (a chat archived past
+  `archivedDeleteDays`, an orphaned run past the same cut, a run past
+  its task's retention). The next batch is a fresh timer task; a pass
+  stops at `KEPT_PASS_BYTES` or when nothing is left. Fork unpacks what
+  it copies (`docs/bash.md`).
 - **No sweep vacuums.** SQLite reuses freed pages.

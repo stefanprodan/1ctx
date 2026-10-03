@@ -99,6 +99,11 @@ export const MESSAGE_BYTES =
   " + coalesce(octet_length(uploads), 0)" +
   " + coalesce(length(packed), 0)";
 
+// a kept file's stored bytes: the frame when packed, else the raw size;
+// quotas count bytes, the raw size, either way
+export const KEPT_BYTES =
+  "case when k.packed > 0 then length(k.data) else k.bytes end";
+
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 
 const sizeOf = (path: string): number => {
@@ -211,7 +216,8 @@ function sessions(db: Db): SessionSum[] {
   );
   const mcp = sums(
     db,
-    "select session_id as id, sum(bytes) as bytes from mcp_kept_files group by session_id",
+    `select k.session_id as id, sum(${KEPT_BYTES}) as bytes
+       from mcp_kept_files k group by k.session_id`,
   );
   return db
     .query<
@@ -282,7 +288,7 @@ const SLOT_SOURCES = [
        count(*) as rows
      from opened_files o join messages m on m.id = o.message_id
      where m.created_at >= ? group by q`,
-  `select m.created_at / ${SLOT_MS} as q, sum(k.bytes) as bytes,
+  `select m.created_at / ${SLOT_MS} as q, sum(${KEPT_BYTES}) as bytes,
        count(*) as rows
      from mcp_kept_files k join messages m on m.id = k.message_id
      where m.created_at >= ? group by q`,

@@ -61,6 +61,7 @@ import {
   type ShutdownResult,
 } from "./runner/index.ts";
 import {
+  type KeptPass,
   type SessionStore,
   type Sessions,
   sessionsArea,
@@ -143,6 +144,11 @@ export type App = {
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
+  // the kept files job: a pass now, then hourly; main.ts starts it after
+  // the first sweep
+  keptStart(): void;
+  // one pass of the kept files job to its end, or the one running
+  packKept(): Promise<KeptPass>;
   // drain, terminate what is left and close every socket, in that
   // order; cut ends the drain's wait
   shutdown(cut?: Promise<void>): Promise<ShutdownResult & DrainResult>;
@@ -655,6 +661,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       }
     },
     mcpStart: () => mcp.start(),
+    keptStart: () => sessions.kept.start(),
+    packKept: () => sessions.kept.pass(),
     // the drain first, while the listener still serves; then the runner,
     // whose ending calls may still ask for a refresh that the MCP close
     // then refuses, then any command it left running, both within the
@@ -665,6 +673,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
       runner.queue.close();
       automations.drain();
       repos.close();
+      // no kept files batch starts from here; a batch is synchronous, so
+      // the wait below is at most for one to commit
+      const packing = sessions.kept.stop();
       const { drained } = await runner.drain(options.drainMs ?? 0, cut);
       skills.close();
       const result = await runner.shutdown(async () => {
@@ -673,6 +684,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
+      await packing;
       overview.close();
       socket.dispose();
       return { ...result, drained };

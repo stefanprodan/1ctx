@@ -113,8 +113,14 @@ export {
 } from "./credentials.ts";
 export {
   copyKeptFiles,
+  KEPT_PACK_FROM,
+  KEPT_PACKABLE,
+  KEPT_PACKED_READ,
+  KEPT_UNPACK_ERROR,
+  type KeptBatch,
   type KeptFile,
   keptPath,
+  packKeptBatch,
   writeKeptFiles,
 } from "./kept.ts";
 export type { CommandRepos } from "./mount.ts";

@@ -33,6 +33,7 @@ import {
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { envelopeRow } from "./feed.ts";
+import { type KeptPacker, keptPacker } from "./pack-kept.ts";
 import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
 import {
@@ -58,6 +59,7 @@ export {
   markdownFilename,
 } from "./markdown.ts";
 export type { MountedRepos } from "./messages.ts";
+export type { KeptPass } from "./pack-kept.ts";
 export {
   lineFrom,
   MAX_REGENERATE_BODY,
@@ -153,6 +155,8 @@ export type Sessions = {
   // ended runs packed, scratch freed, archived chats and orphan runs
   // deleted past the limit; the counts go on the sweep event
   sweep(now: number, caps: ChatCaps): ChatSweep;
+  // the job that packs the kept MCP files of ended sessions in batches
+  kept: KeptPacker;
   routes: RouteDescriptor[];
 };
 
@@ -267,6 +271,12 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         now,
         caps,
       ),
+    kept: keptPacker({
+      db: deps.db,
+      clock: deps.clock,
+      log: deps.log,
+      limits: deps.limits,
+    }),
     routes: [
       ...routes({
         db: deps.db,
