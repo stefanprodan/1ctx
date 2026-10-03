@@ -32,7 +32,7 @@ an event whose outcome is `run`, `skipped` or `deferred`
   now, which ends a cap wait; other fields leave it. Resume computes
   it from now.
 - **A retired agent blocks its automations.** Deleting an agent retires
-  it (the row stays) and suspends them (`docs/sessions.md`). While the
+  it (the row stays) and suspends them (`docs/archive.md`). While the
   agent is retired, resume, Run now and a PATCH that keeps the agent are
   a 409 until a live agent is picked.
 - **Deleting an automation keeps its runs unless asked.** A running

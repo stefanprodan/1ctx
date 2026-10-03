@@ -183,6 +183,53 @@ describe("the storage scan", () => {
       ],
     ]);
   });
+
+  test("counts a packed kept file's frame and a raw one's bytes", async () => {
+    const chat = await chatApp();
+    const first = await settledChat(chat);
+    const second = await settledChat(chat);
+    const messageOf = (sessionId: string) =>
+      chat.app.db
+        .query<{ id: string }, [string]>(
+          "select id from messages where session_id = ? limit 1",
+        )
+        .get(sessionId)!.id;
+    const frame = Bun.zstdCompressSync(Buffer.from("x".repeat(5000)));
+    const other = Bun.zstdCompressSync(Buffer.from("y".repeat(9000)));
+    const noise = crypto.getRandomValues(new Uint8Array(1500));
+    const insert = chat.app.db.query(
+      `insert into mcp_kept_files (message_id, position, session_id, folder,
+         dir, name, bytes, text, data, packed)
+       values (?, ?, ?, 1, '0001-get', ?, ?, ?, ?, ?)`,
+    );
+    insert.run(
+      messageOf(first),
+      0,
+      first,
+      "raw.txt",
+      11,
+      "abcdefghijk",
+      null,
+      0,
+    );
+    insert.run(messageOf(first), 1, first, "a.txt", 5000, null, frame, 1);
+    insert.run(messageOf(second), 0, second, "b.txt", 9000, null, other, 1);
+    insert.run(messageOf(second), 1, second, "c.bin", 1500, null, noise, -1);
+    const result = scan(chat.app.db, { now: chat.app.now.value, since: 0 });
+    const mcpOf = (id: string) =>
+      result.sessions.find((row) => row.id === id)?.mcpBytes;
+    expect(mcpOf(first)).toBe(11 + frame.byteLength);
+    expect(mcpOf(second)).toBe(other.byteLength + 1500);
+    const added = result.slots.reduce((sum, [, bytes]) => sum + bytes, 0);
+    const messages = chat.app.db
+      .query<{ bytes: number }, []>(
+        `select sum(${MESSAGE_BYTES}) as bytes from messages`,
+      )
+      .get()!.bytes;
+    expect(added).toBe(
+      messages + 11 + frame.byteLength + other.byteLength + 1500,
+    );
+  });
 });
 
 describe("the storage answer", () => {

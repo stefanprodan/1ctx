@@ -99,6 +99,13 @@ export const MESSAGE_BYTES =
   " + coalesce(octet_length(uploads), 0)" +
   " + coalesce(length(packed), 0)";
 
+// a kept file's stored bytes: data's length (the frame when packed, the
+// file when binary) else the raw size; quotas count bytes either way.
+// length() reads the record header only, where reading packed, the last
+// column, walks a refused row's blobs to its -1. A group by that sorts
+// takes it from a materialized CTE, never data itself
+export const KEPT_BYTES = "coalesce(length(k.data), k.bytes)";
+
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 
 const sizeOf = (path: string): number => {
@@ -211,7 +218,8 @@ function sessions(db: Db): SessionSum[] {
   );
   const mcp = sums(
     db,
-    "select session_id as id, sum(bytes) as bytes from mcp_kept_files group by session_id",
+    `select k.session_id as id, sum(${KEPT_BYTES}) as bytes
+       from mcp_kept_files k group by k.session_id`,
   );
   return db
     .query<
@@ -282,10 +290,11 @@ const SLOT_SOURCES = [
        count(*) as rows
      from opened_files o join messages m on m.id = o.message_id
      where m.created_at >= ? group by q`,
-  `select m.created_at / ${SLOT_MS} as q, sum(k.bytes) as bytes,
-       count(*) as rows
-     from mcp_kept_files k join messages m on m.id = k.message_id
-     where m.created_at >= ? group by q`,
+  `with r as materialized (
+       select m.created_at / ${SLOT_MS} as q, ${KEPT_BYTES} as bytes
+       from mcp_kept_files k join messages m on m.id = k.message_id
+       where m.created_at >= ?)
+     select q, sum(bytes) as bytes, count(*) as rows from r group by q`,
   `select updated_at / ${SLOT_MS} as q, sum(bytes) as bytes,
        count(*) as rows
      from knowledge_files where updated_at >= ? group by q`,

@@ -171,6 +171,7 @@ const app = await compose({
 });
 app.sweep();
 app.mcpStart();
+app.keptStart();
 setInterval(() => app.sweep(), TOUCH_AFTER_MS);
 
 const { server, stop } = serve({

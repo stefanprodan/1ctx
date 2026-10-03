@@ -52,7 +52,12 @@ const EXPECTED_IDS = [
   "0038-saved-paths",
   "0039-restart-runs",
   "0040-repos",
+  "0041-kept-packing",
 ] as const;
+
+// the columns 0020 made, so its inserts hold after later columns
+const KEPT_COLUMNS =
+  "(message_id, position, session_id, folder, dir, name, bytes, text, data)";
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
   EXPECTED_IDS.slice(EXPECTED_IDS.indexOf(first));
@@ -619,21 +624,23 @@ describe("the schema", () => {
         db.query("select mcp_folders from sessions where id = 'sess'").get(),
       ).toEqual({ mcp_folders: 0 });
       db.exec(`
-        insert into mcp_kept_files values
+        insert into mcp_kept_files
+            (message_id, position, session_id, folder, dir, name, bytes, text,
+             data) values
           ('m2', 0, 'sess', 1, '0001-get', 'result.txt', 1, 'a', null),
           ('m2', 1, 'sess', 1, '0001-get', 'a.png', 1, null, x'00');
       `);
       expect(() =>
         db
           .query(
-            "insert into mcp_kept_files values ('m2', 2, 'sess', 1, 'd', 'n', 1, 'a', x'00')",
+            `insert into mcp_kept_files ${KEPT_COLUMNS} values ('m2', 2, 'sess', 1, 'd', 'n', 1, 'a', x'00')`,
           )
           .run(),
       ).toThrow();
       expect(() =>
         db
           .query(
-            "insert into mcp_kept_files values ('m2', 3, 'sess', 0, 'd', 'n', 1, 'a', null)",
+            `insert into mcp_kept_files ${KEPT_COLUMNS} values ('m2', 3, 'sess', 0, 'd', 'n', 1, 'a', null)`,
           )
           .run(),
       ).toThrow();
@@ -1401,6 +1408,60 @@ describe("the schema", () => {
       expect(db.query("select count(*) as n from repos").get()).toEqual({
         n: 0,
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0041 adds the packed flag with no check and the covering candidate index", () => {
+    const db = seed(MIGRATIONS.slice(0, 40));
+    try {
+      db.exec(`
+        insert into mcp_kept_files ${KEPT_COLUMNS} values
+          ('m2', 0, 'sess', 1, 'd', 'big.txt', 2048, 'a', null),
+          ('m2', 1, 'sess', 1, 'd', 'a.png', 1, null, x'00');
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0041-kept-packing"));
+      expect(MIGRATIONS[40]?.rebuild).toBeUndefined();
+      expect(
+        db
+          .query(
+            "select position, packed from mcp_kept_files order by position",
+          )
+          .all(),
+      ).toEqual([
+        { position: 0, packed: 0 },
+        { position: 1, packed: 0 },
+      ]);
+      // a check would read every row's blobs on a large file
+      const table = db
+        .query<{ sql: string }, []>(
+          "select sql from sqlite_schema where name = 'mcp_kept_files'",
+        )
+        .get()!.sql;
+      expect(table).toContain("packed integer not null default 0,");
+      expect(table).not.toMatch(/check[^,]*packed/);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from pragma_index_info('mcp_kept_files_packable') order by seqno",
+          )
+          .all()
+          .map((column) => column.name),
+      ).toEqual(["session_id", "folder", "position", "message_id", "bytes"]);
+      expect(
+        db
+          .query(
+            "select sql from sqlite_schema where name = 'mcp_kept_files_packable'",
+          )
+          .get(),
+      ).toEqual({
+        sql: expect.stringContaining("where packed = 0 and bytes >= 1024"),
+      });
+      db.exec("delete from messages where id = 'm2'");
+      expect(
+        db.query("select count(*) as n from mcp_kept_files").get(),
+      ).toEqual({ n: 0 });
     } finally {
       db.close();
     }
