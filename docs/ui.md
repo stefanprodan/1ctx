@@ -95,7 +95,8 @@ open row's body or a meta. The shared shapes are below.
   riding with the rows until a reload. A long block is clipped and
   opens with Show all.
 - **A segmented switch is `ui/Seg.tsx`:** a closed set fixed in code,
-  at most five options that fit one line at 390. Named rows from the
+  at most five options that fit one line at 390. A wider set is a
+  `ui/Select` while `narrow` (the schedule's six). Named rows from the
   database are a `ui/Finder.tsx`. A few options with a line each are
   `views/admin/Choices.tsx`.
 - **A list of names to pick or switch between is `ui/Finder.tsx`.**
@@ -156,6 +157,8 @@ open row's body or a meta. The shared shapes are below.
 - **On touch nothing takes a focus the user did not give,** and every
   field is `--text-touch` (16px), since iOS zooms into a smaller one
   and stays zoomed. Touch is `pointer: coarse`, read in `lib/touch.ts`.
+  On it every tap target takes 44px, set in the sheet that owns it,
+  never changing the desktop's density.
 - **A page head is `ui/Page.tsx`.** Its actions take no height, so a
   crumb sits in the same place on every page. An object's switcher is
   `PageSwitcher`, a list's New button `PageNew`. A failed load is

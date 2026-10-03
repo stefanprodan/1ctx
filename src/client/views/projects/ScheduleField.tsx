@@ -10,6 +10,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { MAX_SCHEDULE } from "../../../shared/words.ts";
+import { narrow } from "../../app/shell.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
 import { sentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
@@ -23,6 +24,7 @@ import {
   builderOf,
   EVERY,
   EVERY_LABELS,
+  type Every,
   expressionOf,
   STEPS,
   switchEvery,
@@ -100,16 +102,30 @@ export function ScheduleField({
   );
   return (
     <div class="automations-schedule">
-      <Seg
-        label="Repeats"
-        options={EVERY.map((every) => ({
-          value: every,
-          label: EVERY_LABELS[every],
-          disabled,
-        }))}
-        value={b.every}
-        onPick={(every) => set(switchEvery(b, every))}
-      />
+      {narrow.value ? (
+        // six options do not fit a phone's line
+        <Select
+          label="Repeats"
+          value={b.every}
+          options={EVERY.map((every) => ({
+            value: every,
+            label: EVERY_LABELS[every],
+          }))}
+          disabled={disabled}
+          onChange={(every) => set(switchEvery(b, every as Every))}
+        />
+      ) : (
+        <Seg
+          label="Repeats"
+          options={EVERY.map((every) => ({
+            value: every,
+            label: EVERY_LABELS[every],
+            disabled,
+          }))}
+          value={b.every}
+          onPick={(every) => set(switchEvery(b, every))}
+        />
+      )}
       <div class="automations-when">
         {b.every === "minutes" && (
           <div class="field automations-step">

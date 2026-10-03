@@ -18,6 +18,13 @@
   .search:focus-within {
     color: var(--dim);
   }
+  /* on a phone the head's gap alone parts the box from what sits
+     beside it, so a placeholder keeps its last letters */
+  @media (max-width: 719px) {
+    .search:not(:last-child) {
+      padding-right: 0;
+    }
+  }
   .search-input {
     flex-grow: 1;
     min-width: 0;

@@ -92,6 +92,12 @@
     flex-shrink: 0;
     margin-left: auto;
   }
+  /* the search beside them takes what a phone's head has left */
+  @media (max-width: 719px) {
+    .rows-filters .seg-option {
+      padding: 0 6px;
+    }
+  }
   .rows-count + .rows-add,
   .rows-count + .rows-filters {
     margin-left: 0;

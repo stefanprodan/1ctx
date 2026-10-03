@@ -39,6 +39,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* iOS enlarges some blocks' text in landscape; the sizes are ours */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   #app {
     height: 100%;
   }
@@ -233,6 +239,12 @@
     background: transparent;
     color: var(--faint);
     cursor: default;
+  }
+  /* a finger's 44px */
+  @media (pointer: coarse) {
+    .menu-item {
+      min-height: 44px;
+    }
   }
 
   /* a few options side by side in one frame, the picked one filled */
