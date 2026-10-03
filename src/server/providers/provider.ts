@@ -10,6 +10,7 @@
 // so the runner has one channel to finish a round on; a stop by the
 // caller's signal ends the stream with no event, since the caller knows.
 
+import type { Wire } from "../../shared/words.ts";
 import {
   buildChatBody as buildGeminiChatBody,
   geminiError,
@@ -18,9 +19,15 @@ import {
 import {
   buildChatBody as buildOpenAiChatBody,
   chatEvents,
+  requestTokens as countRequest,
   streamChat,
   Unanswered,
 } from "./openai.ts";
+import {
+  buildChatBody as buildOpenCodeChatBody,
+  openCodeHeaders,
+  sendsReasoning,
+} from "./opencode.ts";
 import {
   buildChatBody as buildOpenRouterChatBody,
   openRouterError,
@@ -28,7 +35,13 @@ import {
 } from "./openrouter.ts";
 import type { ProviderRow } from "./store.ts";
 import { buildChatBody as buildStrictChatBody } from "./strict.ts";
-import type { ChatEvent, ChatRequest, Fetcher, Provider } from "./types.ts";
+import type {
+  ChatEvent,
+  ChatMessageIn,
+  ChatRequest,
+  Fetcher,
+  Provider,
+} from "./types.ts";
 
 export type ProviderDeps = {
   fetcher: Fetcher;
@@ -43,9 +56,33 @@ export const OPENROUTER_HEADERS = {
   "x-title": "1ctx",
 };
 
+// the messages as a fit counts them: a message's plain reasoning only
+// where the wire sends it back
+export function sentMessages(
+  wire: Wire | null,
+  model: string,
+  messages: ChatMessageIn[],
+): ChatMessageIn[] {
+  const sends = wire === "opencode" ? sendsReasoning({ model }) : () => false;
+  return messages.map((message) => {
+    if (message.role !== "assistant" || sends(message)) return message;
+    const { reasoning: _, ...rest } = message;
+    return rest;
+  });
+}
+
+// the tokens a request costs on the wire
+export function requestTokens(wire: Wire | null, req: ChatRequest): number {
+  return countRequest({
+    ...req,
+    messages: sentMessages(wire, req.model, req.messages),
+  });
+}
+
 export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
   const openRouter = row.wire === "openrouter";
   const gemini = row.wire === "gemini";
+  const openCode = row.wire === "opencode";
   const path = gemini ? "/openai/chat/completions" : "/chat/completions";
   const url = `${row.baseUrl.replace(/\/+$/, "")}${path}`;
   return {
@@ -65,6 +102,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
       }
       const headers: Record<string, string> = {
         ...(openRouter ? OPENROUTER_HEADERS : {}),
+        ...(openCode ? openCodeHeaders(req.cacheKey) : {}),
         ...(key === null ? {} : { authorization: `Bearer ${key}` }),
       };
       const body = openRouter
@@ -73,7 +111,9 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           ? buildGeminiChatBody(req)
           : row.wire === "openai-strict"
             ? buildStrictChatBody(req)
-            : buildOpenAiChatBody(req);
+            : openCode
+              ? buildOpenCodeChatBody(req)
+              : buildOpenAiChatBody(req);
       const scrub = (message: string) =>
         key === null ? message : message.replaceAll(key, "[key]");
       const events = streamChat(deps.fetcher, url, body, signal, {

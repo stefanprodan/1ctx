@@ -174,6 +174,16 @@ describe("the words", () => {
     expect(preset("openrouter")).toMatchObject({ fixed: false });
     expect(preset("openrouter").hint).toContain("keeps requests in the EU");
     expect(preset("gemini").fixed).toBe(true);
+    // OpenCode Go's address is filled in and may be changed
+    expect(preset("opencode")).toMatchObject({
+      label: "OpenCode Go",
+      fixed: false,
+      name: "opencode",
+    });
+    expect(presetBaseUrl("", "opencode")).toBe(preset("opencode").baseUrl!);
+    expect(presetBaseUrl(preset("opencode").baseUrl!, "openai-strict")).toBe(
+      "",
+    );
     // a preset's own address follows the preset, a typed one stays
     const openrouter = preset("openrouter").baseUrl!;
     expect(presetBaseUrl("", "openrouter")).toBe(openrouter);
@@ -251,6 +261,13 @@ describe("the words", () => {
       "medium",
       "high",
     ]);
+    expect(effortChoices("opencode").map((c) => c.value)).toEqual([
+      null,
+      "low",
+      "medium",
+      "high",
+      "max",
+    ]);
     expect(effortApplies(flash, null)).toBe(true);
     expect(effortApplies({ ...flash, reasoning: false }, null)).toBe(false);
     expect(
@@ -312,6 +329,8 @@ describe("the words", () => {
     // a level picked on OpenRouter does not survive a move to a plain server
     expect(sentEffort(flash, "on", "xhigh", "openai-compatible")).toBeNull();
     expect(sentEffort(flash, "on", "high", "openai-compatible")).toBe("high");
+    expect(sentEffort(flash, "on", "max", "opencode")).toBe("max");
+    expect(sentEffort(flash, "on", "max", "openrouter")).toBeNull();
     expect(sentEffort(flash, "on", "high", undefined)).toBeNull();
   });
 });

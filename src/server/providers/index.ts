@@ -56,9 +56,11 @@ export {
   geminiEvents,
   parseCatalog as parseGeminiCatalog,
 } from "./gemini.ts";
-export { requestTokens, wireTokens, wireTools } from "./openai.ts";
+export { wireTokens, wireTools } from "./openai.ts";
+export { buildChatBody as buildOpenCodeChatBody } from "./opencode.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseBaseUrl, parseKeyName } from "./parse.ts";
+export { requestTokens, sentMessages } from "./provider.ts";
 export { type ProviderRow, ProviderStore } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
 export {

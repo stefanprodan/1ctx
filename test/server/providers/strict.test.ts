@@ -119,15 +119,21 @@ describe("strict chat body", () => {
     expect(request.messages[2]).toHaveProperty("reasoningDetails");
   });
 
-  test("sends earlier plain reasoning as reasoning, never reasoning_content", () => {
+  test("sends no past reasoning in any field", () => {
     const body = buildChatBody({
       ...request,
-      messages: [{ role: "assistant", content: "hi", reasoning: "think" }],
+      messages: [
+        {
+          role: "assistant",
+          model: request.model,
+          content: "hi",
+          reasoning: "think",
+        },
+      ],
     });
     expect((body.messages as Record<string, unknown>[])[0]).toEqual({
       role: "assistant",
       content: "hi",
-      reasoning: "think",
     });
   });
 

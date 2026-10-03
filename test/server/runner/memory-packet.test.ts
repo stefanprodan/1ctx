@@ -17,6 +17,7 @@ import {
 } from "../../../src/server/runner/memory-packet.ts";
 import type { MemoryEntry } from "../../../src/shared/contracts/memory.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
+import type { Wire } from "../../../src/shared/words.ts";
 
 const fixture: {
   guidance: string;
@@ -85,6 +86,8 @@ const tools: ChatTool[] = [
 
 const context = {
   phase: [] as ChatMessageIn[],
+  wire: "openai-compatible" as Wire | null,
+  model: "org/model",
   tools,
   contextLength: null as number | null,
   reserve: 20,
@@ -425,5 +428,51 @@ describe("memory packet room", () => {
       ),
     ).toBeNull();
     expect(memoryMessages(input, { ...ctx, tools: [] }, tokens)).not.toBeNull();
+  });
+
+  test("counts the phase's past reasoning only where the wire sends it", () => {
+    const input = packet();
+    const thought = "weighing what to keep ".repeat(60);
+    const phase: ChatMessageIn[] = [
+      {
+        role: "assistant",
+        model: context.model,
+        content: null,
+        reasoning: thought,
+        toolCalls: [{ id: "m1", name: "memory_edit", arguments: "{}" }],
+      },
+      { role: "tool", toolCallId: "m1", content: "saved" },
+    ];
+    const full = memoryMessages(input, { ...context, phase }, chars)!;
+    // the window that holds exactly what a wire without replay sends
+    const sent = full.map((message) => {
+      if (message.role !== "assistant") return message;
+      const { reasoning: _, ...rest } = message;
+      return rest;
+    });
+    const fitted = (wire: Wire, model = context.model) =>
+      memoryMessages(
+        input,
+        {
+          ...context,
+          phase,
+          wire,
+          model,
+          contextLength: cost(sent),
+          reserve: 0,
+        },
+        chars,
+      );
+    for (const wire of [
+      "openai-compatible",
+      "openai-strict",
+      "gemini",
+      "openrouter",
+    ] as const) {
+      expect(fitted(wire)).toEqual(full);
+    }
+    // another model's reasoning is not sent, so it is not counted
+    expect(fitted("opencode", "org/other")).toEqual(full);
+    expect(fitted("opencode")).not.toEqual(full);
   });
 });

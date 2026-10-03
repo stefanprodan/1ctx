@@ -18,10 +18,11 @@ import { contextReserve } from "../../shared/compaction.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { MEMORY_ENTRY_CHARS, memorySize } from "../../shared/memory.ts";
-import type { SendCause } from "../../shared/words.ts";
+import type { SendCause, Wire } from "../../shared/words.ts";
 import {
   type ChatMessageIn,
   type ChatTool,
+  sentMessages,
   wireTools,
 } from "../providers/index.ts";
 import { MEMORY_WRITE_RULES } from "../tools/index.ts";
@@ -46,6 +47,10 @@ export type MemoryPacket = {
 
 type MemoryContext = {
   phase: ChatMessageIn[];
+  // the wire and model the phase is sent to, so the fit counts the
+  // phase's past reasoning only where the wire sends it back
+  wire: Wire | null;
+  model: string;
   tools: ChatTool[];
   contextLength: number | null;
   reserve: number;
@@ -220,7 +225,12 @@ export function memoryMessages(
     contextReserve(context.contextLength, context.reserve);
   const schemas = wireTools(context.tools);
   const fits = (messages: ChatMessageIn[]) =>
-    count(JSON.stringify({ messages, tools: schemas })) <= room;
+    count(
+      JSON.stringify({
+        messages: sentMessages(context.wire, context.model, messages),
+        tools: schemas,
+      }),
+    ) <= room;
   let messages = build();
   if (fits(messages)) return messages;
   items = items.map((item) => ({ ...item, excerpt: "" }));

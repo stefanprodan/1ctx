@@ -54,6 +54,15 @@ export const PRESETS: Preset[] = [
     hint: null,
     name: "gemini",
   },
+  {
+    wire: "opencode",
+    label: "OpenCode Go",
+    text: "DeepSeek, GLM, Kimi and more on an OpenCode Go plan.",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    fixed: false,
+    hint: null,
+    name: "opencode",
+  },
 ];
 export const preset = (wire: Wire): Preset =>
   PRESETS.find((p) => p.wire === wire) ?? PRESETS[0];

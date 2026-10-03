@@ -651,6 +651,68 @@ describe("knowledge send snapshot", () => {
 
 describe("history", () => {
   test.each([
+    ["the send's provider", "pr", "thought", true],
+    ["another provider", "other-provider", "thought", false],
+    ["an empty reasoning", "pr", "", false],
+  ] as const)(
+    "carries plain reasoning, with its model, from %s",
+    (_, sendProvider, reasoning, kept) => {
+      const calls = [{ id: "c1", name: "datetime", arguments: "{}" }];
+      const rows = [
+        row({
+          id: "w1",
+          kind: "reply",
+          slot: "work",
+          content: "",
+          reasoning,
+          model: "org/older",
+          toolCalls: calls,
+        }),
+        row({ id: "t1", kind: "tool", toolCallId: "c1", content: "noon" }),
+        row({
+          id: "a1",
+          kind: "reply",
+          slot: "answer",
+          round: 2,
+          content: "noon it is",
+          reasoning,
+          model: "org/older",
+        }),
+      ];
+      const turns: ContextLookups = {
+        ...lookups,
+        turnsOf: () =>
+          new Map([
+            [
+              "snd1",
+              {
+                agentId: policy.agentId,
+                agentName: policy.agentName,
+                summoned: false,
+                providerId: sendProvider,
+              },
+            ],
+          ]),
+      };
+      const out = history(rows, policy, turns, NOW);
+      const held = kept ? { reasoning } : {};
+      expect(out[1]).toEqual({
+        role: "assistant",
+        content: null,
+        model: "org/older",
+        toolCalls: calls,
+        ...held,
+      });
+      expect(out[3]).toEqual({
+        role: "assistant",
+        content: "noon it is",
+        model: "org/older",
+        ...held,
+      });
+    },
+  );
+
+  test.each([
     ["same provider and model", "pr", "org/model", true],
     ["another provider", "other-provider", "org/model", false],
     ["another model", "pr", "org/other-model", false],
@@ -1103,7 +1165,7 @@ describe("history", () => {
         content: "the template has <|im_start|>user and <|endoftext|>",
       },
     ]);
-    expect(requestTokens(req)).toBeGreaterThan(0);
+    expect(requestTokens(policy.wire, req)).toBeGreaterThan(0);
   });
 });
 

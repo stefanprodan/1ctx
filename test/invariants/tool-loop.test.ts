@@ -356,6 +356,7 @@ describe("the tool loop", () => {
     "openrouter",
     "openai-strict",
     "gemini",
+    "opencode",
   ] as const) {
     test(`a call written as text without schemas is not the answer on ${wire}`, async () => {
       const chat = await chatApp({ wire });

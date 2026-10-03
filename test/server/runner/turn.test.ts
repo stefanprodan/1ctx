@@ -150,7 +150,12 @@ describe("a turn of several user messages", () => {
     },
   );
 
-  test.each(["openai-compatible", "openai-strict", "gemini"] as Wire[])(
+  test.each([
+    "openai-compatible",
+    "openai-strict",
+    "gemini",
+    "opencode",
+  ] as Wire[])(
     "the %s wire carries each message with its author",
     async (wire) => {
       const chat = await chatApp({ wire });

@@ -4,9 +4,11 @@
 import { describe, expect, test } from "bun:test";
 import { geminiEvents } from "../../src/server/providers/index.ts";
 import { parseSse } from "../../src/server/providers/openai.ts";
+import type { Wire } from "../../src/shared/words.ts";
 import {
   type ChatApp,
   chatApp,
+  FLASH,
   NO_TOOLS,
   startChat,
   waitScript,
@@ -177,6 +179,134 @@ describe("tool loop provider policy", () => {
       await chat.app.shutdown();
       chat.app.db.close();
     }
+  });
+
+  test("an opencode tool round routes by the session headers and sends its reasoning back", async () => {
+    const chat = await chatApp({ wire: "opencode" });
+    try {
+      const { detail, script, sessionId } = await startChat(
+        chat,
+        "what time is it",
+      );
+      expect(script.body).not.toHaveProperty("enable_thinking");
+      expect(script.body).not.toHaveProperty("prompt_cache_key");
+      const session = {
+        "x-opencode-session": sessionId,
+        "x-opencode-session-id": sessionId,
+        "x-session-affinity": sessionId,
+        "x-session-id": sessionId,
+      };
+      expect(script.headers).toMatchObject(session);
+      expect(script.headers["user-agent"]).toStartWith("1ctx/");
+      script.reasoning("check the clock");
+      script.toolCall({ id: "call_1", name: "datetime", arguments: "{}" });
+      script.finish("tool_calls");
+      script.usage();
+      script.end();
+      const next = await waitScript(chat.scripted, 2);
+      expect(next.headers).toMatchObject(session);
+      const messages = next.body.messages as Record<string, unknown>[];
+      expect(messages.find((message) => message.role === "assistant")).toEqual({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "datetime", arguments: "{}" },
+          },
+        ],
+        reasoning_content: "check the clock",
+      });
+      next.reply("It is noon.");
+      await settle(chat);
+      expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
+        status: "done",
+        cause: "finish",
+        rounds: 2,
+        toolCalls: 1,
+      });
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+
+  // a turn with reasoning, then a second turn: what the second request
+  // carries on the first turn's assistant message
+  async function secondTurn(
+    wire: Wire,
+    reasoning: string,
+    nextModel?: string,
+  ): Promise<{ model: unknown; assistant: Record<string, unknown> }> {
+    const chat = await chatApp({ wire });
+    try {
+      const { script, sessionId } = await startChat(chat, "hello");
+      if (reasoning !== "") script.reasoning(reasoning);
+      script.reply("hi there");
+      await settle(chat);
+      if (nextModel !== undefined) {
+        chat.app.db
+          .query("update agents set model = ? where id = ?")
+          .run(nextModel, chat.agentId);
+      }
+      const pending = chat.scripted.next();
+      const res = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/messages`,
+        { body: { message: "and again" } },
+      );
+      expect(res.status).toBeLessThan(300);
+      const next = await pending;
+      next.reply("done");
+      await settle(chat);
+      const messages = next.body.messages as Record<string, unknown>[];
+      return {
+        model: next.body.model,
+        assistant: messages.find((message) => message.role === "assistant")!,
+      };
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  }
+
+  test("opencode sends the same model's reasoning back on a later turn", async () => {
+    expect(await secondTurn("opencode", "greet first")).toEqual({
+      model: FLASH,
+      assistant: {
+        role: "assistant",
+        content: "hi there",
+        reasoning_content: "greet first",
+      },
+    });
+  });
+
+  test("opencode sends no reasoning another model wrote, and none that is empty", async () => {
+    const other = "z-ai/glm-5.3-flash";
+    expect(await secondTurn("opencode", "greet first", other)).toEqual({
+      model: other,
+      assistant: { role: "assistant", content: "hi there" },
+    });
+    expect((await secondTurn("opencode", "")).assistant).toEqual({
+      role: "assistant",
+      content: "hi there",
+    });
+  });
+
+  test("no other wire sends past reasoning back", async () => {
+    for (const wire of ["openai-compatible", "openai-strict"] as const) {
+      expect((await secondTurn(wire, "greet first")).assistant).toEqual({
+        role: "assistant",
+        content: "hi there",
+      });
+    }
+    // DeepSeek on OpenRouter gets its empty field, as before
+    expect((await secondTurn("openrouter", "greet first")).assistant).toEqual({
+      role: "assistant",
+      content: "hi there",
+      reasoning: "",
+    });
   });
 
   test("websearch is not offered without a chosen provider", async () => {

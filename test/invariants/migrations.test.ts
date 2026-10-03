@@ -53,6 +53,7 @@ const EXPECTED_IDS = [
   "0039-restart-runs",
   "0040-repos",
   "0041-kept-packing",
+  "0042-opencode",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1462,6 +1463,103 @@ describe("the schema", () => {
       expect(
         db.query("select count(*) as n from mcp_kept_files").get(),
       ).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0042 widens the wire and effort checks and keeps every provider and agent", () => {
+    const db = seed(MIGRATIONS.slice(0, 41));
+    const tables = [
+      "providers",
+      "agents",
+      "deciders",
+      "users",
+      "sessions",
+      "sends",
+      "usage",
+    ];
+    const rows = () =>
+      tables.map((table) =>
+        db.query(`select * from ${table} order by rowid`).all(),
+      );
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string | null }, []>(
+          `select name, sql from sqlite_schema where type = 'index'
+             and tbl_name in ('providers', 'agents') order by name`,
+        )
+        .all();
+    try {
+      db.exec(`
+        insert into providers (id, name, wire, base_url, key_name, created_at)
+          values ('g', 'gemini', 'gemini', 'http://g.test', 'provider-g', 5);
+        insert into agents (id, name, avatar, provider_id, model, model_name,
+            context_length, prompt_price, completion_price, tools, reasoning,
+            prompt, thinking, effort, created_at, mcp_mode, model_described,
+            thinking_required, reasoning_known, upstream, is_default,
+            skip_4bit)
+          values ('a2', 'router', 'dome', 'g', 'm2', 'M2', 1000, 1.5, 2.5, 1,
+            1, 'be brief', 'on', 'xhigh', 6, 'catalog', 0, 1, 1, 'host', 1,
+            1);
+        insert into agents (id, name, model, model_name, created_at,
+            deleted_at)
+          values ('gone', 'agent', 'm', 'M', 7, 8);
+        insert into deciders (id, name, provider_id, model, is_default,
+            created_at)
+          values ('d', 'judge', 'g', 'm3', 1, 9);
+        update users set agent_id = 'a2' where id = 'u';
+      `);
+      const before = rows();
+      expect(before.map((table) => table.length)).toEqual([
+        2, 3, 1, 1, 1, 2, 1,
+      ]);
+      const existing = indexes();
+      expect(() =>
+        db.exec("update providers set wire = 'opencode' where id = 'pr'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update agents set effort = 'max' where id = 'a'"),
+      ).toThrow(/CHECK/);
+      expect(MIGRATIONS[41]?.rebuilds).toEqual(["providers", "agents"]);
+      expect(migrate(db)).toEqual(expectedFrom("0042-opencode"));
+      expect(rows()).toEqual(before);
+      expect(indexes()).toEqual(existing);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      db.exec(`
+        update providers set wire = 'opencode' where id = 'pr';
+        update agents set thinking = 'on', effort = 'max' where id = 'a';
+      `);
+      expect(() =>
+        db.exec("update providers set wire = 'opencode-zen'"),
+      ).toThrow(/CHECK/);
+      expect(() => db.exec("update agents set effort = 'maximum'")).toThrow(
+        /CHECK/,
+      );
+      expect(() =>
+        db.exec("update agents set is_default = 1 where id = 'a'"),
+      ).toThrow(/UNIQUE/);
+      expect(() =>
+        db.exec("update agents set provider_id = null where id = 'a'"),
+      ).toThrow(/CHECK/);
+      // the references still hold both ways
+      expect(() => db.exec("delete from providers where id = 'g'")).toThrow(
+        /FOREIGN KEY/,
+      );
+      expect(() => db.exec("delete from agents where id = 'a'")).toThrow(
+        /FOREIGN KEY/,
+      );
+      expect(() =>
+        db.exec("update agents set provider_id = 'missing' where id = 'a'"),
+      ).toThrow(/FOREIGN KEY/);
+      db.exec("delete from agents where id = 'a2'");
+      expect(db.query("select agent_id from users").get()).toEqual({
+        agent_id: null,
+      });
+      expect(migrate(db)).toEqual([]);
     } finally {
       db.close();
     }

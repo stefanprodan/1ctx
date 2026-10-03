@@ -160,6 +160,8 @@ function memoryRequest(
         send.policy,
         lookups,
       ),
+      wire: send.policy.wire,
+      model: send.policy.model,
       tools: offered.tools,
       contextLength: send.policy.contextLength,
       reserve: send.policy.limits.contextReserve,

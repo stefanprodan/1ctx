@@ -8,7 +8,7 @@
 // tool row as role tool. Pairing is by (sendId, round) and call order.
 //
 // The repair is pure: a work reply whose calls lack a complete set of
-// result rows is sent without its calls and without its structured
+// result rows is sent without its calls and without any of its
 // reasoning, as plain text if it has any, else skipped; an orphan tool
 // row is skipped. The answer round ends the request with the ask as a
 // user message, never a stored row. Another agent's turn in the chat
@@ -49,7 +49,12 @@ export const SUMMARY_LEAD =
 
 // who answered a send of the session: its agent and whether it was
 // summoned for the turn
-export type Turn = { agentId: string; agentName: string; summoned: boolean };
+export type Turn = {
+  agentId: string;
+  agentName: string;
+  summoned: boolean;
+  providerId?: string;
+};
 
 export type ContextLookups = {
   // the author's username, for the name field on the wire
@@ -152,13 +157,19 @@ function userMessage(
   };
 }
 
+// reasoning stays with its provider; the message's model lets a wire
+// that sends it back keep only the requested model's
+const plainReasoning = (row: Message, sameProvider: boolean) =>
+  sameProvider && row.reasoning !== "" ? { reasoning: row.reasoning } : {};
+
 // an assistant reply that asked for tools, with a complete set of
-// result rows: the calls and the structured reasoning go back
+// result rows: the calls and the reasoning go back
 function workMessage(
   row: Message,
   calls: ToolCall[],
   policy: Pick<SendPolicy, "providerId" | "model">,
   lookups: ContextLookups,
+  sameProvider: boolean,
 ): ChatMessageIn {
   const details = lookups.reasoningDetailsOf(
     row.id,
@@ -170,6 +181,7 @@ function workMessage(
     model: row.model ?? undefined,
     content: row.content === "" ? null : row.content,
     toolCalls: calls,
+    ...plainReasoning(row, sameProvider),
     ...(details ? { reasoningDetails: details } : {}),
   };
 }
@@ -278,6 +290,8 @@ export function historyMessages(
       ? new Map<string, Turn>()
       : lookups.turnsOf(rows[0]!.sessionId);
   const own = (sendId: string) => ownTurn(turns.get(sendId), policy);
+  const sameProvider = (row: Message) =>
+    turns.get(row.sendId)?.providerId === policy.providerId;
   const yours = yoursOf(policy.offered);
   let start = 0;
   for (let i = rows.length - 1; i >= 0; i--) {
@@ -346,7 +360,7 @@ export function historyMessages(
           return result !== undefined && result.toolCallId === call.id;
         });
       if (complete) {
-        out.push(workMessage(row, calls, policy, lookups));
+        out.push(workMessage(row, calls, policy, lookups, sameProvider(row)));
         calls.forEach((call, index) => {
           out.push({
             role: "tool",
@@ -357,7 +371,7 @@ export function historyMessages(
         continue;
       }
       // the round is incomplete: send it without its calls and without
-      // its structured reasoning, as plain text if it has any, else skip
+      // any of its reasoning, as plain text if it has any, else skip
       if (row.content !== "") {
         out.push({
           role: "assistant",
@@ -377,6 +391,7 @@ export function historyMessages(
       role: "assistant",
       model: row.model ?? undefined,
       content: row.content,
+      ...plainReasoning(row, sameProvider(row)),
       ...(details ? { reasoningDetails: details } : {}),
     });
   }

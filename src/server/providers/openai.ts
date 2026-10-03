@@ -39,9 +39,10 @@ export function wireName(name: string): string | null {
 }
 
 export type ChatBodyOptions = {
-  // the field earlier reasoning goes back in on an assistant message:
-  // reasoning_content (mlx-serve, llama-server) or reasoning (OpenRouter)
-  reasoningField?: "reasoning_content" | "reasoning";
+  // OpenRouter's structured reasoning items go back on its assistant
+  // messages; a message's plain reasoning goes back only where a wire's
+  // own builder adds it (opencode.ts)
+  reasoningDetails?: boolean;
   includeThinkingFlag?: boolean;
 };
 
@@ -49,7 +50,6 @@ export function buildChatBody(
   req: ChatRequest,
   options: ChatBodyOptions = {},
 ): Record<string, unknown> {
-  const reasoningField = options.reasoningField ?? "reasoning_content";
   const messages = req.messages.map((message) => {
     if (message.role === "tool") {
       return {
@@ -86,13 +86,11 @@ export function buildChatBody(
       // OpenRouter takes the structured items in place of the text: the
       // signature or the encrypted blob is what lets a Claude or an OpenAI
       // model continue its chain across a tool round
-      ...(reasoningField === "reasoning" &&
+      ...(options.reasoningDetails &&
       message.reasoningDetails &&
       message.reasoningDetails.length > 0
         ? { reasoning_details: message.reasoningDetails }
-        : message.reasoning
-          ? { [reasoningField]: message.reasoning }
-          : {}),
+        : {}),
     };
   });
   const body: Record<string, unknown> = {

@@ -111,7 +111,7 @@ export function mergeReasoningDetail(
 // provider.quantizations and the per-family message rules above.
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
   const body = buildOpenAiChatBody(req, {
-    reasoningField: "reasoning",
+    reasoningDetails: true,
     includeThinkingFlag: false,
   });
   delete body.prompt_cache_key;

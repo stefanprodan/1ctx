@@ -43,6 +43,8 @@ export type ToolCallFrame = {
 // one chat request's stream, as the test drives it
 export type Script = {
   body: Record<string, unknown>;
+  // the request's headers, names lowercased
+  headers: Record<string, string>;
   sse(text: string): void;
   content(text: string): void;
   reasoning(text: string): void;
@@ -171,8 +173,13 @@ export function scriptedFetch(
         );
       } catch {}
     };
+    const headers: Record<string, string> = {};
+    new Headers(init?.headers).forEach((v, k) => {
+      headers[k] = v;
+    });
     const script: Script = {
       body,
+      headers,
       sse(text) {
         controller.enqueue(encoder.encode(text));
       },

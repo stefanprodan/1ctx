@@ -84,6 +84,7 @@ export const FORBIDDEN_HOSTS = [
   "api.openai.com",
   "api.anthropic.com",
   "generativelanguage.googleapis.com",
+  "opencode.ai",
   "exa.ai",
   "firecrawl.dev",
   "tavily.com",

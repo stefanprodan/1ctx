@@ -597,7 +597,7 @@ describe("provision through the composed app", () => {
     }
   });
 
-  test.each(["openrouter", "openai-compatible", "gemini"])(
+  test.each(["openrouter", "openai-compatible", "gemini", "opencode"])(
     "uses the %s route's effort rules rather than saving unchecked fields",
     async (wire) => {
       const { app } = await instance();
@@ -619,6 +619,47 @@ describe("provision through the composed app", () => {
       }
     },
   );
+
+  test("an opencode provider takes max and an undescribed model's window", async () => {
+    const { app } = await instance();
+    try {
+      const docs = documents(
+        object("Provider", "go", {
+          wire: "opencode",
+          baseUrl: BARE_URL,
+          keyFrom: null,
+        }),
+        object("Agent", "go-guide", {
+          provider: "go",
+          model: "bare-model",
+          thinking: "on",
+          effort: "max",
+          contextLength: 1_000_000,
+          tools: true,
+        }),
+      );
+      expect(await app.provision.apply(docs, ignore)).toEqual({
+        created: 2,
+        updated: 0,
+        unchanged: 0,
+      });
+      expect(app.providers.list()).toMatchObject([
+        { name: "go", wire: "opencode" },
+      ]);
+      expect(app.agents.byName("go-guide")).toMatchObject({
+        thinking: "on",
+        effort: "max",
+        model: {
+          contextLength: 1_000_000,
+          tools: true,
+          reasoningKnown: false,
+          described: false,
+        },
+      });
+    } finally {
+      await app.shutdown();
+    }
+  });
 
   test("refuses an unlisted model without replacing a saved agent", async () => {
     const { app } = await instance();
