@@ -25,12 +25,19 @@ import { QueuedRows, type QueueProps } from "./Queued.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
 import type { Live } from "./stream.ts";
+import { type Box, following } from "./Transcript.model.ts";
 import { UserRow } from "./UserRow.tsx";
 import { Visual } from "./Visual.tsx";
 import { isFileCard, visualCards } from "./visuals.ts";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
+
+const boxOf = (el: HTMLElement): Box => ({
+  top: el.scrollTop,
+  height: el.scrollHeight,
+  client: el.clientHeight,
+});
 
 export function Transcript({
   sessionId,
@@ -68,8 +75,7 @@ export function Transcript({
   const rows = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement | null>(null);
   const stick = useRef(true);
-  const lastTop = useRef(0);
-  const lastHeight = useRef(0);
+  const last = useRef<Box>({ top: 0, height: 0, client: 0 });
   const jumpHidden = useSignal(true);
 
   const footEl = useRef<HTMLDivElement>(null);
@@ -78,8 +84,7 @@ export function Transcript({
     const scroller = box.current;
     if (!scroller) return;
     scroller.scrollTop = scroller.scrollHeight;
-    lastTop.current = scroller.scrollTop;
-    lastHeight.current = scroller.scrollHeight;
+    last.current = boxOf(scroller);
   };
 
   const follow = () => {
@@ -92,19 +97,14 @@ export function Transcript({
     box.current = scroller;
     if (!el || !scroller) return;
     const onScroll = () => {
-      const top = scroller.scrollTop;
-      const height = scroller.scrollHeight;
-      const gap = height - top - scroller.clientHeight;
-      // a shrink clamps scrollTop without anyone scrolling, so a
-      // decrease counts only while the height did not drop
-      if (top < lastTop.current - 1 && height >= lastHeight.current) {
-        stick.current = false;
-      } else if (gap < 40) stick.current = true;
-      lastTop.current = top;
-      lastHeight.current = height;
-      jumpHidden.value = stick.current || gap < 80;
+      const next = boxOf(scroller);
+      stick.current = following(stick.current, last.current, next);
+      last.current = next;
+      jumpHidden.value =
+        stick.current || next.height - next.top - next.client < 80;
     };
-    // the foot grows with the draft and would cover the last rows: a
+    // the foot grows with the draft, and the box shrinks while a
+    // phone's keyboard is up: either would cover the last rows, so a
     // view that follows the end keeps following, one that let go
     // learns whether Jump applies
     const grown = new ResizeObserver(() => {
@@ -112,6 +112,7 @@ export function Transcript({
       else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
+    grown.observe(scroller);
     // rows that shrink while the view is at the top move nothing, so no
     // scroll event tells Jump that the end is in view again
     const resized = new ResizeObserver(() => {

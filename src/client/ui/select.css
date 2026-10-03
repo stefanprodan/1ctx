@@ -85,6 +85,11 @@
     font-size: var(--text-ui);
     cursor: pointer;
   }
+  @media (pointer: coarse) {
+    .select-option {
+      min-height: 44px;
+    }
+  }
   .select-option-on {
     background: var(--hover);
     color: var(--fg);

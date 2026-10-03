@@ -95,7 +95,8 @@ open row's body or a meta. The shared shapes are below.
   riding with the rows until a reload. A long block is clipped and
   opens with Show all.
 - **A segmented switch is `ui/Seg.tsx`:** a closed set fixed in code,
-  at most five options that fit one line at 390. Named rows from the
+  at most five options that fit one line at 390. A wider set is a
+  `ui/Select` while `narrow` (the schedule's six). Named rows from the
   database are a `ui/Finder.tsx`. A few options with a line each are
   `views/admin/Choices.tsx`.
 - **A list of names to pick or switch between is `ui/Finder.tsx`.**
@@ -145,10 +146,15 @@ open row's body or a meta. The shared shapes are below.
 ## Shell
 
 - **One shell, no header or top bar.** `app/shell.ts` holds its state.
-  From 720 up the rail (the side navigation) is a column the user can
-  hide, kept in `localStorage`. Below 720 it covers the screen and is
-  never kept. The breakpoint is `NARROW` in `shell.ts` and the same
-  number in `shell.css`; change both.
+  The rail (the side navigation) is a column the user can hide, kept
+  in `localStorage`. Below 720 wide, or 500 tall on touch (`DRAWER`, a
+  phone on its side), it covers the screen and is never kept. `NARROW`
+  and `DRAWER` in `shell.ts` are the same queries as in the sheets
+  (`shell.css`, `page.css`); change both.
+- **The shell is the visible height.** While a phone's keyboard is
+  up, `watchViewport()` sizes and moves it to the visual viewport
+  (`frameOf()` in `lib/viewport.ts`), so its top stays. Under
+  `MIN_SHELL` tall the browser scrolls the field into view instead.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and
@@ -156,6 +162,10 @@ open row's body or a meta. The shared shapes are below.
 - **On touch nothing takes a focus the user did not give,** and every
   field is `--text-touch` (16px), since iOS zooms into a smaller one
   and stays zoomed. Touch is `pointer: coarse`, read in `lib/touch.ts`.
+  On it menu items, `Seg` and `Select` options, rail rows, the reply's
+  actions and the transcript's fold heads take 44px of tap area, set in
+  the sheet that owns them, never changing the desktop's density. The
+  composer's command list and in-field agent list keep 36 and 32.
 - **A page head is `ui/Page.tsx`.** Its actions take no height, so a
   crumb sits in the same place on every page. An object's switcher is
   `PageSwitcher`, a list's New button `PageNew`. A failed load is

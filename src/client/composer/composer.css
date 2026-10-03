@@ -340,6 +340,14 @@
     max-height: min(290px, 40dvh);
     overflow-y: auto;
   }
+  /* the shell's height while a keyboard is up, else dvh */
+  @media (pointer: coarse) {
+    .composer-menu,
+    .composer-cmds {
+      max-height: min(290px, 0.4 * var(--shell-height, 100dvh));
+      overflow-y: auto;
+    }
+  }
   /* the tall composer is at the top of its page, so its menus drop
      below the chip instead of rising over the head */
   .composer-tall .composer-menu,

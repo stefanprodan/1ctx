@@ -39,6 +39,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* iOS enlarges some blocks' text in landscape; the sizes are ours */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   #app {
     height: 100%;
   }
@@ -209,8 +215,10 @@
     border: 1px solid var(--line-strong);
     box-shadow: var(--shadow-pop);
   }
+  /* never shrinks below its words: a capped menu scrolls instead */
   .menu-item {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: var(--space-2);
     width: 100%;
@@ -233,6 +241,12 @@
     background: transparent;
     color: var(--faint);
     cursor: default;
+  }
+  /* a finger's 44px */
+  @media (pointer: coarse) {
+    .menu-item {
+      min-height: 44px;
+    }
   }
 
   /* a few options side by side in one frame, the picked one filled */
@@ -287,6 +301,22 @@
   .seg-small .seg-option:hover,
   .seg-small .seg-on {
     color: var(--fg);
+  }
+  /* a finger's 44px from a box around the option, so a card's head
+     keeps its height; the options sit side by side, never overlapping */
+  @media (pointer: coarse) {
+    .seg-option {
+      position: relative;
+    }
+    .seg-option::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 44px;
+      transform: translateY(-50%);
+    }
   }
 
   /* two fields side by side, one under the other on a phone; a wide

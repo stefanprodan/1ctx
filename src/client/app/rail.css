@@ -136,6 +136,16 @@
     background: var(--card);
     color: var(--fg);
   }
+  /* a finger's 44px; the nav scrolls, so the rows may grow */
+  @media (pointer: coarse) {
+    .rail-item {
+      height: 44px;
+    }
+    .rail-sub {
+      height: 44px;
+      line-height: 44px;
+    }
+  }
 
   .rail-band {
     display: flex;
