@@ -19,7 +19,6 @@ import { type Failure, failure } from "../lib/format.ts";
 import {
   applyDelta,
   applyHtml,
-  type Live,
   liveOf,
   liveOfSnapshot,
 } from "../transcript/stream.ts";
@@ -35,6 +34,7 @@ import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { session } from "./session-held.ts";
+import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
 import { resetValues, retrying, syncValues } from "./session-values.ts";
@@ -49,6 +49,7 @@ export {
   projectAgentCount,
   projectAgents,
 } from "./project-agents.ts";
+export { setFrames } from "./session-live.ts";
 export { createSession, sending, stopSession } from "./session-start.ts";
 export {
   loadToolResult,
@@ -62,10 +63,8 @@ export {
 // snapshot is refetched instead
 export const BUFFER_MAX = 256;
 
-export { session };
+export { live, session };
 export const sessionError = signal<Failure | null>(null);
-// the replies streaming on the chat on screen, by message id
-export const live = signal<ReadonlyMap<string, Live>>(new Map());
 
 // A stored call keeps only a marker here. Its mounted frame keeps the paint.
 export const visualPreviews = signal<Previews>(new Map());
@@ -91,7 +90,7 @@ effect(() => {
   wanted = { id: "", turn: wanted.turn + 1 };
   session.value = null;
   sessionError.value = null;
-  live.value = new Map();
+  publish(new Map());
   resetValues();
   visualPreviews.value = new Map();
   chatsKept.clear();
@@ -107,7 +106,7 @@ function show(shown: SessionDetail): void {
     detail,
   );
   session.value = detail;
-  live.value = liveFrom(detail);
+  publish(liveFrom(detail));
   syncValues(detail);
   retrying.value = detail.live?.retry ?? null;
   stream =
@@ -126,7 +125,7 @@ function keep(detail: SessionDetail | null): void {
 
 function clear(): void {
   session.value = null;
-  live.value = new Map();
+  publish(new Map());
   resetValues();
   visualPreviews.value = new Map();
 }
@@ -281,7 +280,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     held.messages.filter((message) => !removed.has(message.id)),
     ev.messages,
   );
-  const map = new Map(live.value);
+  const map = new Map(ahead());
   for (const id of removed) map.delete(id);
   for (const m of ev.messages) {
     if (!streams(m)) continue;
@@ -313,7 +312,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   syncValues(session.value);
   // a lost clear frame never outlives the send
   if (ev.session.status !== "running") retrying.value = null;
-  live.value = map;
+  publish(map);
   onQueueSocket(ev);
   // who archived it and until when are the detail's alone, and so are
   // the messages of a turn too large for the envelope
@@ -369,17 +368,15 @@ function applyFrame(frame: Frame): boolean {
     };
     return true;
   }
-  const v = live.value.get(frame.messageId);
+  const v = ahead().get(frame.messageId);
   if (v === undefined) return true;
-  const map = new Map(live.value);
-  if (frame.type === "delta") {
-    const r = applyDelta(v, frame, clock());
-    if (r.gap) return false;
-    map.set(frame.messageId, r.live);
-  } else {
-    map.set(frame.messageId, applyHtml(v, frame));
+  if (frame.type === "html") {
+    stage(frame.messageId, applyHtml(v, frame));
+    return true;
   }
-  live.value = map;
+  const r = applyDelta(v, frame, clock());
+  if (r.gap) return false;
+  stage(frame.messageId, r.live);
   return true;
 }
 
@@ -391,6 +388,7 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
   // answered before the load that follows sends its own
   if (buffered === null) return;
   pending = null;
+  flushLive();
   if (buffered.overflow) {
     refetch();
     return;
@@ -416,9 +414,9 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
       refetch();
       return;
     }
-    const map = new Map(live.value);
+    const map = new Map(ahead());
     map.set(m.id, liveOfSnapshot(snap, m));
-    live.value = map;
+    publish(map);
     stream = { sendId: snap.sendId, seq: snap.seq };
   }
   for (const frame of buffered.buffer) {

@@ -232,10 +232,10 @@ describe("socket fixtures for caps", () => {
       toolRound(script, [call("same")]);
     }
     const answer = await waitScript(chat.scripted, 7);
-    // the answer streams past the html interval, so the recording
-    // carries an html frame between its deltas
+    // the answer's whole block streams past the html interval, so the
+    // recording carries an html frame between its deltas
     chat.app.now.value += HTML_EVERY_MS;
-    answer.reply("answered after the loop");
+    answer.reply("answered after the loop\n\n");
     await settle(chat, 10);
     expect(conn.frames.some((f) => f.type === "html")).toBe(true);
     record("loop-check", detail, conn);
@@ -243,7 +243,7 @@ describe("socket fixtures for caps", () => {
       .messages(sessionId)
       .filter((r) => r.kind === "reply");
     expect(replies.at(-2)!.finishReason).toBe("tool_loop");
-    expect(replies.at(-1)!.content).toBe("answered after the loop");
+    expect(replies.at(-1)!.content).toBe("answered after the loop\n\n");
     chat.app.socket.dispose();
   });
 

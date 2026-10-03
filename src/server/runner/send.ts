@@ -31,7 +31,10 @@ export type RoundState = {
   // the checkpoint cadence
   lastWriteAt: number;
   lastWriteSize: number;
-  // the render cadence, and the last render sent
+  // the render cadence: the last look for whole blocks and the last
+  // render or the first text; html is always the render of
+  // content.slice(0, htmlAt)
+  htmlTriedAt: number;
   lastHtmlAt: number;
   html: string;
   htmlAt: number;
@@ -169,6 +172,7 @@ export function newRound(messageId: string, now: number): RoundState {
     thinkingMs: null,
     lastWriteAt: now,
     lastWriteSize: 0,
+    htmlTriedAt: now,
     lastHtmlAt: now,
     html: "",
     htmlAt: 0,

@@ -139,6 +139,14 @@
     overflow-wrap: anywhere;
   }
 
+  /* the markdown and, while it streams, the plain tail after it */
+  .transcript-answer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
   .transcript-md {
     font-size: var(--text-input);
     line-height: 1.55;

@@ -105,6 +105,20 @@ describe("live transcript buffers", () => {
       htmlAt: 6,
       thinkStart: null,
     });
+    const checkpoint = liveOf(message({ content: "The ans", html: "" }));
+    expect(checkpoint.htmlAt).toBe(0);
+    expect(tail(checkpoint)).toBe("The ans");
+    expect(
+      applyHtml(checkpoint, {
+        type: "html",
+        sessionId: "s1",
+        sendId: "send1",
+        messageId: "m1",
+        seq: 2,
+        html: "<p>The</p>",
+        htmlAt: 4,
+      }).htmlAt,
+    ).toBe(4);
 
     const snapshot: Extract<LiveSend, { phase: "reply" }> = {
       phase: "reply",

@@ -73,6 +73,11 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
   that grow with no render** (a font swap, a visual loading). Any
   pointer, click, wheel or key ends it, so a fold or Show all the user
   opened is never snapped away.
+- **A streaming answer never shrinks.** A block turned into markdown
+  is often shorter than its plain tail, and at the end that shrink
+  pulls the text down; the answer and a live summary keep their
+  tallest height at the current width until the turn ends
+  (`useHeldHeight()`). Visuals sit outside it and size freely.
 
 ## The composer
 

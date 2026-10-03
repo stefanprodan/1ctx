@@ -56,6 +56,15 @@ that agent answers the one turn (see Summons).
   after commit.
 - **The reply in flight is checkpointed without a revision.** Every
   250 ms or 2 KB (`runner/stream.ts`).
+- **A streaming reply renders only whole blocks.** The timed `html`
+  frame renders `content` up to `stableEnd()` (`render/blocks.ts`) and
+  sets `htmlAt` there, since a block cut mid-way renders shorter than
+  its raw text and the text jumps. An open top-level fence renders by
+  whole lines, a table by rows and a list by items. A paragraph still
+  growing renders whole after `HTML_STALL_MS` (1 s) with no render
+  since the first text. `html` is
+  always the render of `content.slice(0, htmlAt)`; the end renders all
+  of it.
 - **An envelope's row is read after the commit, in one statement.**
   `envelopeRow()` (`sessions/feed.ts`) seeks one session and walks
   its messages and sends newest first, stopping at the first match,

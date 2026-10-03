@@ -8,9 +8,11 @@
 // with the streaming tail after it. Whether it is open is kept per row
 // for the life of the page.
 
+import { useRef } from "preact/hooks";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { Icon } from "../lib/icons.tsx";
 import { folds, useTick } from "./fold.ts";
+import { useHeldHeight } from "./hold.ts";
 import { summaryLabel, summaryRunning } from "./Summary.model.ts";
 import type { Live } from "./stream.ts";
 import { tail } from "./stream.ts";
@@ -33,6 +35,8 @@ export function Summary({
   const label = summaryLabel(message, running, Date.now(), retry);
   const { open, onToggle } = useFoldOpen(message.id);
   const html = current?.html ?? message.html;
+  const body = useRef<HTMLDivElement>(null);
+  useHeldHeight(body, current !== null);
   return (
     <details
       class={`transcript-fold transcript-summary${
@@ -48,7 +52,7 @@ export function Summary({
           {label.text}
         </span>
       </summary>
-      <div class="transcript-summary-body">
+      <div class="transcript-summary-body" ref={body}>
         {html !== "" && (
           // the server renders the markdown with raw HTML off: render/
           // is the safety boundary

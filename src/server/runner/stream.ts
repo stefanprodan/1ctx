@@ -8,17 +8,23 @@ import type { LiveRetry } from "../../shared/contracts/session.ts";
 import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent } from "../providers/index.ts";
+import { stableEnd } from "../render/index.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
 export const WRITE_EVERY_MS = 250;
 export const WRITE_EVERY_BYTES = 2048;
-// the client draws text past the last render raw, so a short reply
-// renders often; each render goes whole to every watcher, so the gap
-// grows with the html, capped at HTML_CHARS_PER_MS and once a second
+// how often a reply is looked at for newly whole blocks to render; each
+// render goes whole to every watcher, so the gap grows with the html,
+// capped at HTML_CHARS_PER_MS and once a second
 export const HTML_EVERY_MS = 1000;
 export const HTML_MIN_MS = 100;
 export const HTML_CHARS_PER_MS = 32;
+// only whole blocks render, so a paragraph still growing would stay
+// raw; past this with no render since the text began it renders whole.
+// Raw bold and links read worse than the small jump a cut paragraph
+// makes, so it is no longer than the slowest render gap
+export const HTML_STALL_MS = HTML_EVERY_MS;
 
 export const htmlEvery = (htmlLength: number): number =>
   Math.min(
@@ -112,6 +118,9 @@ export function streamDelta(
     if (round.reasoningStartedAt !== null && round.thinkingMs === null) {
       round.thinkingMs = now - round.reasoningStartedAt;
     }
+    // the stall counts from the first text, so a slow first token never
+    // renders a reply's first word alone
+    if (contentAt === 0) round.lastHtmlAt = now;
     round.content += event.text;
   } else {
     if (round.reasoningStartedAt === null) round.reasoningStartedAt = now;
@@ -133,11 +142,20 @@ export function streamDelta(
   if (
     event.kind === "content" &&
     round.content.length > round.htmlAt &&
-    now - round.lastHtmlAt >= htmlEvery(round.html.length)
+    now - round.htmlTriedAt >= htmlEvery(round.html.length)
   ) {
+    round.htmlTriedAt = now;
+    const stable = stableEnd(round.content);
+    const end =
+      stable > round.htmlAt
+        ? stable
+        : now - round.lastHtmlAt >= HTML_STALL_MS
+          ? round.content.length
+          : null;
+    if (end === null) return;
     round.lastHtmlAt = now;
-    round.htmlAt = round.content.length;
-    round.html = deps.render(round.content, true);
+    round.htmlAt = end;
+    round.html = deps.render(round.content.slice(0, end), true);
     send.seq++;
     deps.stream(send.sessionId, {
       type: "html",
