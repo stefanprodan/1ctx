@@ -14,8 +14,9 @@ import { address, path } from "./router.ts";
 
 export const NARROW = "(max-width: 719px)";
 // a phone on its side is wide but too short for a rail beside the view;
-// the tallest phone is 440 on its side, the smallest tablet 744
-export const DRAWER = `${NARROW}, (max-height: 500px)`;
+// the tallest phone is 440 on its side, the smallest tablet 744. A short
+// desktop window keeps its rail
+export const DRAWER = `${NARROW}, (max-height: 500px) and (pointer: coarse)`;
 const KEY = "rail";
 
 const stored = (): boolean => {
@@ -69,17 +70,26 @@ export function watchScreen(): void {
   drawer.addEventListener("change", apply);
 }
 
-// the shell follows the visible area while a phone's keyboard is up
+// the shell follows the visible area while a phone's keyboard is up; a
+// page without the shell, the login, keeps the browser's own scroll
 export function watchViewport(): void {
   if (typeof window === "undefined" || !window.visualViewport) return;
   const view = window.visualViewport;
   const root = document.documentElement;
+  const set = (name: string, px: number | null) => {
+    if (px === null || px === 0) root.style.removeProperty(name);
+    else root.style.setProperty(name, `${px}px`);
+  };
   const apply = () => {
-    const frame = frameOf(root.clientHeight, view);
-    if (frame.height === null) root.style.removeProperty("--shell-height");
-    else root.style.setProperty("--shell-height", `${frame.height}px`);
-    // a page without the shell, the login, keeps the browser's scroll
-    if (frame.toTop && document.querySelector(".shell")) window.scrollTo(0, 0);
+    const frame = document.querySelector(".shell")
+      ? frameOf(root.clientHeight, view)
+      : { height: null, top: 0 };
+    set("--shell-height", frame.height);
+    // the shell moves to the visible area at once, and the page goes
+    // back to its top; where the browser keeps the visual viewport
+    // lower, the offset stays and the shell with it
+    set("--shell-top", frame.top);
+    if (frame.top > 0) window.scrollTo(0, 0);
   };
   view.addEventListener("resize", apply);
   view.addEventListener("scroll", apply);

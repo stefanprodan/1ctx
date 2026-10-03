@@ -300,6 +300,22 @@
   .seg-small .seg-on {
     color: var(--fg);
   }
+  /* a finger's 44px from a box around the option, so a card's head
+     keeps its height; the options sit side by side, never overlapping */
+  @media (pointer: coarse) {
+    .seg-option {
+      position: relative;
+    }
+    .seg-option::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 44px;
+      transform: translateY(-50%);
+    }
+  }
 
   /* two fields side by side, one under the other on a phone; a wide
      one takes the whole row */

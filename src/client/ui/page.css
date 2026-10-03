@@ -293,7 +293,7 @@
 
   /* where the rail is a drawer (DRAWER in shell.ts) its button floats
      on this row, 32px tall: the crumb takes its height to centre on it */
-  @media (max-width: 719px), (max-height: 500px) {
+  @media (max-width: 719px), (max-height: 500px) and (pointer: coarse) {
     .page-crumb {
       line-height: 32px;
     }

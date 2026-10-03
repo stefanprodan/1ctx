@@ -90,6 +90,9 @@
     z-index: 1;
     min-width: 240px;
     max-width: 420px;
+    /* dvh keeps the keyboard's room on iOS; the shell's height does not */
+    max-height: min(290px, 0.4 * var(--shell-height, 100dvh));
+    overflow-y: auto;
   }
   /* the chip's type, not the menu's */
   .composer-option {
@@ -337,7 +340,7 @@
     z-index: 1;
     /* many agents scroll inside the box, never past a phone's viewport
        with the keyboard up */
-    max-height: min(290px, 40dvh);
+    max-height: min(290px, 0.4 * var(--shell-height, 100dvh));
     overflow-y: auto;
   }
   /* the tall composer is at the top of its page, so its menus drop

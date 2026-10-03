@@ -95,7 +95,7 @@ describe("the shell on a phone", () => {
     railDrawer.value = true;
   });
 
-  test("shows the floating button and no rail until it opens", () => {
+  test.serial("shows the floating button and no rail until it opens", () => {
     const closed = render(<App />);
     expect(closed).toContain("shell-show-float");
     expect(closed).not.toContain("shell-strip");
@@ -107,14 +107,14 @@ describe("the shell on a phone", () => {
     expect(opened).toContain('aria-label="Close the menu"');
   });
 
-  test("the full-screen rail ignores the kept desktop choice", () => {
+  test.serial("the full-screen rail ignores the kept desktop choice", () => {
     hideRail();
     openDrawer();
     expect(render(<App />)).toContain("rail-drawer");
     expect(drawerOpen.value).toBe(true);
   });
 
-  test("the view under the open drawer is inert", () => {
+  test.serial("the view under the open drawer is inert", () => {
     expect(render(<App />)).not.toContain("inert");
     openDrawer();
     expect(render(<App />)).toContain('<main class="shell-main" inert');
@@ -191,9 +191,8 @@ describe("the drawer's query", () => {
       "utf8",
     );
 
-  test("is narrow or short", () => {
-    expect(DRAWER.startsWith(`${NARROW}, `)).toBe(true);
-    expect(DRAWER).toContain("max-height");
+  test("is narrow, or short on touch", () => {
+    expect(DRAWER).toBe(`${NARROW}, (max-height: 500px) and (pointer: coarse)`);
   });
 
   test("is the one the stylesheets place the floating button by", () => {
@@ -261,18 +260,52 @@ describe("watchViewport", () => {
     watchViewport();
     move("resize", { height: 450 });
     expect(props.get("--shell-height")).toBe("450px");
+    expect(props.has("--shell-top")).toBe(false);
     expect(scrolled).toBe(0);
-    move("scroll", { pageTop: 300 });
-    expect(scrolled).toBe(1);
-    move("resize", { height: 800, pageTop: 0 });
+    move("resize", { height: 800 });
     expect(props.has("--shell-height")).toBe(false);
-    expect(scrolled).toBe(1);
   });
+
+  test.serial(
+    "moves the shell to the visible area until the page is back at its top",
+    () => {
+      watchViewport();
+      move("scroll", { height: 450, pageTop: 300 });
+      expect(props.get("--shell-top")).toBe("300px");
+      expect(scrolled).toBe(1);
+      move("scroll", { pageTop: 0 });
+      expect(props.has("--shell-top")).toBe(false);
+      expect(props.get("--shell-height")).toBe("450px");
+    },
+  );
+
+  test.serial(
+    "a browser that keeps the visual viewport lower keeps the shell there",
+    () => {
+      watchViewport();
+      move("scroll", { height: 450, pageTop: 120 });
+      move("scroll", { pageTop: 120 });
+      expect(props.get("--shell-top")).toBe("120px");
+    },
+  );
+
+  test.serial(
+    "too short a visible area is left to the browser's scroll",
+    () => {
+      watchViewport();
+      move("resize", { height: 450 });
+      move("scroll", { height: 60, pageTop: 300 });
+      expect(props.has("--shell-height")).toBe(false);
+      expect(props.has("--shell-top")).toBe(false);
+      expect(scrolled).toBe(0);
+    },
+  );
 
   test.serial("a page without the shell keeps its scroll", () => {
     shell = false;
     watchViewport();
     move("scroll", { height: 450, pageTop: 300 });
+    expect(props.size).toBe(0);
     expect(scrolled).toBe(0);
   });
 });

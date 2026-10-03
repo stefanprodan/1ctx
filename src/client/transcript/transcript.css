@@ -430,17 +430,22 @@
   }
 
   /* a finger's 44px: an action's square side by side with the next,
-     reaching over the line's edges so the line keeps its height; a
-     fold's head and a menu's option grow, since they stack */
+     reaching over the line's edges so the line keeps its height, the
+     first one's icon under the text's edge; a fold's head and a menu's
+     option grow, since they stack */
   @media (pointer: coarse) {
     .transcript-after {
-      margin-left: calc((14px - 44px) / 2);
+      margin-left: 0;
     }
     .transcript-act {
       justify-content: center;
       width: 44px;
       height: 44px;
       margin: -10px 0;
+    }
+    .transcript-after > .transcript-act:first-child,
+    .transcript-after > .transcript-fork:first-child {
+      margin-left: calc((14px - 44px) / 2);
     }
     .transcript-fold-head,
     .transcript-fork-option {

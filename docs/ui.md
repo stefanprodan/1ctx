@@ -147,13 +147,14 @@ open row's body or a meta. The shared shapes are below.
 
 - **One shell, no header or top bar.** `app/shell.ts` holds its state.
   The rail (the side navigation) is a column the user can hide, kept
-  in `localStorage`. Below 720 wide or 500 tall (`DRAWER`, a phone on
-  its side included) it covers the screen and is never kept. `NARROW`
+  in `localStorage`. Below 720 wide, or 500 tall on touch (`DRAWER`, a
+  phone on its side), it covers the screen and is never kept. `NARROW`
   and `DRAWER` in `shell.ts` are the same queries as in the sheets
   (`shell.css`, `page.css`); change both.
 - **The shell is the visible height.** While a phone's keyboard is
-  up, `watchViewport()` sizes it to the visual viewport (`frameOf()`
-  in `lib/viewport.ts`), so the page never scrolls and its top stays.
+  up, `watchViewport()` sizes and moves it to the visual viewport
+  (`frameOf()` in `lib/viewport.ts`), so its top stays. Under
+  `MIN_SHELL` tall the browser scrolls the field into view instead.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and
@@ -161,8 +162,10 @@ open row's body or a meta. The shared shapes are below.
 - **On touch nothing takes a focus the user did not give,** and every
   field is `--text-touch` (16px), since iOS zooms into a smaller one
   and stays zoomed. Touch is `pointer: coarse`, read in `lib/touch.ts`.
-  On it every tap target takes 44px, set in the sheet that owns it,
-  never changing the desktop's density.
+  On it menu items, `Seg` and `Select` options, rail rows, the reply's
+  actions and the transcript's fold heads take 44px of tap area, set in
+  the sheet that owns them, never changing the desktop's density. The
+  composer's command list and in-field agent list keep 36 and 32.
 - **A page head is `ui/Page.tsx`.** Its actions take no height, so a
   crumb sits in the same place on every page. An object's switcher is
   `PageSwitcher`, a list's New button `PageNew`. A failed load is
