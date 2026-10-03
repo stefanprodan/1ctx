@@ -65,6 +65,7 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   awaits each file's compression on Bun's thread pool, one at a time;
   then writes in one short transaction that rechecks each session by
   key and writes a row only `where packed = 0`, counting the rest as
-  skipped. The main thread only reads, copies and writes. Fork unpacks
-  what it copies (`docs/bash.md`).
+  skipped. The main thread only reads, copies and writes; both scale
+  with a file's size, about 5 ms for 32 MiB. Fork unpacks what it
+  copies (`docs/bash.md`).
 - **No sweep vacuums.** SQLite reuses freed pages.

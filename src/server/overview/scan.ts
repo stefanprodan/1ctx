@@ -99,11 +99,12 @@ export const MESSAGE_BYTES =
   " + coalesce(octet_length(uploads), 0)" +
   " + coalesce(length(packed), 0)";
 
-// a kept file's stored bytes: the frame when packed, else the raw size;
-// quotas count bytes, the raw size, either way. Taken in a materialized
-// CTE before a group by, which would carry data into its sorter
-export const KEPT_BYTES =
-  "case when k.packed = 1 then length(k.data) else k.bytes end";
+// a kept file's stored bytes: data's length (the frame when packed, the
+// file when binary) else the raw size; quotas count bytes either way.
+// length() reads the record header only, where reading packed, the last
+// column, walks a refused row's blobs to its -1. A group by that sorts
+// takes it from a materialized CTE, never data itself
+export const KEPT_BYTES = "coalesce(length(k.data), k.bytes)";
 
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 
@@ -217,10 +218,8 @@ function sessions(db: Db): SessionSum[] {
   );
   const mcp = sums(
     db,
-    `with r as materialized (
-         select k.session_id as id, ${KEPT_BYTES} as bytes
-         from mcp_kept_files k)
-       select id, sum(bytes) as bytes from r group by id`,
+    `select k.session_id as id, sum(${KEPT_BYTES}) as bytes
+       from mcp_kept_files k group by k.session_id`,
   );
   return db
     .query<

@@ -673,8 +673,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       runner.queue.close();
       automations.drain();
       repos.close();
-      // no kept files batch starts from here; a batch is synchronous, so
-      // the wait below is at most for one to commit
+      // no kept files batch starts from here; the wait below is for the
+      // one in flight, its compression and its commit
       const packing = sessions.kept.stop();
       const { drained } = await runner.drain(options.drainMs ?? 0, cut);
       skills.close();

@@ -194,8 +194,8 @@ export function compressKept(raw: Uint8Array): Promise<Uint8Array> {
  * In the caller's transaction: the frame stored over the raw file, or
  * the file left raw for good when the frame is no smaller or the bytes
  * read disagree with its size, which would fail every fork's check.
- * Only a row still at 0 is written, a test the record header answers
- * without the blobs; skipped when the row changed or went.
+ * Only a row still at 0 is written; skipped when the row changed or
+ * went.
  */
 export function writeKeptFrame(
   db: Db,
