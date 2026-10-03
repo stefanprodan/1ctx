@@ -39,16 +39,18 @@ persistence:
 cache:
   # past it the kubelet evicts the pod, and the server's free space
   # check reads the node's disk, not this: keep it above the
-  # repoCacheBytes limit (10 GiB by default) and room for an unpack
+  # repoCacheBytes limit (10 GiB by default) and room for two fetches
   sizeLimit: 12Gi
 
+# one core carries a steady day, a burst of runs needs the limit; see
+# the README for the measured figures
 resources:
   requests:
-    cpu: "2"
-    memory: 2Gi
+    cpu: "1"
+    memory: 1Gi
   limits:
     cpu: "4"
-    memory: 8Gi
+    memory: 4Gi
 
 service:
   type: ClusterIP

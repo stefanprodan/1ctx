@@ -35,8 +35,8 @@ Deployment, Service and claim `onectx`.
 | `persistence.storageClass` | `""` | Empty takes the cluster's default class. |
 | `persistence.existingClaim` | `""` | A claim made outside the chart; the chart then renders none. |
 | `persistence.keep` | `true` | Keep the claim when the release is removed. |
-| `cache.sizeLimit` | `12Gi` | The repositories' cache, an `emptyDir` at `/cache`. Keep it above the `repoCacheBytes` limit (10 GiB by default) and room for an unpack, or the kubelet evicts the pod. |
-| `resources` | requests 2 CPU and 2Gi, limits 4 CPU and 8Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
+| `cache.sizeLimit` | `12Gi` | The repositories' cache, an `emptyDir` at `/cache`. Keep it above the `repoCacheBytes` limit (10 GiB by default) and room for two fetches, or the kubelet evicts the pod. |
+| `resources` | requests 1 CPU and 1Gi, limits 4 CPU and 4Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
 | `service.type` | `ClusterIP` | |
 | `service.port` | `80` | The Service port, sent to the container's 11236. |
 | `ingress.enabled` | `false` | |
@@ -115,8 +115,11 @@ data.
 The repositories' cache is an `emptyDir` at `/cache`, not on the claim:
 it is refetched when lost, so a restart only costs fetches. The server's
 free space check reads the node's disk, so `cache.sizeLimit` must stay
-above the admin's `repoCacheBytes` limit and room for one unpack; past
-the size limit the kubelet evicts the pod.
+above the admin's `repoCacheBytes` limit and room for two fetches at
+once; past the size limit the kubelet evicts the pod, and so does an
+`ephemeral-storage` limit below it. An older chart kept the cache in
+`repos` on the claim; nothing reads that folder now, and it can be
+removed from the volume.
 
 To remove the data with the release, set `persistence.keep: false`, let
 the upgrade apply it, then remove the release. With
@@ -125,10 +128,24 @@ one.
 
 ## Resources
 
-The load bench used about 4 cores and 1.3 to 1.45 GB of memory at 100
-agents. A pod throttled at its CPU limit stretches every command toward
-its deadline, and one at its memory limit is killed in the middle of a
-turn, so raise both limits as the number of agents grows.
+The defaults come from a load test on a local kind cluster
+with a fake model: 500 users,
+500 automations and the busiest hour of a working day (250 chats, 100
+hourly runs and 200 daily runs fired between 09:00 and 09:05).
+
+| Load | CPU | Memory |
+|---|---|---|
+| That hour | about half a core, under one at peak | under 500 MB |
+| Four times that hour | 1 to 2.5 cores, near 4 at peak | under 1 GB |
+
+One core carries the hour; at four times it a pod held to one core is
+saturated, its commands wait out their deadline for a slot and pages
+stall for seconds. The figures are on Apple silicon desktop cores; on
+cloud x86 vCPUs plan for two to three times the CPU, the request
+included. A pod throttled at
+its CPU limit stretches every command toward its deadline, and one at
+its memory limit is killed in the middle of a turn, so raise both limits
+as the number of agents grows.
 
 ## Provisioning
 
