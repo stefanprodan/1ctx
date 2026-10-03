@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The catalog of discovery mode and the mode the token cap picks,
-// shared by the server and the page. Environment neutral: no Bun, no
-// DOM, no packages.
+// The catalog of discovery mode and the mode the token cap picks, read
+// by the server's offer and the Directory. Environment neutral: no Bun,
+// no DOM, no packages.
 
 import { cutText, type PromptServer } from "./mcp.ts";
 import { escapeText } from "./skills.ts";
@@ -14,7 +14,7 @@ export const MCP_CATALOG_FROM_TOKENS = 6000;
 export const MAX_CATALOG = 16_000;
 export const MAX_CATALOG_LINE = 160;
 export const CATALOG_LEAD =
-  "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its parameters, then mcp_call with the name and the arguments. Each line is a tool's name, its arguments and what it does. A ? after an argument marks it optional. mcp_describe gives the type and meaning of each argument.";
+  "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its arguments, then mcp_call with the name and the arguments. Each line is a tool's name, its arguments and what it does. A ? after an argument marks it optional. mcp_describe gives the type and meaning of each argument.";
 const CATALOG_OPEN = `${CATALOG_LEAD}\n\n<available_mcp_tools>\n`;
 const CATALOG_CLOSE = "</available_mcp_tools>";
 

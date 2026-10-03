@@ -299,6 +299,41 @@ describe("the lean schema", () => {
     expect(cyclic.$defs).toBeDefined();
   });
 
+  test("a top-level $ref keeps its arguments beside discovery's map", () => {
+    // discovery adds an empty properties to every schema
+    const discovered = {
+      $ref: "#/$defs/x",
+      properties: {},
+      $defs: {
+        x: {
+          type: "object",
+          properties: { p: {}, q: {} },
+          required: ["p"],
+        },
+      },
+    };
+    expect(wireSchema(discovered)).toEqual({
+      type: "object",
+      properties: { p: {}, q: {} },
+      required: ["p"],
+    });
+    expect(
+      wireSchema({
+        $ref: "#/$defs/x",
+        properties: { r: {} },
+        required: ["r", "p"],
+        $defs: discovered.$defs,
+      }),
+    ).toEqual({
+      type: "object",
+      properties: { p: {}, q: {}, r: {} },
+      required: ["p", "r"],
+    });
+    expect(catalogArguments(JSON.stringify(wireSchema(discovered)))).toBe(
+      "(p, q?)",
+    );
+  });
+
   test("is deterministic and keeps the recorded servers' schemas valid", () => {
     for (const name of ["flux", "flux-docs", "flux-schema", "github"]) {
       for (const tool of recorded(name).tools.tools) {
@@ -338,6 +373,16 @@ describe("the lean schema", () => {
     expect(cutText("abc", 3)).toBe("abc");
     expect(cutText("abcd", 3)).toBe("ab…");
     expect(cutText("", 3)).toBe("");
+    // never half a surrogate pair, never a blank before the ellipsis
+    expect(cutText("ab\u{1F600}cd", 4)).toBe("ab\u2026");
+    expect(cutText("a\u{1F600}cd", 4)).toBe("a\u{1F600}\u2026");
+    expect(cutText("ab \n cd", 5)).toBe("ab\u2026");
+    expect(
+      firstSentence(`${"x".repeat(MAX_CATALOG_LINE - 2)}\u{1F600}yyy`),
+    ).toBe(`${"x".repeat(MAX_CATALOG_LINE - 2)}\u2026`);
+    expect(firstSentence(`${"x".repeat(MAX_CATALOG_LINE - 2)} yyy`)).toBe(
+      `${"x".repeat(MAX_CATALOG_LINE - 2)}\u2026`,
+    );
   });
 
   test("a description inside the schema is cut with an ellipsis", () => {
@@ -388,7 +433,7 @@ describe("the lean schema", () => {
     expect(count("flux")).toBe(2664);
     expect(count("flux-schema")).toBe(506);
     expect(count("flux-docs")).toBe(481);
-    expect(count("github")).toBe(11815);
+    expect(count("github")).toBe(11813);
   });
 
   test("sortOffered puts servers, then tools, in one order", () => {
@@ -803,6 +848,6 @@ describe("the catalog and the mode", () => {
     expect(resolveMode("catalog", 0)).toBe("catalog");
     // the three Flux servers stay direct, GitHub flips
     expect(resolveMode("auto", 2664 + 506 + 481)).toBe("all");
-    expect(resolveMode("auto", 11815)).toBe("catalog");
+    expect(resolveMode("auto", 11813)).toBe("catalog");
   });
 });

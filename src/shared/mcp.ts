@@ -166,9 +166,13 @@ function resolveRef(root: unknown, ref: string): unknown {
 }
 
 // a cut text ends in an ellipsis inside the cap, so the model never
-// reads a cut as the whole text
+// reads a cut as the whole text; a cut never splits a surrogate pair
 export function cutText(text: string, cap: number): string {
-  return text.length <= cap ? text : `${text.slice(0, cap - 1)}…`;
+  if (text.length <= cap) return text;
+  let end = cap - 1;
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return `${text.slice(0, end).trimEnd()}…`;
 }
 
 export function wireDescription(text: string): string {
@@ -183,6 +187,19 @@ export function wireSchema(schema: unknown): unknown {
     delete out.definitions;
   }
   return out;
+}
+
+// what sits beside a $ref joins what it inlined: discovery adds an
+// empty `properties` to every schema, which must not erase the target's
+function mergeBeside(key: string, inlined: unknown, beside: unknown): unknown {
+  if (beside === undefined) return inlined;
+  if (SCHEMA_MAPS.has(key) && isRecord(inlined) && isRecord(beside)) {
+    return { ...inlined, ...beside };
+  }
+  if (key === "required" && Array.isArray(inlined) && Array.isArray(beside)) {
+    return [...new Set([...inlined, ...beside])];
+  }
+  return beside;
 }
 
 function leanSchema(
@@ -203,7 +220,7 @@ function leanSchema(
       const rest = leanSchema({ ...node, $ref: undefined }, root, path, state);
       if (isRecord(inlined) && isRecord(rest)) {
         for (const key of Object.keys(rest)) {
-          if (rest[key] !== undefined) inlined[key] = rest[key];
+          inlined[key] = mergeBeside(key, inlined[key], rest[key]);
         }
       }
       return inlined;
