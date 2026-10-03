@@ -20,7 +20,6 @@ import {
   type Fetcher,
   type ListedTool,
   scrub,
-  validateArguments,
   withClient,
 } from "./client.ts";
 import { discover, fingerprint } from "./discover.ts";
@@ -33,6 +32,7 @@ import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
 import { routes, type UsagePort } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
+import { validateArguments } from "./validate.ts";
 
 export {
   parseMcpKeyName,

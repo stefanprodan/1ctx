@@ -10,10 +10,10 @@ reach the model in the sends of agents linked to it.
 
 ## Servers
 
-- **`mcp/client.ts` is the SDK's one importer.** The wire is
-  `@modelcontextprotocol/client` v2 over Streamable HTTP, `auto`
-  negotiation. One client per discovery or call, every response under
-  one byte budget per client.
+- **`mcp/client.ts` and `mcp/validate.ts` alone import the SDK.** The
+  wire is `@modelcontextprotocol/client` v2 over Streamable HTTP,
+  `auto` negotiation. One client per discovery or call, every response
+  under one byte budget per client.
 - **The key is a bearer and never comes back.** It is read from
   `mcp-<name>.key` and scrubbed from every string the server sends.
   Every server string is cut and shown as text; `parametersHtml` is the
@@ -58,7 +58,10 @@ reach the model in the sends of agents linked to it.
   `mcp_call` before its row is written.
 - **Arguments are checked before anything goes out.**
   `validateArguments` checks them against the stored schema in both
-  modes. A schema the validator cannot compile lets the call through.
+  modes (`mcp/validate.ts`). A schema the validator cannot compile lets
+  the call through. Validators are kept by the schema's text, at most
+  `MAX_VALIDATORS`, since Ajv keeps every schema object it compiles and
+  each send parses its schemas afresh.
 - **A call runs under the snapshot.** One client per call over the
   snapshot's URL and key name, under the server's `timeoutMs` or the
   call timeout.
