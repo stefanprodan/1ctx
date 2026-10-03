@@ -11,7 +11,7 @@
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
-import { useLayoutEffect } from "preact/hooks";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { finishWords } from "../../shared/finish.ts";
@@ -23,6 +23,7 @@ import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { CopyButton } from "./Copy.tsx";
 import { ForkButton, type OnFork } from "./Fork.tsx";
+import { useHeldHeight } from "./hold.ts";
 import { endedBy, type ReplyNode, type WorkNode } from "./rows.ts";
 import { Summary } from "./Summary.tsx";
 import { type Live, leadIn, tail } from "./stream.ts";
@@ -144,6 +145,8 @@ export function Reply({
   useLayoutEffect(() => {
     if (shown !== null) follow?.();
   }, [shown, follow]);
+  const answer = useRef<HTMLDivElement>(null);
+  useHeldHeight(answer, current !== null);
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
   const served = servedBy(m);
@@ -198,16 +201,20 @@ export function Reply({
           />
         )}
         {visuals}
-        {html !== "" && !lead && (
-          // the server renders the markdown with raw HTML off: render/
-          // is the safety boundary
-          <div
-            class="transcript-md"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        )}
-        {current !== null && !lead && (
-          <div class="transcript-tail">{tail(current)}</div>
+        {(html !== "" || current !== null) && !lead && (
+          <div class="transcript-answer" ref={answer}>
+            {html !== "" && (
+              // the server renders the markdown with raw HTML off:
+              // render/ is the safety boundary
+              <div
+                class="transcript-md"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            )}
+            {current !== null && (
+              <div class="transcript-tail">{tail(current)}</div>
+            )}
+          </div>
         )}
         {node.summary !== null && (
           <Summary message={node.summary} live={live} retry={retry} />
