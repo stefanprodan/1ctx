@@ -14,6 +14,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
 - **The access matrix is checked against the composed route list,**
   health and ready included.
+- **Only `/api/*` goes through the router.** The page, its bundle and
+  the files `serve()` takes by a fixed path (the manifest's icons) are
+  public static files outside it, with no row in the matrix.
 
 ## Logins
 

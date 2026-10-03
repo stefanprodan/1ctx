@@ -136,7 +136,11 @@ words.
   `tools/visual-theme.ts` alone defines the frame's colours, as a
   separate document outside the client stylesheet rules.
   `tools/visual-scheme.ts` rewrites `prefers-color-scheme` and
-  `matchMedia` to answer the chat's theme.
+  `matchMedia` to answer the chat's theme. The frame opens as
+  `/api/visual?scheme=<light|dark>`, the page's scheme at mount, and
+  the shell starts in it: a scheme unlike the iframe's paints an opaque
+  canvas until the theme lands. The iframe stays hidden until its first
+  load, since Safari paints an unloaded one white.
 - **A whole page keeps a readable ground.** It loses its backdrop only
   when its text reads on the chat's ground at 4.5:1 (`visualGround()`).
   Otherwise, with no background of its own, it gets the

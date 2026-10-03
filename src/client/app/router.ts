@@ -34,14 +34,47 @@ export function navigate(to: string, replace = false): void {
   });
 }
 
+export type Link = {
+  origin: string;
+  pathname: string;
+  download: boolean;
+  // target="_blank", which rendered markdown gives every link
+  blank: boolean;
+};
+
+// a same-origin link opens in place unless it is a download or asks for
+// a new tab. An installed app has no tabs: a new one would leave it
+// for the browser, so there a page of the app opens in place even from
+// a rendered reply, and only the API, another origin, mailto and a
+// download leave
+export function inApp(
+  link: Link,
+  origin: string,
+  standalone: boolean,
+): boolean {
+  if (link.origin !== origin || link.download) return false;
+  if (!link.blank) return true;
+  return (
+    standalone && link.pathname !== "/api" && !link.pathname.startsWith("/api/")
+  );
+}
+
+const STANDALONE = "(display-mode: standalone)";
+
 // the click on any in-page link goes through navigate, so the page
 // never reloads
 function onLinkClick(event: MouseEvent): void {
   if (event.defaultPrevented || event.button !== 0) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const anchor = (event.target as HTMLElement).closest("a");
-  if (anchor === null || anchor.origin !== location.origin) return;
-  if (anchor.hasAttribute("download") || anchor.target === "_blank") return;
+  if (anchor === null) return;
+  const link = {
+    origin: anchor.origin,
+    pathname: anchor.pathname,
+    download: anchor.hasAttribute("download"),
+    blank: anchor.target === "_blank",
+  };
+  if (!inApp(link, location.origin, matchMedia(STANDALONE).matches)) return;
   event.preventDefault();
   navigate(anchor.pathname + anchor.search);
 }

@@ -6,8 +6,17 @@
       http-equiv="Content-Security-Policy"
       content="frame-src 'self'"
     />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#131314" />
+    <!-- installed on iOS: "default" paints the status bar in the
+         theme-color, which app/theme.ts keeps in the page colour, and
+         picks dark or light text to match; "black-translucent" keeps
+         white text over the light theme -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="1ctx" />
     <script>
       // the theme before the first paint; app/theme.ts takes over
       (() => {
@@ -15,16 +24,26 @@
         try {
           kept = localStorage.getItem("theme");
         } catch {}
-        document.documentElement.dataset.theme =
+        var theme =
           kept === "light" || kept === "dark"
             ? kept
             : matchMedia("(prefers-color-scheme: light)").matches
               ? "light"
               : "dark";
+        document.documentElement.dataset.theme = theme;
+        // the light --page, so an installed app's status bar starts in it
+        if (theme === "light")
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", "#f4f2ec");
       })();
     </script>
     <title>1ctx</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <!-- its icons are named by fixed paths that main.ts serves, since
+         the bundler hashes this file without rewriting what it names -->
+    <link rel="manifest" href="./manifest.webmanifest" />
   </head>
   <body>
     <div id="app"></div>

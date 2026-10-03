@@ -69,6 +69,10 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
   before the watchers' frame.
 - **A cut row is read whole before Edit or Send again.** Frames carry a
   preview cut at `QUEUED_PREVIEW` (`readQueued()`).
+- **A chat opens at its end, and until the first input follows rows
+  that grow with no render** (a font swap, a visual loading). Any
+  pointer, click, wheel or key ends it, so a fold or Show all the user
+  opened is never snapped away.
 
 ## The composer
 

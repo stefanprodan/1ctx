@@ -155,6 +155,23 @@ open row's body or a meta. The shared shapes are below.
   up, `watchViewport()` sizes and moves it to the visual viewport
   (`frameOf()` in `lib/viewport.ts`), so its top stays. Under
   `MIN_SHELL` tall the browser scrolls the field into view instead.
+- **The app installs to a phone's Home Screen.** `manifest.webmanifest`
+  and its icons sit beside `index.html`, copies of the brand's files in
+  `site/`, made as `site/README.md` says. The bundler hashes what the
+  page links but not the URLs inside the manifest, so the manifest
+  names its icons by fixed paths that `main.ts` embeds and serves
+  beside the page.
+- **An edge element clears the safe area.** With `viewport-fit=cover`
+  the page runs under the notch and the home indicator, so whatever
+  touches the screen's edge pads by `env(safe-area-inset-*)`, 0 off a
+  phone. In the shell that is `--shell-inset-top`,
+  `--shell-inset-bottom`, `--shell-left` and `--shell-right`
+  (`shell.css`); the bottom one drops while the keyboard is up.
+- **A link to another origin opens a new tab,** which an installed app
+  hands to Safari. The markdown renderer gives every link
+  `target="_blank" rel="noopener"`; in an installed app
+  (`display-mode: standalone`) the router's `inApp()` still opens a
+  page of the app in place, so it never leaves the app.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and
@@ -182,8 +199,12 @@ The stylesheet rules the structure test enforces are in AGENTS.md.
   for dark on `:root` and for light on `:root[data-theme="light"]`;
   no other stylesheet knows the theme. `app/theme.ts` sets
   `data-theme`, and the inline script in `index.html` sets it before
-  the first paint. Script that needs a colour reads the computed
-  token, as the visual frame and the plots do.
+  the first paint, with the `theme-color` meta. That meta is the page
+  colour, which an installed app on iOS paints its status bar in, with
+  text to match (`apple-mobile-web-app-status-bar-style` `default`;
+  `black-translucent` keeps white text over the light theme). Script
+  that needs a colour reads the computed token, as the visual frame
+  and the plots do.
 - **A fill under the pointer or a picked option is `--hover`,** never
   `--line`, `--card` or `--inset`. The rail is the exception: its
   ground is `--rail` and its lit fill `--card`. A word on a brand fill

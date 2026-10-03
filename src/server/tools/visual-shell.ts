@@ -44,7 +44,19 @@ export function visualCsp(hosts: string[]): string {
   ].join("; ");
 }
 
-export function visualDocument(): string {
+export type VisualScheme = "light" | "dark";
+
+// the frame opens in the chat's scheme, named in its URL: a document whose
+// scheme differs from its iframe's paints an opaque canvas until the
+// theme message lands, white on a dark chat
+export function visualScheme(request?: Request): VisualScheme {
+  if (!request) return "light";
+  return new URL(request.url).searchParams.get("scheme") === "dark"
+    ? "dark"
+    : "light";
+}
+
+export function visualDocument(scheme: VisualScheme = "light"): string {
   const helpers = {
     clean: cleanVisual,
     inert: inertVisual,
@@ -66,7 +78,7 @@ export function visualDocument(): string {
   ].join(",\n");
   const script = `${idiomorph}\n;(${bootVisual.toString()})({${source}}, Idiomorph);`;
   return `<!doctype html>
-<html data-theme="light"><head>
+<html data-theme="${scheme}"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Visual</title>
@@ -76,10 +88,14 @@ export function visualDocument(): string {
 </body></html>`;
 }
 
-const document = visualDocument();
+const documents: Record<VisualScheme, string> = {
+  light: visualDocument("light"),
+  dark: visualDocument("dark"),
+};
 
 export function visualShell(hosts: string[], request?: Request): Response {
   const csp = visualCsp(hosts);
+  const document = documents[visualScheme(request)];
   const etag = `"${new Bun.CryptoHasher("sha256")
     .update(document)
     .update(csp)

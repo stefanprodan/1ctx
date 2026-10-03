@@ -45,6 +45,7 @@ test("the listener admits upload bytes while JSON routes keep their own caps", a
     hostname: "127.0.0.1",
     port: 0,
     page,
+    files: {},
     development: false,
     trustProxy: false,
     socket: app.socket,

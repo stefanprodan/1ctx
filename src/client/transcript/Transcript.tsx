@@ -75,6 +75,10 @@ export function Transcript({
   const rows = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement | null>(null);
   const stick = useRef(true);
+  // from a chat's opening to the user's first input, rows that grow with
+  // no render (a font swap, a visual loading) are followed; after it a
+  // fold or Show all the user opened must stay where it is
+  const settling = useRef(true);
   const last = useRef<Box>({ top: 0, height: 0, client: 0 });
   const jumpHidden = useSignal(true);
 
@@ -116,6 +120,7 @@ export function Transcript({
     // rows that shrink while the view is at the top move nothing, so no
     // scroll event tells Jump that the end is in view again
     const resized = new ResizeObserver(() => {
+      if (settling.current && stick.current) toEnd();
       const gap =
         scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
       if (gap < 40) stick.current = true;
@@ -123,11 +128,21 @@ export function Transcript({
     });
     resized.observe(el);
     const onClick = (ev: MouseEvent) => void copyCode(ev);
+    const settled = () => {
+      settling.current = false;
+    };
+    const inputs = ["pointerdown", "click", "wheel", "keydown"] as const;
+    for (const name of inputs) {
+      window.addEventListener(name, settled, { capture: true, passive: true });
+    }
     scroller.addEventListener("scroll", onScroll);
     el.addEventListener("click", onClick);
     return () => {
       grown.disconnect();
       resized.disconnect();
+      for (const name of inputs) {
+        window.removeEventListener(name, settled, { capture: true });
+      }
       scroller.removeEventListener("scroll", onScroll);
       el.removeEventListener("click", onClick);
     };
@@ -136,6 +151,7 @@ export function Transcript({
   // a chat opens at its end
   useLayoutEffect(() => {
     stick.current = true;
+    settling.current = true;
     if (box.current === null && rows.current) {
       box.current = scrollParent(rows.current);
     }
