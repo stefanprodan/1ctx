@@ -25,6 +25,7 @@ export function placeOf({
 }: {
   button: Box;
   frame: { top: number; left: number };
+  // the window's width and the bottom of what is visible in it
   view: { width: number; height: number };
   // null takes the whole room
   width: number | null;

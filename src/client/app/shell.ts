@@ -102,6 +102,7 @@ export function fixedFrame(el: Element): { top: number; left: number } {
   if (shell === null || getComputedStyle(shell).transform === "none") {
     return { top: 0, left: 0 };
   }
+  // the shell has no border, so its box is the frame
   const box = shell.getBoundingClientRect();
   return { top: box.top, left: box.left };
 }

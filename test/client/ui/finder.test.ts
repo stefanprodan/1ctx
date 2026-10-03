@@ -64,3 +64,16 @@ test("a button near the window's bottom gets the least height", () => {
     }).maxHeight,
   ).toBe(160);
 });
+
+test("a keyboard's top bounds the panel, not the window's bottom", () => {
+  const visible = { width: 402, height: 420 };
+  expect(
+    placeOf({
+      button: { top: 160, bottom: 192, left: 16, right: 116 },
+      frame: still,
+      view: visible,
+      width: null,
+      align: "left",
+    }).maxHeight,
+  ).toBe(420 - 196 - 16);
+});

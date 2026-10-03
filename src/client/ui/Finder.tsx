@@ -19,6 +19,12 @@ import {
 } from "./Select.model.ts";
 import "./finder.css";
 
+// the window's bottom a phone's keyboard leaves, in the window's numbers
+const visibleBottom = (): number => {
+  const view = window.visualViewport;
+  return view ? view.offsetTop + view.height : window.innerHeight;
+};
+
 export type FinderOption = Option & {
   sub?: string;
   subBad?: boolean;
@@ -102,7 +108,7 @@ export function Finder({
     place.value = placeOf({
       button: el.getBoundingClientRect(),
       frame: fixedFrame(el),
-      view: { width: window.innerWidth, height: window.innerHeight },
+      view: { width: window.innerWidth, height: visibleBottom() },
       width: matchMedia(NARROW).matches ? null : wide ? 380 : 280,
       align,
     });
@@ -130,7 +136,10 @@ export function Finder({
     // the shell's box scrolls under a fixed panel: it follows the button
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
+    // a phone's keyboard resizes only the visual viewport
+    window.visualViewport?.addEventListener("resize", measure);
     return () => {
+      window.visualViewport?.removeEventListener("resize", measure);
       document.removeEventListener("pointerdown", onPress);
       document.removeEventListener("focusin", onFocus);
       document.removeEventListener("keydown", onKey);
