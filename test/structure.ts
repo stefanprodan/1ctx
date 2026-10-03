@@ -94,7 +94,7 @@ export const FORBIDDEN_HOSTS = [
 const SERVER_ROOT_FILES = new Set(["main.ts", "compose.ts"]);
 
 // the extensions an import may name; a bare specifier is refused
-const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2)$/;
+const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png)$/;
 
 // the two stylesheets with global reach, and where they live
 const TOKENS = join("client", "style", "tokens.css");

@@ -19,7 +19,7 @@
     position: sticky;
     bottom: 0;
     z-index: 1;
-    padding-bottom: var(--shell-inset, 0px);
+    padding-bottom: var(--shell-inset-bottom, 0px);
     background: var(--page);
   }
 

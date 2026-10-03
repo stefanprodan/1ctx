@@ -53,6 +53,7 @@ export async function setupUploads(
           hostname: "127.0.0.1",
           port: 0,
           page,
+          files: {},
           development: false,
           trustProxy: false,
           socket: app.socket,

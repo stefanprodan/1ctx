@@ -3,10 +3,13 @@
 //
 // Bun.serve with two routes: /api/* through the router, everything else
 // the page. Bun bundles the page's script and stylesheet from the HTML
-// import; ONECTX_DEV=1 makes that on demand with hot reload. The socket
+// import; ONECTX_DEV=1 makes that on demand with hot reload. The
+// files the manifest names by a fixed path, its icons, are served
+// beside the page, public as the page is. The socket
 // route upgrades through the router like any other route; the
 // websocket handlers hand each connection to the socket module.
 
+import { readFileSync } from "node:fs";
 import type { HTMLBundle, ServerWebSocket } from "bun";
 import { MAX_REQUEST_BYTES } from "../lib/body.ts";
 import { lastForwarded, type Router } from "./router.ts";
@@ -31,6 +34,8 @@ export type ServeOptions = {
   hostname: string;
   port: number;
   page: HTMLBundle;
+  // a fixed path to the file served there
+  files: Readonly<Record<string, string>>;
   handle: Router;
   socket: SocketHandlers;
   // the client address is the socket's, or with a trusted proxy the
@@ -52,12 +57,22 @@ export function clientAddress(
 }
 
 export function serve(options: ServeOptions) {
+  // static answers, read once: Bun answers HEAD and ETag for them
+  const files = Object.fromEntries(
+    Object.entries(options.files).map(([path, file]) => [
+      path,
+      new Response(readFileSync(file), {
+        headers: { "content-type": Bun.file(file).type },
+      }),
+    ]),
+  );
   const server = Bun.serve({
     hostname: options.hostname,
     port: options.port,
     development: options.development,
     maxRequestBodySize: MAX_REQUEST_BYTES,
     routes: {
+      ...files,
       "/api/*": (req, server) =>
         options.handle(
           req,

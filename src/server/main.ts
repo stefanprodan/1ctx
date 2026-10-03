@@ -8,6 +8,9 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import pkg from "../../package.json";
+import icon192 from "../client/icon-192.png";
+import icon512 from "../client/icon-512.png";
+import maskable from "../client/icon-maskable-512.png";
 import page from "../client/index.html";
 import type { SecretKind } from "../shared/words.ts";
 import { TOUCH_AFTER_MS } from "./access/index.ts";
@@ -178,6 +181,13 @@ const { server, stop } = serve({
   hostname,
   port,
   page,
+  // the manifest's icons: the bundler hashes what the page links but
+  // leaves the URLs inside the manifest alone, so they keep fixed paths
+  files: {
+    "/icon-192.png": icon192,
+    "/icon-512.png": icon512,
+    "/icon-maskable-512.png": maskable,
+  },
   handle: app.handle,
   socket: app.socket,
   trustProxy,

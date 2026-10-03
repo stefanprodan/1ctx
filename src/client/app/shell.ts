@@ -89,6 +89,10 @@ export function watchViewport(): void {
     // back to its top; where the browser keeps the visual viewport
     // lower, the offset stays and the shell with it
     set("--shell-top", frame.top);
+    // the keyboard covers the home indicator, so its safe area is room
+    // wasted above the keyboard
+    if (frame.height === null) root.style.removeProperty("--shell-safe-bottom");
+    else root.style.setProperty("--shell-safe-bottom", "0px");
     if (frame.top > 0) window.scrollTo(0, 0);
   };
   view.addEventListener("resize", apply);
