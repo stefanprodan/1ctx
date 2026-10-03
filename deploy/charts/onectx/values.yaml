@@ -22,7 +22,7 @@ secureCookie: true
 secrets:
   # the Secret mounted at /secrets, never made by the chart: user-admin.key
   # and the <kind>-<name>.key files
-  existingSecret: 1ctx
+  existingSecret: onectx
 
 persistence:
   # the database
@@ -42,8 +42,7 @@ cache:
   # folders running turns hold go past repoCacheBytes; see the README
   sizeLimit: ""
 
-# one core carries a steady day, a burst of runs needs the limit; see
-# the README for the measured figures
+# one core carries a steady day, a burst of runs needs the limit
 resources:
   requests:
     cpu: "1"

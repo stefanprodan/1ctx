@@ -1,5 +1,5 @@
 apiVersion: v2
-name: 1ctx
+name: onectx
 description: One continuous context for agents.
 type: application
 # the release sets both from the tag: version without the v, appVersion with it

@@ -5,9 +5,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "1ctx.fullname" . }}
+  name: {{ include "onectx.fullname" . }}
   labels:
-    {{- include "1ctx.labels" . | nindent 4 }}
+    {{- include "onectx.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -20,7 +20,7 @@ spec:
   tls:
     - hosts:
         - {{ .Values.ingress.host | quote }}
-      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "1ctx.fullname" .)) }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "onectx.fullname" .)) }}
   {{- end }}
   rules:
     - host: {{ .Values.ingress.host | quote }}
@@ -30,7 +30,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "1ctx.fullname" . }}
+                name: {{ include "onectx.fullname" . }}
                 port:
                   name: http
 {{- end }}

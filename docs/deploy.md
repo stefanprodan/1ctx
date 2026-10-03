@@ -100,7 +100,7 @@ never written in a tracked file.
 
 ## Kubernetes
 
-`deploy/charts/1ctx/` is the Helm chart, `deploy/flux/` installs it with
+`deploy/charts/onectx/` is the Helm chart, `deploy/flux/` installs it with
 Flux. Its README holds the values; these are the rules.
 
 - **The templates fix what the server needs, never as values.** One
@@ -110,9 +110,7 @@ Flux. Its README holds the values; these are the rules.
   value for any of these needs a reason the server gives.
 - **The chart never makes the Secret.** It names one
   (`secrets.existingSecret`) and mounts it whole at `/secrets`, never by
-  `subPath`, which would never see a rotated key. No doc tells the
-  reader to run `kubectl`: every step is a value, a file in Git or a
-  Flux object.
+  `subPath`, which would never see a rotated key.
 - **The claim the chart renders is kept by default**
   (`helm.sh/resource-policy: keep`), so removing the release never
   removes the database. `fsGroupChangePolicy: OnRootMismatch` spares a
@@ -126,8 +124,9 @@ Flux. Its README holds the values; these are the rules.
   passed only when one of them is set.
 - **An Ingress and a Gateway API `HTTPRoute` are both optional.** The
   Gateway is the cluster's; the chart only attaches a route.
-- **A Service name must start with a letter.** The names helper spells
-  a leading `1ctx` as `onectx`.
+- **The chart is named `onectx`,** since a Service name must start with
+  a letter; the names helper fails a release name that starts with a
+  digit rather than rename it.
 - **`values.schema.json` refuses unknown keys.** A new value is typed
   there, in `values.yaml` and in the README's table in one change.
 
@@ -156,4 +155,4 @@ Flux. Its README holds the values; these are the rules.
   for it and for the archives' checksums.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
-  `oci://ghcr.io/stefanprodan/charts/1ctx`, with provenance attested.
+  `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.

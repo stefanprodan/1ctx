@@ -1,6 +1,6 @@
-{{- $name := include "1ctx.fullname" . -}}
-{{- $provision := include "1ctx.provisionConfigMap" . -}}
-1ctx {{ include "1ctx.version" . }} is installed as {{ $name }} in the namespace {{ .Release.Namespace }}.
+{{- $name := include "onectx.fullname" . -}}
+{{- $provision := include "onectx.provisionConfigMap" . -}}
+1ctx {{ include "onectx.version" . }} is installed as {{ $name }} in the namespace {{ .Release.Namespace }}.
 
 The pod starts once the Secret {{ .Values.secrets.existingSecret }} exists in {{ .Release.Namespace }}.
 It holds user-admin.key, the first admin's password, and the provider,
