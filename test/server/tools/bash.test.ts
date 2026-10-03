@@ -10,6 +10,7 @@ import {
   acquireSession,
   heldSessions,
 } from "../../../src/server/bash/queue.ts";
+import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { DEFAULT_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
@@ -146,7 +147,9 @@ describe("bash", () => {
       ctx.budget.bashCalls = 1;
       const registry = new Registry([makeBashTool(s.bash)]);
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
+        Array.from({ length: PROCESS_SLOTS }, () =>
+          acquireProcess(freshSignal()),
+        ),
       );
       let releaseSession: (() => void) | undefined;
       try {

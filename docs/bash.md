@@ -50,6 +50,16 @@ of that shell that shows a file on the chat page.
   queues. The interpreter stops at the call timeout with exit 124 and
   its own output; the worker is ended `BACKSTOP_MS` later, and the tool
   registry waits half a second past that (`graceMs`).
+- **A deadline in a queue is `busy`.** A command whose deadline, or the
+  registry's timer, passes before it holds its slots, or that holds them
+  with under `MIN_RUN_MS` of the call timeout left, never runs: cause
+  `busy`, phase `queue`. The longer of its two waits picks the words:
+  the process slot, or the chat's own commands (combine steps).
+  Neither invites a retry at once, which rejoins the queue at its back.
+  An abort or shutdown while queued stays `abort`.
+- **A late start is named.** A command that waited over a second for
+  its slots and then ended at the deadline opens its result with how
+  long it waited, behind whom, and how long it had to run.
 - **An abort posts a cancel first.** Unanswered within
   `CANCEL_GRACE_MS`, the worker is ended. Shutdown ends every worker.
 - **A result is the output, then its tail.** stdout then stderr, cut to
@@ -110,7 +120,10 @@ of that shell that shows a file on the chat page.
   or 126, or a throw discards both writable trees. Any other exit,
   nonzero included, commits in one transaction (`bash/commit.ts`): docs
   through `commitDocs`, then scratch. An overflow rolls both back.
-- **At most four commands hold mounts at once.** The per-chat queue
+- **A process slot per core holds a mount.** `PROCESS_SLOTS` is the
+  cores read at start (a container's CPU limit, floored), at least 4
+  (a command waiting on the network holds one idle) and at most 16,
+  logged at `startup`. The per-chat queue
   (`bash/queue.ts`) is taken before a process slot (`acquireProcess()`,
   shared with uploads) and released after it.
 - **Written doc paths go on the tool row.** `finishTool` stores them as

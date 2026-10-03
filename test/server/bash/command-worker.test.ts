@@ -14,6 +14,7 @@ import {
   type CommandHooks,
   commandWorkers,
 } from "../../../src/server/bash/worker.ts";
+import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { collectLogs } from "../../helpers/app.ts";
@@ -303,7 +304,7 @@ describe("the command worker", () => {
         expect(result.content).toStartWith("nothing saved: ");
         expect(heldSessions().has(s.session.id)).toBe(false);
         const slots: (() => void)[] = [];
-        for (let i = 0; i < 4; i++)
+        for (let i = 0; i < PROCESS_SLOTS; i++)
           slots.push(await acquireProcess(AbortSignal.timeout(1000)));
         for (const release of slots) release();
       } finally {

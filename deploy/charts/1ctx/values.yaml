@@ -25,7 +25,7 @@ secrets:
   existingSecret: 1ctx
 
 persistence:
-  # the database and the repositories' cache
+  # the database
   size: 100Gi
   # empty takes the cluster's default class
   storageClass: ""
@@ -34,13 +34,23 @@ persistence:
   # keep the claim when the release is removed
   keep: true
 
+# the repositories' cache, an emptyDir: it is refetched when lost, so it
+# never takes the claim's space or its backups
+cache:
+  # empty: the node's disk bounds it, which the server's free space
+  # check reads. Past a set limit the kubelet evicts the pod, and the
+  # folders running turns hold go past repoCacheBytes; see the README
+  sizeLimit: ""
+
+# one core carries a steady day, a burst of runs needs the limit; see
+# the README for the measured figures
 resources:
   requests:
-    cpu: "2"
-    memory: 2Gi
+    cpu: "1"
+    memory: 1Gi
   limits:
     cpu: "4"
-    memory: 8Gi
+    memory: 4Gi
 
 service:
   type: ClusterIP

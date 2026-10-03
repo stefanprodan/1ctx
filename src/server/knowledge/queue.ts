@@ -9,9 +9,9 @@ import { UPLOAD_RUNNING } from "../../shared/uploads.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, ServiceUnavailable } from "../lib/errors.ts";
 import { Queue } from "../lib/queue.ts";
-import { ARCHIVE_DEADLINE_MS, KNOWLEDGE_COMMANDS_IN_FLIGHT } from "./limits.ts";
+import { ARCHIVE_DEADLINE_MS, PROCESS_SLOTS } from "./limits.ts";
 
-const processQueue = new Queue(KNOWLEDGE_COMMANDS_IN_FLIGHT);
+const processQueue = new Queue(PROCESS_SLOTS);
 const uploads = new Set<string>();
 
 export const acquireProcess = (signal: AbortSignal) =>

@@ -51,7 +51,7 @@ export type Settled =
   | {
       ok: false;
       phase: CommandPhase;
-      cause: Exclude<CommandCause, "limit">;
+      cause: Exclude<CommandCause, "limit" | "busy">;
       // the start notice, when the worker got that far
       notice: string;
       error?: Error;
@@ -127,7 +127,10 @@ export function commandWorkers(
         worker.terminate();
         resolve(result);
       };
-      const fail = (cause: Exclude<CommandCause, "limit">, error?: Error) =>
+      const fail = (
+        cause: Exclude<CommandCause, "limit" | "busy">,
+        error?: Error,
+      ) =>
         finish({
           ok: false,
           phase,

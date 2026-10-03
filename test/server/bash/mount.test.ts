@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { KNOWLEDGE_COMMANDS } from "../../../src/server/bash/commands.ts";
+import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
@@ -404,12 +405,12 @@ describe("bash command mounts", () => {
   });
 
   test.serial(
-    "only four mounts run process-wide; queued commands time out or wait",
+    "at most PROCESS_SLOTS mounts run process-wide; queued commands wait or end busy",
     async () => {
       const first = setup();
       const second = setup();
       const controllers = Array.from(
-        { length: 4 },
+        { length: PROCESS_SLOTS },
         () => new AbortController(),
       );
       const pending = controllers.map((controller, i) =>
@@ -436,7 +437,10 @@ describe("bash command mounts", () => {
           second.makeSession().id,
         );
         expect(expired.error).toBe(true);
-        expect(expired.ended).toEqual({ phase: "queue", cause: "deadline" });
+        expect(expired.ended).toEqual({ phase: "queue", cause: "busy" });
+        expect(expired.content).toMatch(
+          /^command not run: waited \d+ s for a free slot, the server is busy$/,
+        );
         expect(finished).toBe(false);
         expect(second.knowledge.list(second.projectId).files).toEqual([]);
         controllers[0]!.abort("free the slot");

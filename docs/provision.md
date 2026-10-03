@@ -11,8 +11,12 @@ what they name.
 ## Running it
 
 - **One routine serves both entry points.** `provisionPaths()` in
-  `run.ts` validates offline against a snapshot of the database, then
-  applies through the composed router. The app is composed with
+  `run.ts` validates offline, then applies through the composed router.
+  Validation migrates and reads the database file itself inside a
+  transaction it always rolls back, never a copy: startup memory must
+  not grow with the database. Its migrations run with foreign keys
+  off, so a migration never relies on `on delete cascade`, and a
+  pending rebuild runs twice at start. The app is composed with
   `activate: false`: no listener, scheduler, session repair, sweep or
   MCP refresh runs.
 - **Provisioning needs the database to itself.** It refuses a file

@@ -60,10 +60,11 @@ bash. An upload adds files to it, or attaches them to a chat message.
   files writes and evicts nothing.
 - **Answers are bounded.** At most 200 saved names and 200 skips, each
   name cut by `skippedName()`.
-- **Uploads and commands share four process slots.** One module-level
-  queue in `knowledge/queue.ts`; bash takes a slot through
-  `acquireProcess()`, and there is never a second queue. An upload
-  takes its slot before reading the body.
+- **Uploads and commands share the process slots.** `PROCESS_SLOTS`,
+  one per core (`docs/bash.md`), in one module-level queue in
+  `knowledge/queue.ts`; bash takes a slot through `acquireProcess()`,
+  and there is never a second queue. An upload takes its slot before
+  reading the body.
 - **A user runs one upload at a time.** The uploader and chat staging
   share that admission (`withUpload()`), with one deadline over
   waiting, reading and judging.

@@ -31,11 +31,12 @@ Deployment, Service and claim `onectx`.
 | `trustProxy` | `true` | Take the client address and scheme from the `X-Forwarded-*` headers of the ingress controller. |
 | `secureCookie` | `true` | Mark the login cookie `Secure`. Turn it off only when 1ctx is served over plain http. |
 | `secrets.existingSecret` | `1ctx` | The Secret mounted at `/secrets`. The chart never makes it. |
-| `persistence.size` | `100Gi` | The claim for the database and the repositories' cache. |
+| `persistence.size` | `100Gi` | The claim for the database. |
 | `persistence.storageClass` | `""` | Empty takes the cluster's default class. |
 | `persistence.existingClaim` | `""` | A claim made outside the chart; the chart then renders none. |
 | `persistence.keep` | `true` | Keep the claim when the release is removed. |
-| `resources` | requests 2 CPU and 2Gi, limits 4 CPU and 8Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
+| `cache.sizeLimit` | none | The repositories' cache, an `emptyDir` at `/cache`, bounded by the node's disk unless set. See Persistence before setting it. |
+| `resources` | requests 1 CPU and 1Gi, limits 4 CPU and 4Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
 | `service.type` | `ClusterIP` | |
 | `service.port` | `80` | The Service port, sent to the container's 11236. |
 | `ingress.enabled` | `false` | |
@@ -58,7 +59,7 @@ Deployment, Service and claim `onectx`.
 | `nodeSelector` | `{}` | |
 | `tolerations` | `[]` | |
 | `affinity` | `{}` | |
-| `extraArgs` | `[]` | Server flags appended to the chart's, such as `--cache /cache`. |
+| `extraArgs` | `[]` | Server flags appended to the chart's. |
 
 `values.schema.json` types every key and refuses any other, so a
 misspelt value fails the install instead of being ignored.
@@ -106,10 +107,21 @@ probe takes over.
 
 ## Persistence
 
-The claim holds `1ctx.sqlite` and `repos/`, the repositories' cache. It
-carries `helm.sh/resource-policy: keep`, so removing the release keeps
-it, and a reinstall under the same release name and namespace reuses it
-with its data.
+The claim holds `1ctx.sqlite`. It carries
+`helm.sh/resource-policy: keep`, so removing the release keeps it, and a
+reinstall under the same release name and namespace reuses it with its
+data.
+
+The repositories' cache is an `emptyDir` at `/cache`, not on the claim:
+it is refetched when lost, so a restart only costs fetches. The server
+keeps it near the admin's `repoCacheBytes` limit (10 GiB by default),
+checking free space on the node's disk, but a folder a running turn has
+mounted is never evicted, so the cache can pass the limit by the
+`repoBytes` limit (256 MiB by default) for each folder held. Past
+`cache.sizeLimit`, or an `ephemeral-storage` limit, the kubelet evicts
+the pod in the middle of every turn, so leave both unset or well above
+that. An older chart kept the cache in `repos` on the claim; nothing
+reads that folder now, and it can be removed from the volume.
 
 To remove the data with the release, set `persistence.keep: false`, let
 the upgrade apply it, then remove the release. With
@@ -118,10 +130,24 @@ one.
 
 ## Resources
 
-The load bench used about 4 cores and 1.3 to 1.45 GB of memory at 100
-agents. A pod throttled at its CPU limit stretches every command toward
-its deadline, and one at its memory limit is killed in the middle of a
-turn, so raise both limits as the number of agents grows.
+The defaults come from a load test on a local kind cluster
+with a fake model: 500 users,
+500 automations and the busiest hour of a working day (250 chats, 100
+hourly runs and 200 daily runs fired between 09:00 and 09:05).
+
+| Load | CPU | Memory |
+|---|---|---|
+| That hour | about half a core, under one at peak | under 500 MB |
+| Four times that hour | 1 to 2.5 cores, near 4 at peak | under 1 GB |
+
+One core carries the hour; at four times it a pod held to one core is
+saturated, its commands wait out their deadline for a slot and pages
+stall for seconds. The figures are on Apple silicon desktop cores; on
+cloud x86 vCPUs plan for two to three times the CPU, the request
+included. A pod throttled at
+its CPU limit stretches every command toward its deadline, and one at
+its memory limit is killed in the middle of a turn, so raise both limits
+as the number of agents grows.
 
 ## Provisioning
 

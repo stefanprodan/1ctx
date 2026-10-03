@@ -3,6 +3,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { heldSessions } from "../../../src/server/bash/queue.ts";
+import {
+  PROCESS_SLOTS,
+  processSlots,
+} from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import {
   callCaps,
@@ -13,12 +17,20 @@ import {
 } from "../bash/helpers.ts";
 
 describe("process slots", () => {
+  test("a slot per core, at least 4 and at most 16", () => {
+    expect([1, 2, 4, 5, 15, 16, 64].map(processSlots)).toEqual([
+      4, 4, 4, 5, 15, 16, 16,
+    ]);
+  });
+
   test.serial(
     "an abort leaves the process queue and releases the held session",
     async () => {
       const s = setup();
       const slots = await Promise.all(
-        Array.from({ length: 4 }, () => acquireProcess(freshSignal())),
+        Array.from({ length: PROCESS_SLOTS }, () =>
+          acquireProcess(freshSignal()),
+        ),
       );
       const controller = new AbortController();
       const canceled = run(
@@ -52,7 +64,7 @@ describe("process slots", () => {
     },
   );
   test.serial(
-    "a thrown mount releases both queues, including all four process slots",
+    "a thrown mount releases both queues, including all the process slots",
     async () => {
       const s = setup();
       const read = s.knowledge.store.mounted.bind(s.knowledge.store);
@@ -67,7 +79,7 @@ describe("process slots", () => {
           ended: { phase: "mount", cause: "error" },
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
-        for (let i = 0; i < 4; i++)
+        for (let i = 0; i < PROCESS_SLOTS; i++)
           slots.push(await acquireProcess(AbortSignal.timeout(1000)));
         for (const release of slots) release();
         s.knowledge.store.mounted = read;

@@ -15,6 +15,7 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
+import { after } from "../lib/clock.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
@@ -137,16 +138,16 @@ export function runnerArea(deps: RunnerDeps): Runner {
     tools: deps.tools,
     log: deps.log,
     historyOf,
-    pause,
   };
 
   const run = async (send: ActiveSend): Promise<void> => {
     let finalized = false;
-    if (send.policy.deadlineMs !== null) {
-      void pause(send.policy.deadlineMs).then(() => {
-        void terminate(send, "deadline");
-      });
-    }
+    const disarm =
+      send.policy.deadlineMs === null
+        ? () => {}
+        : after(deps.clock, send.policy.deadlineMs, () => {
+            void terminate(send, "deadline");
+          });
     try {
       try {
         await mountRepos(reposDeps, send);
@@ -167,6 +168,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         send,
       );
     } finally {
+      // a pending deadline would hold the whole send until it rang
+      disarm();
       if (send.tools !== null) await send.tools.catch(() => {});
       // no command runs past here, so the trees may go
       send.repos?.release();

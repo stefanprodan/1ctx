@@ -60,8 +60,8 @@ export function fitResults(
   calls: ToolCall[],
   results: ToolResult[],
   room: number | null,
-): { results: ToolResult[]; cut: boolean; fits: boolean } {
-  if (room === null) return { results, cut: false, fits: true };
+): { results: ToolResult[]; cut: boolean } {
+  if (room === null) return { results, cut: false };
   const count = (index: number, content: string) =>
     tokens(
       JSON.stringify({
@@ -72,7 +72,7 @@ export function fitResults(
     );
   const sizes = results.map((result, i) => count(i, result.content));
   let total = sizes.reduce((sum, size) => sum + size, 0);
-  if (total <= room) return { results, cut: false, fits: true };
+  if (total <= room) return { results, cut: false };
   const fitted = results.slice();
   const order = sizes
     .map((size, index) => ({ size, index }))
@@ -110,5 +110,5 @@ export function fitResults(
     };
     total += keptSize - size;
   }
-  return { results: fitted, cut: true, fits: total <= room };
+  return { results: fitted, cut: true };
 }

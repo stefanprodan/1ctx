@@ -64,6 +64,8 @@ spec:
             - /secrets
             - --drain
             - {{ int .Values.drain | quote }}
+            - --cache
+            - /cache
             {{- if $provision }}
             - --provision
             - /provision
@@ -117,6 +119,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: cache
+              mountPath: /cache
             # mounted whole: a subPath mount never sees a rotated key
             - name: secrets
               mountPath: /secrets
@@ -130,6 +134,13 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "1ctx.claimName" . }}
+        - name: cache
+          {{- with .Values.cache.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         - name: secrets
           secret:
             secretName: {{ .Values.secrets.existingSecret }}

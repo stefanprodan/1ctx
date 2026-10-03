@@ -80,7 +80,8 @@ never written in a tracked file.
   mounted read-only. An unreadable key throws where it is read, and an
   unreadable `user-admin.key` fails the first start.
 - **The cache is `/data/repos` unless `--cache` names another
-  mount,** which must be writable by 65532.
+  mount,** which must be writable by 65532. The Helm chart mounts an
+  `emptyDir` at `/cache` (`cache.sizeLimit`), off the claim.
 - **`/data` is a named volume, never a bind mount on Docker Desktop
   or OrbStack.** Their VirtioFS breaks the POSIX locks SQLite's WAL
   needs, which hangs or corrupts the database. A named volume takes
