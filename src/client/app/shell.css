@@ -1,6 +1,7 @@
 /* The shell: the rail beside the view, or folded to a strip with the
-   button that brings it back. Below 720 the rail covers the screen and
-   the button floats over the view; the number is NARROW in shell.ts. */
+   button that brings it back. Below 720 wide or 500 tall the rail covers
+   the screen and the button floats over the view; the query is DRAWER
+   in shell.ts. */
 
 @layer tokens, base, owners;
 
@@ -8,7 +9,8 @@
   .shell {
     position: relative;
     display: flex;
-    height: 100%;
+    /* the visible area while a phone's keyboard is up (watchViewport) */
+    height: var(--shell-height, 100%);
     min-height: 0;
   }
 
@@ -70,7 +72,7 @@
     padding: var(--space-4);
   }
 
-  @media (max-width: 719px) {
+  @media (max-width: 719px), (max-height: 500px) {
     .shell-main {
       --shell-inset: var(--space-4);
       --shell-gutter: var(--space-4);

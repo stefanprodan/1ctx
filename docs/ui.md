@@ -146,10 +146,14 @@ open row's body or a meta. The shared shapes are below.
 ## Shell
 
 - **One shell, no header or top bar.** `app/shell.ts` holds its state.
-  From 720 up the rail (the side navigation) is a column the user can
-  hide, kept in `localStorage`. Below 720 it covers the screen and is
-  never kept. The breakpoint is `NARROW` in `shell.ts` and the same
-  number in `shell.css`; change both.
+  The rail (the side navigation) is a column the user can hide, kept
+  in `localStorage`. Below 720 wide or 500 tall (`DRAWER`, a phone on
+  its side included) it covers the screen and is never kept. `NARROW`
+  and `DRAWER` in `shell.ts` are the same queries as in the sheets
+  (`shell.css`, `page.css`); change both.
+- **The shell is the visible height.** While a phone's keyboard is
+  up, `watchViewport()` sizes it to the visual viewport (`frameOf()`
+  in `lib/viewport.ts`), so the page never scrolls and its top stays.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and

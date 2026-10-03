@@ -20,20 +20,21 @@ import {
   closeDrawer,
   drawerOpen,
   hideRail,
-  narrow,
   openDrawer,
+  railDrawer,
   railHidden,
   showRail,
 } from "./shell.ts";
 import "./shell.css";
 
 // wide: the rail is a column beside the view, or folded to a strip in
-// its colour with the button that brings it back and the mark. Narrow:
-// the rail is a full screen over the view, opened by the same button
-// floating at the top left of the view; while it is open the view under
-// it is inert, and when it closes the focus comes back to that button.
+// its colour with the button that brings it back and the mark. Narrow
+// or short: the rail is a full screen over the view, opened by the same
+// button floating at the top left of the view; while it is open the view
+// under it is inert, and when it closes the focus comes back to that
+// button.
 function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
-  const phone = narrow.value;
+  const phone = railDrawer.value;
   const railShown = phone ? drawerOpen.value : !railHidden.value;
   const covered = phone && drawerOpen.value;
   const show = useRef<HTMLButtonElement>(null);

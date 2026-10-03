@@ -11,13 +11,14 @@ import { App } from "./app/App.tsx";
 import { reload, startLoading } from "./app/loading.ts";
 import { boot } from "./app/router.ts";
 import { match } from "./app/routes.ts";
-import { watchPages, watchWidth } from "./app/shell.ts";
+import { watchPages, watchScreen, watchViewport } from "./app/shell.ts";
 import { watchTheme } from "./app/theme.ts";
 import { startSocket } from "./data/socket.ts";
 
 watchTheme();
 boot();
-watchWidth();
+watchScreen();
+watchViewport();
 watchPages((pathname) => match(pathname) !== null);
 startLoading();
 startSocket({ reload });

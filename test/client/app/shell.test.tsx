@@ -7,12 +7,14 @@
 // button floats over the view.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { render } from "preact-render-to-string";
 import { App } from "../../../src/client/app/App.tsx";
 import { path, query } from "../../../src/client/app/router.ts";
 import { match } from "../../../src/client/app/routes.ts";
 import {
   closeDrawer,
+  DRAWER,
   drawerOpen,
   hideRail,
   lastAdmin,
@@ -20,10 +22,12 @@ import {
   NARROW,
   narrow,
   openDrawer,
+  railDrawer,
   railHidden,
   showRail,
   watchPages,
-  watchWidth,
+  watchScreen,
+  watchViewport,
 } from "../../../src/client/app/shell.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { MONITOR_HREF } from "../../../src/client/lib/hrefs.ts";
@@ -49,6 +53,7 @@ beforeEach(() => {
   lastWork.value = "/";
   lastAdmin.value = MONITOR_HREF;
   narrow.value = false;
+  railDrawer.value = false;
   showRail();
   closeDrawer();
 });
@@ -87,7 +92,7 @@ describe("the shell on a wide window", () => {
 
 describe("the shell on a phone", () => {
   beforeEach(() => {
-    narrow.value = true;
+    railDrawer.value = true;
   });
 
   test("shows the floating button and no rail until it opens", () => {
@@ -116,21 +121,21 @@ describe("the shell on a phone", () => {
   });
 });
 
-describe("watchWidth", () => {
+describe("watchScreen", () => {
   type Listener = (event: unknown) => void;
-  let matches: boolean;
+  let matches: Record<string, boolean>;
   let listeners: Listener[];
   const fakeMatchMedia = (query: string) => {
-    expect(query).toBe(NARROW);
+    expect([NARROW, DRAWER]).toContain(query);
     return {
       get matches() {
-        return matches;
+        return matches[query];
       },
       addEventListener: (_: string, fn: Listener) => void listeners.push(fn),
     };
   };
-  const resize = (narrowNow: boolean) => {
-    matches = narrowNow;
+  const resize = (width: boolean, drawer: boolean) => {
+    matches = { [NARROW]: width, [DRAWER]: drawer };
     for (const fn of listeners) fn({});
   };
 
@@ -143,24 +148,132 @@ describe("watchWidth", () => {
     delete (globalThis as { matchMedia?: unknown }).matchMedia;
   });
 
-  test("follows the window and closes a drawer left open when it widens", () => {
-    matches = true;
-    watchWidth();
-    expect(narrow.value).toBe(true);
+  test.serial(
+    "follows the window and closes a drawer left open when it widens",
+    () => {
+      matches = { [NARROW]: true, [DRAWER]: true };
+      watchScreen();
+      expect(narrow.value).toBe(true);
+      expect(railDrawer.value).toBe(true);
+      openDrawer();
+      resize(false, false);
+      expect(narrow.value).toBe(false);
+      expect(railDrawer.value).toBe(false);
+      expect(drawerOpen.value).toBe(false);
+      resize(true, true);
+      expect(railDrawer.value).toBe(true);
+      expect(drawerOpen.value).toBe(false);
+    },
+  );
+
+  test.serial("a short wide window keeps the drawer open", () => {
+    matches = { [NARROW]: true, [DRAWER]: true };
+    watchScreen();
     openDrawer();
-    resize(false);
+    resize(false, true);
     expect(narrow.value).toBe(false);
-    expect(drawerOpen.value).toBe(false);
-    resize(true);
-    expect(narrow.value).toBe(true);
-    expect(drawerOpen.value).toBe(false);
+    expect(railDrawer.value).toBe(true);
+    expect(drawerOpen.value).toBe(true);
   });
 
-  test("does nothing without matchMedia", () => {
+  test.serial("does nothing without matchMedia", () => {
     delete (globalThis as { matchMedia?: unknown }).matchMedia;
-    narrow.value = false;
-    watchWidth();
+    watchScreen();
     expect(narrow.value).toBe(false);
+    expect(railDrawer.value).toBe(false);
+  });
+});
+
+describe("the drawer's query", () => {
+  const sheet = (name: string) =>
+    readFileSync(
+      new URL(`../../../src/client/${name}`, import.meta.url),
+      "utf8",
+    );
+
+  test("is narrow or short", () => {
+    expect(DRAWER.startsWith(`${NARROW}, `)).toBe(true);
+    expect(DRAWER).toContain("max-height");
+  });
+
+  test("is the one the stylesheets place the floating button by", () => {
+    expect(sheet("app/shell.css")).toContain(`@media ${DRAWER} {`);
+    expect(sheet("ui/page.css")).toContain(`@media ${DRAWER} {`);
+  });
+});
+
+describe("watchViewport", () => {
+  type Listener = () => void;
+  const g = globalThis as { window?: unknown; document?: unknown };
+  let listeners: Map<string, Listener>;
+  let props: Map<string, string>;
+  let scrolled: number;
+  let shell: boolean;
+  const view = { height: 800, scale: 1, pageTop: 0 };
+
+  beforeEach(() => {
+    listeners = new Map();
+    props = new Map();
+    scrolled = 0;
+    shell = true;
+    Object.assign(view, { height: 800, scale: 1, pageTop: 0 });
+    g.window = {
+      visualViewport: {
+        get height() {
+          return view.height;
+        },
+        get scale() {
+          return view.scale;
+        },
+        get pageTop() {
+          return view.pageTop;
+        },
+        addEventListener: (type: string, fn: Listener) =>
+          void listeners.set(type, fn),
+      },
+      scrollTo: () => void scrolled++,
+    };
+    g.document = {
+      documentElement: {
+        clientHeight: 800,
+        style: {
+          setProperty: (k: string, v: string) => void props.set(k, v),
+          removeProperty: (k: string) => void props.delete(k),
+        },
+      },
+      querySelector: () => (shell ? {} : null),
+    };
+  });
+
+  afterEach(() => {
+    delete g.window;
+    delete g.document;
+  });
+
+  // the keyboard resizes the visual viewport; the browser's own scroll
+  // to the field moves it
+  const move = (type: string, next: Partial<typeof view>) => {
+    Object.assign(view, next);
+    listeners.get(type)?.();
+  };
+
+  test.serial("sizes the shell to the keyboard's edge and back", () => {
+    watchViewport();
+    move("resize", { height: 450 });
+    expect(props.get("--shell-height")).toBe("450px");
+    expect(scrolled).toBe(0);
+    move("scroll", { pageTop: 300 });
+    expect(scrolled).toBe(1);
+    move("resize", { height: 800, pageTop: 0 });
+    expect(props.has("--shell-height")).toBe(false);
+    expect(scrolled).toBe(1);
+  });
+
+  test.serial("a page without the shell keeps its scroll", () => {
+    shell = false;
+    watchViewport();
+    move("scroll", { height: 450, pageTop: 300 });
+    expect(scrolled).toBe(0);
   });
 });
 

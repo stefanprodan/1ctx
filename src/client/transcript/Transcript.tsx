@@ -104,7 +104,8 @@ export function Transcript({
       lastHeight.current = height;
       jumpHidden.value = stick.current || gap < 80;
     };
-    // the foot grows with the draft and would cover the last rows: a
+    // the foot grows with the draft, and the box shrinks while a
+    // phone's keyboard is up: either would cover the last rows, so a
     // view that follows the end keeps following, one that let go
     // learns whether Jump applies
     const grown = new ResizeObserver(() => {
@@ -112,6 +113,7 @@ export function Transcript({
       else onScroll();
     });
     if (footEl.current) grown.observe(footEl.current);
+    grown.observe(scroller);
     // rows that shrink while the view is at the top move nothing, so no
     // scroll event tells Jump that the end is in view again
     const resized = new ResizeObserver(() => {
