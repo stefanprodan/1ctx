@@ -42,6 +42,7 @@ import {
   sending,
   session,
   sessionError,
+  setFrames,
   toolResults,
 } from "../../../src/client/data/sessions.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
@@ -1351,6 +1352,162 @@ describe("the sessions entity", () => {
     expect(list.value).toBeNull();
     expect(projectAgents.value).toBeNull();
     expect(sending.value).toBe(false);
+  });
+});
+
+describe("a streaming reply drawn once per frame", () => {
+  let queued: (() => void)[] = [];
+  let writes = 0;
+  let stop = () => {};
+  const paint = () => {
+    const due = queued;
+    queued = [];
+    for (const draw of due) draw();
+  };
+  const delta = (seq: number, content: string, contentAt: number) =>
+    onSocket({
+      type: "delta",
+      sessionId: "s1",
+      sendId: "send1",
+      messageId: "m1",
+      seq,
+      content,
+      contentAt,
+      reasoningAt: 0,
+    });
+
+  // a chat streaming on screen, its watch answered, writes counted
+  async function streaming(fetched = () => {}): Promise<void> {
+    const base = liveDetail();
+    answer = () => {
+      fetched();
+      return Response.json(base);
+    };
+    await loadSession("s1");
+    onSocket({ type: "watched", sessionId: "s1", live: base.live });
+    stop = live.subscribe(() => writes++);
+    writes = 0;
+  }
+
+  beforeEach(() => {
+    queued = [];
+    setFrames((draw) => queued.push(draw));
+  });
+
+  afterEach(() => {
+    stop();
+    stop = () => {};
+    setFrames(null);
+  });
+
+  test.serial(
+    "deltas in one frame are one write with all the text",
+    async () => {
+      await streaming();
+      delta(1, "A", 0);
+      delta(2, "B", 1);
+      delta(3, "C", 2);
+      expect(writes).toBe(0);
+      expect(queued.length).toBe(1);
+
+      paint();
+      expect(writes).toBe(1);
+      expect(live.value.get("m1")?.content).toBe("ABC");
+    },
+  );
+
+  test.serial("a gap drops the frames not drawn for the refetch", async () => {
+    let fetches = 0;
+    await streaming(() => fetches++);
+    const fresh = liveDetail();
+    if (fresh.live?.phase === "reply") {
+      fresh.live = { ...fresh.live, seq: 3, content: "fresh" };
+    }
+    answer = () => {
+      fetches++;
+      return Response.json(fresh);
+    };
+    delta(1, "A", 0);
+    delta(3, "C", 2);
+    expect(fetches).toBe(2);
+    expect(writes).toBe(0);
+
+    await settle();
+    expect(live.value.get("m1")?.content).toBe("fresh");
+    const after = writes;
+    paint();
+    expect(writes).toBe(after);
+    expect(live.value.get("m1")?.content).toBe("fresh");
+  });
+
+  test.serial("an html frame between deltas keeps their order", async () => {
+    await streaming();
+    delta(1, "Hello", 0);
+    onSocket({
+      type: "html",
+      sessionId: "s1",
+      sendId: "send1",
+      messageId: "m1",
+      seq: 2,
+      html: "<p>Hello</p>",
+      htmlAt: 5,
+    });
+    delta(3, " world", 5);
+    expect(writes).toBe(0);
+
+    paint();
+    expect(writes).toBe(1);
+    expect(live.value.get("m1")).toMatchObject({
+      content: "Hello world",
+      html: "<p>Hello</p>",
+      htmlAt: 5,
+    });
+  });
+
+  test.serial("switching the chat drops the frames not drawn", async () => {
+    await streaming();
+    delta(1, "A", 0);
+    answer = () => Response.json(detail("s2"));
+    await loadSession("s2");
+    paint();
+    expect(live.value.size).toBe(0);
+  });
+
+  test.serial("the end of a send draws what came before it", async () => {
+    await streaming();
+    delta(1, "A", 0);
+    delta(2, "B", 1);
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: summary({ revision: 2, status: "done" }),
+      messages: [message({ content: "AB" })],
+      send: { ...sent, status: "done" },
+    });
+    expect(writes).toBe(1);
+    expect(live.value.size).toBe(0);
+    paint();
+    expect(writes).toBe(1);
+  });
+
+  test.serial("a turn's message stays live past an envelope", async () => {
+    await streaming();
+    delta(1, "A", 0);
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: summary({ revision: 2, status: "running" }),
+      messages: [
+        message({ status: "streaming", slot: null, finishReason: null }),
+      ],
+      send: sent,
+    });
+    expect(live.value.get("m1")?.content).toBe("A");
+    delta(2, "B", 1);
+    paint();
+    expect(live.value.get("m1")?.content).toBe("AB");
   });
 });
 

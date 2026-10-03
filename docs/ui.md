@@ -36,6 +36,10 @@ draws is in `docs/views.md`.
   its revision is above the one held, and applies stream frames in
   sequence through `transcript/stream.ts`. A gap, a frame ahead of the
   buffer or an overflow before `watched` refetches the session's detail.
+  Frames land in a map ahead of `live`, published once per animation
+  frame (`data/session-live.ts`), so a burst draws once per paint; the
+  data layer reads `ahead()`, and an envelope, a load or `watched`
+  publishes at once.
   The server's side is in `docs/access.md`.
 - **Logic lives beside the view, not in it.** A view with real logic
   gets `Name.model.ts` or `Name.state.ts`, and its copy may sit in
