@@ -37,10 +37,10 @@ persistence:
 # the repositories' cache, an emptyDir: it is refetched when lost, so it
 # never takes the claim's space or its backups
 cache:
-  # past it the kubelet evicts the pod, and the server's free space
-  # check reads the node's disk, not this: keep it above the
-  # repoCacheBytes limit (10 GiB by default) and room for two fetches
-  sizeLimit: 12Gi
+  # empty: the node's disk bounds it, which the server's free space
+  # check reads. Past a set limit the kubelet evicts the pod, and the
+  # folders running turns hold go past repoCacheBytes; see the README
+  sizeLimit: ""
 
 # one core carries a steady day, a burst of runs needs the limit; see
 # the README for the measured figures

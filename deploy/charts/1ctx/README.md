@@ -35,7 +35,7 @@ Deployment, Service and claim `onectx`.
 | `persistence.storageClass` | `""` | Empty takes the cluster's default class. |
 | `persistence.existingClaim` | `""` | A claim made outside the chart; the chart then renders none. |
 | `persistence.keep` | `true` | Keep the claim when the release is removed. |
-| `cache.sizeLimit` | `12Gi` | The repositories' cache, an `emptyDir` at `/cache`. Keep it above the `repoCacheBytes` limit (10 GiB by default) and room for two fetches, or the kubelet evicts the pod. |
+| `cache.sizeLimit` | none | The repositories' cache, an `emptyDir` at `/cache`, bounded by the node's disk unless set. See Persistence before setting it. |
 | `resources` | requests 1 CPU and 1Gi, limits 4 CPU and 4Gi | Only `cpu`, `memory` and `ephemeral-storage`. |
 | `service.type` | `ClusterIP` | |
 | `service.port` | `80` | The Service port, sent to the container's 11236. |
@@ -113,13 +113,15 @@ reinstall under the same release name and namespace reuses it with its
 data.
 
 The repositories' cache is an `emptyDir` at `/cache`, not on the claim:
-it is refetched when lost, so a restart only costs fetches. The server's
-free space check reads the node's disk, so `cache.sizeLimit` must stay
-above the admin's `repoCacheBytes` limit and room for two fetches at
-once; past the size limit the kubelet evicts the pod, and so does an
-`ephemeral-storage` limit below it. An older chart kept the cache in
-`repos` on the claim; nothing reads that folder now, and it can be
-removed from the volume.
+it is refetched when lost, so a restart only costs fetches. The server
+keeps it near the admin's `repoCacheBytes` limit (10 GiB by default),
+checking free space on the node's disk, but a folder a running turn has
+mounted is never evicted, so the cache can pass the limit by the
+`repoBytes` limit (256 MiB by default) for each folder held. Past
+`cache.sizeLimit`, or an `ephemeral-storage` limit, the kubelet evicts
+the pod in the middle of every turn, so leave both unset or well above
+that. An older chart kept the cache in `repos` on the claim; nothing
+reads that folder now, and it can be removed from the volume.
 
 To remove the data with the release, set `persistence.keep: false`, let
 the upgrade apply it, then remove the release. With

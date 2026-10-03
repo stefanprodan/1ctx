@@ -135,8 +135,12 @@ spec:
           persistentVolumeClaim:
             claimName: {{ include "1ctx.claimName" . }}
         - name: cache
+          {{- with .Values.cache.sizeLimit }}
           emptyDir:
-            sizeLimit: {{ .Values.cache.sizeLimit }}
+            sizeLimit: {{ . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         - name: secrets
           secret:
             secretName: {{ .Values.secrets.existingSecret }}

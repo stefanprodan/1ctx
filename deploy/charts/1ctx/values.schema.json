@@ -80,7 +80,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "sizeLimit": { "type": "string", "minLength": 1 }
+        "sizeLimit": { "type": "string" }
       }
     },
     "resources": {
