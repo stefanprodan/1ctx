@@ -781,3 +781,17 @@ test("the ground rule decides bare, backdrop or neither", () => {
     backdrop: "light",
   });
 });
+
+test("the shell opens in the scheme its URL names, light by default", async () => {
+  const shell = (query: string) =>
+    visualShell([], new Request(`https://app.test/api/visual${query}`));
+  expect(await shell("?scheme=dark").text()).toBe(visualDocument("dark"));
+  expect(visualDocument("dark")).toContain('<html data-theme="dark">');
+  for (const query of ["", "?scheme=light", "?scheme=blue"]) {
+    expect(await shell(query).text()).toBe(visualDocument("light"));
+  }
+  expect(visualDocument()).toContain('<html data-theme="light">');
+  expect(shell("?scheme=dark").headers.get("etag")).not.toBe(
+    shell("").headers.get("etag"),
+  );
+});

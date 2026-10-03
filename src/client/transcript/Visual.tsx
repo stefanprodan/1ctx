@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { theme } from "../app/theme.ts";
 import {
   cancelValue,
   loadOpened,
@@ -25,6 +26,11 @@ export function Visual({
   text?: { title: string; html: string };
 }) {
   const iframe = useRef<HTMLIFrameElement>(null);
+  // the shell opens in the page's scheme, so no canvas shows before the
+  // theme lands; fixed at mount, since a new src would navigate the frame
+  const [src] = useState(() => `/api/visual?scheme=${theme.peek()}`);
+  // Safari paints an iframe white until its first document loads
+  const loaded = useSignal(false);
   const port = useRef<MessagePort | null>(null);
   const player = useRef<VisualPlayer | null>(null);
   const status = useSignal<VisualStatus>({
@@ -168,14 +174,15 @@ export function Visual({
         {current.state !== "navigated" && (
           <iframe
             ref={iframe}
-            class="visual-frame"
+            class={`visual-frame${loaded.value ? "" : " visual-unloaded"}`}
             title={card.title}
-            src="/api/visual"
+            src={src}
             sandbox="allow-scripts"
             referrerpolicy="no-referrer"
             width={680}
             height={current.height}
             onLoad={() => {
+              loaded.value = true;
               const model = player.current;
               if (!model?.load()) return;
               const channel = new MessageChannel();

@@ -36,6 +36,9 @@
     min-width: 680px;
     border: 0;
   }
+  .visual-unloaded {
+    visibility: hidden;
+  }
   .visual-failed .visual-frame {
     opacity: 0.45;
     pointer-events: none;

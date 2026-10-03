@@ -67,7 +67,7 @@ test.serial("HTML draws as a visual only while visualize is switchable", () => {
   switchable.value = ["web", "visualize"];
   const on = render(<Reader file={page} href={HREF} line={null} now={0} />);
   expect(on).toContain('class="docpage-visual"');
-  expect(on).toContain('src="/api/visual"');
+  expect(on).toContain('src="/api/visual?scheme=');
   expect(on).not.toContain("visual-head");
 });
 
