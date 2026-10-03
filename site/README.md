@@ -104,8 +104,9 @@ console's tokens and are UI, not brand; they never appear in a logo.
 | `mark-dark.svg`, `mark-light.svg` | The mark with a fixed foreground, for a dark or a light ground |
 | `favicon.svg` | The mark at stroke 2 with the sparkle 1.25x, foreground follows the browser's colour scheme |
 | `favicon-32.png`, `favicon-16.png` | The same, light foreground on transparent, for browsers without SVG favicons |
-| `apple-touch-icon.png` | 180 px opaque dark tile; iOS applies its own mask |
-| `icon.svg`, `icon-512.png` | Rounded dark tile with the mark, transparent corners, for Slack, GitHub and app listings |
+| `apple-touch-icon.svg`, `apple-touch-icon.png` | 180 px opaque dark tile; iOS applies its own mask |
+| `icon.svg`, `icon-512.png`, `icon-192.png` | Rounded dark tile with the mark, transparent corners, for Slack, GitHub, app listings and the web app's manifest |
+| `icon-maskable.svg`, `icon-maskable-512.png` | 512 px full-bleed dark tile, the mark inside the centred 80% circle a launcher's mask keeps; the manifest's maskable icon |
 | `logo.svg`, `logo-dark.svg`, `logo-light.svg` | The logo: the wordmark inside the wide chip; `logo.svg` takes the page colour |
 | `wordmark-dark.svg`, `wordmark-light.svg` | "1ctx" alone |
 | `lockup-dark.svg`, `lockup-light.svg` | Mark beside the wordmark, the header proportions |
@@ -136,3 +137,6 @@ Head of the web page:
 
 The PNGs are rasterized from the SVGs in a browser; the transparent
 ones through a canvas export, which keeps the alpha channel.
+The app serves copies of `favicon.svg`, `apple-touch-icon.png`,
+`icon-192.png`, `icon-512.png` and `icon-maskable-512.png` from
+`src/client/`; a test keeps them equal to these.

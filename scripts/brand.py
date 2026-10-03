@@ -196,6 +196,24 @@ body = f'<rect width="{IS}" height="{IS}" rx="{IS * 0.2}" fill="{BG_DARK}"/>'
 body += mark((IS - inner) / 2, (IS - inner) / 2, inner / 24, FG_DARK, AMBER, sw=1.6)
 write("icon.svg", svg(IS, IS, body))
 
+# apple touch icon: the same mark on an opaque square, since iOS draws
+# transparent corners black and applies its own mask
+AS = 180
+inner = AS * 0.7
+body = mark((AS - inner) / 2, (AS - inner) / 2, inner / 24, FG_DARK, AMBER, sw=1.6)
+write("apple-touch-icon.svg", svg(AS, AS, body, BG_DARK))
+
+# maskable icon: full bleed, the mark inside the safe zone, a centred
+# circle 80% across that a launcher's mask never cuts
+inner = IS * 0.6
+s = inner / 24
+# the farthest ink from the mark's centre: the sparkle's top and right
+# points, 13.31 units out, past the chip's rounded corners
+reach = ((19.5 - 12) ** 2 + (12 - (4.5 - SPARK_R)) ** 2) ** 0.5 * s
+assert reach <= IS * 0.4, "the maskable mark leaves the safe zone"
+body = mark((IS - inner) / 2, (IS - inner) / 2, s, FG_DARK, AMBER, sw=1.6)
+write("icon-maskable.svg", svg(IS, IS, body, BG_DARK))
+
 
 # ---- social preview 1280x640: the wordmark inside a wide chip, one 1 ----
 def chip_wide(w, h, s):
