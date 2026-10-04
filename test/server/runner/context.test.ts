@@ -1151,6 +1151,8 @@ describe("history", () => {
     // a tokenizer that counts a quarter more than o200k: the estimate
     // would leave room the provider does not have; 32,000 - 30,997 - 256
     expect(summaryRequest(small, "s1", said(100), 30_997).maxTokens).toBe(747);
+    // within the floor and margin of the window the measure still holds
+    expect(summaryRequest(small, "s1", said(100), 31_617).maxTokens).toBe(128);
     const near = said(26_400);
     expect(estimate(summaryRequest(small, "s1", near))).toBe(26_533);
     expect(summaryRequest(small, "s1", near, 28_000).maxTokens).toBe(3744);

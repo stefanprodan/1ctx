@@ -125,8 +125,9 @@ export type ActiveSend = {
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;
-  // the tokens the last counted round used, prompt plus completion: one
-  // bound on the summary request's size; null when nothing was counted
+  // the tokens the last counted round used, prompt plus completion: the
+  // summary request's size while it is inside the window; null when
+  // the round reported no usage
   used: number | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;

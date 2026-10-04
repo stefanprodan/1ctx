@@ -287,9 +287,11 @@ export function summaryRequest(
   };
   let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
   if (window !== null) {
-    // the estimate counts the whole history, so only when it is needed
+    // a measure inside the window is exact even when it leaves no room;
+    // only one past it (a stated window below the model's) or none
+    // falls back to the estimate, which counts the whole history
     const size =
-      used !== null && used + SUMMARY_MARGIN + SUMMARY_MIN_TOKENS <= window
+      used !== null && used <= window
         ? used
         : Math.ceil(requestTokens(policy.wire, req) * (1 + ESTIMATE_SLACK));
     const room = window - size - SUMMARY_MARGIN;
