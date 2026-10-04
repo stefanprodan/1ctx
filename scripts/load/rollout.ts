@@ -9,8 +9,9 @@ type Kubectl = (...args: string[]) => string[];
 
 const STUCK = [
   "CrashLoopBackOff",
+  // not ErrImagePull: a first pull that fails is retried, and one that
+  // keeps failing turns into ImagePullBackOff
   "ImagePullBackOff",
-  "ErrImagePull",
   "InvalidImageName",
   "CreateContainerConfigError",
   "CreateContainerError",
@@ -49,7 +50,12 @@ export function failIfStuck(
   let terminating = 0;
   for (const pod of pods.items) {
     if (!match(pod.metadata.name)) continue;
-    if (pod.metadata.deletionTimestamp) terminating++;
+    // an old pod on its way out may still be crashing; only the new
+    // ones decide whether the rollout can finish
+    if (pod.metadata.deletionTimestamp) {
+      terminating++;
+      continue;
+    }
     for (const c of pod.status.containerStatuses ?? []) {
       const waiting = c.state.waiting;
       if (!waiting?.reason || !STUCK.includes(waiting.reason)) continue;

@@ -56,6 +56,15 @@ describe("rollout", () => {
     expect(failIfStuck(k, (p) => p.startsWith("onectx-"))).toBe(1);
   });
 
+  test("an old pod crashing on its way out does not fail the rollout", () => {
+    const old = {
+      ...pod("onectx-old", "CrashLoopBackOff"),
+      metadata: { name: "onectx-old", deletionTimestamp: "t" },
+    };
+    const k = fake({ items: [old, pod("onectx-new", "ContainerCreating")] });
+    expect(failIfStuck(k, (p) => p.startsWith("onectx-"))).toBe(1);
+  });
+
   test("a deployment whose pod is stuck throws", async () => {
     const k = fake(
       { items: [pod("onectx-abc", "ImagePullBackOff")] },
