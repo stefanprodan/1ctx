@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Short scripts against what GNU bash 5.2 and coreutils 9.4 answered for
-// them, recorded by scripts/bash-record.ts, the tree each left included.
+// them, recorded by scripts/record/bash.ts, the tree each left included.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/bash-gnu.json" with {
   type: "json",
 };

@@ -3,11 +3,11 @@
 //
 // yq the way agents use it on Kubernetes manifests (a multi-document
 // stack, a kustomization, a HelmRelease, kubectl output), against what
-// mikefarah's yq v4.53.3 answered, recorded by scripts/yq-record.ts. A
+// mikefarah's yq v4.53.3 answered, recorded by scripts/record/yq.ts. A
 // case with `accept` pins our answer where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/yq-kube.json" with {
   type: "json",
 };

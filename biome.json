@@ -42,6 +42,7 @@
       "!site",
       "!vendor",
       "!.preview",
+      "!scripts/load/out",
       "!test/fixtures",
       "!**/*.svg"
     ]

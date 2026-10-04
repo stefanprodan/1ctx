@@ -44,9 +44,12 @@ make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
+make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
+make load-db PRESET=bench|small  # a load test database in scripts/load/out/
+make load-bench ARGS="..."  # compare builds under load; load-cluster on kind, load-summary
 ```
 
 The preview is a local, throwaway instance for trying a change. It runs
@@ -80,7 +83,8 @@ test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
 scripts/      preview, staging, smoke, image, release and vendor-test
-              scripts; brand.py; the *-record.ts recorders, run by hand.
+              scripts; brand.py; record/, the fixture recorders, run by
+              hand; load/, the load harness (docs/load-testing.md).
 skills/       installable agent skills, added by URL, never seeded.
 site/         1ctx.dev and the brand files, its own project.
               site/README.md is the brand book.
@@ -138,6 +142,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
+| `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |

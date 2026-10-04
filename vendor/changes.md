@@ -1043,8 +1043,8 @@ Before:
 
 ### find-exec: -exec, -delete and -name as GNU find
 Files: `src/commands/find/find.ts`, `src/commands/find/matcher.ts`,
-  `src/commands/find/parser.ts`, `scripts/find-record.ts`,
-  `scripts/record-cases.ts`
+  `src/commands/find/parser.ts`, `scripts/record/find.ts`,
+  `scripts/record/cases.ts`
 Upstream: not reported
 Tests: `test/vendor/just-bash/find-gnu.test.ts`,
   `test/vendor/just-bash/symlinks.test.ts`
@@ -1556,7 +1556,7 @@ Files: `src/commands/rg/rg-options.ts`, `src/commands/rg/rg.ts`,
   `src/commands/search-engine/regex.ts`,
   `src/commands/search-engine/index.ts`,
   `src/commands/rg/file-types.ts`, `src/commands/rg/file-types-data.ts`
-  (new), our `scripts/rg-record.ts`,
+  (new), our `scripts/record/rg.ts`,
   `src/commands/rg/imported-tests/binary.test.ts`,
   `src/commands/rg/imported-tests/feature.test.ts`,
   `src/commands/rg/imported-tests/misc.test.ts`,
@@ -1626,7 +1626,7 @@ Now:
   `\b`; `-P` goes through grep's `-P` layer, its rewrites and its
   refusals, and refuses groups nested past 250 deep, as PCRE2 does.
 - **File types.** ripgrep 15's whole type table, written from
-  `rg --type-list` by `scripts/rg-record.ts`, aliases included, each
+  `rg --type-list` by `scripts/record/rg.ts`, aliases included, each
   glob matched case-sensitively against the file's name; `--type-add`
   with `include:` and ripgrep's `invalid definition`, `--type-clear` in
   order with it, `--type-list` showing both, `-t all`, and

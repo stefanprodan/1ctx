@@ -130,6 +130,15 @@ Flux. Its README holds the values; these are the rules.
 - **`values.schema.json` refuses unknown keys.** A new value is typed
   there, in `values.yaml` and in the README's table in one change.
 
+A local kind cluster, `1ctx-test` (context `kind-1ctx-test`), is where
+the chart is tried by hand and where the load harness runs
+(`docs/load-testing.md`). `make kind-up` creates it with metrics-server
+(so `kubectl top` answers) and keeps the current kube context;
+`make kind-image` builds the image and loads it as
+`ghcr.io/stefanprodan/1ctx:dev`, which the chart runs with
+`--set image.tag=dev` (pull policy `IfNotPresent`); `make kind-down`
+deletes the cluster with every release in it.
+
 ## Release and CI
 
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the
@@ -143,6 +152,13 @@ Flux. Its README holds the values; these are the rules.
   both Compose files, `helm lint --strict` on the chart, and `flux-schema`
   on the chart's default render and `deploy/flux/`, CEL rules included.
   Helm is set up at 4, which `flux-schema` needs.
+- **`e2e.yml` runs the load harness by hand** (`workflow_dispatch`) on a
+  Linux runner: `cluster`, the default, builds the image into a fresh
+  `1ctx-test` cluster and runs one step (inputs `mult`, `minutes`,
+  `cpu`); `bench` builds a database (`preset`) and runs the source (`n`,
+  `seconds`); `both` runs the two side by side. The results table goes
+  to the run's summary and the logs to the `load-results-<target>`
+  artifact. Never on a push or a pull request.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a

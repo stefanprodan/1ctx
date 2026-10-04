@@ -16,7 +16,7 @@ import {
   maskTimes,
   type RecordedCase,
   sortLines,
-} from "../../../scripts/record-cases.ts";
+} from "../../../scripts/record/cases.ts";
 
 export function quote(arg: string): string {
   return `'${arg.replaceAll("'", `'\\''`)}'`;

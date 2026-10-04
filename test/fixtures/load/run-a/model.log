@@ -1,0 +1,6 @@
+{"t":"req","at":1100,"marker":"a-1","kind":"chat","round":0,"session":"a"}
+{"t":"end","at":1500,"marker":"a-1","round":0,"calls":[{"tool":"mcp__git__get_issue","mcpMs":200},{"tool":"bash","mcpMs":0}],"final":false}
+{"t":"req","at":1750,"marker":"a-1","kind":"chat","round":1,"session":"a","errors":2}
+{"t":"end","at":2000,"marker":"a-1","round":1,"calls":[],"final":true}
+{"t":"req","at":2300,"marker":"b-1","kind":"chat","round":0,"session":"b"}
+{"t":"req","at":2500,"marker":"a-1","kind":"chat","round":1,"session":"a"}

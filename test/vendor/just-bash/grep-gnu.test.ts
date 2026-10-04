@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // grep against what GNU grep 3.12 answered for the same arguments,
-// recorded by scripts/grep-record.ts. A case with `accept` pins our answer
+// recorded by scripts/record/grep.ts. A case with `accept` pins our answer
 // where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/grep-gnu.json" with {
   type: "json",
 };

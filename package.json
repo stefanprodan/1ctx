@@ -16,6 +16,9 @@
     "smoke": "scripts/smoke.sh",
     "image": "scripts/image.sh",
     "image-smoke": "scripts/image-smoke.sh",
+    "kind-up": "scripts/kind.sh up",
+    "kind-image": "scripts/kind.sh image",
+    "kind-down": "scripts/kind.sh down",
     "clean": "scripts/preview.sh clean && rm -rf bin .*.bun-build",
     "preview": "scripts/preview.sh restart",
     "preview-stop": "scripts/preview.sh stop",
@@ -25,7 +28,12 @@
     "preview-reset": "scripts/preview.sh reset",
     "staging-deploy": "scripts/staging.sh deploy",
     "staging-provision": "scripts/staging.sh provision",
-    "staging-status": "scripts/staging.sh status"
+    "staging-status": "scripts/staging.sh status",
+    "load-db": "bun scripts/load/db/build.ts",
+    "load-bench": "bun scripts/load/bench.ts",
+    "load-cluster": "bun scripts/load/cluster.ts",
+    "load-summary": "bun scripts/load/summarize.ts",
+    "load-smoke": "bun scripts/load/bench.ts --smoke"
   },
   "license": "Apache-2.0",
   "engines": {

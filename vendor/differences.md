@@ -50,7 +50,7 @@ define.
 ## Where our jq still differs from jq
 
 `test/vendor/just-bash/jq-paths.test.ts` pins path expressions against
-jq 1.8, and `jq-1.8.test.ts` the cases `scripts/jq-record.ts` recorded
+jq 1.8, and `jq-1.8.test.ts` the cases `scripts/record/jq.ts` recorded
 from jq 1.8.2 for the dialect rules. Where they part:
 
 - Regular expressions are RE2's, not Oniguruma's: the one-letter class
@@ -154,7 +154,7 @@ scrubs keys and discards the cause.
 ## Where our awk still differs from gawk
 
 `test/fixtures/just-bash/awk-gawk.json` holds what gawk 5.4.1 answered,
-recorded by `scripts/gawk-record.ts`, and
+recorded by `scripts/record/gawk.ts`, and
 `test/vendor/just-bash/awk-gawk.test.ts` holds our awk to it. Where
 they part:
 
@@ -204,7 +204,7 @@ they part:
 ## Where our grep still differs from GNU grep
 
 `test/fixtures/just-bash/grep-gnu.json` holds what GNU grep 3.12
-answered, recorded by `scripts/grep-record.ts`, and
+answered, recorded by `scripts/record/grep.ts`, and
 `test/vendor/just-bash/grep-gnu.test.ts` holds our grep to it; a case
 with `accept` pins ours. Where they part:
 
@@ -232,7 +232,7 @@ with `accept` pins ours. Where they part:
 
 `test/fixtures/just-bash/rg-ripgrep.json` holds what ripgrep 15.2.0
 answered when piped, with `--no-require-git` in its config file, recorded
-by `scripts/rg-record.ts`, and `test/vendor/just-bash/rg-ripgrep.test.ts`
+by `scripts/record/rg.ts`, and `test/vendor/just-bash/rg-ripgrep.test.ts`
 holds our rg to it; a case with `accept` pins ours. Where they part:
 
 - `\b` and `\B` are ASCII, so `\bcole` matches in `école`. `\<` and
@@ -259,7 +259,7 @@ holds our rg to it; a case with `accept` pins ours. Where they part:
 ## Where our xargs still differs from GNU xargs
 
 `test/fixtures/just-bash/xargs-gnu.json` holds what GNU findutils
-4.11.0's xargs answered, recorded by `scripts/xargs-record.ts`, and
+4.11.0's xargs answered, recorded by `scripts/record/xargs.ts`, and
 `test/vendor/just-bash/xargs-gnu.test.ts` holds ours to it; a case with
 `accept` pins ours. `test/vendor/just-bash/xargs.test.ts` pins the words
 and `-t` lines the fixture does not compare. Where they part:
@@ -292,7 +292,7 @@ and `-t` lines the fixture does not compare. Where they part:
 ## Where our find still differs from GNU find
 
 `test/fixtures/just-bash/find-gnu.json`, recorded by
-`scripts/find-record.ts`, `test/vendor/just-bash/find-diagnostics.test.ts`,
+`scripts/record/find.ts`, `test/vendor/just-bash/find-diagnostics.test.ts`,
 `find-path.test.ts` and `find-prune.test.ts` hold our find to what GNU
 findutils 4.11.0 answered. Where they part:
 
@@ -358,11 +358,11 @@ a read-only Linux mount:
 ## Where our diff still differs from GNU diff
 
 `test/fixtures/just-bash/diff-gnu.json` holds what GNU diffutils 3.12
-answered, recorded by `scripts/diff-record.ts` with every file at one
+answered, recorded by `scripts/record/diff.ts` with every file at one
 time, `TZ=UTC` and the symlinks the fixture names, and
 `test/vendor/just-bash/diff-gnu.test.ts` holds our diff to it; a case
 with `accept` pins ours.
-`scripts/diff-patch-check.ts` checks by hand that GNU patch 2.8 applies
+`scripts/record/diff-patch-check.ts` checks by hand that GNU patch 2.8 applies
 our unified and context output of every pair of text files the fixture
 compares. The large inputs are in `diff-engine.test.ts`, which counts
 the work units each costs. Where they part:
@@ -437,7 +437,7 @@ the work units each costs. Where they part:
 ## Where our shell still differs from bash on links and bytes
 
 `test/fixtures/just-bash/bash-gnu.json`, recorded by
-`scripts/bash-record.ts` from GNU bash 5.2 and coreutils 9.4 in the C
+`scripts/record/bash.ts` from GNU bash 5.2 and coreutils 9.4 in the C
 locale, holds short scripts through linked folders, `ls -l`, `readlink
 -f`, `**` and byte escapes, and the tree each leaves;
 `test/vendor/just-bash/bash-gnu.test.ts` holds ours to it. Where they
@@ -474,7 +474,7 @@ UTF-8 locale. Where they part:
 `test/vendor/just-bash/yq.test.ts` pins streams and in-place edits; on
 the podinfo manifests the `-i` writes compared were mikefarah's byte
 for byte, or the same data with safer quoting.
-`yq-mikefarah.test.ts` runs the cases `scripts/yq-record.ts` recorded
+`yq-mikefarah.test.ts` runs the cases `scripts/record/yq.ts` recorded
 from mikefarah's yq v4.53.3; a case with `accept` pins ours instead,
 for one of the reasons below. Where they part:
 

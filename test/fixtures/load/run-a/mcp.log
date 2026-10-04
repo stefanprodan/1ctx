@@ -1,0 +1,2 @@
+{"t":"call","at":1510,"server":"git","tool":"get_issue","ms":200,"bytes":900}
+{"t":"call","at":1520,"server":"git","tool":"list_issues","ms":30,"bytes":300}

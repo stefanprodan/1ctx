@@ -1,0 +1,20 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Records jq 1.8's answers into the fixtures the jq tests compare against:
+// `bun scripts/record/jq.ts`, with jq 1.8 on the PATH.
+
+import { record } from "./cases.ts";
+
+await record(
+  "jq",
+  new URL("../../test/fixtures/just-bash/jq-1.8.json", import.meta.url)
+    .pathname,
+  /^jq-1\.8\./,
+);
+await record(
+  "jq",
+  new URL("../../test/fixtures/just-bash/jq-agent.json", import.meta.url)
+    .pathname,
+  /^jq-1\.8\./,
+);

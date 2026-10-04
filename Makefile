@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke staging-deploy staging-provision staging-status
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -42,6 +42,15 @@ image: ## Build the container image and load it (PLATFORMS=linux/amd64,linux/arm
 image-smoke: ## Build the image, run it as production does, sign in and stop it
 	@bun run image-smoke
 
+kind-up: ## Create the local kind cluster 1ctx-test with metrics-server
+	@bun run kind-up
+
+kind-image: ## Build the image and load it into the 1ctx-test cluster
+	@bun run kind-image
+
+kind-down: ## Delete the 1ctx-test cluster and everything in it
+	@bun run kind-down
+
 clean: ## Stop the preview, remove its db and log, and the build artifacts
 	@bun run clean
 
@@ -71,3 +80,18 @@ staging-provision: ## Stop staging, apply the objects, start it (FILE=path.yaml,
 
 staging-status: ## What the staging service says
 	@bun run staging-status
+
+load-db: ## Build a load test database (PRESET=bench|small|tiny, ARGS="--out path")
+	@bun run load-db $(if $(PRESET),--preset $(PRESET)) $(ARGS)
+
+load-bench: ## Compare builds: the source under load against a clone of a built database (ARGS="--n 10 --seconds 120 --checkout path")
+	@bun run load-bench $(ARGS)
+
+load-cluster: ## The chart's pod under the busiest hour on kind (ARGS="install|setup|step MULT MINUTES|smoke")
+	@bun run load-cluster $(ARGS)
+
+load-summary: ## Print the results table of load runs (ARGS="label ...", all when empty)
+	@bun run load-summary $(ARGS)
+
+load-smoke: ## Run the bench for 30 s at N=2 on a tiny database
+	@bun run load-smoke
