@@ -80,7 +80,7 @@ function policy(
     },
     now: 1,
     tools: null,
-    knowledge: { files: 0, recent: [] },
+    knowledge: { empty: true },
     limits: DEFAULT_LIMITS,
   });
 }
@@ -95,7 +95,7 @@ describe("send policy thinking", () => {
       now: 1,
       tools: null,
       disabledCapabilities,
-      knowledge: { files: 0, recent: [] },
+      knowledge: { empty: true },
       limits: DEFAULT_LIMITS,
     });
     disabledCapabilities.length = 0;
@@ -123,7 +123,7 @@ describe("send policy thinking", () => {
       agent,
       now: 1,
       tools: null,
-      knowledge: { files: 0, recent: [] },
+      knowledge: { empty: true },
       limits: DEFAULT_LIMITS,
       automation,
     });
@@ -151,7 +151,7 @@ describe("send policy thinking", () => {
       agent,
       now: 1,
       tools: null,
-      knowledge: { files: 0, recent: [] },
+      knowledge: { empty: true },
       limits,
     });
     limits.rounds = 20;
@@ -166,11 +166,7 @@ describe("send policy thinking", () => {
     expect(send.toolCaps).not.toHaveProperty("toolWorkTokens");
   });
 
-  test("copies the knowledge count and recent files without tools", () => {
-    const knowledge = {
-      files: 1,
-      recent: [{ name: "docs/x.md", author: "coder", updatedAt: 1 }],
-    };
+  test("carries whether the knowledge base is empty without tools", () => {
     const send = buildPolicy({
       project: { id: "project", kind: "team", name: "ops", description: "" },
       user,
@@ -178,15 +174,9 @@ describe("send policy thinking", () => {
       now: 1,
       tools: null,
       limits: DEFAULT_LIMITS,
-      knowledge,
+      knowledge: { empty: false },
     });
-    knowledge.files = 2;
-    knowledge.recent[0]!.name = "changed.md";
-    knowledge.recent.push({ name: "new.md", author: "ana", updatedAt: 2 });
-    expect(send.knowledge).toEqual({
-      files: 1,
-      recent: [{ name: "docs/x.md", author: "coder", updatedAt: 1 }],
-    });
+    expect(send.knowledge).toEqual({ empty: false });
   });
 
   test("null follows the catalog reasoning flag both ways", () => {
@@ -242,7 +232,7 @@ describe("send policy upstream", () => {
       wire,
       now: 1,
       tools: null,
-      knowledge: { files: 0, recent: [] },
+      knowledge: { empty: true },
       limits: DEFAULT_LIMITS,
     });
 

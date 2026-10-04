@@ -53,10 +53,7 @@ describe("knowledge store and area", () => {
         tokens: tokens("two\n"),
       });
       expect(area.list(projectId).totals.bytes).toBe(4);
-      expect(area.snapshot(projectId)).toEqual({
-        files: 1,
-        recent: [{ name: first.name, author: "coder", updatedAt: 200 }],
-      });
+      expect(area.snapshot(projectId)).toEqual({ empty: false });
       expect(() => area.replace(projectId, author, first.id, "old", 1)).toThrow(
         "docs/x.md is at revision 2",
       );
@@ -214,20 +211,12 @@ describe("knowledge store and area", () => {
     }
   });
 
-  test("the snapshot is five newest live files", () => {
-    const { db, area, projectId, author, now } = setup();
+  test("the snapshot says only whether the base is empty", () => {
+    const { db, area, projectId, author } = setup();
     try {
-      for (let i = 0; i < 7; i++) {
-        now.value++;
-        area.create(projectId, author, `f${i}`, "");
-      }
-      expect(area.snapshot(projectId).recent.map((file) => file.name)).toEqual([
-        "f6",
-        "f5",
-        "f4",
-        "f3",
-        "f2",
-      ]);
+      expect(area.snapshot(projectId)).toEqual({ empty: true });
+      area.create(projectId, author, "f0", "");
+      expect(area.snapshot(projectId)).toEqual({ empty: false });
     } finally {
       db.close();
     }

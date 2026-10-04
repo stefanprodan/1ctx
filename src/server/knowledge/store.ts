@@ -11,11 +11,9 @@ import type {
   KnowledgeFile,
   KnowledgeTotals,
 } from "../../shared/contracts/knowledge.ts";
-import type { RecentFile } from "../../shared/knowledge.ts";
 import type { Db } from "../db/index.ts";
 import { newId, sha256 } from "../lib/ids.ts";
 import { tokens } from "../lib/tokens.ts";
-import { RECENT_FILES } from "./limits.ts";
 import {
   FILE_COLUMNS,
   type FileRaw,
@@ -171,16 +169,6 @@ export class KnowledgeStore extends KnowledgeVersions {
       )
       .all(projectId, limit)
       .map(fileOf);
-  }
-
-  recent(projectId: string): RecentFile[] {
-    return this.filesDb
-      .query<RecentFile, [string, number]>(
-        `select name, author_name as author, updated_at as updatedAt
-       from knowledge_files where project_id = ?
-       order by updated_at desc, rowid desc limit ?`,
-      )
-      .all(projectId, RECENT_FILES);
   }
 
   create(
