@@ -139,6 +139,10 @@ make load-kind ARGS="step 1 20"           # one step, logs to out/results/
 make load-kind ARGS="smoke"               # install, setup, step 1 5
 ```
 
+On demand, the `e2e` workflow runs either target on a GitHub Linux
+runner (`gh workflow run e2e.yml -f target=kind -f mult=1 -f
+minutes=5`); its table lands in the run's summary (`docs/deploy.md`).
+
 Setup and steps are idempotent: setup keeps what exists by name, a
 step sets every automation's time before it starts.
 

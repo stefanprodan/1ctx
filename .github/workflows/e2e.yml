@@ -1,0 +1,135 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "kind: the chart on a kind cluster; local: the source on the runner"
+        type: choice
+        options:
+          - kind
+          - local
+        default: kind
+      mult:
+        description: "kind: the busiest hour times this"
+        type: string
+        default: "1"
+      minutes:
+        description: "kind: the step's minutes"
+        type: string
+        default: "5"
+      cpu:
+        description: "kind: the server pod's CPU limit (the runner has 4)"
+        type: string
+        default: "2"
+      preset:
+        description: "local: the database to build"
+        type: choice
+        options:
+          - tiny
+          - bench
+          - small
+        default: bench
+      n:
+        description: "local: turns kept running"
+        type: string
+        default: "10"
+      seconds:
+        description: "local: how long the load runs"
+        type: string
+        default: "120"
+  # TEMPORARY: proves the workflow on this branch; removed before merge
+  push:
+    branches:
+      - test/load-harness
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # a dispatch runs the target asked for; a push runs both
+        target: ${{ fromJSON(inputs.target && format('["{0}"]', inputs.target) || '["kind","local"]') }}
+    env:
+      MULT: ${{ inputs.mult || '1' }}
+      MINUTES: ${{ inputs.minutes || '5' }}
+      CPU: ${{ inputs.cpu || '2' }}
+      PRESET: ${{ inputs.preset || 'bench' }}
+      N: ${{ inputs.n || '10' }}
+      SECONDS_: ${{ inputs.seconds || '120' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check inputs
+        run: |
+          for v in "$MULT" "$MINUTES" "$CPU" "$N" "$SECONDS_"; do
+            [[ "$v" =~ ^[0-9]+$ ]] || { echo "not a whole number: $v" >&2; exit 1; }
+          done
+      - name: Read Bun version
+        id: bun
+        run: |
+          version=$(scripts/bun-version.sh)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.bun.outputs.version }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Setup kind
+        if: matrix.target == 'kind'
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+        with:
+          version: v0.33.0
+          install_only: true
+      - name: Setup Helm
+        if: matrix.target == 'kind'
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - name: Create the cluster
+        if: matrix.target == 'kind'
+        run: make kind-up
+      - name: Build and load the image
+        if: matrix.target == 'kind'
+        run: make kind-image
+      - name: Install
+        if: matrix.target == 'kind'
+        run: make load-kind ARGS="install --cpu $CPU"
+      - name: Set up the hour
+        if: matrix.target == 'kind'
+        run: make load-kind ARGS="setup --max-mult $MULT"
+      - name: Run the step
+        if: matrix.target == 'kind'
+        run: make load-kind ARGS="step $MULT $MINUTES --label e2e"
+      - name: Build the database
+        if: matrix.target == 'local'
+        run: make load-db PRESET="$PRESET"
+      - name: Run the load
+        if: matrix.target == 'local'
+        run: |
+          make load ARGS="--db scripts/load/out/db/$PRESET.sqlite \
+            --n $N --seconds $SECONDS_ --label e2e"
+      - name: Summary
+        if: always()
+        run: |
+          if [[ -d scripts/load/out/results/e2e ]]; then
+            make load-summary ARGS="e2e" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: load-results-${{ matrix.target }}
+          path: scripts/load/out/results/
+          if-no-files-found: ignore
+          retention-days: 14
