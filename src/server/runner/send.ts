@@ -15,9 +15,9 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import { unmarked } from "./context.ts";
 import type { KeepPort, SendPolicy, SendRepos, ToolBudget } from "./policy.ts";
 import type { RepoLines } from "./prompt.ts";
+import { unmarked } from "./render.ts";
 
 export type RoundState = {
   messageId: string;

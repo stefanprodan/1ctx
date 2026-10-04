@@ -2,36 +2,37 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The session's rows as the wire takes them: the system prompt, then
-// every user message with its author's name, and every reply and tool
-// row that carries something. A work reply goes back as an assistant
-// message with its tool calls and a null content when it has none; a
-// tool row as role tool. Pairing is by (sendId, round) and call order.
-//
-// The repair is pure: a work reply whose calls lack a complete set of
-// result rows is sent without its calls and without any of its
-// reasoning, as plain text if it has any, else skipped; an orphan tool
-// row is skipped. The answer round ends the request with the ask as a
-// user message, never a stored row. Another agent's turn in the chat
-// goes as its answer and its trace, never its calls, results or
-// reasoning. Tested on fixtures, malformed histories among them.
+// the rows (render.ts). After a done summary the history is the summary,
+// then the tail (tail.ts), the newest whole turns before it as they
+// were, then the rows after it; what came before the tail reaches the
+// model only through the summary. The answer round ends the request
+// with the ask as a user message, never a stored row.
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
-import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
+import { UPLOADS_SUMMARY_LINE } from "../../shared/uploads.ts";
+import type { Wire } from "../../shared/words.ts";
 import { tokens } from "../lib/tokens.ts";
 import {
   type ChatMessageIn,
   type ChatRequest,
-  markOf,
-  type ReasoningDetail,
+  type ChatTool,
+  requestTokens,
   type ToolCall,
 } from "../providers/index.ts";
 import { leastThinking, type SendPolicy } from "./policy.ts";
 import { NO_REPO_LINES, type RepoLines, systemPrompt } from "./prompt.ts";
-import { trace, traceCalls, type Yours, yoursOf } from "./trace.ts";
+import {
+  type ContextLookups,
+  ownTurn,
+  type RenderPolicy,
+  renderRows,
+  type Turn,
+} from "./render.ts";
+import { lastSummary, tailBudget, tailOf } from "./tail.ts";
 
-export const SUMMARIZE = `Summarize the conversation so far so that it can continue from the summary alone: the messages before this point are dropped and only the summary is kept. Write Markdown with these sections, terse bullets, no prose:
+export const SUMMARIZE = `Summarize the conversation so far. The chat continues from your summary, followed by its newest turns as they were when they fit, so cover all of it, the newest turns included. Write Markdown with these sections, terse bullets, no prose:
 
 ## Goal
 What the user is after.
@@ -45,169 +46,31 @@ What is still unanswered or in progress.
 Do not mention the summary process.`;
 
 export const SUMMARY_LEAD =
-  "The conversation so far, summarized; the earlier messages were dropped:";
-
-// who answered a send of the session: its agent and whether it was
-// summoned for the turn
-export type Turn = {
-  agentId: string;
-  agentName: string;
-  summoned: boolean;
-  providerId?: string;
-};
-
-export type ContextLookups = {
-  // the author's username, for the name field on the wire
-  usernameOf(userId: string): string | null;
-  reasoningDetailsOf(
-    messageId: string,
-    providerId: string,
-    model: string,
-  ): ReasoningDetail[] | null;
-  // the session's sends by id
-  turnsOf(sessionId: string): ReadonlyMap<string, Turn>;
-};
-
-type Builder = Pick<SendPolicy, "agentId" | "summoned">;
-
-// a turn is the building agent's own when neither is summoned (a fork's
-// copied turns included) or both are summoned sends of the same agent;
-// a send the lookup does not know is its own
-function ownTurn(turn: Turn | undefined, policy: Builder): boolean {
-  if (turn === undefined) return true;
-  return policy.summoned === null
-    ? !turn.summoned
-    : turn.summoned && turn.agentId === policy.agentId;
-}
-
-// an answer without the agent's own mark: a model that read other
-// agents' marked answers may open its own the same way. Only a mark
-// followed by a space or the end, so a link or reference that opens
-// with the name stays; names are lowercase but a model's case is not
-export function unmarked(text: string, name: string): string {
-  const mark = markOf(name).trimEnd().toLowerCase();
-  const start = text.trimStart();
-  if (start.slice(0, mark.length).toLowerCase() !== mark) return text;
-  const rest = start.slice(mark.length);
-  return rest === "" || /^\s/.test(rest) ? rest.trimStart() : text;
-}
-
-// another agent's turn: its answer as a user message opened by its
-// name, with no author field, then its trace as its own message, the
-// calls to tools the building agent lacks marked
-function foreignTurn(
-  turn: Turn,
-  rows: readonly Message[],
-  yours: Yours,
-): ChatMessageIn[] {
-  const out: ChatMessageIn[] = [];
-  const answer = rows
-    .filter(
-      (row) =>
-        row.kind === "reply" &&
-        row.slot !== "work" &&
-        row.status !== "streaming" &&
-        row.content !== "",
-    )
-    .map((row) => row.content)
-    .join("\n\n");
-  if (answer !== "") {
-    out.push({ role: "user", content: `${markOf(turn.agentName)}${answer}` });
-  }
-  const calls = trace(traceCalls(rows), yours);
-  if (calls !== "") out.push({ role: "user", content: calls });
-  return out;
-}
-
-// the tool result rows of one (sendId, round), in call order
-function toolRowsByRound(rows: Message[]): Map<string, Message[]> {
-  const byRound = new Map<string, Message[]>();
-  for (const row of rows) {
-    if (row.kind !== "tool") continue;
-    const key = `${row.sendId}:${row.round}`;
-    const calls = byRound.get(key) ?? [];
-    calls.push(row);
-    byRound.set(key, calls);
-  }
-  return byRound;
-}
-
-// a user message on the wire, with the author's name when it is not the
-// sender and is known
-function userMessage(
-  row: Message,
-  policy: Pick<SendPolicy, "username" | "userId">,
-  lookups: ContextLookups,
-): ChatMessageIn {
-  const name =
-    row.userId === policy.userId
-      ? policy.username
-      : row.userId === null
-        ? null
-        : lookups.usernameOf(row.userId);
-  return {
-    role: "user",
-    content: row.uploads?.length
-      ? `${row.content}\n\n${uploadsBlock(row.uploads)}`
-      : row.content,
-    ...(name === null ? {} : { name }),
-  };
-}
-
-// reasoning stays with its provider; the message's model lets a wire
-// that sends it back keep only the requested model's
-const plainReasoning = (row: Message, sameProvider: boolean) =>
-  sameProvider && row.reasoning !== "" ? { reasoning: row.reasoning } : {};
-
-// an assistant reply that asked for tools, with a complete set of
-// result rows: the calls and the reasoning go back
-function workMessage(
-  row: Message,
-  calls: ToolCall[],
-  policy: Pick<SendPolicy, "providerId" | "model">,
-  lookups: ContextLookups,
-  sameProvider: boolean,
-): ChatMessageIn {
-  const details = lookups.reasoningDetailsOf(
-    row.id,
-    policy.providerId,
-    policy.model,
-  );
-  return {
-    role: "assistant",
-    model: row.model ?? undefined,
-    content: row.content === "" ? null : row.content,
-    toolCalls: calls,
-    ...plainReasoning(row, sameProvider),
-    ...(details ? { reasoningDetails: details } : {}),
-  };
-}
+  "A summary of the conversation so far. Its newest turns, if any, follow as they were:";
 
 export const SKILLS_LEAD =
-  "These skills were loaded earlier in this chat and still apply. Load one again with the skill tool before relying on it:";
+  "These skills were loaded earlier in this chat and still apply. Their instructions are not shown here, so load one again with the skill tool before relying on it:";
 
+// the skills the building agent loaded from `from` (the previous
+// summary's tail, so a load inside it outlives that tail) up to the
+// summary, less those whose result replays in the current tail
 function loadedSkills(
-  rows: Message[],
+  rows: readonly Message[],
+  from: number,
+  tail: number,
   cut: number,
   offered: Set<string>,
   // the skill was loaded by the building agent itself
   own: (sendId: string) => boolean,
 ): string[] {
-  let start = 0;
-  for (let i = cut - 1; i >= 0; i--) {
-    const row = rows[i]!;
-    if (row.kind === "summary" && row.status === "done") {
-      start = i + 1;
-      break;
-    }
-  }
   const calls = new Map<string, ToolCall[]>();
   // a round's tool rows pair with its calls by position, as the writer
   // pairs them, since a provider may repeat a call id
   const positions = new Map<string, number>();
   const names: string[] = [];
-  const seen = new Set<string>();
-  for (const row of rows.slice(start, cut)) {
+  const replayed = new Set<string>();
+  for (let i = from; i < cut; i++) {
+    const row = rows[i]!;
     if (!own(row.sendId)) continue;
     const key = `${row.sendId}:${row.round}`;
     if (row.kind === "reply" && row.slot === "work") {
@@ -221,13 +84,23 @@ function loadedSkills(
     const call = calls.get(key)?.[index];
     if (call?.id !== row.toolCallId || call.name !== "skill") continue;
     const name = toolArguments(call.arguments)?.name;
-    if (typeof name === "string" && offered.has(name) && !seen.has(name)) {
-      seen.add(name);
-      names.push(name);
-    }
+    if (typeof name !== "string" || !offered.has(name)) continue;
+    if (i >= tail) replayed.add(name);
+    if (!names.includes(name)) names.push(name);
   }
-  return names;
+  return names.filter((name) => !replayed.has(name));
 }
+
+// what the tail is sized against: the window and reserve the round
+// compacts at, the wire that counts, and the rest of the request (the
+// system prompt and the schemas) the summary is sent with
+export type TailRoom = {
+  window: number | null;
+  reserve: number;
+  wire: Wire | null;
+  system: ChatMessageIn[];
+  tools: readonly ChatTool[];
+};
 
 export function history(
   rows: Message[],
@@ -255,145 +128,92 @@ export function history(
     | "disabledCapabilities"
     | "mcpOff"
     | "skillsOff"
+    | "contextLength"
+    | "limits"
+    | "wire"
   >,
   lookups: ContextLookups,
   now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
 ): ChatMessageIn[] {
+  const system: ChatMessageIn = {
+    role: "system",
+    content: systemPrompt(policy, now, mcpNote, repos),
+  };
   return [
-    { role: "system", content: systemPrompt(policy, now, mcpNote, repos) },
-    ...historyMessages(rows, policy, lookups),
+    system,
+    ...historyMessages(rows, policy, lookups, {
+      window: policy.contextLength,
+      reserve: policy.limits.contextReserve,
+      wire: policy.wire,
+      system: [system],
+      tools: policy.offered.tools,
+    }),
   ];
 }
 
+const leadOf = (summary: Message) => `${SUMMARY_LEAD}\n\n${summary.content}`;
+
+// the tail budget after one summary: its base is the request without
+// the tail, the summary's lead counted without the lines that depend on
+// the tail
+function budgetAt(room: TailRoom, model: string, summary: Message): number {
+  const base = requestTokens(room.wire, {
+    model,
+    thinking: false,
+    messages: [...room.system, { role: "user", content: leadOf(summary) }],
+    tools: [...room.tools],
+  });
+  return tailBudget(room.window, room.reserve, base);
+}
+
+// the rows after the last done summary, with its tail when a room is
+// given; the memory phase and the attention step read one run's rows,
+// which never hold a summary, and pass none
 export function historyMessages(
   rows: Message[],
-  policy: Pick<
-    SendPolicy,
-    | "username"
-    | "userId"
-    | "providerId"
-    | "model"
-    | "offered"
-    | "agentId"
-    | "summoned"
-  >,
+  policy: RenderPolicy,
   lookups: ContextLookups,
+  room: TailRoom | null = null,
 ): ChatMessageIn[] {
-  const out: ChatMessageIn[] = [];
-  const turns =
-    rows.length === 0
-      ? new Map<string, Turn>()
-      : lookups.turnsOf(rows[0]!.sessionId);
-  const own = (sendId: string) => ownTurn(turns.get(sendId), policy);
-  const sameProvider = (row: Message) =>
-    turns.get(row.sendId)?.providerId === policy.providerId;
-  const yours = yoursOf(policy.offered);
-  let start = 0;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const row = rows[i]!;
-    if (row.kind === "summary" && row.status === "done") {
-      const names = loadedSkills(
-        rows,
-        i,
-        new Set(policy.offered.skills.skills.map((skill) => skill.name)),
-        own,
-      );
-      const remembered =
-        names.length === 0 ? "" : `\n\n${SKILLS_LEAD} ${names.join(", ")}`;
-      const uploads = rows
-        .slice(0, i)
-        .some((row) => row.kind === "user" && row.uploads?.length)
-        ? `\n\n${UPLOADS_SUMMARY_LINE}`
-        : "";
-      out.push({
-        role: "user",
-        content: `${SUMMARY_LEAD}\n\n${row.content}${remembered}${uploads}`,
-      });
-      start = i + 1;
-      break;
-    }
-  }
-  const active = rows.slice(start);
-  const byRound = toolRowsByRound(active);
-  // another agent's rows of one send, sent as its answer and trace once
-  // the send's rows end
-  let foreign: Message[] = [];
-  const flush = () => {
-    const first = foreign[0];
-    if (first !== undefined) {
-      out.push(...foreignTurn(turns.get(first.sendId)!, foreign, yours));
-    }
-    foreign = [];
-  };
-  for (const row of active) {
-    if (foreign.length > 0 && row.sendId !== foreign[0]!.sendId) flush();
-    if (row.kind === "summary") continue;
-    if (row.kind !== "user" && !own(row.sendId)) {
-      foreign.push(row);
-      continue;
-    }
-    if (row.kind === "user") {
-      out.push(userMessage(row, policy, lookups));
-      continue;
-    }
-    if (row.kind === "tool") {
-      // an orphan tool row (no assistant turn placed it) is skipped by
-      // the reply branch below; a paired one is emitted there in order
-      continue;
-    }
-    // a reply row
-    if (row.status === "streaming") continue;
-    const calls = row.toolCalls ?? [];
-    if (row.slot === "work" && calls.length > 0) {
-      const key = `${row.sendId}:${row.round}`;
-      const resultRows = byRound.get(key);
-      const complete =
-        resultRows !== undefined &&
-        resultRows.length === calls.length &&
-        calls.every((call, index) => {
-          const result = resultRows[index];
-          return result !== undefined && result.toolCallId === call.id;
-        });
-      if (complete) {
-        out.push(workMessage(row, calls, policy, lookups, sameProvider(row)));
-        calls.forEach((call, index) => {
-          out.push({
-            role: "tool",
-            toolCallId: call.id,
-            content: resultRows[index]!.content,
-          });
-        });
-        continue;
-      }
-      // the round is incomplete: send it without its calls and without
-      // any of its reasoning, as plain text if it has any, else skip
-      if (row.content !== "") {
-        out.push({
-          role: "assistant",
-          model: row.model ?? undefined,
-          content: row.content,
-        });
-      }
-      continue;
-    }
-    if (row.content === "") continue;
-    const details = lookups.reasoningDetailsOf(
-      row.id,
-      policy.providerId,
-      policy.model,
+  const turns: ReadonlyMap<string, Turn> =
+    rows.length === 0 ? new Map() : lookups.turnsOf(rows[0]!.sessionId);
+  const cut = lastSummary(rows);
+  if (cut < 0) return renderRows(rows, policy, lookups, turns);
+  const tailAt = (at: number) =>
+    tailOf(
+      rows,
+      at,
+      room === null ? 0 : budgetAt(room, policy.model, rows[at]!),
+      policy,
+      lookups,
+      turns,
+      room?.wire ?? null,
     );
-    out.push({
-      role: "assistant",
-      model: row.model ?? undefined,
-      content: row.content,
-      ...plainReasoning(row, sameProvider(row)),
-      ...(details ? { reasoningDetails: details } : {}),
-    });
-  }
-  flush();
-  return out;
+  const tail = tailAt(cut);
+  const previous = lastSummary(rows, cut);
+  const names = loadedSkills(
+    rows,
+    previous < 0 ? 0 : tailAt(previous).start,
+    tail.start,
+    cut,
+    new Set(policy.offered.skills.skills.map((skill) => skill.name)),
+    (sendId) => ownTurn(turns.get(sendId), policy),
+  );
+  const remembered =
+    names.length === 0 ? "" : `\n\n${SKILLS_LEAD} ${names.join(", ")}`;
+  // an upload inside the tail replays as its own block
+  const uploads = rows
+    .slice(0, tail.start)
+    .some((row) => row.kind === "user" && row.uploads?.length)
+    ? `\n\n${UPLOADS_SUMMARY_LINE}`
+    : "";
+  return [
+    { role: "user", content: `${leadOf(rows[cut]!)}${remembered}${uploads}` },
+    ...tail.messages,
+    ...renderRows(rows.slice(cut + 1), policy, lookups, turns),
+  ];
 }
 
 // a summoned agent keeps its own key, so two agents never share a

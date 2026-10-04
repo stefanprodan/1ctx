@@ -593,6 +593,37 @@ describe("a summon", () => {
     }
   });
 
+  test("a compacted chat is counted by its summary and the tail after it", async () => {
+    const { chat, checkerId } = await summonApp();
+    try {
+      // checker compacts at 7,500
+      chat.app.db
+        .query("update agents set context_length = 10000 where id = ?")
+        .run(checkerId);
+      const { sessionId, script } = await startChat(chat, "hello");
+      answer(script, "word ".repeat(3000), { prompt: 3100, completion: 3000 });
+      await free(chat, sessionId);
+      const count = chat.scripted.scripts.length;
+      const compacted = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/compact`,
+      );
+      expect(compacted.status).toBe(200);
+      const summary = await waitScript(chat.scripted, count + 1);
+      // the summary alone is under checker's threshold, with the turn
+      // the chat's agent replays after it, over
+      answer(summary, "the summary", { prompt: 3200, completion: 5000 });
+      await free(chat, sessionId);
+      const refused = await post(chat, sessionId, "@checker check");
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toBe(
+        "the chat is too long for checker",
+      );
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a regenerate leaves the replaced turn's rounds out of the count", async () => {
     const { chat, checkerId } = await summonApp();
     try {

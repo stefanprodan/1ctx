@@ -85,7 +85,12 @@ describe("uploads in provider context", () => {
   });
 
   test("a summary before the first upload stays unchanged and later summaries carry the earlier-file line", async () => {
+    // an unknown window replays no tail, so every upload is behind the
+    // summary
     const chat = await chatApp();
+    chat.app.db
+      .query("update agents set context_length = null where id = ?")
+      .run(chat.agentId);
     try {
       const started = await start(chat);
       await finish(chat, started.sessionId, started.script);

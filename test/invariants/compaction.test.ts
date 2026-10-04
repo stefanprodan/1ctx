@@ -103,15 +103,16 @@ describe("compaction", () => {
       content: string;
       name?: string;
     }[];
+    // the summary, then the turn it followed as it was
     expect(messages.slice(1)).toEqual([
       {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue`,
       },
+      { role: "user", content: "the old question", name: "casey" },
+      { role: "assistant", content: "the answer" },
       { role: "user", content: "the new question", name: "casey" },
     ]);
-    expect(JSON.stringify(messages)).not.toContain("the old question");
-    expect(JSON.stringify(messages)).not.toContain("the answer");
     finish(next, "new answer");
     await settle(chat, started.sessionId);
     chat.app.socket.dispose();
@@ -325,11 +326,15 @@ describe("compaction", () => {
       content: string;
       name?: string;
     }[];
+    // the first summary, its tail and the turn since, none twice
+    const lead = {
+      role: "user",
+      content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
+    };
     expect(body.slice(1, -1)).toEqual([
-      {
-        role: "user",
-        content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
-      },
+      lead,
+      { role: "user", content: "question", name: "casey" },
+      { role: "assistant", content: "answer" },
       { role: "user", content: "next", name: "casey" },
       { role: "assistant", content: "next answer" },
     ]);
@@ -345,6 +350,13 @@ describe("compaction", () => {
     expect(regenerated.status).toBe(201);
     const replacement = await regeneratePending;
     expect(chat.app.sessions.send(compactSendId)).toBeNull();
+    // the second summary went with its send: the first and its tail
+    // come back
+    expect(
+      (replacement.body.messages as { role: string; content: string }[])
+        .slice(1)
+        .map((message) => message.content),
+    ).toEqual([lead.content, "question", "answer", "next"]);
     expect(
       chat.app.db
         .query<{ n: number }, [string]>(

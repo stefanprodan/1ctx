@@ -21,13 +21,8 @@ import {
   requestTokens,
   type Usage,
 } from "../providers/index.ts";
-import {
-  type ContextLookups,
-  history,
-  request,
-  summaryRequest,
-  withExhausted,
-} from "./context.ts";
+import { history, request, summaryRequest, withExhausted } from "./context.ts";
+import type { ContextLookups } from "./render.ts";
 import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { RoundVisuals } from "./round-visuals.ts";
 import type { ActiveSend, RoundState } from "./send.ts";

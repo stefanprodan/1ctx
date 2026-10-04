@@ -5,12 +5,23 @@
 // one write a provider's refusal asks for: the session's stored
 // reasoning from that provider and model, dropped.
 
-import { forgetReasoning, sendTurns } from "../sessions/index.ts";
+import type { Db } from "../db/index.ts";
+import {
+  forgetReasoning,
+  type SessionStore,
+  sendTurns,
+} from "../sessions/index.ts";
+import type { UserRow } from "../users/index.ts";
 import type { RoundDeps } from "./round.ts";
-import type { RunnerDeps } from "./types.ts";
+
+export type LookupDeps = {
+  db: Db;
+  users: { byId(id: string): UserRow | null };
+  sessions: Pick<SessionStore, "reasoningDetails">;
+};
 
 export function roundLookups(
-  deps: Pick<RunnerDeps, "db" | "users" | "sessions">,
+  deps: LookupDeps,
 ): Pick<RoundDeps, "lookups" | "forgetReasoning"> {
   return {
     lookups: {
