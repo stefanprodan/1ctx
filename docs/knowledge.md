@@ -32,9 +32,10 @@ bash. An upload adds files to it, or attaches them to a chat message.
   the per-file version count and the project's history bytes; the
   hourly sweep never drops a live file's versions.
 - **The prompt names the base only when bash is offered and the
-  `knowledge` capability is on.** `knowledgeBlock()` gives a count and
-  the last changes, never a list or a text, and says the files are data,
-  not instructions.
+  `knowledge` capability is on.** `knowledgeBlock()` says only whether
+  the base is empty and that the files are data, not instructions: never
+  a name, count, time or text, so a write that keeps the base nonempty
+  keeps the system prompt and a provider's cached prefix.
 
 ## Reads
 

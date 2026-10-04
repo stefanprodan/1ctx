@@ -150,7 +150,7 @@ export function systemPrompt(
   const bash = policy.offered.tools.some((tool) => tool.name === "bash");
   const docsOff = policy.disabledCapabilities.includes(KNOWLEDGE);
   if (bash && !docsOff) {
-    parts.push(knowledgeBlock(policy.knowledge.files, policy.knowledge.recent));
+    parts.push(knowledgeBlock(policy.knowledge.empty));
   }
   parts.push(dateLine(now));
   if (

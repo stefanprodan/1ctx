@@ -12,7 +12,6 @@ import type {
   KnowledgeCounts,
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
-import type { RecentFile } from "../../shared/knowledge.ts";
 import {
   MAX_UPLOADS_PER_MESSAGE,
   type MessageUpload,
@@ -62,7 +61,7 @@ export type KnowledgeCapability = KnowledgePort & {
     messageIds?: ReadonlyMap<string, string>,
   ): string[];
   uploadsOf(sessionId: string): UploadTree;
-  snapshot(projectId: string): { files: number; recent: RecentFile[] };
+  snapshot(projectId: string): { empty: boolean };
   counts(projectId: string): KnowledgeCounts;
   // the files changed last, newest first
   latest(projectId: string, limit: number): KnowledgeFile[];
@@ -329,8 +328,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     counts: (projectId) => store.counts(projectId),
     latest: (projectId, limit) => store.latest(projectId, limit),
     snapshot: (projectId) => ({
-      files: store.counts(projectId).files,
-      recent: store.recent(projectId),
+      empty: store.counts(projectId).files === 0,
     }),
     sweep(now) {
       const caps = deps.limits.current();

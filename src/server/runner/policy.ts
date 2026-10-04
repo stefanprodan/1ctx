@@ -12,7 +12,6 @@
 
 import { mcpKey } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
-import type { RecentFile } from "../../shared/knowledge.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import {
@@ -114,7 +113,7 @@ export type SendPolicy = {
   attentionOffered: Offered | null;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
-  knowledge: { files: number; recent: RecentFile[] };
+  knowledge: { empty: boolean };
   automation: {
     id: string;
     name: string;
@@ -290,10 +289,7 @@ export function buildPolicy(input: {
     automationMemory: (input.automationMemory ?? []).map((entry) => ({
       ...entry,
     })),
-    knowledge: {
-      files: input.knowledge.files,
-      recent: input.knowledge.recent.map((file) => ({ ...file })),
-    },
+    knowledge: { empty: input.knowledge.empty },
     automation: input.automation ? { ...input.automation } : null,
     deadlineMs: input.deadlineMs ?? null,
     limits: {
