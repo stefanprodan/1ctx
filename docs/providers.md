@@ -183,5 +183,5 @@ shared body must be checked against each.
   decision's usage, which have no output tokens. Every usage route
   reads its range through `lastDays()`.
 - **The fake fetch answers recorded decisions.**
-  `scripts/deciders-record.ts`, run by hand, records the bodies under
+  `scripts/record/deciders.ts`, run by hand, records the bodies under
   `test/fixtures/providers/systemone/`.

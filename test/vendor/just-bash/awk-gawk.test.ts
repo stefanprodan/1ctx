@@ -3,12 +3,12 @@
 //
 // Our awk against what gawk answered for the same program and input,
 // recorded in test/fixtures/just-bash/awk-gawk.json by
-// scripts/gawk-record.ts. stderr is not compared, since gawk's words name
+// scripts/record/gawk.ts. stderr is not compared, since gawk's words name
 // itself; a case where gawk failed with a message expects one from us.
 
 import { describe, expect, test } from "bun:test";
 import { Bash } from "just-bash";
-import type { AwkFixture } from "../../../scripts/gawk-record.ts";
+import type { AwkFixture } from "../../../scripts/record/gawk.ts";
 import recorded from "../../fixtures/just-bash/awk-gawk.json";
 
 const fixture = recorded as AwkFixture;

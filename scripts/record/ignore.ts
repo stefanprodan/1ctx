@@ -2,16 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what git answers for each ignore text over one tree, into
-// test/fixtures/repos/ignore-cases.json: `bun scripts/ignore-record.ts`
+// test/fixtures/repos/ignore-cases.json: `bun scripts/record/ignore.ts`
 // with git on the PATH. Run by hand; the suite reads the fixture.
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_REPO_IGNORE as DEFAULT_IGNORE } from "../src/shared/contracts/repo.ts";
+import { DEFAULT_REPO_IGNORE as DEFAULT_IGNORE } from "../../src/shared/contracts/repo.ts";
 
-const OUT = new URL("../test/fixtures/repos/ignore-cases.json", import.meta.url)
-  .pathname;
+const OUT = new URL(
+  "../../test/fixtures/repos/ignore-cases.json",
+  import.meta.url,
+).pathname;
 
 // folders end in a slash
 const TREE = [

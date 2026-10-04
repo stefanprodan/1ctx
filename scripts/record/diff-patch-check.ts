@@ -3,14 +3,14 @@
 //
 // Checks that GNU patch 2.8 applies our diff's unified and context output
 // of every pair of text files the diff fixture compares, giving back the
-// second file byte for byte: `bun scripts/diff-patch-check.ts`, with
+// second file byte for byte: `bun scripts/record/diff-patch-check.ts`, with
 // Homebrew's GNU patch on the PATH as `gpatch`. Run by hand.
 
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Bash, InMemoryFs } from "just-bash";
-import { type Fixture, fileBytes } from "./record-cases.ts";
+import { type Fixture, fileBytes } from "./cases.ts";
 
 const patch = Bun.which("gpatch") ? "gpatch" : "patch";
 const version = Bun.spawnSync([patch, "--version"]).stdout.toString();
@@ -21,7 +21,7 @@ if (!/GNU patch 2\.8\b/.test(version)) {
 
 const fixture = JSON.parse(
   await readFile(
-    new URL("../test/fixtures/just-bash/diff-gnu.json", import.meta.url),
+    new URL("../../test/fixtures/just-bash/diff-gnu.json", import.meta.url),
     "utf8",
   ),
 ) as Fixture;

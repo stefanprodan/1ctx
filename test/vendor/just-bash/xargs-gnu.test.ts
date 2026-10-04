@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // xargs against what GNU xargs 4.11.0 answered for the same arguments,
-// recorded by scripts/xargs-record.ts. A case with `accept` pins our
+// recorded by scripts/record/xargs.ts. A case with `accept` pins our
 // answer where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/xargs-gnu.json" with {
   type: "json",
 };

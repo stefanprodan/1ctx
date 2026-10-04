@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // rg against what ripgrep 15.2.0 answered for the same arguments, piped and
-// with --no-require-git in its config, recorded by scripts/rg-record.ts. A
+// with --no-require-git in its config, recorded by scripts/record/rg.ts. A
 // case with `accept` pins our answer where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/rg-ripgrep.json" with {
   type: "json",
 };

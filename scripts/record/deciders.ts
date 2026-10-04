@@ -5,7 +5,7 @@
 // systemone/, for the systemone and catalog tests:
 //
 //   KEY_FILE=.preview/secrets/provider-openrouter.key \
-//   KEV_URL=http://<host>:<port>/v1 bun scripts/deciders-record.ts
+//   KEV_URL=http://<host>:<port>/v1 bun scripts/record/deciders.ts
 //
 // OpenRouter's decisions catalog, one answer of each type from Jev and
 // Kev-4B, a yes/no and a refused choice from Respan's free model, and a
@@ -17,7 +17,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const OPENROUTER = "https://openrouter.ai/api/v1";
-const OUT = new URL("../test/fixtures/providers/systemone/", import.meta.url)
+const OUT = new URL("../../test/fixtures/providers/systemone/", import.meta.url)
   .pathname;
 
 const keyFile = process.env.KEY_FILE;

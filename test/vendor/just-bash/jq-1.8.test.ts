@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // jq against what jq 1.8 answered for the same arguments, recorded by
-// scripts/jq-record.ts, on the engine rules the yq dialect work changed.
+// scripts/record/jq.ts, on the engine rules the yq dialect work changed.
 // A case with `accept` pins our answer where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/jq-1.8.json" with {
   type: "json",
 };

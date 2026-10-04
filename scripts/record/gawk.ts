@@ -3,7 +3,7 @@
 //
 // Runs every case of test/fixtures/just-bash/awk-gawk.json through the
 // real gawk and rewrites its answers in place: stdout, the exit code and
-// whether gawk wrote to stderr. Run by hand (`bun scripts/gawk-record.ts`);
+// whether gawk wrote to stderr. Run by hand (`bun scripts/record/gawk.ts`);
 // the suite only reads the fixture. It names the cases whose answer moved,
 // so a gawk upgrade is read before it is committed.
 
@@ -28,6 +28,7 @@ export interface AwkFixture {
 
 const FIXTURE = join(
   import.meta.dir,
+  "..",
   "..",
   "test",
   "fixtures",

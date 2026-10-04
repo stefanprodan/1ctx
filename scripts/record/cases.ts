@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records what a reference binary answers for each case of a fixture under
-// test/fixtures/just-bash/, for yq-record.ts, jq-record.ts, grep-record.ts,
-// rg-record.ts, xargs-record.ts and diff-record.ts. Run by hand;
+// test/fixtures/just-bash/, for yq.ts, jq.ts, grep.ts, rg.ts,
+// xargs.ts and diff.ts. Run by hand;
 // the suite reads the fixture and never needs the binary.
 
 import {

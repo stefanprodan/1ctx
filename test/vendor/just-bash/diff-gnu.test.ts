@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // diff against what GNU diffutils 3.12 answered for the same arguments,
-// recorded by scripts/diff-record.ts. A case with `accept` pins our answer
+// recorded by scripts/record/diff.ts. A case with `accept` pins our answer
 // where we differ on purpose.
 
 import { describe } from "bun:test";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/diff-gnu.json" with {
   type: "json",
 };

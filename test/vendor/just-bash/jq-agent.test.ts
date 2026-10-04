@@ -3,11 +3,11 @@
 //
 // jq the way agents use it (kubectl and GitHub API output, package.json,
 // NDJSON logs, Terraform and AWS output, raw lines), against what jq
-// 1.8.2 answered, recorded by scripts/jq-record.ts.
+// 1.8.2 answered, recorded by scripts/record/jq.ts.
 
 import { describe, expect, test } from "bun:test";
 import { Bash } from "just-bash";
-import type { Fixture } from "../../../scripts/record-cases.ts";
+import type { Fixture } from "../../../scripts/record/cases.ts";
 import recorded from "../../fixtures/just-bash/jq-agent.json" with {
   type: "json",
 };

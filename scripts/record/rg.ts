@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Records ripgrep 15's answers into the fixture the rg tests compare
-// against: `bun scripts/rg-record.ts`, with ripgrep on the PATH as `rg`.
+// against: `bun scripts/record/rg.ts`, with ripgrep on the PATH as `rg`.
 // Its config file holds --no-require-git, so the ignore files apply
 // outside a git repository, as ours always applies them. It also writes
 // ripgrep's type table, from `rg --type-list`, beside rg's file types.
@@ -10,10 +10,10 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { record } from "./record-cases.ts";
+import { record } from "./cases.ts";
 
 const TYPES = new URL(
-  "../vendor/just-bash/src/commands/rg/file-types-data.ts",
+  "../../vendor/just-bash/src/commands/rg/file-types-data.ts",
   import.meta.url,
 ).pathname;
 
@@ -39,7 +39,7 @@ async function writeTypes(env: Record<string, string>): Promise<void> {
     [
       "/**",
       ` * (1ctx rg) ripgrep's file types as \`rg --type-list\` of ${version} lists`,
-      " * them, aliases included. Written by scripts/rg-record.ts; not edited.",
+      " * them, aliases included. Written by scripts/record/rg.ts; not edited.",
       " */",
       "",
       "export const RIPGREP_TYPES: Record<string, string[]> = {",
@@ -60,7 +60,7 @@ try {
   await writeTypes(env);
   await record(
     "rg",
-    new URL("../test/fixtures/just-bash/rg-ripgrep.json", import.meta.url)
+    new URL("../../test/fixtures/just-bash/rg-ripgrep.json", import.meta.url)
       .pathname,
     /^ripgrep 15\./,
     // ripgrep reads a piped stdin in place of the directory
