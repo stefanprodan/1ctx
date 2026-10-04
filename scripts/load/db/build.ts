@@ -166,7 +166,9 @@ export async function build(options: BuildOptions) {
   db.exec("pragma journal_mode = wal");
   db.exec("pragma foreign_keys = on");
   const held = contents(db, tl.running.incident);
-  db.close();
+  // a statement left open keeps the connection, and its -wal and -shm
+  for (const s of Object.values(b.q)) s.finalize();
+  db.close(true);
 
   const devs = b.users.filter((u) => !u.admin);
   const readers = {
@@ -206,11 +208,6 @@ export async function build(options: BuildOptions) {
     summary.validation = v;
     const failures = v.failures as string[];
     log(`validation: ${failures.length === 0 ? "ok" : failures.join("; ")}`);
-  }
-  // an empty WAL and its index left by a reader that closed lazily
-  for (const f of [`${out}-wal`, `${out}-shm`]) {
-    if (existsSync(f) && (f.endsWith("-shm") || statSync(f).size === 0))
-      unlinkSync(f);
   }
   (summary.seconds as Record<string, number>).total = seconds();
   await Bun.write(`${out}.json`, `${JSON.stringify(summary, null, 2)}\n`);

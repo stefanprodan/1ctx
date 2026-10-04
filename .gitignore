@@ -128,3 +128,5 @@ deploy/docker/provision/
 
 # the load harness's databases, keys and results
 scripts/load/out/
+# the summarizer's fixture logs
+!test/fixtures/load/**/*.log

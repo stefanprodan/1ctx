@@ -201,6 +201,6 @@ export function validate(
     expiredRuns: store.expiredRuns(NOW).length,
   };
   out.failures = fail;
-  v.close();
+  v.close(true);
   return out;
 }

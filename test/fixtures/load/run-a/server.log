@@ -1,0 +1,3 @@
+time=2026-10-04T10:00:00.000Z level=INFO msg=startup
+time=2026-10-04T10:00:01.000Z level=ERROR msg="send failed" area=runner
+time=2026-10-04T10:00:02.000Z level=WARN msg="tool failed" area=tools tool=bash phase=run cause=deadline
