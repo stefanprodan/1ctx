@@ -68,8 +68,8 @@ const budgetLimits = [
   {
     name: "summaryMaxTokens",
     default: 4096,
-    min: 256,
-    max: 32_768,
+    min: 1000,
+    max: 32_000,
     unit: "tokens",
     scope: "send",
   },
@@ -442,6 +442,37 @@ describe("limits area", () => {
         expect(area.store.rows()).toEqual([
           { name: "knowledgeProjectBytes", value: stored, changedAt: 50 },
         ]);
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  test("holds every token limit to whole thousands", () => {
+    for (const entry of Object.values(LIMIT_DEFINITIONS)) {
+      if (entry.unit !== "tokens") continue;
+      expect(entry.min % 1000).toBe(0);
+      expect(entry.max % 1000).toBe(0);
+    }
+  });
+
+  test.each([
+    { stored: 256, effective: 1000 },
+    { stored: 32_768, effective: 32_000 },
+  ])(
+    "reads an old summary override inside the new range: %p",
+    ({ stored, effective }) => {
+      const db = memoryDb();
+      try {
+        const area = limitsArea({ db, clock: () => 100 });
+        area.store.set("summaryMaxTokens", stored, 50);
+        expect(area.current().summaryMaxTokens).toBe(effective);
+        expect(
+          area.rows().find((row) => row.name === "summaryMaxTokens"),
+        ).toMatchObject({ value: effective, changedAt: 50 });
+        expect(() =>
+          parseLimits({ values: { summaryMaxTokens: stored } }),
+        ).toThrow("summaryMaxTokens must be between 1000 and 32000");
       } finally {
         db.close();
       }
