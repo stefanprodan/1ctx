@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { createMcp } from "../../../scripts/load/fake-mcp.ts";
 import { createModel } from "../../../scripts/load/fake-model.ts";
+import { checkTarget } from "../../../scripts/load/kind.ts";
 import {
   type Counts,
   memberships,
@@ -30,6 +31,12 @@ function fakes(): typeof fetch {
 }
 
 describe("the kind provision", () => {
+  test("runs only on a kind context and a 1ctx namespace", () => {
+    expect(() => checkTarget("kind-flux", "1ctx-load")).not.toThrow();
+    expect(() => checkTarget("prod-cluster", "1ctx-load")).toThrow("context");
+    expect(() => checkTarget("kind-flux", "default")).toThrow("namespace");
+  });
+
   test("is the same for a count and a namespace", () => {
     expect(provisionFiles(COUNTS, NS)).toEqual(provisionFiles(COUNTS, NS));
     const values = valuesYaml(provisionFiles(COUNTS, NS));

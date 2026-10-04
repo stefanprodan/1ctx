@@ -4,6 +4,11 @@
 // The tools a built history calls, their result sizes, the mix per kind
 // of send, and the pooled texts of messages, answers and notes.
 
+import {
+  MEMORY_CHARS,
+  MEMORY_TOPIC_CHARS,
+  memoryChars,
+} from "../../../src/shared/memory.ts";
 import { int, pick, type Rand as R, rng } from "../random.ts";
 import { hash, lognormal } from "./ids.ts";
 import { CUT_NOTE, RESULT_CUT } from "./presets.ts";
@@ -301,15 +306,25 @@ export const SIGNATURE = pool(
   11,
 );
 export const SCRATCH = pool(16, (r) => bash(r, 1_000_000), 12);
+// notes as the app keeps them: under two thirds of the budget, so the
+// sets a run makes still fit
 export const NOTES = pool(
   32,
-  (r) =>
-    JSON.stringify(
-      Array.from({ length: int(r, 3, 14) }, () => ({
-        topic: `${pick(r, APPS)} ${pick(r, PROSE)}`,
-        text: prose(r, int(r, 80, 500)),
-      })),
-    ),
+  (r) => {
+    const entries: { topic: string; text: string }[] = [];
+    for (;;) {
+      const entry = {
+        topic: `${pick(r, APPS)} ${pick(r, PROSE)}`.slice(
+          0,
+          MEMORY_TOPIC_CHARS,
+        ),
+        text: prose(r, int(r, 80, 400)).trim(),
+      };
+      if (memoryChars([...entries, entry]) > (MEMORY_CHARS * 2) / 3) break;
+      entries.push(entry);
+    }
+    return JSON.stringify(entries);
+  },
   13,
 );
 export const TITLES = pool(

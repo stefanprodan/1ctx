@@ -209,6 +209,12 @@ export async function build(options: BuildOptions) {
     const failures = v.failures as string[];
     log(`validation: ${failures.length === 0 ? "ok" : failures.join("; ")}`);
   }
+  // an empty WAL and its index, left once every connection closed
+  const wal = `${out}-wal`;
+  if (existsSync(wal) && statSync(wal).size === 0) {
+    unlinkSync(wal);
+    if (existsSync(`${out}-shm`)) unlinkSync(`${out}-shm`);
+  }
   (summary.seconds as Record<string, number>).total = seconds();
   await Bun.write(`${out}.json`, `${JSON.stringify(summary, null, 2)}\n`);
   log(`done: ${out} ${summary.gib} GiB in ${seconds()}s`);
