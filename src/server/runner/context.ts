@@ -253,8 +253,8 @@ export function request(
 // reasoning included, and it only overstates the summary (schemas, the
 // completion), so it errs safe. The local estimate, with a tenth on top
 // for another tokenizer, takes over only when nothing was measured or
-// the measure leaves no room, a provider that took more than the window
-// the agent states. The floor is the least a summary is asked for: a
+// the measure passed the window the agent states, a provider that took
+// more than it. The floor is the least a summary is asked for: a
 // short summary beats none, and a provider that cannot fit even that
 // refuses the round, which ends failed and is tried again next time
 export const SUMMARY_MARGIN = 256;
