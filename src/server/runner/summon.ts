@@ -14,12 +14,10 @@ import {
   summonName,
   summonWord,
 } from "../../shared/summon.ts";
-import type { Wire } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
+import type { Db } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { lastPrompt, type SessionStore } from "../sessions/index.ts";
-import { type LookupDeps, roundLookups } from "./lookups.ts";
-import { lastSummary, tailBudget, tailOf } from "./tail.ts";
 
 export type SummonAgents = {
   byId(id: string): AgentRow | null;
@@ -96,11 +94,11 @@ export function summonGone(
 // round, of whichever agent, already passes where its model compacts
 export function refuseTooLong(
   agent: AgentRow,
-  size: number | null,
+  lastPrompt: number | null,
   reserve: number,
 ): void {
   const threshold = compactsAt(agent.model.contextLength, reserve);
-  if (threshold !== null && size !== null && size >= threshold) {
+  if (threshold !== null && lastPrompt !== null && lastPrompt >= threshold) {
     throw new BadRequest(`the chat is too long for ${agent.name}`);
   }
 }
@@ -134,52 +132,12 @@ export function turnBatch<T extends { text: string }>(
   return rows.slice(0, at === 0 ? 1 : at);
 }
 
-export type SummonDeps = LookupDeps & {
-  sessions: Pick<SessionStore, "send" | "agents" | "messages">;
+export type SummonDeps = {
+  db: Db;
   agents: SummonAgents;
-  providers: { byId(id: string): { wire: Wire } | null };
+  sessions: Pick<SessionStore, "send" | "agents">;
   limits: { current(): { contextReserve: number } };
 };
-
-// the chat's size: its last round's prompt, or after a summary the
-// summary and the tail the chat's agent replays next, picked as its
-// history picks it. The system prompt and schemas are not known here,
-// so the budget is sized against the summary alone, which can only
-// make the tail longer
-function chatSize(
-  deps: SummonDeps,
-  sessionId: string,
-  chatAgent: AgentRow,
-  replaced: string | null,
-): number | null {
-  const last = lastPrompt(deps.db, sessionId, replaced);
-  if (last === null || !last.summary) return last?.tokens ?? null;
-  const rows = deps.sessions
-    .messages(sessionId)
-    .filter((row) => row.sendId !== replaced);
-  const cut = lastSummary(rows);
-  if (cut < 0) return last.tokens;
-  const { lookups } = roundLookups(deps);
-  const reserve = deps.limits.current().contextReserve;
-  const tail = tailOf(
-    rows,
-    cut,
-    tailBudget(chatAgent.model.contextLength, reserve, last.tokens),
-    {
-      username: "",
-      userId: "",
-      providerId: chatAgent.providerId,
-      model: chatAgent.model.id,
-      offered: { mcp: [], skills: { block: "", skills: [] } },
-      agentId: chatAgent.id,
-      summoned: null,
-    },
-    lookups,
-    lookups.turnsOf(sessionId),
-    deps.providers.byId(chatAgent.providerId)?.wire ?? null,
-  );
-  return last.tokens + tail.tokens;
-}
 
 // the agent a chat's turn runs on and, when summoned, the chat's agent
 // its prompt names
@@ -195,7 +153,7 @@ const summoning = (
 ): TurnAgent => {
   refuseTooLong(
     agent,
-    chatSize(deps, sessionId, chatAgent, replaced),
+    lastPrompt(deps.db, sessionId, replaced),
     deps.limits.current().contextReserve,
   );
   return { agent, summoned: chatAgent.name };

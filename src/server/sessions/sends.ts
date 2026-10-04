@@ -199,14 +199,13 @@ export function sendTurns(
 
 // the size of the chat's last round, whichever agent answered it: its
 // prompt, or a summary round's answer, since the chat is that summary
-// now and the tail the caller adds. A regenerate leaves out the send it
-// replaces, whose rounds the rerun starts before. Null before the first
-// counted round
+// now. A regenerate leaves out the send it replaces, whose rounds the
+// rerun starts before. Null before the first counted round
 export function lastPrompt(
   db: Db,
   sessionId: string,
   excludeSendId: string | null = null,
-): { tokens: number; summary: boolean } | null {
+): number | null {
   const row = db
     .query<
       { prompt_tokens: number; completion_tokens: number; summary: number },
@@ -224,7 +223,5 @@ export function lastPrompt(
     )
     .get(sessionId, excludeSendId);
   if (row === null) return null;
-  return row.summary === 1
-    ? { tokens: row.completion_tokens, summary: true }
-    : { tokens: row.prompt_tokens, summary: false };
+  return row.summary === 1 ? row.completion_tokens : row.prompt_tokens;
 }

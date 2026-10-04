@@ -103,7 +103,9 @@ function foreignTurn(
 }
 
 // the tool result rows of one (sendId, round), in call order
-function toolRowsByRound(rows: readonly Message[]): Map<string, Message[]> {
+export function toolRowsByRound(
+  rows: readonly Message[],
+): Map<string, Message[]> {
   const byRound = new Map<string, Message[]>();
   for (const row of rows) {
     if (row.kind !== "tool") continue;
@@ -113,6 +115,19 @@ function toolRowsByRound(rows: readonly Message[]): Map<string, Message[]> {
     byRound.set(key, calls);
   }
   return byRound;
+}
+
+// a round goes back with its calls only when every call has its
+// result row, in order
+export function roundComplete(
+  calls: readonly ToolCall[],
+  resultRows: readonly Message[] | undefined,
+): resultRows is readonly Message[] {
+  return (
+    resultRows !== undefined &&
+    resultRows.length === calls.length &&
+    calls.every((call, index) => resultRows[index]?.toolCallId === call.id)
+  );
 }
 
 // a user message on the wire, with the author's name when it is not the
@@ -212,14 +227,7 @@ export function renderRows(
     if (row.slot === "work" && calls.length > 0) {
       const key = `${row.sendId}:${row.round}`;
       const resultRows = byRound.get(key);
-      const complete =
-        resultRows !== undefined &&
-        resultRows.length === calls.length &&
-        calls.every((call, index) => {
-          const result = resultRows[index];
-          return result !== undefined && result.toolCallId === call.id;
-        });
-      if (complete) {
+      if (roundComplete(calls, resultRows)) {
         out.push(workMessage(row, calls, policy, lookups, sameProvider(row)));
         calls.forEach((call, index) => {
           out.push({

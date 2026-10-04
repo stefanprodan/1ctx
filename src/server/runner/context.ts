@@ -28,7 +28,9 @@ import {
   ownTurn,
   type RenderPolicy,
   renderRows,
+  roundComplete,
   type Turn,
+  toolRowsByRound,
 } from "./render.ts";
 import { lastSummary, tailBudget, tailOf } from "./tail.ts";
 
@@ -69,6 +71,7 @@ function loadedSkills(
   const positions = new Map<string, number>();
   const names: string[] = [];
   const replayed = new Set<string>();
+  const byRound = toolRowsByRound(rows.slice(from, cut));
   for (let i = from; i < cut; i++) {
     const row = rows[i]!;
     if (!own(row.sendId)) continue;
@@ -85,7 +88,10 @@ function loadedSkills(
     if (call?.id !== row.toolCallId || call.name !== "skill") continue;
     const name = toolArguments(call.arguments)?.name;
     if (typeof name !== "string" || !offered.has(name)) continue;
-    if (i >= tail) replayed.add(name);
+    // a load in the tail replays only when its round renders whole
+    if (i >= tail && roundComplete(calls.get(key)!, byRound.get(key))) {
+      replayed.add(name);
+    }
     if (!names.includes(name)) names.push(name);
   }
   return names.filter((name) => !replayed.has(name));

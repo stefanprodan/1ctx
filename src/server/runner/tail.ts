@@ -12,7 +12,8 @@
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Wire } from "../../shared/words.ts";
-import { type ChatMessageIn, requestTokens } from "../providers/index.ts";
+import { CHARS_PER_TOKEN, tokens } from "../lib/tokens.ts";
+import { type ChatMessageIn, requestText } from "../providers/index.ts";
 import {
   type ContextLookups,
   type RenderPolicy,
@@ -55,6 +56,22 @@ export function lastSummary(
   return -1;
 }
 
+// a turn's requestTokens() estimate, or null when it is over room. The
+// turn before a compaction is often a huge tool result, so a text
+// longer than room * CHARS_PER_TOKEN, which holds more than room tokens
+// of any text but a rare one (cutToTokens()), is refused uncounted
+export function costWithin(
+  wire: Wire | null,
+  model: string,
+  messages: ChatMessageIn[],
+  room: number,
+): number | null {
+  const text = requestText(wire, { model, messages, thinking: false });
+  if (text.length > room * CHARS_PER_TOKEN) return null;
+  const cost = tokens(text);
+  return cost > room ? null : cost;
+}
+
 export type Tail = {
   // the index of the tail's first row, the summary's own when empty
   start: number;
@@ -76,7 +93,7 @@ export function tailOf(
   wire: Wire | null,
 ): Tail {
   const parts: ChatMessageIn[][] = [];
-  let tokens = 0;
+  let total = 0;
   let start = cut;
   while (budget > 0 && start > 0) {
     const sendId = rows[start - 1]!.sendId;
@@ -91,15 +108,11 @@ export function tailOf(
     const cost =
       messages.length === 0
         ? 0
-        : requestTokens(wire, {
-            model: policy.model,
-            messages,
-            thinking: false,
-          });
-    if (tokens + cost > budget) break;
-    tokens += cost;
+        : costWithin(wire, policy.model, messages, budget - total);
+    if (cost === null) break;
+    total += cost;
     parts.unshift(messages);
     start = begin;
   }
-  return { start, messages: parts.flat(), tokens };
+  return { start, messages: parts.flat(), tokens: total };
 }

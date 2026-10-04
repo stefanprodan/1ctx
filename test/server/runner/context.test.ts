@@ -4,7 +4,8 @@
 // The rows to the wire, the tool round history and its repair, the
 // exhausted line on a copy, and the system prompt, on fixtures.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as tokenCount from "../../../src/server/lib/tokens.ts";
 import { LOOP_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import {
   type ChatMessageIn,
@@ -28,6 +29,7 @@ import {
   unmarked,
 } from "../../../src/server/runner/render.ts";
 import {
+  costWithin,
   TAIL_MAX_TOKENS,
   tailBudget,
 } from "../../../src/server/runner/tail.ts";
@@ -1492,6 +1494,46 @@ describe("the tail after a summary", () => {
     ]);
   });
 
+  test.serial(
+    "a turn far over the budget is refused without counting it",
+    () => {
+      const huge = words(500_000);
+      const rows = [
+        user("a-u", "a", "read the log"),
+        answer("a-r", "a", huge),
+        summary("a-s", "a", "summary"),
+      ];
+      const counted = spyOn(tokenCount, "tokens");
+      try {
+        expect(history(rows, wide, lookups, NOW).slice(1)).toEqual([
+          { role: "user", content: `${SUMMARY_LEAD}\n\nsummary` },
+        ]);
+        // the base was counted, the huge turn never
+        expect(counted.mock.calls.length).toBeGreaterThan(0);
+        expect(counted.mock.calls.some(([text]) => text.includes(huge))).toBe(
+          false,
+        );
+      } finally {
+        counted.mockRestore();
+      }
+    },
+  );
+
+  test("a turn that fits is counted as the wire counts it", () => {
+    const messages: ChatMessageIn[] = [
+      { role: "user", content: words(900), name: "casey" },
+    ];
+    const whole = requestTokens("openai-compatible", {
+      model: "m",
+      messages,
+      thinking: false,
+    });
+    expect(costWithin("openai-compatible", "m", messages, whole)).toBe(whole);
+    expect(
+      costWithin("openai-compatible", "m", messages, whole - 1),
+    ).toBeNull();
+  });
+
   test("large schemas on a small window shrink the tail so the next turn does not compact", () => {
     const small = { ...wide, contextLength: 8000 };
     const heavy: SendPolicy = {
@@ -1616,6 +1658,57 @@ describe("the tail after a summary", () => {
       `${SUMMARY_LEAD}\n\nsecond summary\n\n${SKILLS_LEAD} ops`,
     );
     expect(JSON.stringify(twice)).not.toContain('"toolCallId":"c1"');
+  });
+
+  test("a skill load in the tail whose round was cut short stays named", () => {
+    const skilled: SendPolicy = {
+      ...wide,
+      offered: {
+        ...NONE,
+        skills: {
+          block: "catalog",
+          skills: [
+            { id: "sk1", name: "ops", description: "ops", hasFiles: false },
+          ],
+        },
+      },
+    };
+    // stopped mid-tools: two calls, one result, so the round renders
+    // without its calls and the load's result is not replayed
+    const rows = [
+      user("a-u", "a", "load ops and look"),
+      row({
+        id: "a-w",
+        kind: "reply",
+        sendId: "a",
+        slot: "work",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "skill",
+            arguments: JSON.stringify({ name: "ops" }),
+          },
+          { id: "c2", name: "bash", arguments: '{"command":"ls"}' },
+        ],
+      }),
+      row({
+        id: "a-t",
+        kind: "tool",
+        sendId: "a",
+        toolCallId: "c1",
+        toolName: "skill",
+        content: "ops instructions",
+      }),
+      summary("k-s", "k", "summary"),
+    ];
+    const out = history(rows, skilled, lookups, NOW);
+    expect(out.slice(1)).toEqual([
+      {
+        role: "user",
+        content: `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops`,
+      },
+      { role: "user", content: "load ops and look", name: "casey" },
+    ]);
   });
 
   test("an upload inside the tail replays as its block, not in the summary line", () => {

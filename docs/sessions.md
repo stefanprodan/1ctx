@@ -237,8 +237,8 @@ that agent answers the one turn (see Summons).
   summon. A multi-message turn holds a summon alone. A run never
   summons. The send is refused, "the chat is too long for <name>", when
   `lastPrompt()` reaches the summoned model's `compactsAt()`. After a
-  summary that is the summary's tokens plus the tail the chat's agent
-  replays, from `tailOf()`. A queued
+  summary that is the summary alone: the summoned agent sizes its own
+  tail by its own window, so the tail never takes it past. A queued
   one refused so turns not sent with reason `failed`: the reason check
   is fixed in its table, and a new reason needs a rebuild migration.
 - **A summoned send never compacts,** and `SessionSummary.usage` reads

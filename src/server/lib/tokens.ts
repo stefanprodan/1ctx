@@ -43,7 +43,7 @@ export function tokens(text: string): number {
 
 // o200k averages four characters a token on English and code; a start
 // this long holds more than max tokens of any text but a rare one
-const CHARS_PER_TOKEN = 12;
+export const CHARS_PER_TOKEN = 12;
 
 // the start of text within max tokens: the characters are cut first,
 // so a huge text is never counted whole, then trimmed to the count
