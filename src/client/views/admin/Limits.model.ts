@@ -4,6 +4,7 @@
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { LimitName } from "../../../shared/words.ts";
 import { pluralCommas } from "../../lib/format.ts";
+import { K, thousandsText, thousandsValue } from "../../lib/thousands.ts";
 
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   rounds: {
@@ -80,7 +81,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept free in the context window.",
+    text: "Tokens kept free in the context window.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",
@@ -200,7 +201,9 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
 };
 
-type Display = { word: string; factor: number };
+// thousands: typed in whole thousands as the agent's window is, a
+// stored value shown rounded
+type Display = { word: string; factor: number; thousands?: true };
 
 const KB = 1024;
 const MB = 1024 * KB;
@@ -216,7 +219,7 @@ export function displayOf(row: LimitRow): Display {
     case "chars":
       return { word: "chars", factor: 1 };
     case "tokens":
-      return { word: "tokens", factor: 1 };
+      return { word: "K", factor: K, thousands: true };
     case "days":
       return { word: "days", factor: 1 };
     case "minutes":
@@ -229,24 +232,49 @@ export function displayOf(row: LimitRow): Display {
 // milliseconds and binary byte factors have finite decimal forms, so
 // the full number keeps every integer the server accepts through a save
 export function show(row: LimitRow, value: number): string {
-  return String(value / displayOf(row).factor);
+  const { factor, thousands } = displayOf(row);
+  return thousands ? thousandsText(value) : String(value / factor);
 }
 
-export function read(row: LimitRow, text: string): number | null {
+// the fields Use defaults filled: each stands for its default until it
+// is typed in, since a stored 4400 and the default 4096 both show 4
+export type Defaulted = ReadonlySet<string>;
+const NONE: Defaulted = new Set();
+
+// thousands left as shown give back the value the field stands for, so a
+// save of another field never rewrites 4096; typed by hand, the text of
+// the stored value keeps it, as the agent's window does
+export function read(
+  row: LimitRow,
+  text: string,
+  defaulted: Defaulted = NONE,
+): number | null {
+  if (displayOf(row).thousands) {
+    const kept = defaulted.has(row.name) ? row.default : row.value;
+    return thousandsValue(text, [kept]);
+  }
   const t = text.trim();
   if (t === "" || !/^\d+(\.\d+)?$/.test(t)) return null;
   return Math.round(Number(t) * displayOf(row).factor);
 }
 
-export function problem(row: LimitRow, text: string): string | null {
-  const value = read(row, text);
+export function problem(
+  row: LimitRow,
+  text: string,
+  defaulted: Defaulted = NONE,
+): string | null {
+  const value = read(row, text, defaulted);
   const { label } = LIMIT_WORDS[row.name];
-  if (value === null) return `${label} needs a number`;
-  const { word } = displayOf(row);
+  const { word, thousands } = displayOf(row);
   const unit = word === "" ? "" : ` ${word}`;
-  if (value < row.min || value > row.max) {
-    return `${label} must be from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
+  // thousands in the agent window's words: 10 to 10,000 K
+  const bound = (n: number) =>
+    thousands ? Number(show(row, n)).toLocaleString("en-US") : show(row, n);
+  const range = `${label} must be ${thousands ? "a whole number " : ""}from ${bound(row.min)} to ${bound(row.max)}${unit}`;
+  if (value === null) {
+    return thousands && text.trim() !== "" ? range : `${label} needs a number`;
   }
+  if (value < row.min || value > row.max) return range;
   return null;
 }
 
@@ -284,15 +312,16 @@ export function draftOf(rows: LimitRow[]): Record<string, string> {
 export function collect(
   rows: LimitRow[],
   draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
 ):
   | { values: Record<LimitName, number> }
   | { problem: string; field: LimitName } {
   const values = {} as Record<LimitName, number>;
   for (const row of rows) {
     const text = draft[row.name] ?? "";
-    const why = problem(row, text);
+    const why = problem(row, text, defaulted);
     if (why !== null) return { problem: why, field: row.name };
-    values[row.name] = read(row, text) as number;
+    values[row.name] = read(row, text, defaulted) as number;
   }
   const out = unordered(rows, values);
   return out ?? { values };
@@ -346,8 +375,36 @@ export function limitRefusal(message: string): {
   return { words, field: limitFieldOf(message) };
 }
 
-export function dirty(rows: LimitRow[], draft: Record<string, string>) {
-  return rows.some((row) => read(row, draft[row.name] ?? "") !== row.value);
+export function dirty(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
+) {
+  return rows.some(
+    (row) => read(row, draft[row.name] ?? "", defaulted) !== row.value,
+  );
+}
+
+// by value, not text: a stored 4400 shows as the default 4096 does
+export function atDefaults(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
+) {
+  return rows.every(
+    (row) => read(row, draft[row.name] ?? "", defaulted) === row.default,
+  );
+}
+
+// Use defaults: every field shows its default and stands for it
+export function defaultsDraft(rows: LimitRow[]): {
+  draft: Record<string, string>;
+  defaulted: Defaulted;
+} {
+  return {
+    draft: draftOf(rows.map((row) => ({ ...row, value: row.default }))),
+    defaulted: new Set(rows.map((row) => row.name)),
+  };
 }
 
 export function defaultLine(row: LimitRow): string {

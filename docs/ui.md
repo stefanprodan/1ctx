@@ -226,6 +226,10 @@ One helper per job, never a copy in a view.
 - **Words for numbers and times are in `lib/format.ts`:** `ago()`,
   `elapsed()`, `count()`, `plural()`, `commas()`, `k()`, `size()`,
   `share()` and their siblings.
+- **Tokens are typed in whole thousands, K in the box,** through
+  `thousandsText()` and `thousandsValue()` in `lib/thousands.ts`: a
+  stored value shows rounded and, left as shown, is sent back exact.
+  The agent's window and the token limits use it.
 - **A ticking clock is `useNow(ms)`** from `lib/now.ts`; a view never
   runs its own interval. Words that name the day redraw at midnight
   through `useDayTurn(tz)`. A poll pauses while the tab is hidden

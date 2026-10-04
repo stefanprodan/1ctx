@@ -32,8 +32,10 @@ import {
 } from "../../../src/client/views/admin/Config.model.ts";
 import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
 import {
+  atDefaults,
   collect,
   defaultLine,
+  defaultsDraft,
   dirty,
   displayOf,
   draftOf,
@@ -252,8 +254,13 @@ describe("the limit words and units", () => {
       expect(displayOf(resultBytes).word).toBe("MB");
       expect(displayOf(searchBody).word).toBe("MB");
       expect(displayOf(cut).word).toBe("chars");
-      expect(displayOf(reserve)).toEqual({ word: "tokens", factor: 1 });
-      expect(displayOf(toolWorkTokens)).toEqual({ word: "tokens", factor: 1 });
+      expect(displayOf(reserve)).toEqual({
+        word: "K",
+        factor: 1000,
+        thousands: true,
+      });
+      expect(displayOf(toolWorkTokens).word).toBe("K");
+      expect(show(reserve, 20_000)).toBe("20");
       expect(displayOf(maxBashCalls)).toEqual({ word: "", factor: 1 });
       expect(show(toolMs, 600_000)).toBe("600");
       expect(show(timeout, 1500)).toBe("1.5");
@@ -284,15 +291,20 @@ describe("the limit words and units", () => {
     );
     expect(problem(rounds, "x")).toBe("Rounds needs a number");
     expect(problem(rounds, "500")).toBeNull();
-    expect(problem(toolWorkTokens, "9999")).toBe(
-      "Tool-work tokens must be from 10000 to 10000000 tokens",
+    const tokensRange =
+      "Tool-work tokens must be a whole number from 10 to 10,000 K";
+    expect(problem(toolWorkTokens, "9")).toBe(tokensRange);
+    expect(problem(toolWorkTokens, "10001")).toBe(tokensRange);
+    expect(problem(toolWorkTokens, "12.5")).toBe(tokensRange);
+    expect(problem(toolWorkTokens, " ")).toBe(
+      "Tool-work tokens needs a number",
     );
     expect(problem(maxBashCalls, "1001")).toBe(
       "Bash calls per turn must be from 1 to 1000",
     );
     for (const row of [toolWorkTokens, maxBashCalls]) {
-      expect(problem(row, String(row.min))).toBeNull();
-      expect(problem(row, String(row.max))).toBeNull();
+      expect(problem(row, show(row, row.min))).toBeNull();
+      expect(problem(row, show(row, row.max))).toBeNull();
     }
     expect(limitFieldOf("toolWorkTokens needs a number")).toBe(
       "toolWorkTokens",
@@ -397,8 +409,88 @@ describe("the limit words and units", () => {
     expect(defaultLine(timeout)).toBe("default 20 s");
     expect(defaultLine(searchBody)).toBe("default 1 MB");
     expect(defaultLine(rounds)).toBe("default 100");
-    expect(defaultLine(toolWorkTokens)).toBe("default 500000 tokens");
+    expect(defaultLine(toolWorkTokens)).toBe("default 500 K");
     expect(defaultLine(maxBashCalls)).toBe("default 100");
+  });
+
+  test("tokens are typed in thousands, a stored value kept when untouched", () => {
+    const summary = row({
+      name: "summaryMaxTokens",
+      value: 8192,
+      default: 4096,
+      min: 1000,
+      max: 32_000,
+      unit: "tokens",
+      scope: "send",
+      changedAt: 1,
+    });
+    expect(show(summary, 8192)).toBe("8");
+    expect(show(summary, 1500)).toBe("2");
+    expect(read(summary, "8")).toBe(8192);
+    expect(read(summary, "16")).toBe(16_000);
+    expect(read(summary, "1,000")).toBe(1_000_000);
+    expect(read(summary, "1.5")).toBeNull();
+    expect(read(summary, "")).toBeNull();
+    // typed by hand, only the stored value's text keeps it
+    expect(read(summary, "4")).toBe(4000);
+    expect(problem(summary, "33")).toBe(
+      "Summary tokens must be a whole number from 1 to 32 K",
+    );
+    expect(problem(summary, "8")).toBeNull();
+    // a save of another field sends the stored value unchanged
+    const draft = draftOf([summary, rounds]);
+    expect(draft.summaryMaxTokens).toBe("8");
+    expect(dirty([summary, rounds], draft)).toBe(false);
+    expect(
+      collect([summary, rounds], { ...draft, rounds: "12" }) as unknown,
+    ).toEqual({ values: { summaryMaxTokens: 8192, rounds: 12 } });
+    const reset = defaultsDraft([summary]);
+    expect(reset.draft.summaryMaxTokens).toBe("4");
+    expect(atDefaults([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(collect([summary], reset.draft, reset.defaulted) as unknown).toEqual(
+      { values: { summaryMaxTokens: 4096 } },
+    );
+    expect(dirty([summary], { summaryMaxTokens: "9" })).toBe(true);
+    expect(collect([summary], { summaryMaxTokens: "9" }) as unknown).toEqual({
+      values: { summaryMaxTokens: 9000 },
+    });
+  });
+
+  test("a stored value that shows as its default can be put back to it", () => {
+    const summary = row({
+      name: "summaryMaxTokens",
+      value: 4400,
+      default: 4096,
+      min: 1000,
+      max: 32_000,
+      unit: "tokens",
+      scope: "send",
+      changedAt: 1,
+    });
+    const draft = draftOf([summary]);
+    expect(draft.summaryMaxTokens).toBe("4");
+    // Use defaults stays on: the value differs though the text does not
+    expect(atDefaults([summary], draft)).toBe(false);
+    expect(dirty([summary], draft)).toBe(false);
+    // untouched, the stored value goes back
+    expect(collect([summary], draft) as unknown).toEqual({
+      values: { summaryMaxTokens: 4400 },
+    });
+    // Use defaults, then Save, sends the default
+    const reset = defaultsDraft([summary]);
+    expect(reset.draft).toEqual(draft);
+    expect(atDefaults([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(dirty([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(collect([summary], reset.draft, reset.defaulted) as unknown).toEqual(
+      { values: { summaryMaxTokens: 4096 } },
+    );
+    // typed by hand, the stored value's text keeps the stored value
+    expect(collect([summary], { summaryMaxTokens: "4" }) as unknown).toEqual({
+      values: { summaryMaxTokens: 4400 },
+    });
+    expect(collect([summary], { summaryMaxTokens: "5" }) as unknown).toEqual({
+      values: { summaryMaxTokens: 5000 },
+    });
   });
 
   test.serial("a card sums its tokens and re-seeds only on new values", () => {
@@ -706,7 +798,7 @@ describe("the Config board", () => {
     const turns = forms[0]!;
     expect(turns).toContain(">Turns<");
     for (const [name, value, label, defaultText] of [
-      ["toolWorkTokens", "750000", "Tool-work tokens", "default 500000 tokens"],
+      ["toolWorkTokens", "750", "Tool-work tokens", "default 500 K"],
       ["maxBashCalls", "200", "Bash calls per turn", "default 100"],
     ]) {
       expect(turns).toContain(label);

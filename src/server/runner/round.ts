@@ -142,16 +142,38 @@ export function buildRequest(
   lookups: ContextLookups,
   now: number,
 ): ChatRequest {
-  const messages = history(
-    rows,
-    send.policy,
-    lookups,
-    now,
-    send.mcpNote,
-    send.repos ?? undefined,
-  );
+  const historyOf = (of: Message[]) =>
+    history(
+      of,
+      send.policy,
+      lookups,
+      now,
+      send.mcpNote,
+      send.repos ?? undefined,
+    );
+  const messages = historyOf(rows);
   if (send.summarizing) {
-    return summaryRequest(send.policy, send.sessionId, messages, send.used);
+    // when rows came after the counted round, the history before its
+    // reply: the reply is estimated with the rest, since its calls
+    // render only with their results
+    const through = send.usedThrough;
+    const prompt = send.usedPrompt;
+    const counted =
+      through !== null &&
+      prompt !== null &&
+      rows.some((row) => row.seq > through && row.sendId !== send.id)
+        ? {
+            prompt,
+            messages: historyOf(rows.filter((row) => row.seq < through)),
+          }
+        : null;
+    return summaryRequest(
+      send.policy,
+      send.sessionId,
+      messages,
+      send.used,
+      counted,
+    );
   }
   const req = request(
     send.policy,

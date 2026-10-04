@@ -17,6 +17,12 @@ import {
   type Wire,
 } from "../../../shared/words.ts";
 import { priceLine } from "../../agents/meta.ts";
+import {
+  digits,
+  K,
+  thousandsText,
+  thousandsValue,
+} from "../../lib/thousands.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export function agentFieldOf(message: string): string | undefined {
@@ -145,18 +151,13 @@ export function listed<T>(
     : picks.filter((p) => rows.some((r) => r.id === idOf(p)));
 }
 
-// The window is typed in thousands of tokens and the API keeps tokens. A
-// saved window shows rounded and, left as shown, goes back unchanged, so
-// 131072 stays 131072
-const K = 1000;
+// The window is typed in thousands of tokens (lib/thousands.ts)
 const MIN_K = Math.ceil(MIN_CONTEXT_LENGTH / K);
 const MAX_K = Math.floor(MAX_CONTEXT_LENGTH / K);
 
 export function windowText(tokens: number | null): string {
-  return tokens === null ? "" : String(Math.round(tokens / K));
+  return tokens === null ? "" : thousandsText(tokens);
 }
-
-const digits = (value: string) => value.trim().replaceAll(/[,_ ]/g, "");
 
 const unchanged = (value: string, saved: number | null) =>
   saved !== null && digits(value) === windowText(saved);
@@ -179,7 +180,7 @@ export function contextProblem(
 function contextValue(value: string, saved: number | null): number | null {
   const v = digits(value);
   if (v === "") return null;
-  return unchanged(value, saved) ? saved : Number(v) * K;
+  return thousandsValue(value, saved === null ? [] : [saved]);
 }
 
 // the server refuses a stated window and tools for a described model

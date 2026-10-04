@@ -156,8 +156,8 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   },
   summaryMaxTokens: {
     default: 4096,
-    min: 256,
-    max: 32_768,
+    min: 1000,
+    max: 32_000,
     unit: "tokens",
     scope: "send",
   },
