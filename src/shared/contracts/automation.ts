@@ -8,7 +8,12 @@
 // row's writes; a client applies an event only when its revision is
 // above the one it holds.
 
-import type { EventOutcome, EventSource, SessionStatus } from "../words.ts";
+import type {
+  AttentionMode,
+  EventOutcome,
+  EventSource,
+  SessionStatus,
+} from "../words.ts";
 
 export type AutomationSummary = {
   id: string;
@@ -34,6 +39,12 @@ export type AutomationSummary = {
   // what its runs have turned off, sorted keys of shared/capabilities.ts
   disabledCapabilities: string[];
   memoryGuidance: string;
+  // who marks its runs as needing attention, and its words on when,
+  // which its agent and the decider read
+  attentionMode: AttentionMode;
+  attentionGuidance: string;
+  // the open alert, null while none is open
+  alert: AutomationAlert | null;
   // a run a restart cut starts again at the next start
   rerunOnRestart: boolean;
   // an epoch while suspended; nextAt is null exactly then
@@ -55,6 +66,19 @@ export type AutomationSummary = {
   revision: number;
   createdAt: number;
   updatedAt: number;
+};
+
+// An automation's open alert: since when, how many of its runs were
+// marked since then, and the latest one's reason, null for a decider's.
+// Its runs are those marked runs; no row holds them
+export type AutomationAlert = {
+  since: number;
+  runs: number;
+  // the latest reason any of its runs gave; null when only a decider
+  // marked them
+  reason: string | null;
+  // who marked its latest run
+  by: string | null;
 };
 
 // a fire starts within milliseconds; the grace covers that and a clock

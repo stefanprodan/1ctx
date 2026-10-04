@@ -76,6 +76,8 @@ export type RunnerDeps = {
   // a send's place let go, so a run waiting for one may start
   wake(): void;
   attention: AttentionPort;
+  // the automations area's open alert, built after the runner
+  alerts: WriterDeps["alerts"];
 };
 
 export type MessageAnswer =

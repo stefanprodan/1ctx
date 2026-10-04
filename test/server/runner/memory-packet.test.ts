@@ -9,12 +9,14 @@ import {
   wireTools,
 } from "../../../src/server/providers/index.ts";
 import {
-  MEMORY_ANSWER_CHARS,
-  MEMORY_EXCERPT_CHARS,
-  MEMORY_RECEIPTS_CHARS,
   type MemoryPacket,
   memoryMessages,
 } from "../../../src/server/runner/memory-packet.ts";
+import {
+  RECORD_ANSWER_CHARS,
+  RECORD_EXCERPT_CHARS,
+  RECORD_RECEIPTS_CHARS,
+} from "../../../src/server/runner/run-record.ts";
 import type { MemoryEntry } from "../../../src/shared/contracts/memory.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import type { Wire } from "../../../src/shared/words.ts";
@@ -205,7 +207,7 @@ Reply with memory_edit calls only, no text. Calls in one round run in order, so 
     const page = `Consent required. ${"é".repeat(600)}`;
     input.rows = input.rows.map((row) => {
       if (row.slot === "answer") {
-        return { ...row, content: "a".repeat(MEMORY_ANSWER_CHARS + 50) };
+        return { ...row, content: "a".repeat(RECORD_ANSWER_CHARS + 50) };
       }
       if (row.toolCallId === "consent") return { ...row, content: page };
       if (row.kind === "reply" && row.round === 1) {
@@ -220,13 +222,13 @@ Reply with memory_edit calls only, no text. Calls in one round run in order, so 
       return row;
     });
     const result = text(memoryMessages(input, context, chars)!);
-    expect(result).toContain("a".repeat(MEMORY_ANSWER_CHARS));
-    expect(result).not.toContain("a".repeat(MEMORY_ANSWER_CHARS + 1));
+    expect(result).toContain("a".repeat(RECORD_ANSWER_CHARS));
+    expect(result).not.toContain("a".repeat(RECORD_ANSWER_CHARS + 1));
     expect(result).toContain(
       `done (${new TextEncoder().encode(page).length} bytes)`,
     );
-    expect(result).toContain(`Excerpt: ${page.slice(0, MEMORY_EXCERPT_CHARS)}`);
-    expect(result).not.toContain(page.slice(0, MEMORY_EXCERPT_CHARS + 1));
+    expect(result).toContain(`Excerpt: ${page.slice(0, RECORD_EXCERPT_CHARS)}`);
+    expect(result).not.toContain(page.slice(0, RECORD_EXCERPT_CHARS + 1));
     expect(result).toContain(`webfetch { "query": "${"q".repeat(388)}:`);
     expect(result).not.toContain("q".repeat(401));
   });
@@ -253,7 +255,7 @@ Reply with memory_edit calls only, no text. Calls in one round run in order, so 
     const receipts = body
       .split("<tool_calls>\n")[1]!
       .split("\n</tool_calls>")[0]!;
-    expect(receipts.length).toBeLessThanOrEqual(MEMORY_RECEIPTS_CHARS);
+    expect(receipts.length).toBeLessThanOrEqual(RECORD_RECEIPTS_CHARS);
     expect(receipts).not.toContain('https://page.example/0"');
     expect(receipts).toContain('https://page.example/39"');
     const kept = [...receipts.matchAll(/https:\/\/page.example\/(\d+)/g)].map(
@@ -309,7 +311,7 @@ Reply with memory_edit calls only, no text. Calls in one round run in order, so 
     "cuts %s without splitting a surrogate pair or borrowing another send's text",
     (slot) => {
       const input = packet();
-      const long = `${"a".repeat(MEMORY_ANSWER_CHARS - 1)}\u{1f600} tail`;
+      const long = `${"a".repeat(RECORD_ANSWER_CHARS - 1)}\u{1f600} tail`;
       input.rows = [
         input.rows[0]!,
         { ...input.rows[1]!, slot, content: long, toolCalls: null },
@@ -321,7 +323,7 @@ Reply with memory_edit calls only, no text. Calls in one round run in order, so 
         ...input.rows.slice(5),
       ];
       const body = text(memoryMessages(input, context, chars)!);
-      expect(body).toContain("a".repeat(MEMORY_ANSWER_CHARS - 1));
+      expect(body).toContain("a".repeat(RECORD_ANSWER_CHARS - 1));
       expect(body).not.toContain("\ud83d");
       expect(body).not.toContain("Another send");
       expect(body).not.toContain("Phase work");

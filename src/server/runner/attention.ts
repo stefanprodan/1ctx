@@ -3,9 +3,14 @@
 //
 // Whether a finished run needs a person: the run-attention decision,
 // asked of its decider once the run is done and its frames are out, so
-// the ask never holds the run. A failure stores nothing and is not asked
-// again; the answer and the decision's settings are read when the ask
-// starts.
+// the ask never holds the run. It is the backup of the run's own mark:
+// asked only for an automation in the decider mode, of a run that
+// finished with no mark of its agent's or the runner's. A failure
+// stores nothing and is not asked again; the answer and the decision's
+// settings are read when the ask starts. Its word opens or closes the
+// automation's open alert, which the run's end left to it: an ask that
+// marks nothing (off, no answer, a failure, dropped) closes it, as a
+// clean run's end would; a shutdown leaves it.
 
 import {
   DECISION_OPTIONS,
@@ -19,6 +24,7 @@ import {
 } from "../deciders/index.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { cutToTokens } from "../lib/tokens.ts";
+import { decidesLater } from "./marks.ts";
 import type { ActiveSend } from "./send.ts";
 
 // a burst of runs ending together never floods one local server
@@ -33,19 +39,32 @@ export const UNKNOWN_WINDOW_TOKENS = 4000;
 const PURPOSE: DecisionId = "run-attention";
 const NEEDS_ATTENTION = DECISION_OPTIONS[PURPOSE][1]!.key;
 
-// the instructions are fixed; what each option means is the admin's
+// the instructions are fixed; what each option means is the admin's,
+// and the automation's own words on when replace needs-attention's
 export function outcomeQuestion(
   decision: Pick<DecisionSummary, "options">,
+  guidance = "",
 ): Record<string, DecisionQuestion> {
   return {
     outcome: {
       type: "choice",
       instructions: "What is the outcome of this task run?",
       criteria: Object.fromEntries(
-        decision.options.map((o) => [o.key, o.description]),
+        decision.options.map((o) => [
+          o.key,
+          o.key === NEEDS_ATTENTION && guidance !== ""
+            ? guidance
+            : o.description,
+        ]),
       ),
     },
   };
+}
+
+// a finished run of an automation that asks the decider, which neither
+// its agent nor the runner marked
+export function asksDecider(send: ActiveSend): boolean {
+  return send.terminal !== null && decidesLater(send, send.terminal);
 }
 
 export type AttentionPort = {
@@ -53,11 +72,16 @@ export type AttentionPort = {
   // the run-attention decision's settings
   decision(): DecisionSummary;
   runAnswer(sendId: string, memoryRound: number | null): string | null;
+  // the decider's chance on the run, and with it the automation's open
+  // alert opened or closed, in one transaction
   markAttention(sessionId: string, attention: number, by: string): boolean;
+  // the decider was not asked or said nothing: the run's end closes the
+  // alert, as a clean run's does in the other modes
+  undecided(sessionId: string): void;
 };
 
 export type Attention = {
-  // a finalized send: asked only for a run that finished with an answer
+  // a finalized send: asked only when asksDecider() holds
   ask(send: ActiveSend): void;
   // every ask queued or in flight has ended
   settled(): Promise<void>;
@@ -84,6 +108,7 @@ type Job = {
   sessionId: string;
   projectId: string;
   memoryRound: number | null;
+  guidance: string;
   start(skip: boolean): void;
 };
 
@@ -106,7 +131,16 @@ export function attention(port: AttentionPort, log: Log): Attention {
       ...errorFields(error, !(error instanceof DecisionError)),
     });
 
+  const undecided = (job: Job) => {
+    try {
+      port.undecided(job.sessionId);
+    } catch (error) {
+      failed(job.sessionId, error);
+    }
+  };
+
   const run = async (job: Job) => {
+    let marked = false;
     try {
       const decision = port.decision();
       if (!decision.enabled) return;
@@ -118,12 +152,13 @@ export function attention(port: AttentionPort, log: Log): Attention {
           sessionId: job.sessionId,
           projectId: job.projectId,
         },
-        outcomeQuestion(decision),
+        outcomeQuestion(decision, job.guidance),
         stateOf(answer),
         closing.signal,
       );
       const outcome = decided?.answers.outcome;
       if (decided === null || outcome === undefined) return;
+      marked = true;
       port.markAttention(
         job.sessionId,
         outcome.probabilities[NEEDS_ATTENTION] ?? 0,
@@ -131,6 +166,9 @@ export function attention(port: AttentionPort, log: Log): Attention {
       );
     } catch (error) {
       failed(job.sessionId, error);
+    } finally {
+      // a shutdown leaves the alert as it is
+      if (!marked && !closing.signal.aborted) undecided(job);
     }
   };
 
@@ -143,6 +181,7 @@ export function attention(port: AttentionPort, log: Log): Attention {
       const dropped = queue.shift()!;
       log.warn("run attention dropped", { chat: dropped.sessionId });
       dropped.start(true);
+      undecided(dropped);
     }
     const done = new Promise<void>((resolve) => {
       const job: Job = {
@@ -150,6 +189,7 @@ export function attention(port: AttentionPort, log: Log): Attention {
         sessionId: send.sessionId,
         projectId: send.projectId,
         memoryRound: send.memoryRound,
+        guidance: send.policy.automation?.attentionGuidance ?? "",
         start(skip) {
           if (skip) return resolve();
           running += 1;
@@ -170,13 +210,7 @@ export function attention(port: AttentionPort, log: Log): Attention {
 
   return {
     ask(send) {
-      if (
-        closing.signal.aborted ||
-        send.kind !== "run" ||
-        send.terminal !== "finish"
-      ) {
-        return;
-      }
+      if (closing.signal.aborted || !asksDecider(send)) return;
       // the run has ended: nothing here may reach it
       try {
         enqueue(send);

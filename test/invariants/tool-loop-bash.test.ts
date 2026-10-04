@@ -40,7 +40,8 @@ describe("bash in the tool loop", () => {
           "webfetch",
           "visualize",
           "bash",
-          // a run never saves to the project's memory
+          // a run never saves to the project's memory, nor marks itself
+          // in its main rounds
           ...(origin === "chat" ? ["memory_edit"] : []),
         ]);
         const prompt = (script.body.messages as { content: string }[])[0]!

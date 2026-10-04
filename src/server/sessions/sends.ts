@@ -25,6 +25,8 @@ export type SendCounters = {
   rounds: number;
   toolCalls: number;
   memoryRound?: number;
+  attentionRound?: number;
+  memoryFrom?: number;
 };
 
 export function readSend(db: Db, id: string): SendSummary | null {
@@ -92,8 +94,9 @@ export function endSendRow(
   return readSend(db, id);
 }
 
-// the counters as the loop advances; memory_round is written once and
-// never cleared
+// the counters as the loop advances; memory_round, the first round after
+// the run's answer, attention_round and memory_from are each written
+// once and never cleared
 export function bumpSendCounters(
   db: Db,
   id: string,
@@ -101,9 +104,18 @@ export function bumpSendCounters(
 ): SendSummary | null {
   db.query(
     `update sends set rounds = ?, tool_calls = ?,
-       memory_round = coalesce(?, memory_round)
+       memory_round = coalesce(memory_round, ?),
+       attention_round = coalesce(attention_round, ?),
+       memory_from = coalesce(memory_from, ?)
      where id = ? and status = 'running'`,
-  ).run(fields.rounds, fields.toolCalls, fields.memoryRound ?? null, id);
+  ).run(
+    fields.rounds,
+    fields.toolCalls,
+    fields.memoryRound ?? null,
+    fields.attentionRound ?? null,
+    fields.memoryFrom ?? null,
+    id,
+  );
   return readSend(db, id);
 }
 

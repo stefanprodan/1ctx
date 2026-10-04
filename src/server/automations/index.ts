@@ -13,6 +13,7 @@ import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { type Alerts, alerts } from "./alerts.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
 import { AutomationStore } from "./store.ts";
@@ -34,10 +35,17 @@ export type AutomationsDeps = {
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
   sessions: SessionStore;
   runner: { startRun(event: Event): PreparedRun };
+  // the run-attention decision is on with a decider to ask; off when
+  // absent
+  deciderOn?: () => boolean;
+  // the decider's chance on a run, in the caller's transaction
+  markAttention(sessionId: string, attention: number, by: string): boolean;
 };
 
 export type Automations = {
   store: AutomationStore;
+  // the open alert: a run's end, a decider's word, a dismiss
+  alerts: Alerts;
   scheduler: Scheduler;
   // in the caller's transaction: the agent's active automations
   // suspended by the admin who deleted it, and an envelope for every one
@@ -54,8 +62,15 @@ export function automationsArea(deps: AutomationsDeps): Automations {
   const store = new AutomationStore(deps.db);
   const scheduled = scheduler({ ...deps, store });
   store.setWake(scheduled.wake);
+  const alerted = alerts({
+    db: deps.db,
+    store,
+    sessions: deps.sessions,
+    markAttention: deps.markAttention,
+  });
   return {
     store,
+    alerts: alerted,
     scheduler: scheduled,
     suspendAgent: (agentId, by, now) =>
       store.retireAgent(agentId, by, now).map((row) => ({
@@ -66,6 +81,12 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     drain: scheduled.drain,
     stop: scheduled.stop,
     dispose: scheduled.dispose,
-    routes: routes({ ...deps, store, scheduler: scheduled }),
+    routes: routes({
+      ...deps,
+      store,
+      scheduler: scheduled,
+      deciderOn: deps.deciderOn ?? (() => false),
+      alerts: alerted,
+    }),
   };
 }

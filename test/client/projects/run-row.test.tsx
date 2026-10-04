@@ -18,6 +18,9 @@ const row = (changes: Partial<SessionSummary>): FeedRow => ({
   session: {
     archived: null,
     attention: null,
+    attentionReason: null,
+    attentionSource: null,
+    attentionBy: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -39,7 +42,7 @@ const row = (changes: Partial<SessionSummary>): FeedRow => ({
   send: null,
   sendAgent: null,
   last: null,
-  automation: { id: "au1", name: "nightly" },
+  automation: { id: "au1", name: "nightly", alert: null },
   runBy:
     changes.runSource === "manual" ? { id: "u1", username: "casey" } : null,
   runs: null,
@@ -78,5 +81,15 @@ describe("the Runs log's source icon", () => {
       'title="Scheduled, deferred by a restart"',
     );
     expect(deferred({ runSource: "restart" })).toContain('title="Restarted"');
+  });
+});
+
+describe("the Runs log's row on a phone", () => {
+  test("keeps its meta beside the title, the bar its own to hide", () => {
+    const html = drawn({});
+    expect(html).toContain('class="rows-line rows-go rows-go-side"');
+    expect(html).toContain('class="meter automations-meter"');
+    const running = drawn({ status: "running" });
+    expect(running).toContain('class="rows-go rows-go-part rows-go-side"');
   });
 });

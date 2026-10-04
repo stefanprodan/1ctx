@@ -54,6 +54,9 @@ const EXPECTED_IDS = [
   "0040-repos",
   "0041-kept-packing",
   "0042-opencode",
+  "0043-run-attention",
+  "0044-attention-round",
+  "0045-open-attention",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1260,13 +1263,29 @@ describe("the schema", () => {
             `select * from ${table} order by rowid`,
           )
           .all()
-          .map(({ rerun_on_restart: _, mounted_repos: __, ...rest }) => rest),
+          .map(
+            ({
+              rerun_on_restart: _,
+              mounted_repos: __,
+              attention_reason: ___,
+              attention_source: ____,
+              attention_mode: _____,
+              attention_guidance: ______,
+              attention_round: _______,
+              memory_from: ________,
+              attention_since: _________,
+              ...rest
+            }) => rest,
+          ),
       );
     const indexes = () =>
       db
         .query<{ name: string; sql: string | null }, []>(
           `select name, sql from sqlite_schema where type = 'index'
-             and tbl_name in ('sessions', 'automations') order by name`,
+             and tbl_name in ('sessions', 'automations')
+             -- the indexes 0045 adds after it
+             and name not in ('automations_attention', 'sessions_marked')
+           order by name`,
         )
         .all();
     try {
@@ -1479,9 +1498,23 @@ describe("the schema", () => {
       "sends",
       "usage",
     ];
+    // the columns 0043 adds after it
     const rows = () =>
       tables.map((table) =>
-        db.query(`select * from ${table} order by rowid`).all(),
+        db
+          .query<Record<string, unknown>, []>(
+            `select * from ${table} order by rowid`,
+          )
+          .all()
+          .map(
+            ({
+              attention_reason: _,
+              attention_source: __,
+              attention_round: ___,
+              memory_from: ____,
+              ...rest
+            }) => rest,
+          ),
       );
     const indexes = () =>
       db
@@ -1559,6 +1592,107 @@ describe("the schema", () => {
       expect(db.query("select agent_id from users").get()).toEqual({
         agent_id: null,
       });
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0043 keeps the decider as every existing automation's backup and marks' source", () => {
+    const db = seed(MIGRATIONS.slice(0, 42));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('au', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 1000, 0, 0);
+        insert into sessions (id, project_id, owner_id, agent_id, origin,
+            automation_id, title, status, revision, created_at,
+            last_activity_at, attention, attention_by)
+          values ('marked', 'p', 'u', 'a', 'automation', 'au', 'daily',
+            'done', 1, 0, 0, 0.9, 'judge'),
+            ('plain', 'p', 'u', 'a', 'automation', 'au', 'daily', 'done', 1,
+            0, 0, null, null);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0043-run-attention"));
+      expect(
+        db
+          .query(
+            "select id, attention, attention_by, attention_reason, attention_source from sessions order by id",
+          )
+          .all(),
+      ).toEqual([
+        {
+          id: "marked",
+          attention: 0.9,
+          attention_by: "judge",
+          attention_reason: null,
+          attention_source: "decider",
+        },
+        {
+          id: "plain",
+          attention: null,
+          attention_by: null,
+          attention_reason: null,
+          attention_source: null,
+        },
+        {
+          id: "sess",
+          attention: null,
+          attention_by: null,
+          attention_reason: null,
+          attention_source: null,
+        },
+      ]);
+      expect(
+        db
+          .query("select attention_mode, attention_guidance from automations")
+          .all(),
+      ).toEqual([{ attention_mode: "decider", attention_guidance: "" }]);
+      // a new automation defaults to its agent
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('au2', 'p', 'u', 'a', 'hourly', 'check', '0 * * * *',
+            'UTC', 30, 1000, 0, 0);
+      `);
+      expect(
+        db
+          .query("select attention_mode from automations where id = 'au2'")
+          .get(),
+      ).toEqual({ attention_mode: "agent" });
+      expect(() =>
+        db.exec("update automations set attention_mode = 'always'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update sessions set attention_source = 'user'"),
+      ).toThrow(/CHECK/);
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0044 adds the attention step's and the memory phase's start rounds, null on every send", () => {
+    const db = seed(MIGRATIONS.slice(0, 43));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0044-attention-round"));
+      const sends = db
+        .query<
+          { memory_round: null; attention_round: null; memory_from: null },
+          []
+        >("select memory_round, attention_round, memory_from from sends")
+        .all();
+      expect(sends.length).toBeGreaterThan(0);
+      for (const send of sends) {
+        expect(send).toEqual({
+          memory_round: null,
+          attention_round: null,
+          memory_from: null,
+        });
+      }
       expect(migrate(db)).toEqual([]);
     } finally {
       db.close();

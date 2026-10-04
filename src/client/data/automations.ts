@@ -52,6 +52,8 @@ export const automations = signal<AutomationSummary[] | null>(null);
 export const automationsError = signal<Failure | null>(null);
 // the run deadline limit a row with no deadline runs under, in ms
 export const runDeadlineMs = signal<number | null>(null);
+// the instance's run-attention decision is on with a decider to ask
+export const deciderOn = signal(false);
 // the automation page's own failure, a 404 for one gone or not ours
 export const automationError = signal<Failure | null>(null);
 // the project the automation on screen was found in, so the page tells
@@ -76,6 +78,7 @@ let projectFor: string | null = null;
 const kept = new Held<{
   list: AutomationSummary[];
   deadline: number | null;
+  decider: boolean;
 }>();
 let listTurn = 0;
 let pageTurn = 0;
@@ -93,6 +96,7 @@ effect(() => {
   automations.value = null;
   automationsError.value = null;
   runDeadlineMs.value = null;
+  deciderOn.value = false;
   automationError.value = null;
   automationProject.value = null;
   preview.value = null;
@@ -111,7 +115,9 @@ const path = (id: string) => `/api/automations/${encodeURIComponent(id)}`;
 // the feed row's label for a run of a held automation
 const labelOf = (id: string): FeedRow["automation"] => {
   const row = automations.value?.find((a) => a.id === id);
-  return row === undefined ? null : { id: row.id, name: row.name };
+  return row === undefined
+    ? null
+    : { id: row.id, name: row.name, alert: row.alert };
 };
 
 export async function loadAutomations(projectId: string): Promise<void> {
@@ -122,11 +128,13 @@ export async function loadAutomations(projectId: string): Promise<void> {
       kept.set(projectFor, {
         list: automations.value,
         deadline: runDeadlineMs.value,
+        decider: deciderOn.value,
       });
     }
     const held = kept.get(projectId);
     automations.value = held?.list ?? null;
     runDeadlineMs.value = held?.deadline ?? null;
+    deciderOn.value = held?.decider ?? false;
     closeRuns();
   }
   projectFor = projectId;
@@ -137,6 +145,7 @@ export async function loadAutomations(projectId: string): Promise<void> {
     );
     if (owner === forUser && listTurn === turn) {
       runDeadlineMs.value = body.runDeadlineMs;
+      deciderOn.value = body.deciderOn === true;
       // a frame that landed while the answer was in flight keeps its word
       const held = automations.value ?? [];
       automations.value = body.automations.reduce(
@@ -270,6 +279,17 @@ export async function suspendAutomation(id: string, suspend: boolean) {
   return automation;
 }
 
+// the open alert closed; with none open it answers the row as it is
+export async function dismissAlert(id: string): Promise<AutomationSummary> {
+  const forUser = owner;
+  const { automation } = await api<AutomationResponse>(
+    `${path(id)}/dismiss`,
+    "POST",
+  );
+  take(automation, forUser);
+  return automation;
+}
+
 // the run opens at once; its row joins the runs from the answer, and
 // the envelopes that follow move it
 export async function runAutomation(id: string): Promise<SessionDetail> {
@@ -334,7 +354,11 @@ export function onAutomationsSocket(ev: SocketEvent): void {
       else {
         automations.value = upsertAutomation(automations.value, ev.automation);
       }
-      relabelRuns({ id: ev.automation.id, name: ev.automation.name });
+      relabelRuns({
+        id: ev.automation.id,
+        name: ev.automation.name,
+        alert: ev.automation.alert,
+      });
       break;
     }
     case "automationDeleted":

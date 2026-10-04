@@ -135,8 +135,9 @@ export function groupRows(
     const answer =
       rows.find((row) => row.kind === "reply" && row.slot === "answer") ?? null;
     const send = currentSend?.id === sendId ? currentSend : null;
-    // the rows from the memory round on are the phase's, never the
-    // turn's; the boundary is the server's word on the send
+    // the rows from the first round after the answer on are the attention
+    // step's and the memory phase's, never the turn's; the boundary is
+    // the server's word on the send
     const boundary = send?.memoryRound ?? null;
     const inPhase = (row: Message) =>
       boundary !== null && row.round >= boundary;

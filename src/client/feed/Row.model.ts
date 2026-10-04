@@ -7,9 +7,10 @@
 // on the row.
 
 import type { FeedRow } from "../../shared/api/sessions.ts";
+import type { AutomationAlert } from "../../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import type { SessionSummary } from "../../shared/contracts/session.ts";
-import { ago, elapsed } from "../lib/format.ts";
+import { ago, clock, dayMonth, elapsed, plural } from "../lib/format.ts";
 
 // the first line of an error, so a provider's paragraph stays a line
 const firstLine = (text: string): string =>
@@ -34,12 +35,55 @@ export function markOf(row: FeedRow): string | null {
   return row.session.runSource === "restart" ? "restarted" : null;
 }
 
-// a finished run the default decider judged to need a person; a run
-// not asked, a chat and a chance under the mark say nothing
-export const ATTENTION_WORDS = "needs attention";
+// a run its agent or the runner marked, or a decider judged to need a
+// person; a run not marked, a chat and a chance under the mark say
+// nothing
+export const ATTENTION_WORDS = "flagged";
 export const needsAttention = (
   session: Pick<SessionSummary, "attention">,
 ): boolean => session.attention !== null && session.attention >= ATTENTION_AT;
+
+// whether a row says flagged: a failed run's red words already say it
+export const flagShown = (
+  session: Pick<SessionSummary, "attention" | "status">,
+): boolean => needsAttention(session) && session.status !== "failed";
+
+// the reason a row draws after the mark: the agent's; the runner's only
+// repeats the status line, and a decider gives none
+export const markReason = (
+  session: Pick<SessionSummary, "attentionReason" | "attentionSource">,
+): string | null =>
+  session.attentionSource === "runner" ? null : session.attentionReason;
+
+// when an open alert began: the time of day today, else the day too
+export function sinceText(since: number, now: number): string {
+  const sameDay =
+    new Date(since).toDateString() === new Date(now).toDateString();
+  return sameDay ? clock(since) : `${dayMonth(since)} ${clock(since)}`;
+}
+
+// an open alert's span: "since 08:41, 3 runs"
+export const alertSpan = (alert: AutomationAlert, now: number): string =>
+  `since ${sinceText(alert.since, now)}, ${plural(alert.runs, "run")}`;
+
+// an automation's open alert on its line: "flagged since
+// 08:41, 3 runs", the latest reason drawn after it
+export const alertWords = (alert: AutomationAlert, now: number): string =>
+  `${ATTENTION_WORDS} ${alertSpan(alert, now)}`;
+
+// the open alert a line shows in place of its run's state: on an
+// automation's one line, in All and in the Flagged pick
+export const alertOf = (row: FeedRow, line: boolean): AutomationAlert | null =>
+  line ? (row.automation?.alert ?? null) : null;
+
+// the icon's colour: a marked run that finished wears the mark's, a
+// failed or stopped one keeps its own status
+export const iconStatus = (
+  session: Pick<SessionSummary, "attention" | "status">,
+): string =>
+  needsAttention(session) && session.status === "done"
+    ? "attention"
+    : session.status;
 
 // whether the line's author is the session's agent or the last send's,
 // since deleted: the name is greyed, with no tag, since rows are dense

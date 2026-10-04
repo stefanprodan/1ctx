@@ -22,9 +22,15 @@ import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent, Usage } from "../providers/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
+import { type AlertsPort, alertEvents, runMark } from "./marks.ts";
 import type { ToolResult } from "./policy.ts";
 import { toolFinish } from "./results.ts";
-import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
+import {
+  type ActiveSend,
+  afterRun,
+  type RoundState,
+  unmarkAnswer,
+} from "./send.ts";
 import {
   type StartDeps,
   type Started,
@@ -69,6 +75,7 @@ export type WriterDeps = {
   render: (markdown: string, streaming: boolean) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
+  alerts: AlertsPort;
 };
 
 // the status a cause ends in
@@ -376,7 +383,7 @@ export class Writer {
         now,
       });
       const reply =
-        send.phase === "memory"
+        send.phase === "memory" || send.phase === "attention"
           ? (this.deps.sessions.markSlot(created.id, "work") ?? created)
           : created;
       changed.push(reply);
@@ -405,23 +412,18 @@ export class Writer {
   ): Message | null {
     const round = send.round;
     if (round === null) return null;
-    // work once a call delta came, else the answer, even empty and stopped
-    const memory = send.phase === "memory";
-    const slot = memory
+    // work once a call delta came, else the answer, even empty and
+    // stopped; a round after the run is work, ended by its own step
+    const after = afterRun(send);
+    const slot = after
       ? "work"
       : send.summarizing
         ? null
         : round.slotMarked
           ? "work"
           : "answer";
-    const finalStatus = memory
-      ? send.memoryError !== null
-        ? "failed"
-        : send.memoryStopped
-          ? "stopped"
-          : "done"
-      : status;
-    const finalError = memory ? send.memoryError : error;
+    const finalStatus = after?.status ?? status;
+    const finalError = after ? after.error : error;
     if (slot === "answer") unmarkAnswer(round, send.policy.agentName);
     this.recordUsage(send, round, now);
     return this.finishReplyRow(round, finalStatus, finalError, slot, null, now);
@@ -471,7 +473,9 @@ export class Writer {
       const session = this.deps.sessions.touch(send.sessionId, {
         status,
         now,
+        mark: runMark(send, cause, error),
       })!;
+      const alerted = alertEvents(this.deps.alerts, send, cause, now);
       // the send after a summary takes the note as it is then
       if (reply?.kind === "summary" && reply.status === "done") {
         this.deps.views.end(send.sessionId);
@@ -483,7 +487,7 @@ export class Writer {
           : undefined;
       return {
         result: { session, reply, send: row, memorySkipped },
-        events: [envelope(session, changed, row, [], last)],
+        events: [envelope(session, changed, row, [], last), ...alerted],
       };
     });
     send.openTools = new Map();

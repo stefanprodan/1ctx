@@ -15,6 +15,9 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
     archived: null,
     attention: null,
+    attentionReason: null,
+    attentionSource: null,
+    attentionBy: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -67,7 +70,7 @@ const line = (
   send: null,
   sendAgent: null,
   last: { seq: 2, author: "sre", text: "all good" },
-  automation: { id: "au", name: "digest" },
+  automation: { id: "au", name: "digest", alert: null },
   runBy: null,
   runs,
 });
@@ -83,7 +86,11 @@ describe("swapRun", () => {
     expect(ids(rows!)).toEqual(["r2", "c1", "c2"]);
     expect(rows![0]!.runs).toBe(8);
     expect(rows![0]!.last).toBeNull();
-    expect(rows![0]!.automation).toEqual({ id: "au", name: "digest" });
+    expect(rows![0]!.automation).toEqual({
+      id: "au",
+      name: "digest",
+      alert: null,
+    });
     expect(rows![0]!.agent).toBe("sre");
   });
 

@@ -459,15 +459,36 @@ describe("parseStreamQuery", () => {
   test.each([
     [
       "http://one.test/api/sessions",
-      { project: null, q: "", origin: null, before: null },
+      {
+        project: null,
+        q: "",
+        origin: null,
+        attention: false,
+        before: null,
+        alertBefore: null,
+      },
     ],
     [
       "http://one.test/api/sessions?project=",
-      { project: null, q: "", origin: null, before: null },
+      {
+        project: null,
+        q: "",
+        origin: null,
+        attention: false,
+        before: null,
+        alertBefore: null,
+      },
     ],
     [
       "http://one.test/api/sessions?project=p1&q=%20Alpha%20",
-      { project: "p1", q: "Alpha", origin: null, before: null },
+      {
+        project: "p1",
+        q: "Alpha",
+        origin: null,
+        attention: false,
+        before: null,
+        alertBefore: null,
+      },
     ],
     [
       "http://one.test/api/sessions?origin=automation",
@@ -475,7 +496,9 @@ describe("parseStreamQuery", () => {
         project: null,
         q: "",
         origin: "automation" as const,
+        attention: false,
         before: null,
+        alertBefore: null,
       },
     ],
     [
@@ -484,7 +507,9 @@ describe("parseStreamQuery", () => {
         project: null,
         q: "a",
         origin: null,
+        attention: false,
         before: { running: 1 as const, at: 1700000000000, id: "abc123def456" },
+        alertBefore: null,
       },
     ],
     [
@@ -493,7 +518,20 @@ describe("parseStreamQuery", () => {
         project: null,
         q: "",
         origin: null,
+        attention: false,
         before: { running: 0 as const, at: 0, id: "000000000000" },
+        alertBefore: null,
+      },
+    ],
+    [
+      "http://one.test/api/sessions?attention=1&before=1700000000000.abc123def456",
+      {
+        project: null,
+        q: "",
+        origin: null,
+        attention: true,
+        before: null,
+        alertBefore: { at: 1700000000000, id: "abc123def456" },
       },
     ],
   ])("accepts %s", (input, expected) => {
@@ -510,6 +548,9 @@ describe("parseStreamQuery", () => {
     "http://one.test/api/sessions?other=x",
     "http://one.test/api/sessions?project=p1&project=p2",
     "http://one.test/api/sessions?q=one&q=two",
+    "http://one.test/api/sessions?attention=0",
+    "http://one.test/api/sessions?attention=1&origin=chat",
+    "http://one.test/api/sessions?attention=1&before=1.5.abc123def456",
   ])("refuses unknown or duplicated parameters in %s", (input) => {
     expect(() => parseStreamQuery(new URL(input))).toThrow(BadRequest);
   });
@@ -545,7 +586,7 @@ describe("parseStreamQuery", () => {
 describe("parseRunsQuery", () => {
   test.each([
     ["", { filter: null, before: null }],
-    ["?filter=failed", { filter: "failed" as const, before: null }],
+    ["?filter=attention", { filter: "attention" as const, before: null }],
     [
       "?filter=manual&before=1700000000000.abc123def456",
       {

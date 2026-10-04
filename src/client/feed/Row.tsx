@@ -17,10 +17,13 @@ import { sessionHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import {
   ATTENTION_WORDS,
+  alertOf,
+  alertWords,
   authorGone,
+  flagShown,
   iconOf,
+  iconStatus,
   markOf,
-  needsAttention,
   stateLine,
   whenText,
 } from "./Row.model.ts";
@@ -40,24 +43,27 @@ function joined(parts: (ComponentChild | false)[]) {
 export function Row({
   row,
   projectName,
+  line = row.runs !== null,
   now,
 }: {
   row: FeedRow;
+  // whether the row stands for its automation, as its open alert does
+  line?: boolean;
   // the project's name, when the page knows it; on the project page
   // the row is under the name already
   projectName: string | null;
   now: number;
 }) {
   const { session } = row;
-  const line = stateLine(row);
+  const state = stateLine(row);
   const archived = session.archived !== null;
   const mark = markOf(row);
-  const attention = needsAttention(session);
+  const alert = alertOf(row, line);
   return (
     <a class="feed-row" href={sessionHref(session)}>
       <Icon
         name={iconOf(row)}
-        class={`feed-icon ${archived ? "feed-icon-archived" : attention ? "status-attention" : `status-${session.status}`}`}
+        class={`feed-icon ${archived ? "feed-icon-archived" : `status-${iconStatus(session)}`}`}
         size={16}
       />
       <span class="feed-text">
@@ -79,26 +85,33 @@ export function Row({
                 <Icon name="bolt" class="feed-runs-icon" size={12} />
               </span>
             ),
-            (line.author !== null || line.text !== "") && (
+            (alert !== null || state.author !== null || state.text !== "") && (
               <>
-                {line.author !== null && (
+                {state.author !== null && (
                   <span
-                    class={`feed-author${authorGone(row, line) ? " feed-author-gone" : ""}`}
+                    class={`feed-author${authorGone(row, state) ? " feed-author-gone" : ""}`}
                   >
-                    @{line.author}{" "}
+                    @{state.author}{" "}
                   </span>
                 )}
-                {attention && (
+                {alert !== null && (
                   <>
-                    <span class="feed-attention">{ATTENTION_WORDS}</span>
-                    {line.text !== "" && " · "}
+                    <span class="feed-attention">{alertWords(alert, now)}</span>
+                    {alert.reason !== null && ` · ${alert.reason}`}
                   </>
                 )}
-                {session.status === "failed" ? (
-                  <span class="feed-bad">{line.text}</span>
-                ) : (
-                  line.text
+                {alert === null && flagShown(session) && (
+                  <>
+                    <span class="feed-attention">{ATTENTION_WORDS}</span>
+                    {state.text !== "" && " · "}
+                  </>
                 )}
+                {alert === null &&
+                  (session.status === "failed" ? (
+                    <span class="feed-bad">{state.text}</span>
+                  ) : (
+                    state.text
+                  ))}
               </>
             ),
           ])}

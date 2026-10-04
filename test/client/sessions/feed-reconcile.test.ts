@@ -25,6 +25,9 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
     archived: null,
     attention: null,
+    attentionReason: null,
+    attentionSource: null,
+    attentionBy: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -69,7 +72,7 @@ function rowOf(session: SessionSummary, runs: number | null = null): FeedRow {
     automation:
       session.automationId === null
         ? null
-        : { id: session.automationId, name: "digest" },
+        : { id: session.automationId, name: "digest", alert: null },
     runBy: null,
     runs,
   };

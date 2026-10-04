@@ -98,6 +98,7 @@ export function Reply({
   fork,
   visuals,
   retry = null,
+  marked = false,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
@@ -105,6 +106,8 @@ export function Reply({
   visuals?: ComponentChildren;
   // the running round waiting to ask its provider again
   retry?: LiveRetry | null;
+  // the run carries its agent's mark (agentMarked())
+  marked?: boolean;
   // set on the last turn alone: regenerate drops it and sends its
   // user message again; a refusal shows in the failure slot
   onRegenerate?: () => Promise<void>;
@@ -226,6 +229,7 @@ export function Reply({
             live={live}
             running={running}
             memory
+            marked={marked}
             retry={retry}
           />
         )}

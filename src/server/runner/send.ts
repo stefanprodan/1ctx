@@ -77,7 +77,12 @@ export type CapReason =
 
 // the phase of a send: talking to the provider, running a round's
 // tools with no row streaming, or ended
-export type SendPhase = "provider" | "tools" | "memory" | "terminal";
+export type SendPhase =
+  | "provider"
+  | "tools"
+  | "attention"
+  | "memory"
+  | "terminal";
 
 export type SendOp = "message" | "regenerate" | "compact" | "run";
 
@@ -140,10 +145,20 @@ export type ActiveSend = {
   // set when the error is the provider's words, which a log replaces
   // with its status, when it gave one
   refusal: { status: number | null } | null;
+  // the first round after the run's answer, the step's or the phase's
   memoryRound: number | null;
+  // the attention step's first round and the memory phase's own
+  attentionRound: number | null;
+  memoryFrom: number | null;
+  // why the attention step ended early, or that Stop ended it
+  attentionError: string | null;
+  attentionStopped: boolean;
   memoryError: string | null;
   memorySkipped: number | null;
   memoryStopped: boolean;
+  // a Stop or a shutdown came after another cause claimed the send, in
+  // the work after its answer
+  interrupted: boolean;
   terminal: SendCause | null;
   // every caller of terminate observes the ending run by run().
   ended: Promise<boolean>;
@@ -158,6 +173,22 @@ export type ActiveSend = {
 // answer carries in its history
 export function unmarkAnswer(round: RoundState, agentName: string): void {
   round.content = unmarked(round.content, agentName);
+}
+
+// how a round after the run's answer ended, by the step it belongs to;
+// null for any other round
+export function afterRun(
+  send: ActiveSend,
+): { status: "done" | "failed" | "stopped"; error: string | null } | null {
+  const [error, stopped] =
+    send.phase === "memory"
+      ? [send.memoryError, send.memoryStopped]
+      : send.phase === "attention"
+        ? [send.attentionError, send.attentionStopped]
+        : [null, null];
+  if (stopped === null) return null;
+  const status = error !== null ? "failed" : stopped ? "stopped" : "done";
+  return { status, error };
 }
 
 export function newRound(messageId: string, now: number): RoundState {
@@ -254,9 +285,14 @@ export function newSend(fields: {
     error: null,
     refusal: null,
     memoryRound: null,
+    attentionRound: null,
+    memoryFrom: null,
+    attentionError: null,
+    attentionStopped: false,
     memoryError: null,
     memorySkipped: null,
     memoryStopped: false,
+    interrupted: false,
     terminal: null,
     ended,
     end,

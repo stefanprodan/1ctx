@@ -10,6 +10,7 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
   skillFiles: "Sent when one of the agent's skills has files.",
   mcpCatalog: "Sent when the agent's MCP tools go as a catalog.",
   memory: "Sent in every chat, over the project's memory.",
+  runs: "Sent alone in a step after a task run whose agent may mark it as needing attention.",
   knowledge:
     "Sent in every chat and run, over the project's knowledge base. Its tokens leave out the project's credentials.",
   web: "Sent while web access is on for the chat or the run.",

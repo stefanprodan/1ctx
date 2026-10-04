@@ -7,7 +7,9 @@
 // views, and null the memory notes' and automations' pointers to it.
 // Its usage rows stay: they are the record of what was spent.
 
-import type { Db } from "../db/index.ts";
+import { type Db, transact } from "../db/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
+import { markedRun } from "./alerts.ts";
 
 export type SessionDeleted = {
   type: "session.deleted";
@@ -32,4 +34,28 @@ export function deleteSession(
     type: "session.deleted",
     data: { projectId: row.project_id, sessionId: id },
   };
+}
+
+// a marked run's delete, with when the run ended, over its automation's
+// open alert: the events to publish
+export type Pruned = (automationId: string, endedAt: number) => BusEvent[];
+
+// the delete with what it leaves of its automation's open alert: a
+// marked run's delete tells the automations area, through pruned, which
+// closes an alert with no run left or counts one run fewer, its events
+// published with the caller's transaction
+export function removeSession(
+  db: Db,
+  id: string,
+  pruned: Pruned,
+): SessionDeleted | "running" | null {
+  return transact(db, () => {
+    const marked = markedRun(db, id);
+    const deleted = deleteSession(db, id);
+    const events =
+      marked === null || deleted === null || deleted === "running"
+        ? []
+        : pruned(marked.automationId, marked.endedAt);
+    return { result: deleted, events };
+  });
 }

@@ -253,22 +253,15 @@ describe("automations", () => {
       }
     }
 
-    const failed = await (
-      await chat.member.call(
-        "GET",
-        `/api/automations/${automation.id}/runs?filter=failed`,
-      )
-    ).json();
-    expect(failed.rows.map((row: FeedRow) => row.session.id).sort()).toEqual([
-      "run-failed-manual",
-      "run-failed-schedule",
-    ]);
-    expect(failed.tally).toEqual({
-      running: 1,
-      done: 1,
-      failed: 2,
-      stopped: 1,
-    });
+    // failures are flagged, so there is no failed filter
+    expect(
+      (
+        await chat.member.call(
+          "GET",
+          `/api/automations/${automation.id}/runs?filter=failed`,
+        )
+      ).status,
+    ).toBe(400);
 
     const manual = await (
       await chat.member.call(
@@ -280,7 +273,12 @@ describe("automations", () => {
       "run-done",
       "run-failed-manual",
     ]);
-    expect(manual.tally).toEqual(failed.tally);
+    expect(manual.tally).toEqual({
+      running: 1,
+      done: 1,
+      failed: 2,
+      stopped: 1,
+    });
     expect(manual.next).toBeNull();
     for (const before of ["0.1.abc123def456", "1.bad", "-1.abc123def456"]) {
       expect(
@@ -437,6 +435,8 @@ describe("automation rights", () => {
           deadlineMs: null,
           retentionDays: 30,
           ownMemory: false,
+          // its runs ask no attention step of the scripted provider
+          attentionMode: "off",
         },
       },
     );

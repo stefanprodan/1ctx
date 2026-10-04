@@ -1,13 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The automation editor, a page for a new automation and for one that
-// exists, in steps: its name, the task (the composer's box with its
-// agent chip, since a run is that message to that agent), what it may
-// use, whether a restart starts it again, when it runs and its limits.
-// The owner, or an admin in a team project, saves and deletes; anyone
-// else reads the fields. The deadline starts at the server's limit, the
-// value a run is held to when none is set.
+// The automation editor, for a new automation and one that exists, in
+// steps: its name, the task (the composer's box with its agent chip),
+// memory, who marks a run, what it may use, a restart, when it runs and
+// its limits. The owner, or an admin in a team project, saves and
+// deletes; anyone else reads. The deadline starts at the server's
+// limit, the value a run is held to when none is set.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -45,6 +44,7 @@ import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
+import { AttentionSection } from "./AttentionSection.tsx";
 import {
   automationFieldOf,
   automationPageOf,
@@ -243,6 +243,13 @@ function Editor({
           )}
         </div>
       </Section>
+      <AttentionSection
+        draft={d}
+        set={set}
+        save={save}
+        takesTools={takesTools}
+        disabled={off}
+      />
       <AccessSection
         web={kind(WEB)}
         webOn={d.web}

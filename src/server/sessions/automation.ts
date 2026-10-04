@@ -9,6 +9,7 @@ import type { RunFilter } from "../../shared/words.ts";
 import { SESSION_STATUSES } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { DAY_MS } from "../lib/clock.ts";
+import { MARKED } from "./alerts.ts";
 import { type RunsCursor, runsAfter, runsCursor } from "./cursor.ts";
 import { feedRows } from "./feed.ts";
 import type { RawSession, SessionRow, UsagePort } from "./rows.ts";
@@ -27,10 +28,10 @@ export function automationRuns(
   ...[automationId, filter = null, before = null, limit = FEED_LIMIT]: RunsArgs
 ): AutomationRunsResponse {
   const condition =
-    filter === "failed"
-      ? "and status = 'failed'"
-      : filter === "manual"
-        ? "and run_source = 'manual'"
+    filter === "manual"
+      ? "and run_source = 'manual'"
+      : filter === "attention"
+        ? `and ${MARKED}`
         : "";
   const after = runsAfter(before);
   const read = db

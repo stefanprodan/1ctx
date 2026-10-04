@@ -15,7 +15,7 @@ import type {
   SessionStatus,
 } from "../../shared/words.ts";
 import type { OpenedRecord } from "../bash/index.ts";
-import type { ReplyFinish, SessionRow } from "../sessions/index.ts";
+import type { ReplyFinish, RunMark, SessionRow } from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
 export type UploadsPort = {
@@ -56,7 +56,7 @@ export type SessionsPort = {
   }): SessionRow;
   touch(
     id: string,
-    fields: { status: SessionStatus; now: number },
+    fields: { status: SessionStatus; now: number; mark?: RunMark | null },
   ): SessionRow | null;
   addUserMessage(fields: {
     id?: string;
@@ -151,7 +151,13 @@ export type SessionsPort = {
   // the running counters as the loop advances, without ending the send
   bumpCounters(
     id: string,
-    fields: { rounds: number; toolCalls: number; memoryRound?: number },
+    fields: {
+      rounds: number;
+      toolCalls: number;
+      memoryRound?: number;
+      attentionRound?: number;
+      memoryFrom?: number;
+    },
   ): SendSummary | null;
   finishSend(
     id: string,

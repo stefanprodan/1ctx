@@ -23,6 +23,7 @@ import {
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import {
+  type AttentionMode,
   DEFERRED_BY_RESTART,
   type ProjectKind,
   type Role,
@@ -282,6 +283,9 @@ export type Draft = {
   memory: MemoryMode;
   // what the run's own note keeps, as typed
   memoryGuidance: string;
+  attention: AttentionMode;
+  // when a run needs attention, as typed
+  attentionGuidance: string;
   rerunOnRestart: boolean;
 } & AccessDraft;
 
@@ -307,6 +311,8 @@ export function draftOf(
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      attention: "agent",
+      attentionGuidance: "",
       rerunOnRestart: false,
       web: true,
       visuals: true,
@@ -327,6 +333,8 @@ export function draftOf(
     retention: String(a.retentionDays),
     memory: modeOf(a),
     memoryGuidance: a.memoryGuidance,
+    attention: a.attentionMode,
+    attentionGuidance: a.attentionGuidance,
     rerunOnRestart: a.rerunOnRestart,
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
@@ -363,7 +371,9 @@ type AutomationField =
   | "deadline"
   | "retention"
   | "memory"
-  | "memoryGuidance";
+  | "memoryGuidance"
+  | "attention"
+  | "attentionGuidance";
 
 // which field a server refusal of the automation routes names; a cap on
 // the project or a run still going is the form's
@@ -379,6 +389,8 @@ export function automationFieldOf(
   if (message.startsWith("retention")) return "retention";
   if (message.startsWith("memory guidance")) return "memoryGuidance";
   if (message.startsWith("ownMemory")) return "memory";
+  if (message.startsWith("attention guidance")) return "attentionGuidance";
+  if (message.startsWith("attentionMode")) return "attention";
   return undefined;
 }
 
@@ -429,6 +441,9 @@ export function requestOf(
       retentionDays: Number(days),
       ownMemory: d.memory === "own",
       memoryGuidance: d.memoryGuidance.trim(),
+      attentionMode: d.attention,
+      // kept while off, so turning a mode on again brings it back
+      attentionGuidance: d.attentionGuidance.trim(),
       rerunOnRestart: d.rerunOnRestart,
       disabledCapabilities: disabledOf(d, shown),
     },

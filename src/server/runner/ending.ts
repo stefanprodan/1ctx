@@ -3,6 +3,7 @@
 
 import { errorFields, type Log } from "../lib/log.ts";
 import type { Attention } from "./attention.ts";
+import { attentionStep, hasAttentionStep } from "./attention-step.ts";
 import {
   type MemoryPhaseDeps,
   memoryPhase,
@@ -66,6 +67,18 @@ export async function endSend(
   send: ActiveSend,
 ): Promise<boolean> {
   if (send.cause === null) throw new Error("the send has no ending");
+  // before the memory phase, so its mark is written with the run's end
+  // and the phase's record is the run's alone
+  if (hasAttentionStep(send)) {
+    try {
+      await attentionStep(deps.phase, send);
+    } catch (error) {
+      deps.log.warn("attention step failed", {
+        chat: send.sessionId,
+        ...errorFields(error),
+      });
+    }
+  }
   if (hasMemoryPhase(send)) {
     try {
       // the phase writes rows of its own, so the main round's tools

@@ -1,8 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A run's attention mark: the chance a decider gave that its outcome
-// needs a person, and which decider said so.
+// A run's attention mark from a decider: the chance it gave that the
+// outcome needs a person, and which decider said so. The agent's and
+// the runner's marks are written with the run's end (marks.ts).
 
 import { type Db, transact } from "../db/index.ts";
 import { archivedEvent } from "./archive.ts";
@@ -39,6 +40,7 @@ export function markAttention(
     const changed = db
       .query(
         `update sessions set attention = ?, attention_by = ?,
+           attention_reason = null, attention_source = 'decider',
            revision = revision + 1
          where id = ?`,
       )

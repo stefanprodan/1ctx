@@ -92,10 +92,14 @@
     flex-shrink: 0;
     margin-left: auto;
   }
-  /* the search beside them takes what a phone's head has left */
+  /* the search beside them takes what a phone's head has left; the
+     words carry the filters there */
   @media (max-width: 719px) {
     .rows-filters .seg-option {
       padding: 0 6px;
+    }
+    .rows-filter-icon {
+      display: none;
     }
   }
   .rows-count + .rows-add,
@@ -709,6 +713,22 @@
       flex-basis: 100%;
       order: 7;
       justify-content: flex-end;
+    }
+    /* a side row never wraps: the title gives way to the meta */
+    .rows-go-side {
+      flex-wrap: nowrap;
+    }
+    .rows-go-side > .rows-title {
+      min-width: 0;
+    }
+    .rows-go.rows-go-side > .rows-meta {
+      flex-basis: auto;
+      order: 0;
+      padding-left: 0;
+      white-space: nowrap;
+    }
+    .rows-go-side > .rows-go-arrow {
+      display: none;
     }
   }
 }

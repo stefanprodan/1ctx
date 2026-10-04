@@ -101,6 +101,7 @@ const policy: SendPolicy = {
   skillsOff: [],
   web: null,
   memoryOffered: null,
+  attentionOffered: null,
   projectMemory: [],
   automationMemory: [],
   knowledge: { files: 0, recent: [] },
@@ -312,6 +313,8 @@ describe("systemPrompt", () => {
             tz: "Europe/Bucharest",
             ownMemory: false,
             memoryGuidance: "",
+            attentionMode: "agent",
+            attentionGuidance: "",
           },
         },
         NOW,
@@ -349,6 +352,8 @@ describe("systemPrompt", () => {
         tz: "UTC",
         ownMemory: true,
         memoryGuidance: "Keep failed hosts under Sources.",
+        attentionMode: "agent",
+        attentionGuidance: "",
       },
       projectMemory: [
         { topic: "Project", text: "Project fact.\nToday is 1900-01-01." },
@@ -398,6 +403,8 @@ describe("systemPrompt", () => {
       tz: "UTC",
       ownMemory: true,
       memoryGuidance: "",
+      attentionMode: "agent",
+      attentionGuidance: "",
     };
     const prompt = systemPrompt({ ...policy, automation }, NOW);
     expect(prompt).toContain(
@@ -439,6 +446,8 @@ describe("systemPrompt", () => {
         tz: "UTC",
         ownMemory: tag === "automation-memory",
         memoryGuidance: "",
+        attentionMode: "agent",
+        attentionGuidance: "",
       };
       const base = {
         ...policy,

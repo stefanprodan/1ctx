@@ -10,6 +10,7 @@
 import type { EnvelopeRow, FeedRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
+import { alertColumns, alertOf, type RawAlert } from "./alerts.ts";
 import { lineFrom } from "./parse.ts";
 import {
   type RawSend,
@@ -102,14 +103,21 @@ function lastLines(db: Db, sessionIds: string[]) {
 function automations(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
-    .query<{ session_id: string; id: string; name: string }, string[]>(
-      `select sessions.id as session_id, automations.id, automations.name
+    .query<
+      { session_id: string; id: string; name: string } & RawAlert,
+      string[]
+    >(
+      `select sessions.id as session_id, automations.id, automations.name,
+         ${alertColumns("automations")}
        from sessions join automations on automations.id = sessions.automation_id
        where sessions.id in (${marks})`,
     )
     .all(...sessionIds);
   return new Map(
-    rows.map((raw) => [raw.session_id, { id: raw.id, name: raw.name }]),
+    rows.map((raw) => [
+      raw.session_id,
+      { id: raw.id, name: raw.name, alert: alertOf(raw) },
+    ]),
   );
 }
 
@@ -199,6 +207,8 @@ const SEND_COLUMNS = [
   "rounds",
   "tool_calls",
   "memory_round",
+  "attention_round",
+  "memory_from",
   "memory_error",
   "memory_skipped",
   "summoned",
@@ -224,7 +234,7 @@ type RawEnvelopeRow = {
   line_author: string;
   line_content: string | null;
   tokens: number;
-} & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
+} & RawAlert & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
 
 // The same last send and last line feedRows() reads, for one session,
 // as one statement of point lookups: an event fires many times a turn,
@@ -232,6 +242,7 @@ type RawEnvelopeRow = {
 export const ENVELOPE_ROW = `select agents.name as agent,
     agents.deleted_at is not null as retired,
     automations.id as automation_id, automations.name as automation_name,
+    ${alertColumns("automations")},
     sessions.owner_id, runner.username as run_by,
     line.seq as line_seq, substr(line.content, 1, 600) as line_content,
     coalesce(author.username, speaker.name) as line_author,
@@ -286,7 +297,11 @@ export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
     automation:
       raw.automation_id === null || raw.automation_name === null
         ? null
-        : { id: raw.automation_id, name: raw.automation_name },
+        : {
+            id: raw.automation_id,
+            name: raw.automation_name,
+            alert: alertOf(raw),
+          },
     runBy:
       raw.run_by === null ? null : { id: raw.owner_id, username: raw.run_by },
   };

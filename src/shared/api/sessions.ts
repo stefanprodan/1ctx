@@ -6,6 +6,7 @@
 
 import type { CapabilityChange } from "../capabilities.ts";
 import type { AgentSummary } from "../contracts/agent.ts";
+import type { AutomationAlert } from "../contracts/automation.ts";
 import type {
   LastLine,
   OpenedFile,
@@ -19,7 +20,9 @@ import type { NotSentReason } from "../words.ts";
 // GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
 // the caller may see, running first, then by last activity, each with
 // what its row in the feed shows. next is the cursor a later page
-// passes as before, null when no row is left
+// passes as before, null when no row is left. With attention=1 in place
+// of origin, the automations with an open alert, one line each as in
+// All, newest alert first, paged by <since>.<automation id>
 export type SessionsResponse = { rows: FeedRow[]; next: string | null };
 
 // one row of the feed: the session, its last send (the counters,
@@ -32,7 +35,8 @@ export type SessionsResponse = { rows: FeedRow[]; next: string | null };
 // row is built without it; agentRetired is true once that agent was
 // deleted, so the row draws the name as plain text. runs is how many
 // runs the automation keeps, set only on its one line in All, which
-// stands for them all. sendAgent is the agent of the last send, the
+// stands for them all, and on the lines of the Flagged pick.
+// automation.alert is its open alert, null while none is. sendAgent is the agent of the last send, the
 // summoned one's for a summoned turn, which a working or failed line
 // names; null before the first send
 export type FeedRow = {
@@ -42,7 +46,11 @@ export type FeedRow = {
   send: SendSummary | null;
   sendAgent: { name: string; retired: boolean } | null;
   last: LastLine | null;
-  automation: { id: string; name: string } | null;
+  automation: {
+    id: string;
+    name: string;
+    alert: AutomationAlert | null;
+  } | null;
   runBy: { id: string; username: string } | null;
   runs: number | null;
 };

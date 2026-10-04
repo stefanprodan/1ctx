@@ -16,7 +16,8 @@ import {
 import {
   composeProjectOf,
   emptyLine,
-  originOf,
+  listPick,
+  pickOf,
   searchHref,
   searchOf,
 } from "../../../src/client/views/home/Home.model.ts";
@@ -31,6 +32,9 @@ const now = new Date(2026, 8, 13, 12).getTime();
 const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   archived: null,
   attention: null,
+  attentionReason: null,
+  attentionSource: null,
+  attentionBy: null,
   id: "s1",
   projectId: "p1",
   ownerId: "u1",
@@ -64,6 +68,8 @@ const send = (changes: Partial<SendSummary> = {}): SendSummary => ({
   rounds: 1,
   toolCalls: 0,
   memoryRound: null,
+  attentionRound: null,
+  memoryFrom: null,
   memoryError: null,
   memorySkipped: null,
   summoned: false,
@@ -262,10 +268,17 @@ describe("Home.model", () => {
   });
 
   test("the filter rides on the address beside the query", () => {
-    expect(originOf("")).toBeNull();
-    expect(originOf("?origin=automation")).toBe("automation");
-    expect(originOf("?origin=chat")).toBe("chat");
-    expect(originOf("?origin=other")).toBeNull();
+    expect(pickOf("")).toBeNull();
+    expect(pickOf("?origin=automation")).toBe("automation");
+    expect(pickOf("?origin=chat")).toBe("chat");
+    expect(pickOf("?origin=other")).toBeNull();
+    expect(pickOf("?attention=1")).toBe("attention");
+    expect(pickOf("?attention=1&origin=chat")).toBe("attention");
+    expect(pickOf("?attention=0")).toBeNull();
+    expect(listPick("attention")).toEqual({ origin: null, attention: true });
+    expect(listPick("chat")).toEqual({ origin: "chat", attention: false });
+    expect(listPick(null)).toEqual({ origin: null, attention: false });
+    expect(searchHref("/", "pods", "attention")).toBe("/?q=pods&attention=1");
     expect(searchHref("/", "")).toBe("/");
     expect(searchHref("/", " pods ", "automation")).toBe(
       "/?q=pods&origin=automation",
@@ -280,6 +293,7 @@ describe("Home.model", () => {
     expect(emptyLine("", "chat")).toBe("No chats yet");
     expect(emptyLine("", "automation")).toBe("No task runs yet");
     expect(emptyLine("", null)).toBe("No sessions found");
+    expect(emptyLine("", "attention")).toBe("Nothing flagged");
   });
 });
 
@@ -288,7 +302,7 @@ describe("a run's row", () => {
     expect(iconOf(row())).toBe("chat");
     const ran = row({
       session: session({ origin: "automation", automationId: "au1" }),
-      automation: { id: "au1", name: "nightly" },
+      automation: { id: "au1", name: "nightly", alert: null },
       runBy: null,
     });
     expect(iconOf(ran)).toBe("clock");

@@ -29,6 +29,32 @@
   }
 
   /* the automation page */
+  /* its open alert, over the brief */
+  .automations-open {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) 14px;
+    background: var(--attention-wash);
+  }
+  .automations-open-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--attention);
+  }
+  .automations-open-text {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .automations-open-title {
+    margin: 0;
+    color: var(--attention);
+  }
+  .automations-open-reason {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-small);
+    overflow-wrap: anywhere;
+  }
   .automations-actions,
   .automations-actions-end {
     display: flex;
@@ -113,6 +139,21 @@
     display: inline-block;
     min-width: 8ch;
     text-align: right;
+  }
+  /* a phone's row is the feed's: when over how long, no bar */
+  @media (max-width: 719px) {
+    .automations-run-meta {
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .automations-took {
+      align-items: flex-end;
+      width: auto;
+    }
+    .automations-meter {
+      display: none;
+    }
   }
   /* the meter's fill in the run's colour while it runs or once failed */
   .automations-bar-running {

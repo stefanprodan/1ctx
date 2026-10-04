@@ -57,6 +57,9 @@ export function visualDetail(): SessionDetail {
     session: {
       archived: null,
       attention: null,
+      attentionReason: null,
+      attentionSource: null,
+      attentionBy: null,
       id: "session00001", projectId: "project00001", ownerId: "user00000001",
       agentId: "agent0000001", origin: "chat", forkedFromId: null,
       automationId: null, runSource: null, title: "Visual",
@@ -71,7 +74,7 @@ export function visualDetail(): SessionDetail {
       userId: "user00000001", agentId: "agent0000001",
       providerId: "provider0001", model: "test", status: "running",
       cause: null, error: null, firstMessageId: "userrow00001",
-      rounds: 1, toolCalls: 0, memoryRound: null, memoryError: null,
+      rounds: 1, toolCalls: 0, memoryRound: null, attentionRound: null, memoryFrom: null, memoryError: null,
       memorySkipped: null, summoned: false, tokens: 0, startedAt: 1,
       finishedAt: null,
     },

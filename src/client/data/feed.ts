@@ -23,7 +23,17 @@ import type { FeedRow, SessionsResponse } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import {
+  alertFrame,
+  byAlert,
+  mergeAlertPage,
+  reconcileAlert,
+  refreshAlertHead,
+  replayAlerts,
+  sameAlert,
+} from "./alert-rows.ts";
 import { api } from "./api.ts";
+import { address, keyOf, type ListFilter, sameFilter } from "./feed-filter.ts";
 import { Flight } from "./flight.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -46,13 +56,9 @@ export type FeedList = { rows: FeedRow[]; next: string | null; more: More };
 
 export const IDLE: More = { loading: false, error: null };
 
+export type { ListFilter } from "./feed-filter.ts";
+
 export const list = signal<FeedList | null>(null);
-// origin narrows the rows to chats or to runs; null lists both
-export type ListFilter = {
-  project: string | null;
-  q: string;
-  origin?: SessionOrigin | null;
-};
 
 let owner: string | null = null;
 // turn orders the first pages; cold moves on every cold load, and a
@@ -61,6 +67,7 @@ let listFor: Required<ListFilter> & { turn: number; cold: number } = {
   project: "",
   q: "",
   origin: null,
+  attention: false,
   turn: 0,
   cold: 0,
 };
@@ -86,13 +93,15 @@ const retired = new Set<string>();
 let frames = 0;
 const kept = new Held<{ rows: FeedRow[]; next: string | null }>();
 
-const keyOf = (f: ListFilter) =>
-  JSON.stringify([f.project, f.q, f.origin ?? null]);
-
 // the first page again for the filter on screen, over the rows held
 const flight = new Flight(() =>
   load(
-    { project: listFor.project, q: listFor.q, origin: listFor.origin },
+    {
+      project: listFor.project,
+      q: listFor.q,
+      origin: listFor.origin,
+      attention: listFor.attention,
+    },
     true,
   ),
 );
@@ -105,6 +114,7 @@ effect(() => {
     project: "",
     q: "",
     origin: null,
+    attention: false,
     turn: listFor.turn + 1,
     cold: listFor.cold + 1,
   };
@@ -133,24 +143,25 @@ function relabel(rows: FeedRow[], asked: number): FeedRow[] {
     const runs = label === null ? null : row.runs;
     return row.automation?.name === label?.name &&
       row.automation?.id === label?.id &&
+      sameAlert(row.automation?.alert, label?.alert) &&
       row.runs === runs
       ? out
       : { ...out, automation: label, runs };
   });
 }
 
-const sameFilter = (a: ListFilter, b: ListFilter) =>
-  a.project === b.project &&
-  a.q === b.q &&
-  (a.origin ?? null) === (b.origin ?? null);
+// the pick's rows over a frame's word: a line whose alert closed goes
+const open = (rows: FeedRow[]) =>
+  listFor.attention ? rows.filter((row) => row.automation?.alert) : rows;
 
 // whether the filter on screen would list a row of that project, and
-// of that origin when one is given
+// of that origin when one is given; the pick lists runs alone
 const covers = (projectId: string, origin?: SessionOrigin) =>
   (listFor.project === null || listFor.project === projectId) &&
   (origin === undefined ||
-    listFor.origin === null ||
-    listFor.origin === origin);
+    (listFor.attention
+      ? origin === "automation"
+      : listFor.origin === null || listFor.origin === origin));
 
 const shown = (): Shown => ({ origin: listFor.origin, q: listFor.q });
 
@@ -158,6 +169,7 @@ const shown = (): Shown => ({ origin: listFor.origin, q: listFor.q });
 // answer's copy while it was in flight keeps its newer word, and
 // nothing past the answer stays
 function merge(held: FeedRow[] | null, answer: FeedRow[]): FeedRow[] {
+  if (listFor.attention) return byAlert(answer);
   if (held === null) return ordered(answer);
   const newer = new Map(held.map((row) => [row.session.id, row]));
   return ordered(
@@ -177,6 +189,9 @@ function firstPage(rows: FeedRow[]): {
   next: string | null;
 } {
   if (head.next === null) return { rows, next: null };
+  if (listFor.attention) {
+    return { rows: rows.slice(0, head.size), next: head.next };
+  }
   const edge = cursorPlace(head.next);
   return {
     rows:
@@ -185,16 +200,6 @@ function firstPage(rows: FeedRow[]): {
         : rows.filter((row) => feedOrder(row.session, edge) <= 0),
     next: head.next,
   };
-}
-
-function address(filter: Required<ListFilter>, before: string | null): string {
-  const params = new URLSearchParams();
-  if (filter.project !== null) params.set("project", filter.project);
-  if (filter.q !== "") params.set("q", filter.q);
-  if (filter.origin) params.set("origin", filter.origin);
-  if (before !== null) params.set("before", before);
-  const search = params.toString();
-  return `/api/sessions${search === "" ? "" : `?${search}`}`;
 }
 
 // the first page for a filter; a different filter puts the rows on
@@ -214,7 +219,13 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
     // the page in flight is not wanted past a cold load
     list.value = { ...list.value, more: IDLE };
   }
-  listFor = { ...filter, origin: filter.origin ?? null, turn, cold };
+  listFor = {
+    ...filter,
+    origin: filter.origin ?? null,
+    attention: filter.attention ?? false,
+    turn,
+    cold,
+  };
   if (!warm) settled = false;
   loading = true;
   changes = [];
@@ -224,20 +235,23 @@ async function load(filter: ListFilter, asked: boolean): Promise<void> {
     if (listFor.turn !== turn) return;
     loading = false;
     const next = answer.next ?? null;
-    const replayed = replay(
-      relabel(answer.rows, since),
-      next,
-      shown(),
-      changes,
-    );
+    const replayed = listFor.attention
+      ? replayAlerts(
+          open(relabel(answer.rows, since)),
+          next,
+          listFor.q,
+          changes,
+        )
+      : replay(relabel(answer.rows, since), next, shown(), changes);
     changes = [];
     const body = { rows: replayed.rows, next };
     const held = list.value;
     head = { size: body.rows.length, next: body.next };
     settled = true;
+    const refresh = listFor.attention ? refreshAlertHead : refreshHead;
     list.value =
       warm && held !== null
-        ? { ...refreshHead(held.rows, body, held.next), more: held.more }
+        ? { ...refresh(held.rows, body, held.next), more: held.more }
         : {
             rows: merge(held?.rows ?? null, body.rows),
             next: body.next,
@@ -277,7 +291,9 @@ export async function loadMore(): Promise<void> {
       return;
     }
     list.value = {
-      rows: mergeNextPage(now.rows, relabel(body.rows, asked)),
+      rows: listFor.attention
+        ? mergeAlertPage(now.rows, open(relabel(body.rows, asked)))
+        : mergeNextPage(now.rows, relabel(body.rows, asked)),
       next: body.next,
       more: IDLE,
     };
@@ -297,9 +313,10 @@ const without = (rows: FeedRow[], keep: (row: FeedRow) => boolean) => {
   return out.length === rows.length ? rows : out;
 };
 
-// rows went: from every held list, from the rows on screen, and from
-// the answer of a first page out, which may have read them before
-function drop(projectId: string, gone: (row: FeedRow) => boolean): void {
+type Gone = (row: FeedRow) => boolean;
+// rows went: from every held list, from the rows on screen unless kept
+// there, and from the answer of a first page out, which may hold them
+function drop(projectId: string, gone: Gone, screen = true): void {
   const keep = (row: FeedRow) => !gone(row);
   if (covers(projectId)) {
     pages++;
@@ -307,11 +324,20 @@ function drop(projectId: string, gone: (row: FeedRow) => boolean): void {
   }
   kept.update((held) => ({ ...held, rows: without(held.rows, keep) }));
   const held = list.value;
-  if (held !== null) list.value = { ...held, rows: without(held.rows, keep) };
+  if (screen && held !== null) {
+    list.value = { ...held, rows: without(held.rows, keep) };
+  }
 }
 
 export function dropRow(sessionId: string, projectId: string): void {
-  drop(projectId, (row) => row.session.id === sessionId);
+  const gone = (row: FeedRow) => row.session.id === sessionId;
+  const line = listFor.attention ? list.value?.rows.find(gone) : undefined;
+  // the pick's line stands for an alert that may still be open with
+  // other runs: the server places it, cold when a warm tail could keep it
+  const stays = line !== undefined && line.automation?.alert !== null;
+  drop(projectId, gone, !stays);
+  if (stays && head.next !== null) void loadList(listFor);
+  else if (stays || (listFor.attention && loading)) flight.ask();
 }
 
 // an automation's runs went with it
@@ -381,7 +407,11 @@ export function applyAutomationFrame(
   const id = ev.type === "automation" ? ev.automation.id : ev.automationId;
   const label =
     ev.type === "automation"
-      ? { id: ev.automation.id, name: ev.automation.name }
+      ? {
+          id: ev.automation.id,
+          name: ev.automation.name,
+          alert: ev.automation.alert,
+        }
       : null;
   labels.set(id, { label, at: ++frames });
   if (ev.type === "automation" && ev.automation.agentRetired) {
@@ -395,6 +425,10 @@ export function applyAutomationFrame(
   }
   if (ev.type === "automationDeleted" && ev.runs) {
     dropRuns(id, ev.projectId);
+    return;
+  }
+  if (listFor.attention) {
+    alertMoved(ev);
     return;
   }
   const held = list.value;
@@ -411,7 +445,8 @@ export function applyAutomationFrame(
     if (
       row.runs === runs &&
       row.automation?.id === label?.id &&
-      row.automation?.name === label?.name
+      row.automation?.name === label?.name &&
+      sameAlert(row.automation?.alert, label?.alert)
     ) {
       return row;
     }
@@ -420,6 +455,23 @@ export function applyAutomationFrame(
   });
   if (changed) list.value = { ...held, rows };
   if (grouped) flight.ask();
+}
+
+// the pick under a frame: a gone automation or a closed alert drops its
+// line, an answer in flight included, and a moved alert moves it
+function alertMoved(
+  ev: Extract<SocketEvent, { type: "automation" | "automationDeleted" }>,
+): void {
+  if (!covers(ev.projectId)) return;
+  const id = ev.type === "automation" ? ev.automation.id : ev.automationId;
+  if (ev.type === "automationDeleted" || ev.automation.alert === null) {
+    drop(ev.projectId, (row) => row.automation?.id === id);
+    return;
+  }
+  const held = list.value;
+  if (held === null) return;
+  const rows = alertFrame(held.rows, ev.automation);
+  if (rows !== held.rows) list.value = { ...held, rows };
 }
 
 // the envelope over the rows on screen (sessions-rows.ts reconcile):
@@ -438,7 +490,9 @@ export function applyEnvelope(
   if (loading) changes.push({ ev });
   const held = list.value;
   if (held === null) return;
-  const out = reconcile(held.rows, held.next, shown(), ev, head.next);
+  const out = listFor.attention
+    ? reconcileAlert(held.rows, held.next, listFor.q, ev)
+    : reconcile(held.rows, held.next, shown(), ev, head.next);
   if (out.rows !== held.rows) list.value = { ...held, rows: out.rows };
   if (out.reload) flight.ask();
 }

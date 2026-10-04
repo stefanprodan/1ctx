@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One run on an automation's Runs tab: how it started, when, the
-// answer's first line, marked after the agent when the default
-// decider judged it to need a person, and how long it took against its deadline, with
-// Stop while it runs.
+// answer's first line, marked after the agent with its reason when it
+// needs attention, and how long it took against its deadline, with
+// Stop while it runs. On a phone it is the feed's row: the time ago
+// over the length beside the two lines, without the deadline's bar.
 
 import { useSignal } from "@preact/signals";
 import type { FeedRow } from "../../../shared/api/sessions.ts";
@@ -13,7 +14,9 @@ import { stopSession } from "../../data/sessions.ts";
 import {
   ATTENTION_WORDS,
   authorGone,
-  needsAttention,
+  flagShown,
+  iconStatus,
+  markReason,
   stateLine,
   whenText,
 } from "../../feed/Row.model.ts";
@@ -52,13 +55,14 @@ export function RunRow({
   const failure = useSignal<string | null>(null);
   const { session } = row;
   const running = session.status === "running";
-  const attention = needsAttention(session);
+  const reason = markReason(session);
   const line = stateLine(row);
   const took = durationOf(row, now);
   const share = took === null ? 0 : deadlineShare(took, deadlineMs);
   return (
     <RowsGo
       href={runHref(session.id)}
+      side
       end={
         running ? (
           <RowsEnd>
@@ -98,7 +102,7 @@ export function RunRow({
         <Icon
           name={sourceIcon(session)}
           size={15}
-          class={attention ? "status-attention" : `status-${session.status}`}
+          class={`status-${iconStatus(session)}`}
         />
       </span>
       <RowsTitle
@@ -113,9 +117,11 @@ export function RunRow({
                 />{" "}
               </>
             )}
-            {attention && (
+            {flagShown(session) && (
               <>
+                {/* only the mark is coloured, its reason reads as text */}
                 <span class="automations-attention">{ATTENTION_WORDS}</span>
+                {reason !== null && ` · ${reason}`}
                 {line.text !== "" && " · "}
               </>
             )}
@@ -136,7 +142,7 @@ export function RunRow({
         <span class="automations-run-meta">
           <span class="automations-took">
             <span>{took === null ? "" : durationText(took)}</span>
-            <span class="meter" aria-hidden="true">
+            <span class="meter automations-meter" aria-hidden="true">
               <span
                 class={`meter-fill automations-bar-${session.status}`}
                 style={{ width: `${Math.round(share * 100)}%` }}

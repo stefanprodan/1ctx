@@ -47,9 +47,13 @@ export function repairRows(
       "select id, session_id from messages where status = 'streaming'",
     )
     .all();
+  // the memory phase's words only once it began: memory_from, or a
+  // memory_round with no attention step from before memory_from existed
   db.query(
     `update sends set status = 'failed', cause = 'restart', error = ?,
-       memory_error = case when memory_round is null then memory_error else ? end,
+       memory_error = case when memory_from is not null
+         or (memory_round is not null and attention_round is null)
+         then ? else memory_error end,
        finished_at = ? where status = 'running'`,
   ).run(error, error, now);
   db.query(

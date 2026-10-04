@@ -50,12 +50,16 @@ export function Transcript({
   foot,
   queue,
   retry = null,
+  marked = false,
 }: {
   sessionId: string;
   nodes: Node[];
   live: ReadonlyMap<string, Live>;
   // the running round waiting to ask its provider again
   retry?: LiveRetry | null;
+  // a run its agent marked (agentMarked()), which the fold after its
+  // answer says
+  marked?: boolean;
   // the agent a reply names, by the row's agent id; null for one no
   // longer listed, and for a turn with no row yet the session's
   agentOf: (agentId: string | null) => Agent | null;
@@ -195,6 +199,7 @@ export function Transcript({
                 onRegenerate={last ? onRegenerate : undefined}
                 follow={last ? follow : undefined}
                 retry={last ? retry : null}
+                marked={marked}
                 fork={fork}
                 visuals={visualCards(node, visualPreviews.value).map((card) =>
                   isFileCard(card) ? (

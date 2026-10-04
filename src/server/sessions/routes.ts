@@ -26,6 +26,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { archivedEvent, refuseArchived } from "./archive.ts";
+import type { AlertArgs } from "./list.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import { openedFileResponse } from "./opened.ts";
 import {
@@ -74,6 +75,8 @@ export type RoutesDeps = {
   // an archive leaves the chat's waiting messages to the queue, which
   // turns them not sent
   wakeQueue(): void;
+  // the feed's Flagged pick
+  alerts(...args: AlertArgs): SessionsResponse;
 };
 
 export function detail(
@@ -105,12 +108,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const principal = ctx.principal!;
-        const { project, q, origin, before } = parseStreamQuery(ctx.url);
+        const query = parseStreamQuery(ctx.url);
+        const { project, q } = query;
         const ids =
           project === null
             ? (deps.access.visibleProjectIds(principal.userId) ?? [])
             : [deps.access.project(principal, project).id];
-        const body: SessionsResponse = deps.store.list(ids, q, origin, before);
+        const body: SessionsResponse = query.attention
+          ? deps.alerts(ids, q, query.alertBefore)
+          : deps.store.list(ids, q, query.origin, query.before);
         return json(body);
       },
     },

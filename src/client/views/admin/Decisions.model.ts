@@ -23,8 +23,8 @@ export type DecisionWords = {
 export const DECISION_WORDS: Record<DecisionId, DecisionWords> = {
   "run-attention": {
     title: "Mark task runs that need attention",
-    sub: "Reads each finished task run",
-    hint: "The decider reads the answer of each finished task run and marks the run when it fits Needs attention.",
+    sub: "Backs up the agent's own mark",
+    hint: "The decider reads a finished run of a task set to Decider when neither its agent nor the runner marked it. A task's own When it needs attention text replaces Needs attention when for its runs.",
     icon: "decision",
     labels: {
       "all-good": "All good when",

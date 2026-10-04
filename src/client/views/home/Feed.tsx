@@ -10,7 +10,7 @@ import { createSession, list, loadMore } from "../../data/sessions.ts";
 import { FeedCard } from "../../feed/FeedCard.tsx";
 import { tickMs } from "../../feed/Row.model.ts";
 import { useNow } from "../../lib/now.ts";
-import { emptyLine, originOf, searchHref, searchOf } from "./Home.model.ts";
+import { emptyLine, pickOf, searchHref, searchOf } from "./Home.model.ts";
 
 export const startChat =
   (projectId: string) =>
@@ -34,20 +34,20 @@ export function Feed({
   const rows = held?.rows ?? null;
   const now = useNow(tickMs(rows));
   const q = searchOf(query.value);
-  const origin = originOf(query.value);
+  const pick = pickOf(query.value);
   return (
     <FeedCard
       rows={rows}
       projectName={projectName}
       search={{
         value: q,
-        onChange: (next) => navigate(searchHref(path, next, origin), true),
+        onChange: (next) => navigate(searchHref(path, next, pick), true),
       }}
       filter={{
-        value: origin,
+        value: pick,
         onPick: (next) => navigate(searchHref(path, q, next), true),
       }}
-      empty={emptyLine(q, origin)}
+      empty={emptyLine(q, pick)}
       now={now}
       more={{
         next: (held?.next ?? null) !== null,

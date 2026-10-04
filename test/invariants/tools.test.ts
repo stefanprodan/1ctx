@@ -68,6 +68,7 @@ describe("tools administration", () => {
       "mcp_call",
       "mcp_describe",
       "memory_edit",
+      "needs_attention",
       "skill",
       "skill_file",
       "webfetch",
@@ -101,7 +102,7 @@ describe("tools administration", () => {
       "search",
       "visualize",
     ]);
-    expect(body.builtin).toHaveLength(9);
+    expect(body.builtin).toHaveLength(10);
     expect(body.search).toEqual({
       provider: null,
       keys: { exa: true, firecrawl: false, tavily: false },

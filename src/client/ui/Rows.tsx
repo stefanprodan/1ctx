@@ -175,18 +175,27 @@ export function RowsGo({
   end,
   under,
   off,
+  side,
   children,
 }: {
   href: string;
   end?: ComponentChildren;
   under?: ComponentChildren;
   off?: boolean;
+  // on a phone the meta stays beside the title, as the feed's time
+  // does, and the arrow waits for the width where the row fits
+  side?: boolean;
   children: ComponentChildren;
 }) {
   // a row with a button at its end leaves the arrow out, or it would
   // sit between the words and the button
   const link = (line: boolean) => (
-    <a class={line ? "rows-line rows-go" : "rows-go rows-go-part"} href={href}>
+    <a
+      class={`${line ? "rows-line rows-go" : "rows-go rows-go-part"}${
+        side ? " rows-go-side" : ""
+      }`}
+      href={href}
+    >
       {children}
       {line && <Icon name="chevron-right" size={14} class="rows-go-arrow" />}
     </a>

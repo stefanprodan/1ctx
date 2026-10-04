@@ -220,6 +220,7 @@ describe("the envelope row", () => {
     expect(byId.get("manual")?.automation).toEqual({
       id: "au",
       name: "digest",
+      alert: null,
     });
     expect(byId.get("scheduled")?.runBy).toBeNull();
     expect(byId.get("orphan")?.automation).toBeNull();

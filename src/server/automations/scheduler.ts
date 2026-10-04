@@ -117,9 +117,7 @@ export function scheduler(deps: Deps): Scheduler {
     source: EventSource,
     dueAt: number,
     receivedAt: number,
-    user: UserRow,
-    project: ProjectRow,
-    agent: AgentRow,
+    resolved: Pick<Event, "user" | "project" | "agent">,
   ): Event => ({
     source,
     automation: {
@@ -128,6 +126,8 @@ export function scheduler(deps: Deps): Scheduler {
       tz: row.tz,
       ownMemory: row.ownMemory,
       memoryGuidance: row.memoryGuidance,
+      attentionMode: row.attentionMode,
+      attentionGuidance: row.attentionGuidance,
       disabledCapabilities: row.disabledCapabilities,
     },
     instructions: row.instructions,
@@ -135,9 +135,7 @@ export function scheduler(deps: Deps): Scheduler {
     receivedAt,
     key: null,
     deadlineMs: row.deadlineMs,
-    user,
-    project,
-    agent,
+    ...resolved,
   });
 
   const start = (
@@ -186,15 +184,7 @@ export function scheduler(deps: Deps): Scheduler {
             throw new Conflict("still running");
           }
           holder.value = deps.runner.startRun(
-            eventFor(
-              row,
-              source,
-              dueAt!,
-              now,
-              resolved.user,
-              resolved.project,
-              resolved.agent,
-            ),
+            eventFor(row, source, dueAt!, now, resolved),
           );
           const prepared = holder.value;
           const updated = deps.store.recordEvent(row.id, {

@@ -4,10 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { tokens } from "../../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import {
-  MEMORY_EXCERPT_CHARS,
-  memorySystem,
-} from "../../../src/server/runner/memory-packet.ts";
+import { memorySystem } from "../../../src/server/runner/memory-packet.ts";
+import { RECORD_EXCERPT_CHARS } from "../../../src/server/runner/run-record.ts";
 import { NOT_FOUR_BIT } from "../../../src/shared/quantization.ts";
 import {
   createAutomation,
@@ -689,7 +687,7 @@ describe("memory phase input", () => {
       .filter((row) => row.kind === "tool");
     expect(mainTools.map((row) => row.status)).toEqual(["failed", "done"]);
     const success = mainTools[1]!;
-    expect(success.content.length).toBeGreaterThan(MEMORY_EXCERPT_CHARS);
+    expect(success.content.length).toBeGreaterThan(RECORD_EXCERPT_CHARS);
     chat.app.now.value += 2000;
     answer.reply("Both sources were blocked.");
     const phase = await waitScript(chat.scripted, 3);
@@ -709,10 +707,10 @@ describe("memory phase input", () => {
       `done (${new TextEncoder().encode(success.content).length} bytes)`,
     );
     expect(messages[1]!.content).toContain(
-      `Excerpt: ${success.content.slice(0, MEMORY_EXCERPT_CHARS)}`,
+      `Excerpt: ${success.content.slice(0, RECORD_EXCERPT_CHARS)}`,
     );
     expect(messages[1]!.content).not.toContain(
-      success.content.slice(0, MEMORY_EXCERPT_CHARS + 1),
+      success.content.slice(0, RECORD_EXCERPT_CHARS + 1),
     );
     expect(messages[1]!.content).not.toContain("Main work");
     expect(JSON.stringify(messages)).not.toContain("Main reasoning");

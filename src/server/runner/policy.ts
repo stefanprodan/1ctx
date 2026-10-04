@@ -15,16 +15,18 @@ import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import type { RecentFile } from "../../shared/knowledge.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
-import type {
-  Effort,
-  EventSource,
-  ProjectKind,
-  Wire,
+import {
+  type AttentionMode,
+  EFFORTS,
+  type Effort,
+  type EventSource,
+  type ProjectKind,
+  type Wire,
 } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits, SendCaps } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import type { ToolCall } from "../providers/index.ts";
+import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type {
   MemoryScope,
   Offered,
@@ -107,6 +109,9 @@ export type SendPolicy = {
   skillsOff: string[];
   web: WebSnapshot | null;
   memoryOffered: Offered | null;
+  // the attention step's set, needs_attention alone, for a run whose
+  // automation is not off on a model that takes tools
+  attentionOffered: Offered | null;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
   knowledge: { files: number; recent: RecentFile[] };
@@ -118,6 +123,9 @@ export type SendPolicy = {
     tz: string;
     ownMemory: boolean;
     memoryGuidance: string;
+    // who marks the run, and the automation's words on when
+    attentionMode: AttentionMode;
+    attentionGuidance: string;
   } | null;
   deadlineMs: number | null;
   // the caps the send started on, the limits area's word at that moment
@@ -126,6 +134,19 @@ export type SendPolicy = {
   // what admission holds the send to, read in the same turn
   sendCaps: SendCaps;
 };
+
+// no thinking, or the least effort the wire names for a model that
+// always thinks: for a round that only needs a short answer or a call
+export const leastThinking = (
+  policy: Pick<SendPolicy, "thinkingRequired" | "thinkingOff" | "wire">,
+): Pick<ChatRequest, "thinking" | "thinkingOff" | "reasoningEffort"> => ({
+  thinking: policy.thinkingRequired,
+  thinkingOff: policy.thinkingOff,
+  reasoningEffort:
+    policy.thinkingRequired && policy.wire !== null
+      ? EFFORTS[policy.wire][0]
+      : null,
+});
 
 const NONE: Offered = {
   tools: [],
@@ -172,6 +193,10 @@ export function buildPolicy(input: {
       : {
           id: input.automation.id,
           ownMemory: input.automation.ownMemory,
+          attention:
+            input.automation.attentionMode === "off"
+              ? null
+              : { guidance: input.automation.attentionGuidance },
         };
   const offered =
     input.tools !== null && agent.model.tools
@@ -198,6 +223,14 @@ export function buildPolicy(input: {
           projectId: input.project.id,
           automation: automationScope,
           phase: "memory",
+        })
+      : null;
+  const attentionOffered =
+    input.tools !== null && agent.model.tools && automationScope?.attention
+      ? input.tools.offered(input.now, agent.id, [], "auto", {
+          projectId: input.project.id,
+          automation: automationScope,
+          phase: "attention",
         })
       : null;
   // a word the model cannot take, saved before the catalog said so, is
@@ -248,6 +281,7 @@ export function buildPolicy(input: {
         : [],
     web: offered.web,
     memoryOffered,
+    attentionOffered,
     projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),
     automationMemory: (input.automationMemory ?? []).map((entry) => ({
       ...entry,

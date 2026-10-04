@@ -27,6 +27,7 @@ export function Work({
   live,
   running,
   memory = false,
+  marked = false,
   retry = null,
 }: {
   node: WorkNode;
@@ -34,8 +35,11 @@ export function Work({
   reply: Message | null;
   live: ReadonlyMap<string, Live>;
   running: boolean;
-  // the run's memory phase, folded after the answer
+  // the rounds after a run's answer, its attention step and its memory
+  // phase, folded as one
   memory?: boolean;
+  // the run carries its agent's mark, which the memory fold says
+  marked?: boolean;
   // the running round waiting to ask its provider again
   retry?: LiveRetry | null;
 }) {
@@ -43,7 +47,7 @@ export function Work({
   const { open, onToggle } = useFoldOpen(foldKey);
   useTick(running);
   const summary = memory
-    ? memorySummary(node, running, Date.now(), retry)
+    ? memorySummary(node, running, Date.now(), retry, marked)
     : workSummary(node, running, Date.now(), retry);
   const wasRunning = useRef(running);
 

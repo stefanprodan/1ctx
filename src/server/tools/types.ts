@@ -105,8 +105,11 @@ export type MemoryScope = {
   automation: {
     id: string;
     ownMemory: boolean;
+    // the run's agent may mark it in the attention step, with the
+    // automation's words on when; null or absent offers no step
+    attention?: { guidance: string } | null;
   } | null;
-  phase: "main" | "memory";
+  phase: "main" | "memory" | "attention";
   // the chat a main round saves from; absent for a run and a compaction
   chat?: { sessionId: string; userId: string } | null;
 };
@@ -130,6 +133,13 @@ export type MemoryHandle = {
   settleRound(): void;
 };
 
+// a run's needs_attention in its attention step: the automation's words
+// on when, and the reason the agent's last call gave, null until it calls
+export type AttentionHandle = {
+  guidance: string;
+  reason: string | null;
+};
+
 // a credential of the send's project, as the send began: the key is
 // read again by name at each command
 export type OfferedCredential = Pick<
@@ -149,6 +159,8 @@ export type Offered = {
   mcpPrompt: { text: string; digest: McpDigest };
   mcpCatalog: string;
   memory: MemoryHandle | null;
+  // set only in a run's attention step, whose set is needs_attention alone
+  attention?: AttentionHandle | null;
   // the project's credentials, in name order, empty without network;
   // those the send turned off kept apart, so a command refuses them by
   // name

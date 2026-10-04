@@ -61,6 +61,9 @@ open row's body or a meta. The shared shapes are below.
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
   row (`feed/Row.tsx`) is the one row outside Rows.
+- **A row's meta wraps under its title on a phone,** unless `RowsGo`
+  has `side`: then it stays beside the title, as the feed's time does,
+  and the arrow shows only from 720 wide.
 - **Details that mean nothing cut wrap.** `RowsTitle`'s `wrap` stacks
   the sub and its `lines` whole, one fact each (a repository's URL,
   ref and state), and on a phone puts the row's end under them.
@@ -71,6 +74,8 @@ open row's body or a meta. The shared shapes are below.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
   (`searchList()` outside a component).
+- **A card head's filters are `RowsFilters`,** short words; under 720
+  their icons are hidden, so a search beside them keeps room.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
   `AsideSection`, `AsideLine` and `AsideRead`; `Page` alone has no
   aside. The aside holds only real numbers, and is hidden under 1100.

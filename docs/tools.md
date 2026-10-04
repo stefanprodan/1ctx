@@ -96,6 +96,18 @@ words.
   `search-<provider>.key` file only raises the rate.
 - **Only the `visualize` row's `enabled` is read.** Webfetch's and
   websearch's `enabled` are ignored, and no route patches webfetch.
+- **`needs_attention` is offered only in a run's attention step**, alone
+  (`phase: "attention"` in `offer.ts`, `attentionOffered` on the
+  policy), whose automation's mode is not off (`docs/automations.md`),
+  never a chat, a run's main rounds or the memory phase. Any other name
+  there is refused. Its one argument, `reason`, is one line, never a
+  placeholder ("todo", "n/a", anything with "placeholder"); anything
+  else is a tool error the model can correct. The description states
+  `MAX_ATTENTION_REASON` characters, and a longer reason is cut to it,
+  never refused: models miss a stated length. It holds the reason on the step's
+  `AttentionHandle`, a later call replacing it, and answers `Marked.`,
+  never that anyone was told. The automation's words on when follow its
+  fixed description and end the step's ask, as the eval measured.
 - **Each capability key drops exactly its part.** A capability is a part
   of the offer a chat or automation may switch off (`docs/sessions.md`).
   - `web`: as above.

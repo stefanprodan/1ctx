@@ -30,6 +30,7 @@ import {
 import type { ProjectRow } from "../projects/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import type { Alerts } from "./alerts.ts";
 import {
   MAX_AUTOMATION_BODY,
   parseDeleteAutomation,
@@ -62,6 +63,9 @@ export type RoutesDeps = {
   limits: { current(): Limits };
   sessions: SessionStore;
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
+  // the run-attention decision is on with a decider to ask
+  deciderOn(): boolean;
+  alerts: Pick<Alerts, "dismiss">;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -101,6 +105,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body: AutomationsResponse = {
           automations: deps.store.byProject(project.id),
           runDeadlineMs: deps.limits.current().runDeadlineMs,
+          deciderOn: deps.deciderOn(),
         };
         return json(body);
       },
@@ -262,6 +267,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             nextAt,
             ownMemory: next.ownMemory,
             memoryGuidance: next.memoryGuidance,
+            attentionMode: next.attentionMode,
+            attentionGuidance: next.attentionGuidance,
             disabledCapabilities: next.disabledCapabilities,
             rerunOnRestart: next.rerunOnRestart,
             now,
@@ -314,6 +321,23 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return { result: updated, events: [changed(updated)] };
         });
         deps.scheduler.wake();
+        return json({ automation } satisfies AutomationResponse);
+      },
+    },
+    {
+      // anyone who sees it dismisses its open alert; with none open it
+      // answers the automation as it is
+      method: "POST",
+      path: "/api/automations/:id/dismiss",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const principal = ctx.principal!;
+        const found = visible(principal, ctx.params.id);
+        const automation = transact(deps.db, () => {
+          const current = visible(principal, found.id);
+          const { automation, events } = deps.alerts.dismiss(current.id);
+          return { result: automation, events };
+        });
         return json({ automation } satisfies AutomationResponse);
       },
     },

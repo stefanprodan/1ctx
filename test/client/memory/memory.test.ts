@@ -7,7 +7,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { endedBy, groupRows } from "../../../src/client/transcript/rows.ts";
-import { memorySummary } from "../../../src/client/transcript/Work.model.ts";
+import {
+  agentMarked,
+  memorySummary,
+} from "../../../src/client/transcript/Work.model.ts";
 import {
   countLine,
   draftDirty,
@@ -76,6 +79,8 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
     rounds: 3,
     toolCalls: 1,
     memoryRound: 3,
+    attentionRound: null,
+    memoryFrom: null,
     memoryError: null,
     memorySkipped: null,
     summoned: false,
@@ -183,6 +188,215 @@ describe("the Memory fold's line", () => {
         .text,
     ).toBe("Memory not updated. no room");
     expect(memorySummary(node, true, 20_000).text).toMatch(/^Updating memory/);
+  });
+});
+
+describe("the fold after a run's answer", () => {
+  // the step in round 2, needs_attention done or text only; the memory
+  // phase in round 3, its edit done
+  const step = (marked: boolean) =>
+    marked
+      ? [
+          message({
+            id: "step",
+            seq: 3,
+            round: 2,
+            finishReason: "tool_calls",
+            toolCalls: [
+              {
+                id: "a1",
+                name: "needs_attention",
+                arguments: '{"reason":"flux is not ready"}',
+              },
+            ],
+            createdAt: 10_000,
+            finishedAt: 11_000,
+          }),
+          message({
+            id: "flag",
+            seq: 4,
+            kind: "tool",
+            slot: null,
+            round: 2,
+            toolCallId: "a1",
+            toolName: "needs_attention",
+            content: "Marked.",
+            createdAt: 11_000,
+            finishedAt: 12_000,
+          }),
+        ]
+      : [
+          message({
+            id: "step",
+            seq: 3,
+            round: 2,
+            content: "ok",
+            createdAt: 10_000,
+            finishedAt: 12_000,
+          }),
+        ];
+  const memory = (changed: boolean) => [
+    message({ ...run[2]!, seq: 5, createdAt: 12_000, finishedAt: 20_000 }),
+    message({
+      ...run[3]!,
+      seq: 6,
+      status: changed ? "done" : "failed",
+      createdAt: 20_000,
+      finishedAt: 27_000,
+    }),
+  ];
+  const fold = (rows: Message[], checked = true) => ({
+    sendId: "send-1",
+    rows,
+    rounds: [],
+    answer: null,
+    send: send({
+      memoryRound: checked ? 2 : 3,
+      attentionRound: checked ? 2 : null,
+      // the memory phase's rows are round 3, its start once it has one
+      memoryFrom: rows.some((row) => row.round === 3) ? 3 : null,
+      finishedAt: rows.at(-1)?.finishedAt ?? null,
+    }),
+  });
+  // the step's reply as a failure, a timeout or a Stop left it
+  const ended = (status: "failed" | "stopped") =>
+    step(false).map((row) => ({ ...row, status, content: "" }));
+
+  // done, over a run its agent marked or not
+  const said = (rows: Message[], marked: boolean) =>
+    memorySummary(fold(rows), false, 0, null, marked).text;
+
+  test("names what the step and the memory phase did, and the time both took", () => {
+    expect(said([...step(true), ...memory(true)], true)).toBe(
+      "Marked and memory updated in 17 s",
+    );
+    expect(said(step(true), true)).toBe("Marked in 2.0 s");
+    expect(said([...step(true), ...memory(false)], true)).toBe(
+      "Marked in 17 s",
+    );
+    expect(
+      memorySummary(fold([...step(false), ...memory(true)]), false).text,
+    ).toBe("Memory updated in 17 s");
+    expect(memorySummary(fold(step(false)), false).text).toBe(
+      "Checked in 2.0 s",
+    );
+    expect(
+      memorySummary(fold([...step(false), ...memory(false)]), false).text,
+    ).toBe("Checked in 17 s");
+  });
+
+  test("with no step it is the memory phase's line, as before", () => {
+    expect(memorySummary(fold(memory(true), false), false).text).toBe(
+      "Memory updated in 15 s",
+    );
+    expect(memorySummary(fold(memory(false), false), false).text).toBe(
+      "Memory not updated, 1 edit refused",
+    );
+  });
+
+  test("a step that failed, timed out or was stopped checked nothing", () => {
+    expect(memorySummary(fold(ended("failed")), false).text).toBe(
+      "Not checked in 2.0 s",
+    );
+    expect(memorySummary(fold(ended("stopped")), false).text).toBe(
+      "Not checked in 2.0 s",
+    );
+    expect(
+      memorySummary(fold([...ended("failed"), ...memory(true)]), false).text,
+    ).toBe("Not checked, memory updated in 17 s");
+    expect(
+      memorySummary(fold([...ended("failed"), ...memory(false)]), false).text,
+    ).toBe("Not checked in 17 s");
+    // a refused reason is the step working, not failing
+    const refused = step(true).map((row) =>
+      row.kind === "tool" ? { ...row, status: "failed" as const } : row,
+    );
+    expect(memorySummary(fold(refused), false).text).toBe("Checked in 2.0 s");
+  });
+
+  test("says Marked by the run's own mark, never by the step's tool row", () => {
+    // the call went through but the run's end never wrote its reason,
+    // as a crash before it leaves it
+    expect(said(step(true), false)).toBe("Checked in 2.0 s");
+    expect(said([...step(true), ...memory(true)], false)).toBe(
+      "Memory updated in 17 s",
+    );
+    const cut = step(true).map((row) =>
+      row.kind === "reply" ? { ...row, status: "stopped" as const } : row,
+    );
+    expect(said(cut, false)).toBe("Not checked in 2.0 s");
+    expect(
+      memorySummary(
+        {
+          ...fold(step(true)),
+          send: send({
+            memoryRound: 2,
+            attentionRound: 2,
+            memoryError: "no room",
+            finishedAt: 12_000,
+          }),
+        },
+        false,
+        0,
+        null,
+        true,
+      ).text,
+    ).toBe("Marked in 2.0 s. Memory not updated. no room");
+    expect(agentMarked({ attention: 1, attentionSource: "agent" })).toBeTrue();
+    expect(
+      agentMarked({ attention: 1, attentionSource: "runner" }),
+    ).toBeFalse();
+    expect(
+      agentMarked({ attention: 0.9, attentionSource: "decider" }),
+    ).toBeFalse();
+    expect(agentMarked({ attention: null, attentionSource: null })).toBeFalse();
+  });
+
+  test("says which of them runs, by the memory phase's own start", () => {
+    // the step's text reply done, the memory phase's reply streaming
+    // with no edit row yet
+    const streaming = message({
+      ...run[2]!,
+      seq: 5,
+      status: "streaming",
+      toolCalls: null,
+      createdAt: 12_000,
+      finishedAt: null,
+    });
+    expect(memorySummary(fold(step(false)), true, 12_000).text).toMatch(
+      /^Checking/,
+    );
+    expect(
+      memorySummary(fold([...step(false), streaming]), true, 20_000).text,
+    ).toMatch(/^Updating memory/);
+    expect(
+      memorySummary(fold([...step(true), ...memory(true)]), true, 25_000).text,
+    ).toMatch(/^Updating memory/);
+    expect(memorySummary(fold(memory(true), false), true, 25_000).text).toMatch(
+      /^Updating memory/,
+    );
+  });
+
+  test("is one fold, the step's call first, then the memory edits", () => {
+    const rows = [
+      run[0]!,
+      run[1]!,
+      ...step(true),
+      ...memory(true).map((row) => ({ ...row, round: 3 })),
+    ];
+    const nodes = groupRows(rows, send({ memoryRound: 2, attentionRound: 2 }));
+    const reply = nodes[1];
+    if (reply?.kind !== "reply") throw new Error("no reply node");
+    expect(reply.message?.id).toBe("answer");
+    expect(reply.work).toBeNull();
+    expect(
+      reply.memory?.rounds.flatMap((round) =>
+        round.calls.map((call) => [call.call.name, call.result?.id]),
+      ),
+    ).toEqual([
+      ["needs_attention", "flag"],
+      ["memory_edit", "edit"],
+    ]);
   });
 });
 

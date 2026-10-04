@@ -35,6 +35,7 @@ import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
 import { withCommandHints } from "./bash-hint.ts";
+import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
 import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
@@ -75,6 +76,7 @@ import type {
   ToolResult,
 } from "./types.ts";
 
+export { ATTENTION_TOOL } from "./builtin/attention.ts";
 export {
   CHAT_MEMORY_DESCRIPTION,
   isMemoryTool,
@@ -145,6 +147,8 @@ export type ToolsArea = Tools & {
 // the memory phase is offered memory_edit and nothing else; a call to
 // anything the run had gets the reason rather than a bare not found
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
+// the attention step likewise offers needs_attention alone
+const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
 // how long an MCP call's own timer runs past the registry's limit
 const MCP_BACKSTOP_MS = 1000;
 
@@ -397,6 +401,13 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       const memory = offered.memory;
       if (memory !== null && call.name === "memory_edit") {
         return runMemory(memory, call, ctx);
+      }
+      const attention = offered.attention ?? null;
+      if (attention !== null) {
+        return new Registry(
+          [makeAttentionTool(attention)],
+          () => ATTENTION_ONLY,
+        ).run(call, ctx);
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const catalog =

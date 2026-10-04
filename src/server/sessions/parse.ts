@@ -31,7 +31,12 @@ import {
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { type FeedCursor, parseFeedCursor } from "./cursor.ts";
+import {
+  type FeedCursor,
+  parseFeedCursor,
+  parseRunsCursor,
+  type RunsCursor,
+} from "./cursor.ts";
 
 // the body cap: the message plus the JSON around it
 export const MAX_REGENERATE_BODY =
@@ -206,12 +211,16 @@ export function parseRenameSession(body: unknown): RenameSessionRequest {
 }
 
 // ?project=&q=&origin=&before=: an optional project id, search, origin
-// and the cursor of a later page
+// and the cursor of a later page. attention=1 in place of origin is the
+// Flagged pick, whose cursor is an alert's place
 export function parseStreamQuery(url: URL): {
   project: string | null;
   q: string;
   origin: "chat" | "automation" | null;
+  attention: boolean;
   before: FeedCursor | null;
+  // the pick's own cursor
+  alertBefore: RunsCursor | null;
 } {
   const seen = new Set<string>();
   for (const name of url.searchParams.keys()) {
@@ -219,6 +228,7 @@ export function parseStreamQuery(url: URL): {
       name !== "project" &&
       name !== "q" &&
       name !== "origin" &&
+      name !== "attention" &&
       name !== "before"
     ) {
       throw new BadRequest(`unknown parameter ${name}`);
@@ -229,16 +239,27 @@ export function parseStreamQuery(url: URL): {
   const project = url.searchParams.get("project");
   const q = url.searchParams.get("q") ?? "";
   const origin = url.searchParams.get("origin");
+  const attention = url.searchParams.get("attention");
   const before = url.searchParams.get("before");
   if (q.length > MAX_SEARCH) throw new BadRequest("q is too long");
   if (origin !== null && origin !== "chat" && origin !== "automation") {
     throw new BadRequest("origin must be chat or automation");
   }
+  if (attention !== null && attention !== "1") {
+    throw new BadRequest("attention must be 1");
+  }
+  if (attention !== null && origin !== null) {
+    throw new BadRequest("attention takes no origin");
+  }
   return {
     project: project === null || project === "" ? null : project,
     q: q.trim(),
     origin,
-    before: before === null ? null : parseFeedCursor(before),
+    attention: attention !== null,
+    before:
+      before === null || attention !== null ? null : parseFeedCursor(before),
+    alertBefore:
+      before === null || attention === null ? null : parseRunsCursor(before),
   };
 }
 
