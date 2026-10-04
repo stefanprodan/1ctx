@@ -260,7 +260,6 @@ async function install() {
   console.log(`installed onectx in ${context}/${ns}`);
 }
 
-// runs the driver in a fresh pod, waits for it and returns its log
 // runs the driver in a fresh pod and returns its log; the pod must
 // start within READY_MS and end within doneMs, or the run fails
 const READY_MS = 5 * 60_000;

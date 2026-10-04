@@ -82,8 +82,8 @@ test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
 scripts/      preview, staging, smoke, image, release and vendor-test
-              scripts; brand.py; the *-record.ts recorders, run by hand;
-              load/, the load harness (docs/load.md).
+              scripts; brand.py; record/, the fixture recorders, run by
+              hand; load/, the load harness (docs/load-testing.md).
 skills/       installable agent skills, added by URL, never seeded.
 site/         1ctx.dev and the brand files, its own project.
               site/README.md is the brand book.
@@ -141,7 +141,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
-| `docs/load.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
+| `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |

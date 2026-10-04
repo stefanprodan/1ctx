@@ -1,4 +1,4 @@
-# Load
+# Load testing
 
 How the server is measured under load: one harness in `scripts/load/`,
 two targets, one results table. Governs `scripts/load/`,
