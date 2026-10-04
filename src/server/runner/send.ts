@@ -125,6 +125,9 @@ export type ActiveSend = {
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;
+  // the tokens the last counted round used, prompt plus completion: one
+  // bound on the summary request's size; null when nothing was counted
+  used: number | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;
   // the current round's launched tool rows still streaming, keyed by
@@ -226,6 +229,7 @@ export function newSend(fields: {
   kind?: SendKind;
   op: SendOp;
   summarizing?: boolean;
+  used?: number | null;
   policy: SendPolicy;
   firstMessageId: string;
   replyId: string;
@@ -270,6 +274,7 @@ export function newSend(fields: {
     repeated: false,
     bare: false,
     summarizing: fields.summarizing ?? false,
+    used: fields.used ?? null,
     mcpNote: "",
     openTools: new Map(),
     tools: null,

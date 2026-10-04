@@ -118,25 +118,31 @@ describe("compaction", () => {
     chat.app.socket.dispose();
   });
 
-  test("a summary is sized by its own request", async () => {
-    const chat = await chatApp({ window: 32_000 });
-    const started = await startChat(chat, "the old question");
-    // schemas and a long reasoning completion took the answer round past
-    // the window; the summary request sends neither
-    finish(started.script, "the answer", 26_910, 5_093);
-    const summaryScript = await waitScript(chat.scripted, 2);
-    expect(summaryScript.body.max_tokens).toBe(4096);
-    finish(summaryScript, "## Goal\n\n- Continue", 22_932, 300);
-    await settle(chat, started.sessionId);
-    expect(chat.scripted.requests.every((request) => request.accepted)).toBe(
-      true,
-    );
-    expect(rows(chat, started.sessionId)[2]).toMatchObject({
-      kind: "summary",
-      status: "done",
-    });
-    chat.app.socket.dispose();
-  });
+  // the preview's 32K agent, whose schemas and long reasoning took the
+  // answer round past the window, and a 1M window at its threshold
+  test.each([
+    [32_000, 26_910, 5_093],
+    [1_000_000, 985_000, 4_000],
+  ])(
+    "a %d window gets the summary its whole cap",
+    async (window, prompt, completion) => {
+      const chat = await chatApp({ window });
+      const started = await startChat(chat, "the old question");
+      finish(started.script, "the answer", prompt, completion);
+      const summaryScript = await waitScript(chat.scripted, 2);
+      expect(summaryScript.body.max_tokens).toBe(4096);
+      finish(summaryScript, "## Goal\n\n- Continue", 22_932, 300);
+      await settle(chat, started.sessionId);
+      expect(chat.scripted.requests.every((request) => request.accepted)).toBe(
+        true,
+      );
+      expect(rows(chat, started.sessionId)[2]).toMatchObject({
+        kind: "summary",
+        status: "done",
+      });
+      chat.app.socket.dispose();
+    },
+  );
 
   test("an under-threshold answer and a model without a window do not compact", async () => {
     const chat = await chatApp();

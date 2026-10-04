@@ -136,6 +136,7 @@ export async function toolLoop(
       ) {
         const summary = deps.writer.startSummary(send);
         send.summarizing = true;
+        send.used = round.tokens;
         send.roundNo += 1;
         send.phase = "provider";
         send.round = newRound(summary.id, summary.createdAt);

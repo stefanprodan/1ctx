@@ -13,6 +13,7 @@ import {
   requestTokens,
 } from "../../../src/server/providers/index.ts";
 import {
+  ESTIMATE_SLACK,
   EXHAUSTED_LINE,
   history,
   LOOP_LINE,
@@ -21,7 +22,6 @@ import {
   SUMMARIZE,
   SUMMARY_LEAD,
   SUMMARY_MARGIN,
-  SUMMARY_MARGIN_SHARE,
   SUMMARY_MIN_TOKENS,
   summaryRequest,
   withExhausted,
@@ -1095,7 +1095,7 @@ describe("history", () => {
 
   // a 32K model whose answer round carried large schemas and a long
   // reasoning completion, as seen on the preview
-  const fullWindow: SendPolicy = {
+  const small: SendPolicy = {
     ...policy,
     contextLength: 32_000,
     limits: { ...policy.limits, contextReserve: 8000, summaryMaxTokens: 4096 },
@@ -1106,46 +1106,55 @@ describe("history", () => {
       ],
     },
   };
-  const margin = SUMMARY_MARGIN + Math.floor(32_000 * SUMMARY_MARGIN_SHARE);
-  const summaryPrompt = (req: ChatRequest) => {
+  const estimate = (req: ChatRequest) => {
     const { maxTokens: _cap, ...rest } = req;
-    return requestTokens(fullWindow.wire, rest);
+    return requestTokens(small.wire, rest);
   };
+  const said = (n: number): ChatMessageIn[] => [
+    { role: "user", content: "word ".repeat(n) },
+  ];
 
   test("a full answer round leaves the summary its whole cap", () => {
     const messages: ChatMessageIn[] = [
       { role: "system", content: "system" },
-      { role: "user", content: "word ".repeat(22_700) },
+      ...said(22_700),
     ];
     // the answer round's prompt plus its completion passed the window
-    const answer = requestTokens(
-      fullWindow.wire,
-      request(fullWindow, "s1", messages),
-    );
+    const answer = requestTokens(small.wire, request(small, "s1", messages));
     expect(answer + 5093).toBeGreaterThan(32_000);
-    const req = summaryRequest(fullWindow, "s1", messages);
+    const req = summaryRequest(small, "s1", messages, 32_003);
     expect(req.tools).toBeUndefined();
-    expect(margin).toBe(3456);
-    expect(32_000 - summaryPrompt(req) - margin).toBeGreaterThan(4096);
+    expect(estimate(req)).toBe(22_841);
     expect(req.maxTokens).toBe(4096);
   });
 
-  test("a summary near the window gets its room, at least the floor", () => {
-    const near = summaryRequest(fullWindow, "s1", [
-      { role: "user", content: "word ".repeat(26_400) },
-    ]);
-    const room = 32_000 - summaryPrompt(near) - margin;
-    expect(room).toBeGreaterThan(SUMMARY_MIN_TOKENS);
-    expect(room).toBeLessThan(4096);
-    expect(near.maxTokens).toBe(room);
-    expect(near.maxTokens).toBe(2011);
-    const over = summaryRequest(fullWindow, "s1", [
-      { role: "user", content: "word ".repeat(28_500) },
-    ]);
-    expect(32_000 - summaryPrompt(over) - margin).toBeLessThan(
+  test("a 1M window at its threshold sizes the summary by usage", () => {
+    const wide: SendPolicy = { ...policy, contextLength: 1_000_000 };
+    const req = summaryRequest(wide, "s1", said(974_850), 985_000);
+    expect(estimate(req)).toBe(974_983);
+    // a tenth on the estimate passes the window; the measured size fits
+    expect(req.maxTokens).toBe(4096);
+    expect(summaryRequest(wide, "s1", said(974_850)).maxTokens).toBe(
       SUMMARY_MIN_TOKENS,
     );
-    expect(over.maxTokens).toBe(SUMMARY_MIN_TOKENS);
+  });
+
+  test("the summary fits the smaller bound, less the margin", () => {
+    const near = said(26_400);
+    expect(estimate(summaryRequest(small, "s1", near))).toBe(26_533);
+    // the measured size is the smaller: 32,000 - 28,000 - 256
+    expect(summaryRequest(small, "s1", near, 28_000).maxTokens).toBe(3744);
+    // nothing measured: 32,000 - ceil(26,533 * 1.1) - 256
+    expect(summaryRequest(small, "s1", near).maxTokens).toBe(2557);
+    expect(summaryRequest(small, "s1", near, 30_000).maxTokens).toBe(2557);
+    expect(SUMMARY_MARGIN).toBe(256);
+    expect(ESTIMATE_SLACK).toBe(0.1);
+  });
+
+  test("both bounds past the window ask for the floor", () => {
+    const req = summaryRequest(small, "s1", said(29_500), 33_000);
+    expect(estimate(req)).toBe(29_633);
+    expect(req.maxTokens).toBe(SUMMARY_MIN_TOKENS);
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {
