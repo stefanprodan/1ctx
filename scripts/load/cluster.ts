@@ -201,7 +201,9 @@ export function restoreKeys(
       .data ?? {};
   mkdirSync(dir, { recursive: true });
   for (const [name, value] of Object.entries(data)) {
-    writeFileSync(join(dir, name), Buffer.from(value, "base64"));
+    writeFileSync(join(dir, name), Buffer.from(value, "base64"), {
+      mode: 0o600,
+    });
   }
   return Object.keys(data).length;
 }
