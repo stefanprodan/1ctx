@@ -70,11 +70,6 @@ export function compactSend(
     kind: "compact",
     op: "compact",
     summarizing: true,
-    // The last counted round is the size the history has now.
-    used:
-      session.usage === null
-        ? null
-        : session.usage.promptTokens + session.usage.completionTokens,
     policy,
     firstMessageId: lastUser.id,
     replyId: summaryId,

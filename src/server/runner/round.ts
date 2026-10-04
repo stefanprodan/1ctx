@@ -151,7 +151,7 @@ export function buildRequest(
     send.repos ?? undefined,
   );
   if (send.summarizing) {
-    return summaryRequest(send.policy, send.sessionId, messages, send.used);
+    return summaryRequest(send.policy, send.sessionId, messages);
   }
   const req = request(
     send.policy,

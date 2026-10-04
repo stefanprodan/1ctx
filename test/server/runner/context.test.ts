@@ -9,6 +9,7 @@ import * as tokenCount from "../../../src/server/lib/tokens.ts";
 import { LOOP_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import {
   type ChatMessageIn,
+  type ChatRequest,
   requestTokens,
 } from "../../../src/server/providers/index.ts";
 import {
@@ -19,6 +20,9 @@ import {
   SKILLS_LEAD,
   SUMMARIZE,
   SUMMARY_LEAD,
+  SUMMARY_MARGIN,
+  SUMMARY_MARGIN_SHARE,
+  SUMMARY_MIN_TOKENS,
   summaryRequest,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
@@ -1069,15 +1073,15 @@ describe("history", () => {
       skip4Bit: false,
       maxTokens: 2000,
     });
-    // the answer left less room than the reserve: the summary fits it
-    expect(summaryRequest(withTools, "s1", [], 6500).maxTokens).toBe(1244);
-    // and never asks for less than the floor
-    expect(summaryRequest(withTools, "s1", [], 7900).maxTokens).toBe(128);
-    // a model with no window is capped by the limit alone
+    // a model with no window is capped by the limit alone, however long
+    // the history
+    const long = [{ role: "user" as const, content: "word ".repeat(9000) }];
     expect(
-      summaryRequest({ ...withTools, contextLength: null }, "s1", [], 6500)
+      summaryRequest({ ...withTools, contextLength: null }, "s1", long)
         .maxTokens,
     ).toBe(4096);
+    // a history the window cannot hold still asks for the floor, never less
+    expect(summaryRequest(withTools, "s1", long).maxTokens).toBe(128);
     // a model that always thinks is asked for the least the wire names
     const required = { ...withTools, thinkingRequired: true };
     expect(summaryRequest(required, "s1", [])).toMatchObject({
@@ -1087,6 +1091,59 @@ describe("history", () => {
     expect(
       summaryRequest({ ...required, wire: "openrouter" }, "s1", []),
     ).toMatchObject({ thinking: true, reasoningEffort: "minimal" });
+  });
+
+  // a 32K model whose answer round carried large schemas and a long
+  // reasoning completion, as seen on the preview
+  const fullWindow: SendPolicy = {
+    ...policy,
+    contextLength: 32_000,
+    limits: { ...policy.limits, contextReserve: 8000, summaryMaxTokens: 4096 },
+    offered: {
+      ...NONE,
+      tools: [
+        { name: "big", description: "word ".repeat(4500), parameters: {} },
+      ],
+    },
+  };
+  const margin = SUMMARY_MARGIN + Math.floor(32_000 * SUMMARY_MARGIN_SHARE);
+  const summaryPrompt = (req: ChatRequest) => {
+    const { maxTokens: _cap, ...rest } = req;
+    return requestTokens(fullWindow.wire, rest);
+  };
+
+  test("a summary after an answer round past the window still gets the whole cap when its own request leaves room", () => {
+    const messages: ChatMessageIn[] = [
+      { role: "system", content: "system" },
+      { role: "user", content: "word ".repeat(22_700) },
+    ];
+    // the answer round's prompt plus its completion passed the window
+    const answer = requestTokens(
+      fullWindow.wire,
+      request(fullWindow, "s1", messages),
+    );
+    expect(answer + 5093).toBeGreaterThan(32_000);
+    const req = summaryRequest(fullWindow, "s1", messages);
+    expect(req.tools).toBeUndefined();
+    expect(32_000 - summaryPrompt(req) - margin).toBeGreaterThan(4096);
+    expect(req.maxTokens).toBe(4096);
+  });
+
+  test("a summary request near the window is capped at its room less the margin, never under the floor", () => {
+    const near = summaryRequest(fullWindow, "s1", [
+      { role: "user", content: "word ".repeat(29_000) },
+    ]);
+    const room = 32_000 - summaryPrompt(near) - margin;
+    expect(room).toBeGreaterThan(SUMMARY_MIN_TOKENS);
+    expect(room).toBeLessThan(4096);
+    expect(near.maxTokens).toBe(room);
+    const over = summaryRequest(fullWindow, "s1", [
+      { role: "user", content: "word ".repeat(30_000) },
+    ]);
+    expect(32_000 - summaryPrompt(over) - margin).toBeLessThan(
+      SUMMARY_MIN_TOKENS,
+    );
+    expect(over.maxTokens).toBe(SUMMARY_MIN_TOKENS);
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {

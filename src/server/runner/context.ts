@@ -248,46 +248,48 @@ export function request(
   };
 }
 
-// what the instruction and the lead line add to the request, and the
-// least a summary is asked for when the answer left little room: a
-// short summary beats none, and a provider that cannot fit even that
-// refuses the round, which ends failed and is tried again next time
+// the room left under the window beyond the summary request's own
+// estimate: a fixed part plus a share of the window, since the local
+// count can undercount another provider's tokenizer and a strict
+// provider refuses prompt plus max_tokens past the window. The floor is
+// the least a summary is asked for: a short summary beats none, and a
+// provider that cannot fit even that refuses the round, which ends
+// failed and is tried again next time
 export const SUMMARY_MARGIN = 256;
+export const SUMMARY_MARGIN_SHARE = 0.05;
 export const SUMMARY_MIN_TOKENS = 128;
 
 // the summary round: the history plus the instruction, no tools and the
 // least thinking, since a model's thoughts come out of the same cap. Its
-// answer is capped by the limit and the reserve, then by the room the
-// answer round actually left (its prompt plus completion, `used`): a
-// strict provider refuses a request whose prompt and max_tokens together
-// pass the window
+// answer is capped by the limit and the reserve, then by the room its
+// own request leaves under the window. The answer round's usage is no
+// measure: it carried the schemas and replayed reasoning, and counts
+// its completion on top
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
   messages: ChatMessageIn[],
-  used: number | null = null,
 ): ChatRequest {
   const window = policy.contextLength;
   const reserve =
     window === null
       ? policy.limits.summaryMaxTokens
       : contextReserve(window, policy.limits.contextReserve);
-  let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
-  if (window !== null && used !== null) {
-    maxTokens = Math.max(
-      SUMMARY_MIN_TOKENS,
-      Math.min(maxTokens, window - used - SUMMARY_MARGIN),
-    );
-  }
-  return {
+  const req: ChatRequest = {
     model: policy.model,
     messages: [...messages, { role: "user", content: SUMMARIZE }],
     ...leastThinking(policy),
     cacheKey: cacheKeyOf(policy, sessionId),
     upstream: policy.upstream,
     skip4Bit: policy.skip4Bit,
-    maxTokens,
   };
+  let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
+  if (window !== null) {
+    const margin = SUMMARY_MARGIN + Math.floor(window * SUMMARY_MARGIN_SHARE);
+    const room = window - requestTokens(policy.wire, req) - margin;
+    maxTokens = Math.max(SUMMARY_MIN_TOKENS, Math.min(maxTokens, room));
+  }
+  return { ...req, maxTokens };
 }
 
 // the ask the answer round ends with: a request-local user message after
