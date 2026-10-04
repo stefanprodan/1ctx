@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { check, docsCheck, networkCheck } from "./structure.ts";
+import { check, colourLiterals, docsCheck, networkCheck } from "./structure.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const FIXTURES = join(import.meta.dir, "fixtures", "structure");
@@ -23,6 +23,26 @@ describe("the layout", () => {
 
   test("no doc is over the token cap", () => {
     expect(docsCheck(ROOT)).toEqual([]);
+  });
+
+  test("a wire named like a colour is no colour literal in code", () => {
+    const code = [
+      'wire: "azure",',
+      'wire === "azure"',
+      'name: "azure",',
+      '<NewProvider wire="azure" />',
+      'const next: Wire = "azure";',
+      'function f(w: Wire = "azure") {}',
+      'if (wire !== "azure") {}',
+    ].join("\n");
+    expect(colourLiterals(code, true)).toEqual([]);
+    expect(colourLiterals('wire: "azure",\ncolor: "teal"', true)).toEqual([2]);
+    // as a style or an attribute it is the colour, and markup has no wire
+    expect(colourLiterals('style={{ color: "azure" }}', true)).toEqual([1]);
+    expect(colourLiterals('<rect fill="azure"/>', true)).toEqual([1]);
+    expect(colourLiterals('const tint: Colour = "azure";', true)).toEqual([1]);
+    expect(colourLiterals('<Box color="azure" />', true)).toEqual([1]);
+    expect(colourLiterals('wire: "azure"')).toEqual([1]);
   });
 
   test("a visual palette belongs only to visual-theme.ts", () => {

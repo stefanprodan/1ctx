@@ -25,7 +25,9 @@ export type ChatTool = {
 // One item of OpenRouter's reasoning_details: reasoning.text (with the
 // signature an Anthropic upstream needs back), reasoning.summary or
 // reasoning.encrypted (OpenAI's opaque blob). Kept whole and sent back as
-// received, since the upstream verifies the sequence.
+// received, since the upstream verifies the sequence. The azure wire
+// keeps its own records here too: reasoning (the summary and the
+// encrypted blob of one output item) and phase.
 export type ReasoningDetail = {
   type: string;
   index?: number;
@@ -55,6 +57,10 @@ export type ChatRequest = {
   // thinking: a strict server refuses the field that turns thinking off
   // on a model that never thinks, so it is sent only on this word
   thinkingOff?: boolean;
+  // a short round that wants the least thinking (leastThinking()), as
+  // against a default that resolved to off: only a wire with a word for
+  // no thinking that a default must not send reads it
+  least?: boolean;
   reasoningEffort?: Effort | null;
   temperature?: number | null;
   topP?: number | null;
@@ -97,7 +103,17 @@ export type ChatEvent =
       arguments?: string;
       signature?: string;
     }
+  // a call's whole arguments, replacing what its deltas built; consumed
+  // by the stream, never yielded
+  | { kind: "toolCallDone"; index: number; arguments: string }
   | { kind: "toolCalls"; calls: ToolCall[] }
+  // a frame with nothing to show, or a change of thinking: while the
+  // wire says the model is thinking, it may send nothing for minutes,
+  // so the round lifts its idle check until thinking ends
+  | { kind: "alive"; thinking: boolean }
+  // the provider refused the stored reasoning sent back and the request
+  // went again without it, so the caller forgets that reasoning
+  | { kind: "reasoningRefused" }
   // native: the upstream's own stop reason, when a router passes it on
   | { kind: "finish"; reason: string; details: string | null; native?: string }
   // who served the round, from a router's frames: the upstream and the
@@ -118,6 +134,10 @@ export type ChatEvent =
       remote?: boolean;
       // the response's Retry-After in milliseconds, when it had one
       retryAfterMs?: number;
+      // the error's own code and the field it names, when the provider
+      // gave them, so a wire matches a refusal by them and never by words
+      code?: string;
+      param?: string;
     };
 
 // one provider row, ready to talk to

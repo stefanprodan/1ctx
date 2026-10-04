@@ -14,7 +14,13 @@ import {
   parseQuery,
 } from "../../src/server/providers/parse.ts";
 import secretNames from "../fixtures/secrets/names.json";
-import { GEMINI_URL, PROVIDER_URL, testApp } from "../helpers/app.ts";
+import {
+  AZURE_DEPLOYMENTS,
+  AZURE_URL,
+  GEMINI_URL,
+  PROVIDER_URL,
+  testApp,
+} from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
 
 const admin = async (options?: Parameters<typeof testApp>[0]) => {
@@ -281,6 +287,76 @@ describe("GET /api/providers/:id/catalog", () => {
           headers: {
             "user-agent": "1ctx/v0.0.0-test",
             "x-goog-api-key": "gemini-test-key",
+          },
+          body: null,
+        },
+      ]);
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
+  test("an azure provider takes only a resource's v1 address, and its catalog is the deployments", async () => {
+    const { app, client } = await admin({
+      secrets: { "provider-azure": "azure-test-key" },
+    });
+    try {
+      for (const baseUrl of [
+        "http://foundry.test/openai/v1",
+        "https://foundry.test/openai",
+        "https://foundry.test/openai/v1/responses",
+      ]) {
+        const refused = await client.call("POST", "/api/providers", {
+          body: { name: "azure", wire: "azure", baseUrl, keyName: null },
+        });
+        expect(refused.status).toBe(400);
+        expect((await refused.json()).error).toStartWith(
+          "baseUrl must be https://<resource>",
+        );
+      }
+      const created = await client.call("POST", "/api/providers", {
+        body: {
+          name: "azure",
+          wire: "azure",
+          baseUrl: `${AZURE_URL}/`,
+          keyName: "provider-azure",
+        },
+      });
+      expect(created.status).toBe(201);
+      const { provider } = await created.json();
+      expect(provider).toMatchObject({ wire: "azure", baseUrl: AZURE_URL });
+      const result = await client.call(
+        "GET",
+        `/api/providers/${provider.id}/catalog?q=gpt`,
+      );
+      expect(result.status).toBe(200);
+      const { matches } = await result.json();
+      expect(matches.map((model: { id: string }) => model.id)).toEqual([
+        "gpt-6-luna",
+        "gpt-6.1-sol",
+      ]);
+      // undescribed, so the agent states its window to take tools
+      const agent = await client.call("POST", "/api/agents", {
+        body: {
+          name: "luna",
+          providerId: provider.id,
+          model: "gpt-6-luna",
+          thinking: "on",
+          effort: "xhigh",
+          servers: [],
+          mcpMode: "auto",
+          contextLength: 400_000,
+          tools: true,
+        },
+      });
+      expect(agent.status).toBe(201);
+      expect(app.fetched).toEqual([
+        {
+          url: AZURE_DEPLOYMENTS,
+          headers: {
+            "user-agent": "1ctx/v0.0.0-test",
+            "api-key": "azure-test-key",
           },
           body: null,
         },

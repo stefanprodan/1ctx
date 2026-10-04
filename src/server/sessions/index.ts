@@ -96,7 +96,7 @@ export {
   type SessionRow,
   type UsagePort,
 } from "./rows.ts";
-export { lastPrompt, sendTurns } from "./sends.ts";
+export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
 
 export const RESTART_ERROR = "the server restarted";

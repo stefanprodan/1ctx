@@ -50,6 +50,13 @@ export const GROQ_URL = "http://groq.test/openai/v1";
 // a local decisions server on the openai-compatible wire, recorded from
 // kev.serve: TypeSafe's model list, which ignores the catalog's query
 export const KEV_URL = "http://kev.test/v1";
+// a Foundry resource on the azure wire: the Responses API under the
+// base, the deployments beside it (recorded from one with gpt-6-luna
+// and gpt-6.1-sol deployed)
+export const AZURE_URL = "https://foundry.test/openai/v1";
+export const AZURE_CHAT = `${AZURE_URL}/responses?api-version=v1`;
+export const AZURE_DEPLOYMENTS =
+  "https://foundry.test/openai/deployments?api-version=2022-12-01";
 
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
@@ -76,6 +83,22 @@ const geminiChatBody = (body: string | null) => {
     "providers",
     "gemini",
     tools ? "chat-tools.sse" : "chat-stream.sse",
+  );
+};
+
+// the azure recording for a request: the reasoning and the call when it
+// offers tools and has no result yet, else the answer after a tool
+const azureChatBody = (body: string | null) => {
+  const request = JSON.parse(body ?? "{}");
+  const tools =
+    request.tools?.length > 0 &&
+    !request.input?.some(
+      (item: { type?: string }) => item.type === "function_call_output",
+    );
+  return fixture(
+    "providers",
+    "azure",
+    tools ? "chat-reasoning-tool.sse" : "chat-text-after-tool.sse",
   );
 };
 
@@ -160,6 +183,16 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
     }
     if (url === `${GEMINI_URL}/openai/chat/completions`) {
       return new Response(geminiChatBody(body), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }
+    if (url === AZURE_DEPLOYMENTS) {
+      return new Response(fixture("providers", "azure", "deployments.json"), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === AZURE_CHAT) {
+      return new Response(azureChatBody(body), {
         headers: { "content-type": "text/event-stream" },
       });
     }

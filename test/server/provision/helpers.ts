@@ -5,7 +5,12 @@ import { type App, compose } from "../../../src/server/compose.ts";
 import type { Db } from "../../../src/server/db/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { parse } from "../../../src/server/provision/index.ts";
-import { TEST_PASSWORD_COST, type TestApp } from "../../helpers/app.ts";
+import {
+  AZURE_DEPLOYMENTS,
+  TEST_PASSWORD_COST,
+  type TestApp,
+} from "../../helpers/app.ts";
+import { azureFixture } from "../../helpers/azure.ts";
 import { mcpFetch } from "../mcp/fake.ts";
 
 export const MODEL_URL = "http://models.test/v1";
@@ -131,6 +136,11 @@ export function network() {
           inputTokenLimit: 32_768,
           supportedGenerationMethods: ["generateContent"],
         })),
+      });
+    }
+    if (url === AZURE_DEPLOYMENTS) {
+      return new Response(azureFixture("deployments.json"), {
+        headers: { "content-type": "application/json" },
       });
     }
     if (url === `${BARE_URL}/models`) {

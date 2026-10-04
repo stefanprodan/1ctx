@@ -139,9 +139,13 @@ export type SendPolicy = {
 // always thinks: for a round that only needs a short answer or a call
 export const leastThinking = (
   policy: Pick<SendPolicy, "thinkingRequired" | "thinkingOff" | "wire">,
-): Pick<ChatRequest, "thinking" | "thinkingOff" | "reasoningEffort"> => ({
+): Pick<
+  ChatRequest,
+  "thinking" | "thinkingOff" | "least" | "reasoningEffort"
+> => ({
   thinking: policy.thinkingRequired,
   thinkingOff: policy.thinkingOff,
+  least: true,
   reasoningEffort:
     policy.thinkingRequired && policy.wire !== null
       ? EFFORTS[policy.wire][0]

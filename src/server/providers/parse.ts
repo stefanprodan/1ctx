@@ -20,6 +20,7 @@ import {
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { azureBaseUrlProblem } from "./azure.ts";
 
 export const MAX_BASE_URL = 256;
 export const MAX_QUERY = 100;
@@ -78,10 +79,13 @@ export function parseKeyName(value: unknown): string | null {
 export function parseProvider(body: unknown): CreateProviderRequest {
   const b = fields(body, ["name", "wire", "baseUrl", "keyName"]);
   if (!isWire(b.wire)) throw new BadRequest("wire must be a known wire");
+  const baseUrl = parseBaseUrl(b.baseUrl);
+  const problem = b.wire === "azure" ? azureBaseUrlProblem(baseUrl) : null;
+  if (problem !== null) throw new BadRequest(`baseUrl ${problem}`);
   return {
     name: parseName(b.name),
     wire: b.wire,
-    baseUrl: parseBaseUrl(b.baseUrl),
+    baseUrl,
     keyName: parseKeyName(b.keyName ?? null),
   };
 }

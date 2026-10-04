@@ -130,15 +130,6 @@ export function wireTokens(tools: readonly ChatTool[]): number {
   return tools.length === 0 ? 0 : tokens(JSON.stringify(wireTools(tools)));
 }
 
-export function requestTokens(req: ChatRequest): number {
-  return tokens(
-    JSON.stringify({
-      messages: req.messages,
-      tools: wireTools(req.tools ?? []),
-    }),
-  );
-}
-
 // Frames are returned as their joined data payload. Comments count as bytes
 // for liveness in the reader but carry no event for the runner.
 export function parseSse(
@@ -225,6 +216,14 @@ export class ToolCallTracker {
     if (delta.signature !== undefined) call.signature = delta.signature;
     this.latest = call;
     return { callIndex: call.order, name: call.name };
+  }
+
+  // the whole arguments a wire gives when a call ends, which win over
+  // the deltas
+  replace(index: number, args: string): void {
+    const call = this.byIndex.get(index);
+    if (call) call.arguments = args;
+    else this.push({ kind: "toolCallDelta", index, arguments: args });
   }
 
   flush(): ToolCall[] {
@@ -321,6 +320,15 @@ export type StreamOptions = {
   headers?: Record<string, string>;
   // shorter in a test, so a timed out wait is seen without two minutes
   headersTimeoutMs?: number;
+  // shorter in a test, so a silent stream is seen without five minutes
+  silenceMs?: number;
+  // asked after each frame: the wire's terminal event came, so the read
+  // ends there, for a wire that sends no [DONE]
+  ended?: () => boolean;
+  // asked before each read: the model is thinking, which a wire may do
+  // in silence for longer than the silence limit, so that read waits
+  // with none and the send's deadline ends it
+  thinking?: () => boolean;
 };
 
 export async function* streamChat(
@@ -386,13 +394,15 @@ export async function* streamChat(
         (value) => ({ value }),
         (error) => ({ error }),
       );
-      const silence = new Promise<{ silent: true }>((resolve) => {
-        timer = setTimeout(
-          () => resolve({ silent: true }),
-          CHAT_SILENCE_TIMEOUT_MS,
-        );
-      });
-      const result = await Promise.race([read, silence]);
+      const silence = options.thinking?.()
+        ? null
+        : new Promise<{ silent: true }>((resolve) => {
+            timer = setTimeout(
+              () => resolve({ silent: true }),
+              options.silenceMs ?? CHAT_SILENCE_TIMEOUT_MS,
+            );
+          });
+      const result = await (silence ? Promise.race([read, silence]) : read);
       if (timer) clearTimeout(timer);
       if ("silent" in result) {
         controller.abort(new Error("the provider was silent for 5 min"));
@@ -426,8 +436,16 @@ export async function* streamChat(
             yield { ...event, ...tracker.push(event) };
             continue;
           }
+          if (event.kind === "toolCallDone") {
+            tracker.replace(event.index, event.arguments);
+            continue;
+          }
           if (event.kind === "finish") sawFinish = true;
           yield event;
+        }
+        if (options.ended?.()) {
+          done = true;
+          break;
         }
       }
     }
