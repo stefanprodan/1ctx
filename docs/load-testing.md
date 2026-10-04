@@ -142,6 +142,9 @@ make load-cluster ARGS="smoke"            # install, setup, step 1 5
 On demand, the `e2e` workflow runs either target on a GitHub Linux
 runner (`gh workflow run e2e.yml -f target=cluster -f mult=1 -f
 minutes=5`); its table lands in the run's summary (`docs/deploy.md`).
+The runner's 4 CPUs carry kind, the fakes, the driver and the server
+together, so its times are several times a workstation's: compare a CI
+run only with another CI run.
 
 Setup and steps are idempotent: setup keeps what exists by name, a
 step sets every automation's time before it starts.
