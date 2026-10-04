@@ -15,7 +15,7 @@ with probabilities.
 
 - **A provider is added and deleted, never changed.** There is no
   PATCH. Its wire is `openrouter`, `openai-compatible`,
-  `openai-strict`, `gemini` or `opencode`. Deleting one a live agent
+  `openai-strict`, `gemini`, `opencode` or `azure`. Deleting one a live agent
   or a decider uses is a 409; a send keeps the provider's name as text.
 - **Everything that leaves the process goes through the fetcher.**
   The `fetcher` compose option is the one way out, so a test passes a
@@ -25,9 +25,11 @@ with probabilities.
   provider and kind, and the browser never gets the whole list.
   `forget()` clears both kinds. Gemini's catalog is the native
   `/v1beta/models?pageSize=1000` with the key in `x-goog-api-key`; a
-  second page is an error, not a silent cut.
+  second page is an error, not a silent cut. Azure's is the resource's
+  deployments (below), the same way.
 - **A catalog row with no window and no parameter list is
-  undescribed.** NIM, OpenAI and OpenCode Go list only ids. Only for
+  undescribed.** NIM, OpenAI, OpenCode Go and Azure list only ids.
+  Only for
   such a model does the agents API take `contextLength` and `tools` (a
   400 otherwise), and a window is required with tools on, since the
   tool loop weighs it.
@@ -38,14 +40,18 @@ with probabilities.
 
 ## Wire rules
 
-Each wire's body is built in its own file over `providers/openai.ts`.
-These are what the providers refuse or need; a field added to the
-shared body must be checked against each.
+Each wire's body is built in its own file over `providers/openai.ts`,
+but `azure`'s, which is its own. These are what the providers refuse
+or need; a field added to the shared body must be checked against
+each. A request is counted in its wire's shape (`requestText()`), so
+every window fit matches what goes out. The tool catalog's counts
+(`tools/offer.ts`'s MCP mode, the Tools page) stay in the Chat
+Completions shape, about one token a tool under the azure one.
 
-- **Past reasoning goes back on `openrouter` and `opencode` only.**
-  The history carries a reply's reasoning, with its model, only from
-  sends on the same provider; the window fit counts it only where it
-  is sent.
+- **Past reasoning goes back on `openrouter`, `opencode` and `azure`
+  only.** The history carries a reply's reasoning, with its model, only
+  from sends on the same provider; the window fit counts it only where
+  it is sent.
 - **`openai-compatible` (mlx-serve, llama-server) reads
   `enable_thinking` on every request, off included.** It also gets
   `prompt_cache_key`, and no past reasoning.
@@ -96,6 +102,60 @@ shared body must be checked against each.
   signature gets Google's `skip_thought_signature_validator` on its
   first call.
 
+## The azure wire
+
+Microsoft Foundry and Azure OpenAI, over the Responses API: chat
+completions refuse function tools with any thinking.
+
+- **The base URL is the resource's `/openai/v1`,** https, on either
+  host, checked at add and in provisioning (`azureBaseUrlProblem()`).
+  Chat is `{base}/responses?api-version=v1`; the catalog is
+  `{root}/openai/deployments?api-version=2022-12-01` beside it, only
+  `succeeded` rows, a further page an error. The key goes in `api-key`.
+- **The body is stateless:** `store: false`, `include:
+  ["reasoning.encrypted_content"]`, `prompt_cache_key`, no item ids.
+  Tools always carry `strict: false`, or Azure makes every property
+  required. The system text is the first input item. There is no
+  author field (`name` is refused), so a named user message opens with
+  `markOf()`'s `[name] `.
+- **Thinking:** an effort is `{effort, summary: "auto"}`; Off and
+  `least` (`leastThinking()`) are `{effort: "none"}`; the default is
+  `{summary: "auto"}`, the model's own level. Other wires ignore
+  `least`.
+- **Reasoning and phase are records** in `reasoning_details`: at
+  `output_item.done` a reasoning item is `{type: "reasoning", index,
+  summary, encrypted_content}` and a message's phase `{type: "phase",
+  index, phase}`. They are projected, never sent as stored: a
+  reasoning item without its blob is dropped, the index never goes,
+  and the phase only sets its message's `phase`. A row keeps one
+  message, so the last phase wins.
+- **A reasoning record counts by its summary,** never its blob, and
+  tools as Responses tool objects; the blob is billed far below its
+  length.
+- **The stream ends on its terminal event:** `response.completed`,
+  `.incomplete` or `.failed` end the read (Responses sends no
+  `[DONE]`). A call's `output_item.done` arguments replace what its
+  deltas built. Summaries stream as sent, a blank line between parts
+  and items, as the fold shows every wire's reasoning. A frame with
+  nothing to show is an `alive` event, `thinking` while a reasoning
+  item is open: Azure sends nothing while the model reasons before its
+  summary, so the round's quiet check and `streamChat()`'s five-minute
+  silence limit are both lifted until the item closes.
+  `max_output_tokens` is `length`, a refusal is content with
+  `refusal` as the details. Errors are `code: message` with the code
+  and param on the event.
+- **Two refusals are adapted once each, before any event:** a 400
+  `unsupported_value` on `reasoning.effort` with `none` sent goes again
+  at `low`, remembered per provider and model until a restart; a 400
+  `invalid_encrypted_content` goes again without reasoning after a
+  `reasoningRefused` event, and the runner drops that session's
+  reasoning records from this provider and model (`forgetReasoning()`),
+  phases kept. A round makes at most three requests; a second refusal
+  is its error.
+- **Off stays on the agent form,** with the line that a model that
+  cannot stop thinking runs at Low, since the deployments cannot say
+  which models those are.
+
 ## Requests
 
 - **No chat, run or memory round sends `max_tokens`.** Only the
@@ -110,7 +170,8 @@ shared body must be checked against each.
   event does not count as started. No wait passes the turn's deadline
   (the memory phase's own window in that phase).
 - **Only a send's rounds retry.** Deciders, catalogs and MCP calls are
-  never retried here.
+  never retried here. The one exception is the azure wire's two
+  adapted refusals, inside the wire, never a 429 or 5xx.
 - **A provider's words are kept but never logged.** A `remote` failure
   is a `ProviderRefusal`: the chat row keeps its words exactly, and
   the log carries a fixed phrase and `provider_status`.

@@ -87,8 +87,10 @@ that agent answers the one turn (see Summons).
   against the first author, or the one the dispatcher names, and runs
   under their policy.
 - **On the wire each message is its own user message** with its
-  author's `name`. Every wire is the OpenAI chat shape, which takes
-  consecutive user messages.
+  author's `name`. Each wire builds its own body and count from the
+  history (`docs/providers.md`); every wire takes consecutive user
+  messages, and one with no name field opens the text with the
+  author's mark.
 - **A start whose user messages pass `START_FRAME_BYTES`** sends its
   envelope with the reply alone and `messagesCut`; a tab reads the
   session's detail (`GET /api/sessions/:id`).
@@ -169,8 +171,14 @@ that agent answers the one turn (see Summons).
   runs exactly once, and the lock is held until the stream has let go.
 - **Stream bounds (`runner/round.ts`).** Two minutes quiet after the
   first event, or a reply past 1 MB, is a failure. The wait for the
-  first event is bounded only by the deadline, since a local server
-  reads a long prompt in silence. The headers wait is two minutes.
+  first event is bounded by the deadline and `streamChat()`'s
+  five-minute silence limit, never the quiet check, since a local
+  server reads a long prompt in silence. The headers wait is two
+  minutes. An `alive` event shows nothing and never starts the quiet
+  check; once it runs, an `alive` starts it over, and while one says
+  `thinking` both the check and the silence limit are lifted until
+  thinking ends. `reasoningRefused` starts nothing either, since the
+  request it announces starts afresh.
 - **A chat send past `sendDeadlineMs` ends with cause `deadline`,**
   status `stopped`. A run has its own deadline.
 - **A failed `finalizeSend` keeps the lock.** The session answers 409
@@ -317,7 +325,8 @@ that agent answers the one turn (see Summons).
   `contextLength - min(contextReserve, contextLength / 4)`.
 - **The summary round sends no tools and thinking off,** or the wire's
   least effort for a `thinkingRequired` model, since a provider refuses
-  Off there.
+  Off there. It carries `least` (`leastThinking()`), so a wire can tell
+  it from a default that resolved to off.
 - **History starts from the last done summary.**
 - **Compact on demand is a send of kind `compact`** under the same
   lock. It needs a done answer since the last summary and a reply after

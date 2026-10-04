@@ -6,7 +6,7 @@
 
 import type { SendSummary } from "../../shared/contracts/session.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
-import type { Db } from "../db/index.ts";
+import { type Db, transact } from "../db/index.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import { type RawSend, send, sendTokens } from "./rows.ts";
 
@@ -68,6 +68,46 @@ export function readReasoningDetails(
   } catch {
     return null;
   }
+}
+
+// A provider refused a reasoning record sent back: the session's
+// records of type reasoning that this provider and model wrote are
+// dropped, so no later turn sends them again. Other records, the phase
+// among them, stay. Answers how many messages changed.
+export function forgetReasoning(
+  db: Db,
+  sessionId: string,
+  providerId: string,
+  model: string,
+): number {
+  return transact(db, () => {
+    const rows = db
+      .query<{ id: string; details: string }, [string, string, string]>(
+        `select messages.id, messages.reasoning_details as details
+         from messages join sends on sends.id = messages.send_id
+         where messages.session_id = ? and sends.provider_id = ?
+           and sends.model = ? and messages.reasoning_details is not null`,
+      )
+      .all(sessionId, providerId, model);
+    const update = db.query(
+      "update messages set reasoning_details = ? where id = ?",
+    );
+    let changed = 0;
+    for (const row of rows) {
+      let items: unknown;
+      try {
+        items = JSON.parse(row.details);
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(items)) continue;
+      const kept = items.filter((item) => item?.type !== "reasoning");
+      if (kept.length === items.length) continue;
+      update.run(kept.length > 0 ? JSON.stringify(kept) : null, row.id);
+      changed++;
+    }
+    return { result: changed };
+  });
 }
 
 // the one end of a send, guarded by its running status

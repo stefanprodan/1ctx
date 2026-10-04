@@ -177,7 +177,8 @@ Flagged.
   project write goes through `keepProject()`, so both pages show one
   row.
 - **Token counts come from the server.** The agent page shows what
-  `wireTokens()` counted; the client never counts tokens.
+  `wireTokens()` counted in its provider's wire shape; the client never
+  counts tokens.
 
 ## Repositories
 

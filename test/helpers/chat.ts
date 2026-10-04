@@ -16,6 +16,7 @@ import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import type { Wire } from "../../src/shared/words.ts";
 import {
+  AZURE_URL,
   fakeFetch,
   GEMINI_URL,
   hashPassword,
@@ -26,6 +27,9 @@ import {
 
 export const FLASH = "deepseek/deepseek-v4.1-flash";
 export const GEMINI_FLASH = "gemini-3.8-flash";
+// a deployment the azure recording lists, undescribed, so the agent
+// states its window and tools
+export const AZURE_MODEL = "gpt-6-luna";
 // the one catalog model whose row has no tools flag: a send on it is
 // offered no tools and behaves as before
 export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
@@ -386,7 +390,12 @@ export async function chatApp(
       body: {
         name: "local",
         wire: options.wire ?? "openai-compatible",
-        baseUrl: options.wire === "gemini" ? GEMINI_URL : PROVIDER_URL,
+        baseUrl:
+          options.wire === "gemini"
+            ? GEMINI_URL
+            : options.wire === "azure"
+              ? AZURE_URL
+              : PROVIDER_URL,
         keyName: null,
       },
     })
@@ -401,6 +410,9 @@ export async function chatApp(
         effort: null,
         servers: [],
         mcpMode: "auto",
+        ...(options.wire === "azure"
+          ? { contextLength: options.window ?? 400_000, tools: true }
+          : {}),
       },
     });
     if (res.status !== 201) {
@@ -413,7 +425,13 @@ export async function chatApp(
   };
   const agentId = await makeAgent({
     name: "coder",
-    model: options.model ?? (options.wire === "gemini" ? GEMINI_FLASH : FLASH),
+    model:
+      options.model ??
+      (options.wire === "gemini"
+        ? GEMINI_FLASH
+        : options.wire === "azure"
+          ? AZURE_MODEL
+          : FLASH),
   });
   if (options.window !== undefined) {
     app.db

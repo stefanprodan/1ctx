@@ -39,6 +39,14 @@ import {
 } from "./systemone.ts";
 import type { ChatEvent, ChatRequest } from "./types.ts";
 
+export { markOf } from "./author.ts";
+export {
+  AZURE_BASE_URL_PROBLEM,
+  azureBaseUrlProblem,
+  buildChatBody as buildAzureChatBody,
+  parseDeployments,
+} from "./azure.ts";
+export { azureEvents } from "./azure-stream.ts";
 export {
   CatalogError,
   Catalogs,
@@ -56,11 +64,16 @@ export {
   geminiEvents,
   parseCatalog as parseGeminiCatalog,
 } from "./gemini.ts";
-export { wireTokens, wireTools } from "./openai.ts";
+export { wireTools } from "./openai.ts";
 export { buildChatBody as buildOpenCodeChatBody } from "./opencode.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseBaseUrl, parseKeyName } from "./parse.ts";
-export { requestTokens, sentMessages } from "./provider.ts";
+export {
+  requestText,
+  requestTokens,
+  sentMessages,
+  wireTokens,
+} from "./provider.ts";
 export { type ProviderRow, ProviderStore } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
 export {
@@ -133,6 +146,7 @@ export type Providers = {
 
 export function providersArea(deps: ProvidersDeps): Providers {
   const store = new ProviderStore(deps.db);
+  const noneRefused = new Set<string>();
   const endpoints = async (provider: ProviderRow, model: string) => {
     const key =
       provider.keyName === null ? null : deps.secret(provider.keyName);
@@ -165,7 +179,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
     chat: (providerId, req, signal) => {
       const row = store.byId(providerId);
       if (row === null) throw new NotFound("no such provider");
-      return providerFor(row, deps).chat(req, signal);
+      return providerFor(row, { ...deps, noneRefused }).chat(req, signal);
     },
     decisions: async (providerId, req, signal) => {
       const row = store.byId(providerId);

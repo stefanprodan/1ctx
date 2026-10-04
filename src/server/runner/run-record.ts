@@ -20,8 +20,7 @@ import type { SendCause, Wire } from "../../shared/words.ts";
 import {
   type ChatMessageIn,
   type ChatTool,
-  sentMessages,
-  wireTools,
+  requestText,
 } from "../providers/index.ts";
 
 // These caps bound provider input, not any stored text.
@@ -53,7 +52,7 @@ export type RecordParts = {
 // the request the record is fitted into
 export type RecordContext = {
   // the wire and model the step is sent to, so the fit counts the
-  // step's past reasoning only where the wire sends it back
+  // request in the wire's shape, past reasoning only where it goes back
   wire: Wire | null;
   model: string;
   tools: ChatTool[];
@@ -190,12 +189,13 @@ export function fitRecord(
   const room =
     context.contextLength -
     contextReserve(context.contextLength, context.reserve);
-  const schemas = wireTools(context.tools);
   const fits = (messages: ChatMessageIn[]) =>
     count(
-      JSON.stringify({
-        messages: sentMessages(context.wire, context.model, messages),
-        tools: schemas,
+      requestText(context.wire, {
+        model: context.model,
+        messages,
+        thinking: false,
+        tools: context.tools,
       }),
     ) <= room;
   let current = parts;

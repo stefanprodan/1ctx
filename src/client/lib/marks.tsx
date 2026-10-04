@@ -5,7 +5,8 @@
 // colour so they sit in a tile like the icons. OpenRouter's is the
 // glyph of its official logo (openrouter.ai/press), the wordmark left
 // out; the box is the glyph's own bounds, squared. Gemini's is the
-// spark, as Simple Icons traces it (CC0), in its 24 box.
+// spark and OpenCode's the frame of its identity mark, as Simple Icons
+// traces them (CC0), in their 24 box.
 
 import type { Wire } from "../../shared/words.ts";
 
@@ -15,9 +16,12 @@ const OPENROUTER =
 const GEMINI =
   "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81";
 
+const OPENCODE = "M22 24H2V0h20zM17 4.8H7v14.4h10z";
+
 const MARKS: Partial<Record<Wire, { d: string; box: string }>> = {
   openrouter: { d: OPENROUTER, box: "19.8 -34.45 361.6 361.6" },
   gemini: { d: GEMINI, box: "0 0 24 24" },
+  opencode: { d: OPENCODE, box: "0 0 24 24" },
 };
 
 // whether the wire has a mark; a server without one shows the cloud

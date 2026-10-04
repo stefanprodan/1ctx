@@ -22,7 +22,7 @@ import type {
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { firstSentence } from "../../shared/mcp-catalog.ts";
-import { WEB_TOOLS } from "../../shared/words.ts";
+import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
 import { parseNoQuery } from "../access/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
@@ -50,7 +50,7 @@ const byName = (a: { name: string }, b: { name: string }) =>
 
 // the lean MCP schemas as the wire carries them in all mode, the count
 // the token cap reads whatever mode the send resolved to
-function schemaTokens(servers: OfferedServer[]): number {
+function schemaTokens(servers: OfferedServer[], wire: Wire | null): number {
   const schemas = servers.flatMap((server) =>
     server.tools.map((tool) => ({
       name: tool.wireName,
@@ -58,7 +58,7 @@ function schemaTokens(servers: OfferedServer[]): number {
       parameters: tool.wireInputSchema,
     })),
   );
-  return wireTokens(schemas);
+  return wireTokens(schemas, wire);
 }
 
 export type SkillsListPort = {
@@ -171,9 +171,12 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
         const versions = deps.skills.versions(agent.id);
         const byId = new Map(versions.map((v) => [v.id, v]));
+        // counted as the agent's own wire sends the schemas
+        const provider = deps.providers.byId(agent.providerId);
+        const wire = provider?.wire ?? null;
         const body: DirectoryAgentResponse = {
           agent: summary(agent),
-          provider: deps.providers.byId(agent.providerId)?.name ?? "",
+          provider: provider?.name ?? "",
           skills: deps.skills
             .forAgent(agent.id)
             .map((skill) => ({
@@ -200,7 +203,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                 refreshFailedAt: server.refreshFailedAt,
               }))
               .sort(byName),
-            tokens: schemaTokens(offered.mcp),
+            tokens: schemaTokens(offered.mcp, wire),
           },
           tokens: {
             prompt: tokens(agent.prompt),
@@ -210,7 +213,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             ),
             // the schemas as the chat body carries them, skill tools
             // included
-            tools: wireTokens(offered.tools),
+            tools: wireTokens(offered.tools, wire),
           },
         };
         return json(body);

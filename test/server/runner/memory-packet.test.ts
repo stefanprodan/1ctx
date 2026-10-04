@@ -6,6 +6,7 @@ import { tokens } from "../../../src/server/lib/tokens.ts";
 import {
   type ChatMessageIn,
   type ChatTool,
+  requestText,
   wireTools,
 } from "../../../src/server/providers/index.ts";
 import {
@@ -476,5 +477,61 @@ describe("memory packet room", () => {
     // another model's reasoning is not sent, so it is not counted
     expect(fitted("opencode", "org/other")).toEqual(full);
     expect(fitted("opencode")).not.toEqual(full);
+  });
+
+  test("on azure a reasoning record counts by its summary, never its blob", () => {
+    const input = packet();
+    const phase = (blob: string): ChatMessageIn[] => [
+      {
+        role: "assistant",
+        model: context.model,
+        content: null,
+        reasoningDetails: [
+          {
+            type: "reasoning",
+            index: 0,
+            summary: [{ type: "summary_text", text: "keep the date" }],
+            encrypted_content: blob,
+          },
+        ],
+        toolCalls: [{ id: "m1", name: "memory_edit", arguments: "{}" }],
+      },
+      { role: "tool", toolCallId: "m1", content: "saved" },
+    ];
+    const big = "b".repeat(50_000);
+    const small = memoryMessages(
+      input,
+      { ...context, phase: phase("b") },
+      chars,
+    )!;
+    // the window that holds exactly the request with a one-letter blob
+    const room = chars(
+      requestText("azure", {
+        model: context.model,
+        messages: small,
+        thinking: false,
+        tools,
+      }),
+    );
+    const fitted = (wire: Wire) =>
+      memoryMessages(
+        input,
+        {
+          ...context,
+          wire,
+          phase: phase(big),
+          contextLength: room,
+          reserve: 0,
+        },
+        chars,
+      );
+    const full = memoryMessages(
+      input,
+      { ...context, phase: phase(big) },
+      chars,
+    );
+    expect(fitted("azure")).toEqual(full);
+    // a wire that counts the stored items whole cuts the record to fit
+    expect(fitted("openrouter")).not.toEqual(full);
   });
 });

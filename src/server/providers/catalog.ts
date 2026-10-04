@@ -13,6 +13,7 @@ import {
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import type { ProviderRow } from "./store.ts";
 import { CatalogError, type Fetcher } from "./types.ts";
@@ -139,6 +140,7 @@ export async function fetchCatalog(
 ): Promise<CatalogMatch[]> {
   let res: Response;
   const gemini = provider.wire === "gemini";
+  const azure = provider.wire === "azure";
   if (kind === "decisions" && !servesDecisions(provider.wire)) {
     throw new CatalogError("the provider serves no decision models");
   }
@@ -153,9 +155,14 @@ export async function fetchCatalog(
       ? {}
       : gemini
         ? { "x-goog-api-key": key }
-        : { authorization: `Bearer ${key}` };
+        : azure
+          ? { "api-key": key }
+          : { authorization: `Bearer ${key}` };
+  const url = azure
+    ? azureUrls(provider.baseUrl).catalog
+    : `${provider.baseUrl.replace(/\/+$/, "")}${path}`;
   try {
-    res = await fetcher(`${provider.baseUrl.replace(/\/+$/, "")}${path}`, {
+    res = await fetcher(url, {
       headers,
       signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
     });
@@ -172,7 +179,11 @@ export async function fetchCatalog(
     if (err instanceof CatalogError) throw err;
     throw new CatalogError("the provider did not answer with JSON");
   }
-  const models = gemini ? parseGeminiCatalog(body) : parseCatalog(body);
+  const models = gemini
+    ? parseGeminiCatalog(body)
+    : azure
+      ? parseDeployments(body)
+      : parseCatalog(body);
   if (models.length === 0) throw new CatalogError("the catalog is empty");
   return models;
 }

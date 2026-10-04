@@ -639,7 +639,7 @@ describe("a model its catalog does not describe", () => {
 
   refuses(
     [
-      { contextLength: 1023 },
+      { contextLength: 999 },
       { contextLength: 10_000_001 },
       { contextLength: 4096.5 },
       { contextLength: "4096" },
@@ -806,7 +806,7 @@ describe("a preferred upstream", () => {
     });
     expect(unknown.status).toBe(400);
     expect(await unknown.json()).toEqual({
-      error: `upstream nobody does not serve ${GLM} on router`,
+      error: `The preferred provider nobody does not serve ${GLM} on router`,
     });
     for (const upstream of ["a b", "../x", "a/.."]) {
       const malformed = await client.call("PATCH", `/api/agents/${agent.id}`, {
@@ -854,7 +854,7 @@ describe("a preferred upstream", () => {
       });
       expect(refused.status).toBe(400);
       expect(await refused.json()).toEqual({
-        error: `upstream ${upstream} is a 4-bit host, which skip4Bit leaves out`,
+        error: `The preferred provider ${upstream} is a 4-bit host, which Skip 4-bit providers leaves out`,
       });
     }
     const odd = await client.call("PATCH", `/api/agents/${agent.id}`, {
@@ -901,7 +901,8 @@ describe("a preferred upstream", () => {
     });
     expect(refused.status).toBe(400);
     expect(await refused.json()).toEqual({
-      error: "upstream relace is a 4-bit host, which skip4Bit leaves out",
+      error:
+        "The preferred provider relace is a 4-bit host, which Skip 4-bit providers leaves out",
     });
     const made = await client.call("POST", "/api/agents", {
       body: { ...body, upstream: "deepinfra/fp4" },
@@ -959,7 +960,7 @@ describe("a preferred upstream", () => {
     });
     expect(refused.status).toBe(400);
     expect(await refused.json()).toEqual({
-      error: `skip4Bit leaves no provider serving ${GLM}`,
+      error: `Skip 4-bit providers leaves no provider serving ${GLM}`,
     });
     // without the filter it saves, and a save that keeps it asks nothing
     const made = await client.call("POST", "/api/agents", { body });
@@ -970,7 +971,7 @@ describe("a preferred upstream", () => {
       body: { ...body, skip4Bit: true },
     });
     expect(tools.status).toBe(400);
-    expect((await tools.json()).error).toStartWith("skip4Bit");
+    expect((await tools.json()).error).toStartWith("Skip 4-bit providers");
     // a list that fails cannot judge
     answer = "not json";
     const unjudged = await client.call("PATCH", `/api/agents/${agent.id}`, {

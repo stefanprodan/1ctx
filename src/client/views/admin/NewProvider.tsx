@@ -5,6 +5,7 @@ import { useSignal } from "@preact/signals";
 import { MAX_NAME, type Wire } from "../../../shared/words.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
+import { ApiError } from "../../data/api.ts";
 import {
   createProvider,
   keys,
@@ -22,10 +23,12 @@ import { Choices } from "./Choices.tsx";
 import { NewCard } from "./NewCard.tsx";
 import {
   baseUrlProblem,
+  matchingKey,
   PRESETS,
   preset,
   presetBaseUrl,
   providerFieldOf,
+  providerRefusal,
 } from "./Providers.model.ts";
 
 const STEPS = [
@@ -33,7 +36,8 @@ const STEPS = [
   { label: "Providers", href: PROVIDERS_HREF },
 ];
 
-export function NewProvider() {
+// wire: the preset the form opens on
+export function NewProvider({ wire }: { wire?: Wire } = {}) {
   const error = providersError.value;
   return (
     <Page
@@ -42,16 +46,18 @@ export function NewProvider() {
       loading={providers.value === null && error === null}
       error={error}
     >
-      <Form />
+      <Form initial={wire ?? PRESETS[0]!.wire} />
     </Page>
   );
 }
 
-function Form() {
-  const wire = useSignal<Wire>(PRESETS[0]!.wire);
+function Form({ initial }: { initial: Wire }) {
+  const wire = useSignal<Wire>(initial);
   const name = useSignal(preset(wire.value).name);
   const baseUrl = useSignal(preset(wire.value).baseUrl ?? "");
-  const keyName = useSignal(NO_KEY);
+  // the key the admin picked; until then it follows the name
+  const picked = useSignal<string | null>(null);
+  const key = () => picked.value ?? matchingKey(keys.value, name.value);
   const chosen = preset(wire.value);
   // read at call time: the save keeps the first render's callback
   const body = () => {
@@ -63,7 +69,7 @@ function Form() {
         p.fixed && p.baseUrl !== null
           ? p.baseUrl
           : baseUrl.value.trim().replace(/\/+$/, ""),
-      keyName: keyName.value === NO_KEY ? null : keyName.value,
+      keyName: key() === NO_KEY ? null : key(),
     };
   };
   const choose = (next: Wire) => {
@@ -78,7 +84,13 @@ function Form() {
   };
   const save = useSave(async () => {
     const from = address();
-    const created = await createProvider(body());
+    let created: Awaited<ReturnType<typeof createProvider>>;
+    try {
+      created = await createProvider(body());
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      throw new ApiError(err.status, providerRefusal(err.message));
+    }
     if (address() === from) navigate(configProviderHref(created.name));
   }, providerFieldOf);
   const invalid = (field: string) => save.fieldError(field) !== null;
@@ -136,10 +148,10 @@ function Form() {
             mono
             invalid={invalid("keyName")}
             disabled={busy}
-            value={keyName.value}
-            options={keyOptions(keys.value, keyName.value)}
+            value={key()}
+            options={keyOptions(keys.value, key())}
             onChange={(value) => {
-              keyName.value = value;
+              picked.value = value;
               save.touch();
             }}
           />
@@ -159,7 +171,7 @@ function Form() {
               aria-required="true"
               autocomplete="off"
               spellcheck={false}
-              placeholder="http://host:port/v1"
+              placeholder={chosen.placeholder}
               aria-invalid={invalid("baseUrl") || undefined}
               disabled={busy}
               value={baseUrl.value}

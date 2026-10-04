@@ -50,7 +50,11 @@ import {
   parseTimeout,
   parseUrl,
 } from "../mcp/index.ts";
-import { parseBaseUrl, parseKeyName } from "../providers/index.ts";
+import {
+  azureBaseUrlProblem,
+  parseBaseUrl,
+  parseKeyName,
+} from "../providers/index.ts";
 import { MAX_SKILL_URL, validPath } from "../skills/index.ts";
 import { parseHosts, parseWebDomains } from "../tools/index.ts";
 import { at, boolean, guarded, names, object, optional } from "./fields.ts";
@@ -244,7 +248,7 @@ export function credential(value: unknown): CredentialSpec {
 }
 
 export function provider(value: unknown): ProviderSpec {
-  return optional<ProviderSpec>(
+  const spec = optional<ProviderSpec>(
     object(value, ["wire", "baseUrl", "keyFrom"], "spec"),
     {
       wire: guarded(isWire, "must be a known wire"),
@@ -252,6 +256,12 @@ export function provider(value: unknown): ProviderSpec {
       keyFrom: parseKeyName,
     },
   );
+  const problem =
+    spec.wire === "azure" && spec.baseUrl !== undefined
+      ? azureBaseUrlProblem(spec.baseUrl)
+      : null;
+  if (problem !== null) throw new Error(`spec.baseUrl: ${problem}`);
+  return spec;
 }
 
 const onlyTrue = (v: unknown): true => {

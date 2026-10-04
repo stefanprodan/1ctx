@@ -14,6 +14,7 @@ import {
   resetsThinking,
   statedModel,
   thinkingChoices,
+  thinkingHint,
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import { EffortField } from "./EffortField.tsx";
@@ -43,7 +44,12 @@ export function ModelFields({
   const rows = providers.value ?? [];
   const wire = rows.find((p) => p.id === d.providerId.value)?.wire;
   const model = d.model.value;
-  const picked = statedModel(model, d.windowText.value, d.takesTools.value);
+  const picked = statedModel(
+    model,
+    d.windowText.value,
+    d.takesTools.value,
+    d.windowSaved,
+  );
   const busy = save.busy;
   return (
     <>
@@ -122,6 +128,9 @@ export function ModelFields({
                 save.touch();
               }}
             />
+            {thinkingHint(wire) !== null && (
+              <span class="hint">{thinkingHint(wire)}</span>
+            )}
           </div>
           {wire !== undefined && effortApplies(model, d.thinking.value) && (
             <EffortField

@@ -1091,6 +1091,9 @@ describe("history", () => {
       ],
       thinking: false,
       thinkingOff: false,
+      // the least thinking said out loud, so a wire can tell it from a
+      // default that resolved to off
+      least: true,
       reasoningEffort: null,
       cacheKey: "s1",
       upstream: null,

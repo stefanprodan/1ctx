@@ -16,6 +16,7 @@ import {
   statedFields,
   statedModel,
   statedProblem,
+  windowText,
 } from "./Agents.model.ts";
 import { holding } from "./drafts.ts";
 
@@ -27,6 +28,7 @@ type ModelDraft = {
   upstream: string | null;
   skip4Bit: boolean;
   windowText: string;
+  windowSaved: number | null;
   takesTools: boolean;
 };
 
@@ -42,7 +44,10 @@ export class AgentDrafts {
   readonly effort = signal<Effort | null>(null);
   readonly upstream = signal<string | null>(null);
   readonly skip4Bit = signal(false);
+  // in thousands, as typed
   readonly windowText = signal("");
+  // the stored window the text was shown from, sent back when untouched
+  windowSaved: number | null = null;
   readonly takesTools = signal(false);
   // the model the upstream was chosen for: a tag names a provider of it
   upstreamOf: string | null = null;
@@ -90,7 +95,8 @@ export class AgentDrafts {
     this.upstream.value = agent.upstream;
     this.skip4Bit.value = agent.skip4Bit;
     this.upstreamOf = agent.model.id;
-    this.windowText.value = agent.model.contextLength?.toString() ?? "";
+    this.windowText.value = windowText(agent.model.contextLength);
+    this.windowSaved = agent.model.contextLength;
     this.takesTools.value = agent.model.tools;
     this.changing.value = false;
     this.before = null;
@@ -134,8 +140,7 @@ export class AgentDrafts {
       this.effort.value === before.effort &&
       this.upstream.value === before.upstream &&
       this.skip4Bit.value === before.skip4Bit &&
-      this.windowText.value ===
-        (before.model.contextLength?.toString() ?? "") &&
+      this.windowText.value === windowText(before.model.contextLength) &&
       this.takesTools.value === before.model.tools;
     if (untouched) this.resetModel(after);
   }
@@ -151,6 +156,7 @@ export class AgentDrafts {
       upstream: this.upstream.value,
       skip4Bit: this.skip4Bit.value,
       windowText: this.windowText.value,
+      windowSaved: this.windowSaved,
       takesTools: this.takesTools.value,
     };
     this.changing.value = true;
@@ -170,6 +176,7 @@ export class AgentDrafts {
       this.upstream.value = b.upstream;
       this.skip4Bit.value = b.skip4Bit;
       this.windowText.value = b.windowText;
+      this.windowSaved = b.windowSaved;
       this.takesTools.value = b.takesTools;
     }
     this.before = null;
@@ -182,6 +189,7 @@ export class AgentDrafts {
     this.upstreamOf = model.id;
     if (resetThinking) this.thinking.value = null;
     this.windowText.value = "";
+    this.windowSaved = null;
     this.takesTools.value = false;
     this.before = null;
     this.changing.value = false;
@@ -214,7 +222,12 @@ export class AgentDrafts {
       effort: sentEffort(m, this.thinking.value, this.effort.value, wire),
       upstream: wire === "openrouter" ? this.upstream.value : null,
       skip4Bit: wire === "openrouter" ? this.skip4Bit.value : false,
-      ...statedFields(m, this.windowText.value, this.takesTools.value),
+      ...statedFields(
+        m,
+        this.windowText.value,
+        this.takesTools.value,
+        this.windowSaved,
+      ),
     };
   }
 
@@ -227,6 +240,7 @@ export class AgentDrafts {
           this.model.value,
           this.windowText.value,
           this.takesTools.value,
+          this.windowSaved,
         ),
       )
     );
@@ -236,7 +250,8 @@ export class AgentDrafts {
     const model = this.model.value;
     const window = this.windowText.value;
     const tools = this.takesTools.value;
-    const picked = statedModel(model, window, tools);
+    const saved = this.windowSaved;
+    const picked = statedModel(model, window, tools, saved);
     return (
       this.providerId.value !== agent.providerId ||
       model?.id !== agent.model.id ||
@@ -253,7 +268,7 @@ export class AgentDrafts {
       picked?.contextLength !== agent.model.contextLength ||
       picked?.tools !== agent.model.tools ||
       // a window it cannot take reads as none, yet is an edit to refuse
-      statedProblem(model, window, tools) !== null
+      statedProblem(model, window, tools, saved) !== null
     );
   }
 

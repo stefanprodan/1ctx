@@ -45,6 +45,9 @@ export type RoundDeps = {
   ): AsyncIterable<ChatEvent>;
   writer: Writer;
   lookups: ContextLookups;
+  // the session's stored reasoning from this provider and model, which
+  // the provider refused, dropped so no later turn sends it again
+  forgetReasoning?(sessionId: string, providerId: string, model: string): void;
   clock: Clock;
   log: Log;
   // the jitter of a retry's wait, in [0, 1)
@@ -229,13 +232,15 @@ async function streamRound(
   // heard: any event came, so the quiet timer runs; started: one reached
   // the writer or the page, so asking again is no longer safe
   let heard = false;
+  // the wire says the model is reasoning, which it may do in silence
+  let thinking = false;
   let started = false;
   while (true) {
     const next = await nextEvent(
       iterator,
       deps.clock,
       visuals,
-      heard ? STREAM_IDLE_MS : null,
+      heard && !thinking ? STREAM_IDLE_MS : null,
     );
     if (next.kind === "idle") throw new Error("the provider went quiet");
     if (next.result.done) break;
@@ -279,9 +284,22 @@ async function streamRound(
         });
         if (!(await pause(deps.clock, wait, signal))) return;
         heard = false;
+        thinking = false;
         iterator = open();
         continue;
       }
+    }
+    // the wire asks again with no reasoning: a fresh request, so no
+    // idle cap until it answers
+    if (event.kind === "reasoningRefused") {
+      deps.forgetReasoning?.(send.sessionId, send.policy.providerId, req.model);
+      continue;
+    }
+    // a frame with nothing to show starts no idle check, but one already
+    // running starts over, and thinking lifts it
+    if (event.kind === "alive") {
+      thinking = event.thinking;
+      continue;
     }
     heard = true;
     // who serves the round reaches neither the writer nor the page, so

@@ -23,7 +23,6 @@ import type { ProjectRow } from "../projects/index.ts";
 import {
   refuseArchived,
   type SessionRow,
-  sendTurns,
   titleFrom,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
@@ -32,6 +31,7 @@ import { liveAuthor, principalOf } from "./authors.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
+import { roundLookups } from "./lookups.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
 import { dispatcher } from "./queue.ts";
@@ -86,12 +86,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   const roundDeps: RoundDeps = {
     chat: deps.providers.chat,
     writer,
-    lookups: {
-      usernameOf: (userId) => deps.users.byId(userId)?.username ?? null,
-      reasoningDetailsOf: (messageId, providerId, model) =>
-        deps.sessions.reasoningDetails(messageId, providerId, model),
-      turnsOf: (sessionId) => sendTurns(deps.db, sessionId),
-    },
+    ...roundLookups(deps),
     clock: deps.clock,
     log: deps.log,
   };

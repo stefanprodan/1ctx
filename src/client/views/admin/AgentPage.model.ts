@@ -18,7 +18,12 @@ import {
 } from "../../../shared/mcp.ts";
 import { MCP_MODES, type McpMode } from "../../../shared/words.ts";
 import { ago, commas, plural } from "../../lib/format.ts";
-import { agentFieldOf, listed, statedFields } from "./Agents.model.ts";
+import {
+  agentFieldOf,
+  listed,
+  statedFields,
+  windowText,
+} from "./Agents.model.ts";
 
 // a refusal lands on a field only when the card draws it, else it is
 // the card's notice
@@ -55,8 +60,9 @@ export function cardBody(
     skip4Bit: agent.skip4Bit,
     ...statedFields(
       agent.model,
-      agent.model.contextLength?.toString() ?? "",
+      windowText(agent.model.contextLength),
       agent.model.tools,
+      agent.model.contextLength,
     ),
     ...change,
   };

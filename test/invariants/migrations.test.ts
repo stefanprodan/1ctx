@@ -57,6 +57,7 @@ const EXPECTED_IDS = [
   "0043-run-attention",
   "0044-attention-round",
   "0045-open-attention",
+  "0046-azure",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1482,6 +1483,53 @@ describe("the schema", () => {
       expect(
         db.query("select count(*) as n from mcp_kept_files").get(),
       ).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0046 widens the wire check and keeps every provider", () => {
+    const db = seed(MIGRATIONS.slice(0, 45));
+    const tables = ["providers", "agents", "deciders", "sends"];
+    const rows = () =>
+      tables.map((table) =>
+        db.query(`select * from ${table} order by rowid`).all(),
+      );
+    try {
+      db.exec(`
+        insert into providers (id, name, wire, base_url, key_name, created_at)
+          values ('g', 'go', 'opencode', 'http://g.test', 'provider-g', 5);
+        insert into deciders (id, name, provider_id, model, is_default,
+            created_at)
+          values ('d', 'judge', 'g', 'm3', 1, 9);
+      `);
+      const before = rows();
+      expect(before.map((table) => table.length)).toEqual([2, 1, 1, 2]);
+      expect(() =>
+        db.exec("update providers set wire = 'azure' where id = 'pr'"),
+      ).toThrow(/CHECK/);
+      expect(MIGRATIONS[45]?.rebuilds).toEqual(["providers"]);
+      expect(migrate(db)).toEqual(expectedFrom("0046-azure"));
+      expect(rows()).toEqual(before);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(db.query("pragma foreign_keys").get()).toEqual({
+        foreign_keys: 1,
+      });
+      db.exec("update providers set wire = 'azure' where id = 'pr'");
+      expect(() => db.exec("update providers set wire = 'azure-v2'")).toThrow(
+        /CHECK/,
+      );
+      expect(() =>
+        db.exec("update providers set name = 'go' where id = 'pr'"),
+      ).toThrow(/UNIQUE/);
+      // the references still hold
+      expect(() => db.exec("delete from providers where id = 'g'")).toThrow(
+        /FOREIGN KEY/,
+      );
+      expect(() =>
+        db.exec("update agents set provider_id = 'missing' where id = 'a'"),
+      ).toThrow(/FOREIGN KEY/);
+      expect(migrate(db)).toEqual([]);
     } finally {
       db.close();
     }

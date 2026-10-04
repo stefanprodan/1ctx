@@ -500,6 +500,9 @@ function round(
     chat?: (req: ChatRequest, signal: AbortSignal) => AsyncIterable<ChatEvent>;
     // the quiet timer fires at once
     quiet?: boolean;
+    // the quiet timer fires after these real milliseconds
+    idleRealMs?: number;
+    forgetReasoning?: RoundDeps["forgetReasoning"];
     // Stop lands during the first retry's wait
     stopInWait?: boolean;
   } = {},
@@ -511,6 +514,11 @@ function round(
     // a retry's wait passes at once; the quiet timer never fires
     sleep: (ms: number) => {
       if (ms >= STREAM_IDLE_MS) {
+        if (fields.idleRealMs !== undefined) {
+          return new Promise<void>((resolve) =>
+            setTimeout(resolve, fields.idleRealMs),
+          );
+        }
         return fields.quiet ? Promise.resolve() : new Promise<void>(() => {});
       }
       if (fields.stopInWait) {
@@ -542,6 +550,7 @@ function round(
       },
     },
     lookups: {},
+    forgetReasoning: fields.forgetReasoning,
     clock,
     log: logs.logFactory("runner"),
     random: () => 0,
@@ -563,6 +572,7 @@ function round(
     round: {
       content: "",
       reasoning: "",
+      reasoningDetails: [],
       finishReason: null,
       usage: null,
       retry: null,
@@ -609,6 +619,119 @@ describe("runRound retries", () => {
           await new Promise(() => {});
         })(),
     });
+    await expect(r.run).rejects.toThrow("the provider went quiet");
+  });
+
+  test("a resend after refused reasoning has no idle cap until it answers", async () => {
+    const forgot: string[] = [];
+    const r = round([], {
+      idleRealMs: 5,
+      forgetReasoning: (sessionId, providerId, model) => {
+        forgot.push(`${sessionId}/${providerId}/${model}`);
+      },
+      chat: () =>
+        (async function* (): AsyncGenerator<ChatEvent> {
+          yield { kind: "reasoningRefused" };
+          // the resend's headers wait
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          yield* answer;
+        })(),
+    });
+    await r.run;
+    expect(forgot).toEqual(["chat/p/m"]);
+    expect(r.send.round!.content).toBe("");
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  // an azure stream shaped as the recordings: frames sent together, then
+  // a gap where Azure sends nothing at all, then the rest
+  const azureStream = (
+    before: Record<string, unknown>[],
+    gapMs: number,
+    after: Record<string, unknown>[],
+  ) => {
+    const encoder = new TextEncoder();
+    const frame = (body: Record<string, unknown>) =>
+      encoder.encode(`event: ${body.type}\ndata: ${JSON.stringify(body)}\n\n`);
+    const fetcher = (async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          async start(controller) {
+            for (const body of before) controller.enqueue(frame(body));
+            await new Promise((resolve) => setTimeout(resolve, gapMs));
+            for (const body of after) controller.enqueue(frame(body));
+            controller.close();
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      )) as unknown as typeof fetch;
+    const provider = providerFor(
+      {
+        id: "p",
+        name: "foundry",
+        wire: "azure",
+        baseUrl: "https://foundry.test/openai/v1",
+        keyName: null,
+        createdAt: 0,
+      },
+      { fetcher, secret: () => null },
+    );
+    // the idle window is 30 real ms, every gap 100
+    return round([], {
+      idleRealMs: 30,
+      chat: (req, signal) => provider.chat(req, signal),
+    });
+  };
+  const opened = [
+    { type: "response.created", response: {} },
+    { type: "response.in_progress", response: {} },
+    {
+      type: "response.output_item.added",
+      output_index: 0,
+      item: { type: "reasoning" },
+    },
+  ];
+  const reasoned = {
+    type: "response.output_item.done",
+    output_index: 0,
+    item: { type: "reasoning", summary: [], encrypted_content: "blob" },
+  };
+  const text = (delta: string) => ({
+    type: "response.output_text.delta",
+    output_index: 1,
+    delta,
+  });
+  const completed = { type: "response.completed", response: {} };
+
+  test("a silent start longer than the idle window still answers", async () => {
+    const r = azureStream([opened[0]!, opened[1]!], 100, [
+      text("hi"),
+      completed,
+    ]);
+    await r.run;
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  test("an open reasoning item lifts the idle check until it closes", async () => {
+    const r = azureStream(
+      [
+        ...opened,
+        {
+          type: "response.reasoning_summary_text.delta",
+          output_index: 0,
+          summary_index: 0,
+          delta: "thinking",
+        },
+      ],
+      100,
+      [reasoned, text("hi"), completed],
+    );
+    await r.run;
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  test("after visible text, silence with no reasoning open goes quiet", async () => {
+    const r = azureStream([...opened, reasoned, text("hi")], 100, [completed]);
     await expect(r.run).rejects.toThrow("the provider went quiet");
   });
 

@@ -20,11 +20,12 @@ import type { Message } from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
 import { UPLOADS_SUMMARY_LINE, uploadsBlock } from "../../shared/uploads.ts";
 import { tokens } from "../lib/tokens.ts";
-import type {
-  ChatMessageIn,
-  ChatRequest,
-  ReasoningDetail,
-  ToolCall,
+import {
+  type ChatMessageIn,
+  type ChatRequest,
+  markOf,
+  type ReasoningDetail,
+  type ToolCall,
 } from "../providers/index.ts";
 import { leastThinking, type SendPolicy } from "./policy.ts";
 import { NO_REPO_LINES, type RepoLines, systemPrompt } from "./prompt.ts";
@@ -78,9 +79,6 @@ function ownTurn(turn: Turn | undefined, policy: Builder): boolean {
     ? !turn.summoned
     : turn.summoned && turn.agentId === policy.agentId;
 }
-
-// the mark that opens another agent's answer in a history
-const markOf = (name: string) => `[${name}] `;
 
 // an answer without the agent's own mark: a model that read other
 // agents' marked answers may open its own the same way. Only a mark

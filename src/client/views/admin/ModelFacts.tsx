@@ -3,6 +3,7 @@
 
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
+import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 
 const TOOLS_CHOICES = [
@@ -30,22 +31,20 @@ export function ModelFacts({
     <>
       <label class="field agent-page-window">
         <span class="label">Context window</span>
-        <input
+        <NumberBox
           name="contextLength"
-          inputMode="numeric"
-          autocomplete="off"
-          spellcheck={false}
-          placeholder="131072"
-          aria-invalid={invalid || undefined}
+          unit="K"
+          placeholder="128"
+          invalid={invalid}
           disabled={busy}
           value={window}
-          onInput={(e) => onWindow((e.currentTarget as HTMLInputElement).value)}
+          onInput={onWindow}
         />
         {invalid ? (
           <FieldError save={save} field="contextLength" />
         ) : (
           <span class="hint">
-            Tokens. The catalog does not list this model's window.
+            Thousands of tokens. The catalog does not list this model's window.
           </span>
         )}
       </label>

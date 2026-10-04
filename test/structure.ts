@@ -11,6 +11,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, relative, sep } from "node:path";
 import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
+import { WIRES } from "../src/shared/words.ts";
 
 // the layer order: a server area may import only areas above it
 export const LAYERS = [
@@ -85,6 +86,8 @@ export const FORBIDDEN_HOSTS = [
   "api.anthropic.com",
   "generativelanguage.googleapis.com",
   "opencode.ai",
+  "openai.azure.com",
+  "services.ai.azure.com",
   "exa.ai",
   "firecrawl.dev",
   "tavily.com",
@@ -109,6 +112,13 @@ const NAMED_COLOURS = new Set(
     " ",
   ),
 );
+
+// a wire whose name is a colour's, azure, is the wire where code names
+// it as one: compared, a wire key or prop, a provider name key, or a
+// value typed Wire. After any other key, a style or markup attribute, it
+// is a colour
+const WIRE_NAMES = new Set<string>(WIRES);
+const WIRE_CONTEXT = /(?:\bwire\s*[:=]|\bname\s*:|:\s*Wire\s*=|[!=]==)$/;
 
 export type Violation = { file: string; rule: string; detail: string };
 
@@ -241,7 +251,7 @@ export function check(root: string): Violation[] {
         rel.endsWith(".ts") &&
         rel !== "server/tools/visual-theme.ts")
     ) {
-      for (const line of colourLiterals(code)) {
+      for (const line of colourLiterals(code, true)) {
         out.push({
           file: rel,
           rule: "tokens",
@@ -645,8 +655,9 @@ export function tokenLiteral(property: string, value: string): string | null {
 
 // colour literals in code or markup, by line: hex of any length, a
 // colour function, or a colour name where a value goes (after `:` or
-// `=`, quoted or not), so prose may still say "red"
-export function colourLiterals(text: string): number[] {
+// `=`, quoted or not), so prose may still say "red". In code, a wire's
+// name where a wire goes is no colour
+export function colourLiterals(text: string, code = false): number[] {
   const out: number[] = [];
   const hex = /(?:^|["'`\s(,=:])#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b/gi;
   const fn =
@@ -655,7 +666,11 @@ export function colourLiterals(text: string): number[] {
   for (const m of text.matchAll(hex)) out.push(lineAt(text, m.index));
   for (const m of text.matchAll(fn)) out.push(lineAt(text, m.index));
   for (const m of text.matchAll(named)) {
-    if (NAMED_COLOURS.has(m[1].toLowerCase())) out.push(lineAt(text, m.index));
+    const name = m[1].toLowerCase();
+    if (!NAMED_COLOURS.has(name)) continue;
+    const lead = text.slice(text.lastIndexOf("\n", m.index) + 1, m.index + 1);
+    if (code && WIRE_NAMES.has(name) && WIRE_CONTEXT.test(lead)) continue;
+    out.push(lineAt(text, m.index));
   }
   return [...new Set(out)].sort((a, b) => a - b);
 }

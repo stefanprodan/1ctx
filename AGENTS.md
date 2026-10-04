@@ -113,8 +113,9 @@ since a relative URL inside the binary resolves against `src/server`.
 
 **Test helpers.** `test/helpers/app.ts` wires the server over a test db
 with a fake clock, the least argon2id cost, a cookie jar and a fake
-fetch that answers only the recorded hosts (`PROVIDER_URL`, `NIM_URL`,
-`GROQ_URL`, `KEV_URL`) and fails every other. `chat.ts` drives a chat
+fetch that answers only the recorded hosts (`PROVIDER_URL`,
+`GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`) and fails
+every other. `chat.ts` drives a chat
 with a scripted provider stream. `auth-cases.ts` is the authorization
 matrix.
 

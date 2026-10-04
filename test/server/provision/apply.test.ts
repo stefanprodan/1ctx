@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { CredentialStore } from "../../../src/server/credentials/index.ts";
 import { parse } from "../../../src/server/provision/index.ts";
-import { testApp } from "../../helpers/app.ts";
+import { AZURE_URL, testApp } from "../../helpers/app.ts";
 import {
   agent,
   BARE_URL,
@@ -619,6 +619,51 @@ describe("provision through the composed app", () => {
       }
     },
   );
+
+  test("an azure provider takes a deployment, max and a stated window", async () => {
+    const { app } = await instance();
+    try {
+      const docs = documents(
+        object("Provider", "foundry", {
+          wire: "azure",
+          baseUrl: AZURE_URL,
+          keyFrom: null,
+        }),
+        object("Agent", "luna", {
+          provider: "foundry",
+          model: "gpt-6-luna",
+          thinking: "on",
+          effort: "max",
+          contextLength: 400_000,
+          tools: true,
+        }),
+      );
+      expect(await app.provision.apply(docs, ignore)).toMatchObject({
+        created: 2,
+      });
+      expect(app.providers.list()).toMatchObject([
+        { name: "foundry", wire: "azure", baseUrl: AZURE_URL },
+      ]);
+      expect(app.agents.byName("luna")).toMatchObject({
+        effort: "max",
+        model: { contextLength: 400_000, tools: true, described: false },
+      });
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("an azure provider's base URL is checked before anything is applied", () => {
+    expect(() =>
+      documents(
+        object("Provider", "foundry", {
+          wire: "azure",
+          baseUrl: BARE_URL,
+          keyFrom: null,
+        }),
+      ),
+    ).toThrow("spec.baseUrl: must be https://<resource>");
+  });
 
   test("an opencode provider takes max and an undescribed model's window", async () => {
     const { app } = await instance();
