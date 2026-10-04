@@ -179,7 +179,8 @@ export function prefixConflict(
 export const LATEST_FILES = 3;
 
 // what the system prompt says about the base: one line, never a name,
-// a count or a time, so a write keeps the prefix a provider cached
+// a count or a time, so only adding the first file or removing the last
+// moves the prefix a provider cached
 export function knowledgeBlock(empty: boolean): string {
   return empty
     ? "This project's knowledge base, which people may call the project docs or the project files, shown on the project's Knowledge tab, is empty. Its files are kept by agents with the bash tool at /knowledge; a command may create the first."

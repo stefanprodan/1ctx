@@ -488,7 +488,7 @@ describe("systemPrompt", () => {
 });
 
 describe("knowledge in a send", () => {
-  test("a doc write never changes the system prompt; compaction omits the block", async () => {
+  test("a write that keeps the base nonempty keeps the system prompt; compaction omits the block", async () => {
     const chat = await chatApp();
     try {
       const author = {
@@ -535,12 +535,23 @@ describe("knowledge in a send", () => {
         "changed",
         file.revision,
       );
+      const turn = await chat.member.call(
+        "POST",
+        `/api/sessions/${first.sessionId}/messages`,
+        { body: { message: "again" } },
+      );
+      expect(turn.status).toBe(201);
+      const third = await waitScript(chat.scripted, 3);
+      expect(prompt(third)).toBe(original);
+      third.reply("done");
+      await settleRun(chat, first.sessionId);
+
       const compacted = await chat.member.call(
         "POST",
         `/api/sessions/${first.sessionId}/compact`,
       );
       expect(compacted.status).toBe(200);
-      const compact = await waitScript(chat.scripted, 3);
+      const compact = await waitScript(chat.scripted, 4);
       expect(prompt(compact)).not.toContain("knowledge");
       expect(compact.body.tools).toBeUndefined();
       compact.reply("summary");
