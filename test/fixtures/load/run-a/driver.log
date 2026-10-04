@@ -5,3 +5,4 @@
 {"t":"watchers","step":2,"feedRefresh":{"n":3,"p50":20,"p95":40,"p99":40,"max":40},"relay":{"n":0},"firstDelta":{"n":2,"p50":400,"p95":450,"p99":450,"max":450}}
 {"t":"summary","mode":"turns","step":2,"turns":{"done":3,"failed":1},"turnsPerMin":4.5,"refused":{"chat:user":2},"turnMs":{"chat":{"n":4,"p50":20000,"p95":30000,"p99":30000,"max":31000}}}
 not a json line
+{"t":"stopped","at":1791108009500,"step":2,"session":"s-stop","origin":"chat","project":"team001","status":200}

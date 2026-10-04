@@ -26,7 +26,12 @@ describe("the summarizer", () => {
     expect(row.mcpCalls).toBe(2);
     expect(row.refused).toBe(2);
     expect(row.serverErrors).toBe(1);
-    expect(row.toolFailed).toEqual({ "bash run deadline": 1 });
+    // the mcp:git failure is the driver's stop; the mcp:docs one came
+    // earlier in that send and counts
+    expect(row.toolFailed).toEqual({
+      "bash run deadline": 1,
+      "mcp:docs": 1,
+    });
     expect(row.cpuM.max).toBe(900);
     expect(row.memMi.max).toBe(320);
     expect(row.probe.feed.p95).toBe(9);
@@ -43,6 +48,6 @@ describe("the summarizer", () => {
     expect(cells(row)[5]).toBe("20.0 / 30.0");
     // a lost frame never looks healthy
     expect(cells(row)[14]).toBe("8 / 8, 1 lost");
-    expect(cells(row).at(-1)).toBe("1 server, 1 tool, 2 exit, 3 probe");
+    expect(cells(row).at(-1)).toBe("1 server, 2 tool, 2 exit, 3 probe");
   });
 });

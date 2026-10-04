@@ -13,6 +13,9 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 type Event = Record<string, any>;
+
+// how long before its logged stop a send's aborted calls may fail
+const STOP_SLACK_MS = 5_000;
 type Q = { n: number; p50: number; p95: number; p99: number; max: number };
 
 const OUT = resolve(import.meta.dir, "out", "results");
@@ -140,9 +143,19 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
   const server = await lines(dir, "server");
   let serverErrors = 0;
   const toolFailed: Record<string, number> = {};
+  // a send the driver stopped at the end aborts its tool calls; those
+  // failures are the stop, not the server's. The driver logs a stop once
+  // it is answered, so the aborts land around it, from a few seconds
+  // before on; a failure earlier in that send still counts
+  const stoppedAt = new Map<string, number>(
+    driver.filter((e) => e.t === "stopped").map((e) => [e.session, e.at]),
+  );
   for (const l of server) {
     if (l.includes("level=ERROR")) serverErrors++;
     if (!l.includes('msg="tool failed"')) continue;
+    const stop = stoppedAt.get(l.match(/ chat=(\S+)/)?.[1] ?? "");
+    const at = Date.parse(l.match(/^time=(\S+)/)?.[1] ?? "");
+    if (stop !== undefined && at >= stop - STOP_SLACK_MS) continue;
     const k = [/tool=(\S+)/, /phase=(\S+)/, /cause=(\S+)/]
       .map((re) => l.match(re)?.[1] ?? "")
       .filter(Boolean)
