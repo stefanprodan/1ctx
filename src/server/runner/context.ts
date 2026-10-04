@@ -248,24 +248,24 @@ export function request(
   };
 }
 
-// two upper bounds on the summary request's size. The answer round's
-// measured prompt plus completion is exact for the provider's tokenizer
-// and counts reasoning a wire replays (Azure's encrypted items), but
-// overstates it by the schemas and the completion. The local estimate
-// is close but can undercount another tokenizer, so it carries a tenth
-// on top. SUMMARY_MARGIN covers the rest; the floor is the least a
-// summary is asked for: a short summary beats none, and a provider that
-// cannot fit even that refuses the round, which ends failed and is
-// tried again next time
+// the summary request's size is the answer round's measured prompt
+// plus completion: exact for the provider's tokenizer, replayed
+// reasoning included, and it only overstates the summary (schemas, the
+// completion), so it errs safe. The local estimate, with a tenth on top
+// for another tokenizer, takes over only when nothing was measured or
+// the measure leaves no room, a provider that took more than the window
+// the agent states. The floor is the least a summary is asked for: a
+// short summary beats none, and a provider that cannot fit even that
+// refuses the round, which ends failed and is tried again next time
 export const SUMMARY_MARGIN = 256;
 export const ESTIMATE_SLACK = 0.1;
 export const SUMMARY_MIN_TOKENS = 128;
 
 // the summary round: the history plus the instruction, no tools and the
 // least thinking, since a model's thoughts come out of the same cap. Its
-// answer is capped by the limit and the reserve, then by the room the
-// smaller bound leaves: a strict provider refuses a request whose prompt
-// and max_tokens together pass the window
+// answer is capped by the limit and the reserve, then by the room its
+// size leaves: a strict provider refuses a request whose prompt and
+// max_tokens together pass the window
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
@@ -287,10 +287,11 @@ export function summaryRequest(
   };
   let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
   if (window !== null) {
-    const estimate = Math.ceil(
-      requestTokens(policy.wire, req) * (1 + ESTIMATE_SLACK),
-    );
-    const size = used === null ? estimate : Math.min(used, estimate);
+    // the estimate counts the whole history, so only when it is needed
+    const size =
+      used !== null && used + SUMMARY_MARGIN + SUMMARY_MIN_TOKENS <= window
+        ? used
+        : Math.ceil(requestTokens(policy.wire, req) * (1 + ESTIMATE_SLACK));
     const room = window - size - SUMMARY_MARGIN;
     maxTokens = Math.max(SUMMARY_MIN_TOKENS, Math.min(maxTokens, room));
   }

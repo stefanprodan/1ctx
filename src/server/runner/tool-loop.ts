@@ -136,7 +136,9 @@ export async function toolLoop(
       ) {
         const summary = deps.writer.startSummary(send);
         send.summarizing = true;
-        send.used = round.tokens;
+        // a round with no usage holds its request estimate without the
+        // answer, which must not pass as measured
+        send.used = round.usage === null ? null : round.tokens;
         send.roundNo += 1;
         send.phase = "provider";
         send.round = newRound(summary.id, summary.createdAt);

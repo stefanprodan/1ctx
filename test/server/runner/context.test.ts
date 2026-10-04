@@ -1128,33 +1128,45 @@ describe("history", () => {
     expect(req.maxTokens).toBe(4096);
   });
 
-  test("a 1M window at its threshold sizes the summary by usage", () => {
-    const wide: SendPolicy = { ...policy, contextLength: 1_000_000 };
-    const req = summaryRequest(wide, "s1", said(974_850), 985_000);
-    expect(estimate(req)).toBe(974_983);
-    // a tenth on the estimate passes the window; the measured size fits
-    expect(req.maxTokens).toBe(4096);
-    expect(summaryRequest(wide, "s1", said(974_850)).maxTokens).toBe(
-      SUMMARY_MIN_TOKENS,
-    );
+  test.serial("a window at its threshold sizes the summary by usage", () => {
+    const counted = spyOn(tokenCount, "tokens");
+    try {
+      // 1M and 200K with the default 20K reserve, compacting at 980K and
+      // 180K: the measure leaves room, so the history is never counted
+      const wide: SendPolicy = { ...policy, contextLength: 1_000_000 };
+      expect(summaryRequest(wide, "s1", said(100), 985_000).maxTokens).toBe(
+        4096,
+      );
+      const mid: SendPolicy = { ...policy, contextLength: 200_000 };
+      expect(summaryRequest(mid, "s1", said(100), 182_000).maxTokens).toBe(
+        4096,
+      );
+      expect(counted).not.toHaveBeenCalled();
+    } finally {
+      counted.mockRestore();
+    }
   });
 
-  test("the summary fits the smaller bound, less the margin", () => {
+  test("a measure near the window wins over a smaller estimate", () => {
+    // a tokenizer that counts a quarter more than o200k: the estimate
+    // would leave room the provider does not have; 32,000 - 30,997 - 256
+    expect(summaryRequest(small, "s1", said(100), 30_997).maxTokens).toBe(747);
     const near = said(26_400);
     expect(estimate(summaryRequest(small, "s1", near))).toBe(26_533);
-    // the measured size is the smaller: 32,000 - 28,000 - 256
     expect(summaryRequest(small, "s1", near, 28_000).maxTokens).toBe(3744);
-    // nothing measured: 32,000 - ceil(26,533 * 1.1) - 256
-    expect(summaryRequest(small, "s1", near).maxTokens).toBe(2557);
-    expect(summaryRequest(small, "s1", near, 30_000).maxTokens).toBe(2557);
-    expect(SUMMARY_MARGIN).toBe(256);
-    expect(ESTIMATE_SLACK).toBe(0.1);
   });
 
-  test("both bounds past the window ask for the floor", () => {
-    const req = summaryRequest(small, "s1", said(29_500), 33_000);
-    expect(estimate(req)).toBe(29_633);
-    expect(req.maxTokens).toBe(SUMMARY_MIN_TOKENS);
+  test("no measure, or one past the window, falls back to the estimate", () => {
+    const near = said(26_400);
+    // 32,000 - ceil(26,533 * 1.1) - 256
+    expect(summaryRequest(small, "s1", near).maxTokens).toBe(2557);
+    expect(summaryRequest(small, "s1", near, 32_100).maxTokens).toBe(2557);
+    expect(SUMMARY_MARGIN).toBe(256);
+    expect(ESTIMATE_SLACK).toBe(0.1);
+    // both past the window ask for the floor
+    const over = summaryRequest(small, "s1", said(29_500), 33_000);
+    expect(estimate(over)).toBe(29_633);
+    expect(over.maxTokens).toBe(SUMMARY_MIN_TOKENS);
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {

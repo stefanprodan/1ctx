@@ -330,7 +330,7 @@ that agent answers the one turn (see Summons).
   Off there. It carries `least` (`leastThinking()`), so a wire can tell
   it from a default that resolved to off.
 - **The summary's `max_tokens` fits the window less** 256 and the
-  lesser of the answer's usage and `requestTokens()` +10%, min 128.
+  last usage if it fits, else `requestTokens()` +10%; min 128.
 - **After a done summary, history is the summary, then its tail**
   (`runner/tail.ts`): the newest whole turns before the summary row,
   replayed as they were, then the rows after it. A turn is one send's
