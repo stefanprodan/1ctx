@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke staging-deploy staging-provision staging-status
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke staging-deploy staging-provision staging-status load-db load load-kind load-summary load-smoke
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -71,3 +71,18 @@ staging-provision: ## Stop staging, apply the objects, start it (FILE=path.yaml,
 
 staging-status: ## What the staging service says
 	@bun run staging-status
+
+load-db: ## Build a load test database (PRESET=bench|small|tiny, ARGS="--out path")
+	@bun run load-db $(if $(PRESET),--preset $(PRESET)) $(ARGS)
+
+load: ## Run the load locally against a clone of a built database (ARGS="--n 10 --seconds 120 --checkout path")
+	@bun run load $(ARGS)
+
+load-kind: ## Run the load on a kind cluster (ARGS="install|setup|step MULT MINUTES|smoke")
+	@bun run load-kind $(ARGS)
+
+load-summary: ## Print the results table of load runs (ARGS="label ...", all when empty)
+	@bun run load-summary $(ARGS)
+
+load-smoke: ## Run the local load for 30 s at N=2 on a tiny database
+	@bun run load-smoke

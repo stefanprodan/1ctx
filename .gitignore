@@ -125,3 +125,6 @@ bin/
 .*.bun-build
 deploy/docker/secrets/
 deploy/docker/provision/
+
+# the load harness's databases, keys and results
+scripts/load/out/
