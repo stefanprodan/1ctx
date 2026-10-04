@@ -16,6 +16,7 @@ import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { mcpBase, modelUrl, writeKind } from "./provision.ts";
+import { failIfStuck, rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
 
@@ -224,16 +225,8 @@ async function install() {
     undefined,
     true,
   );
-  run(
-    k("rollout", "status", "deploy/fake-model", "--timeout=180s"),
-    undefined,
-    true,
-  );
-  run(
-    k("rollout", "status", "deploy/fake-mcp", "--timeout=180s"),
-    undefined,
-    true,
-  );
+  await rolledOut(k, "fake-model");
+  await rolledOut(k, "fake-mcp");
   const tag = flag("tag") ?? "dev";
   run(
     [
@@ -252,9 +245,6 @@ async function install() {
       `image.tag=${tag}`,
       "--set",
       `resources.limits.cpu=${flag("cpu") ?? "4"}`,
-      "--wait",
-      "--timeout",
-      "15m",
     ],
     undefined,
     true,
@@ -262,11 +252,7 @@ async function install() {
   // a rebuilt image keeps the dev tag, so helm sees no change and the
   // old pod would keep running the previous build
   run(k("rollout", "restart", "deploy/onectx"), undefined, true);
-  run(
-    k("rollout", "status", "deploy/onectx", "--timeout=15m"),
-    undefined,
-    true,
-  );
+  await rolledOut(k, "onectx");
   console.log(`installed onectx in ${context}/${ns}`);
 }
 
@@ -291,7 +277,7 @@ function checkMetrics() {
 
 // runs the driver in a fresh pod and returns its log; the pod must
 // start within READY_MS and end within doneMs, or the run fails
-const READY_MS = 5 * 60_000;
+const READY_MS = 3 * 60_000;
 async function driver(
   name: string,
   args: string[],
@@ -309,6 +295,7 @@ async function driver(
   for (;;) {
     await Bun.sleep(5000);
     const phase = phaseOf();
+    if (phase === "Pending") failIfStuck(k, (pod) => pod === name);
     if (phase === "Succeeded" || phase === "Failed") break;
     const waited = Date.now() - start;
     if (phase === "Pending" && waited > READY_MS) {
@@ -378,15 +365,7 @@ async function step(mult: string, minutes: string) {
       children.add(f);
     }
     sampler = setInterval(() => {
-      // nodes, since the namespace may not exist before install
-      const p = Bun.spawnSync([
-        "kubectl",
-        "--context",
-        context,
-        "top",
-        "node",
-        "--no-headers",
-      ]);
+      const p = Bun.spawnSync(k("top", "pod", "--no-headers"));
       const m = p.stdout.toString().match(/onectx-\S+\s+(\d+)m\s+(\d+)Mi/);
       if (m)
         top.push(
@@ -421,6 +400,12 @@ async function step(mult: string, minutes: string) {
     await Bun.write(join(results, "top.log"), `${top.join("\n")}\n`);
   }
   printTable([await summarize(results)]);
+  // a step with no samples would print empty CPU and RSS columns
+  if (top.length === 0) {
+    throw new Error(
+      `no CPU or memory samples: kubectl top pod never showed the server pod in ${ns}`,
+    );
+  }
 }
 
 async function main() {
