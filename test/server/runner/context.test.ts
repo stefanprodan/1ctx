@@ -1112,7 +1112,7 @@ describe("history", () => {
     return requestTokens(fullWindow.wire, rest);
   };
 
-  test("a summary after an answer round past the window still gets the whole cap when its own request leaves room", () => {
+  test("a full answer round leaves the summary its whole cap", () => {
     const messages: ChatMessageIn[] = [
       { role: "system", content: "system" },
       { role: "user", content: "word ".repeat(22_700) },
@@ -1125,20 +1125,22 @@ describe("history", () => {
     expect(answer + 5093).toBeGreaterThan(32_000);
     const req = summaryRequest(fullWindow, "s1", messages);
     expect(req.tools).toBeUndefined();
+    expect(margin).toBe(3456);
     expect(32_000 - summaryPrompt(req) - margin).toBeGreaterThan(4096);
     expect(req.maxTokens).toBe(4096);
   });
 
-  test("a summary request near the window is capped at its room less the margin, never under the floor", () => {
+  test("a summary near the window gets its room, at least the floor", () => {
     const near = summaryRequest(fullWindow, "s1", [
-      { role: "user", content: "word ".repeat(29_000) },
+      { role: "user", content: "word ".repeat(26_400) },
     ]);
     const room = 32_000 - summaryPrompt(near) - margin;
     expect(room).toBeGreaterThan(SUMMARY_MIN_TOKENS);
     expect(room).toBeLessThan(4096);
     expect(near.maxTokens).toBe(room);
+    expect(near.maxTokens).toBe(2011);
     const over = summaryRequest(fullWindow, "s1", [
-      { role: "user", content: "word ".repeat(30_000) },
+      { role: "user", content: "word ".repeat(28_500) },
     ]);
     expect(32_000 - summaryPrompt(over) - margin).toBeLessThan(
       SUMMARY_MIN_TOKENS,

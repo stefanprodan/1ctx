@@ -118,7 +118,7 @@ describe("compaction", () => {
     chat.app.socket.dispose();
   });
 
-  test("a summary is sized by its own request, not an answer round past the window", async () => {
+  test("a summary is sized by its own request", async () => {
     const chat = await chatApp({ window: 32_000 });
     const started = await startChat(chat, "the old question");
     // schemas and a long reasoning completion took the answer round past

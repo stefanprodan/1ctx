@@ -248,23 +248,22 @@ export function request(
   };
 }
 
-// the room left under the window beyond the summary request's own
-// estimate: a fixed part plus a share of the window, since the local
-// count can undercount another provider's tokenizer and a strict
-// provider refuses prompt plus max_tokens past the window. The floor is
-// the least a summary is asked for: a short summary beats none, and a
-// provider that cannot fit even that refuses the round, which ends
-// failed and is tried again next time
+// the room kept under the window past the summary request's estimate:
+// another provider's tokenizer can count more, and a wire may replay
+// reasoning the count leaves out (Azure's encrypted items), while a
+// strict provider refuses prompt plus max_tokens past the window. The
+// floor is the least a summary is asked for: a short summary beats
+// none, and a provider that cannot fit even that refuses the round,
+// which ends failed and is tried again next time
 export const SUMMARY_MARGIN = 256;
-export const SUMMARY_MARGIN_SHARE = 0.05;
+export const SUMMARY_MARGIN_SHARE = 0.1;
 export const SUMMARY_MIN_TOKENS = 128;
 
 // the summary round: the history plus the instruction, no tools and the
 // least thinking, since a model's thoughts come out of the same cap. Its
-// answer is capped by the limit and the reserve, then by the room its
-// own request leaves under the window. The answer round's usage is no
-// measure: it carried the schemas and replayed reasoning, and counts
-// its completion on top
+// answer is capped by the limit and the reserve, then fits an estimate
+// of its own request: the answer round's usage carried the schemas and
+// counts its completion on top
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,

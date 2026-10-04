@@ -329,8 +329,8 @@ that agent answers the one turn (see Summons).
   least effort for a `thinkingRequired` model, since a provider refuses
   Off there. It carries `least` (`leastThinking()`), so a wire can tell
   it from a default that resolved to off.
-- **The summary's `max_tokens` fits its own request,** not the answer
-  round's usage: the window less its `requestTokens()`, 256 and 5%.
+- **The summary's `max_tokens` fits an estimate of its own request:**
+  the window less its `requestTokens()`, 256 and 10%, at least 128.
 - **After a done summary, history is the summary, then its tail**
   (`runner/tail.ts`): the newest whole turns before the summary row,
   replayed as they were, then the rows after it. A turn is one send's
