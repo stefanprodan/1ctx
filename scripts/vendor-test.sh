@@ -101,6 +101,10 @@ until matches; do
   attempt=$((attempt + 1))
   echo "vendor-test: failures differ, run $attempt of $ATTEMPTS:"
   comm -3 "$LIST" "$LOG.now" | sed 's/^/  /'
+  # a flake that passes on the next run leaves only this to root-cause
+  while IFS= read -r line; do
+    grep -aF -B 30 "$line" "$LOG" | grep -av '^(pass)' | tail -30 || true
+  done <"$LOG.new"
   run
 done
 echo "vendor-test: ok, $(wc -l <"$LIST" | tr -d ' ') expected failures"
