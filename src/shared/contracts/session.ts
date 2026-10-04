@@ -9,6 +9,7 @@
 import type { MessageUpload } from "../uploads.ts";
 import type {
   ArchiveReason,
+  AttentionSource,
   Avatar,
   EventSource,
   MessageKind,
@@ -51,9 +52,17 @@ export type SessionSummary = {
   // set once a chat is archived, for good; null while it takes turns,
   // and always for a run, which is read-only once it ends
   archived: { at: number; reason: ArchiveReason } | null;
-  // the chance, 0 to 1, that a finished run needs a person, as the
-  // default decider answered; null for a chat and a run not asked
+  // whether a run needs a user: 1 when its agent or the runner marked
+  // it, else the chance, 0 to 1, a decider gave; null for a chat and a
+  // run nobody marked
   attention: number | null;
+  // the agent's or the runner's one line, null for a decider's mark
+  attentionReason: string | null;
+  attentionSource: AttentionSource | null;
+  // who marked it: the agent's name, or the decider's, set whenever a
+  // decider read the run; null for the runner's mark and a run no
+  // decider read
+  attentionBy: string | null;
 };
 
 // what the chat page says of an archived chat beyond the summary: who
@@ -201,8 +210,13 @@ export type SendSummary = {
   rounds: number;
   // tool calls launched, not calls a cap cut
   toolCalls: number;
-  // the round the memory phase started at; null for a send without one
+  // the first round after a run's answer, its attention step's or its
+  // memory phase's; null for a send without either
   memoryRound: number | null;
+  // the round the attention step started at; null for a send without one
+  attentionRound: number | null;
+  // the round the memory phase started at; null until it starts
+  memoryFrom: number | null;
   // why the memory phase did not update the note, null when it did
   memoryError: string | null;
   // edits the commit skipped because the note moved during the run

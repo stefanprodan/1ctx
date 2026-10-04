@@ -68,6 +68,8 @@ export type ToolWhen =
   | "skillFiles"
   | "mcpCatalog"
   | "memory"
+  // in a run whose automation lets its agent mark it
+  | "runs"
   // while the send has web access, and for websearch a provider too
   | "web"
   | "webSearch";

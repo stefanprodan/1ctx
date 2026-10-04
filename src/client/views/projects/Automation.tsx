@@ -7,8 +7,9 @@
 // it with a tag and says it is paused until an edit picks another.
 // Suspend or Resume and Run now, which anyone in the project presses,
 // and Edit for whoever may change it, sit over two tabs. Runs is a log
-// of RunRow.tsx rows, a page at a time. Memory is the automation's own
-// note.
+// of RunRow.tsx rows, a page at a time, filtered to the manual or the
+// flagged runs. An open alert sits over the brief with
+// Dismiss. Memory is the automation's own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
@@ -48,6 +49,7 @@ import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
+import { ATTENTION_LABELS } from "./Attention.model.ts";
 import { AccessLines } from "./AutomationAccess.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
@@ -58,6 +60,7 @@ import {
   scheduleTitle,
   suspendedText,
 } from "./Automations.model.ts";
+import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
 import { fireLabel } from "./Schedule.model.ts";
@@ -65,8 +68,8 @@ import "./automations.css";
 
 const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: null, label: "All" },
-  { value: "failed", label: "Failed" },
   { value: "manual", label: "Manual" },
+  { value: "attention", label: "Flagged" },
 ];
 
 // the instructions cut to a few lines, Show all in the fade once they
@@ -239,6 +242,9 @@ export function Automation({ params }: { params: Params }) {
                 <AsideLine label="Deadline">
                   {deadlineText(deadlineMs)}
                 </AsideLine>
+                <AsideLine label="Needs attention">
+                  {ATTENTION_LABELS[row.attentionMode]}
+                </AsideLine>
                 <AccessLines row={row} />
                 {row.rerunOnRestart && (
                   <div class="split-line">
@@ -253,6 +259,9 @@ export function Automation({ params }: { params: Params }) {
             </>
           }
         >
+          {row.alert !== null && (
+            <OpenAttention id={row.id} alert={row.alert} now={now} />
+          )}
           <section class="card automations-brief">
             <p class="automations-brief-line">
               <span class="automations-strong">
@@ -356,10 +365,10 @@ export function Automation({ params }: { params: Params }) {
                 <RowsNote>Loading</RowsNote>
               ) : held.rows.length === 0 ? (
                 <RowsNote>
-                  {filter === "failed"
-                    ? "No failed runs."
-                    : filter === "manual"
-                      ? "No manual runs."
+                  {filter === "manual"
+                    ? "No manual runs."
+                    : filter === "attention"
+                      ? "Nothing flagged."
                       : "No runs yet."}
                 </RowsNote>
               ) : (

@@ -395,6 +395,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     uploads: knowledge,
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
+    pruned: (automationId, endedAt) =>
+      automations.alerts.pruned(automationId, endedAt),
   });
   const configuredTools = toolsArea({
     db,
@@ -470,7 +472,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
       runAnswer: (sendId, memoryRound) =>
         sessions.runAnswer(sendId, memoryRound),
       markAttention: (sessionId, attention, by) =>
-        sessions.markAttention(sessionId, attention, by),
+        automations.alerts.decided(sessionId, attention, by),
+      undecided: (sessionId) => automations.alerts.undecided(sessionId),
+    },
+    alerts: {
+      runEnded: (run, change) => automations.alerts.runEnded(run, change),
     },
   });
   automations = automationsArea({
@@ -485,6 +491,17 @@ export async function compose(options: ComposeOptions): Promise<App> {
     memory,
     sessions: sessions.store,
     runner,
+    markAttention: (sessionId, attention, by) =>
+      sessions.markAttention(sessionId, attention, by),
+    deciderOn: () => {
+      const decision = deciders.decision("run-attention");
+      const named =
+        decision.deciderId === null
+          ? null
+          : deciders.store.byId(decision.deciderId);
+      // a decision whose decider is gone asks the default, as decide() does
+      return decision.enabled && (named ?? deciders.current()) !== null;
+    },
   });
   const overview: Overview = overviewArea({
     db,

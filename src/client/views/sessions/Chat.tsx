@@ -23,7 +23,7 @@ import type { SessionOrigin } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { archiveSession } from "../../data/archive.ts";
-import { automations } from "../../data/automations.ts";
+import { automations, dismissAlert } from "../../data/automations.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
@@ -43,21 +43,18 @@ import {
   stopSession,
 } from "../../data/sessions.ts";
 import type { Failure } from "../../lib/format.ts";
-import {
-  automationHref,
-  chatHref,
-  markdownHref,
-  runHref,
-} from "../../lib/hrefs.ts";
+import { chatHref, markdownHref, runHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
+import { agentMarked } from "../../transcript/Work.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RESTARTED_LINE } from "../projects/Run.model.ts";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
 import { queueActions } from "./queue.ts";
+import { inOpenAlert, runOf } from "./RunFoot.model.ts";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
 
@@ -129,8 +126,11 @@ function SessionPage({
   );
   const from = shown?.forkedFrom ?? null;
   const automation = run
-    ? (automations.value?.find((a) => a.id === shown?.session.automationId) ??
+    ? (automations.value?.find((a) => a.id === shown.session.automationId) ??
       null)
+    : null;
+  const of = run
+    ? runOf(shown.session.automationId, automation, automations.value !== null)
     : null;
   return (
     <Page
@@ -189,20 +189,15 @@ function SessionPage({
               )}
             </p>
           )}
-          {run && (
+          {of !== null && (
             <p class="chat-run">
               <Icon name="clock" size={12} />
               <span class="chat-run-label">Run of</span>
-              {automation === null ? (
-                <span>
-                  {shown.session.automationId === null ||
-                  automations.value !== null
-                    ? "a deleted automation"
-                    : "an automation"}
-                </span>
+              {of.href === null ? (
+                <span>{of.name}</span>
               ) : (
-                <a class="chat-run-link" href={automationHref(automation.id)}>
-                  {automation.name}
+                <a class="chat-run-link" href={of.href}>
+                  {of.name}
                 </a>
               )}
             </p>
@@ -218,6 +213,7 @@ function SessionPage({
             nodes={groupRows(shown.messages, shown.send)}
             live={live.value}
             retry={retrying.value}
+            marked={agentMarked(shown.session)}
             agentOf={agentOf}
             authorOf={authorOf}
             onRegenerate={
@@ -252,6 +248,7 @@ function SessionPage({
             foot={
               run || archived ? (
                 <RunFoot
+                  runOf={of ?? undefined}
                   row={{
                     session: shown.session,
                     agent: null,
@@ -269,6 +266,12 @@ function SessionPage({
                       : undefined
                   }
                   onStop={() => stopSession(shown.session.id)}
+                  onDismiss={
+                    automation !== null &&
+                    inOpenAlert(shown.session, automation.alert)
+                      ? () => dismissAlert(automation.id)
+                      : undefined
+                  }
                   fork={
                     lastTurn === undefined
                       ? undefined

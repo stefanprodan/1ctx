@@ -129,7 +129,12 @@ describe("the memory phase boundary", () => {
       trustProxy: false,
     });
     const send = fresh.sessions.lastSend(run.sessionId)!;
-    expect(send).toMatchObject({ cause: "restart", status: "failed" });
+    expect(send).toMatchObject({
+      cause: "restart",
+      status: "failed",
+      attentionRound: null,
+      memoryFrom: 2,
+    });
     expect(send.memoryError).not.toBeNull();
     expect(chat.scripted.scripts).toHaveLength(3);
     const replies = fresh.sessions
@@ -146,6 +151,43 @@ describe("the memory phase boundary", () => {
         automationId: automation.id,
       }).entries,
     ).toEqual([]);
+    fresh.socket.dispose();
+  });
+
+  test("a restart in the attention step leaves the memory phase's words alone", async () => {
+    const chat = await chatApp();
+    const restart = () => {
+      chat.app.socket.dispose();
+      return compose({
+        db: chat.app.db,
+        secret: (kind, name) =>
+          kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
+        clock: () => chat.app.now.value,
+        fetcher: chat.scripted.fetcher,
+        log: () => silent,
+        version: VERSION,
+        secureCookie: false,
+        trustProxy: false,
+      });
+    };
+    const automation = await createAutomation(chat, {
+      attentionMode: "agent",
+      ownMemory: true,
+    });
+    const run = await startRun(chat, automation.id);
+    run.main.reply("Done.");
+    await waitScript(chat.scripted, 2);
+    expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+      memoryRound: 2,
+      attentionRound: 2,
+      memoryFrom: null,
+    });
+    const fresh = await restart();
+    expect(fresh.sessions.lastSend(run.sessionId)).toMatchObject({
+      cause: "restart",
+      status: "failed",
+      memoryError: null,
+    });
     fresh.socket.dispose();
   });
 

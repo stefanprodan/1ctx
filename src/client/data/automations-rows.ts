@@ -6,6 +6,7 @@
 
 import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import type { RunFilter } from "../../shared/words.ts";
 import { ordered, runOrder } from "./sessions-rows.ts";
 
@@ -28,8 +29,11 @@ export function matchesFilter(
   row: Pick<FeedRow, "session">,
   filter: RunFilter | null,
 ): boolean {
-  if (filter === "failed") return row.session.status === "failed";
   if (filter === "manual") return row.session.runSource === "manual";
+  if (filter === "attention") {
+    const chance = row.session.attention;
+    return chance !== null && chance >= ATTENTION_AT;
+  }
   return true;
 }
 

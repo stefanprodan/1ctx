@@ -3,7 +3,12 @@
 
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";
-import { type FeedCursor, feedAfter, feedCursor } from "./cursor.ts";
+import {
+  type FeedCursor,
+  feedAfter,
+  feedCursor,
+  type RunsCursor,
+} from "./cursor.ts";
 import { feedRows } from "./feed.ts";
 import type { RawSession, UsagePort } from "./rows.ts";
 import { FEED_LIMIT } from "./rows.ts";
@@ -139,5 +144,64 @@ export function listSessions(
       origin === null ? runCounts(db, rows) : undefined,
     ),
     next: read.length > limit && last !== undefined ? feedCursor(last) : null,
+  };
+}
+
+export type AlertArgs = [
+  projectIds: string[],
+  q: string,
+  before?: RunsCursor | null,
+  limit?: number,
+];
+
+// The Flagged pick: the automations with an open alert, newest
+// alert first, through the partial index on attention_since, each as
+// All's line, its newest run holding the search. The cursor is the
+// alert's place: <since>.<automation id>
+export function listAlerts(
+  db: Db,
+  usagePort: UsagePort,
+  ...[projectIds, q, before = null, limit = FEED_LIMIT]: AlertArgs
+): SessionsResponse {
+  if (projectIds.length === 0) return { rows: [], next: null };
+  const search: [string, string] = [q, `%${q.replace(/[%_\\]/g, "\\$&")}%`];
+  const after =
+    before === null
+      ? { sql: "", args: [] }
+      : {
+          sql: `and (automations.attention_since < ?
+            or (automations.attention_since = ? and automations.id > ?))`,
+          args: [before.at, before.at, before.id],
+        };
+  const read = db
+    .query<
+      RawSession & { alert_since: number; alert_automation: string },
+      (string | number)[]
+    >(
+      `select sessions.*, automations.attention_since as alert_since,
+         automations.id as alert_automation
+       from automations indexed by automations_attention
+       join sessions on sessions.id = (
+         select newest.id from sessions newest indexed by sessions_automation
+         where newest.automation_id = automations.id
+           and (? = '' or newest.title like ? escape '\\')
+         order by newest.last_activity_at desc, newest.id limit 1)
+       where automations.attention_since is not null
+         and automations.project_id in (select value from json_each(?))
+         ${after.sql}
+       order by automations.attention_since desc, automations.id limit ?`,
+    )
+    .all(...search, JSON.stringify(projectIds), ...after.args, limit + 1);
+  const rows = read
+    .slice(0, limit)
+    .map(({ alert_since: _, alert_automation: __, ...raw }) => raw);
+  const last = read.at(limit - 1);
+  const usage = usagePort.latestFor(rows.map((row) => row.id));
+  return {
+    rows: feedRows(db, rows, usage, runCounts(db, rows)),
+    next:
+      read.length > limit && last !== undefined
+        ? `${last.alert_since}.${last.alert_automation}`
+        : null,
   };
 }

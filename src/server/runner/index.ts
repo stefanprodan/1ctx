@@ -51,6 +51,7 @@ import type { Runner, RunnerDeps } from "./types.ts";
 import { Writer } from "./writer.ts";
 
 export type { Event } from "./event.ts";
+export type { AlertChange, AlertsPort } from "./marks.ts";
 export type { PreparedRun } from "./prepare.ts";
 export { Registry, RunCapacity, type Running } from "./registry.ts";
 export type { ActiveSend } from "./send.ts";
@@ -80,6 +81,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     render: deps.render,
     stream: deps.stream,
+    alerts: deps.alerts,
   });
   const roundDeps: RoundDeps = {
     chat: deps.providers.chat,
@@ -102,13 +104,19 @@ export function runnerArea(deps: RunnerDeps): Runner {
       .filter((row) => row.id !== send.round?.messageId);
 
   // The first cause wins. Stop and shutdown still abort a phase opened
-  // after another cause claimed the send.
+  // after another cause claimed the send, and the send remembers it, so
+  // its end leaves the open alert as a stop's would.
   const terminate = (
     send: ActiveSend,
     cause: SendCause,
     error: string | null = null,
   ): Promise<boolean> => {
-    if (cause === "stop" || cause === "shutdown") send.ending.abort();
+    if (cause === "stop" || cause === "shutdown") {
+      if (send.cause !== null && send.terminal === null) {
+        send.interrupted = true;
+      }
+      send.ending.abort();
+    }
     claim(send, cause, error);
     return send.ended;
   };

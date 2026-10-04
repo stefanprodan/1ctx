@@ -58,6 +58,9 @@ function summary(changes: Partial<SessionSummary> = {}): SessionSummary {
   return {
     archived: null,
     attention: null,
+    attentionReason: null,
+    attentionSource: null,
+    attentionBy: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -192,6 +195,8 @@ const sent: SendSummary = {
   rounds: 1,
   toolCalls: 0,
   memoryRound: null,
+  attentionRound: null,
+  memoryFrom: null,
   memoryError: null,
   memorySkipped: null,
   summoned: false,
@@ -412,7 +417,7 @@ describe("the sessions entity", () => {
         rows: [
           {
             ...row({ origin: "automation", automationId: "au1" }),
-            automation: { id: "au1", name: "old-name" },
+            automation: { id: "au1", name: "old-name", alert: null },
           },
         ],
       });
@@ -421,7 +426,7 @@ describe("the sessions entity", () => {
     applyAutomationFrame({
       type: "automation",
       projectId: "p1",
-      automation: { id: "au1", name: "new-name" },
+      automation: { id: "au1", name: "new-name", alert: null },
     } as Parameters<typeof applyAutomationFrame>[0]);
     expect(list.value?.rows[0]?.automation?.name).toBe("new-name");
 
@@ -2091,7 +2096,7 @@ describe("the feed's pages", () => {
         origin: "automation",
         automationId: "t1",
       }),
-      automation: { id: "t1", name: "old-name" },
+      automation: { id: "t1", name: "old-name", alert: null },
     });
     answer = () => Response.json({ rows: [run("a", 50)], next: "after-a" });
     await loadList({ project: null, q: "" });
@@ -2105,7 +2110,7 @@ describe("the feed's pages", () => {
     applyAutomationFrame({
       type: "automation",
       projectId: "p1",
-      automation: { id: "t1", name: "new-name" },
+      automation: { id: "t1", name: "new-name", alert: null },
     } as Parameters<typeof applyAutomationFrame>[0]);
     release(Response.json({ rows: [run("b", 40)], next: null }));
     await more;
@@ -2177,7 +2182,7 @@ describe("the feed's pages", () => {
           origin: "automation",
           automationId: "t1",
         }),
-        automation: { id: "t1", name },
+        automation: { id: "t1", name, alert: null },
       });
       answer = () =>
         Response.json({ rows: [run("a", 50, "old-name")], next: null });
@@ -2185,7 +2190,7 @@ describe("the feed's pages", () => {
       applyAutomationFrame({
         type: "automation",
         projectId: "p1",
-        automation: { id: "t1", name: "b-name" },
+        automation: { id: "t1", name: "b-name", alert: null },
       } as Parameters<typeof applyAutomationFrame>[0]);
       // renamed again while the socket was down; the reload says so
       answer = () =>
@@ -2283,7 +2288,7 @@ describe("runs grouped in All", () => {
       lastActivityAt: at,
       ...changes,
     }),
-    automation: { id: "au", name: "digest" },
+    automation: { id: "au", name: "digest", alert: null },
     runs,
   });
   const run = (id: string, at: number, changes: Partial<SessionSummary> = {}) =>
@@ -2522,5 +2527,257 @@ describe("runs grouped in All", () => {
     expect(ids(list.value)).toEqual(["r2"]);
     expect(list.value?.rows[0]?.runs).toBe(4);
     expect(list.value?.rows[0]?.session.revision).toBe(2);
+  });
+});
+
+describe("the Flagged pick", () => {
+  const alert = (since: number, runs = 1) => ({
+    since,
+    runs,
+    reason: "pods down",
+    by: "sre",
+  });
+  // the line of automation au, its run, its alert open since a time or
+  // closed
+  const line = (
+    au: string,
+    id: string,
+    at: number,
+    since: number | null,
+    changes: Partial<SessionSummary> = {},
+  ): FeedRow => ({
+    ...row({
+      id,
+      origin: "automation",
+      automationId: au,
+      title: au,
+      createdAt: at,
+      lastActivityAt: at,
+      attention: 1,
+      ...changes,
+    }),
+    automation: {
+      id: au,
+      name: au,
+      alert: since === null ? null : alert(since),
+    },
+    runs: 3,
+  });
+  const envelope = (next: FeedRow) =>
+    onSocket({
+      type: "session",
+      row: {
+        agent: next.agent,
+        agentRetired: false,
+        send: null,
+        sendAgent: null,
+        last: null,
+        automation: next.automation,
+        runBy: null,
+      },
+      projectId: "p1",
+      session: next.session,
+      messages: [],
+      send: null,
+    });
+  const frame = (au: string, since: number | null, revision = 9) =>
+    applyAutomationFrame({
+      type: "automation",
+      projectId: "p1",
+      automation: {
+        id: au,
+        name: au,
+        alert: since === null ? null : alert(since),
+        agentRetired: false,
+        agentId: "a1",
+        revision,
+      },
+    } as Parameters<typeof applyAutomationFrame>[0]);
+
+  test.serial(
+    "asks the pick, and places and drops lines without a load",
+    async () => {
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows: [line("bb", "b1", 40, 40), line("aa", "a1", 30, 30)],
+          next: null,
+        });
+      };
+      await loadList({ project: null, q: "", attention: true });
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
+      answer = (url) => {
+        throw new Error(`unexpected fetch: ${url}`);
+      };
+      // an alert opened: its line goes where its since says
+      envelope(line("cc", "c1", 50, 50));
+      expect(ids(list.value)).toEqual(["c1", "b1", "a1"]);
+      // a run that joins moves the line in place, one more run
+      envelope(line("aa", "a2", 60, 30));
+      expect(ids(list.value)).toEqual(["c1", "b1", "a2"]);
+      expect(list.value?.rows[2]?.runs).toBe(4);
+      // a clean run closed it
+      envelope(line("bb", "b2", 70, null, { attention: null }));
+      expect(ids(list.value)).toEqual(["c1", "a2"]);
+      // a dismiss closes it with the automation's frame alone
+      frame("cc", null);
+      expect(ids(list.value)).toEqual(["a2"]);
+      // a chat never enters
+      envelope({ ...row({ id: "x1" }), automation: null });
+      expect(ids(list.value)).toEqual(["a2"]);
+      await settle();
+    },
+  );
+
+  test.serial(
+    "a warm first page keeps the lines and the cursor past it",
+    async () => {
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return url.includes("before=")
+          ? Response.json({ rows: [line("aa", "a1", 30, 30)], next: null })
+          : Response.json({ rows: [line("bb", "b1", 40, 40)], next: "40.bb" });
+      };
+      await loadList({ project: null, q: "", attention: true });
+      await loadMore();
+      expect(ids(list.value)).toEqual(["b1", "a1"]);
+      // a row the server could not read asks for the first page, warm
+      onSocket({
+        type: "session",
+        row: null,
+        projectId: "p1",
+        session: line("bb", "b1", 41, 40, { revision: 2 }).session,
+        messages: [],
+        send: null,
+      });
+      await settle();
+      expect(urls).toEqual([
+        "/api/sessions?attention=1",
+        "/api/sessions?attention=1&before=40.bb",
+        "/api/sessions?attention=1",
+      ]);
+      expect(ids(list.value)).toEqual(["b1", "a1"]);
+      expect(list.value?.next).toBeNull();
+    },
+  );
+
+  test.serial(
+    "a deleted run whose alert is open keeps its line until the server places it",
+    async () => {
+      answer = () =>
+        Response.json({
+          rows: [line("bb", "b2", 40, 40), line("aa", "a1", 30, 30)],
+          next: null,
+        });
+      await loadList({ project: null, q: "", attention: true });
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows: [line("bb", "b1", 20, 20), line("aa", "a1", 30, 30)],
+          next: null,
+        });
+      };
+      onSocket({ type: "deleted", projectId: "p1", sessionId: "b2" });
+      expect(ids(list.value)).toEqual(["b2", "a1"]);
+      await settle();
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
+      expect(ids(list.value)).toEqual(["a1", "b1"]);
+    },
+  );
+
+  test.serial(
+    "a deleted run past the first page loads the pick again, cold",
+    async () => {
+      answer = (url) =>
+        url.includes("before=")
+          ? Response.json({ rows: [line("aa", "a1", 30, 30)], next: null })
+          : Response.json({ rows: [line("bb", "b1", 40, 40)], next: "40.bb" });
+      await loadList({ project: null, q: "", attention: true });
+      await loadMore();
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows: [line("bb", "b1", 40, 40)],
+          next: "40.bb",
+        });
+      };
+      onSocket({ type: "deleted", projectId: "p1", sessionId: "a1" });
+      await settle();
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
+      expect(ids(list.value)).toEqual(["b1"]);
+      expect(list.value?.next).toBe("40.bb");
+    },
+  );
+
+  test.serial(
+    "a deleted run in the first page of a longer pick loads it again, cold",
+    async () => {
+      answer = () =>
+        Response.json({
+          rows: [line("aa", "a1", 50, 50), line("bb", "b2", 40, 40)],
+          next: "40.bb",
+        });
+      await loadList({ project: null, q: "", attention: true });
+      // a new alert lands on top, so bb's line is no longer the head's
+      // last and a warm answer would keep it in the tail
+      envelope(line("nn", "n1", 60, 60));
+      expect(ids(list.value)).toEqual(["n1", "a1", "b2"]);
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows: [line("nn", "n1", 60, 60), line("aa", "a1", 50, 50)],
+          next: "50.aa",
+        });
+      };
+      onSocket({ type: "deleted", projectId: "p1", sessionId: "b2" });
+      await settle();
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
+      expect(ids(list.value)).toEqual(["n1", "a1"]);
+      expect(list.value?.next).toBe("50.aa");
+      // the next page brings bb's line with the run that holds it now
+      answer = () =>
+        Response.json({ rows: [line("bb", "b1", 20, 40)], next: null });
+      await loadMore();
+      expect(ids(list.value)).toEqual(["n1", "a1", "b1"]);
+    },
+  );
+
+  test.serial(
+    "a dismiss while the first page is out drops its line",
+    async () => {
+      let release: (r: Response) => void = () => {};
+      answer = () =>
+        new Promise((r) => {
+          release = r;
+        });
+      const load = loadList({ project: null, q: "", attention: true });
+      await settle();
+      frame("aa", null);
+      release(
+        Response.json({
+          rows: [line("bb", "b1", 40, 40), line("aa", "a1", 30, 30)],
+          next: null,
+        }),
+      );
+      await load;
+      expect(ids(list.value)).toEqual(["b1"]);
+    },
+  );
+
+  test.serial("All keeps its order and takes the alert's word", async () => {
+    answer = () =>
+      Response.json({
+        rows: [row({ id: "c9", lastActivityAt: 90 }), line("aa", "a1", 30, 30)],
+        next: null,
+      });
+    await loadList({ project: null, q: "" });
+    frame("aa", null);
+    expect(ids(list.value)).toEqual(["c9", "a1"]);
+    expect(list.value?.rows[1]?.automation?.alert).toBeNull();
   });
 });

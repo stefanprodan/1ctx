@@ -142,6 +142,8 @@ function expectCopy(
         tool_calls: kept.filter((row) => row.kind === "tool").length,
         mcp: null,
         memory_round: null,
+        attention_round: null,
+        memory_from: null,
         memory_error: null,
         memory_skipped: null,
       };
@@ -293,6 +295,9 @@ describe("POST /api/sessions/:id/fork", () => {
         usage: null,
         archived: null,
         attention: null,
+        attentionReason: null,
+        attentionSource: null,
+        attentionBy: null,
       });
       const rawSession = chat.app.db
         .query<RawSession, [string]>("select * from sessions where id = ?")
@@ -319,6 +324,8 @@ describe("POST /api/sessions/:id/fork", () => {
         archived_reason: null,
         attention: null,
         attention_by: null,
+        attention_reason: null,
+        attention_source: null,
       });
       expect(copied.live).toBeNull();
       expect(copied.send?.kind).toBe("compact");

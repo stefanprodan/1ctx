@@ -57,7 +57,8 @@ note edits it in the memory phase, an extra step after its main rounds.
 
 - **A run with `ownMemory` edits its automation's note in a final
   phase.** The main rounds never get the edit tool. The phase runs
-  after the main round lets go, only on cause `finish`, `deadline` or
+  after the main round lets go and after the attention step
+  (`docs/automations.md`), only on cause `finish`, `deadline` or
   `failure`, then the send finalizes once (`runner/ending.ts`).
 - **The phase has its own window and spend.** It runs past the turn's
   deadline within `memoryPhaseMs`, and the send's budget never cuts
@@ -70,11 +71,12 @@ note edits it in the memory phase, an extra step after its main rounds.
   A topic whose first operation expected text but is absent at replay
   start skips every set, so a hand delete is never resurrected.
 - **The phase never resends the run.** `runner/memory-packet.ts` builds
-  its input: its own system prompt (`memorySystem()`), and the task, the
-  answer and a receipt per tool call (a line naming the call and its
-  outcome, with an excerpt of the result) as a record inside tags. A
-  model that reads the task under the run's prompt goes back to the
-  task.
+  its input: its own system prompt (`memorySystem()`), and the run's
+  record from `runner/run-record.ts`, shared with the attention step:
+  the task, the answer and a receipt per tool call (a line naming the
+  call and its outcome, with an excerpt of the result) inside tags,
+  never the rounds after the answer. A model that reads the task under
+  the run's prompt goes back to the task.
 - **The packet fits the window by cutting the run, never the note.**
   The room check counts the tool schemas too; it drops excerpts, then
   receipts, then halves the answer. An unknown window skips the check.

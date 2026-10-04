@@ -254,6 +254,7 @@ describe("the built-in catalog", () => {
       mcp_describe: "mcpCatalog",
       mcp_call: "mcpCatalog",
       memory_edit: "memory",
+      needs_attention: "runs",
       webfetch: "web",
       websearch: "webSearch",
     });

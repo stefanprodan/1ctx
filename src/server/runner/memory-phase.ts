@@ -98,8 +98,11 @@ export function startMemory(
       now,
     });
     const reply = deps.sessions.markSlot(created.id, "work") ?? created;
+    // the first round after the run stays the attention step's, when
+    // it had one
     const sendRow = deps.sessions.bumpCounters(send.id, {
       memoryRound,
+      memoryFrom: memoryRound,
       rounds: memoryRound,
       toolCalls: send.budget.calls,
     })!;
@@ -121,7 +124,8 @@ export function startMemory(
       ],
     };
   });
-  send.memoryRound = memoryRound;
+  send.memoryRound ??= memoryRound;
+  send.memoryFrom = memoryRound;
   send.roundNo = memoryRound;
   send.phase = "memory";
   send.round = newRound(started.id, started.createdAt);
@@ -137,10 +141,12 @@ function memoryRequest(
   if (
     send.policy.automation === null ||
     send.memoryRound === null ||
+    send.memoryFrom === null ||
     send.cause === null
   ) {
     throw new Error("the memory phase has no run context");
   }
+  const from = send.memoryFrom;
   const messages = memoryMessages(
     {
       automation: send.policy.automation.name,
@@ -154,9 +160,7 @@ function memoryRequest(
     },
     {
       phase: historyMessages(
-        rows.filter(
-          (row) => row.sendId === send.id && row.round >= send.memoryRound!,
-        ),
+        rows.filter((row) => row.sendId === send.id && row.round >= from),
         send.policy,
         lookups,
       ),

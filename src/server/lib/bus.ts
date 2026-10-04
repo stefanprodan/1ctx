@@ -59,6 +59,15 @@ export type BusEvents = {
     projectId: string;
     automation: AutomationSummary;
   };
+  // an automation's alert opened: once per open alert, at the run that
+  // opened it, never for a run that joins it. The one place a
+  // notification will be sent from; nothing listens yet
+  "automation.attention": {
+    projectId: string;
+    automationId: string;
+    sessionId: string;
+    since: number;
+  };
   // runs: its runs went with it
   "automation.deleted": {
     projectId: string;

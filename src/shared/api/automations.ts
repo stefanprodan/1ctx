@@ -6,21 +6,25 @@
 // in a team project, an admin edits and deletes.
 
 import type { AutomationSummary } from "../contracts/automation.ts";
-import type { SessionStatus } from "../words.ts";
+import type { AttentionMode, SessionStatus } from "../words.ts";
 import type { FeedRow } from "./sessions.ts";
 
 // GET /api/projects/:id/automations: the project's rows, by name, and
-// the run deadline limit, the deadline a row with none runs under
+// the run deadline limit, the deadline a row with none runs under, and
+// whether the instance's run-attention decision is on with a decider to
+// ask, which the decider mode needs
 export type AutomationsResponse = {
   automations: AutomationSummary[];
   runDeadlineMs: number;
+  deciderOn: boolean;
 };
 
 // POST /api/projects/:id/automations (201), GET, PATCH and
 // POST /api/automations/:id/suspend|resume answer the row
 export type AutomationResponse = { automation: AutomationSummary };
 
-// POST /api/projects/:id/automations: guidance defaults to empty; PATCH
+// POST /api/projects/:id/automations: guidance defaults to empty and
+// the attention mode to agent; PATCH
 // /api/automations/:id: any of them, each given one checked
 export type SaveAutomationRequest = {
   name: string;
@@ -37,10 +41,12 @@ export type SaveAutomationRequest = {
   memoryGuidance?: string;
   // false when absent on create
   rerunOnRestart?: boolean;
+  attentionMode?: AttentionMode;
+  attentionGuidance?: string;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
 
-// GET /api/automations/:id/runs?filter=failed|manual&before=: a page of
+// GET /api/automations/:id/runs?filter=manual|attention&before=: a page of
 // its sessions, newest first, narrowed by the filter, with next as for
 // the feed; the tally counts every kept run by status, whatever the
 // filter, on every page.

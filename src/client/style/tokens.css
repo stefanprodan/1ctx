@@ -43,8 +43,9 @@
     --running: #60a5fa;
     --done: #4ade80;
     --failed: #f87171;
-    /* a finished run a decider says needs a person */
+    /* a run marked as needing a person, and the row that says why */
     --attention: #fb923c;
+    --attention-wash: rgba(251, 146, 60, 0.08);
     --failed-line: rgba(248, 113, 113, 0.45);
     --failed-wash: rgba(248, 113, 113, 0.08);
     /* a line a change added, under its words */
@@ -121,6 +122,7 @@
     --done: #1b7a3d;
     --failed: #c62828;
     --attention: #c2410c;
+    --attention-wash: rgba(194, 65, 12, 0.06);
     --failed-line: rgba(198, 40, 40, 0.4);
     --failed-wash: rgba(198, 40, 40, 0.06);
     --done-wash: rgba(27, 122, 61, 0.07);

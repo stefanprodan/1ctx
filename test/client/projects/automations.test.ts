@@ -81,6 +81,9 @@ const automation = (
   retentionDays: 30,
   ownMemory: false,
   memoryGuidance: "",
+  attentionMode: "agent",
+  attentionGuidance: "",
+  alert: null,
   rerunOnRestart: false,
   suspendedAt: null,
   suspendedBy: null,
@@ -102,6 +105,9 @@ const automation = (
 const session = (changes: Partial<SessionSummary> = {}): SessionSummary => ({
   archived: null,
   attention: null,
+  attentionReason: null,
+  attentionSource: null,
+  attentionBy: null,
   id: "s1",
   projectId: "p1",
   ownerId: "u1",
@@ -127,7 +133,7 @@ const run = (changes: Partial<SessionSummary> = {}): FeedRow => ({
   send: null,
   sendAgent: null,
   last: null,
-  automation: { id: "au1", name: "nightly" },
+  automation: { id: "au1", name: "nightly", alert: null },
   runBy: null,
   runs: null,
 });
@@ -410,6 +416,8 @@ describe("the form", () => {
       retention: "30",
       memory: "own",
       memoryGuidance: OWN_MEMORY_GUIDANCE,
+      attention: "agent",
+      attentionGuidance: "",
       rerunOnRestart: false,
       web: true,
       visuals: true,
@@ -435,6 +443,8 @@ describe("the form", () => {
         retentionDays: 30,
         ownMemory: true,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
+        attentionMode: "agent",
+        attentionGuidance: "",
         rerunOnRestart: false,
         disabledCapabilities: [],
       },
@@ -446,6 +456,28 @@ describe("the form", () => {
     expect("body" in atLimit && atLimit.body.deadlineMs).toBeNull();
     const part = requestOf(filled({ deadline: "1.5" }), LIMIT);
     expect("body" in part && part.body.deadlineMs).toBe(90_000);
+  });
+
+  test("the attention mode and its words are saved as drafted", () => {
+    const body = requestOf(
+      filled({ attention: "decider", attentionGuidance: " only when behind " }),
+      LIMIT,
+    );
+    expect("body" in body && body.body.attentionMode).toBe("decider");
+    expect("body" in body && body.body.attentionGuidance).toBe(
+      "only when behind",
+    );
+    const row = automation({ attentionMode: "off", attentionGuidance: "x" });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.attention).toBe("off");
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, attention: "agent" }, row, LIMIT)).toBe(true);
+    expect(
+      automationFieldOf("attention guidance must be at most 1000 bytes"),
+    ).toBe("attentionGuidance");
+    expect(
+      automationFieldOf("attentionMode must be off, agent or decider"),
+    ).toBe("attention");
   });
 
   test("starting again after a restart is off for a new task and saved as drafted", () => {
@@ -831,6 +863,8 @@ describe("the run log", () => {
       rounds: 1,
       toolCalls: 0,
       memoryRound: null,
+      attentionRound: null,
+      memoryFrom: null,
       memoryError: null,
       memorySkipped: null,
       summoned: false,
@@ -855,10 +889,10 @@ describe("the run log", () => {
     expect(deadlineText(90_000)).toBe("90 s");
   });
 
-  test("a filter holds failed or manual runs", () => {
+  test("a filter holds manual or flagged runs", () => {
     expect(matchesFilter(run(), null)).toBe(true);
-    expect(matchesFilter(run({ status: "failed" }), "failed")).toBe(true);
-    expect(matchesFilter(run({ status: "stopped" }), "failed")).toBe(false);
+    expect(matchesFilter(run({ attention: 1 }), "attention")).toBe(true);
+    expect(matchesFilter(run({ status: "failed" }), "attention")).toBe(false);
     expect(matchesFilter(run({ runSource: "manual" }), "manual")).toBe(true);
     expect(matchesFilter(run(), "manual")).toBe(false);
     expect(matchesFilter(run({ runSource: "restart" }), "manual")).toBe(false);
@@ -1125,29 +1159,29 @@ describe("the entity over the socket", () => {
     });
     expect(runs.value?.rows?.[0]?.automation?.name).toBe("digest");
 
-    // under the failed filter a run that fails joins and one that is
-    // done leaves
+    // under the flagged filter a run that is marked joins and one that
+    // is not leaves
     runs.value = {
       id: "au1",
-      filter: "failed",
+      filter: "attention",
       rows: [],
       tally,
       next: null,
       more: IDLE,
     };
-    const failedRun = {
+    const markedRun = {
       type: "session" as const,
       row: null,
       projectId: "p1",
-      session: session({ id: "s2", revision: 3, status: "failed" }),
+      session: session({ id: "s2", revision: 3, attention: 1 }),
       messages: [],
       send: null,
     };
-    onAutomationsSocket(failedRun);
+    onAutomationsSocket(markedRun);
     expect(runs.value?.rows?.map((r) => r.session.id)).toEqual(["s2"]);
     onAutomationsSocket({
-      ...failedRun,
-      session: session({ id: "s2", revision: 4, status: "done" }),
+      ...markedRun,
+      session: session({ id: "s2", revision: 4, attention: null }),
     });
     expect(runs.value?.rows).toEqual([]);
 
@@ -1287,7 +1321,7 @@ describe("the runs' pages", () => {
     const release = hold();
     const more = loadMoreRuns();
     await settle();
-    relabelRuns({ id: "au1", name: "renamed" });
+    relabelRuns({ id: "au1", name: "renamed", alert: null });
     release(Response.json({ rows: second(), tally, next: null }));
     await more;
     expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
@@ -1305,7 +1339,7 @@ describe("the runs' pages", () => {
       const release = hold();
       const load = loadRuns("au1", "manual");
       await settle();
-      relabelRuns({ id: "au1", name: "renamed" });
+      relabelRuns({ id: "au1", name: "renamed", alert: null });
       release(Response.json({ rows: first(), tally, next: null }));
       await load;
       expect(runs.value?.rows?.map((r) => r.automation?.name)).toEqual([
@@ -1334,7 +1368,7 @@ describe("the runs' pages", () => {
       const more = loadMoreRuns();
       await settle();
       const releaseFailed = hold();
-      const failed = loadRuns("au1", "failed");
+      const failed = loadRuns("au1", "manual");
       expect(runs.value?.rows).toBeNull();
       expect(runs.value?.tally).toEqual(tally);
       expect(runs.value?.more).toEqual(IDLE);
@@ -1345,7 +1379,7 @@ describe("the runs' pages", () => {
       releaseFailed(Response.json({ rows: [], tally, next: null }));
       await failed;
       expect(ids()).toEqual([]);
-      expect(runs.value?.filter).toBe("failed");
+      expect(runs.value?.filter).toBe("manual");
     },
   );
 

@@ -7,7 +7,8 @@ forms and the data layer's general rules are in `docs/ui.md`.
 ## The feed
 
 The feed is the session list on Home and on a project's Feed tab: chats
-and runs, one row each, under the filters All, Chats and Tasks (runs).
+and runs, one row each, under the filters All, Chats, Tasks (runs) and
+Flagged.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
@@ -20,8 +21,23 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **A row is drawn from the server's row alone.** `feed/Row.model.ts`
   never reads a transcript. A working, failed or stopped line names
   `sendAgent` (the summoned agent on a summoned turn), else the chat's.
-- **The attention mark is a hint, never a filter or a sort.**
-  `needsAttention()` decides it; All shows only the latest run's mark.
+- **The attention mark is a hint and a filter, never a sort.**
+  `needsAttention()` decides it; a failed row omits the word
+  (`flagShown()`). Its icon wears the mark only on a done run; a
+  failed or stopped one keeps its status (`iconStatus()`). A run's
+  page says it in its foot's strip instead.
+- **An automation's line shows its open alert, not each mark.** While
+  `automation.alert` is set, All's line and every line of the Flagged
+  pick (`line` on `Row`) say the agent, `alertWords()` and the latest
+  reason in place of the run's state. The page never says alert.
+- **Flagged is the feed's fourth pick** (`?attention=1`, with
+  its own `<since>.<automation id>` cursor): the automations with an
+  open alert, one line each, newest alert first. `data/alert-rows.ts`
+  reconciles it: a run's envelope carries its automation's alert,
+  which places, moves or drops the line; an automation frame with no
+  alert drops it (a dismiss). A run off the search or a null `row`
+  asks for the first page, as does a deleted run whose line's alert is
+  open (cold when more than a page is held).
 - **The feed reconciles envelopes instead of reloading.**
   `data/feed.ts` inserts an envelope's row where the server would
   list it: the origin filter, the search and above the paging cursor.
@@ -44,6 +60,17 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin.
+- **A run's rounds after its answer are one fold.** `transcript/rows.ts`
+  splits at the send's `memoryRound`, the first round after the answer,
+  whether the attention step's or the memory phase's; never two
+  disclosures. Open, its calls in order, the step's first. Running, it
+  says Checking until `memoryFrom`, the memory phase's own start, is
+  set. Closed, one line (`memorySummary()`): "Marked and memory updated
+  in", "Marked in", "Memory updated in", "Not checked" for a step whose
+  reply failed or stopped, or, when `attentionRound` is set and none of
+  these happened, "Checked in", with the time both took; with no step,
+  the memory phase's own words. Marked reads the run's mark
+  (`agentMarked()`), not the tool row.
 - **Regenerate sends no agent.** The server reruns the send's agent. A
   refusal shows in the turn's failure block until the next press.
 - **An envelope that archives the chat on screen reads the session's
@@ -188,14 +215,33 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
 - **An HTML file is drawn as a visual only while `visualize` is
   switchable and within `VISUAL_FRAME_BYTES`.** Otherwise it is
   source.
+- **A run's foot is one card in the transcript's sticky foot.** A run
+  that needs attention has `AttentionStrip` on top, with any reason
+  (the runner's too), cut until pressed open, else the decider's name.
+  The bar under it keeps the icon in the run's own status colour and
+  names its automation through `runOf()` in `RunFoot.model.ts`, as the
+  line over the transcript does: a link, or plain words once deleted.
+  It is one line: only the name gives way, and the state's rest
+  (`footState()`'s `more`) is hidden under 720. An archived chat's foot
+  has no strip.
+  While the run is one of its automation's open alert (`inOpenAlert()`:
+  marked, ended at or after `alert.since`), the strip has Dismiss, a
+  button beside the toggle, never inside it.
 - **Rename keeps the file's id and history.** Restore asks nothing: it
   saves the text as a new revision.
 
 ## Automations
 
+- **An open alert sits over the brief** (`OpenAttention.tsx`): the
+  feed line's words, the latest reason and Dismiss. The Runs list's
+  filters are Manual and Flagged (the marked runs). A row adds the
+  agent's reason (`markReason()`), never the runner's.
 - **"Waiting" is computed on the page.** No field carries it: a row not
   suspended whose `nextAt` is past the page's clock by
   `WAIT_GRACE_MS`.
+- **The Runs list's row is the feed's on a phone:** the time ago over
+  the length beside the two lines, the deadline's bar and the arrow
+  only from 720 wide.
 - **A later page of runs is fenced by a load counter** (`runsTurn` in
   `data/runs.ts`). `closeRuns()`, a filter change, a revocation and a
   first-page load drop a `loadMoreRuns()` in flight. A filter change is
@@ -209,6 +255,11 @@ and runs, one row each, under the filters All, Chats and Tasks (runs).
   (`retiredPick()`).
 - **Delete asks in place** with Keep, Delete and Delete with runs, and
   hides every other button while it asks.
+- **Needs attention follows what can mark** (`Attention.model.ts`).
+  Agent is off for a model without tools, as Memory's own note is, and
+  Decider while the list's `deciderOn` is false, with a hint saying
+  why. A saved pick stays shown. The words on when are kept
+  while the mode is off, so turning it on again brings them back.
 
 ## Admin
 

@@ -28,6 +28,7 @@ import type { Mcp, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
+import { makeAttentionTool } from "./builtin/attention.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
 import {
   makeChatMemoryHandle,
@@ -38,6 +39,7 @@ import { makeSkillTools, type SkillToolsPort } from "./builtin/skill.ts";
 import { fillYear, schema } from "./catalog.ts";
 import type { ToolStore } from "./store.ts";
 import type {
+  AttentionHandle,
   MemoryHandle,
   MemoryScope,
   Offered,
@@ -145,6 +147,27 @@ function memoryFor(
   });
 }
 
+// only a run's attention step, after its main rounds: never a chat, a
+// run's main rounds or its memory phase
+function attentionFor(scope: MemoryScope | undefined): AttentionHandle | null {
+  const attention = scope?.automation?.attention ?? null;
+  if (scope?.phase !== "attention" || attention === null) return null;
+  return { guidance: attention.guidance, reason: null };
+}
+
+const EMPTY: Omit<Offered, "tools" | "memory"> = {
+  visuals: false,
+  knowledge: false,
+  web: null,
+  search: null,
+  skills: { block: "", skills: [] },
+  mcp: [],
+  mcpPrompt: { text: "", digest: {} },
+  mcpCatalog: "",
+  credentials: [],
+  credentialsOff: [],
+};
+
 function promptServers(servers: OfferedServer[]): PromptServer[] {
   return servers.map((server) => ({
     name: server.name,
@@ -176,22 +199,22 @@ export function offered(
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
 ): Offered {
+  if (scope?.phase === "attention") {
+    const attention = attentionFor(scope);
+    return {
+      ...EMPTY,
+      tools: attention === null ? [] : [schema(makeAttentionTool(attention))],
+      memory: null,
+      attention,
+    };
+  }
   const memory = memoryFor(deps.memory, scope, disabledCapabilities);
   if (scope?.phase === "memory") {
     const phaseTools = memory === null ? [] : makeMemoryTools(memory);
     return {
+      ...EMPTY,
       tools: fillYear(phaseTools.map(schema), now),
-      visuals: false,
-      knowledge: false,
-      web: null,
-      search: null,
-      skills: { block: "", skills: [] },
-      mcp: [],
-      mcpPrompt: { text: "", digest: {} },
-      mcpCatalog: "",
       memory,
-      credentials: [],
-      credentialsOff: [],
     };
   }
   const rows = new Map(deps.store.rows().map((row) => [row.name, row]));

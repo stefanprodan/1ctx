@@ -114,6 +114,8 @@ describe("send policy thinking", () => {
       tz: "UTC",
       ownMemory: true,
       memoryGuidance: "Sources: failed hosts",
+      attentionMode: "agent",
+      attentionGuidance: "",
     };
     const send = buildPolicy({
       project: { id: "project", kind: "team", name: "ops", description: "" },

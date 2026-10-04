@@ -48,6 +48,9 @@ import { m0039 } from "./0039-restart-runs.ts";
 import { m0040 } from "./0040-repos.ts";
 import { m0041 } from "./0041-kept-packing.ts";
 import { m0042 } from "./0042-opencode.ts";
+import { m0043 } from "./0043-run-attention.ts";
+import { m0044 } from "./0044-attention-round.ts";
+import { m0045 } from "./0045-open-attention.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -92,4 +95,7 @@ export const MIGRATIONS: Migration[] = [
   m0040,
   m0041,
   m0042,
+  m0043,
+  m0044,
+  m0045,
 ];

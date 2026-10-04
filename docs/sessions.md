@@ -274,9 +274,10 @@ that agent answers the one turn (see Summons).
   and sends after them go, their usage stays. The envelope names them
   in `removedMessageIds`. A summoned turn reruns on its send's agent; a
   retired one is the 400 "the agent <name> is gone".
-- **Fork copies through a settled turn,** never memory phase rows, into
-  a chat the caller owns on a live agent. Source ids are recorded
-  without foreign keys. Usage and the attention mark are not copied. A
+- **Fork copies through a settled turn,** never a run's rows after its
+  answer (from `memoryRound`), into a chat the caller owns on a live
+  agent. Source ids are recorded without foreign keys. Usage and the
+  attention mark are not copied. A
   packed row (`docs/archive.md`) is unpacked into `content`, and a packed
   kept file into its raw row, since a fork is live.
 - **Fork copies the upload tree in the same transaction.** Files last

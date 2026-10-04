@@ -33,6 +33,7 @@ import {
 import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { envelopeRow } from "./feed.ts";
+import { listAlerts } from "./list.ts";
 import { type KeptPacker, keptPacker } from "./pack-kept.ts";
 import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
@@ -47,6 +48,13 @@ import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
+export {
+  alertColumns,
+  alertOf,
+  endedAfter,
+  MARKED,
+  type RawAlert,
+} from "./alerts.ts";
 export { refuseArchived } from "./archive.ts";
 export {
   parseFeedCursor,
@@ -58,6 +66,7 @@ export {
   type ExportRow,
   markdownFilename,
 } from "./markdown.ts";
+export type { RunMark } from "./marks.ts";
 export type { MountedRepos } from "./messages.ts";
 export type { KeptPass } from "./pack-kept.ts";
 export {
@@ -109,6 +118,9 @@ export type SessionsDeps = {
   limits: { current(): { archivedDeleteDays: number } };
   // the queue's dispatcher, built later in the runner
   wakeQueue(): void;
+  // a marked run's delete, with when it ended: its automation's open
+  // alert, built later in the automations area
+  pruned?: (automationId: string, endedAt: number) => BusEvent[];
 };
 
 export type Sessions = {
@@ -161,7 +173,12 @@ export type Sessions = {
 };
 
 export function sessionsArea(deps: SessionsDeps): Sessions {
-  const store = new SessionStore(deps.db, deps.usage, deps.scratch);
+  const store = new SessionStore(
+    deps.db,
+    deps.usage,
+    deps.scratch,
+    (automationId, endedAt) => deps.pruned?.(automationId, endedAt) ?? [],
+  );
   const visible = (principal: Principal, id: string): SessionRow => {
     const session = store.byId(id);
     if (session === null) throw new NotFound("no such chat");
@@ -289,6 +306,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         keptDays: () => deps.limits.current().archivedDeleteDays,
         visible,
         wakeQueue: () => deps.wakeQueue(),
+        alerts: (...args) => listAlerts(deps.db, deps.usage, ...args),
       }),
       ...queuedRoutes({
         db: deps.db,

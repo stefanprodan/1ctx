@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AutomationSummary } from "../../src/shared/contracts/automation.ts";
-import { type ChatApp, type Script, tick } from "./chat.ts";
+import type { AttentionMode } from "../../src/shared/words.ts";
+import { type ChatApp, type Script, tick, waitScript } from "./chat.ts";
 
+// set to off unless the test names a mode, so a finished run asks no
+// attention step of the scripted provider
 export const automationBody = (
   chat: ChatApp,
   fields: Partial<{
@@ -16,6 +19,8 @@ export const automationBody = (
     ownMemory: boolean;
     memoryGuidance: string;
     disabledCapabilities: string[];
+    attentionMode: AttentionMode;
+    attentionGuidance: string;
   }> = {},
 ) => ({
   name: fields.name ?? "daily-run",
@@ -32,6 +37,10 @@ export const automationBody = (
   ...(fields.memoryGuidance === undefined
     ? {}
     : { memoryGuidance: fields.memoryGuidance }),
+  attentionMode: fields.attentionMode ?? "off",
+  ...(fields.attentionGuidance === undefined
+    ? {}
+    : { attentionGuidance: fields.attentionGuidance }),
 });
 
 export async function createAutomation(
@@ -79,4 +88,19 @@ export async function settleRun(chat: ChatApp, sessionId: string) {
     await tick();
   }
   throw new Error("run did not settle");
+}
+
+// a run's answer, then its attention step's reply, "ok" unless the test
+// drives it; the step's script
+export async function answerRun(
+  chat: ChatApp,
+  main: Script,
+  answer: string,
+  step: (script: Script) => void = (script) => script.reply("ok"),
+): Promise<Script> {
+  const before = chat.scripted.scripts.length;
+  main.reply(answer);
+  const script = await waitScript(chat.scripted, before + 1);
+  step(script);
+  return script;
 }

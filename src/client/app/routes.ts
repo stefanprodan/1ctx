@@ -85,7 +85,11 @@ import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers, loadUserUsage, users } from "../data/users.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
-import { composeProjectOf, originOf } from "../views/home/Home.model.ts";
+import {
+  composeProjectOf,
+  listPick,
+  pickOf,
+} from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
@@ -219,8 +223,8 @@ export const ROUTES: Route[] = [
     // waited for only when none is held
     load: async (_params, query) => {
       const q = query.get("q")?.trim() ?? "";
-      const origin = originOf(`?${query.toString()}`);
-      const rows = loadList({ project: null, q, origin });
+      const pick = listPick(pickOf(`?${query.toString()}`));
+      const rows = loadList({ project: null, q, ...pick });
       const spent = loadWeek();
       const unsent = loadNotSent();
       const listed = loadProjects();
@@ -296,7 +300,7 @@ export const ROUTES: Route[] = [
         loadList({
           project: params.id,
           q: query.get("q")?.trim() ?? "",
-          origin: originOf(`?${query.toString()}`),
+          ...listPick(pickOf(`?${query.toString()}`)),
         }),
         loadUploads(params.id),
       ]);

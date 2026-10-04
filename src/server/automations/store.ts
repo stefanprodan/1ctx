@@ -3,16 +3,18 @@
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type {
+  AttentionMode,
   EventOutcome,
   EventSource,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
+import { alertColumns, alertOf, type RawAlert } from "../sessions/index.ts";
 
 export const MAX_AUTOMATIONS_PER_PROJECT = 20;
 
-type Raw = {
+type Raw = RawAlert & {
   id: string;
   project_id: string;
   owner_id: string;
@@ -25,6 +27,8 @@ type Raw = {
   retention_days: number;
   own_memory: number;
   memory_guidance: string;
+  attention_mode: AttentionMode;
+  attention_guidance: string;
   disabled_capabilities: string;
   rerun_on_restart: number;
   suspended_at: number | null;
@@ -54,7 +58,8 @@ export const RETIRED = "its agent was deleted";
 const SELECT = `select automations.*, owners.username as owner_name,
     suspenders.username as suspended_by_name,
     agents.name as agent_name,
-    agents.deleted_at is not null as agent_retired
+    agents.deleted_at is not null as agent_retired,
+    ${alertColumns("automations")}
   from automations
   join users owners on owners.id = automations.owner_id
   join agents on agents.id = automations.agent_id
@@ -76,6 +81,9 @@ const row = (raw: Raw): AutomationSummary => ({
   retentionDays: raw.retention_days,
   ownMemory: raw.own_memory === 1,
   memoryGuidance: raw.memory_guidance,
+  attentionMode: raw.attention_mode,
+  attentionGuidance: raw.attention_guidance,
+  alert: alertOf(raw),
   disabledCapabilities: JSON.parse(raw.disabled_capabilities),
   rerunOnRestart: raw.rerun_on_restart === 1,
   suspendedAt: raw.suspended_at,
@@ -109,6 +117,8 @@ export type AutomationFields = Pick<
   | "retentionDays"
   | "ownMemory"
   | "memoryGuidance"
+  | "attentionMode"
+  | "attentionGuidance"
   | "disabledCapabilities"
   | "rerunOnRestart"
 >;
@@ -211,9 +221,10 @@ export class AutomationStore {
         `insert into automations
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, own_memory,
-           memory_guidance, disabled_capabilities, rerun_on_restart,
+           memory_guidance, attention_mode, attention_guidance,
+           disabled_capabilities, rerun_on_restart,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -228,6 +239,8 @@ export class AutomationStore {
         fields.retentionDays,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
+        fields.attentionMode,
+        fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
         fields.nextAt,
@@ -251,6 +264,8 @@ export class AutomationStore {
       | "nextAt"
       | "ownMemory"
       | "memoryGuidance"
+      | "attentionMode"
+      | "attentionGuidance"
       | "disabledCapabilities"
       | "rerunOnRestart"
     > & { now: number },
@@ -260,6 +275,7 @@ export class AutomationStore {
         `update automations set agent_id = ?, name = ?, instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, own_memory = ?, memory_guidance = ?,
+           attention_mode = ?, attention_guidance = ?,
            disabled_capabilities = ?, rerun_on_restart = ?,
            revision = revision + 1, updated_at = ? where id = ?`,
       )
@@ -274,6 +290,8 @@ export class AutomationStore {
         fields.nextAt,
         fields.ownMemory ? 1 : 0,
         fields.memoryGuidance,
+        fields.attentionMode,
+        fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
         fields.now,

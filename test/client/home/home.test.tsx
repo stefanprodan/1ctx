@@ -40,6 +40,9 @@ const chatRow = (): FeedRow => ({
   session: {
     archived: null,
     attention: null,
+    attentionReason: null,
+    attentionSource: null,
+    attentionBy: null,
     id: "s1",
     projectId: "p1",
     ownerId: "u1",
@@ -181,7 +184,7 @@ describe("Home", () => {
             automationId: "au1",
             title: "digest",
           },
-          automation: { id: "au1", name: "digest" },
+          automation: { id: "au1", name: "digest", alert: null },
           runs: 24,
         },
       ],

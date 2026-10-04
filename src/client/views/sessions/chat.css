@@ -51,12 +51,141 @@
   .chat-run-archived {
     color: var(--faint);
   }
-  /* the state shares the icon's line and wraps inside its own box, so
-     a long reason never leaves the icon alone on a phone */
-  .chat-run-state {
+  /* an archived chat's line shares the icon's line and wraps inside
+     its own box, so a long reason never leaves the icon alone on a
+     phone */
+  .chat-run-archived-line {
     flex: 1 1 0;
     min-width: 0;
     font-size: var(--text-ui);
+  }
+  /* one line, never wrapped: only the name gives way, and the state's
+     rest, hidden on a phone */
+  .chat-run-line {
+    display: flex;
+    align-items: center;
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: var(--text-ui);
+  }
+  .chat-run-of {
+    flex-shrink: 0;
+    margin-right: var(--space-1);
+    white-space: nowrap;
+  }
+  .chat-run-name {
+    flex: 0 1 auto;
+  }
+  /* a deleted automation's words are whole wherever they fit; the
+     state never shrinks */
+  .chat-run-words {
+    flex: 0 1 auto;
+  }
+  .chat-run-state {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .chat-run-more {
+    flex: 0 1 auto;
+  }
+  @media (max-width: 719px) {
+    .chat-run-more {
+      display: none;
+    }
+  }
+
+  /* why the run needs attention, over the bar: the title and the
+     reason on one line, cut until opened */
+  .chat-attention {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) 14px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    /* the card's top corners inside its border; the card never clips,
+       so the Fork menu can rise out of it */
+    --chat-attention-round: calc(var(--radius-card) - 1px);
+    border-radius: 0;
+    border-top-left-radius: var(--chat-attention-round);
+    border-top-right-radius: var(--chat-attention-round);
+    background: var(--attention-wash);
+    color: var(--fg);
+    font: inherit;
+    font-size: var(--text-ui);
+    text-align: left;
+  }
+  /* the line, the toggle when there is a reason, takes the row but
+     Dismiss */
+  .chat-attention-line {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+  .chat-attention-toggle {
+    cursor: pointer;
+  }
+  .chat-attention-open .chat-attention-line {
+    align-items: flex-start;
+  }
+  .chat-attention-dismiss {
+    flex-shrink: 0;
+  }
+  .chat-attention-dismiss:focus-visible {
+    outline: 2px solid var(--brand);
+  }
+  .chat-attention-toggle:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+  }
+  .chat-attention-icon {
+    flex-shrink: 0;
+    color: var(--attention);
+  }
+  .chat-attention-text {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* with the space after it, the gap of the row's */
+  .chat-attention-title {
+    margin-right: var(--space-1);
+    color: var(--attention);
+  }
+  .chat-attention-by {
+    color: var(--dim);
+  }
+  .chat-attention-open {
+    align-items: flex-start;
+  }
+  .chat-attention-open .chat-attention-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  /* up while closed, down once open; the icons sit on the text's
+     first line when it wraps */
+  .chat-attention-chevron {
+    flex-shrink: 0;
+    color: var(--faint);
+    transform: rotate(180deg);
+  }
+  .chat-attention-open .chat-attention-icon,
+  .chat-attention-open .chat-attention-chevron {
+    margin-top: 3px;
+  }
+  .chat-attention-open .chat-attention-chevron {
+    transform: none;
   }
   .chat-run-failure {
     flex-basis: 100%;

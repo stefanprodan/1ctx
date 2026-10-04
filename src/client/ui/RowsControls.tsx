@@ -26,7 +26,9 @@ export function RowsFilters({
         const cls = `seg-option${f.on ? " seg-on" : ""}`;
         const inner = (
           <>
-            {f.icon && <Icon name={f.icon} size={12} />}
+            {f.icon && (
+              <Icon name={f.icon} size={12} class="rows-filter-icon" />
+            )}
             {f.label}
           </>
         );

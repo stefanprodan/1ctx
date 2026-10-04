@@ -16,6 +16,7 @@ import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   ArchiveReason,
+  AttentionSource,
   EventSource,
   MessageKind,
   MessageStatus,
@@ -76,6 +77,8 @@ export type RawSession = {
   archived_by: string | null;
   attention: number | null;
   attention_by: string | null;
+  attention_reason: string | null;
+  attention_source: AttentionSource | null;
 };
 
 export type UsagePort = {
@@ -107,6 +110,9 @@ export const session = (
       ? null
       : { at: raw.archived_at, reason: raw.archived_reason },
   attention: raw.attention,
+  attentionReason: raw.attention_reason,
+  attentionSource: raw.attention_source,
+  attentionBy: raw.attention_by,
 });
 
 export type RawMessage = {
@@ -262,6 +268,8 @@ export type RawSend = {
   rounds: number;
   tool_calls: number;
   memory_round: number | null;
+  attention_round: number | null;
+  memory_from: number | null;
   memory_error: string | null;
   memory_skipped: number | null;
   summoned: number;
@@ -291,6 +299,8 @@ export const send = (raw: RawSend): SendSummary => ({
   rounds: raw.rounds,
   toolCalls: raw.tool_calls,
   memoryRound: raw.memory_round,
+  attentionRound: raw.attention_round,
+  memoryFrom: raw.memory_from,
   memoryError: raw.memory_error,
   memorySkipped: raw.memory_skipped,
   summoned: raw.summoned === 1,

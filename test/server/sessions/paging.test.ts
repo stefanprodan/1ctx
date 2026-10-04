@@ -259,11 +259,14 @@ describe("an automation's pages of runs", () => {
     for (const tally of tallies) {
       expect(tally).toEqual({ running: 1, done: 60, failed: 10, stopped: 0 });
     }
-    const failed = store.runs("au", "failed", null, 4);
-    expect(failed.rows).toHaveLength(4);
-    const rest = store.runs("au", "failed", parseRunsCursor(failed.next!));
+    for (const id of made.slice(0, 10)) {
+      db.query("update sessions set attention = 1 where id = ?").run(id);
+    }
+    const flagged = store.runs("au", "attention", null, 4);
+    expect(flagged.rows).toHaveLength(4);
+    const rest = store.runs("au", "attention", parseRunsCursor(flagged.next!));
     expect(rest.next).toBeNull();
-    expect(new Set([...ids(failed.rows), ...ids(rest.rows)])).toEqual(
+    expect(new Set([...ids(flagged.rows), ...ids(rest.rows)])).toEqual(
       new Set(made.slice(0, 10)),
     );
   });

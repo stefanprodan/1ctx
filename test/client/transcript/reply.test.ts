@@ -71,6 +71,8 @@ function send(status: SendSummary["status"]): SendSummary {
     rounds: 2,
     toolCalls: 1,
     memoryRound: null,
+    attentionRound: null,
+    memoryFrom: null,
     memoryError: null,
     memorySkipped: null,
     summoned: false,

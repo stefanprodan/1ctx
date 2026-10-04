@@ -21,6 +21,7 @@ import {
   stateOf,
   UNKNOWN_WINDOW_TOKENS,
 } from "../../../src/server/runner/attention.ts";
+import { ATTENTION_STEP_MS } from "../../../src/server/runner/attention-step.ts";
 import {
   FINALIZE_ATTEMPTS,
   FINALIZE_RETRY_MS,
@@ -34,14 +35,27 @@ import {
 } from "../../../src/shared/contracts/decision.ts";
 import { collectLogs, PROVIDER_URL } from "../../helpers/app.ts";
 import {
-  createAutomation,
+  answerRun,
+  createAutomation as create,
   settleRun,
   startRun,
 } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  NO_TOOLS,
+  startChat,
+  tick,
+  waitScript,
+} from "../../helpers/chat.ts";
 import { systemoneAnswer } from "../../helpers/systemone.ts";
 
 const ANSWER = "The check failed: the Flux controllers are not ready.";
+
+// an automation that asks the decider, the only mode that does
+const createAutomation = (
+  chat: Parameters<typeof create>[0],
+  fields: Parameters<typeof create>[1] = {},
+) => create(chat, { attentionMode: "decider", ...fields });
 
 const DEFAULTS: DecisionSummary = {
   id: "run-attention",
@@ -138,7 +152,7 @@ const mark = (chat: Awaited<ReturnType<typeof chatApp>>, id: string) =>
 async function finishedRun(chat: Awaited<ReturnType<typeof chatApp>>) {
   const automation = await createAutomation(chat);
   const { sessionId, main } = await startRun(chat, automation.id);
-  main.reply(ANSWER);
+  await answerRun(chat, main, ANSWER);
   expect((await settleRun(chat, sessionId))?.status).toBe("done");
   return sessionId;
 }
@@ -167,8 +181,13 @@ describe("a finished run", () => {
         expect(after.attention_by).toBe("judge");
         expect(after.revision).toBe(before.revision + 1);
         expect(after.last_activity_at).toBe(before.last_activity_at);
+        // the session's one envelope, then its automation's alert opened
         const envelopes = events.slice(seen);
-        expect(envelopes).toHaveLength(1);
+        expect(envelopes.map((e) => e.type)).toEqual([
+          "session.changed",
+          "automation.changed",
+          "automation.attention",
+        ]);
         expect(envelopes[0]).toMatchObject({
           type: "session.changed",
           data: {
@@ -188,6 +207,122 @@ describe("a finished run", () => {
     },
   );
 
+  test("closes or keeps its automation's alert only once the decider answered", async () => {
+    const { chat, asked } = await deciderApp({ hold: true });
+    const automation = await createAutomation(chat);
+    const since = () =>
+      chat.app.db
+        .query<{ attention_since: number | null }, [string]>(
+          "select attention_since from automations where id = ?",
+        )
+        .get(automation.id)!.attention_since;
+    // a failed run opens the alert with no decider
+    const failed = await startRun(chat, automation.id);
+    failed.main.content("half");
+    failed.main.end();
+    await settleRun(chat, failed.sessionId);
+    const opened = since();
+    expect(opened).not.toBeNull();
+    // a clean run's end leaves it to the decider
+    chat.app.now.value += 60_000;
+    const clean = await startRun(chat, automation.id);
+    await answerRun(chat, clean.main, ANSWER);
+    await settleRun(chat, clean.sessionId);
+    while (asked.length === 0) await tick();
+    expect(since()).toBe(opened);
+    // its yes keeps the alert, the run joining it
+    asked[0]!.release();
+    await chat.app.runner.settled();
+    expect(since()).toBe(opened);
+    expect(chat.app.automations.byId(automation.id)?.alert?.runs).toBe(2);
+    // with the decision off, a clean run's end closes it
+    const res = await chat.admin.call("PUT", "/api/decisions/run-attention", {
+      body: {
+        enabled: false,
+        deciderId: null,
+        options: Object.fromEntries(
+          DEFAULTS.options.map((o) => [o.key, o.default]),
+        ),
+      },
+    });
+    expect(res.status).toBe(200);
+    chat.app.now.value += 60_000;
+    const off = await startRun(chat, automation.id);
+    await answerRun(chat, off.main, ANSWER);
+    await settleRun(chat, off.sessionId);
+    await chat.app.runner.settled();
+    expect(since()).toBeNull();
+    await chat.app.shutdown();
+  });
+
+  test("opens its automation's alert past a newer run a user stopped", async () => {
+    const { chat, asked } = await deciderApp({ hold: true });
+    const automation = await createAutomation(chat);
+    const clean = await startRun(chat, automation.id);
+    await answerRun(chat, clean.main, ANSWER);
+    await settleRun(chat, clean.sessionId);
+    while (asked.length === 0) await tick();
+    chat.app.now.value += 60_000;
+    const stopped = await startRun(chat, automation.id);
+    const stop = await chat.member.call(
+      "POST",
+      `/api/sessions/${stopped.sessionId}/stop`,
+    );
+    expect(stop.status).toBe(200);
+    expect((await settleRun(chat, stopped.sessionId))?.status).toBe("stopped");
+    asked[0]!.release();
+    await chat.app.runner.settled();
+    expect(chat.app.automations.byId(automation.id)?.alert).toEqual({
+      since: chat.app.sessions.byId(clean.sessionId)!.lastActivityAt,
+      runs: 1,
+      reason: null,
+      by: "judge",
+    });
+    await chat.app.shutdown();
+  });
+
+  test("is not asked once a Stop cut its attention step, which leaves the alert", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const failed = await startRun(chat, automation.id);
+    failed.main.content("half");
+    failed.main.end();
+    await settleRun(chat, failed.sessionId);
+    const opened = chat.app.automations.byId(automation.id)?.alert?.since;
+    expect(opened).toBeNumber();
+    chat.app.now.value += 60_000;
+    const run = await startRun(chat, automation.id);
+    const step = await answerRun(chat, run.main, ANSWER, () => {});
+    const stop = await chat.member.call(
+      "POST",
+      `/api/sessions/${run.sessionId}/stop`,
+    );
+    expect(stop.status).toBe(200);
+    expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
+    await chat.app.runner.settled();
+    expect(step.aborted).toBeTrue();
+    expect(asked).toHaveLength(0);
+    expect(mark(chat, run.sessionId)?.attention).toBeNull();
+    expect(chat.app.automations.byId(automation.id)?.alert).toMatchObject({
+      since: opened,
+      runs: 1,
+    });
+    await chat.app.shutdown();
+  });
+
+  test("is asked when its attention step ran out of time", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const run = await startRun(chat, automation.id);
+    await answerRun(chat, run.main, ANSWER, () => {});
+    chat.app.now.value += ATTENTION_STEP_MS;
+    expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(1);
+    expect(mark(chat, run.sessionId)?.attention_by).toBe("judge");
+    await chat.app.shutdown();
+  });
+
   test("is asked with the option descriptions an admin saved", async () => {
     const { chat, asked } = await deciderApp();
     const text = {
@@ -202,7 +337,7 @@ describe("a finished run", () => {
     const automation = await createAutomation(chat);
     const run = async () => {
       const { sessionId, main } = await startRun(chat, automation.id);
-      main.reply(ANSWER);
+      await answerRun(chat, main, ANSWER);
       await settleRun(chat, sessionId);
       await chat.app.runner.settled();
     };
@@ -221,6 +356,102 @@ describe("a finished run", () => {
     expect(JSON.parse(asked[1]!.body).questions).toEqual(
       outcomeQuestion(DEFAULTS),
     );
+    await chat.app.shutdown();
+  });
+
+  test("is asked with the automation's words in place of needs-attention's", async () => {
+    const { chat, asked } = await deciderApp();
+    const words = "Only when Flux is behind the latest release.";
+    const automation = await createAutomation(chat, {
+      attentionGuidance: words,
+    });
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER);
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(JSON.parse(asked[0]!.body).questions).toEqual({
+      outcome: {
+        type: "choice",
+        instructions: "What is the outcome of this task run?",
+        criteria: {
+          [GOOD]: DEFAULTS.options[0]!.description,
+          [BAD]: words,
+        },
+      },
+    });
+    expect(outcomeQuestion(DEFAULTS, words)).toEqual(
+      JSON.parse(asked[0]!.body).questions,
+    );
+    await chat.app.shutdown();
+  });
+
+  test("is never asked in the agent mode", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await create(chat, { attentionMode: "agent" });
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER);
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(0);
+    expect(mark(chat, sessionId)?.attention).toBeNull();
+    await chat.app.shutdown();
+  });
+
+  test("is not asked once its agent marked it, and keeps the agent's mark", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER, (step) => {
+      step.toolRound([
+        {
+          id: "c1",
+          name: "needs_attention",
+          arguments: JSON.stringify({ reason: "podinfo is not ready" }),
+        },
+      ]);
+      step.end();
+    });
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(0);
+    expect(mark(chat, sessionId)).toMatchObject({
+      attention: 1,
+      attention_by: "coder",
+    });
+    await chat.app.shutdown();
+  });
+
+  test("of an agent without tools gets the runner's mark or the decider", async () => {
+    const { chat, asked } = await deciderApp();
+    const plain = await chat.makeAgent({ name: "plain", model: NO_TOOLS });
+    const automation = await createAutomation(chat);
+    const moved = await chat.member.call(
+      "PATCH",
+      `/api/automations/${automation.id}`,
+      { body: { agentId: plain } },
+    );
+    expect(moved.status).toBe(200);
+    const failed = await startRun(chat, automation.id);
+    expect(failed.main.body.tools).toBeUndefined();
+    failed.main.content("half");
+    failed.main.end();
+    expect((await settleRun(chat, failed.sessionId))?.status).toBe("failed");
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(0);
+    expect(mark(chat, failed.sessionId)).toMatchObject({
+      attention: 1,
+      attention_by: null,
+    });
+    const clean = await startRun(chat, automation.id);
+    clean.main.reply(ANSWER);
+    expect((await settleRun(chat, clean.sessionId))?.status).toBe("done");
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(1);
+    expect(JSON.parse(asked[0]!.body).state).toBe(ANSWER);
+    expect(mark(chat, clean.sessionId)).toMatchObject({
+      attention: 0.9802,
+      attention_by: "judge",
+    });
     await chat.app.shutdown();
   });
 
@@ -294,12 +525,13 @@ describe("a finished run", () => {
     const { chat, asked } = await deciderApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const { sessionId, main } = await startRun(chat, automation.id);
-    main.reply(ANSWER);
-    const phase = await waitScript(chat.scripted, 2);
+    await answerRun(chat, main, ANSWER);
+    const phase = await waitScript(chat.scripted, 3);
     phase.reply("Noted the Flux failure for the next run.");
     expect((await settleRun(chat, sessionId))?.status).toBe("done");
     await chat.app.runner.settled();
     expect(chat.app.sessions.lastSend(sessionId)?.memoryRound).toBe(2);
+    expect(chat.app.sessions.lastSend(sessionId)?.attentionRound).toBe(2);
     expect(asked).toHaveLength(1);
     expect(JSON.parse(asked[0]!.body).state).toBe(ANSWER);
     expect(mark(chat, sessionId)?.attention).toBe(0.9802);
@@ -391,7 +623,7 @@ describe("no ask", () => {
     store.finishSend = () => {
       throw new Error("finalize failed");
     };
-    run.main.reply(ANSWER);
+    await answerRun(chat, run.main, ANSWER);
     for (let i = 0; i < FINALIZE_ATTEMPTS; i++) {
       await tick();
       chat.app.now.value += FINALIZE_RETRY_MS;
@@ -494,7 +726,7 @@ describe("a drain", () => {
     const automation = await createAutomation(chat);
     const { sessionId, main } = await startRun(chat, automation.id);
     const done = chat.app.shutdown();
-    main.reply(ANSWER);
+    await answerRun(chat, main, ANSWER);
     while (asked.length === 0) await tick();
     expect(chat.app.sessions.byId(sessionId)?.status).toBe("done");
     asked[0]!.release();
@@ -507,7 +739,7 @@ describe("a drain", () => {
     const automation = await createAutomation(chat);
     const { sessionId, main } = await startRun(chat, automation.id);
     const done = chat.app.shutdown();
-    main.reply(ANSWER);
+    await answerRun(chat, main, ANSWER);
     while (asked.length === 0) await tick();
     expect(asked[0]!.signal?.aborted).toBe(false);
     chat.app.now.value += 10_000;
@@ -526,6 +758,12 @@ describe("the asks", () => {
       kind: "run",
       terminal: "finish",
       memoryRound: null,
+      answering: null,
+      policy: {
+        agentName: "sre",
+        automation: { attentionMode: "decider", attentionGuidance: "" },
+        attentionOffered: null,
+      },
       ...fields,
     }) as ActiveSend;
 
@@ -538,6 +776,7 @@ describe("the asks", () => {
       settle(p: number | Error): void;
     }[] = [];
     const marks: [string, number, string][] = [];
+    const undecided: string[] = [];
     const fake: AttentionPort = {
       decide: (use, _questions, state, signal) =>
         new Promise((resolve, reject) => {
@@ -577,12 +816,15 @@ describe("the asks", () => {
         marks.push([sessionId, value, by]);
         return true;
       },
+      undecided: (sessionId) => {
+        undecided.push(sessionId);
+      },
     };
-    return { fake, pending, marks };
+    return { fake, pending, marks, undecided };
   }
 
   test("run at most two at once and queue the rest", async () => {
-    const { fake, pending, marks } = port();
+    const { fake, pending, marks, undecided } = port();
     const asks = attention(fake, silent);
     for (const id of ["a", "b", "c", "d"]) asks.ask(send(id));
     await tick();
@@ -601,6 +843,19 @@ describe("the asks", () => {
       ["c", 0.7, "judge"],
       ["d", 0.2, "judge"],
     ]);
+    // a refusal settles the alert as a clean run's end would
+    expect(undecided).toEqual(["b"]);
+  });
+
+  test("a decision turned off or no answer settles the alert", async () => {
+    const { fake, marks, undecided } = port(null);
+    const asks = attention(fake, silent);
+    asks.ask(send("a"));
+    fake.decision = () => ({ ...DEFAULTS, enabled: false });
+    asks.ask(send("b"));
+    await asks.settled();
+    expect(marks).toEqual([]);
+    expect(undecided).toEqual(["a", "b"]);
   });
 
   test("skip a send that is not a finished run with an answer", async () => {
@@ -620,8 +875,40 @@ describe("the asks", () => {
     await others.settled();
   });
 
+  test("skip a run its agent or the runner marked, or one not in the decider mode", async () => {
+    const { fake, pending } = port();
+    const asks = attention(fake, silent);
+    const base = send("x").policy;
+    asks.ask(
+      send("a", {
+        policy: {
+          ...base,
+          attentionOffered: {
+            ...base.offered,
+            attention: { guidance: "", reason: "r" },
+          },
+        },
+      }),
+    );
+    asks.ask(send("b", { answering: "tool_limit" }));
+    asks.ask(
+      send("c", {
+        policy: {
+          ...base,
+          automation: { ...base.automation!, attentionMode: "agent" },
+        },
+      }),
+    );
+    // the loop check is no budget: its run is asked
+    asks.ask(send("d", { answering: "tool_loop" }));
+    await tick();
+    expect(pending.map((p) => p.id)).toEqual(["d"]);
+    pending[0]!.settle(0.1);
+    await asks.settled();
+  });
+
   test("close aborts the asks in flight and asks no other", async () => {
-    const { fake, pending, marks } = port();
+    const { fake, pending, marks, undecided } = port();
     const logs = collectLogs();
     const asks = attention(fake, logs.logFactory("runner"));
     for (const id of ["a", "b", "c"]) asks.ask(send(id));
@@ -632,6 +919,8 @@ describe("the asks", () => {
     await asks.settled();
     expect(pending.map((p) => p.id)).toEqual(["a", "b"]);
     expect(marks).toEqual([]);
+    // a shutdown leaves the alert as it is
+    expect(undecided).toEqual([]);
     expect(
       logs.events.map((e) => [e.msg, e.fields.chat, e.fields.error]),
     ).toEqual([
@@ -663,7 +952,7 @@ describe("the asks", () => {
   });
 
   test("queue at most MAX_QUEUED and drop the oldest waiting", async () => {
-    const { fake, pending } = port();
+    const { fake, pending, undecided } = port();
     const logs = collectLogs();
     const asks = attention(fake, logs.logFactory("runner"));
     const total = ASKS_AT_ONCE + MAX_QUEUED + 1;
@@ -673,6 +962,7 @@ describe("the asks", () => {
     expect(logs.events.map((e) => [e.msg, e.fields.chat])).toEqual([
       ["run attention dropped", `s${ASKS_AT_ONCE}`],
     ]);
+    expect(undecided).toEqual([`s${ASKS_AT_ONCE}`]);
     // the next to start is the oldest kept
     pending[0]!.settle(0.1);
     await tick();

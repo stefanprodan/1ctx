@@ -19,6 +19,7 @@ import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import type { RunFilter } from "../../shared/words.ts";
 import { failure } from "../lib/format.ts";
+import { sameAlert } from "./alert-rows.ts";
 import { api } from "./api.ts";
 import { matchesFilter, upsertRun } from "./automations-rows.ts";
 import { IDLE, type More } from "./feed.ts";
@@ -27,6 +28,8 @@ import { mergeNextPage, refreshHead, runOrder } from "./sessions-rows.ts";
 
 // newest first; rows and tally are null while they load. next is the
 // cursor of the page after the rows, and more a later page's own state
+type Label = NonNullable<FeedRow["automation"]>;
+
 export type Runs = {
   id: string;
   filter: RunFilter | null;
@@ -47,16 +50,17 @@ const seen = new Map<string, string>();
 const moved = new Map<string, FeedRow>();
 // the automation's name as its frame last said, with the frame's
 // number, applied only over an answer asked before the frame
-let renamed: { id: string; name: string; at: number } | null = null;
+let renamed: (Label & { at: number }) | null = null;
 let frames = 0;
 
 function named(rows: FeedRow[], asked: number): FeedRow[] {
   if (renamed === null || renamed.at <= asked) return rows;
-  const label = { id: renamed.id, name: renamed.name };
+  const { at: _, ...label } = renamed;
   return rows.map((r) =>
     r.automation !== null &&
     r.automation.id === label.id &&
-    r.automation.name !== label.name
+    (r.automation.name !== label.name ||
+      !sameAlert(r.automation.alert, label.alert))
       ? { ...r, automation: label }
       : r,
   );
@@ -252,8 +256,9 @@ export function applyRunEnvelope(
   });
 }
 
-// a rename reaches the open runs, which carry the old label
-export function relabelRuns(label: { id: string; name: string }): void {
+// a rename or an alert's move reaches the open runs, which carry the
+// old label
+export function relabelRuns(label: Label): void {
   const open = runs.value;
   if (open?.id !== label.id) return;
   renamed = { ...label, at: ++frames };
@@ -261,7 +266,10 @@ export function relabelRuns(label: { id: string; name: string }): void {
   runs.value = {
     ...open,
     rows: open.rows.map((r) =>
-      r.automation?.name === label.name ? r : { ...r, automation: label },
+      r.automation?.name === label.name &&
+      sameAlert(r.automation.alert, label.alert)
+        ? r
+        : { ...r, automation: label },
     ),
   };
 }

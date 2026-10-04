@@ -17,7 +17,7 @@ import {
   type RunsArgs,
 } from "./automation.ts";
 import { forgetCapability as forget, setDisabled } from "./capabilities.ts";
-import { deleteSession, type SessionDeleted } from "./delete.ts";
+import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
   exportRows,
   agents as readAgents,
@@ -32,6 +32,7 @@ import {
 } from "./fork.ts";
 import { type ListArgs, listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
+import { markRun, type RunMark } from "./marks.ts";
 import {
   type DigestArgs,
   insertMcpSend,
@@ -93,6 +94,7 @@ export class SessionStore {
     private readonly db: Db,
     private readonly usage: UsagePort,
     private readonly scratch: ScratchPort,
+    private readonly pruned: Pruned = () => [],
   ) {
     this.queue = new QueueStore(db);
   }
@@ -238,10 +240,12 @@ export class SessionStore {
     return mountedBefore(this.db, sessionId, sendId);
   }
 
+  // a run's end may carry its mark, written in the same transaction
   touch(
     id: string,
-    fields: { status: SessionStatus; now: number },
+    fields: { status: SessionStatus; now: number; mark?: RunMark | null },
   ): SessionRow | null {
+    if (fields.mark) markRun(this.db, id, fields.mark);
     this.db
       .query(
         "update sessions set status = ?, last_activity_at = ?, revision = revision + 1 where id = ?",
@@ -260,7 +264,7 @@ export class SessionStore {
   }
 
   remove(id: string): SessionDeleted | "running" | null {
-    return deleteSession(this.db, id);
+    return removeSession(this.db, id, this.pruned);
   }
 
   count(projectId: string): number {

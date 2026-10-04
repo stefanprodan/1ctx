@@ -15,6 +15,7 @@ import { BUILTIN_TOOLS } from "../../shared/words.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import type { MemoryWork } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
+import { makeAttentionTool } from "./builtin/attention.ts";
 import { makeBashTool } from "./builtin/bash.ts";
 import {
   DEFAULT_TIMEZONE,
@@ -65,6 +66,7 @@ const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
   mcp_describe: "mcpCatalog",
   mcp_call: "mcpCatalog",
   memory_edit: "memory",
+  needs_attention: "runs",
   webfetch: "web",
   websearch: "webSearch",
 };
@@ -130,6 +132,7 @@ export function builtinCatalog(
       }).map(withoutNames),
       ...makeMcpCatalogTools([server]),
       ...chatMemoryTools(),
+      makeAttentionTool({ guidance: "", reason: null }),
     ].map(schema),
     now,
   );

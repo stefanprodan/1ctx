@@ -287,7 +287,7 @@ export type EventOutcome = (typeof EVENT_OUTCOMES)[number];
 // the reason on the run event of a fire a restart put off, the one trace
 // of the deferral once the run overwrites it
 export const DEFERRED_BY_RESTART = "deferred by a restart";
-export const RUN_FILTERS = ["failed", "manual"] as const;
+export const RUN_FILTERS = ["manual", "attention"] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];
 export function isRunFilter(value: unknown): value is RunFilter {
   return RUN_FILTERS.includes(value as RunFilter);
@@ -314,6 +314,22 @@ export function isTimeZone(value: unknown): value is string {
 }
 export const RETENTION_DAYS = { min: 1, max: 365, default: 30 } as const;
 export const MAX_MEMORY_GUIDANCE = 2000;
+
+// who marks an automation's runs as needing attention: nobody, the
+// run's agent with the runner's failure marks, or those and the
+// decider for a finished run they left unmarked
+export const ATTENTION_MODES = ["off", "agent", "decider"] as const;
+export type AttentionMode = (typeof ATTENTION_MODES)[number];
+export function isAttentionMode(value: unknown): value is AttentionMode {
+  return ATTENTION_MODES.includes(value as AttentionMode);
+}
+// where a run's mark came from
+export const ATTENTION_SOURCES = ["agent", "runner", "decider"] as const;
+export type AttentionSource = (typeof ATTENTION_SOURCES)[number];
+// the guidance replaces a decider option's text, whose cap this is
+export const MAX_ATTENTION_GUIDANCE = 1000;
+// the agent's reason, one line
+export const MAX_ATTENTION_REASON = 300;
 
 export const MESSAGE_KINDS = ["user", "reply", "tool", "summary"] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
@@ -344,6 +360,7 @@ export const BUILTIN_TOOLS = [
   "mcp_call",
   "mcp_describe",
   "memory_edit",
+  "needs_attention",
   "skill",
   "skill_file",
 ] as const;

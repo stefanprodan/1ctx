@@ -6,6 +6,7 @@
 
 import type { ProjectSummary } from "../../../shared/contracts/project.ts";
 import type { SessionOrigin } from "../../../shared/words.ts";
+import type { FeedPick } from "../../feed/FeedCard.tsx";
 
 export function dateLine(now: Date): string {
   return now.toLocaleDateString("en-GB", {
@@ -47,30 +48,43 @@ export function searchOf(search: string): string {
   return new URLSearchParams(search).get("q")?.trim() ?? "";
 }
 
-// the feed's filter as the address carries it: chats, task runs, or
-// null for both
-export function originOf(search: string): SessionOrigin | null {
-  const origin = new URLSearchParams(search).get("origin");
+// the pick as the address carries it: attention=1, else the origin
+export function pickOf(search: string): FeedPick | null {
+  const params = new URLSearchParams(search);
+  if (params.get("attention") === "1") return "attention";
+  const origin = params.get("origin");
   return origin === "chat" || origin === "automation" ? origin : null;
 }
 
-// the address for a query and a filter on a page, none when both are
+// what the feed's list reads for a pick
+export function listPick(pick: FeedPick | null): {
+  origin: SessionOrigin | null;
+  attention: boolean;
+} {
+  return pick === "attention"
+    ? { origin: null, attention: true }
+    : { origin: pick, attention: false };
+}
+
+// the address for a query and a pick on a page, none when both are
 // blank
 export function searchHref(
   pathname: string,
   q: string,
-  origin: SessionOrigin | null = null,
+  pick: FeedPick | null = null,
 ): string {
   const params = new URLSearchParams();
   if (q.trim() !== "") params.set("q", q.trim());
-  if (origin !== null) params.set("origin", origin);
+  if (pick === "attention") params.set("attention", "1");
+  else if (pick !== null) params.set("origin", pick);
   const search = params.toString();
   return `${pathname}${search === "" ? "" : `?${search}`}`;
 }
 
 // what the feed says with no rows
-export function emptyLine(q: string, origin: SessionOrigin | null): string {
+export function emptyLine(q: string, origin: FeedPick | null): string {
   if (q !== "") return "No sessions match";
+  if (origin === "attention") return "Nothing flagged";
   if (origin === "chat") return "No chats yet";
   if (origin === "automation") return "No task runs yet";
   return "No sessions found";

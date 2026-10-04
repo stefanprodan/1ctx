@@ -12,8 +12,10 @@ import {
 } from "../../shared/capabilities.ts";
 import { sanitize } from "../../shared/memory.ts";
 import {
+  isAttentionMode,
   isName,
   isRunFilter,
+  MAX_ATTENTION_GUIDANCE,
   MAX_MEMORY_GUIDANCE,
   MAX_MESSAGE_BYTES,
   MAX_SCHEDULE,
@@ -28,6 +30,7 @@ import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 export const MAX_AUTOMATION_BODY =
   MAX_MESSAGE_BYTES +
   MAX_MEMORY_GUIDANCE +
+  MAX_ATTENTION_GUIDANCE +
   MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) +
   2048;
 const KEYS = [
@@ -123,6 +126,30 @@ function parseValues(
     }
     out.memoryGuidance = guidance;
   }
+  if (take("attentionMode")) {
+    const value = Object.hasOwn(body, "attentionMode")
+      ? body.attentionMode
+      : "agent";
+    if (!isAttentionMode(value)) {
+      throw new BadRequest("attentionMode must be off, agent or decider");
+    }
+    out.attentionMode = value;
+  }
+  if (take("attentionGuidance")) {
+    const value = Object.hasOwn(body, "attentionGuidance")
+      ? body.attentionGuidance
+      : "";
+    if (typeof value !== "string") {
+      throw new BadRequest("attentionGuidance must be text");
+    }
+    const guidance = sanitize(value);
+    if (new TextEncoder().encode(guidance).length > MAX_ATTENTION_GUIDANCE) {
+      throw new BadRequest(
+        `attention guidance must be at most ${MAX_ATTENTION_GUIDANCE} bytes`,
+      );
+    }
+    out.attentionGuidance = guidance;
+  }
   if (take("disabledCapabilities")) {
     const parsed = parseSet(
       Object.hasOwn(body, "disabledCapabilities")
@@ -136,15 +163,19 @@ function parseValues(
   return out;
 }
 
+// optional on create, with a default
+const OPTIONAL = [
+  "memoryGuidance",
+  "disabledCapabilities",
+  "rerunOnRestart",
+  "attentionMode",
+  "attentionGuidance",
+];
+
 export function parseSaveAutomation(
   body: unknown,
 ): Required<SaveAutomationRequest> {
-  const parsed = fields(body, [
-    ...KEYS,
-    "memoryGuidance",
-    "disabledCapabilities",
-    "rerunOnRestart",
-  ]);
+  const parsed = fields(body, [...KEYS, ...OPTIONAL]);
   for (const key of KEYS) {
     if (!Object.hasOwn(parsed, key))
       throw new BadRequest(`missing field ${key}`);
@@ -153,12 +184,7 @@ export function parseSaveAutomation(
 }
 
 export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
-  const parsed = fields(body, [
-    ...KEYS,
-    "memoryGuidance",
-    "disabledCapabilities",
-    "rerunOnRestart",
-  ]);
+  const parsed = fields(body, [...KEYS, ...OPTIONAL]);
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
   return parseValues(parsed, false);
 }
@@ -181,7 +207,7 @@ export function parseRunsQuery(url: URL): {
   queryKeys(url, ["filter", "before"]);
   const filter = url.searchParams.get("filter");
   if (filter !== null && !isRunFilter(filter)) {
-    throw new BadRequest("filter must be failed or manual");
+    throw new BadRequest("filter must be manual or attention");
   }
   const before = url.searchParams.get("before");
   return {
