@@ -12,7 +12,7 @@
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
@@ -201,9 +201,9 @@ export function restoreKeys(
       .data ?? {};
   mkdirSync(dir, { recursive: true });
   for (const [name, value] of Object.entries(data)) {
-    writeFileSync(join(dir, name), Buffer.from(value, "base64"), {
-      mode: 0o600,
-    });
+    const path = join(dir, name);
+    writeFileSync(path, Buffer.from(value, "base64"));
+    chmodSync(path, 0o600);
   }
   return Object.keys(data).length;
 }

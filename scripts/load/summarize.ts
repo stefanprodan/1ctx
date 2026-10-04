@@ -145,8 +145,8 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
   const toolFailed: Record<string, number> = {};
   // a send the driver stopped at the end aborts its tool calls; those
   // failures are the stop, not the server's. The driver logs a stop once
-  // it is answered, so the aborts come just before; a failure earlier in
-  // that send still counts
+  // it is answered, so the aborts land around it, from a few seconds
+  // before on; a failure earlier in that send still counts
   const stoppedAt = new Map<string, number>(
     driver.filter((e) => e.t === "stopped").map((e) => [e.session, e.at]),
   );

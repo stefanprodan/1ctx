@@ -151,7 +151,8 @@ the namespace's Secret before it writes any, since the database there
 was made with them; setup keeps what exists by name; a step sets every
 automation's time and starts on the next minute after. The tail waits
 at most 3 minutes for sends in flight, then stops them; tool failures
-in the 5 seconds before a send's stop are its aborts and not counted.
+of a send from 5 seconds before its stop on are its aborts and not
+counted.
 
 ## Comparing a branch with main
 
