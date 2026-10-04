@@ -14,8 +14,11 @@ import { Setting } from "../../ui/Setting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import {
+  atDefaults as allAtDefaults,
   collect,
+  type Defaulted,
   defaultLine,
+  defaultsDraft,
   deleteAsk,
   displayOf,
   draftOf,
@@ -24,7 +27,6 @@ import {
   limitRefusal,
   dirty as limitsDirty,
   seedOf,
-  show,
 } from "./Limits.model.ts";
 import "./limits-setting.css";
 
@@ -44,6 +46,7 @@ export function LimitsSetting({
   const own = mine(rows);
   const latest = useLatest(rows);
   const draft = useSignal(draftOf(own));
+  const defaulted = useSignal<Defaulted>(new Set());
   // a re-seed drops the ask, which was of the draft it replaces
   const asking = useSignal<string | null>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -52,13 +55,14 @@ export function LimitsSetting({
   const seed = seedOf(own);
   useEffect(() => {
     draft.value = draftOf(own);
+    defaulted.value = new Set();
     asking.value = null;
   }, [seed]);
   // the field of the last refusal, whose words no longer name it
   const refused = useRef<LimitName | undefined>(undefined);
   const save = useSave(
     async () => {
-      const got = collect(mine(latest.current), draft.value);
+      const got = collect(mine(latest.current), draft.value, defaulted.value);
       if ("problem" in got) throw new Error(got.problem);
       try {
         await saveLimits({ values: got.values });
@@ -73,19 +77,23 @@ export function LimitsSetting({
   );
   useFocusField(save, form);
   const run = () => {
-    const got = collect(own, draft.value);
+    const got = collect(own, draft.value, defaulted.value);
     void save.run(
       "problem" in got ? { error: got.problem, field: got.field } : null,
     );
   };
   const type = (name: string, text: string) => {
     draft.value = { ...draft.value, [name]: text };
+    // typed by hand, the field no longer stands for its default
+    if (defaulted.value.has(name)) {
+      const next = new Set(defaulted.value);
+      next.delete(name);
+      defaulted.value = next;
+    }
     save.touch();
   };
-  const atDefaults = own.every(
-    (row) => draft.value[row.name] === show(row, row.default),
-  );
-  const dirty = limitsDirty(own, draft.value);
+  const atDefaults = allAtDefaults(own, draft.value, defaulted.value);
+  const dirty = limitsDirty(own, draft.value, defaulted.value);
   return (
     <form
       ref={form}
@@ -109,9 +117,9 @@ export function LimitsSetting({
             class="btn btn-small"
             disabled={save.busy || atDefaults || asking.value !== null}
             onClick={() => {
-              draft.value = draftOf(
-                own.map((row) => ({ ...row, value: row.default })),
-              );
+              const next = defaultsDraft(own);
+              draft.value = next.draft;
+              defaulted.value = next.defaulted;
               save.touch();
             }}
           >
@@ -155,6 +163,7 @@ export function LimitsSetting({
             onDiscard={() => {
               asking.value = null;
               draft.value = draftOf(own);
+              defaulted.value = new Set();
             }}
           />
         }

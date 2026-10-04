@@ -32,8 +32,10 @@ import {
 } from "../../../src/client/views/admin/Config.model.ts";
 import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
 import {
+  atDefaults,
   collect,
   defaultLine,
+  defaultsDraft,
   dirty,
   displayOf,
   draftOf,
@@ -290,7 +292,7 @@ describe("the limit words and units", () => {
     expect(problem(rounds, "x")).toBe("Rounds needs a number");
     expect(problem(rounds, "500")).toBeNull();
     const tokensRange =
-      "Tool-work tokens must be a whole number from 10 to 10000 K";
+      "Tool-work tokens must be a whole number from 10 to 10,000 K";
     expect(problem(toolWorkTokens, "9")).toBe(tokensRange);
     expect(problem(toolWorkTokens, "10001")).toBe(tokensRange);
     expect(problem(toolWorkTokens, "12.5")).toBe(tokensRange);
@@ -429,8 +431,8 @@ describe("the limit words and units", () => {
     expect(read(summary, "1,000")).toBe(1_000_000);
     expect(read(summary, "1.5")).toBeNull();
     expect(read(summary, "")).toBeNull();
-    // the default Use defaults puts there goes back exact
-    expect(read(summary, "4")).toBe(4096);
+    // typed by hand, only the stored value's text keeps it
+    expect(read(summary, "4")).toBe(4000);
     expect(problem(summary, "33")).toBe(
       "Summary tokens must be a whole number from 1 to 32 K",
     );
@@ -442,15 +444,52 @@ describe("the limit words and units", () => {
     expect(
       collect([summary, rounds], { ...draft, rounds: "12" }) as unknown,
     ).toEqual({ values: { summaryMaxTokens: 8192, rounds: 12 } });
-    expect(
-      collect(
-        [summary],
-        draftOf([{ ...summary, value: summary.default }]),
-      ) as unknown,
-    ).toEqual({ values: { summaryMaxTokens: 4096 } });
+    const reset = defaultsDraft([summary]);
+    expect(reset.draft.summaryMaxTokens).toBe("4");
+    expect(atDefaults([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(collect([summary], reset.draft, reset.defaulted) as unknown).toEqual(
+      { values: { summaryMaxTokens: 4096 } },
+    );
     expect(dirty([summary], { summaryMaxTokens: "9" })).toBe(true);
     expect(collect([summary], { summaryMaxTokens: "9" }) as unknown).toEqual({
       values: { summaryMaxTokens: 9000 },
+    });
+  });
+
+  test("a stored value that shows as its default can be put back to it", () => {
+    const summary = row({
+      name: "summaryMaxTokens",
+      value: 4400,
+      default: 4096,
+      min: 1000,
+      max: 32_000,
+      unit: "tokens",
+      scope: "send",
+      changedAt: 1,
+    });
+    const draft = draftOf([summary]);
+    expect(draft.summaryMaxTokens).toBe("4");
+    // Use defaults stays on: the value differs though the text does not
+    expect(atDefaults([summary], draft)).toBe(false);
+    expect(dirty([summary], draft)).toBe(false);
+    // untouched, the stored value goes back
+    expect(collect([summary], draft) as unknown).toEqual({
+      values: { summaryMaxTokens: 4400 },
+    });
+    // Use defaults, then Save, sends the default
+    const reset = defaultsDraft([summary]);
+    expect(reset.draft).toEqual(draft);
+    expect(atDefaults([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(dirty([summary], reset.draft, reset.defaulted)).toBe(true);
+    expect(collect([summary], reset.draft, reset.defaulted) as unknown).toEqual(
+      { values: { summaryMaxTokens: 4096 } },
+    );
+    // typed by hand, the stored value's text keeps the stored value
+    expect(collect([summary], { summaryMaxTokens: "4" }) as unknown).toEqual({
+      values: { summaryMaxTokens: 4400 },
+    });
+    expect(collect([summary], { summaryMaxTokens: "5" }) as unknown).toEqual({
+      values: { summaryMaxTokens: 5000 },
     });
   });
 

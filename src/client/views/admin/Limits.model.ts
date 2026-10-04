@@ -236,23 +236,41 @@ export function show(row: LimitRow, value: number): string {
   return thousands ? thousandsText(value) : String(value / factor);
 }
 
-// thousands left as shown give back the stored value, or the default Use
-// defaults put there, so a save of another field never rewrites 4096
-export function read(row: LimitRow, text: string): number | null {
+// the fields Use defaults filled: each stands for its default until it
+// is typed in, since a stored 4400 and the default 4096 both show 4
+export type Defaulted = ReadonlySet<string>;
+const NONE: Defaulted = new Set();
+
+// thousands left as shown give back the value the field stands for, so a
+// save of another field never rewrites 4096; typed by hand, the text of
+// the stored value keeps it, as the agent's window does
+export function read(
+  row: LimitRow,
+  text: string,
+  defaulted: Defaulted = NONE,
+): number | null {
   if (displayOf(row).thousands) {
-    return thousandsValue(text, [row.value, row.default]);
+    const kept = defaulted.has(row.name) ? row.default : row.value;
+    return thousandsValue(text, [kept]);
   }
   const t = text.trim();
   if (t === "" || !/^\d+(\.\d+)?$/.test(t)) return null;
   return Math.round(Number(t) * displayOf(row).factor);
 }
 
-export function problem(row: LimitRow, text: string): string | null {
-  const value = read(row, text);
+export function problem(
+  row: LimitRow,
+  text: string,
+  defaulted: Defaulted = NONE,
+): string | null {
+  const value = read(row, text, defaulted);
   const { label } = LIMIT_WORDS[row.name];
   const { word, thousands } = displayOf(row);
   const unit = word === "" ? "" : ` ${word}`;
-  const range = `${label} must be ${thousands ? "a whole number " : ""}from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
+  // thousands in the agent window's words: 10 to 10,000 K
+  const bound = (n: number) =>
+    thousands ? Number(show(row, n)).toLocaleString("en-US") : show(row, n);
+  const range = `${label} must be ${thousands ? "a whole number " : ""}from ${bound(row.min)} to ${bound(row.max)}${unit}`;
   if (value === null) {
     return thousands && text.trim() !== "" ? range : `${label} needs a number`;
   }
@@ -294,15 +312,16 @@ export function draftOf(rows: LimitRow[]): Record<string, string> {
 export function collect(
   rows: LimitRow[],
   draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
 ):
   | { values: Record<LimitName, number> }
   | { problem: string; field: LimitName } {
   const values = {} as Record<LimitName, number>;
   for (const row of rows) {
     const text = draft[row.name] ?? "";
-    const why = problem(row, text);
+    const why = problem(row, text, defaulted);
     if (why !== null) return { problem: why, field: row.name };
-    values[row.name] = read(row, text) as number;
+    values[row.name] = read(row, text, defaulted) as number;
   }
   const out = unordered(rows, values);
   return out ?? { values };
@@ -356,8 +375,36 @@ export function limitRefusal(message: string): {
   return { words, field: limitFieldOf(message) };
 }
 
-export function dirty(rows: LimitRow[], draft: Record<string, string>) {
-  return rows.some((row) => read(row, draft[row.name] ?? "") !== row.value);
+export function dirty(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
+) {
+  return rows.some(
+    (row) => read(row, draft[row.name] ?? "", defaulted) !== row.value,
+  );
+}
+
+// by value, not text: a stored 4400 shows as the default 4096 does
+export function atDefaults(
+  rows: LimitRow[],
+  draft: Record<string, string>,
+  defaulted: Defaulted = NONE,
+) {
+  return rows.every(
+    (row) => read(row, draft[row.name] ?? "", defaulted) === row.default,
+  );
+}
+
+// Use defaults: every field shows its default and stands for it
+export function defaultsDraft(rows: LimitRow[]): {
+  draft: Record<string, string>;
+  defaulted: Defaulted;
+} {
+  return {
+    draft: draftOf(rows.map((row) => ({ ...row, value: row.default }))),
+    defaulted: new Set(rows.map((row) => row.name)),
+  };
 }
 
 export function defaultLine(row: LimitRow): string {
