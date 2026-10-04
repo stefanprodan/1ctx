@@ -84,7 +84,8 @@ export function uploadsBlock(record: MessageUpload[]): string {
   return `<uploads>\nThe user attached ${plural(total)}, now under ${UPLOADS_ROOT}${list}. Read them with the bash tool.\n</uploads>`;
 }
 
-// after a summary the earlier blocks are gone with their rows
+// after a summary, the blocks of the uploads before its tail are no
+// longer in the history
 export const UPLOADS_SUMMARY_LINE = `Files the user attached earlier are under ${UPLOADS_ROOT}.`;
 
 // one line under a user message in a download or a snapshot, raw: the

@@ -15,9 +15,9 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
-import { unmarked } from "./context.ts";
 import type { KeepPort, SendPolicy, SendRepos, ToolBudget } from "./policy.ts";
 import type { RepoLines } from "./prompt.ts";
+import { unmarked } from "./render.ts";
 
 export type RoundState = {
   messageId: string;
@@ -126,7 +126,8 @@ export type ActiveSend = {
   // summary rounds ignore calls and are always the send's last round
   summarizing: boolean;
   // the tokens the last counted round used, prompt plus completion: the
-  // room the summary round has to fit in; null when nothing was counted
+  // summary request's size while it is inside the window; null when
+  // the round reported no usage
   used: number | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;

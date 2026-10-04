@@ -103,19 +103,49 @@ describe("compaction", () => {
       content: string;
       name?: string;
     }[];
+    // the summary, then the turn it followed as it was
     expect(messages.slice(1)).toEqual([
       {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue`,
       },
+      { role: "user", content: "the old question", name: "casey" },
+      { role: "assistant", content: "the answer" },
       { role: "user", content: "the new question", name: "casey" },
     ]);
-    expect(JSON.stringify(messages)).not.toContain("the old question");
-    expect(JSON.stringify(messages)).not.toContain("the answer");
     finish(next, "new answer");
     await settle(chat, started.sessionId);
     chat.app.socket.dispose();
   });
+
+  // the preview's 32K agent, whose schemas and long reasoning took the
+  // answer round past the window; a 1M window at its threshold; and a
+  // tokenizer counting more than ours near a 32K window, where only the
+  // measure fits: 32,000 - 30,997 - 256
+  test.each([
+    [32_000, 26_910, 5_093, 4096],
+    [1_000_000, 985_000, 4_000, 4096],
+    [32_000, 30_000, 997, 747],
+  ])(
+    "a %d window, %d + %d used, asks for %d",
+    async (window, prompt, completion, cap) => {
+      const chat = await chatApp({ window });
+      const started = await startChat(chat, "the old question");
+      finish(started.script, "the answer", prompt, completion);
+      const summaryScript = await waitScript(chat.scripted, 2);
+      expect(summaryScript.body.max_tokens).toBe(cap);
+      finish(summaryScript, "## Goal\n\n- Continue", 22_932, 300);
+      await settle(chat, started.sessionId);
+      expect(chat.scripted.requests.every((request) => request.accepted)).toBe(
+        true,
+      );
+      expect(rows(chat, started.sessionId)[2]).toMatchObject({
+        kind: "summary",
+        status: "done",
+      });
+      chat.app.socket.dispose();
+    },
+  );
 
   test("an under-threshold answer and a model without a window do not compact", async () => {
     const chat = await chatApp();
@@ -325,11 +355,15 @@ describe("compaction", () => {
       content: string;
       name?: string;
     }[];
+    // the first summary, its tail and the turn since, none twice
+    const lead = {
+      role: "user",
+      content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
+    };
     expect(body.slice(1, -1)).toEqual([
-      {
-        role: "user",
-        content: `${SUMMARY_LEAD}\n\n## Goal\n\n- First`,
-      },
+      lead,
+      { role: "user", content: "question", name: "casey" },
+      { role: "assistant", content: "answer" },
       { role: "user", content: "next", name: "casey" },
       { role: "assistant", content: "next answer" },
     ]);
@@ -345,6 +379,13 @@ describe("compaction", () => {
     expect(regenerated.status).toBe(201);
     const replacement = await regeneratePending;
     expect(chat.app.sessions.send(compactSendId)).toBeNull();
+    // the second summary went with its send: the first and its tail
+    // come back
+    expect(
+      (replacement.body.messages as { role: string; content: string }[])
+        .slice(1)
+        .map((message) => message.content),
+    ).toEqual([lead.content, "question", "answer", "next"]);
     expect(
       chat.app.db
         .query<{ n: number }, [string]>(

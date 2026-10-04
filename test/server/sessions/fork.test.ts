@@ -398,9 +398,12 @@ describe("POST /api/sessions/:id/fork", () => {
         ).status,
       ).toBe(201);
       const next = await waitScript(chat.scripted, 3);
+      // the copied rows give the source's tail
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
         { role: "user", content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue` },
+        { role: "user", content: "the old question", name: "casey" },
+        { role: "assistant", content: "the old answer" },
         { role: "user", content: "the new question", name: "casey" },
       ]);
       await finish(chat, copied.session.id, next);
@@ -410,6 +413,60 @@ describe("POST /api/sessions/:id/fork", () => {
         promptTokens: 10,
         completionTokens: 5,
       });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a fork before a summary leaves it out and sends the plain history", async () => {
+    const chat = await chatApp();
+    try {
+      const source = await startChat(chat, "the first question");
+      await finish(chat, source.sessionId, source.script);
+      expect(
+        (
+          await chat.member.call(
+            "POST",
+            `/api/sessions/${source.sessionId}/messages`,
+            { body: { message: "the old question" } },
+          )
+        ).status,
+      ).toBe(201);
+      const long = await waitScript(chat.scripted, 2);
+      long.content("the old answer");
+      long.finish();
+      long.usage({ prompt: 1_040_000, completion: 10 });
+      long.end();
+      const summary = await waitScript(chat.scripted, 3);
+      summary.reply("## Goal\n\n- Continue");
+      await settle(chat, source.sessionId);
+      const rows = chat.app.sessions.messages(source.sessionId);
+      expect(rows.map((row) => row.kind)).toEqual([
+        "user",
+        "reply",
+        "user",
+        "reply",
+        "summary",
+      ]);
+      const copied = await fork(chat, source.sessionId, rows[1]!.id);
+      expect(copied.messages.map((row) => row.kind)).toEqual(["user", "reply"]);
+      expect(
+        (
+          await chat.member.call(
+            "POST",
+            `/api/sessions/${copied.session.id}/messages`,
+            { body: { message: "the new question" } },
+          )
+        ).status,
+      ).toBe(201);
+      const next = await waitScript(chat.scripted, 4);
+      expect(next.body.messages).toEqual([
+        { role: "system", content: expect.any(String) },
+        { role: "user", content: "the first question", name: "casey" },
+        { role: "assistant", content: "the original answer" },
+        { role: "user", content: "the new question", name: "casey" },
+      ]);
+      await finish(chat, copied.session.id, next);
     } finally {
       await chat.app.shutdown();
     }

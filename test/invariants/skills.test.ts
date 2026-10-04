@@ -670,7 +670,12 @@ describe("skills in a send", () => {
   });
 
   test("a compacted chat names successful skill loads again", async () => {
+    // an unknown window replays no tail, so every load is behind the
+    // summary
     const chat = await chatApp();
+    chat.app.db
+      .query("update agents set context_length = null where id = ?")
+      .run(chat.agentId);
     assign(chat, [loadedSkill("ops")]);
     const started = await startChat(chat, "first");
     started.script.toolRound([call("c1", "skill", { name: "ops" })]);

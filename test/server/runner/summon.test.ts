@@ -593,6 +593,44 @@ describe("a summon", () => {
     }
   });
 
+  test("a summoned agent after a summary sizes the tail by its own window", async () => {
+    const { chat, checkerId } = await summonApp();
+    try {
+      // checker compacts at 7,500, so its tail budget is at most 1,000
+      chat.app.db
+        .query("update agents set context_length = 10000 where id = ?")
+        .run(checkerId);
+      const long = "word ".repeat(3000);
+      const { sessionId, script } = await startChat(chat, "hello");
+      answer(script, long, { prompt: 3100, completion: 3000 });
+      await free(chat, sessionId);
+      const count = chat.scripted.scripts.length;
+      const compacted = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/compact`,
+      );
+      expect(compacted.status).toBe(200);
+      const summary = await waitScript(chat.scripted, count + 1);
+      answer(summary, "the summary", { prompt: 3200, completion: 5000 });
+      // the summary is under checker's threshold and its own tail can
+      // only fit in what is left, so the summon is let in
+      const asked = await turn(chat, sessionId, "@checker check");
+      expect(turns(asked)).toEqual([
+        { role: "user", content: `${SUMMARY_LEAD}\n\nthe summary` },
+        { role: "user", content: "@checker check", name: "casey" },
+      ]);
+      asked.reply("fine");
+      await free(chat, sessionId);
+      // the chat's agent, on its wide window, replays the long turn
+      const next = await turn(chat, sessionId, "go on");
+      expect(turns(next).map((message) => message.content)).toContain(long);
+      next.reply("ok");
+      await free(chat, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a regenerate leaves the replaced turn's rounds out of the count", async () => {
     const { chat, checkerId } = await summonApp();
     try {

@@ -4,14 +4,16 @@
 // The rows to the wire, the tool round history and its repair, the
 // exhausted line on a copy, and the system prompt, on fixtures.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as tokenCount from "../../../src/server/lib/tokens.ts";
 import { LOOP_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
 import {
   type ChatMessageIn,
+  type ChatRequest,
   requestTokens,
 } from "../../../src/server/providers/index.ts";
 import {
-  type ContextLookups,
+  ESTIMATE_SLACK,
   EXHAUSTED_LINE,
   history,
   LOOP_LINE,
@@ -19,12 +21,23 @@ import {
   SKILLS_LEAD,
   SUMMARIZE,
   SUMMARY_LEAD,
+  SUMMARY_MARGIN,
+  SUMMARY_MIN_TOKENS,
   summaryRequest,
-  unmarked,
   withExhausted,
 } from "../../../src/server/runner/context.ts";
 import type { Offered, SendPolicy } from "../../../src/server/runner/policy.ts";
 import { dateLine, systemPrompt } from "../../../src/server/runner/prompt.ts";
+import {
+  type ContextLookups,
+  unmarked,
+} from "../../../src/server/runner/render.ts";
+import {
+  costWithin,
+  TAIL_MAX_TOKENS,
+  tailBudget,
+} from "../../../src/server/runner/tail.ts";
+import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
 import {
@@ -37,6 +50,10 @@ import {
 import { compactsAt, contextReserve } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import { knowledgeBlock } from "../../../src/shared/knowledge.ts";
+import {
+  UPLOADS_SUMMARY_LINE,
+  uploadsBlock,
+} from "../../../src/shared/uploads.ts";
 import {
   createAutomation,
   settleRun,
@@ -1005,7 +1022,9 @@ describe("history", () => {
       row({ id: "u3", kind: "user", content: "new", userId: "u1" }),
       row({ id: "r3", kind: "reply", content: "answer", slot: "answer" }),
     ];
-    expect(history(rows, policy, lookups, NOW).slice(1)).toEqual([
+    // an unknown window replays no tail
+    const unknown = { ...policy, contextLength: null };
+    expect(history(rows, unknown, lookups, NOW).slice(1)).toEqual([
       { role: "user", content: `${SUMMARY_LEAD}\n\nlatest summary` },
       { role: "user", content: "new", name: "casey" },
       { role: "assistant", content: "answer" },
@@ -1054,15 +1073,15 @@ describe("history", () => {
       skip4Bit: false,
       maxTokens: 2000,
     });
-    // the answer left less room than the reserve: the summary fits it
-    expect(summaryRequest(withTools, "s1", [], 6500).maxTokens).toBe(1244);
-    // and never asks for less than the floor
-    expect(summaryRequest(withTools, "s1", [], 7900).maxTokens).toBe(128);
-    // a model with no window is capped by the limit alone
+    // a model with no window is capped by the limit alone, however long
+    // the history
+    const long = [{ role: "user" as const, content: "word ".repeat(9000) }];
     expect(
-      summaryRequest({ ...withTools, contextLength: null }, "s1", [], 6500)
+      summaryRequest({ ...withTools, contextLength: null }, "s1", long)
         .maxTokens,
     ).toBe(4096);
+    // a history the window cannot hold still asks for the floor, never less
+    expect(summaryRequest(withTools, "s1", long).maxTokens).toBe(128);
     // a model that always thinks is asked for the least the wire names
     const required = { ...withTools, thinkingRequired: true };
     expect(summaryRequest(required, "s1", [])).toMatchObject({
@@ -1072,6 +1091,84 @@ describe("history", () => {
     expect(
       summaryRequest({ ...required, wire: "openrouter" }, "s1", []),
     ).toMatchObject({ thinking: true, reasoningEffort: "minimal" });
+  });
+
+  // a 32K model whose answer round carried large schemas and a long
+  // reasoning completion, as seen on the preview
+  const small: SendPolicy = {
+    ...policy,
+    contextLength: 32_000,
+    limits: { ...policy.limits, contextReserve: 8000, summaryMaxTokens: 4096 },
+    offered: {
+      ...NONE,
+      tools: [
+        { name: "big", description: "word ".repeat(4500), parameters: {} },
+      ],
+    },
+  };
+  const estimate = (req: ChatRequest) => {
+    const { maxTokens: _cap, ...rest } = req;
+    return requestTokens(small.wire, rest);
+  };
+  const said = (n: number): ChatMessageIn[] => [
+    { role: "user", content: "word ".repeat(n) },
+  ];
+
+  test("a full answer round leaves the summary its whole cap", () => {
+    const messages: ChatMessageIn[] = [
+      { role: "system", content: "system" },
+      ...said(22_700),
+    ];
+    // the answer round's prompt plus its completion passed the window
+    const answer = requestTokens(small.wire, request(small, "s1", messages));
+    expect(answer + 5093).toBeGreaterThan(32_000);
+    const req = summaryRequest(small, "s1", messages, 32_003);
+    expect(req.tools).toBeUndefined();
+    expect(estimate(req)).toBe(22_841);
+    expect(req.maxTokens).toBe(4096);
+  });
+
+  test.serial("a window at its threshold sizes the summary by usage", () => {
+    const counted = spyOn(tokenCount, "tokens");
+    try {
+      // 1M and 200K with the default 20K reserve, compacting at 980K and
+      // 180K: the measure leaves room, so the history is never counted
+      const wide: SendPolicy = { ...policy, contextLength: 1_000_000 };
+      expect(summaryRequest(wide, "s1", said(100), 985_000).maxTokens).toBe(
+        4096,
+      );
+      const mid: SendPolicy = { ...policy, contextLength: 200_000 };
+      expect(summaryRequest(mid, "s1", said(100), 182_000).maxTokens).toBe(
+        4096,
+      );
+      expect(counted).not.toHaveBeenCalled();
+    } finally {
+      counted.mockRestore();
+    }
+  });
+
+  test("a measure near the window wins over a smaller estimate", () => {
+    // a tokenizer that counts a quarter more than o200k: the estimate
+    // would leave room the provider does not have; 32,000 - 30,997 - 256
+    expect(summaryRequest(small, "s1", said(100), 30_997).maxTokens).toBe(747);
+    // within the floor and margin of the window the measure still holds
+    expect(summaryRequest(small, "s1", said(100), 31_617).maxTokens).toBe(128);
+    const near = said(26_400);
+    expect(estimate(summaryRequest(small, "s1", near))).toBe(26_533);
+    expect(summaryRequest(small, "s1", near, 28_000).maxTokens).toBe(3744);
+  });
+
+  test("no measure, or one past the window, falls back to the estimate", () => {
+    const near = said(26_400);
+    // 32,000 - ceil(26,533 * 1.1) - 256
+    expect(summaryRequest(small, "s1", near).maxTokens).toBe(2557);
+    expect(summaryRequest(small, "s1", near, 32_100).maxTokens).toBe(2557);
+    expect(SUMMARY_MARGIN).toBe(256);
+    expect(ESTIMATE_SLACK).toBe(0.1);
+    // both past the window ask for the floor
+    const over = summaryRequest(small, "s1", said(29_500), 33_000);
+    expect(estimate(over)).toBe(29_633);
+    expect(over.maxTokens).toBe(SUMMARY_MIN_TOKENS);
   });
 
   test("the request carries the model, the thinking flag and the session as the cache key", () => {
@@ -1161,8 +1258,10 @@ describe("withExhausted", () => {
 });
 
 describe("skills after a summary", () => {
+  // summary only: an unknown window replays no tail
   const withSkills: SendPolicy = {
     ...policy,
+    contextLength: null,
     offered: {
       ...NONE,
       tools: [],
@@ -1303,5 +1402,425 @@ describe("skills after a summary", () => {
     expect(history(rows, itself, summoned, NOW)[1]?.content).toBe(
       `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops`,
     );
+  });
+});
+
+describe("the tail after a summary", () => {
+  // a 100K window: the tail budget is its tenth, 10K
+  const wide: SendPolicy = { ...policy, contextLength: 100_000, offered: NONE };
+  const words = (n: number) => "word ".repeat(n);
+  const user = (id: string, sendId: string, content: string, userId = "u1") =>
+    row({ id, kind: "user", sendId, userId, content });
+  const answer = (id: string, sendId: string, content: string, round = 1) =>
+    row({ id, kind: "reply", sendId, round, slot: "answer", content });
+  const summary = (id: string, sendId: string, content: string) =>
+    row({ id, kind: "summary", sendId, round: 9, content });
+  const without = (rows: Message[]) =>
+    rows.filter((one) => one.kind !== "summary");
+
+  test("the budget is the least of 20K, a tenth of the window and half the room left", () => {
+    const reserve = LOOP_LIMITS.contextReserve;
+    expect(tailBudget(null, reserve, 0)).toBe(0);
+    expect(tailBudget(32_000, reserve, 0)).toBe(3200);
+    expect(tailBudget(128_000, reserve, 0)).toBe(12_800);
+    expect(tailBudget(400_000, reserve, 0)).toBe(TAIL_MAX_TOKENS);
+    // 80K compacts a 100K window: half of what 70K leaves is 5K
+    expect(tailBudget(100_000, 20_000, 70_000)).toBe(5000);
+    expect(tailBudget(100_000, 20_000, 90_000)).toBe(0);
+  });
+
+  test("the newest turns replay verbatim, calls with their results, oldest dropped first", () => {
+    const rows = [
+      user("a-u", "a", words(12_000)),
+      answer("a-r", "a", "the old answer"),
+      user("b-u", "b", "run kubectl get pods -n flux-system"),
+      row({
+        id: "b-w",
+        kind: "reply",
+        sendId: "b",
+        slot: "work",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "bash",
+            arguments: '{"command":"kubectl get pods -n flux-system"}',
+          },
+        ],
+      }),
+      row({
+        id: "b-t",
+        kind: "tool",
+        sendId: "b",
+        toolCallId: "c1",
+        toolName: "bash",
+        content: "Error from server (Forbidden): pods is forbidden",
+      }),
+      answer("b-r", "b", "The call was forbidden.", 2),
+      user("c-u", "c", "No, use the staging context.", "u2"),
+      answer("c-r", "c", "Switched to staging."),
+      summary("c-s", "c", "## Goal\n\n- Pods"),
+      user("d-u", "d", "and now?"),
+    ];
+    expect(history(rows, wide, lookups, NOW).slice(1)).toEqual([
+      { role: "user", content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Pods` },
+      {
+        role: "user",
+        content: "run kubectl get pods -n flux-system",
+        name: "casey",
+      },
+      {
+        role: "assistant",
+        content: null,
+        toolCalls: [
+          {
+            id: "c1",
+            name: "bash",
+            arguments: '{"command":"kubectl get pods -n flux-system"}',
+          },
+        ],
+      },
+      {
+        role: "tool",
+        toolCallId: "c1",
+        content: "Error from server (Forbidden): pods is forbidden",
+      },
+      { role: "assistant", content: "The call was forbidden." },
+      { role: "user", content: "No, use the staging context.", name: "mihai" },
+      { role: "assistant", content: "Switched to staging." },
+      { role: "user", content: "and now?", name: "casey" },
+    ]);
+  });
+
+  test("another agent's turn and queued messages replay as the plain history renders them", () => {
+    const summoned: ContextLookups = {
+      ...lookups,
+      turnsOf: () =>
+        new Map([
+          ["b", { agentId: "b", agentName: "checker", summoned: true }],
+        ]),
+    };
+    const rows = [
+      user("a-u1", "a", "first queued"),
+      user("a-u2", "a", "second queued"),
+      answer("a-r", "a", "both read"),
+      user("b-u", "b", "@checker look"),
+      row({
+        id: "b-w",
+        kind: "reply",
+        sendId: "b",
+        slot: "work",
+        toolCalls: [{ id: "k1", name: "datetime", arguments: "{}" }],
+      }),
+      row({
+        id: "b-t",
+        kind: "tool",
+        sendId: "b",
+        toolCallId: "k1",
+        toolName: "datetime",
+        content: "noon",
+      }),
+      answer("b-r", "b", "looks fine", 2),
+      summary("k-s", "k", "summary"),
+      user("c-u", "c", "next"),
+    ];
+    const out = history(rows, wide, summoned, NOW);
+    expect(out[1]).toEqual({
+      role: "user",
+      content: `${SUMMARY_LEAD}\n\nsummary`,
+    });
+    expect(out.slice(2)).toEqual(
+      history(without(rows), wide, summoned, NOW).slice(1),
+    );
+    expect(out).toContainEqual({
+      role: "user",
+      content: "[checker] looks fine",
+    });
+    expect(
+      out.some((message) => message.content?.startsWith(TRACE_HEADING)),
+    ).toBe(true);
+  });
+
+  test("a send of queued messages is one turn, never cut in half", () => {
+    // a 20K window: a budget of 2K
+    const narrow = { ...wide, contextLength: 20_000 };
+    const rows = (first: string) => [
+      user("a-u1", "a", first),
+      user("a-u2", "a", "second queued"),
+      answer("a-r", "a", "both read"),
+      summary("a-s", "a", "summary"),
+    ];
+    const fits = history(rows(words(1500)), narrow, lookups, NOW).slice(1);
+    expect(fits.map((message) => message.content)).toEqual([
+      `${SUMMARY_LEAD}\n\nsummary`,
+      words(1500),
+      "second queued",
+      "both read",
+    ]);
+    expect(history(rows(words(2500)), narrow, lookups, NOW).slice(1)).toEqual([
+      { role: "user", content: `${SUMMARY_LEAD}\n\nsummary` },
+    ]);
+  });
+
+  test("a newest turn over the budget leaves the tail empty", () => {
+    const rows = [
+      user("a-u", "a", "early"),
+      answer("a-r", "a", "early answer"),
+      user("b-u", "b", words(12_000)),
+      answer("b-r", "b", "long answer"),
+      summary("b-s", "b", "summary"),
+      user("c-u", "c", "next"),
+    ];
+    expect(history(rows, wide, lookups, NOW).slice(1)).toEqual([
+      { role: "user", content: `${SUMMARY_LEAD}\n\nsummary` },
+      { role: "user", content: "next", name: "casey" },
+    ]);
+  });
+
+  test.serial(
+    "a turn far over the budget is refused without counting it",
+    () => {
+      const huge = words(500_000);
+      const rows = [
+        user("a-u", "a", "read the log"),
+        answer("a-r", "a", huge),
+        summary("a-s", "a", "summary"),
+      ];
+      const counted = spyOn(tokenCount, "tokens");
+      try {
+        expect(history(rows, wide, lookups, NOW).slice(1)).toEqual([
+          { role: "user", content: `${SUMMARY_LEAD}\n\nsummary` },
+        ]);
+        // the base was counted, the huge turn never
+        expect(counted.mock.calls.length).toBeGreaterThan(0);
+        expect(counted.mock.calls.some(([text]) => text.includes(huge))).toBe(
+          false,
+        );
+      } finally {
+        counted.mockRestore();
+      }
+    },
+  );
+
+  test("a turn that fits is counted as the wire counts it", () => {
+    const messages: ChatMessageIn[] = [
+      { role: "user", content: words(900), name: "casey" },
+    ];
+    const whole = requestTokens("openai-compatible", {
+      model: "m",
+      messages,
+      thinking: false,
+    });
+    expect(costWithin("openai-compatible", "m", messages, whole)).toBe(whole);
+    expect(
+      costWithin("openai-compatible", "m", messages, whole - 1),
+    ).toBeNull();
+  });
+
+  test("large schemas on a small window shrink the tail so the next turn does not compact", () => {
+    const small = { ...wide, contextLength: 8000 };
+    const heavy: SendPolicy = {
+      ...small,
+      offered: {
+        ...NONE,
+        tools: [{ name: "big", description: words(5000), parameters: {} }],
+      },
+    };
+    const rows = [
+      user("a-u", "a", words(500)),
+      answer("a-r", "a", "read"),
+      summary("a-s", "a", "summary"),
+      user("b-u", "b", "next"),
+    ];
+    expect(history(rows, small, lookups, NOW)).toHaveLength(5);
+    const messages = history(rows, heavy, lookups, NOW);
+    expect(messages.slice(1)).toEqual([
+      { role: "user", content: `${SUMMARY_LEAD}\n\nsummary` },
+      { role: "user", content: "next", name: "casey" },
+    ]);
+    const threshold = compactsAt(8000, heavy.limits.contextReserve)!;
+    for (const one of [small, heavy]) {
+      const req = request(one, "s", history(rows, one, lookups, NOW));
+      expect(requestTokens(one.wire, req)).toBeLessThan(threshold);
+    }
+  });
+
+  test("the tail stays the same as the chat goes on, so the cached prefix holds", () => {
+    const rows = [
+      user("a-u", "a", "ask"),
+      answer("a-r", "a", "answer"),
+      summary("a-s", "a", "summary"),
+      user("b-u", "b", "next"),
+      answer("b-r", "b", "next answer"),
+    ];
+    const before = history(rows, wide, lookups, NOW);
+    const after = history(
+      [...rows, user("c-u", "c", words(3000)), answer("c-r", "c", "more")],
+      wide,
+      lookups,
+      NOW,
+    );
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(history(rows, wide, lookups, NOW)).toEqual(before);
+  });
+
+  test("a second summary reads the first, its tail and the turns since, none twice", () => {
+    const rows = [
+      user("a-u", "a", "first ask"),
+      answer("a-r", "a", "first answer"),
+      summary("a-s", "a", "first summary"),
+      user("b-u", "b", "second ask"),
+      answer("b-r", "b", "second answer"),
+    ];
+    const req = summaryRequest(wide, "s", history(rows, wide, lookups, NOW));
+    expect(req.messages.slice(1).map((message) => message.content)).toEqual([
+      `${SUMMARY_LEAD}\n\nfirst summary`,
+      "first ask",
+      "first answer",
+      "second ask",
+      "second answer",
+      SUMMARIZE,
+    ]);
+  });
+
+  test("a skill loaded in the previous tail stays named once that tail ages out", () => {
+    const skilled: SendPolicy = {
+      ...wide,
+      offered: {
+        ...NONE,
+        skills: {
+          block: "catalog",
+          skills: [
+            { id: "sk1", name: "ops", description: "ops", hasFiles: false },
+          ],
+        },
+      },
+    };
+    const first = [
+      user("a-u", "a", "load ops"),
+      row({
+        id: "a-w",
+        kind: "reply",
+        sendId: "a",
+        slot: "work",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "skill",
+            arguments: JSON.stringify({ name: "ops" }),
+          },
+        ],
+      }),
+      row({
+        id: "a-t",
+        kind: "tool",
+        sendId: "a",
+        toolCallId: "c1",
+        toolName: "skill",
+        content: words(3000),
+      }),
+      answer("a-r", "a", "loaded", 2),
+      summary("k1-s", "k1", "first summary"),
+    ];
+    // the load replays in the first tail, so the line leaves it out
+    const once = history(first, skilled, lookups, NOW);
+    expect(once[1]?.content).toBe(`${SUMMARY_LEAD}\n\nfirst summary`);
+    expect(once).toContainEqual({
+      role: "tool",
+      toolCallId: "c1",
+      content: words(3000),
+    });
+    const second = [
+      ...first,
+      user("b-u", "b", words(8000)),
+      answer("b-r", "b", "read"),
+      summary("k2-s", "k2", "second summary"),
+    ];
+    const twice = history(second, skilled, lookups, NOW);
+    expect(twice[1]?.content).toBe(
+      `${SUMMARY_LEAD}\n\nsecond summary\n\n${SKILLS_LEAD} ops`,
+    );
+    expect(JSON.stringify(twice)).not.toContain('"toolCallId":"c1"');
+  });
+
+  test("a skill load in the tail whose round was cut short stays named", () => {
+    const skilled: SendPolicy = {
+      ...wide,
+      offered: {
+        ...NONE,
+        skills: {
+          block: "catalog",
+          skills: [
+            { id: "sk1", name: "ops", description: "ops", hasFiles: false },
+          ],
+        },
+      },
+    };
+    // stopped mid-tools: two calls, one result, so the round renders
+    // without its calls and the load's result is not replayed
+    const rows = [
+      user("a-u", "a", "load ops and look"),
+      row({
+        id: "a-w",
+        kind: "reply",
+        sendId: "a",
+        slot: "work",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "skill",
+            arguments: JSON.stringify({ name: "ops" }),
+          },
+          { id: "c2", name: "bash", arguments: '{"command":"ls"}' },
+        ],
+      }),
+      row({
+        id: "a-t",
+        kind: "tool",
+        sendId: "a",
+        toolCallId: "c1",
+        toolName: "skill",
+        content: "ops instructions",
+      }),
+      summary("k-s", "k", "summary"),
+    ];
+    const out = history(rows, skilled, lookups, NOW);
+    expect(out.slice(1)).toEqual([
+      {
+        role: "user",
+        content: `${SUMMARY_LEAD}\n\nsummary\n\n${SKILLS_LEAD} ops`,
+      },
+      { role: "user", content: "load ops and look", name: "casey" },
+    ]);
+  });
+
+  test("an upload inside the tail replays as its block, not in the summary line", () => {
+    const uploads = [
+      {
+        name: "notes.md",
+        archive: false,
+        files: 1,
+        bytes: 5,
+        saved: ["notes.md"],
+      },
+    ];
+    const rows = [
+      row({
+        id: "a-u",
+        kind: "user",
+        sendId: "a",
+        userId: "u1",
+        content: "read this",
+        uploads,
+      }),
+      answer("a-r", "a", "read"),
+      summary("a-s", "a", "summary"),
+    ];
+    const out = history(rows, wide, lookups, NOW);
+    expect(out[1]?.content).toBe(`${SUMMARY_LEAD}\n\nsummary`);
+    expect(out[2]?.content).toBe(`read this\n\n${uploadsBlock(uploads)}`);
+    // with no tail the line names them
+    expect(
+      history(rows, { ...wide, contextLength: null }, lookups, NOW)[1]?.content,
+    ).toBe(`${SUMMARY_LEAD}\n\nsummary\n\n${UPLOADS_SUMMARY_LINE}`);
   });
 });
