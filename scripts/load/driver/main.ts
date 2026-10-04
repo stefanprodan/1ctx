@@ -16,7 +16,7 @@
 import type { ProjectsResponse } from "../../../src/shared/api/projects.ts";
 import { KNOWLEDGE_FILES } from "../shapes.ts";
 import { Api } from "./api.ts";
-import { assertFenced, loadDirectory } from "./directory.ts";
+import { assertFenced, fenceWeb, loadDirectory } from "./directory.ts";
 import { step } from "./hour.ts";
 import { failure } from "./log.ts";
 import { setup } from "./setup.ts";
@@ -52,6 +52,7 @@ async function main() {
   });
   const admin = await api.signIn(process.env.ADMIN ?? "admin", 0);
   // the fence, read back before any load
+  await fenceWeb(api, admin);
   await assertFenced(api, admin, env("FAKE_MODEL_URL"), env("FAKE_MCP_URL"));
   const d = await loadDirectory(api, admin);
   const projects = await api.must<ProjectsResponse>(

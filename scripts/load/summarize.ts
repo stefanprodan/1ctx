@@ -63,7 +63,8 @@ export type Row = {
   relayMs: Q;
   firstDeltaMs: Q;
   feedRefreshMs: Q;
-  probe: { feed: Q; renameFrame: Q };
+  // a rename whose frame never came, or that failed, counts as an error
+  probe: { feed: Q; renameFrame: Q; framesLost: number; renamesFailed: number };
   cpuM: Q;
   memMi: Q;
   refused: number;
@@ -71,7 +72,7 @@ export type Row = {
   toolFailed: Record<string, number>;
   commandErrors: number;
   mcpCalls: number;
-  compactions: number;
+  reasks: number;
 };
 
 const empty = q([]);
@@ -113,16 +114,17 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
     posted.set(d.marker, d.at);
   const gaps: number[] = [];
   const first: number[] = [];
-  // a second request for a marker's round is a compaction's summary
-  // round, sent after the answer: not a gap between rounds
+  // a second request for a marker's round re-asks it after the answer
+  // (a run's memory phase, a decider's attention read, a compaction's
+  // summary): counted apart, never a gap between rounds
   const asked = new Set<string>();
-  let compactions = 0;
+  let reasks = 0;
   let commandErrors = 0;
   for (const r of model.filter((e) => e.t === "req")) {
     commandErrors += r.errors ?? 0;
     const k = `${r.marker}/${r.round}`;
     if (asked.has(k)) {
-      compactions++;
+      reasks++;
       continue;
     }
     asked.add(k);
@@ -170,7 +172,14 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
     relayMs: pq(watchers.relay),
     firstDeltaMs: pq(watchers.firstDelta),
     feedRefreshMs: pq(watchers.feedRefresh),
-    probe: { feed: pq(probe.feed), renameFrame: pq(probe.rename_frame) },
+    probe: {
+      feed: pq(probe.feed),
+      renameFrame: pq(probe.rename_frame),
+      framesLost: probe.frame_lost?.n ?? 0,
+      renamesFailed: Object.entries(probe as Record<string, Event>)
+        .filter(([k]) => /^rename_\d+$/.test(k))
+        .reduce((n, [, v]) => n + (v.n ?? 0), 0),
+    },
     cpuM: q(top.map((e) => e.cpuM)),
     memMi: q(top.map((e) => e.memMi)),
     refused,
@@ -178,7 +187,7 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
     toolFailed,
     commandErrors,
     mcpCalls: mcp.filter((e) => e.t === "call").length,
-    compactions,
+    reasks,
   };
 }
 
@@ -233,11 +242,11 @@ export function cells(r: Row): string[] {
     ms(r.firstDeltaMs),
     ms(r.feedRefreshMs),
     ms(r.probe.feed, "p95", "max"),
-    ms(r.probe.renameFrame, "p95", "max"),
+    `${ms(r.probe.renameFrame, "p95", "max")}${r.probe.framesLost > 0 ? `, ${r.probe.framesLost} lost` : ""}`,
     ms(r.cpuM, "p50", "max"),
     r.memMi.n === 0 ? "-" : String(Math.round(r.memMi.max)),
     String(r.refused),
-    `${r.serverErrors} server, ${failed} tool, ${r.commandErrors} exit`,
+    `${r.serverErrors} server, ${failed} tool, ${r.commandErrors} exit, ${r.probe.framesLost + r.probe.renamesFailed} probe`,
   ];
 }
 

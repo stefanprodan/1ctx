@@ -65,11 +65,18 @@ describe("the database builder", () => {
         "insert into providers (id, name, wire, base_url, key_name, created_at) values ('p2', 'elsewhere', 'openai-compatible', 'http://models.test/v1', 'provider-elsewhere', 0)",
       ).run();
       db.query("update mcp_servers set url = 'https://mcp.test/mcp'").run();
+      db.query("update tools set mode = 'all' where name = 'web'").run();
       expect(fenced(db, options).length).toBeGreaterThan(0);
       const report = fence(db, options);
       expect(report.providers).toBe(2);
       expect(report.servers).toBe(3);
       expect(fenced(db, options)).toEqual([]);
+      const web = db
+        .query<{ mode: string }, []>(
+          "select mode from tools where name = 'web'",
+        )
+        .get()!;
+      expect(web.mode).toBe("off");
       const keys = db
         .query<{ n: number }, []>(
           "select count(*) as n from providers where key_name is not null",

@@ -20,8 +20,8 @@ describe("the summarizer", () => {
     // a turn's first request against its post
     expect(row.firstRequestMs.n).toBe(2);
     expect(row.firstRequestMs.max).toBe(300);
-    // a second request for a round is a compaction, not a gap
-    expect(row.compactions).toBe(1);
+    // a second request for a round re-asks it, not a gap
+    expect(row.reasks).toBe(1);
     expect(row.commandErrors).toBe(2);
     expect(row.mcpCalls).toBe(2);
     expect(row.refused).toBe(2);
@@ -31,6 +31,8 @@ describe("the summarizer", () => {
     expect(row.memMi.max).toBe(320);
     expect(row.probe.feed.p95).toBe(9);
     expect(row.feedRefreshMs.p95).toBe(40);
+    expect(row.probe.framesLost).toBe(1);
+    expect(row.probe.renamesFailed).toBe(2);
   });
 
   test("prints one table row per run", async () => {
@@ -39,5 +41,8 @@ describe("the summarizer", () => {
     expect(lines).toHaveLength(3);
     expect(lines[2]).toBe(`| ${cells(row).join(" | ")} |`);
     expect(cells(row)[5]).toBe("20.0 / 30.0");
+    // a lost frame never looks healthy
+    expect(cells(row)[14]).toBe("8 / 8, 1 lost");
+    expect(cells(row).at(-1)).toBe("1 server, 1 tool, 2 exit, 3 probe");
   });
 });

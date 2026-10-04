@@ -4,9 +4,11 @@
 // The fence that keeps a local run off every real engine: on the clone
 // a run opens, every provider points at the fake model and every agent
 // at its one model, every MCP server at the fake MCP, no key is named,
-// the web tools are off, and the automations are suspended so a run's
-// load never depends on the hour. A database holding repositories or
-// credentials is refused, since a turn could reach their hosts.
+// web access is off (the `web` row's mode, which gates webfetch and
+// websearch) and search has no provider, and the automations are
+// suspended so a run's load never depends on the hour. A database
+// holding repositories or credentials is refused, since a turn could
+// reach their hosts.
 
 import type { Database } from "bun:sqlite";
 import { FAKE } from "./shapes.ts";
@@ -65,7 +67,7 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
     db.query("update deciders set model = ?").run(FAKE.model);
     if (has("tools")) {
       db.query(
-        "update tools set enabled = 0, provider = null where name in ('web', 'webfetch', 'websearch')",
+        "update tools set enabled = 0, mode = 'off', provider = null where name in ('web', 'webfetch', 'websearch')",
       ).run();
     }
     const servers = db
@@ -119,9 +121,9 @@ export function fenced(db: Database, o: FenceOptions): string[] {
   if (live > 0) wrong.push(`${live} automations not suspended`);
   const web = db
     .query<{ n: number }, []>(
-      "select count(*) as n from tools where enabled = 1 and name in ('web', 'webfetch', 'websearch')",
+      "select count(*) as n from tools where name in ('web', 'webfetch', 'websearch') and (mode <> 'off' or enabled = 1 or provider is not null)",
     )
     .get()!.n;
-  if (web > 0) wrong.push(`${web} web tools on`);
+  if (web > 0) wrong.push(`web access or search on (${web} rows)`);
   return wrong;
 }

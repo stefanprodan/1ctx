@@ -10,6 +10,7 @@ import type { AgentsResponse } from "../../../src/shared/api/agents.ts";
 import type { McpResponse } from "../../../src/shared/api/mcp.ts";
 import type { ProjectsResponse } from "../../../src/shared/api/projects.ts";
 import type { ProvidersResponse } from "../../../src/shared/api/providers.ts";
+import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
 import type { UsersResponse } from "../../../src/shared/api/users.ts";
 import type { Api, Who } from "./api.ts";
 import { info, now, pool, stats } from "./log.ts";
@@ -95,9 +96,20 @@ export async function signInAll(
   return map;
 }
 
-// every provider on the fake model and every MCP server on the fake MCP
+// the calls the fence makes, so a test can answer them in process
+export type Caller = Pick<Api, "call" | "must">;
+
+// web access off, which gates webfetch and websearch, and no search
+// provider: a turn never leaves the fakes, on either target
+export async function fenceWeb(api: Caller, admin: Who) {
+  await api.must(admin, "PATCH", "/api/tools/web", { mode: "off" });
+  await api.must(admin, "PATCH", "/api/tools/websearch", { provider: null });
+}
+
+// every provider on the fake model, every MCP server on the fake MCP,
+// web access off and no search provider, read back before any load
 export async function assertFenced(
-  api: Api,
+  api: Caller,
   admin: Who,
   modelUrl: string,
   mcpBase: string,
@@ -108,6 +120,7 @@ export async function assertFenced(
     "/api/providers",
   );
   const mcp = await api.must<McpResponse>(admin, "GET", "/api/mcp");
+  const tools = await api.must<ToolsResponse>(admin, "GET", "/api/tools");
   const wrong = [
     ...providers.providers
       .filter((p) => p.baseUrl !== modelUrl)
@@ -115,6 +128,10 @@ export async function assertFenced(
     ...mcp.servers
       .filter((s) => !s.url.startsWith(mcpBase))
       .map((s) => `mcp server ${s.name}`),
+    ...(tools.access.mode === "off" ? [] : [`web access ${tools.access.mode}`]),
+    ...(tools.search.provider === null
+      ? []
+      : [`search provider ${tools.search.provider}`]),
   ];
   if (wrong.length > 0) {
     throw new Error(`not on the fakes, refusing to run: ${wrong.join(", ")}`);

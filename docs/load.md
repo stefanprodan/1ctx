@@ -73,7 +73,7 @@ fails on a broken page.
 | Preset | What | Size |
 |---|---|---|
 | `bench` (default) | 2 admins, 100 members, 10 teams, 90 days of history | between `tiny` and `small` |
-| `small` | the MVP at 1/20: 3 admins, 25 members, 5 teams, 25 automations, a year of history, runs and chats in flight | ~4.6 GB, ~30 s |
+| `small` | the MVP at 1/20: 3 admins, 25 members, 5 teams, 25 automations, a year of history, runs and chats in flight | ~5.4 GB, ~35 s |
 | `tiny` | seconds: the tests and `make load-smoke` | ~80 MB |
 
 Full-size figures are extrapolated from `small` and the MVP's counts;
@@ -88,15 +88,24 @@ No run ever reaches a real engine.
   servers; nothing else.
 - A local run opens a clone, never the built file. `fence.ts` points
   every provider at the fake model and every agent at its model, every
-  MCP server at the fake MCP, clears every key name, turns the web
-  tools off, suspends every automation, and sets one throwaway
-  password for this run. A database with repositories or credentials
+  MCP server at the fake MCP, clears every key name, sets the `web`
+  tools row's mode to `off` (the mode, not `enabled`, gates
+  `webfetch` and `websearch`) and search's provider to none,
+  suspends every automation, and sets one throwaway password for this
+  run. A database with repositories or credentials
   is refused. The fence is read back before the server starts.
-- The driver reads it back again through the API and refuses to load
-  an instance with a provider or MCP server anywhere else.
+- The driver, on both targets, sets web access off and search to none
+  through `PATCH /api/tools/web` and `/api/tools/websearch`, then
+  reads the fence back through the API and refuses to load an instance
+  with a provider or MCP server anywhere else, web access on or a
+  search provider set.
 - `kind.ts` refuses any context not named `kind-*` (default
   `kind-flux`) and any namespace not named `1ctx-*` (default
-  `1ctx-load`), and passes the context to every `kubectl` and `helm`.
+  `1ctx-load`), refuses a context whose API server is not on
+  loopback (127.0.0.1, localhost, ::1), and passes the context to every
+  `kubectl` and `helm`. A driver pod must start within 5 minutes and
+  end within the step's minutes plus 30 (setup: 2 hours), or the run
+  fails; the log followers stop on every exit.
 
 ## Running it
 
@@ -137,6 +146,12 @@ drift on the machine lands on both. One run against another tells
 nothing; a difference smaller than the spread between a side's own
 runs is noise.
 
+When the branch adds a migration, build the database from main's
+checkout (`bun scripts/load/db/build.ts` run in it, `--out` into this
+one's `out/db/`): `migrate()` accepts migration ids it does not know
+without a word, so main would otherwise run on the branch's schema.
+The branch then migrates its clone at start, as a deploy would.
+
 ## Reading the table
 
 | Column | What |
@@ -149,9 +164,9 @@ runs is noise.
 | relay ms | a «ms» marker in a delta against its arrival (`bash`, `text`) |
 | first delta ms | a post to its first stream frame on the author's socket |
 | feed refresh ms | the watchers' first-page reloads |
-| probe | the feed route and a rename's socket frame, timed every second |
+| probe | the feed route and a rename's socket frame, timed every second; a frame that never came is counted as lost |
 | CPU, RSS | the server process every 5 s, millicores and MiB |
-| refused, errors | turns turned away by a cap; `level=ERROR` lines, failed tools, commands that exited non-zero |
+| refused, errors | turns turned away by a cap; `level=ERROR` lines, failed tools, commands that exited non-zero, probe renames lost or failed |
 
 A regression is a server gap, first request, probe or lateness that
 moves past the other side's spread in paired runs, a turn count that

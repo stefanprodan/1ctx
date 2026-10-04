@@ -37,6 +37,20 @@ export function checkTarget(context: string, ns: string) {
     throw new Error(`refusing namespace ${ns}: only 1ctx-* namespaces`);
 }
 
+// a kind cluster serves its API on the machine itself; a context named
+// kind-* that points anywhere else is not one
+export function checkServer(context: string, server: string) {
+  let host = "";
+  try {
+    host = new URL(server).hostname;
+  } catch {}
+  if (!["127.0.0.1", "localhost", "[::1]", "::1"].includes(host)) {
+    throw new Error(
+      `refusing context ${context}: its API server ${server || "(none)"} is not on loopback`,
+    );
+  }
+}
+
 const context = flag("context") ?? "kind-flux";
 const ns = flag("namespace") ?? "1ctx-load";
 
@@ -247,19 +261,63 @@ async function install() {
 }
 
 // runs the driver in a fresh pod, waits for it and returns its log
-async function driver(name: string, args: string[]): Promise<string> {
+// runs the driver in a fresh pod and returns its log; the pod must
+// start within READY_MS and end within doneMs, or the run fails
+const READY_MS = 5 * 60_000;
+async function driver(
+  name: string,
+  args: string[],
+  doneMs: number,
+): Promise<string> {
   run(k("delete", "pod", name, "--ignore-not-found"), undefined, true);
   apply(driverPod(name, args));
-  for (;;) {
-    await Bun.sleep(5000);
-    const phase = run(
+  const start = Date.now();
+  const phaseOf = () =>
+    run(
       k("get", "pod", name, "-o", "jsonpath={.status.phase}"),
       undefined,
       true,
     ).trim();
+  for (;;) {
+    await Bun.sleep(5000);
+    const phase = phaseOf();
     if (phase === "Succeeded" || phase === "Failed") break;
+    const waited = Date.now() - start;
+    if (phase === "Pending" && waited > READY_MS) {
+      throw new Error(
+        `pod ${name} did not start in ${READY_MS / 60_000} minutes`,
+      );
+    }
+    if (waited > doneMs) {
+      const log = Bun.spawnSync(k("logs", name)).stdout.toString();
+      if (log !== "") console.log(log);
+      throw new Error(
+        `pod ${name} did not end in ${Math.round(doneMs / 60_000)} minutes`,
+      );
+    }
   }
   return run(k("logs", name), undefined, true);
+}
+
+// a step: its minutes, the schedules set before it, the tail and the
+// read back after it
+const stepMs = (minutes: number) => (minutes + 30) * 60_000;
+const SETUP_MS = 120 * 60_000;
+
+// every process this run started, stopped on any exit
+const children = new Set<Bun.Subprocess>();
+const stopChildren = () => {
+  for (const c of children) c.kill();
+  children.clear();
+};
+function stopOnExit() {
+  process.on("exit", stopChildren);
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+      stopChildren();
+      process.exit(130);
+    });
+  }
 }
 
 async function step(mult: string, minutes: string) {
@@ -278,26 +336,32 @@ async function step(mult: string, minutes: string) {
       stdout: Bun.file(join(results, file)),
       stderr: "ignore",
     });
-  const followers = [
-    follow("deploy/onectx", "server.log"),
-    follow("deploy/fake-model", "model.log"),
-    follow("deploy/fake-mcp", "mcp.log"),
-  ];
+  const followers: Bun.Subprocess[] = [];
   const top: string[] = [];
-  const sampler = setInterval(() => {
-    const p = Bun.spawnSync(k("top", "pod", "--no-headers"));
-    const m = p.stdout.toString().match(/onectx-\S+\s+(\d+)m\s+(\d+)Mi/);
-    if (m)
-      top.push(
-        JSON.stringify({
-          t: "top",
-          at: Date.now(),
-          cpuM: Number(m[1]),
-          memMi: Number(m[2]),
-        }),
-      );
-  }, 5000);
+  let sampler: ReturnType<typeof setInterval> | undefined;
   try {
+    for (const [what, file] of [
+      ["deploy/onectx", "server.log"],
+      ["deploy/fake-model", "model.log"],
+      ["deploy/fake-mcp", "mcp.log"],
+    ] as const) {
+      const f = follow(what, file);
+      followers.push(f);
+      children.add(f);
+    }
+    sampler = setInterval(() => {
+      const p = Bun.spawnSync(k("top", "pod", "--no-headers"));
+      const m = p.stdout.toString().match(/onectx-\S+\s+(\d+)m\s+(\d+)Mi/);
+      if (m)
+        top.push(
+          JSON.stringify({
+            t: "top",
+            at: Date.now(),
+            cpuM: Number(m[1]),
+            memMi: Number(m[2]),
+          }),
+        );
+    }, 5000);
     const args = [
       "step",
       mult,
@@ -306,11 +370,18 @@ async function step(mult: string, minutes: string) {
     ];
     await Bun.write(
       join(results, "driver.log"),
-      await driver(`driver-${label}`.slice(0, 63), args),
+      await driver(
+        `driver-${label}`.slice(0, 63),
+        args,
+        stepMs(Number(minutes)),
+      ),
     );
   } finally {
     clearInterval(sampler);
-    for (const f of followers) f.kill();
+    for (const f of followers) {
+      f.kill();
+      children.delete(f);
+    }
     await Bun.write(join(results, "top.log"), `${top.join("\n")}\n`);
   }
   printTable([await summarize(results)]);
@@ -318,34 +389,48 @@ async function step(mult: string, minutes: string) {
 
 async function main() {
   checkTarget(context, ns);
+  stopOnExit();
   const contexts = run(
     ["kubectl", "config", "get-contexts", "-o", "name"],
     undefined,
     true,
   ).split("\n");
   if (!contexts.includes(context)) throw new Error(`no context ${context}`);
+  const server = run(
+    [
+      "kubectl",
+      "config",
+      "view",
+      "--context",
+      context,
+      "--minify",
+      "-o",
+      "jsonpath={.clusters[0].cluster.server}",
+    ],
+    undefined,
+    true,
+  ).trim();
+  checkServer(context, server);
   const [command, a, b] = positional;
   if (command === "install") await install();
   else if (command === "setup") {
     await scripts();
     console.log(
-      await driver("driver-setup", [
-        "setup",
-        "--max-mult",
-        flag("max-mult") ?? "16",
-      ]),
+      await driver(
+        "driver-setup",
+        ["setup", "--max-mult", flag("max-mult") ?? "16"],
+        SETUP_MS,
+      ),
     );
   } else if (command === "step" && a && b) await step(a, b);
   else if (command === "smoke") {
     await install();
     console.log(
-      await driver("driver-setup", [
-        "setup",
-        "--max-mult",
-        "1",
-        "--docs",
-        "20",
-      ]),
+      await driver(
+        "driver-setup",
+        ["setup", "--max-mult", "1", "--docs", "20"],
+        SETUP_MS,
+      ),
     );
     await step("1", "5");
   } else {
