@@ -4,6 +4,7 @@
 import type { LimitRow } from "../../../shared/contracts/limit.ts";
 import type { LimitName } from "../../../shared/words.ts";
 import { pluralCommas } from "../../lib/format.ts";
+import { K, thousandsText, thousandsValue } from "../../lib/thousands.ts";
 
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   rounds: {
@@ -80,7 +81,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   contextReserve: {
     label: "Context reserve",
-    text: "Room kept free in the context window.",
+    text: "Tokens kept free in the context window.",
   },
   summaryMaxTokens: {
     label: "Summary tokens",
@@ -200,7 +201,9 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
 };
 
-type Display = { word: string; factor: number };
+// thousands: typed in whole thousands as the agent's window is, a
+// stored value shown rounded
+type Display = { word: string; factor: number; thousands?: true };
 
 const KB = 1024;
 const MB = 1024 * KB;
@@ -216,7 +219,7 @@ export function displayOf(row: LimitRow): Display {
     case "chars":
       return { word: "chars", factor: 1 };
     case "tokens":
-      return { word: "tokens", factor: 1 };
+      return { word: "K", factor: K, thousands: true };
     case "days":
       return { word: "days", factor: 1 };
     case "minutes":
@@ -229,10 +232,16 @@ export function displayOf(row: LimitRow): Display {
 // milliseconds and binary byte factors have finite decimal forms, so
 // the full number keeps every integer the server accepts through a save
 export function show(row: LimitRow, value: number): string {
-  return String(value / displayOf(row).factor);
+  const { factor, thousands } = displayOf(row);
+  return thousands ? thousandsText(value) : String(value / factor);
 }
 
+// thousands left as shown give back the stored value, or the default Use
+// defaults put there, so a save of another field never rewrites 4096
 export function read(row: LimitRow, text: string): number | null {
+  if (displayOf(row).thousands) {
+    return thousandsValue(text, [row.value, row.default]);
+  }
   const t = text.trim();
   if (t === "" || !/^\d+(\.\d+)?$/.test(t)) return null;
   return Math.round(Number(t) * displayOf(row).factor);
@@ -241,12 +250,13 @@ export function read(row: LimitRow, text: string): number | null {
 export function problem(row: LimitRow, text: string): string | null {
   const value = read(row, text);
   const { label } = LIMIT_WORDS[row.name];
-  if (value === null) return `${label} needs a number`;
-  const { word } = displayOf(row);
+  const { word, thousands } = displayOf(row);
   const unit = word === "" ? "" : ` ${word}`;
-  if (value < row.min || value > row.max) {
-    return `${label} must be from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
+  const range = `${label} must be ${thousands ? "a whole number " : ""}from ${show(row, row.min)} to ${show(row, row.max)}${unit}`;
+  if (value === null) {
+    return thousands && text.trim() !== "" ? range : `${label} needs a number`;
   }
+  if (value < row.min || value > row.max) return range;
   return null;
 }
 
