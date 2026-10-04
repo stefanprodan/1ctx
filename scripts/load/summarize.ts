@@ -140,9 +140,15 @@ export async function summarize(dirOrLabel: string): Promise<Row> {
   const server = await lines(dir, "server");
   let serverErrors = 0;
   const toolFailed: Record<string, number> = {};
+  // a send the driver stopped at the end aborts its tool calls; those
+  // failures are the stop, not the server's
+  const stopped = new Set(
+    driver.filter((e) => e.t === "stopped").map((e) => e.session),
+  );
   for (const l of server) {
     if (l.includes("level=ERROR")) serverErrors++;
     if (!l.includes('msg="tool failed"')) continue;
+    if (stopped.has(l.match(/ chat=(\S+)/)?.[1])) continue;
     const k = [/tool=(\S+)/, /phase=(\S+)/, /cause=(\S+)/]
       .map((re) => l.match(re)?.[1] ?? "")
       .filter(Boolean)

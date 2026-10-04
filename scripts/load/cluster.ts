@@ -12,7 +12,7 @@
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
@@ -182,7 +182,33 @@ async function scripts() {
   );
 }
 
+// the namespace's database was provisioned with its Secret's keys, so
+// those win over the local folder: fresh local keys would lock the
+// server out of its own users and crash it on every start
+export function restoreKeys(
+  kubectl: (...args: string[]) => string[],
+  dir: string,
+): number {
+  const p = Bun.spawnSync(kubectl("get", "secret", "onectx", "-o", "json"));
+  if (p.exitCode !== 0) {
+    const err = p.stderr.toString();
+    // a fresh namespace has no Secret yet and gets fresh keys
+    if (err.includes("NotFound") || err.includes("not found")) return 0;
+    throw new Error(`reading the namespace's keys: ${err.trim()}`);
+  }
+  const data =
+    (JSON.parse(p.stdout.toString()) as { data?: Record<string, string> })
+      .data ?? {};
+  mkdirSync(dir, { recursive: true });
+  for (const [name, value] of Object.entries(data)) {
+    writeFileSync(join(dir, name), Buffer.from(value, "base64"));
+  }
+  return Object.keys(data).length;
+}
+
 async function install() {
+  const restored = restoreKeys(k, join(CLUSTER, "secrets"));
+  if (restored > 0) console.log(`${restored} keys taken from the namespace`);
   const { made } = writeCluster(CLUSTER, ns);
   console.log(`provision written to ${CLUSTER}, ${made} new keys`);
   apply(

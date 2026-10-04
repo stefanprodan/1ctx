@@ -1,3 +1,4 @@
 time=2026-10-04T10:00:00.000Z level=INFO msg=startup
 time=2026-10-04T10:00:01.000Z level=ERROR msg="send failed" area=runner
 time=2026-10-04T10:00:02.000Z level=WARN msg="tool failed" area=tools tool=bash phase=run cause=deadline
+time=2026-10-04T10:00:09.000Z level=WARN msg="tool failed" area=runner chat=s-stop tool=mcp:git duration=370ms error_type=ToolError error="MCP request timed out"

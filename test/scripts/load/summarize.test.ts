@@ -26,6 +26,7 @@ describe("the summarizer", () => {
     expect(row.mcpCalls).toBe(2);
     expect(row.refused).toBe(2);
     expect(row.serverErrors).toBe(1);
+    // the mcp:git failure belongs to a send the driver stopped
     expect(row.toolFailed).toEqual({ "bash run deadline": 1 });
     expect(row.cpuM.max).toBe(900);
     expect(row.memMi.max).toBe(320);

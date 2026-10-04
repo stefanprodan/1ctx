@@ -146,8 +146,12 @@ The runner's 4 CPUs carry kind, the fakes, the driver and the server
 together, so its times are several times a workstation's: compare a CI
 run only with another CI run.
 
-Setup and steps are idempotent: setup keeps what exists by name, a
-step sets every automation's time before it starts.
+Install, setup and steps are idempotent. Install takes the keys from
+the namespace's Secret before it writes any, since the database there
+was made with them; setup keeps what exists by name; a step sets every
+automation's time and starts on the next minute after. The tail waits
+at most 3 minutes for sends in flight, then stops them; tool failures
+of a stopped send are not counted.
 
 ## Comparing a branch with main
 

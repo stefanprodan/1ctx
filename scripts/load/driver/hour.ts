@@ -163,7 +163,9 @@ export async function step(api: Api, admin: Who, d: Directory, o: StepOptions) {
   });
 
   const patches = hourly.length + daily.length;
-  const T0 = Math.ceil((now() + 2 * MIN + patches * 40 + 30_000) / MIN) * MIN;
+  // on a minute, past the patches with a margin: the scheduler wakes on
+  // each schedule change, so it needs no lead of its own
+  const T0 = Math.ceil((now() + patches * 40 + 30_000) / MIN) * MIN;
   const end = T0 + minutes * MIN;
   const due = new Map<string, number>();
   const slots: number[] = [];
