@@ -50,6 +50,8 @@ export type Usage = {
   // summoned turn's, or for many at once
   latest(sessionId: string): RoundUsage | null;
   latestFor(sessionIds: string[]): Map<string, RoundUsage>;
+  // that last round as its row, whose send and round name what it counted
+  latestRound(sessionId: string): UsageRow | null;
   // an agent's year of days in the zone, every project in one series
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
   total: UsageStore["total"];
@@ -68,6 +70,7 @@ export function usageArea(deps: UsageDeps): Usage {
     recordDecision: (fields) => decisions.record(fields),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
+    latestRound: (sessionId) => store.latestRound(sessionId),
     total: (by, since, until) => store.total(by, since, until),
     activeProjects: (ids, since, until) =>
       store.activeProjects(ids, since, until),

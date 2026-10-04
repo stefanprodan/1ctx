@@ -16,9 +16,20 @@ import type { Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
+// the chat's last counted round, with the send and round that name its rows
+export type CountedPort = {
+  latestRound(sessionId: string): {
+    sendId: string;
+    round: number;
+    promptTokens: number;
+    completionTokens: number;
+  } | null;
+};
+
 export function compactSend(
   deps: {
     sessions: SessionStore;
+    usage: CountedPort;
     registry: Registry;
     writer: Writer;
     clock: Clock;
@@ -55,6 +66,20 @@ export function compactSend(
   if (!hasAnswer || !replied || lastUser === null) {
     throw new BadRequest("nothing to compact");
   }
+  // The last counted round read the rows before its reply and wrote
+  // the reply; a row after it (a stopped turn's tool results, a later
+  // message) is not in its measure. Without its reply row nothing is
+  // known to be measured.
+  const counted = deps.usage.latestRound(session.id);
+  const through =
+    counted === null
+      ? null
+      : (messages.findLast(
+          (message) =>
+            message.sendId === counted.sendId &&
+            message.round === counted.round &&
+            (message.kind === "reply" || message.kind === "summary"),
+        )?.seq ?? null);
   deps.registry.admit(
     session.id,
     { userId: policy.userId, projectId: policy.projectId },
@@ -70,11 +95,11 @@ export function compactSend(
     kind: "compact",
     op: "compact",
     summarizing: true,
-    // The last counted round is the size the history has now.
     used:
-      session.usage === null
+      counted === null || through === null
         ? null
-        : session.usage.promptTokens + session.usage.completionTokens,
+        : counted.promptTokens + counted.completionTokens,
+    usedThrough: through,
     policy,
     firstMessageId: lastUser.id,
     replyId: summaryId,

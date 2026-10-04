@@ -1171,6 +1171,79 @@ describe("history", () => {
     expect(over.maxTokens).toBe(SUMMARY_MIN_TOKENS);
   });
 
+  const windowed = (contextLength: number): SendPolicy => ({
+    ...policy,
+    contextLength,
+  });
+  const sized = (p: SendPolicy, req: ChatRequest) => {
+    const { maxTokens: _cap, ...rest } = req;
+    return requestTokens(p.wire, rest);
+  };
+  // a history whose summary request counts exactly `target`
+  const historyOf = (p: SendPolicy, target: number): ChatMessageIn[] => {
+    const base = sized(p, summaryRequest(p, "s1", said(1000))) - 1000;
+    return said(target - base);
+  };
+
+  // the default reserve: 8,000 at 32K, 20,000 above; a tenth of the
+  // estimate at 200K and 1M is more than the reserve leaves
+  test.each([
+    [32_000, 24_000, 4096],
+    [200_000, 180_000, 4096],
+    [1_000_000, 980_000, 4096],
+  ])(
+    "a %d window at its threshold %d with no measure asks for %d",
+    (window, threshold, cap) => {
+      const p = windowed(window);
+      expect(compactsAt(window, p.limits.contextReserve)).toBe(threshold);
+      const req = summaryRequest(p, "s1", historyOf(p, threshold));
+      expect(sized(p, req)).toBe(threshold);
+      expect(req.maxTokens).toBe(cap);
+    },
+  );
+
+  // the counted round read half the window, then a stopped turn left a
+  // third of it in tool results; the request as it goes, the size the
+  // provider counts, plus its cap stays inside the window
+  test.each([
+    [32_000, 0.5, 0.3],
+    [200_000, 0.5, 0.3],
+    [1_000_000, 0.5, 0.3],
+    [32_000, 0.7, 0.24],
+    [200_000, 0.85, 0.135],
+    [1_000_000, 0.9, 0.097],
+  ])(
+    "a %d window measured at %p and %p added after it fits",
+    (window, measured, added) => {
+      const p = windowed(window);
+      const counted = historyOf(p, Math.round(window * measured));
+      const used = sized(p, summaryRequest(p, "s1", counted));
+      const full = [
+        ...counted,
+        { role: "user" as const, content: "word ".repeat(window * added) },
+      ];
+      const req = summaryRequest(p, "s1", full, used, counted);
+      expect(sized(p, req) + req.maxTokens!).toBeLessThanOrEqual(
+        window - SUMMARY_MARGIN,
+      );
+      // the measure alone would have asked for more than the window holds
+      // in the last three
+      const stale = summaryRequest(p, "s1", full, used);
+      if (measured > 0.5) {
+        expect(sized(p, stale) + stale.maxTokens!).toBeGreaterThan(window);
+      }
+    },
+  );
+
+  test("a measure with nothing after it is used as is", () => {
+    const p = windowed(200_000);
+    const counted = said(100);
+    expect(summaryRequest(p, "s1", counted, 182_000, counted).maxTokens).toBe(
+      summaryRequest(p, "s1", counted, 182_000).maxTokens,
+    );
+    expect(summaryRequest(p, "s1", counted, 182_000).maxTokens).toBe(4096);
+  });
+
   test("the request carries the model, the thinking flag and the session as the cache key", () => {
     const req = request({ ...policy, offered: NONE }, "s1", []);
     expect(req).toEqual({

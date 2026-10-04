@@ -24,6 +24,7 @@ import type { ProjectRow } from "../projects/index.ts";
 import type { SessionRow, SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { AttentionPort } from "./attention.ts";
+import type { CountedPort } from "./compact.ts";
 import type { Event } from "./event.ts";
 import type { ToolsPort } from "./policy.ts";
 import type { PreparedRun } from "./prepare.ts";
@@ -70,7 +71,7 @@ export type RunnerDeps = {
     ): void;
   };
   limits: { current(): Limits };
-  usage: WriterDeps["usage"];
+  usage: WriterDeps["usage"] & CountedPort;
   render: WriterDeps["render"];
   stream: WriterDeps["stream"];
   // a send's place let go, so a run waiting for one may start

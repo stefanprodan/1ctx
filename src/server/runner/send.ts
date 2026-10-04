@@ -129,6 +129,10 @@ export type ActiveSend = {
   // summary request's size while it is inside the window; null when
   // the round reported no usage
   used: number | null;
+  // the seq of that round's reply on compact on demand: rows after it,
+  // but this send's own, are estimated on top. Null when the round is
+  // this send's answer, which read every row
+  usedThrough: number | null;
   // the change since the previous non-compact send, fixed for its life
   mcpNote: string;
   // the current round's launched tool rows still streaming, keyed by
@@ -231,6 +235,7 @@ export function newSend(fields: {
   op: SendOp;
   summarizing?: boolean;
   used?: number | null;
+  usedThrough?: number | null;
   policy: SendPolicy;
   firstMessageId: string;
   replyId: string;
@@ -276,6 +281,7 @@ export function newSend(fields: {
     bare: false,
     summarizing: fields.summarizing ?? false,
     used: fields.used ?? null,
+    usedThrough: fields.usedThrough ?? null,
     mcpNote: "",
     openTools: new Map(),
     tools: null,

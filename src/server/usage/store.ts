@@ -334,13 +334,24 @@ export class UsageStore {
   // a regenerate's replaced turn keeps its usage but is no longer the
   // history's size, so only rows of sends that are still there count
   latest(sessionId: string): RoundUsage | null {
-    const raw = this.db
+    const raw = this.latestRaw(sessionId);
+    return raw ? usageOf(raw) : null;
+  }
+
+  // the same round with its send and round number, which name the rows
+  // it counted
+  latestRound(sessionId: string): UsageRow | null {
+    const raw = this.latestRaw(sessionId);
+    return raw ? row(raw) : null;
+  }
+
+  private latestRaw(sessionId: string): Raw | null {
+    return this.db
       .query<Raw, [string]>(
         `select * from usage where session_id = ? and ${CHAT_ROUND}
          order by seq desc limit 1`,
       )
       .get(sessionId);
-    return raw ? usageOf(raw) : null;
   }
 
   latestFor(sessionIds: string[]): Map<string, RoundUsage> {

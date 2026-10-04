@@ -142,16 +142,32 @@ export function buildRequest(
   lookups: ContextLookups,
   now: number,
 ): ChatRequest {
-  const messages = history(
-    rows,
-    send.policy,
-    lookups,
-    now,
-    send.mcpNote,
-    send.repos ?? undefined,
-  );
+  const historyOf = (of: Message[]) =>
+    history(
+      of,
+      send.policy,
+      lookups,
+      now,
+      send.mcpNote,
+      send.repos ?? undefined,
+    );
+  const messages = historyOf(rows);
   if (send.summarizing) {
-    return summaryRequest(send.policy, send.sessionId, messages, send.used);
+    // the history the measure read, when rows came after it
+    const through = send.usedThrough;
+    const counted =
+      through !== null &&
+      send.used !== null &&
+      rows.some((row) => row.seq > through && row.sendId !== send.id)
+        ? historyOf(rows.filter((row) => row.seq <= through))
+        : null;
+    return summaryRequest(
+      send.policy,
+      send.sessionId,
+      messages,
+      send.used,
+      counted,
+    );
   }
   const req = request(
     send.policy,

@@ -248,15 +248,20 @@ export function request(
   };
 }
 
-// the summary request's size is the answer round's measured prompt
-// plus completion: exact for the provider's tokenizer, replayed
+// the summary request's size is the last counted round's measured
+// prompt plus completion: exact for the provider's tokenizer, replayed
 // reasoning included, and it only overstates the summary (schemas, the
-// completion), so it errs safe. The local estimate, with a tenth on top
-// for another tokenizer, takes over only when nothing was measured or
-// the measure passed the window the agent states, a provider that took
-// more than it. The floor is the least a summary is asked for: a
-// short summary beats none, and a provider that cannot fit even that
-// refuses the round, which ends failed and is tried again next time
+// completion), so it errs safe. Rows written after that round (a
+// stopped turn's tool results, a later message) are not in it, so the
+// local estimate of what they add goes on top. The estimate, with a
+// tenth on top for another tokenizer, takes the whole size only when
+// nothing was measured or the measure passed the window the agent
+// states, a provider that took more than it. That tenth stops at half
+// the reserve: at a large window's threshold it would otherwise eat the
+// reserve and the summary with it. The floor is the least a summary is
+// asked for: a short summary beats none, and a provider that cannot
+// fit even that refuses the round, which ends failed and is tried
+// again next time
 export const SUMMARY_MARGIN = 256;
 export const ESTIMATE_SLACK = 0.1;
 export const SUMMARY_MIN_TOKENS = 128;
@@ -265,12 +270,14 @@ export const SUMMARY_MIN_TOKENS = 128;
 // least thinking, since a model's thoughts come out of the same cap. Its
 // answer is capped by the limit and the reserve, then by the room its
 // size leaves: a strict provider refuses a request whose prompt and
-// max_tokens together pass the window
+// max_tokens together pass the window. `counted` is the history the
+// measure read, given only when rows came after it
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
   messages: ChatMessageIn[],
   used: number | null = null,
+  counted: ChatMessageIn[] | null = null,
 ): ChatRequest {
   const window = policy.contextLength;
   const reserve =
@@ -287,13 +294,27 @@ export function summaryRequest(
   };
   let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
   if (window !== null) {
+    const estimate = (of: ChatRequest) => requestTokens(policy.wire, of);
+    const slacked = (tokens: number) =>
+      Math.ceil(tokens + Math.min(tokens * ESTIMATE_SLACK, reserve / 2));
+    let size: number;
     // a measure inside the window is exact even when it leaves no room;
     // only one past it (a stated window below the model's) or none
     // falls back to the estimate, which counts the whole history
-    const size =
-      used !== null && used <= window
-        ? used
-        : Math.ceil(requestTokens(policy.wire, req) * (1 + ESTIMATE_SLACK));
+    if (used !== null && used <= window) {
+      size = used;
+      if (counted !== null) {
+        const added =
+          estimate(req) -
+          estimate({
+            ...req,
+            messages: [...counted, { role: "user", content: SUMMARIZE }],
+          });
+        if (added > 0) size += slacked(added);
+      }
+    } else {
+      size = slacked(estimate(req));
+    }
     const room = window - size - SUMMARY_MARGIN;
     maxTokens = Math.max(SUMMARY_MIN_TOKENS, Math.min(maxTokens, room));
   }
