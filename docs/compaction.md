@@ -16,8 +16,10 @@ Sends, the writer and the queue are in `docs/sessions.md`.
   it from a default that resolved to off.
 - **The summary's `max_tokens` fits the window** less 256 and the
   request's size, min 128. The size is the last counted usage when it
-  is inside the window, plus the estimate of rows written after that
-  round's reply (a stopped turn's tool results, a later message), else
+  is inside the window. When rows came after that round's reply (a
+  stopped turn's tool results, a later message), it is the round's
+  prompt plus the estimate of the reply and every row after it, so the
+  reply's calls are counted once, with their results. Else it is
   `requestTokens()` of the whole request. An estimate gets +10%, at
   most what leaves a history at the threshold the whole
   `summaryMaxTokens` (the reserve less it and 256), never capped below

@@ -100,6 +100,7 @@ export function compactSend(
         ? null
         : counted.promptTokens + counted.completionTokens,
     usedThrough: through,
+    usedPrompt: counted === null ? null : counted.promptTokens,
     policy,
     firstMessageId: lastUser.id,
     replyId: summaryId,

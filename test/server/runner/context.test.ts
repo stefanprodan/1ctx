@@ -1238,7 +1238,10 @@ describe("history", () => {
         ...counted,
         { role: "user" as const, content: "word ".repeat(window * added) },
       ];
-      const req = summaryRequest(p, "s1", full, used, counted);
+      const req = summaryRequest(p, "s1", full, used, {
+        prompt: used,
+        messages: counted,
+      });
       expect(sized(p, req) + req.maxTokens!).toBeLessThanOrEqual(
         window - SUMMARY_MARGIN,
       );
@@ -1254,9 +1257,12 @@ describe("history", () => {
   test("a measure with nothing after it is used as is", () => {
     const p = windowed(200_000);
     const counted = said(100);
-    expect(summaryRequest(p, "s1", counted, 182_000, counted).maxTokens).toBe(
-      summaryRequest(p, "s1", counted, 182_000).maxTokens,
-    );
+    expect(
+      summaryRequest(p, "s1", counted, 182_000, {
+        prompt: 182_000,
+        messages: counted,
+      }).maxTokens,
+    ).toBe(summaryRequest(p, "s1", counted, 182_000).maxTokens);
     expect(summaryRequest(p, "s1", counted, 182_000).maxTokens).toBe(4096);
   });
 

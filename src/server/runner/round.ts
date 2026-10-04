@@ -153,13 +153,19 @@ export function buildRequest(
     );
   const messages = historyOf(rows);
   if (send.summarizing) {
-    // the history the measure read, when rows came after it
+    // when rows came after the counted round, the history before its
+    // reply: the reply is estimated with the rest, since its calls
+    // render only with their results
     const through = send.usedThrough;
+    const prompt = send.usedPrompt;
     const counted =
       through !== null &&
-      send.used !== null &&
+      prompt !== null &&
       rows.some((row) => row.seq > through && row.sendId !== send.id)
-        ? historyOf(rows.filter((row) => row.seq <= through))
+        ? {
+            prompt,
+            messages: historyOf(rows.filter((row) => row.seq < through)),
+          }
         : null;
     return summaryRequest(
       send.policy,

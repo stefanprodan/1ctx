@@ -253,7 +253,9 @@ export function request(
 // reasoning included, and it only overstates the summary (schemas, the
 // completion), so it errs safe. Rows written after that round (a
 // stopped turn's tool results, a later message) are not in it, so the
-// local estimate of what they add goes on top. The estimate, with a
+// size is then its measured prompt plus the local estimate of the rest,
+// its reply included: a reply's calls render only with their results,
+// so the reply is never counted apart from them. The estimate, with a
 // tenth on top for another tokenizer, takes the whole size only when
 // nothing was measured or the measure passed the window the agent
 // states, a provider that took more than it. That tenth stops where a
@@ -261,10 +263,10 @@ export function request(
 // reserve when the summary wants more: at a large window's threshold it
 // would otherwise eat the reserve and the summary with it, and any less
 // sends a history past the threshold to a tokenizer counting more than
-// ours with a summary cap that passes the window. The floor is the least a summary is
-// asked for: a short summary beats none, and a provider that cannot
-// fit even that refuses the round, which ends failed and is tried
-// again next time
+// ours with a summary cap that passes the window. The floor is the
+// least a summary is asked for: a short summary beats none, and a
+// provider that cannot fit even that refuses the round, which ends
+// failed and is tried again next time
 export const SUMMARY_MARGIN = 256;
 export const ESTIMATE_SLACK = 0.1;
 export const SUMMARY_MIN_TOKENS = 128;
@@ -273,14 +275,15 @@ export const SUMMARY_MIN_TOKENS = 128;
 // least thinking, since a model's thoughts come out of the same cap. Its
 // answer is capped by the limit and the reserve, then by the room its
 // size leaves: a strict provider refuses a request whose prompt and
-// max_tokens together pass the window. `counted` is the history the
-// measure read, given only when rows came after it
+// max_tokens together pass the window. `counted` is the counted round's
+// measured prompt and the history before its reply, given only when
+// rows came after it
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
   messages: ChatMessageIn[],
   used: number | null = null,
-  counted: ChatMessageIn[] | null = null,
+  counted: { prompt: number; messages: ChatMessageIn[] } | null = null,
 ): ChatRequest {
   const window = policy.contextLength;
   const reserve =
@@ -315,9 +318,12 @@ export function summaryRequest(
           estimate(req) -
           estimate({
             ...req,
-            messages: [...counted, { role: "user", content: SUMMARIZE }],
+            messages: [
+              ...counted.messages,
+              { role: "user", content: SUMMARIZE },
+            ],
           });
-        if (added > 0) size += slacked(added);
+        size = counted.prompt + slacked(Math.max(0, added));
       }
     } else {
       size = slacked(estimate(req));

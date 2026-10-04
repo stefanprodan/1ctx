@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { SUMMARIZE, SUMMARY_LEAD } from "../../src/server/runner/context.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
@@ -516,4 +517,86 @@ describe("compaction", () => {
     });
     chat.app.socket.dispose();
   });
+
+  // the counted round is a tool call with a long argument: the measure
+  // holds the argument as completion, so the estimate on top of it must
+  // not count it again
+  // the 32K case found in review, then larger windows with the history
+  // nearer the window, since a reply is capped at 1 MB
+  test.each([
+    [32_000, 15_000, 8000],
+    [200_000, 118_000, 50_000],
+    [1_000_000, 690_000, 150_000],
+  ])(
+    "a %d window compacts after %d words and a %d-word tool argument with its full cap",
+    async (window, history, words) => {
+      const chat = await chatApp({
+        window,
+        tools: fixedTools("word ".repeat(100)),
+      });
+      // the history in messages under the 256 KiB cap
+      const chunk = Math.min(history, 50_000);
+      const started = await startChat(chat, "word ".repeat(chunk));
+      finish(started.script, "answer", chat.scripted.requests[0]!.inputTokens);
+      await settle(chat, started.sessionId);
+      for (let at = chunk; at < history; at += chunk) {
+        const next = chat.scripted.next();
+        await chat.member.call(
+          "POST",
+          `/api/sessions/${started.sessionId}/messages`,
+          {
+            body: { message: "word ".repeat(Math.min(chunk, history - at)) },
+          },
+        );
+        finish(
+          await next,
+          "answer",
+          chat.scripted.requests.at(-1)!.inputTokens,
+        );
+        await settle(chat, started.sessionId);
+      }
+      const pending = chat.scripted.next();
+      await chat.member.call(
+        "POST",
+        `/api/sessions/${started.sessionId}/messages`,
+        { body: { message: "the time" } },
+      );
+      const work = await pending;
+      const answered = chat.scripted.scripts.length + 1;
+      const argument = JSON.stringify({
+        text: "word ".repeat(words),
+      });
+      // in fragments, as a stream carries a long argument
+      for (let at = 0; at < argument.length; at += 50_000) {
+        work.toolCall({
+          index: 0,
+          ...(at === 0 ? { id: "time-1", name: "datetime" } : {}),
+          arguments: argument.slice(at, at + 50_000),
+        });
+      }
+      work.finish("tool_calls");
+      work.usage({
+        prompt: chat.scripted.requests.at(-1)!.inputTokens,
+        completion: tokens(argument),
+      });
+      work.end();
+      // the answer round reads the result and is stopped unmeasured
+      await waitScript(chat.scripted, answered);
+      await chat.member.call("POST", `/api/sessions/${started.sessionId}/stop`);
+      await settle(chat, started.sessionId);
+
+      const response = await chat.member.call(
+        "POST",
+        `/api/sessions/${started.sessionId}/compact`,
+      );
+      expect(response.status).toBe(200);
+      const summary = await waitScript(chat.scripted, answered + 1);
+      const sent = chat.scripted.requests.at(-1)!;
+      expect(sent.maxTokens).toBe(4096);
+      expect(sent.inputTokens + sent.maxTokens).toBeLessThanOrEqual(window);
+      finish(summary, "## Goal\n\n- Continue");
+      await settle(chat, started.sessionId);
+      chat.app.socket.dispose();
+    },
+  );
 });
