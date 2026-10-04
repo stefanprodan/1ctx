@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "scale_settings": {
+        "scale_type": "standard"
+      },
+      "model": "gpt-6-luna",
+      "owner": "organization-owner",
+      "id": "gpt-6-luna",
+      "status": "succeeded",
+      "created_at": 1791127586,
+      "updated_at": 1791127586,
+      "object": "deployment"
+    },
+    {
+      "scale_settings": {
+        "scale_type": "standard"
+      },
+      "model": "gpt-6.1-sol",
+      "owner": "organization-owner",
+      "id": "gpt-6.1-sol",
+      "status": "succeeded",
+      "created_at": 1791129423,
+      "updated_at": 1791129423,
+      "object": "deployment"
+    }
+  ],
+  "object": "list"
+}
