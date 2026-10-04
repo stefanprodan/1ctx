@@ -259,7 +259,34 @@ async function install() {
     undefined,
     true,
   );
+  // a rebuilt image keeps the dev tag, so helm sees no change and the
+  // old pod would keep running the previous build
+  run(k("rollout", "restart", "deploy/onectx"), undefined, true);
+  run(
+    k("rollout", "status", "deploy/onectx", "--timeout=15m"),
+    undefined,
+    true,
+  );
   console.log(`installed onectx in ${context}/${ns}`);
+}
+
+// the CPU and RSS columns come from kubectl top; without metrics-server
+// they would be empty with no word why, so a step refuses to start
+function checkMetrics() {
+  // nodes, since the namespace may not exist before install
+  const p = Bun.spawnSync([
+    "kubectl",
+    "--context",
+    context,
+    "top",
+    "node",
+    "--no-headers",
+  ]);
+  if (p.exitCode !== 0) {
+    throw new Error(
+      `kubectl top fails on ${context} (metrics-server missing or not ready; make kind-up installs it): ${p.stderr.toString().trim()}`,
+    );
+  }
 }
 
 // runs the driver in a fresh pod and returns its log; the pod must
@@ -324,13 +351,6 @@ function stopOnExit() {
 async function step(mult: string, minutes: string) {
   const label = flag("label") ?? `kind-step-${mult}x`;
   const results = join(OUT_DIR, "results", label);
-  // the CPU and RSS columns come from kubectl top; without
-  // metrics-server they would be empty with no word why
-  if (Bun.spawnSync(k("top", "pod", "--no-headers")).exitCode !== 0) {
-    throw new Error(
-      `kubectl top fails on ${context}: metrics-server missing (make kind-up installs it)`,
-    );
-  }
   mkdirSync(results, { recursive: true });
   await scripts();
   await Bun.write(
@@ -358,7 +378,15 @@ async function step(mult: string, minutes: string) {
       children.add(f);
     }
     sampler = setInterval(() => {
-      const p = Bun.spawnSync(k("top", "pod", "--no-headers"));
+      // nodes, since the namespace may not exist before install
+      const p = Bun.spawnSync([
+        "kubectl",
+        "--context",
+        context,
+        "top",
+        "node",
+        "--no-headers",
+      ]);
       const m = p.stdout.toString().match(/onectx-\S+\s+(\d+)m\s+(\d+)Mi/);
       if (m)
         top.push(
@@ -420,6 +448,7 @@ async function main() {
   ).trim();
   checkServer(context, server);
   const [command, a, b] = positional;
+  if (command === "step" || command === "smoke") checkMetrics();
   if (command === "install") await install();
   else if (command === "setup") {
     await scripts();

@@ -39,7 +39,7 @@ const LOCALE = "en_US.UTF-8";
 
 const gawk = Bun.which("gawk");
 if (!gawk) {
-  console.error("gawk-record: gawk is not installed");
+  console.error("gawk: gawk is not installed");
   process.exit(1);
 }
 
@@ -52,7 +52,7 @@ const names = new Set<string>();
 const moved: string[] = [];
 for (const c of fixture.cases) {
   if (names.has(c.name)) {
-    console.error(`gawk-record: two cases named ${JSON.stringify(c.name)}`);
+    console.error(`gawk: two cases named ${JSON.stringify(c.name)}`);
     process.exit(1);
   }
   names.add(c.name);
@@ -91,6 +91,4 @@ if (fixture.gawk !== version) moved.unshift(`gawk: ${version}`);
 fixture.gawk = version;
 await Bun.write(FIXTURE, `${JSON.stringify(fixture, null, 2)}\n`);
 for (const line of moved) console.log(`moved: ${line}`);
-console.log(
-  `gawk-record: ${fixture.cases.length} cases, ${moved.length} moved`,
-);
+console.log(`gawk: ${fixture.cases.length} cases, ${moved.length} moved`);
