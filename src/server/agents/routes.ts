@@ -209,7 +209,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         !endpoints.some((e) => e.tag === body.upstream)
       ) {
         throw new BadRequest(
-          `upstream ${body.upstream} does not serve ${body.model} on ${provider.name}`,
+          `The preferred provider ${body.upstream} does not serve ${body.model} on ${provider.name}`,
         );
       }
       if (body.skip4Bit && body.upstream !== null) {
@@ -220,7 +220,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             : fourBitEndpoint(listed);
         if (fourBit) {
           throw new BadRequest(
-            `upstream ${body.upstream} is a 4-bit host, which skip4Bit leaves out`,
+            `The preferred provider ${body.upstream} is a 4-bit host, which Skip 4-bit providers leaves out`,
           );
         }
       }
@@ -229,7 +229,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const serving = endpoints.filter((e) => !resolved.tools || e.tools);
         if (serving.length > 0 && serving.every(fourBitEndpoint)) {
           throw new BadRequest(
-            `skip4Bit leaves no provider serving ${body.model}`,
+            `Skip 4-bit providers leaves no provider serving ${body.model}`,
           );
         }
       }

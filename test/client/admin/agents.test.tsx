@@ -55,17 +55,21 @@ import {
   statedModel,
   statedProblem,
   thinkingChoices,
+  thinkingHint,
   upstreamOptions,
+  windowText,
 } from "../../../src/client/views/admin/Agents.model.ts";
 import { CatalogSearch } from "../../../src/client/views/admin/Agents.state.ts";
 import { NewProvider } from "../../../src/client/views/admin/NewProvider.tsx";
 import { ProviderPage } from "../../../src/client/views/admin/ProviderPage.tsx";
 import {
   keyLine,
+  matchingKey,
   preset,
   presetBaseUrl,
   providerDeleteLine,
   providerFieldOf,
+  providerRefusal,
 } from "../../../src/client/views/admin/Providers.model.ts";
 import { Providers } from "../../../src/client/views/admin/Providers.tsx";
 import { Skip4BitField } from "../../../src/client/views/admin/UpstreamField.tsx";
@@ -168,6 +172,7 @@ describe("the words", () => {
       baseUrl: null,
       fixed: false,
       hint: null,
+      placeholder: "http://host:port/v1",
       name: "",
     });
     // OpenRouter's address is filled in and may move to the EU one
@@ -180,6 +185,20 @@ describe("the words", () => {
       fixed: false,
       name: "opencode",
     });
+    // each Foundry resource has its own address, so it is typed
+    expect(preset("azure")).toEqual({
+      wire: "azure",
+      label: "Microsoft Foundry",
+      text: "GPT models deployed on Microsoft Foundry or Azure OpenAI.",
+      baseUrl: null,
+      fixed: false,
+      hint: "From the resource's Keys and Endpoint page.",
+      placeholder: expect.stringMatching(
+        /^https:\/\/<resource>\..*\/openai\/v1$/,
+      ),
+      name: "azure",
+    });
+    expect(presetBaseUrl(preset("opencode").baseUrl!, "azure")).toBe("");
     expect(presetBaseUrl("", "opencode")).toBe(preset("opencode").baseUrl!);
     expect(presetBaseUrl(preset("opencode").baseUrl!, "openai-strict")).toBe(
       "",
@@ -197,6 +216,36 @@ describe("the words", () => {
     expect(
       providerFieldOf("keyName must be provider- followed by a name"),
     ).toBe("keyName");
+    // a refusal names the field by its label, never its API name
+    const refused = providerRefusal(
+      "baseUrl must be https://<resource>.x/openai/v1 or the same path",
+    );
+    expect(refused).toBe(
+      "The base URL must be https://<resource>.x/openai/v1 or the same path",
+    );
+    expect(providerFieldOf(refused)).toBe("baseUrl");
+    expect(providerRefusal("keyName must be provider- followed by x")).toBe(
+      "The key file must be provider- followed by x",
+    );
+    // the API's null is no word for the form
+    expect(
+      providerRefusal(
+        "keyName must be provider- followed by 1 to 48 lowercase letters, digits and dashes, starting with a letter or digit, or null",
+      ),
+    ).toBe(
+      "The key file must be provider- followed by 1 to 48 lowercase letters, digits and dashes, starting with a letter or digit",
+    );
+    expect(providerFieldOf("The key file must be x")).toBe("keyName");
+    expect(providerRefusal("name must be 1 to 80")).toBe(
+      "name must be 1 to 80",
+    );
+    // the key file follows the name when one matches it
+    expect(matchingKey(["provider-gemini"], "gemini")).toBe("provider-gemini");
+    expect(matchingKey(["provider-gemini"], " gemini ")).toBe(
+      "provider-gemini",
+    );
+    expect(matchingKey(["provider-gemini"], "azure")).toBe("");
+    expect(matchingKey(["provider-"], "")).toBe("");
   });
 
   test.serial(
@@ -241,6 +290,18 @@ describe("the words", () => {
     expect(thinkingChoices({ ...flash, reasoning: false })).toEqual([
       { value: null, label: "Off" },
     ]);
+    // azure keeps Off and says what it does on a model that always thinks
+    expect(
+      thinkingChoices(
+        { ...flash, described: false, reasoningKnown: false },
+        "azure",
+      ).map((c) => c.value),
+    ).toEqual([null, "on", "off"]);
+    expect(thinkingHint("azure")).toBe(
+      "A model that cannot stop thinking runs at Low.",
+    );
+    expect(thinkingHint("gemini")).toBeNull();
+    expect(thinkingHint(undefined)).toBeNull();
     expect(effortChoices("openrouter").map((c) => c.value)).toEqual([
       null,
       "minimal",
@@ -350,25 +411,34 @@ describe("a model its catalog does not describe", () => {
   };
 
   test.serial(
-    "the window is a whole number in range, required with tools",
+    "the window is a whole number of thousands in range, required with tools",
     () => {
       expect(contextProblem("", false)).toBeNull();
       expect(contextProblem(" ", true)).toBe("Enter the context window");
-      expect(contextProblem("262,144", true)).toBeNull();
-      expect(contextProblem("262_144", true)).toBeNull();
-      expect(contextProblem("1023", false)).toBe(
-        "Enter a whole number from 1,024 to 10,000,000",
-      );
-      expect(contextProblem("12.5k", false)).not.toBeNull();
+      expect(contextProblem("1,050", true)).toBeNull();
+      expect(contextProblem("262", true)).toBeNull();
+      const range = "Enter a whole number of thousands from 1 to 10,000";
+      expect(contextProblem("1", false)).toBeNull();
+      expect(contextProblem("0", false)).toBe(range);
+      expect(contextProblem("10001", false)).toBe(range);
+      expect(contextProblem("12.5", false)).toBe(range);
+      expect(contextProblem("12k", false)).toBe(range);
+      // a saved window shown as it was is taken whatever it rounds to
+      expect(contextProblem("1", true, 1024)).toBeNull();
+      expect(contextProblem("10,000", true, 10_000_000)).toBeNull();
+      expect(windowText(131072)).toBe("131");
+      expect(windowText(null)).toBe("");
       expect(statedProblem(flash, "", true)).toBeNull();
       expect(statedProblem(null, "", true)).toBeNull();
       expect(statedProblem(ultra, "", true)).toBe("Enter the context window");
       expect(
         agentFieldOf("contextLength is required for a model with tools"),
       ).toBe("contextLength");
-      expect(agentFieldOf("upstream modelx does not serve m on router")).toBe(
-        "upstream",
-      );
+      expect(
+        agentFieldOf(
+          "The preferred provider modelx does not serve m on router",
+        ),
+      ).toBe("upstream");
     },
   );
 
@@ -445,8 +515,29 @@ describe("a model its catalog does not describe", () => {
     () => {
       expect(statedFields(flash, "4096", true)).toEqual({});
       expect(statedFields(null, "4096", true)).toEqual({});
-      expect(statedFields(ultra, "262,144", true)).toEqual({
-        contextLength: 262144,
+      expect(statedFields(ultra, "1050", true)).toEqual({
+        contextLength: 1_050_000,
+        tools: true,
+      });
+      // left as shown, the stored count goes back unchanged
+      expect(statedFields(ultra, "131", true, 131072)).toEqual({
+        contextLength: 131072,
+        tools: true,
+      });
+      // commas and spaces do not make it an edit
+      expect(statedFields(ultra, "1,049", true, 1048576)).toEqual({
+        contextLength: 1048576,
+        tools: true,
+      });
+      expect(statedFields(ultra, " 131 ", true, 131072).contextLength).toBe(
+        131072,
+      );
+      expect(statedFields(ultra, "1,050", true, 1048576).contextLength).toBe(
+        1_050_000,
+      );
+      expect(statedFields(ultra, "1", true, null).contextLength).toBe(1000);
+      expect(statedFields(ultra, "132", true, 131072)).toEqual({
+        contextLength: 132_000,
         tools: true,
       });
       expect(statedFields(ultra, "", false)).toEqual({
@@ -454,13 +545,13 @@ describe("a model its catalog does not describe", () => {
         tools: false,
       });
       expect(statedModel(flash, "4096", false)).toBe(flash);
-      expect(statedModel(ultra, "262144", true)).toEqual({
+      expect(statedModel(ultra, "262", true)).toEqual({
         ...ultra,
-        contextLength: 262144,
+        contextLength: 262_000,
         tools: true,
       });
       // a window still being typed is no window yet
-      expect(statedModel(ultra, "12", true)?.contextLength).toBeNull();
+      expect(statedModel(ultra, "0", true)?.contextLength).toBeNull();
     },
   );
 
@@ -481,7 +572,14 @@ describe("a model its catalog does not describe", () => {
       <AgentModel agent={nim} drafts={AgentDrafts.of(nim)} />,
     );
     expect(html).toContain("Context window");
-    expect(html).toMatch(/name="contextLength"[^>]*value="262144"/);
+    // in thousands, the unit inside the box
+    expect(html).toMatch(/name="contextLength"[^>]*value="262"/);
+    expect(html).toContain('<span class="numberbox-unit">K</span>');
+    expect(html).toContain("Thousands of tokens.");
+    // saved untouched, the stored count goes back as it was
+    expect(AgentDrafts.of(nim).modelBody("openai-strict").contextLength).toBe(
+      nim.model.contextLength,
+    );
     expect(html).toContain("262K · tools");
     expect(html).toContain(">Default<");
     expect(html).not.toContain("Default (off)");
@@ -614,6 +712,15 @@ describe("Skip 4-bit providers", () => {
     expect(agentFieldOf("skip4Bit is only for an OpenRouter provider")).toBe(
       "skip4Bit",
     );
+    // the refusals the page reaches name the control by its label
+    expect(
+      agentFieldOf("Skip 4-bit providers leaves no provider serving m"),
+    ).toBe("skip4Bit");
+    expect(
+      agentFieldOf(
+        "The preferred provider x/fp4 is a 4-bit host, which Skip 4-bit providers leaves out",
+      ),
+    ).toBe("upstream");
   });
 
   test.serial("the switch shows only on an OpenRouter provider", () => {
@@ -837,6 +944,26 @@ describe("the page", () => {
     expect(html).not.toMatch(/<input[^>]*name="keyName"/);
     expect(html).toContain("No key");
     expect(html).toContain("provider-&lt;name>.key");
+    expect(html).toContain('placeholder="http://host:port/v1"');
+  });
+
+  test.serial("the key file follows the preset's name when one matches", () => {
+    keys.value = ["provider-azure", "provider-gemini"];
+    providers.value = [];
+    const keyButton = (html: string) =>
+      /<button[^>]*name="keyName"[^>]*>(.*?)<\/button>/s.exec(html)?.[1] ?? "";
+    expect(keyButton(render(<NewProvider wire="gemini" />))).toContain(
+      "provider-gemini",
+    );
+    const azure = render(<NewProvider wire="azure" />);
+    expect(keyButton(azure)).toContain("provider-azure");
+    expect(azure).toMatch(
+      /placeholder="https:\/\/&lt;resource>\.[^"]*\/openai\/v1"/,
+    );
+    // no file of that name: No key
+    expect(keyButton(render(<NewProvider wire="opencode" />))).toContain(
+      "No key",
+    );
   });
 
   test.serial(

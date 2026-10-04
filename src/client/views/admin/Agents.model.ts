@@ -20,8 +20,14 @@ import { priceLine } from "../../agents/meta.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export function agentFieldOf(message: string): string | undefined {
-  if (message.startsWith("skip4Bit")) return "skip4Bit";
-  if (message.startsWith("upstream")) return "upstream";
+  // the two refusals the page can reach name their controls by label
+  if (message.startsWith("skip4Bit") || message.startsWith("Skip 4-bit"))
+    return "skip4Bit";
+  if (
+    message.startsWith("upstream") ||
+    message.startsWith("The preferred provider")
+  )
+    return "upstream";
   if (message.startsWith("name") || message.startsWith("an agent named"))
     return "name";
   if (message.startsWith("providerId") || message === "no such provider")
@@ -67,6 +73,14 @@ export function thinkingChoices(
     choices.push({ value: "off", label: "Off" });
   }
   return choices;
+}
+
+// what Off does where the catalog cannot say which models always think:
+// azure sends such a model's Off at the least effort
+export function thinkingHint(wire: Wire | undefined): string | null {
+  return wire === "azure"
+    ? "A model that cannot stop thinking runs at Low."
+    : null;
 }
 
 // a newly picked model drops a thinking word it cannot take
@@ -131,23 +145,41 @@ export function listed<T>(
     : picks.filter((p) => rows.some((r) => r.id === idOf(p)));
 }
 
-export function contextProblem(value: string, tools: boolean): string | null {
-  const v = value.trim().replaceAll(/[,_ ]/g, "");
+// The window is typed in thousands of tokens and the API keeps tokens. A
+// saved window shows rounded and, left as shown, goes back unchanged, so
+// 131072 stays 131072
+const K = 1000;
+const MIN_K = Math.ceil(MIN_CONTEXT_LENGTH / K);
+const MAX_K = Math.floor(MAX_CONTEXT_LENGTH / K);
+
+export function windowText(tokens: number | null): string {
+  return tokens === null ? "" : String(Math.round(tokens / K));
+}
+
+const digits = (value: string) => value.trim().replaceAll(/[,_ ]/g, "");
+
+const unchanged = (value: string, saved: number | null) =>
+  saved !== null && digits(value) === windowText(saved);
+
+export function contextProblem(
+  value: string,
+  tools: boolean,
+  saved: number | null = null,
+): string | null {
+  const v = digits(value);
   if (v === "") return tools ? "Enter the context window" : null;
+  if (unchanged(value, saved)) return null;
   const n = Number(v);
-  if (
-    !Number.isInteger(n) ||
-    n < MIN_CONTEXT_LENGTH ||
-    n > MAX_CONTEXT_LENGTH
-  ) {
-    return `Enter a whole number from ${MIN_CONTEXT_LENGTH.toLocaleString("en-US")} to ${MAX_CONTEXT_LENGTH.toLocaleString("en-US")}`;
+  if (!/^\d+$/.test(v) || n < MIN_K || n > MAX_K) {
+    return `Enter a whole number of thousands from ${MIN_K} to ${MAX_K.toLocaleString("en-US")}`;
   }
   return null;
 }
 
-function contextValue(value: string): number | null {
-  const v = value.trim().replaceAll(/[,_ ]/g, "");
-  return v === "" ? null : Number(v);
+function contextValue(value: string, saved: number | null): number | null {
+  const v = digits(value);
+  if (v === "") return null;
+  return unchanged(value, saved) ? saved : Number(v) * K;
 }
 
 // the server refuses a stated window and tools for a described model
@@ -155,22 +187,24 @@ export function statedFields(
   model: CatalogMatch | null,
   contextLength: string,
   tools: boolean,
+  saved: number | null = null,
 ): { contextLength?: number | null; tools?: boolean } {
   if (model === null || model.described) return {};
-  return { contextLength: contextValue(contextLength), tools };
+  return { contextLength: contextValue(contextLength, saved), tools };
 }
 
 export function statedModel(
   model: CatalogMatch | null,
   contextLength: string,
   tools: boolean,
+  saved: number | null = null,
 ): CatalogMatch | null {
   if (model === null || model.described) return model;
   return {
     ...model,
     contextLength:
-      contextProblem(contextLength, false) === null
-        ? contextValue(contextLength)
+      contextProblem(contextLength, false, saved) === null
+        ? contextValue(contextLength, saved)
         : null,
     tools,
   };
@@ -180,9 +214,10 @@ export function statedProblem(
   model: CatalogMatch | null,
   contextLength: string,
   tools: boolean,
+  saved: number | null = null,
 ): string | null {
   if (model === null || model.described) return null;
-  return contextProblem(contextLength, tools);
+  return contextProblem(contextLength, tools, saved);
 }
 
 // an endpoint without tools never serves a model that takes them; a
