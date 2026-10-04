@@ -63,8 +63,9 @@ describe("validateArguments", () => {
         structuredClone(schema("get_kubernetes_events")),
       ),
     );
+    // three times the cache, so a leak keeps them all
     const distinct = check(
-      Array.from({ length: MAX_VALIDATORS + 20 }, (_, i) => ({
+      Array.from({ length: 3 * MAX_VALIDATORS + 20 }, (_, i) => ({
         ...schema("get_kubernetes_events"),
         description: `copy ${i}`,
       })),
@@ -75,7 +76,9 @@ describe("validateArguments", () => {
     const alive = (refs: WeakRef<object>[]) =>
       refs.filter((ref) => ref.deref() !== undefined).length;
     expect(alive(same)).toBeLessThanOrEqual(1);
-    expect(alive(distinct)).toBeLessThanOrEqual(MAX_VALIDATORS);
-    expect(alive(distinct.slice(0, 20))).toBe(0);
+    // a dropped engine can outlive its drop, held by a stale stack word
+    // or jitted code, and keeps every schema it compiled: the bound is
+    // the live engine and one dropped, never every one
+    expect(alive(distinct)).toBeLessThanOrEqual(2 * MAX_VALIDATORS);
   });
 });

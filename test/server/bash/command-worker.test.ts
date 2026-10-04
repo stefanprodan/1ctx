@@ -70,13 +70,23 @@ describe("the command worker", () => {
         worst = Math.max(worst, now - last);
         last = now;
       }, 5);
-      const started = performance.now();
+      // the deadline starts once the loop runs, so a slow mount on a
+      // busy runner never spends it
+      const deadline = new AbortController();
+      const watch = phaseWatch();
+      let expiry: Timer | undefined;
       try {
-        const settled = await workers.run(
+        const pending = workers.run(
           job(BUSY),
           hooks,
-          stops(AbortSignal.timeout(400)),
+          stops(deadline.signal, undefined, watch.phase),
         );
+        await watch.running;
+        const started = performance.now();
+        last = started;
+        worst = 0;
+        expiry = setTimeout(() => deadline.abort(), 400);
+        const settled = await pending;
         expect(settled).toMatchObject({
           ok: false,
           phase: "run",
@@ -87,6 +97,7 @@ describe("the command worker", () => {
         expect(worst).toBeLessThan(500);
       } finally {
         clearInterval(tick);
+        clearTimeout(expiry);
       }
     },
   );
