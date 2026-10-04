@@ -156,8 +156,9 @@ deletes the cluster with every release in it.
   Linux runner: `cluster`, the default, builds the image into a fresh
   `1ctx-test` cluster and runs one step (inputs `mult`, `minutes`,
   `cpu`); `bench` builds a database (`preset`) and runs the source (`n`,
-  `seconds`). The results table goes to the run's summary and the logs
-  to the `load-results-<target>` artifact. Never on a push or a pull request.
+  `seconds`); `both` runs the two side by side. The results table goes
+  to the run's summary and the logs to the `load-results-<target>`
+  artifact. Never on a push or a pull request.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a

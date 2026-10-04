@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "cluster: the chart's pod on a kind cluster; bench: the source on the runner"
+        description: "cluster: the chart's pod on a kind cluster; bench: the source on the runner; both"
         type: choice
         options:
           - cluster
           - bench
+          - both
         default: cluster
       mult:
         description: "cluster: the busiest hour times this"
@@ -38,10 +39,6 @@ on:
         description: "bench: how long the load runs"
         type: string
         default: "120"
-  # TEMPORARY: proves the workflow on this branch; removed before merge
-  push:
-    branches:
-      - test/load-harness
 
 permissions:
   contents: read
@@ -57,15 +54,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # a dispatch runs the target asked for; a push runs both
-        target: ${{ fromJSON(inputs.target && format('["{0}"]', inputs.target) || '["cluster","bench"]') }}
+        target: ${{ fromJSON(inputs.target == 'both' && '["cluster","bench"]' || format('["{0}"]', inputs.target)) }}
     env:
-      MULT: ${{ inputs.mult || '1' }}
-      MINUTES: ${{ inputs.minutes || '5' }}
-      CPU: ${{ inputs.cpu || '2' }}
-      PRESET: ${{ inputs.preset || 'bench' }}
-      N: ${{ inputs.n || '10' }}
-      SECONDS_: ${{ inputs.seconds || '120' }}
+      MULT: ${{ inputs.mult }}
+      MINUTES: ${{ inputs.minutes }}
+      CPU: ${{ inputs.cpu }}
+      PRESET: ${{ inputs.preset }}
+      N: ${{ inputs.n }}
+      SECONDS_: ${{ inputs.seconds }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
