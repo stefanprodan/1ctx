@@ -1185,19 +1185,35 @@ describe("history", () => {
     return said(target - base);
   };
 
-  // the default reserve: 8,000 at 32K, 20,000 above; a tenth of the
-  // estimate at 200K and 1M is more than the reserve leaves
+  // a history exactly at the threshold with no measure. The default
+  // reserve, 8,000 at 32K and 20,000 above, leaves the whole 4,096: a
+  // tenth of the estimate at 200K and 1M is more than the reserve, so the
+  // slack stops at the reserve less the summary and the margin. A
+  // summary over half the reserve, or a small reserve, keeps half of it
+  // as slack
   test.each([
-    [32_000, 24_000, 4096],
-    [200_000, 180_000, 4096],
-    [1_000_000, 980_000, 4096],
+    [32_000, 20_000, 4096, 24_000, 26_400, 4096],
+    [200_000, 20_000, 4096, 180_000, 195_648, 4096],
+    [1_000_000, 20_000, 4096, 980_000, 995_648, 4096],
+    [32_000, 20_000, 32_000, 24_000, 26_400, 5344],
+    [200_000, 20_000, 32_000, 180_000, 190_000, 9744],
+    [1_000_000, 20_000, 32_000, 980_000, 990_000, 9744],
+    [32_000, 1000, 4096, 31_000, 31_500, 244],
+    [200_000, 1000, 4096, 199_000, 199_500, 244],
+    [1_000_000, 1000, 4096, 999_000, 999_500, 244],
   ])(
-    "a %d window at its threshold %d with no measure asks for %d",
-    (window, threshold, cap) => {
-      const p = windowed(window);
-      expect(compactsAt(window, p.limits.contextReserve)).toBe(threshold);
+    "a %d window, reserve %d, summary %d: at %d sized %d asks for %d",
+    (window, contextReserve, summaryMaxTokens, threshold, size, cap) => {
+      const p: SendPolicy = {
+        ...windowed(window),
+        limits: { ...policy.limits, contextReserve, summaryMaxTokens },
+      };
+      expect(compactsAt(window, contextReserve)).toBe(threshold);
       const req = summaryRequest(p, "s1", historyOf(p, threshold));
       expect(sized(p, req)).toBe(threshold);
+      expect(req.maxTokens).toBe(
+        Math.min(summaryMaxTokens, window - size - SUMMARY_MARGIN),
+      );
       expect(req.maxTokens).toBe(cap);
     },
   );

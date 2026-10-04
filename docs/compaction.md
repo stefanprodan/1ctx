@@ -19,8 +19,9 @@ Sends, the writer and the queue are in `docs/sessions.md`.
   is inside the window, plus the estimate of rows written after that
   round's reply (a stopped turn's tool results, a later message), else
   `requestTokens()` of the whole request. An estimate gets +10%, at
-  most half the reserve, which leaves the other half to the summary at
-  the threshold.
+  most what leaves a history at the threshold the whole
+  `summaryMaxTokens` (the reserve less it and 256), never capped below
+  half the reserve.
 - **After a done summary, history is the summary, then its tail**
   (`runner/tail.ts`): the newest whole turns before the summary row,
   replayed as they were, then the rows after it. A turn is one send's

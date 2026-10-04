@@ -256,9 +256,12 @@ export function request(
 // local estimate of what they add goes on top. The estimate, with a
 // tenth on top for another tokenizer, takes the whole size only when
 // nothing was measured or the measure passed the window the agent
-// states, a provider that took more than it. That tenth stops at half
-// the reserve: at a large window's threshold it would otherwise eat the
-// reserve and the summary with it. The floor is the least a summary is
+// states, a provider that took more than it. That tenth stops where a
+// history at the threshold still gets the whole summary, or at half the
+// reserve when the summary wants more: at a large window's threshold it
+// would otherwise eat the reserve and the summary with it, and any less
+// sends a history past the threshold to a tokenizer counting more than
+// ours with a summary cap that passes the window. The floor is the least a summary is
 // asked for: a short summary beats none, and a provider that cannot
 // fit even that refuses the round, which ends failed and is tried
 // again next time
@@ -295,8 +298,12 @@ export function summaryRequest(
   let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
   if (window !== null) {
     const estimate = (of: ChatRequest) => requestTokens(policy.wire, of);
+    const most = Math.max(
+      reserve / 2,
+      reserve - policy.limits.summaryMaxTokens - SUMMARY_MARGIN,
+    );
     const slacked = (tokens: number) =>
-      Math.ceil(tokens + Math.min(tokens * ESTIMATE_SLACK, reserve / 2));
+      Math.ceil(tokens + Math.min(tokens * ESTIMATE_SLACK, most));
     let size: number;
     // a measure inside the window is exact even when it leaves no room;
     // only one past it (a stated window below the model's) or none
