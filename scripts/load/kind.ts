@@ -5,11 +5,12 @@
 // fakes beside it, the driver in a pod, nothing through a port-forward.
 // Only a context named kind-* is used, and only a namespace named 1ctx-*.
 //
-//   bun scripts/load/kind.ts install [--tag TAG] [--cpu 4]
+//   bun scripts/load/kind.ts install [--tag dev] [--cpu 4]
 //   bun scripts/load/kind.ts setup [--max-mult 16]
 //   bun scripts/load/kind.ts step MULT MINUTES [--label NAME] [--incident]
 //   bun scripts/load/kind.ts smoke        (install, setup, step 1 5)
-// every command: [--context kind-flux] [--namespace 1ctx-load]
+// every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
+// `make kind-up` makes that cluster, `make kind-image` loads the image
 
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -51,7 +52,7 @@ export function checkServer(context: string, server: string) {
   }
 }
 
-const context = flag("context") ?? "kind-flux";
+const context = flag("context") ?? "kind-1ctx-test";
 const ns = flag("namespace") ?? "1ctx-load";
 
 function run(cmd: string[], input?: string, quiet = false): string {
@@ -233,7 +234,7 @@ async function install() {
     undefined,
     true,
   );
-  const tag = flag("tag");
+  const tag = flag("tag") ?? "dev";
   run(
     [
       "helm",
@@ -247,7 +248,8 @@ async function install() {
       ns,
       "-f",
       join(KIND, "values.yaml"),
-      ...(tag ? ["--set", `image.tag=${tag}`] : []),
+      "--set",
+      `image.tag=${tag}`,
       "--set",
       `resources.limits.cpu=${flag("cpu") ?? "4"}`,
       "--wait",
@@ -322,6 +324,13 @@ function stopOnExit() {
 async function step(mult: string, minutes: string) {
   const label = flag("label") ?? `kind-step-${mult}x`;
   const results = join(OUT_DIR, "results", label);
+  // the CPU and RSS columns come from kubectl top; without
+  // metrics-server they would be empty with no word why
+  if (Bun.spawnSync(k("top", "pod", "--no-headers")).exitCode !== 0) {
+    throw new Error(
+      `kubectl top fails on ${context}: metrics-server missing (make kind-up installs it)`,
+    );
+  }
   mkdirSync(results, { recursive: true });
   await scripts();
   await Bun.write(

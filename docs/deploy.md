@@ -130,6 +130,15 @@ Flux. Its README holds the values; these are the rules.
 - **`values.schema.json` refuses unknown keys.** A new value is typed
   there, in `values.yaml` and in the README's table in one change.
 
+A local kind cluster, `1ctx-test` (context `kind-1ctx-test`), is where
+the chart is tried by hand and where the load harness runs
+(`docs/load-testing.md`). `make kind-up` creates it with metrics-server
+(so `kubectl top` answers) and keeps the current kube context;
+`make kind-image` builds the image and loads it as
+`ghcr.io/stefanprodan/1ctx:dev`, which the chart runs with
+`--set image.tag=dev` (pull policy `IfNotPresent`); `make kind-down`
+deletes the cluster with every release in it.
+
 ## Release and CI
 
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the

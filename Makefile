@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke staging-deploy staging-provision staging-status load-db load load-kind load-summary load-smoke
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load load-kind load-summary load-smoke
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -41,6 +41,15 @@ image: ## Build the container image and load it (PLATFORMS=linux/amd64,linux/arm
 
 image-smoke: ## Build the image, run it as production does, sign in and stop it
 	@bun run image-smoke
+
+kind-up: ## Create the local kind cluster 1ctx-test with metrics-server
+	@bun run kind-up
+
+kind-image: ## Build the image and load it into the 1ctx-test cluster
+	@bun run kind-image
+
+kind-down: ## Delete the 1ctx-test cluster and everything in it
+	@bun run kind-down
 
 clean: ## Stop the preview, remove its db and log, and the build artifacts
 	@bun run clean

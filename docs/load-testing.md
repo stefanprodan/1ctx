@@ -100,7 +100,7 @@ No run ever reaches a real engine.
   with a provider or MCP server anywhere else, web access on or a
   search provider set.
 - `kind.ts` refuses any context not named `kind-*` (default
-  `kind-flux`) and any namespace not named `1ctx-*` (default
+  `kind-1ctx-test`) and any namespace not named `1ctx-*` (default
   `1ctx-load`), refuses a context whose API server is not on
   loopback (127.0.0.1, localhost, ::1), and passes the context to every
   `kubectl` and `helm`. A driver pod must start within 5 minutes and
@@ -125,11 +125,15 @@ text shape's share of turns asking one tool call). The fakes take
 ports 1241 and 1250; a run refuses to start when any of the three
 answers already.
 
-The kind target, with an image the cluster has (`make image`, then
-`kind load docker-image ghcr.io/stefanprodan/1ctx:TAG --name flux`):
+The kind target needs Docker, kind, kubectl and Helm, and runs on
+the local cluster `1ctx-test` (`docs/deploy.md`). A step refuses to
+start when `kubectl top` fails, since its CPU and RSS columns come
+from metrics-server.
 
 ```sh
-make load-kind ARGS="install --tag TAG"   # namespace, Secret, fakes, chart
+make kind-up                              # the cluster and metrics-server
+make kind-image                           # the branch's image, tag dev
+make load-kind ARGS="install"             # namespace, Secret, fakes, chart
 make load-kind ARGS="setup --max-mult 16" # automations, team docs
 make load-kind ARGS="step 1 20"           # one step, logs to out/results/
 make load-kind ARGS="smoke"               # install, setup, step 1 5

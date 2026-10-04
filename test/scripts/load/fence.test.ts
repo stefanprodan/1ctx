@@ -68,9 +68,9 @@ describe("the driver's fence", () => {
 
 describe("the kind target", () => {
   test("runs only on a kind context and a 1ctx namespace", () => {
-    expect(() => checkTarget("kind-flux", "1ctx-load")).not.toThrow();
+    expect(() => checkTarget("kind-1ctx-test", "1ctx-load")).not.toThrow();
     expect(() => checkTarget("prod-cluster", "1ctx-load")).toThrow("context");
-    expect(() => checkTarget("kind-flux", "default")).toThrow("namespace");
+    expect(() => checkTarget("kind-1ctx-test", "default")).toThrow("namespace");
   });
 
   test("runs only on a cluster served from loopback", () => {
@@ -79,14 +79,16 @@ describe("the kind target", () => {
       "https://localhost:6443",
       "https://[::1]:6443",
     ]) {
-      expect(() => checkServer("kind-flux", server)).not.toThrow();
+      expect(() => checkServer("kind-1ctx-test", server)).not.toThrow();
     }
     for (const server of [
       "https://10.0.0.5:6443",
       "https://k8s.example:443",
       "",
     ]) {
-      expect(() => checkServer("kind-flux", server)).toThrow("not on loopback");
+      expect(() => checkServer("kind-1ctx-test", server)).toThrow(
+        "not on loopback",
+      );
     }
   });
 });
