@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { checkServer, checkTarget } from "../../../scripts/load/cluster.ts";
 import type { Res, Who } from "../../../scripts/load/driver/api.ts";
 import {
   assertFenced,
   type Caller,
   fenceWeb,
 } from "../../../scripts/load/driver/directory.ts";
-import { checkServer, checkTarget } from "../../../scripts/load/kind.ts";
 import { type TestClient, testApp } from "../../helpers/app.ts";
 
 const MODEL = "http://127.0.0.1:1241/v1";
@@ -66,7 +66,7 @@ describe("the driver's fence", () => {
   });
 });
 
-describe("the kind target", () => {
+describe("the cluster target", () => {
   test("runs only on a kind context and a 1ctx namespace", () => {
     expect(() => checkTarget("kind-1ctx-test", "1ctx-load")).not.toThrow();
     expect(() => checkTarget("prod-cluster", "1ctx-load")).toThrow("context");

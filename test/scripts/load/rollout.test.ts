@@ -47,6 +47,15 @@ describe("rollout", () => {
     await rolledOut(fake({ items: [] }), "onectx");
   });
 
+  test("an old pod still terminating is counted", () => {
+    const old = {
+      ...pod("onectx-old"),
+      metadata: { name: "onectx-old", deletionTimestamp: "t" },
+    };
+    const k = fake({ items: [old, pod("onectx-new")] });
+    expect(failIfStuck(k, (p) => p.startsWith("onectx-"))).toBe(1);
+  });
+
   test("a deployment whose pod is stuck throws", async () => {
     const k = fake(
       { items: [pod("onectx-abc", "ImagePullBackOff")] },

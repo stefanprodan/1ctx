@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The kind target's instance as provision YAML, deterministic for a
+// The cluster target's instance as provision YAML, deterministic for a
 // count and a namespace: admins adm01.., members u001.. in 2 to 5 team
 // projects each (every team at least 5), the fake provider, the three
 // fake MCP servers, the agents on them. The users' keys are throwaway
@@ -186,7 +186,7 @@ export function writeSecrets(dir: string, users: string[]): number {
   return made;
 }
 
-export function writeKind(dir: string, ns: string, c: Counts = MVP_COUNTS) {
+export function writeCluster(dir: string, ns: string, c: Counts = MVP_COUNTS) {
   const files = provisionFiles(c, ns);
   mkdirSync(join(dir, "provision"), { recursive: true });
   for (const [name, text] of Object.entries(files)) {

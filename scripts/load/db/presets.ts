@@ -87,7 +87,7 @@ export const RESULT_CUT = 50_000;
 export const CUT_NOTE =
   "\n[result cut at 50000 characters; the whole result is kept under /mcp]";
 // An argon2id hash of a value nobody kept, fixed so builds are the same
-// file: nobody signs in to a built database until the local target
+// file: nobody signs in to a built database until the bench target
 // sets a password of its own run
 export const NO_PASSWORD =
   "$argon2id$v=19$m=65536,t=2,p=1$D8Q0jkML04qtHn8pVrqEK1E3nki5R8dazlCFxIFOpns$XaLvJsrcSKTwmISVbbnUzyw2+MAYpxSaawbRJOWDCVE";

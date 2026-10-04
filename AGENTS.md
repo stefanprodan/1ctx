@@ -49,7 +49,7 @@ make staging-deploy     # build main, back the staging db up, swap the binary, r
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
 make load-db PRESET=bench|small  # a load test database in scripts/load/out/
-make load ARGS="..."    # the load on this machine; load-kind on kind, load-summary
+make load-bench ARGS="..."  # compare builds under load; load-cluster on kind, load-summary
 ```
 
 The preview is a local, throwaway instance for trying a change. It runs

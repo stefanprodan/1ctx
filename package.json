@@ -30,10 +30,10 @@
     "staging-provision": "scripts/staging.sh provision",
     "staging-status": "scripts/staging.sh status",
     "load-db": "bun scripts/load/db/build.ts",
-    "load": "bun scripts/load/local.ts",
-    "load-kind": "bun scripts/load/kind.ts",
+    "load-bench": "bun scripts/load/bench.ts",
+    "load-cluster": "bun scripts/load/cluster.ts",
     "load-summary": "bun scripts/load/summarize.ts",
-    "load-smoke": "bun scripts/load/local.ts --smoke"
+    "load-smoke": "bun scripts/load/bench.ts --smoke"
   },
   "license": "Apache-2.0",
   "engines": {

@@ -153,9 +153,9 @@ deletes the cluster with every release in it.
   on the chart's default render and `deploy/flux/`, CEL rules included.
   Helm is set up at 4, which `flux-schema` needs.
 - **`e2e.yml` runs the load harness by hand** (`workflow_dispatch`) on a
-  Linux runner: `kind`, the default, builds the image into a fresh
+  Linux runner: `cluster`, the default, builds the image into a fresh
   `1ctx-test` cluster and runs one step (inputs `mult`, `minutes`,
-  `cpu`); `local` builds a database (`preset`) and runs the source (`n`,
+  `cpu`); `bench` builds a database (`preset`) and runs the source (`n`,
   `seconds`). The results table goes to the run's summary and the logs
   to the `load-results-<target>` artifact. Never on a push or a pull request.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**

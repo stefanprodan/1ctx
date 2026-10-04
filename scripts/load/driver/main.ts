@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The load against a running server, on either target: the local
-// target runs it on the machine, the kind target in a pod beside the
+// The load against a running server, on either target: the bench
+// target runs it on the machine, the cluster target in a pod beside the
 // server. Every line on stdout is one JSON event.
 //
 //   bun scripts/load/driver/main.ts setup [--max-mult M] [--docs N] [--parallel P]

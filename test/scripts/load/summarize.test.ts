@@ -11,7 +11,7 @@ describe("the summarizer", () => {
   test("reads a run's logs into one row", async () => {
     const row = await summarize(RUN);
     expect(row.label).toBe("run-a");
-    expect(row.target).toBe("local");
+    expect(row.target).toBe("bench");
     expect(row.mode).toBe("turns");
     expect(row.turns).toEqual({ done: 3, failed: 1 });
     // round 1 asked 250 ms after round 0 ended, less its 200 ms MCP call

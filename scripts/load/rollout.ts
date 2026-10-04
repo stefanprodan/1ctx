@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Waits on the kind target's pods that fail fast: a pod that cannot
+// Waits on the cluster target's pods that fail fast: a pod that cannot
 // start ends the wait at once with its last log, instead of sitting out
 // a timeout in a crash or pull back-off.
 
@@ -23,7 +23,7 @@ const ROLLOUT_MS = 3 * 60_000;
 
 interface Pods {
   items: {
-    metadata: { name: string };
+    metadata: { name: string; deletionTimestamp?: string };
     status: {
       containerStatuses?: {
         state: { waiting?: { reason?: string; message?: string } };
@@ -39,11 +39,17 @@ function out(cmd: string[]): string {
   return p.stdout.toString();
 }
 
-// throws when a matching pod waits for a reason it never leaves alone
-export function failIfStuck(k: Kubectl, match: (pod: string) => boolean) {
+// throws when a matching pod waits for a reason it never leaves alone;
+// returns how many matching pods are still terminating
+export function failIfStuck(
+  k: Kubectl,
+  match: (pod: string) => boolean,
+): number {
   const pods = JSON.parse(out(k("get", "pods", "-o", "json"))) as Pods;
+  let terminating = 0;
   for (const pod of pods.items) {
     if (!match(pod.metadata.name)) continue;
+    if (pod.metadata.deletionTimestamp) terminating++;
     for (const c of pod.status.containerStatuses ?? []) {
       const waiting = c.state.waiting;
       if (!waiting?.reason || !STUCK.includes(waiting.reason)) continue;
@@ -56,9 +62,11 @@ export function failIfStuck(k: Kubectl, match: (pod: string) => boolean) {
       );
     }
   }
+  return terminating;
 }
 
-// every replica of the deployment's latest spec available
+// every replica of the deployment's latest spec available and the old
+// pods gone, so a log follower started next attaches to a live pod
 export async function rolledOut(k: Kubectl, deploy: string) {
   const start = Date.now();
   for (;;) {
@@ -71,9 +79,15 @@ export async function rolledOut(k: Kubectl, deploy: string) {
         "jsonpath={.metadata.generation} {.status.observedGeneration} {.spec.replicas} {.status.updatedReplicas} {.status.availableReplicas} {.status.unavailableReplicas}",
       ),
     ).split(" ");
-    if (gen === seen && updated === want && available === want && !unavailable)
+    const terminating = failIfStuck(k, (pod) => pod.startsWith(`${deploy}-`));
+    if (
+      gen === seen &&
+      updated === want &&
+      available === want &&
+      !unavailable &&
+      terminating === 0
+    )
       return;
-    failIfStuck(k, (pod) => pod.startsWith(`${deploy}-`));
     if (Date.now() - start > ROLLOUT_MS) {
       throw new Error(`${deploy}: not ready in ${ROLLOUT_MS / 60_000} minutes`);
     }

@@ -1,27 +1,27 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The kind target: the Helm chart's pod on a local kind cluster, the
+// The cluster target: the Helm chart's pod on a local kind cluster, the
 // fakes beside it, the driver in a pod, nothing through a port-forward.
 // Only a context named kind-* is used, and only a namespace named 1ctx-*.
 //
-//   bun scripts/load/kind.ts install [--tag dev] [--cpu 4]
-//   bun scripts/load/kind.ts setup [--max-mult 16]
-//   bun scripts/load/kind.ts step MULT MINUTES [--label NAME] [--incident]
-//   bun scripts/load/kind.ts smoke        (install, setup, step 1 5)
+//   bun scripts/load/cluster.ts install [--tag dev] [--cpu 4]
+//   bun scripts/load/cluster.ts setup [--max-mult 16]
+//   bun scripts/load/cluster.ts step MULT MINUTES [--label NAME] [--incident]
+//   bun scripts/load/cluster.ts smoke        (install, setup, step 1 5)
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
-import { mcpBase, modelUrl, writeKind } from "./provision.ts";
+import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
 import { failIfStuck, rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
-const KIND = join(OUT_DIR, "kind");
+const CLUSTER = join(OUT_DIR, "cluster");
 const BUN_IMAGE = "oven/bun:1.4.2";
 const argv = process.argv.slice(2);
 const flag = (name: string) => {
@@ -146,7 +146,7 @@ spec:
 
 // one file per entry, so the pods need nothing but Bun
 async function scripts() {
-  const dir = join(KIND, "bundle");
+  const dir = join(CLUSTER, "bundle");
   const entries: [string, string][] = [
     ["scripts/load/fake-model.ts", "fake-model.js"],
     ["scripts/load/fake-mcp.ts", "fake-mcp.js"],
@@ -183,8 +183,8 @@ async function scripts() {
 }
 
 async function install() {
-  const { made } = writeKind(KIND, ns);
-  console.log(`provision written to ${KIND}, ${made} new keys`);
+  const { made } = writeCluster(CLUSTER, ns);
+  console.log(`provision written to ${CLUSTER}, ${made} new keys`);
   apply(
     run(
       [
@@ -209,7 +209,7 @@ async function install() {
         "secret",
         "generic",
         "onectx",
-        `--from-file=${join(KIND, "secrets")}`,
+        `--from-file=${join(CLUSTER, "secrets")}`,
         "--dry-run=client",
         "-o",
         "yaml",
@@ -240,7 +240,7 @@ async function install() {
       "-n",
       ns,
       "-f",
-      join(KIND, "values.yaml"),
+      join(CLUSTER, "values.yaml"),
       "--set",
       `image.tag=${tag}`,
       "--set",
@@ -336,13 +336,13 @@ function stopOnExit() {
 }
 
 async function step(mult: string, minutes: string) {
-  const label = flag("label") ?? `kind-step-${mult}x`;
+  const label = flag("label") ?? `cluster-step-${mult}x`;
   const results = join(OUT_DIR, "results", label);
   mkdirSync(results, { recursive: true });
   await scripts();
   await Bun.write(
     join(results, "meta.json"),
-    `${JSON.stringify({ target: "kind", label, context, namespace: ns, mult: Number(mult), minutes: Number(minutes), at: new Date().toISOString() }, null, 2)}\n`,
+    `${JSON.stringify({ target: "cluster", label, context, namespace: ns, mult: Number(mult), minutes: Number(minutes), at: new Date().toISOString() }, null, 2)}\n`,
   );
   // streamed, since the kubelet rotates a busy container's log mid-step
   const follow = (what: string, file: string) =>
@@ -400,11 +400,15 @@ async function step(mult: string, minutes: string) {
     await Bun.write(join(results, "top.log"), `${top.join("\n")}\n`);
   }
   printTable([await summarize(results)]);
-  // a step with no samples would print empty CPU and RSS columns
+  // a step with no samples or no fake model log would print empty
+  // columns that read as a result
   if (top.length === 0) {
     throw new Error(
       `no CPU or memory samples: kubectl top pod never showed the server pod in ${ns}`,
     );
+  }
+  if (Bun.file(join(results, "model.log")).size === 0) {
+    throw new Error("the fake model's log is empty: no server gap measured");
   }
 }
 
@@ -457,7 +461,7 @@ async function main() {
     await step("1", "5");
   } else {
     console.error(
-      "usage: kind.ts install|setup|step MULT MINUTES|smoke [--context kind-*] [--namespace 1ctx-*]",
+      "usage: cluster.ts install|setup|step MULT MINUTES|smoke [--context kind-*] [--namespace 1ctx-*]",
     );
     process.exit(2);
   }

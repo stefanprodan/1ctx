@@ -1,17 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The local target: a clone of a built database (an APFS clone, so it
+// The bench target: a clone of a built database (an APFS clone, so it
 // costs nothing until written), fenced onto the fakes with a password
 // of this run's own, the fake model and the fake MCP, the server from a
 // checkout, N turns with watchers and the probe for a while, then all
 // stopped. The logs land in out/results/<label>/ and the results row is
 // printed.
 //
-//   bun scripts/load/local.ts [--db PATH] [--checkout PATH] [--n 10]
+//   bun scripts/load/bench.ts [--db PATH] [--checkout PATH] [--n 10]
 //     [--seconds 120] [--shape day|bash|text|markdown] [--repeat 1]
 //     [--label NAME] [--port 1240] [--tool-share 0.25]
-//   bun scripts/load/local.ts --smoke    (a tiny build, N=2 for 30 s)
+//   bun scripts/load/bench.ts --smoke    (a tiny build, N=2 for 30 s)
 
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
@@ -137,7 +137,7 @@ async function main() {
     .trim();
   await Bun.write(
     join(results, "meta.json"),
-    `${JSON.stringify({ target: "local", label, db: flag("db") ?? defaultDb(smoke ? "tiny" : "bench"), checkout, commit, shape, n, seconds, fence: report, at: new Date().toISOString() }, null, 2)}\n`,
+    `${JSON.stringify({ target: "bench", label, db: flag("db") ?? defaultDb(smoke ? "tiny" : "bench"), checkout, commit, shape, n, seconds, fence: report, at: new Date().toISOString() }, null, 2)}\n`,
   );
 
   const procs: Bun.Subprocess[] = [];

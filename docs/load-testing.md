@@ -6,12 +6,12 @@ two targets, one results table. Governs `scripts/load/`,
 
 ## What each target answers
 
-- **local** (`make load`): is this branch slower than main? The source
+- **bench** (`make load-bench`): is this branch slower than main? The source
   of a checkout runs on the machine against a clone of a built
   database, N members keep a turn running back to back, 100 sockets
   watch their feeds, and the probe times the routes a page loads. Runs
   are minutes, cheap, and comparable when paired (below).
-- **kind** (`make load-kind`): does the container image hold the
+- **cluster** (`make load-cluster`): does the container image hold the
   MVP's busiest hour? The Helm chart's pod (4 CPU, 8Gi) on a local
   kind cluster, the fakes and the driver as pods beside it, the real
   scheduler firing the automations. Steps scale the hour until
@@ -29,14 +29,14 @@ two targets, one results table. Governs `scripts/load/`,
 | `knowledge.ts` | the team docs, 150 runbooks and incident write-ups, ~3.6 MB a team |
 | `db/` | the database builder (`build.ts` is the entry) |
 | `fence.ts` | what a local run does to its clone before the server opens it |
-| `provision.ts` | the kind target's provision YAML, keys and chart values |
+| `provision.ts` | the cluster target's provision YAML, keys and chart values |
 | `driver/` | the load itself, the same code on both targets (`main.ts` is the entry) |
-| `local.ts`, `kind.ts` | the two targets |
+| `bench.ts`, `cluster.ts` | the two targets |
 | `summarize.ts` | the results table |
 
 Everything generated lands in the gitignored `scripts/load/out/`:
 `db/` (databases and their `.json` summaries), `run/` (the clone a
-local run opens), `kind/` (provision, keys, values, bundles) and
+bench run opens), `cluster/` (provision, keys, values, bundles) and
 `results/<label>/` (one folder of logs per run).
 
 ## The shapes
@@ -99,7 +99,7 @@ No run ever reaches a real engine.
   reads the fence back through the API and refuses to load an instance
   with a provider or MCP server anywhere else, web access on or a
   search provider set.
-- `kind.ts` refuses any context not named `kind-*` (default
+- `cluster.ts` refuses any context not named `kind-*` (default
   `kind-1ctx-test`) and any namespace not named `1ctx-*` (default
   `1ctx-load`), refuses a context whose API server is not on
   loopback (127.0.0.1, localhost, ::1), and passes the context to every
@@ -112,20 +112,20 @@ No run ever reaches a real engine.
 ```sh
 make load-db                     # out/db/bench.sqlite
 make load-smoke                  # tiny build, N=2 for 30 s
-make load ARGS="--n 10 --seconds 120"
-make load ARGS="--db scripts/load/out/db/small.sqlite --shape bash --label x"
+make load-bench ARGS="--n 10 --seconds 120"
+make load-bench ARGS="--db scripts/load/out/db/small.sqlite --shape bash --label x"
 make load-summary                # every run under out/results/
 make load-summary ARGS="a b"     # those runs
 ```
 
-Local flags: `--db`, `--checkout PATH` (another worktree; it needs its
+Bench flags: `--db`, `--checkout PATH` (another worktree; it needs its
 packages installed), `--n`, `--seconds`, `--shape`, `--repeat` (the
 markdown reply's), `--label`, `--port` (1240), `--tool-share` (the
 text shape's share of turns asking one tool call). The fakes take
 ports 1241 and 1250; a run refuses to start when any of the three
 answers already.
 
-The kind target needs Docker, kind, kubectl and Helm, and runs on
+The cluster target needs Docker, kind, kubectl and Helm, and runs on
 the local cluster `1ctx-test` (`docs/deploy.md`). A step refuses to
 start when `kubectl top` fails, since its CPU and RSS columns come
 from metrics-server.
@@ -133,14 +133,14 @@ from metrics-server.
 ```sh
 make kind-up                              # the cluster and metrics-server
 make kind-image                           # the branch's image, tag dev
-make load-kind ARGS="install"             # namespace, Secret, fakes, chart
-make load-kind ARGS="setup --max-mult 16" # automations, team docs
-make load-kind ARGS="step 1 20"           # one step, logs to out/results/
-make load-kind ARGS="smoke"               # install, setup, step 1 5
+make load-cluster ARGS="install"          # namespace, Secret, fakes, chart
+make load-cluster ARGS="setup --max-mult 16" # automations, team docs
+make load-cluster ARGS="step 1 20"        # one step, logs to out/results/
+make load-cluster ARGS="smoke"            # install, setup, step 1 5
 ```
 
 On demand, the `e2e` workflow runs either target on a GitHub Linux
-runner (`gh workflow run e2e.yml -f target=kind -f mult=1 -f
+runner (`gh workflow run e2e.yml -f target=cluster -f mult=1 -f
 minutes=5`); its table lands in the run's summary (`docs/deploy.md`).
 
 Setup and steps are idempotent: setup keeps what exists by name, a

@@ -4,26 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "kind: the chart on a kind cluster; local: the source on the runner"
+        description: "cluster: the chart's pod on a kind cluster; bench: the source on the runner"
         type: choice
         options:
-          - kind
-          - local
-        default: kind
+          - cluster
+          - bench
+        default: cluster
       mult:
-        description: "kind: the busiest hour times this"
+        description: "cluster: the busiest hour times this"
         type: string
         default: "1"
       minutes:
-        description: "kind: the step's minutes"
+        description: "cluster: the step's minutes"
         type: string
         default: "5"
       cpu:
-        description: "kind: the server pod's CPU limit (the runner has 4)"
+        description: "cluster: the server pod's CPU limit (the runner has 4)"
         type: string
         default: "2"
       preset:
-        description: "local: the database to build"
+        description: "bench: the database to build"
         type: choice
         options:
           - tiny
@@ -31,11 +31,11 @@ on:
           - small
         default: bench
       n:
-        description: "local: turns kept running"
+        description: "bench: turns kept running"
         type: string
         default: "10"
       seconds:
-        description: "local: how long the load runs"
+        description: "bench: how long the load runs"
         type: string
         default: "120"
   # TEMPORARY: proves the workflow on this branch; removed before merge
@@ -58,7 +58,7 @@ jobs:
       fail-fast: false
       matrix:
         # a dispatch runs the target asked for; a push runs both
-        target: ${{ fromJSON(inputs.target && format('["{0}"]', inputs.target) || '["kind","local"]') }}
+        target: ${{ fromJSON(inputs.target && format('["{0}"]', inputs.target) || '["cluster","bench"]') }}
     env:
       MULT: ${{ inputs.mult || '1' }}
       MINUTES: ${{ inputs.minutes || '5' }}
@@ -86,38 +86,38 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Setup kind
-        if: matrix.target == 'kind'
+        if: matrix.target == 'cluster'
         uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           version: v0.33.0
           install_only: true
       - name: Setup Helm
-        if: matrix.target == 'kind'
+        if: matrix.target == 'cluster'
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v4.3.0
       - name: Create the cluster
-        if: matrix.target == 'kind'
+        if: matrix.target == 'cluster'
         run: make kind-up
       - name: Build and load the image
-        if: matrix.target == 'kind'
+        if: matrix.target == 'cluster'
         run: make kind-image
       - name: Install
-        if: matrix.target == 'kind'
-        run: make load-kind ARGS="install --cpu $CPU"
+        if: matrix.target == 'cluster'
+        run: make load-cluster ARGS="install --cpu $CPU"
       - name: Set up the hour
-        if: matrix.target == 'kind'
-        run: make load-kind ARGS="setup --max-mult $MULT"
+        if: matrix.target == 'cluster'
+        run: make load-cluster ARGS="setup --max-mult $MULT"
       - name: Run the step
-        if: matrix.target == 'kind'
-        run: make load-kind ARGS="step $MULT $MINUTES --label e2e"
+        if: matrix.target == 'cluster'
+        run: make load-cluster ARGS="step $MULT $MINUTES --label e2e"
       - name: Build the database
-        if: matrix.target == 'local'
+        if: matrix.target == 'bench'
         run: make load-db PRESET="$PRESET"
       - name: Run the load
-        if: matrix.target == 'local'
+        if: matrix.target == 'bench'
         run: |
-          make load ARGS="--db scripts/load/out/db/$PRESET.sqlite \
+          make load-bench ARGS="--db scripts/load/out/db/$PRESET.sqlite \
             --n $N --seconds $SECONDS_ --label e2e"
       - name: Summary
         if: always()
