@@ -7,7 +7,10 @@
 // a row: usage is the record of what was spent and outlives its session,
 // send, project and agent. Decisions are counted apart, one row each.
 
-import type { DirectoryAgentDaysResponse } from "../../shared/api/directory.ts";
+import type {
+  DirectoryAgentDaysResponse,
+  DirectoryDeciderDaysResponse,
+} from "../../shared/api/directory.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -54,6 +57,11 @@ export type Usage = {
   latestRound(sessionId: string): UsageRow | null;
   // an agent's year of days in the zone, every project in one series
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
+  // a decider's year of answers in the zone, Checks left out
+  deciderDays(
+    deciderId: string,
+    timeZone: string,
+  ): DirectoryDeciderDaysResponse;
   total: UsageStore["total"];
   activeProjects: UsageStore["activeProjects"];
   decisionTotal: DecisionUsageStore["total"];
@@ -85,6 +93,18 @@ export function usageArea(deps: UsageDeps): Usage {
         until,
         days,
         ...store.agentDays(agentId, starts, until),
+      };
+    },
+    deciderDays(deciderId, timeZone) {
+      const { days, starts, since, until } = usageWindow(
+        deps.clock(),
+        timeZone,
+      );
+      return {
+        since,
+        until,
+        days,
+        ...decisions.deciderDays(deciderId, starts, until),
       };
     },
     routes: routes({ clock: deps.clock, store, access: deps.access }),

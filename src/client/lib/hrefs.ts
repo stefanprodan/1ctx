@@ -23,6 +23,7 @@ export const STORAGE_HREF = "/admin/monitor/storage";
 export const USAGE_HREF = "/admin/monitor/usage";
 export const DIRECTORY_HREF = "/directory";
 export const DIRECTORY_AGENTS_HREF = "/directory/agents";
+export const DIRECTORY_DECIDERS_HREF = "/directory/deciders";
 
 export function userHref(username: string): string {
   return `/users/${encodeURIComponent(username)}`;
@@ -38,6 +39,12 @@ export function adminProjectHref(id: string): string {
 
 export function agentHref(name: string): string {
   return `/agents/${encodeURIComponent(name)}`;
+}
+
+// a decider's own page, apart from the agents', since a name is unique
+// among deciders only
+export function deciderHref(name: string): string {
+  return `/deciders/${encodeURIComponent(name)}`;
 }
 
 export function configProviderHref(name: string): string {

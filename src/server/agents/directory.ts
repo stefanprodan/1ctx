@@ -23,7 +23,7 @@ import type {
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { firstSentence } from "../../shared/mcp-catalog.ts";
 import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
-import { parseNoQuery } from "../access/index.ts";
+import { parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";

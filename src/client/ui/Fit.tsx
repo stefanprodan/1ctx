@@ -29,16 +29,21 @@ export function Fit({
     const span = el.current;
     if (!span || long === short) return;
     const measure = () => {
-      // a probe next to the span, under the same class in the same
+      // a probe in the span's place, under the same class in the same
       // layout, holds the long form: it overflows or it does not,
-      // whatever the span shows at the moment
+      // whatever the span shows at the moment. The span steps out
+      // while it measures, or in a flex line the two share the room
+      // and the probe overflows in half of it
       const probe = document.createElement("span");
       probe.className = span.className;
       probe.style.visibility = "hidden";
       probe.textContent = long;
+      const display = span.style.display;
+      span.style.display = "none";
       span.after(probe);
       const wide = probe.scrollWidth > probe.clientWidth;
       probe.remove();
+      span.style.display = display;
       shrunk.value = wide;
     };
     measure();

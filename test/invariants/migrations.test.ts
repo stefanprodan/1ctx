@@ -58,6 +58,7 @@ const EXPECTED_IDS = [
   "0044-attention-round",
   "0045-open-attention",
   "0046-azure",
+  "0047-decision-usage-decider",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns

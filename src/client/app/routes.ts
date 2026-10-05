@@ -30,7 +30,10 @@ import { loadDecisions } from "../data/decisions.ts";
 import {
   loadAgentDays,
   loadAgentPage,
+  loadDeciderDays,
+  loadDeciderPage,
   loadDirectoryAgents,
+  loadDirectoryDeciders,
   loadDirectoryUsers,
   loadUserDays,
   loadUserPage,
@@ -169,6 +172,13 @@ const agentPage = async (params: Params) => {
   ]);
 };
 
+const deciderPage = async (params: Params) => {
+  await Promise.all([
+    loadDeciderPage(params.name),
+    loadDeciderDays(params.name),
+  ]);
+};
+
 const userPage = async (params: Params) => {
   await Promise.all([
     loadUserPage(params.username),
@@ -267,19 +277,24 @@ export const ROUTES: Route[] = [
     },
     nav: { label: "Projects", icon: "projects", order: 2 },
   },
-  // both lists load on either tab, so each tab's count shows
+  // every list loads on each tab, so each tab's count shows
   ...tabRoutes(
     "/directory",
     [
       ["", () => "Directory"],
       ["/agents", () => "Directory agents"],
+      ["/deciders", () => "Directory deciders"],
     ],
     lazy(() =>
       import("../views/directory/Directory.tsx").then((m) => m.Directory),
     ),
     "authenticated",
     async () => {
-      await Promise.all([loadDirectoryUsers(), loadDirectoryAgents()]);
+      await Promise.all([
+        loadDirectoryUsers(),
+        loadDirectoryAgents(),
+        loadDirectoryDeciders(),
+      ]);
     },
   ).map(
     (route, i): Route =>
@@ -801,6 +816,15 @@ export const ROUTES: Route[] = [
     "authenticated",
     agentPage,
   ),
+  {
+    path: "/deciders/:name",
+    view: lazy(() =>
+      import("../views/directory/Decider.tsx").then((m) => m.Decider),
+    ),
+    title: (params) => params.name,
+    role: "authenticated",
+    load: deciderPage,
+  },
   {
     path: "/profile",
     view: lazy(() =>

@@ -88,9 +88,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   check) and the name is reserved for team projects.
 - **A handler gets a project through `access.project()`.** It answers
   the same 404 whether the project is missing or hidden.
-- **Aggregates may cross personal projects only unnamed.** An agent's
-  page and a user's page count across every project as one series. An
-  admin sees a user's usage as their personal project's totals alone.
+- **Aggregates may cross personal projects only unnamed.** An agent's,
+  a decider's and a user's page count across every project as one
+  series. An admin sees a user's usage as their personal project's
+  totals alone.
 - **Only admins manage team projects.** An owner only describes their
   personal project, through `PATCH /api/profile/project`.
 - **Deleting a team project is refused while a chat runs.** It takes

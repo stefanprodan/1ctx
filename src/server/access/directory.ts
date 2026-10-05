@@ -19,12 +19,13 @@ import type {
   DirectoryUsersResponse,
 } from "../../shared/api/directory.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
+import { parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { type UsageWindow, usageWindow } from "../usage/index.ts";
 import { summary, type UserRow } from "../users/index.ts";
-import { parseNoQuery, parseUsername } from "./parse.ts";
+import { parseUsername } from "./parse.ts";
 import type { VisitStore } from "./visits.ts";
 
 export type UsersPort = {

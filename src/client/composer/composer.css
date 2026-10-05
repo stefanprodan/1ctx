@@ -293,8 +293,8 @@
   .composer-chip-field:disabled {
     color: var(--dim);
   }
-  /* Fit measures a probe beside the model, so the model is bounded by
-     the field's width, never by its neighbours, or the forms flip */
+  /* bounded by the field's width, never by its neighbours, so the
+     model's long form has a fixed room for Fit to measure */
   .composer-chip-field .composer-chip-model {
     flex-shrink: 0;
     max-width: calc(100cqw - 160px);

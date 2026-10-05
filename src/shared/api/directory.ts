@@ -1,11 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Response bodies of the directory routes: the lists of users and
-// agents, a user's page and an agent's page, open to every signed-in
-// user.
+// Response bodies of the directory routes: the lists of users, agents
+// and deciders, and a page for each, open to every signed-in user.
 
 import type { AgentSummary } from "../contracts/agent.ts";
+import type { DeciderSummary } from "../contracts/decider.ts";
+import type { DecisionId } from "../contracts/decision.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
 import type { DirectoryUser, UserSummary } from "../contracts/user.ts";
@@ -104,4 +105,40 @@ export type DirectoryUserDaysResponse = {
   days: string[];
   total: number;
   usage: number[];
+};
+
+// GET /api/directory/deciders: every decider by name, the model as its
+// id
+export type DirectoryDeciderRow = Pick<
+  DeciderSummary,
+  "id" | "name" | "default" | "model"
+>;
+export type DirectoryDecidersResponse = { deciders: DirectoryDeciderRow[] };
+
+// a decider as every user sees it: no provider id
+export type DirectoryDecider = Omit<DeciderSummary, "providerId">;
+
+// GET /api/directory/deciders/:name; the provider's name and the
+// decisions it answers now: those naming it, and those naming none when
+// it is the default, a turned-off one left out
+export type DirectoryDeciderResponse = {
+  decider: DirectoryDecider;
+  provider: string;
+  decisions: DecisionId[];
+};
+
+// a decider's day: its answers and their input tokens, since a decision
+// has no output
+export type DeciderDay = { answers: number; tokens: number };
+
+// GET /api/directory/deciders/:name/days?tz=: the decider's answers in
+// every project over the 53 ISO weeks in the caller's zone, Monday
+// first, today last, an admin's Check not counted: usage is as long as
+// days, zeros included, and total is its sum
+export type DirectoryDeciderDaysResponse = {
+  since: number;
+  until: number;
+  days: string[];
+  total: DeciderDay;
+  usage: DeciderDay[];
 };

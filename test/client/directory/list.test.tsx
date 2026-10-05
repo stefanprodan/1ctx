@@ -10,8 +10,11 @@ import { navLit } from "../../../src/client/app/Rail.model.ts";
 import { path } from "../../../src/client/app/router.ts";
 import {
   agentPage,
+  deciderPage,
   directoryAgents,
   directoryAgentsError,
+  directoryDeciders,
+  directoryDecidersError,
   directoryUsers,
   directoryUsersError,
   loadDirectoryAgents,
@@ -19,9 +22,12 @@ import {
   userPage,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { searchList } from "../../../src/client/lib/search.ts";
 import { Agent } from "../../../src/client/views/directory/Agent.tsx";
+import { Decider } from "../../../src/client/views/directory/Decider.tsx";
 import {
   agentTabHref,
+  deciderFields,
   directoryTab,
   directoryTabs,
   switchItems,
@@ -99,16 +105,33 @@ beforeEach(() => {
     },
   ];
   directoryAgentsError.value = null;
+  directoryDeciders.value = [
+    {
+      id: "d1",
+      name: "jev",
+      default: true,
+      model: "typesafe/jev-1.13",
+    },
+    {
+      id: "d2",
+      name: "kev",
+      default: false,
+      model: "kev-latest",
+    },
+  ];
+  directoryDecidersError.value = null;
 });
 
 describe("the directory", () => {
   test("the tab is the address, Users for any other", () => {
     expect(directoryTab("/directory")).toBe("users");
     expect(directoryTab("/directory/agents")).toBe("agents");
+    expect(directoryTab("/directory/deciders")).toBe("deciders");
     expect(directoryTab("/directory/else")).toBe("users");
-    expect(directoryTabs(2, undefined)).toEqual([
+    expect(directoryTabs(2, undefined, 3)).toEqual([
       { label: "Users", href: "/directory", count: 2 },
       { label: "Agents", href: "/directory/agents", count: undefined },
+      { label: "Deciders", href: "/directory/deciders", count: 3 },
     ]);
   });
 
@@ -132,6 +155,42 @@ describe("the directory", () => {
     expect(html).toContain("default");
     expect(html).toContain("deepseek/deepseek-v4-flash");
     expect(html).not.toContain('rows-go" href="/users/casey"');
+  });
+
+  test.serial(
+    "the Deciders tab lists each decider with its model and decisions",
+    () => {
+      path.value = "/directory/deciders";
+      const html = render(<Directory />);
+      expect(html).toContain('href="/deciders/jev"');
+      expect(html).toContain('href="/deciders/kev"');
+      expect(html).not.toContain("@jev");
+      expect(html).toContain("default");
+      expect(html).toContain("typesafe/jev-1.13");
+      // the decisions show on the decider's page alone
+      expect(html).not.toContain("run-attention");
+      expect(html).not.toContain(">none<");
+      // every tab carries its count
+      expect(html).toMatch(/Users.*2.*Agents.*1.*Deciders.*2/s);
+      expect(html).not.toContain('rows-go" href="/agents/coder"');
+    },
+  );
+
+  test("the Deciders tab searches the name and the model", () => {
+    const list = directoryDeciders.value!;
+    const names = (q: string) =>
+      searchList(list, q, deciderFields).shown.map((d) => d.name);
+    expect(names("")).toEqual(["jev", "kev"]);
+    expect(names("KEV")).toEqual(["kev"]);
+    expect(names("typesafe")).toEqual(["jev"]);
+    expect(searchList(list, "typesafe", deciderFields).count).toBe("1 of 2");
+    expect(names("run-attention")).toEqual([]);
+  });
+
+  test.serial("the Deciders tab says when there are none", () => {
+    path.value = "/directory/deciders";
+    directoryDeciders.value = [];
+    expect(render(<Directory />)).toContain("No deciders yet.");
   });
 
   test.serial("a failed list says so on its own tab", () => {
@@ -162,6 +221,18 @@ describe("the directory", () => {
     },
   );
 
+  test.serial(
+    "a decider's crumb is Directory / Deciders, Deciders to its tab",
+    () => {
+      path.value = "/deciders/jev";
+      deciderPage.value = null;
+      const html = render(<Decider params={{ name: "jev" }} />);
+      expect(html).toMatch(
+        /href="\/directory">Directory<\/a>.*href="\/directory\/deciders">Deciders<\/a>.*jev/,
+      );
+    },
+  );
+
   test("the name's switcher keeps the tab on screen", () => {
     expect(userTabHref("radu", 0)).toBe("/users/radu");
     expect(userTabHref("radu", 1)).toBe("/users/radu/projects");
@@ -182,8 +253,10 @@ describe("the directory", () => {
     for (const at of [
       "/directory",
       "/directory/agents",
+      "/directory/deciders",
       "/users/casey",
       "/agents/coder",
+      "/deciders/jev",
     ]) {
       expect(navLit(at, "/directory")).toBe(true);
     }

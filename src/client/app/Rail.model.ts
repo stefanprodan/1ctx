@@ -64,12 +64,13 @@ export function zoneLit(pathname: string): string | null {
 }
 
 // a rail entry is lit on its own address; the Directory also on its
-// Agents tab and on the user and agent pages it lists
+// other tabs and on the user, agent and decider pages it lists
 export function navLit(pathname: string, href: string): boolean {
   if (href !== "/directory") return pathname === href;
   return (
     onPage(pathname, href) ||
     pathname.startsWith("/users/") ||
-    pathname.startsWith("/agents/")
+    pathname.startsWith("/agents/") ||
+    pathname.startsWith("/deciders/")
   );
 }

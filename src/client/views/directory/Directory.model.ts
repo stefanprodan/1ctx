@@ -1,11 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words on the Directory, a user's page and an agent's page.
+// The words on the Directory, a user's, an agent's and a decider's
+// page.
 
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
+  DirectoryDecider,
+  DirectoryDeciderDaysResponse,
   DirectoryUserDaysResponse,
   DirectoryUserResponse,
 } from "../../../shared/api/directory.ts";
@@ -18,11 +21,13 @@ import { ago, tokensText } from "../../lib/format.ts";
 import {
   agentHref,
   DIRECTORY_AGENTS_HREF,
+  DIRECTORY_DECIDERS_HREF,
   DIRECTORY_HREF,
   userHref,
 } from "../../lib/hrefs.ts";
 import type { Tab } from "../../ui/Tabs.tsx";
 import { offsetOf } from "../../ui/Zone.model.ts";
+import { inputPriceLine } from "../admin/Deciders.model.ts";
 
 // "16:34 · GMT+3": the time where the user is, and how far that is from
 // UTC; the time alone when the runtime does not know the zone
@@ -225,20 +230,67 @@ export function agentHint(
     : tokensText(shown.mcp.tokens);
 }
 
+export type DirectoryTab = "users" | "agents" | "deciders";
+
 // the Directory's tab is its address: Users for /directory and any
-// other, Agents for /directory/agents
-export function directoryTab(pathname: string): "users" | "agents" {
-  return pathname === DIRECTORY_AGENTS_HREF ? "agents" : "users";
+// other
+export function directoryTab(pathname: string): DirectoryTab {
+  if (pathname === DIRECTORY_AGENTS_HREF) return "agents";
+  if (pathname === DIRECTORY_DECIDERS_HREF) return "deciders";
+  return "users";
 }
 
 export function directoryTabs(
   users: number | undefined,
   agents: number | undefined,
+  deciders: number | undefined,
 ): Tab[] {
   return [
     { label: "Users", href: DIRECTORY_HREF, count: users },
     { label: "Agents", href: DIRECTORY_AGENTS_HREF, count: agents },
+    { label: "Deciders", href: DIRECTORY_DECIDERS_HREF, count: deciders },
   ];
+}
+
+// what the Deciders tab's search reads: the name and the model
+export const deciderFields = (d: { name: string; model: string }) => [
+  d.name,
+  d.model,
+];
+
+// under a decider's model: the provider, the window and the input
+// price when the catalog knew them; a decision has no output to price
+export function deciderLine(
+  provider: string,
+  decider: Pick<DirectoryDecider, "contextLength" | "promptPrice" | "default">,
+): string {
+  return [
+    provider,
+    windowLine(decider.contextLength),
+    inputPriceLine(decider.promptPrice),
+    decider.default ? "default" : "",
+  ]
+    .filter((s) => s !== "")
+    .join(" · ");
+}
+
+// the decider's answers as the heatmap's answer, one answer in the
+// place of a turn
+export function deciderAnswer(
+  body: DirectoryDeciderDaysResponse,
+  deciderId: string,
+): DaysUsageResponse {
+  const day = (d: { answers: number; tokens: number }) => ({
+    sends: d.answers,
+    tokens: d.tokens,
+  });
+  return {
+    since: body.since,
+    until: body.until,
+    days: body.days,
+    total: day(body.total),
+    projects: [{ projectId: deciderId, usage: body.usage.map(day) }],
+  };
 }
 
 type SwitchItem = { id: string; label: string; href: string };
