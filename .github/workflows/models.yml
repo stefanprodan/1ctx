@@ -1,0 +1,56 @@
+name: models
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: models
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write # dispatch test.yml, which a github.token PR never starts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read Bun version
+        id: bun
+        run: |
+          version=$(scripts/bun-version.sh)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.bun.outputs.version }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Refresh the catalog
+        run: make models
+      - name: Summarize the changes
+        run: bun scripts/models.ts --diff > "$RUNNER_TEMP/models-diff.md"
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ github.token }}
+          sign-commits: true
+          branch: models-refresh
+          commit-message: 'chore(providers): refresh models.dev catalog'
+          title: 'chore(providers): refresh models.dev catalog'
+          body-path: ${{ runner.temp }}/models-diff.md
+          labels: chore
+          add-paths: src/server/providers/models.json
+      - name: Run CI on the refresh
+        if: steps.cpr.outputs.pull-request-operation == 'created' || steps.cpr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run test.yml --repo "$GITHUB_REPOSITORY" --ref models-refresh

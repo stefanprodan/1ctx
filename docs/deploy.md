@@ -159,6 +159,12 @@ deletes the cluster with every release in it.
   `seconds`); `both` runs the two side by side. The results table goes
   to the run's summary and the logs to the `load-results-<target>`
   artifact. Never on a push or a pull request.
+- **`models.yml` refreshes `models.json` weekly** and by hand: it runs
+  `make models` and opens or updates one signed PR on `models-refresh`,
+  labelled `chore`. A PR made with `github.token` starts no workflow,
+  so the job dispatches `test.yml` (which takes `workflow_dispatch` for
+  this) on the branch, and that run reports the required
+  `lint-test-build`. Never auto-merged.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a
