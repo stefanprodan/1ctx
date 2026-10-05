@@ -29,7 +29,6 @@ import {
   checkTemplate,
   normalizePrefix,
 } from "./check.ts";
-import { orderedMethods } from "./store.ts";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
@@ -76,7 +75,7 @@ export function parseMethods(value: unknown): HttpMethod[] {
       `methods must be distinct names from ${HTTP_METHODS.join(", ")}`,
     );
   }
-  return orderedMethods(value);
+  return value;
 }
 
 function parseProjectIds(value: unknown): string[] {

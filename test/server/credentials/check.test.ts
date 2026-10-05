@@ -6,12 +6,11 @@ import {
   checkHeaderName,
   checkTemplate,
   headerValue,
-  httpKeys,
   isUsableKey,
   normalizePrefix,
   prefixesOverlap,
-  readKey,
-} from "../../../src/server/credentials/index.ts";
+} from "../../../src/server/credentials/check.ts";
+import { httpKeys, readKey } from "../../../src/server/credentials/index.ts";
 import {
   KEY_BYTES,
   MAX_PREFIX,
