@@ -32,8 +32,74 @@ export function fields(
   return body as Record<string, unknown>;
 }
 
-// the body read chunk by chunk and dropped past the cap, so a declared
-// length is not trusted and an undeclared one cannot grow unbounded
+// a promise that rejects with the signal's reason once it aborts
+export function raceSignal<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolveRace, reject) => {
+    const aborted = () => reject(signal.reason);
+    signal.addEventListener("abort", aborted, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", aborted);
+        resolveRace(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", aborted);
+        reject(error);
+      },
+    );
+  });
+}
+
+// a stream read to its end, or null past max bytes. Each read races the
+// signal, and the cancel is awaited only to settle: an upload holds its
+// slot until its body is let go, while a call's deadline must not wait
+// on a cancel that hangs
+export async function readStream(
+  body: ReadableStream<Uint8Array> | null,
+  max: number,
+  signal?: AbortSignal,
+  settle = false,
+): Promise<Uint8Array | null> {
+  if (body === null) {
+    signal?.throwIfAborted();
+    return new Uint8Array();
+  }
+  const reader = body.getReader();
+  let cancellation: Promise<unknown> | undefined;
+  const cancel = (reason?: unknown) => {
+    cancellation ??= reader.cancel(reason).catch(() => {});
+  };
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const { done, value } = await (signal
+        ? raceSignal(reader.read(), signal)
+        : reader.read());
+      if (done) return Buffer.concat(chunks, size);
+      size += value.byteLength;
+      if (size > max) {
+        cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    cancel(error);
+    throw error;
+  } finally {
+    if (settle) await cancellation;
+    reader.releaseLock();
+  }
+}
+
+// a declared length is not trusted and an undeclared one cannot grow
+// past the cap
 export async function readBytes(
   req: Request,
   max = MAX_BODY,
@@ -41,41 +107,9 @@ export async function readBytes(
 ): Promise<Uint8Array> {
   const declared = Number(req.headers.get("content-length") ?? 0);
   if (declared > max) throw new PayloadTooLarge();
-  if (req.body === null) {
-    signal?.throwIfAborted();
-    return new Uint8Array();
-  }
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  let cancellation: Promise<PromiseSettledResult<void>[]> | undefined;
-  const cancel = (reason: unknown) => {
-    // Cleanup can fail too; settle it without replacing the refusal or abort.
-    cancellation ??= Promise.allSettled([reader.cancel(reason)]);
-  };
-  const abort = () => cancel(signal?.reason);
-  signal?.addEventListener("abort", abort, { once: true });
-  try {
-    if (signal?.aborted) abort();
-    signal?.throwIfAborted();
-    for (;;) {
-      const { done, value } = await reader.read();
-      signal?.throwIfAborted();
-      if (done) break;
-      size += value.byteLength;
-      if (size > max) {
-        const error = new PayloadTooLarge();
-        cancel(error);
-        throw error;
-      }
-      chunks.push(value);
-    }
-    return Buffer.concat(chunks, size);
-  } finally {
-    signal?.removeEventListener("abort", abort);
-    await cancellation;
-    reader.releaseLock();
-  }
+  const bytes = await readStream(req.body, max, signal, true);
+  if (bytes === null) throw new PayloadTooLarge();
+  return bytes;
 }
 
 export async function readBody(req: Request, max = MAX_BODY): Promise<string> {

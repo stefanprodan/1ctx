@@ -4,6 +4,7 @@
 // A ref's commit now: the API's answer, or the archive's when no key signs.
 
 import type { RepoError } from "../../shared/contracts/repo.ts";
+import { readStream } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { type Adapter, adapter, isCommit } from "./adapters.ts";
 import type { RepoCache } from "./cache.ts";
@@ -32,18 +33,6 @@ export type Looked =
   | { ok: true; commit: string | null; etag: string | null }
   | { ok: false; error: RepoError; status: number | null };
 
-async function capped(response: Response): Promise<string | null> {
-  if (response.body === null) return "";
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.length;
-    if (size > REPO_LOOKUP_BYTES) return null;
-    chunks.push(chunk);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
-}
-
 function commitOf(text: string): string | null {
   const trimmed = text.trim();
   if (isCommit(trimmed)) return trimmed;
@@ -70,32 +59,34 @@ export async function apiLookup(
     "user-agent": userAgent,
   };
   if (etag !== null) headers["if-none-match"] = etag;
+  const signal = AbortSignal.timeout(REPO_LOOKUP_DEADLINE_MS);
   const followed = await follow(
     fetcher,
     adapter.lookupUrl(ref),
     headers,
     header,
-    AbortSignal.timeout(REPO_LOOKUP_DEADLINE_MS),
+    signal,
   );
   if (!followed.ok) return followed;
   const response = followed.response;
   const status = response.status;
   if (status === 304 && etag !== null) {
-    await response.body?.cancel().catch(() => {});
+    response.body?.cancel().catch(() => {});
     return { ok: true, commit: null, etag };
   }
   if (status !== 200) {
-    await response.body?.cancel().catch(() => {});
+    response.body?.cancel().catch(() => {});
     const error = status === 422 ? "not found" : statusError(status);
     return { ok: false, error, status };
   }
-  let text: string | null;
+  let bytes: Uint8Array | null;
   try {
-    text = await capped(response);
+    bytes = await readStream(response.body, REPO_LOOKUP_BYTES, signal);
   } catch {
     return { ok: false, error: "host unreachable", status };
   }
-  const commit = text === null ? null : commitOf(text);
+  const commit =
+    bytes === null ? null : commitOf(new TextDecoder().decode(bytes));
   if (commit === null) return { ok: false, error: "host unreachable", status };
   return { ok: true, commit, etag: response.headers.get("etag") };
 }

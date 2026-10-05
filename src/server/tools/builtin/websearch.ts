@@ -3,6 +3,7 @@
 //
 // The websearch tool; the network only through the fetch dependency.
 
+import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
@@ -103,24 +104,6 @@ export function retryAfterMs(header: string | null): number | null {
   return 1000;
 }
 
-function raceSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise<T>((resolveRace, reject) => {
-    const aborted = () => reject(signal.reason);
-    signal.addEventListener("abort", aborted, { once: true });
-    promise.then(
-      (value) => {
-        signal.removeEventListener("abort", aborted);
-        resolveRace(value);
-      },
-      (error) => {
-        signal.removeEventListener("abort", aborted);
-        reject(error);
-      },
-    );
-  });
-}
-
 // discarding a body is best effort: the cancel is not awaited, so a
 // stream whose cancel hangs or rejects cannot hold the deadline or
 // replace the error
@@ -133,33 +116,9 @@ async function readBody(
   signal: AbortSignal,
   maxBytes: number,
 ): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      signal.throwIfAborted();
-      const { done, value } = await raceSignal(reader.read(), signal);
-      if (done) break;
-      size += value.byteLength;
-      if (size > maxBytes) {
-        reader.cancel().catch(() => {});
-        throw new Error(`websearch answer over ${bytesWords(maxBytes)}`);
-      }
-      chunks.push(value);
-    }
-  } catch (error) {
-    if (signal.aborted) reader.cancel(signal.reason).catch(() => {});
-    throw error;
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
+  const bytes = await readStream(response.body, maxBytes, signal);
+  if (bytes === null) {
+    throw new Error(`websearch answer over ${bytesWords(maxBytes)}`);
   }
   return new TextDecoder().decode(bytes);
 }

@@ -3,6 +3,7 @@
 
 import { sniffArchive } from "../../shared/archive.ts";
 import { readArchive } from "../lib/archive.ts";
+import { readStream } from "../lib/body.ts";
 import { BadGateway, BadRequest, ServiceUnavailable } from "../lib/errors.ts";
 import {
   FETCH_DEADLINE_MS,
@@ -14,37 +15,6 @@ import {
 export type Fetched =
   | { kind: "text"; bytes: Uint8Array; text: string }
   | { kind: "archive"; bytes: Uint8Array; files: Map<string, Uint8Array> };
-
-const join = (chunks: Uint8Array[], size: number): Uint8Array => {
-  const out = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return out;
-};
-
-async function readCapped(
-  stream: ReadableStream<Uint8Array> | null,
-  cap: number,
-  words: string,
-): Promise<Uint8Array> {
-  if (stream === null) return new Uint8Array();
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return join(chunks, size);
-    size += value.byteLength;
-    if (size > cap) {
-      await reader.cancel();
-      throw new BadRequest(words);
-    }
-    chunks.push(value);
-  }
-}
 
 // an http or https URL with no user info, else a 400 naming the label
 export function httpUrl(text: string, label: string, base?: string): URL {
@@ -103,7 +73,7 @@ export async function download(
     }
     if (response.status >= 300 && response.status < 400) {
       // the body of a redirect is never read; free it before the hop
-      await response.body?.cancel().catch(() => {});
+      response.body?.cancel().catch(() => {});
       const location = response.headers.get("location");
       if (location === null)
         throw new BadGateway(
@@ -115,7 +85,7 @@ export async function download(
       continue;
     }
     if (!response.ok) {
-      await response.body?.cancel().catch(() => {});
+      response.body?.cancel().catch(() => {});
       if (
         response.headers.get("x-ratelimit-remaining") === "0" ||
         ((response.status === 403 || response.status === 429) &&
@@ -125,12 +95,14 @@ export async function download(
       }
       throw new BadGateway(`the host ${url.host} answered ${response.status}`);
     }
+    let bytes: Uint8Array | null;
     try {
-      return await readCapped(response.body, cap, "the download is too large");
-    } catch (error) {
-      if (error instanceof BadRequest) throw error;
+      bytes = await readStream(response.body, cap, signal);
+    } catch {
       throw failed();
     }
+    if (bytes === null) throw new BadRequest("the download is too large");
+    return bytes;
   }
 }
 

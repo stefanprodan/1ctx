@@ -76,16 +76,6 @@ function selected(manifest: ArchiveMember[], want: Want): Set<number> {
   return indexes;
 }
 
-function join(chunks: Uint8Array[], size: number): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return bytes;
-}
-
 function tarType(header: TarHeader): ArchiveMember["type"] {
   // The pinned patch retains flags modern-tar otherwise reports as files.
   if (
@@ -184,7 +174,7 @@ async function tarPass(
         expanded(chunk.length);
         if (prefix.length < 512) {
           const head = chunk.subarray(0, 512 - prefix.length);
-          prefix = join([prefix, head], prefix.length + head.length);
+          prefix = Buffer.concat([prefix, head], prefix.length + head.length);
           if (
             prefix.length === 512 &&
             sniffArchive(prefix) !== "tar" &&
@@ -230,7 +220,7 @@ async function tarPass(
         if (size !== header.size) {
           throw new BadRequest("the tar member size does not match its body");
         }
-        manifest[index].data = join(chunks, size);
+        manifest[index].data = Buffer.concat(chunks, size);
       } else {
         await body.cancel();
       }
@@ -332,7 +322,7 @@ async function zipArchive(
         }),
         { signal },
       );
-      member.data = join(chunks, size);
+      member.data = Buffer.concat(chunks, size);
     }
     running(signal);
     return manifest;
@@ -407,7 +397,7 @@ async function sniffed(
       size += next.value.length;
     }
   }
-  const first = join(head, size);
+  const first = Buffer.concat(head, size);
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       if (first.length > 0) controller.enqueue(first);

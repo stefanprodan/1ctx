@@ -1,11 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { readCapped } from "./catalog.ts";
+import { readStream } from "../lib/body.ts";
 import { OPENROUTER_HEADERS } from "./openrouter.ts";
 import { keyOf, noKeyFile, type ProviderDeps, scrubKey } from "./provider.ts";
 import type { ProviderRow } from "./store.ts";
-import { CatalogError } from "./types.ts";
 import { authHeaders, endpoint } from "./wires.ts";
 
 // far past any answer: what is dropped unread past it
@@ -248,15 +247,14 @@ function decisionError(
   );
 }
 
-async function capped(res: Response, max: number): Promise<string> {
-  try {
-    return await readCapped(res, max);
-  } catch (err) {
-    if (err instanceof CatalogError) {
-      throw new DecisionError("the answer is too large");
-    }
-    throw err;
-  }
+async function capped(
+  res: Response,
+  max: number,
+  signal: AbortSignal,
+): Promise<string> {
+  const bytes = await readStream(res.body, max, signal);
+  if (bytes === null) throw new DecisionError("the answer is too large");
+  return new TextDecoder().decode(bytes);
 }
 
 async function send(
@@ -282,11 +280,11 @@ async function send(
     signal,
   });
   if (!res.ok) {
-    const text = await capped(res, MAX_ERROR_BYTES).catch(() => "");
+    const text = await capped(res, MAX_ERROR_BYTES, signal).catch(() => "");
     throw decisionError(row.name, res.status, text, req);
   }
   let body: unknown;
-  const text = await capped(res, MAX_DECISION_BYTES);
+  const text = await capped(res, MAX_DECISION_BYTES, signal);
   try {
     body = JSON.parse(text);
   } catch {

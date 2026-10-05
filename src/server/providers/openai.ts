@@ -281,13 +281,7 @@ async function readErrorBody(
       chunks.push(chunk);
       size += chunk.byteLength;
     }
-    const body = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      body.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(body);
+    return new TextDecoder().decode(Buffer.concat(chunks, size));
   } catch {
     return "";
   } finally {

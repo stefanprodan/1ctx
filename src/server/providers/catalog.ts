@@ -8,6 +8,7 @@ import {
 } from "../../shared/contracts/decider.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Wire } from "../../shared/words.ts";
+import { readStream } from "../lib/body.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { BadGateway } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -108,23 +109,6 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
 
 // the body read chunk by chunk and refused past the cap, so a provider
 // cannot fill the process however long it talks
-export async function readCapped(res: Response, max: number): Promise<string> {
-  if (res.body === null) return "";
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > max) {
-      await reader.cancel();
-      throw new CatalogError("the catalog is too large");
-    }
-    chunks.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
-}
 
 // a server that ignores the query answers its whole list, which is
 // what a local decisions server serves
@@ -149,12 +133,10 @@ export async function fetchJson(
   url: string,
   headers: Record<string, string>,
 ): Promise<unknown> {
+  const signal = AbortSignal.timeout(CATALOG_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetcher(url, {
-      headers,
-      signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
-    });
+    res = await fetcher(url, { headers, signal });
   } catch (err) {
     throw new CatalogError(
       `the provider did not answer: ${err instanceof Error ? err.message : String(err)}`,
@@ -162,7 +144,9 @@ export async function fetchJson(
   }
   if (!res.ok) throw new CatalogError(`the provider answered ${res.status}`);
   try {
-    return JSON.parse(await readCapped(res, MAX_CATALOG_BYTES));
+    const bytes = await readStream(res.body, MAX_CATALOG_BYTES, signal);
+    if (bytes === null) throw new CatalogError("the catalog is too large");
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch (err) {
     if (err instanceof CatalogError) throw err;
     throw new CatalogError("the provider did not answer with JSON");

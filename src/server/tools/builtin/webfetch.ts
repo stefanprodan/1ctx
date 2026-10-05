@@ -4,6 +4,7 @@
 // Listed access checks every origin, redirects included.
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
+import { raceSignal } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
@@ -142,33 +143,29 @@ async function readBody(
   const chunks: Uint8Array[] = [];
   let size = 0;
   let cut = false;
-  while (true) {
-    signal.throwIfAborted();
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (size === maxBytes) {
-      cut = true;
-      await reader.cancel();
-      break;
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const { done, value } = await raceSignal(reader.read(), signal);
+      if (done) break;
+      const remaining = maxBytes - size;
+      if (value.byteLength > remaining) {
+        chunks.push(value.subarray(0, remaining));
+        size = maxBytes;
+        cut = true;
+        reader.cancel().catch(() => {});
+        break;
+      }
+      chunks.push(value);
+      size += value.byteLength;
     }
-    const remaining = maxBytes - size;
-    const chunk =
-      value.byteLength > remaining ? value.subarray(0, remaining) : value;
-    chunks.push(chunk);
-    size += chunk.byteLength;
-    if (value.byteLength > remaining) {
-      cut = true;
-      await reader.cancel();
-      break;
-    }
+  } catch (error) {
+    reader.cancel(error).catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { bytes, cut };
+  return { bytes: Buffer.concat(chunks, size), cut };
 }
 
 function decode(bytes: Uint8Array, charset: string): string {
@@ -370,7 +367,7 @@ export async function fetchText(
         [301, 302, 303, 307, 308].includes(response.status) &&
         location !== null
       ) {
-        await response.body?.cancel();
+        response.body?.cancel().catch(() => {});
         if (redirects >= 3) {
           throw new Error("redirect limit exceeded after 3 hops");
         }
@@ -387,7 +384,7 @@ export async function fetchText(
         continue;
       }
       if (response.status < 200 || response.status >= 300) {
-        await response.body?.cancel();
+        response.body?.cancel().catch(() => {});
         throw new Error(`HTTP status ${response.status}`);
       }
 
