@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Repositories: git trees a project mounts read-only for bash, each a
-// row an admin writes for a team project, or an owner for their
-// personal project, public only. The server fetches them; an http- key
-// file a repository names signs only the server's requests.
+// Repositories a project mounts read-only for bash.
 
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -28,36 +25,20 @@ import {
 import { type RepoRow, ReposStore } from "./store.ts";
 
 export {
-  type Adapter,
   adapter,
   checkRef,
   covers,
   defaultName,
   isCommit,
   normalizeUrl,
-  type RepoUrl,
 } from "./adapters.ts";
-export {
-  type KeysPort,
-  type RepoAuth,
-  type RepoHeader,
-  repoAuth,
-} from "./check.ts";
 export { type JobRunner, threadJobs, workerJobs } from "./jobs.ts";
-export {
-  REPO_FETCH_MS,
-  REPO_LOOKUP_MS,
-  REPO_STALL_MS,
-  REPO_WAIT_MS,
-} from "./limits.ts";
 export { logCacheSwept, logFetched, logFetchFailed } from "./log.ts";
-export {
-  type Prepared,
-  type PrepareOptions,
-  type RepoLimits,
-  type RepoMount,
-  type RepoNotice,
-  sourceOf,
+export type {
+  Prepared,
+  PrepareOptions,
+  RepoLimits,
+  RepoMount,
 } from "./mounts.ts";
 export {
   parseIgnoreText,
@@ -66,13 +47,7 @@ export {
   parseRepoName,
   parseRepoUrl,
 } from "./parse.ts";
-export {
-  type RepoFetched,
-  type RepoFields,
-  type RepoRow,
-  ReposStore,
-  view,
-} from "./store.ts";
+export { type RepoFields, ReposStore, view } from "./store.ts";
 
 export type ReposDeps = {
   db: Db;

@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The repository routes. Anyone who sees a project lists its
-// repositories; admins write a team project's, and an owner their
-// personal project's under /api/profile/project/repos, so no route lets
-// a member write a team project's.
 
 import type {
   CreateRepoRequest,
@@ -20,14 +15,13 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
-  checkRepo,
-  desired,
+  checkFields,
   type KeysPort,
   type RepoProject,
   refetches,
 } from "./check.ts";
 import { parseCreateRepo, parsePatchRepo } from "./parse.ts";
-import { type ReposStore, view } from "./store.ts";
+import { type RepoRow, type ReposStore, view } from "./store.ts";
 
 export type AccessPort = {
   // the project the principal may see, else a 404
@@ -59,10 +53,9 @@ export type RoutesDeps = {
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   // the row as the writer's list shows it: a key's name is an admin's
-  const answer = (
-    row: Parameters<typeof view>[0],
-    admin: boolean,
-  ): RepoResponse => ({ repo: view(row, admin) });
+  const answer = (row: RepoRow, admin: boolean): RepoResponse => ({
+    repo: view(row, admin),
+  });
   const team = (id: string): RepoProject => {
     const project = deps.projects.byId(id);
     if (project === null || project.kind !== "team") {
@@ -92,8 +85,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     admin: boolean,
   ) => {
     const made = transact(deps.db, () => {
-      const fields = desired(null, change, project.kind === "personal");
-      checkRepo(project, fields, null, deps.keys);
+      const fields = checkFields(project, null, change, deps.keys);
       if (deps.store.count(project.id) >= MAX_REPOS_PER_PROJECT) {
         throw new Conflict(
           `a project holds at most ${MAX_REPOS_PER_PROJECT} repositories`,
@@ -119,8 +111,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     let refetch = false;
     const patched = transact(deps.db, () => {
       const before = find(project, id);
-      const fields = desired(before, change, project.kind === "personal");
-      checkRepo(project, fields, before, deps.keys);
+      const fields = checkFields(project, before, change, deps.keys);
       nameFree(project, fields.name, before.id);
       refetch = refetches(before, fields);
       const after = deps.store.update(before.id, fields, refetch, deps.clock());

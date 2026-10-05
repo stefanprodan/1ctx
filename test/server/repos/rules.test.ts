@@ -136,27 +136,6 @@ test("a byte order mark is not part of the first pattern", () => {
   expect(ignored(rules("\uFEFF*.md"), "a.md", false)).toBe(true);
 });
 
-test("the caps refuse a long text", () => {
-  const lines = (n: number) => `${Array(n).fill("x").join("\n")}\n`;
-  expect(parseIgnore(lines(200)).ok).toBe(true);
-  expect(parseIgnore(lines(201))).toEqual({
-    ok: false,
-    line: 201,
-    reason: "more than 200 lines",
-  });
-  expect(parseIgnore(`${"a".repeat(8192)}`).ok).toBe(true);
-  expect(parseIgnore(`${"a".repeat(8193)}`)).toEqual({
-    ok: false,
-    line: 0,
-    reason: "longer than 8 KiB",
-  });
-  expect(parseIgnore("é".repeat(4097))).toEqual({
-    ok: false,
-    line: 0,
-    reason: "longer than 8 KiB",
-  });
-});
-
 test("the answer depends on the path alone", () => {
   const r = rules("charts/\n!charts/app/Chart.yaml\n");
   const paths = ["charts/app/Chart.yaml", "charts", "charts/app"];

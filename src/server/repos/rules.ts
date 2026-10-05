@@ -5,11 +5,7 @@
 // ported from git's dir.c and wildmatch.c so every answer is git's.
 // Patterns and paths are matched as UTF-8 bytes, as git matches them.
 
-import {
-  DEFAULT_REPO_IGNORE as DEFAULT_IGNORE,
-  MAX_REPO_IGNORE_BYTES as MAX_IGNORE_BYTES,
-  MAX_REPO_IGNORE_LINES as MAX_IGNORE_LINES,
-} from "../../shared/contracts/repo.ts";
+import { DEFAULT_REPO_IGNORE as DEFAULT_IGNORE } from "../../shared/contracts/repo.ts";
 
 export interface IgnorePattern {
   /** the pattern as bytes, without its `!`, leading `/` and trailing `/` */
@@ -72,20 +68,11 @@ function bytes(text: string): string {
   return out;
 }
 
-/** Parses an ignore text, refusing a line git would never match. */
+/** Parses an ignore text, refusing a line git would never match; the
+ * caps are parseIgnoreText's, which every stored text passed. */
 export function parseIgnore(text: string): ParsedIgnore {
-  if (encoder.encode(text).length > MAX_IGNORE_BYTES) {
-    return { ok: false, line: 0, reason: "longer than 8 KiB" };
-  }
   const lines = text.replace(/^\uFEFF/, "").split("\n");
   if (lines[lines.length - 1] === "") lines.pop();
-  if (lines.length > MAX_IGNORE_LINES) {
-    return {
-      ok: false,
-      line: MAX_IGNORE_LINES + 1,
-      reason: `more than ${MAX_IGNORE_LINES} lines`,
-    };
-  }
   const patterns: IgnorePattern[] = [];
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
