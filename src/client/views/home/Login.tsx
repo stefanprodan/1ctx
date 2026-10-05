@@ -5,7 +5,6 @@
 // server's error shows under the button as it came.
 
 import { useSignal } from "@preact/signals";
-import { navigate } from "../../app/router.ts";
 import { login } from "../../data/me.ts";
 import { Logo } from "../../lib/icons.tsx";
 import "./login.css";
@@ -23,8 +22,9 @@ export function Login() {
     busy.value = true;
     error.value = null;
     try {
+      // the form renders at the address that needed a user, so staying
+      // there lands on it; App sends /login itself home
       await login({ username: username.value, password: password.value });
-      navigate("/", true);
     } catch (err) {
       error.value = says(err);
     } finally {
