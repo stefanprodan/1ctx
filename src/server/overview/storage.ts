@@ -19,13 +19,8 @@ import type {
   StoredPart,
 } from "../../shared/api/admin.ts";
 import { daysWindow } from "../usage/index.ts";
-import type {
-  AutomationRow,
-  ProjectRow,
-  ScanResult,
-  SessionSum,
-} from "./scan.ts";
-import { SLOT_MS } from "./scan.ts";
+import { type ProjectRow, SLOT_MS } from "./read.ts";
+import type { AutomationRow, ScanResult, SessionSum } from "./scan.ts";
 
 export const STORAGE_DAYS = 30;
 

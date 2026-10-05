@@ -4,7 +4,6 @@
 // The days come as sums by quarter hour of UTC, which every zone's
 // midnight falls on, laid on the zone's days by the caller.
 
-import { statSync } from "node:fs";
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
 import { type DecisionSlot, decisionSlots } from "../usage/index.ts";
@@ -16,6 +15,7 @@ import {
   byProjects,
   type GroupRow,
 } from "./breakdowns.ts";
+import { inMemory, SLOT_MS, sizeOf, snapshot } from "./read.ts";
 
 export type RangeInput = {
   now: number;
@@ -74,8 +74,6 @@ export type MonthResult = DayReads & {
   deciders: DeciderUsage[];
 };
 
-export const SLOT_MS = 900_000;
-
 const SEND_SUMS = `sum(kind != 'run') as turns,
        sum(kind != 'run' and status = 'failed') as turnsFailed,
        sum(kind = 'run') as runs,
@@ -109,16 +107,8 @@ function usageSlots(db: Db, bounds: Bounds): UsageSlot[] {
 const count = (db: Db, sql: string): number =>
   db.query<{ n: number }, []>(sql).get()!.n;
 
-const sizeOf = (path: string): number => {
-  try {
-    return statSync(path).size;
-  } catch {
-    return 0;
-  }
-};
-
 function instance(db: Db): RangeResult["instance"] {
-  const memory = db.filename === "" || db.filename === ":memory:";
+  const memory = inMemory(db);
   return {
     users: count(db, "select count(*) as n from users"),
     projects: count(
@@ -172,16 +162,6 @@ function actives(db: Db, bounds: Bounds): Actives {
     out.user.push(at);
   }
   return out;
-}
-
-// one read transaction, so every statement sees the same WAL snapshot
-function snapshot<T>(db: Db, read: () => T): T {
-  db.exec("begin");
-  try {
-    return read();
-  } finally {
-    db.exec("rollback");
-  }
 }
 
 function dayReads(db: Db, input: RangeInput, days: Bounds): DayReads {

@@ -25,7 +25,7 @@ import type {
   SendSlot,
   UsageSlot,
 } from "./range.ts";
-import { SLOT_MS } from "./range.ts";
+import { SLOT_MS } from "./read.ts";
 
 const TOP = 10;
 

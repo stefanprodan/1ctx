@@ -34,6 +34,7 @@ import {
   type RangeResult,
   range,
 } from "./range.ts";
+import { inMemory } from "./read.ts";
 import { routes } from "./routes.ts";
 import { type ScanInput, type ScanResult, scan } from "./scan.ts";
 import {
@@ -102,7 +103,7 @@ function inlineScanner(db: Db): Scanner {
 }
 
 export function overviewArea(deps: OverviewDeps): Overview {
-  const memory = deps.db.filename === "" || deps.db.filename === ":memory:";
+  const memory = inMemory(deps.db);
   const scanner =
     deps.scanner ??
     (memory

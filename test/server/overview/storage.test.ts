@@ -7,11 +7,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import {
-  MESSAGE_BYTES,
-  SLOT_MS,
-  scan,
-} from "../../../src/server/overview/scan.ts";
+import { SLOT_MS } from "../../../src/server/overview/read.ts";
+import { MESSAGE_BYTES, scan } from "../../../src/server/overview/scan.ts";
 import { STORAGE_TABLES } from "../../../src/server/overview/storage.ts";
 import type {
   StorageAreaKey,

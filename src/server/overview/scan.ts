@@ -1,17 +1,20 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The storage scan: every query the storage answer needs, over one
-// connection, read once and shaped into plain data the worker can post.
-// Nothing here knows a zone: what was added when is summed by quarter
-// hour of UTC, which every zone's midnight falls on, so one scan answers
-// any zone's days. On disk is dbstat; stored is the tables' own `bytes`
-// or octet_length of the text, which counts without decoding it.
+// On disk is dbstat; stored is a table's bytes column or octet_length of
+// the text.
 
-import { statSync } from "node:fs";
 import { basename } from "node:path";
 import type { StorageFile } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
+import {
+  inMemory,
+  type ProjectRow,
+  projectRows,
+  SLOT_MS,
+  sizeOf,
+  snapshot,
+} from "./read.ts";
 
 export type ScanInput = {
   now: number;
@@ -43,13 +46,6 @@ export type SessionSum = {
   uploadBytes: number;
   scratchBytes: number;
   mcpBytes: number;
-};
-
-export type ProjectRow = {
-  id: string;
-  kind: "personal" | "team";
-  name: string;
-  owner: string;
 };
 
 export type AutomationRow = {
@@ -84,8 +80,6 @@ export type ScanResult = {
   digests: number;
 };
 
-export const SLOT_MS = 900_000;
-
 // a quarter hour, the stored bytes and the rows created in it
 export type Slot = [slot: number, bytes: number, rows: number];
 
@@ -104,24 +98,16 @@ export const MESSAGE_BYTES =
 // length() reads the record header only, where reading packed, the last
 // column, walks a refused row's blobs to its -1. A group by that sorts
 // takes it from a materialized CTE, never data itself
-export const KEPT_BYTES = "coalesce(length(k.data), k.bytes)";
+const KEPT_BYTES = "coalesce(length(k.data), k.bytes)";
 
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
-
-const sizeOf = (path: string): number => {
-  try {
-    return statSync(path).size;
-  } catch {
-    return 0;
-  }
-};
 
 function pragma<T>(db: Db, name: string): T {
   return db.query<Record<string, T>, []>(`pragma ${name}`).get()?.[name] as T;
 }
 
 function fileFacts(db: Db): StorageFile {
-  const memory = db.filename === "" || db.filename === ":memory:";
+  const memory = inMemory(db);
   const path = db.filename;
   const last = db
     .query<{ id: string }, []>(
@@ -338,14 +324,8 @@ function slots(db: Db, since: number): Slot[] {
 const total = (db: Db, sql: string): number =>
   db.query<{ bytes: number | null }, []>(sql).get()?.bytes ?? 0;
 
-// one read transaction, so every statement sees the same WAL snapshot
 export function scan(db: Db, input: ScanInput): ScanResult {
-  db.exec("begin");
-  try {
-    return read(db, input);
-  } finally {
-    db.exec("rollback");
-  }
+  return snapshot(db, () => read(db, input));
 }
 
 function read(db: Db, input: ScanInput): ScanResult {
@@ -356,12 +336,7 @@ function read(db: Db, input: ScanInput): ScanResult {
     pages: pageRows,
     rows: rowCounts(db, tables),
     sessions: sessions(db),
-    projects: db
-      .query<ProjectRow, []>(
-        `select p.id, p.kind, p.name, u.username as owner
-           from projects p join users u on u.id = p.owner_id`,
-      )
-      .all(),
+    projects: projectRows(db),
     automations: db
       .query<AutomationRow, []>(
         `select id, project_id as projectId, name,
