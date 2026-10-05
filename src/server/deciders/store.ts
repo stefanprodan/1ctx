@@ -29,8 +29,6 @@ const row = (raw: Raw, defaultId: string | null): DeciderRow => ({
   createdAt: raw.created_at,
 });
 
-export const summary = (decider: DeciderRow): DeciderSummary => decider;
-
 export type DeciderFields = {
   name: string;
   providerId: string;

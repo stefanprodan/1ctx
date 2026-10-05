@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Asking a decider: the call over its provider's wire with a timeout
-// beside the caller's signal, and one usage row for each answer, one
-// whose answers are refused included. A refusal, a timeout or an abort
-// writes nothing, since nothing was charged, and is a DecisionError the
-// caller logs.
 
 import type { DecisionPurpose } from "../../shared/contracts/decision.ts";
 import type { Clock } from "../lib/clock.ts";

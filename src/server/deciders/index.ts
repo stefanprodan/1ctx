@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Deciders: named decision models that answer typed questions about a
-// state with probabilities, and the decisions features ask them. A
-// decision asks the decider it names, else the default; with none, or
-// turned off, the feature stays off.
 
 import {
   type DecisionId,
@@ -25,7 +20,7 @@ import {
   type ProvidersPort,
   type UsagePort,
 } from "./decide.ts";
-import { DecisionStore } from "./decisions.ts";
+import { DecisionStore, deciderIdFor } from "./decisions.ts";
 import { type DaysPort, directoryRoutes } from "./directory.ts";
 import { routes, type TotalsPort } from "./routes.ts";
 import { type DeciderRow, DeciderStore } from "./store.ts";
@@ -51,11 +46,8 @@ export type Deciders = {
   usesProvider(providerId: string): boolean;
   // a decision's settings, read at each ask
   decision(id: DecisionId): DecisionSummary;
-  // asks the decider the use's decision names, else the default, within
-  // DECIDE_TIMEOUT_MS or the caller's signal; null when the decision is
-  // off, there is no decider or the state fits nothing, and the caller
-  // skips. Every failure is a DecisionError, and only an answer writes
-  // a usage row
+  // null when off, no decider, or no state fits; failures are
+  // DecisionErrors
   decide(
     use: DecideUse,
     questions: Record<string, DecisionQuestion>,
@@ -78,14 +70,13 @@ export function decidersArea(deps: DecidersDeps): Deciders {
     usesProvider: (providerId) => store.usesProvider(providerId),
     decision: (id) => decisions.byId(id),
     async decide(use, questions, state, signal) {
-      let decider = current();
-      if (isDecisionId(use.purpose)) {
-        const decision = decisions.byId(use.purpose);
-        if (!decision.enabled) return null;
-        if (decision.deciderId !== null) {
-          decider = store.byId(decision.deciderId) ?? decider;
-        }
-      }
+      const defaultId = store.defaultId();
+      const id = isDecisionId(use.purpose)
+        ? deciderIdFor(decisions.byId(use.purpose), defaultId)
+        : defaultId;
+      if (id === null) return null;
+      // a named decider deleted since falls back to the default
+      const decider = store.byId(id) ?? current();
       if (decider === null) return null;
       return ask(
         deps,

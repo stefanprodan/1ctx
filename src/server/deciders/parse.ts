@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The decider and decision request parsers. That the provider serves
-// decisions, its catalog lists the model and a named decider exists
-// are the routes' checks, not the parsers'.
 
 import {
   DECISION_OPTIONS,
