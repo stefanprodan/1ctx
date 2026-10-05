@@ -1224,7 +1224,7 @@
   "body": "{\"model\":\"glm-4.6\",\"messages\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":\"what time is it\",\"name\":\"ana_b\"},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"datetime\",\"arguments\":\"{}\"}},{\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"}}],\"reasoning_content\":\"check the clock\"},{\"role\":\"tool\",\"tool_call_id\":\"call_1\",\"content\":\"noon\"},{\"role\":\"tool\",\"tool_call_id\":\"call_2\",\"content\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":\"it is noon\",\"tool_calls\":[{\"id\":\"call_3\",\"type\":\"function\",\"function\":{\"name\":\"datetime\",\"arguments\":\"{}\"}}]},{\"role\":\"tool\",\"tool_call_id\":\"call_3\",\"content\":\"noon\"},{\"role\":\"assistant\",\"content\":\"noon\"},{\"role\":\"user\",\"content\":\"thanks\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true},\"reasoning_effort\":\"none\"}"
  },
  "azure gpt-5 default": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1232,7 +1232,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"summary\":\"auto\"}}"
  },
  "azure gpt-5 on": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1240,7 +1240,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"summary\":\"auto\"}}"
  },
  "azure gpt-5 off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1248,7 +1248,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 least": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1256,7 +1256,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 full": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1264,7 +1264,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"summary\":\"auto\"},\"tools\":[{\"type\":\"function\",\"name\":\"datetime\",\"description\":\"the clock\",\"parameters\":{\"type\":\"object\"},\"strict\":false}],\"prompt_cache_key\":\"session-1\",\"temperature\":0.2,\"top_p\":0.9,\"max_output_tokens\":300}"
  },
  "azure gpt-5 bare": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1272,7 +1272,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"summary\":\"auto\"}}"
  },
  "azure gpt-5 effort-low": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1280,7 +1280,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"low\",\"summary\":\"auto\"},\"prompt_cache_key\":\"s2\"}"
  },
  "azure gpt-5 effort-low-off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1288,7 +1288,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 effort-medium": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1296,7 +1296,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"medium\",\"summary\":\"auto\"},\"prompt_cache_key\":\"s2\"}"
  },
  "azure gpt-5 effort-medium-off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1304,7 +1304,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 effort-high": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1312,7 +1312,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"high\",\"summary\":\"auto\"},\"prompt_cache_key\":\"s2\"}"
  },
  "azure gpt-5 effort-high-off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1320,7 +1320,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 effort-xhigh": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1328,7 +1328,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"xhigh\",\"summary\":\"auto\"},\"prompt_cache_key\":\"s2\"}"
  },
  "azure gpt-5 effort-xhigh-off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1336,7 +1336,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
  },
  "azure gpt-5 effort-max": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"
@@ -1344,7 +1344,7 @@
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"max\",\"summary\":\"auto\"},\"prompt_cache_key\":\"s2\"}"
  },
  "azure gpt-5 effort-max-off": {
-  "url": "https://res.services.ai.azure.com/openai/v1/responses?api-version=v1",
+  "url": "https://foundry.test/openai/v1/responses?api-version=v1",
   "headers": {
    "api-key": "k",
    "content-type": "application/json"

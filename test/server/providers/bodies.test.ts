@@ -12,6 +12,7 @@ import type {
   ChatRequest,
 } from "../../../src/server/providers/types.ts";
 import { EFFORTS, WIRES, type Wire } from "../../../src/shared/words.ts";
+import { AZURE_URL } from "../../helpers/app.ts";
 
 const FIXTURE = new URL(
   "../../fixtures/providers/bodies.json",
@@ -24,7 +25,7 @@ const BASE_URL: Record<Wire, string> = {
   "openai-strict": "https://strict.test/v1",
   gemini: "https://gemini.test/v1beta",
   opencode: "https://opencode.test/zen/go/v1",
-  azure: "https://res.services.ai.azure.com/openai/v1",
+  azure: AZURE_URL,
 };
 
 const MODELS: Record<Wire, string[]> = {
