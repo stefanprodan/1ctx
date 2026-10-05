@@ -1,13 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tail: the newest whole turns before the last summary, replayed as
-// they were right after it, so an exact command, error or correction
-// from a minute ago is not a bullet. A turn is one send's rows but its
-// summary row, so queued messages stay one turn and a call never parts
-// from its result. Nothing is stored: the same rows, policy and window
-// pick the same tail every turn, which keeps the provider's cached
-// prefix, and a fork or a regenerate needs no migration.
+// The tail after a summary (docs/compaction.md, The summary and its tail).
 
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";

@@ -1,15 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The active sends by session, and admission: synchronous, taken
-// before startSend, with nothing written before it passes. A session
-// takes one send at a time; a terminated send holds the lock until its
-// stream has let go, so a second send cannot start on a reply that is
-// still being written. Every send counts in one tally under three caps,
-// limits the caller reads in the admission's turn: per user who started
-// it, per project and in the process. A scheduled run has no one who
-// started it and may hold only a share of the project's and the
-// process's places, so the rest stays free for users.
+// Active sends by session and synchronous admission (docs/sessions.md).
 
 import {
   Conflict,

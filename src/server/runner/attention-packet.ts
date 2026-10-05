@@ -1,14 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a run's attention step is told and what it does with a reply. The
-// step asks the run's own model, after its main rounds, whether a user
-// needs to act, over the run's record (run-record.ts) with needs_attention
-// alone on offer. Offered in the main rounds the tool was called on 5 of
-// 48 runs that needed it; asked alone after the run with thinking off,
-// on 32 of 32. The wording was measured again, thinking off, without a
-// line on memory notes, which flagged healthy runs: 2 of 12 against 6
-// of 12 with it, the broken run 4 of 4 either way. Pure.
+// The attention step's prompt. Offered in the main rounds the tool was called
+// on 5 of 48 runs that needed it; asked alone after the run, on 32 of 32.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { ChatMessageIn, ToolCall } from "../providers/index.ts";
