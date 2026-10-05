@@ -1,17 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The users list and a user's page, for every signed-in user: one
-// server is one team, so anyone may see who a teammate is. The list
-// holds the enabled users without their email; the page adds the email,
-// the zone and the about text. The projects listed are the team projects
-// both may open: an admin opens every team, a member the teams they
-// belong to. A personal project is never listed, so no one learns a name
-// they could not open. Their days are their actions in every project as
-// one series, whoever asks: posts, chats, manual runs and a signed-in
-// day. The days are the user's own, in their zone: a caller who could
-// move the day boundary would read, from the differences, what they did
-// each hour.
+// the users list and a user's page; rules in docs/access.md (Users)
 
 import type {
   DirectoryUserDaysResponse,

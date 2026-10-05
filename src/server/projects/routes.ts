@@ -17,7 +17,7 @@ import { LATEST_FILES } from "../../shared/knowledge.ts";
 import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
-import type { BusEvent } from "../lib/bus.ts";
+import { accessChanged, type BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
@@ -68,7 +68,7 @@ export type RoutesDeps = {
   clock: Clock;
 };
 
-const uniqueName = (error: unknown): boolean =>
+const uniqueViolation = (error: unknown): boolean =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
@@ -110,7 +110,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     try {
       return write();
     } catch (error) {
-      if (uniqueName(error)) throw new Conflict("name is taken");
+      if (uniqueViolation(error)) throw new Conflict("name is taken");
       throw error;
     }
   }
@@ -148,12 +148,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           );
           return {
             result: detail(created),
-            events: [
-              {
-                type: "access.changed" as const,
-                data: { userIds: null },
-              },
-            ],
+            events: [accessChanged(null)],
           };
         });
         const body: ProjectResponse = { project };
@@ -228,12 +223,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
           return {
             result: chats,
-            events: [
-              {
-                type: "access.changed" as const,
-                data: { userIds: null },
-              },
-            ],
+            events: [accessChanged(null)],
           };
         });
         const body: DeleteProjectResponse = { deleted };
@@ -271,19 +261,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           try {
             deps.store.addMember(current.id, userId, deps.clock());
           } catch (error) {
-            if (uniqueName(error)) {
+            if (uniqueViolation(error)) {
               throw new Conflict("userId is already a member");
             }
             throw error;
           }
           return {
             result: detail(current),
-            events: [
-              {
-                type: "access.changed" as const,
-                data: { userIds: [userId] },
-              },
-            ],
+            events: [accessChanged([userId])],
           };
         });
         const body: ProjectResponse = { project };
@@ -307,10 +292,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             result: detail(current),
             events: [
               ...deps.sessions.dropQueued(current.id, ctx.params.userId),
-              {
-                type: "access.changed" as const,
-                data: { userIds: [ctx.params.userId] },
-              },
+              accessChanged([ctx.params.userId]),
             ],
           };
         });

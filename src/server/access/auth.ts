@@ -1,13 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Access: the cookie, the login row behind it, and the principal the
-// router hands to every handler. The cookie carries a random token; the
-// row holds its hash. Thirty days sliding: a request past an hour since
-// the last touch pushes the row's expiry out and re-sends the cookie
-// with a full Max-Age, so the browser's copy slides with it.
 
 import { type Db, transact } from "../db/index.ts";
+import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
@@ -60,7 +55,6 @@ export type Auth = {
   open(user: UserRow): { login: Login; setCookie: string };
   // revoke one login; the cleared cookie header value
   close(loginId: string): string;
-  clearCookie(): string;
   // drop the rows whose expiry passed, telling the socket layer about
   // each; how many went
   sweep(): number;
@@ -135,12 +129,7 @@ export function auth(deps: AuthDeps): Auth {
           deps.logins.delete(login.id);
           return {
             result: undefined,
-            events: [
-              {
-                type: "login.revoked" as const,
-                data: { userId: login.userId, loginId: login.id },
-              },
-            ],
+            events: [loginRevoked(login.userId, login.id)],
           };
         });
         return nobody;
@@ -174,16 +163,12 @@ export function auth(deps: AuthDeps): Auth {
       deps.logins.delete(loginId);
       return clearCookie();
     },
-    clearCookie,
     sweep() {
       return transact(deps.db, () => {
         const gone = deps.logins.deleteExpired(deps.clock());
         return {
           result: gone.length,
-          events: gone.map((login) => ({
-            type: "login.revoked" as const,
-            data: { userId: login.userId, loginId: login.id },
-          })),
+          events: gone.map((login) => loginRevoked(login.userId, login.id)),
         };
       });
     },

@@ -92,6 +92,16 @@ export type BusEvent = {
   [K in keyof BusEvents]: { type: K; data: BusEvents[K] };
 }[keyof BusEvents];
 
+export const loginRevoked = (
+  userId: string,
+  loginId: string | null,
+): BusEvent => ({ type: "login.revoked", data: { userId, loginId } });
+
+export const accessChanged = (userIds: string[] | null): BusEvent => ({
+  type: "access.changed",
+  data: { userIds },
+});
+
 type Listener = (event: BusEvent) => void;
 type Subscription = { listener: Listener; log: Log };
 

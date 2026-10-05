@@ -1,18 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The signed-in user's own page: read it, change the full name, the
-// about text and the time zone, change the password. A password change proves the current
-// one first, then revokes every other login of the user, so a stolen
-// cookie dies with the old password while the tab that changed it stays
-// signed in. The proof is rate limited per user, since a signed-in thief
-// could otherwise guess at the current password for as long as they
-// liked. A wrong guess is a 403, never a 401: the login behind the
-// request is fine, and a 401 would sign the tab out.
+// the signed-in user's own page and password change
 
 import type { ProfileResponse } from "../../shared/api/profile.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -108,15 +102,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
           return {
             result: self(user.id),
-            events:
-              revoked > 0
-                ? [
-                    {
-                      type: "login.revoked" as const,
-                      data: { userId: user.id, loginId: null },
-                    },
-                  ]
-                : [],
+            events: revoked > 0 ? [loginRevoked(user.id, null)] : [],
           };
         });
         deps.log.info("password changed", { user: user.username });

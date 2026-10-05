@@ -119,18 +119,11 @@ export class ProjectStore {
 
   // among team projects: every personal project shares one name
   nameTaken(name: string, exceptId?: string): boolean {
-    const found =
-      exceptId === undefined
-        ? this.db
-            .query<{ n: number }, [string]>(
-              "select count(*) as n from projects where kind = 'team' and name = ?",
-            )
-            .get(name)!.n
-        : this.db
-            .query<{ n: number }, [string, string]>(
-              "select count(*) as n from projects where kind = 'team' and name = ? and id != ?",
-            )
-            .get(name, exceptId)!.n;
+    const found = this.db
+      .query<{ n: number }, [string, string | null]>(
+        "select count(*) as n from projects where kind = 'team' and name = ? and id != coalesce(?, '')",
+      )
+      .get(name, exceptId ?? null)!.n;
     return found > 0;
   }
 
@@ -202,11 +195,7 @@ export class ProjectStore {
         "insert into projects (id, kind, name, owner_id, created_at) values (?, 'personal', ?, ?, ?)",
       )
       .run(id, PERSONAL_PROJECT_NAME, fields.userId, fields.now);
-    this.db
-      .query(
-        "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
-      )
-      .run(id, fields.userId, fields.now);
+    this.addMember(id, fields.userId, fields.now);
     return this.byId(id)!;
   }
 }
