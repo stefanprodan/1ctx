@@ -50,8 +50,6 @@ type TimedNext =
   | { kind: "next"; result: IteratorResult<ChatEvent> }
   | { kind: "idle" };
 
-const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
-
 function sleep(clock: Clock, ms: number) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return {
@@ -239,9 +237,10 @@ async function streamRound(
     offers(send.policy.offered, "visualize")
       ? new RoundVisuals(send, round, deps.writer, signal)
       : null;
-  let replyBytes = bytes(round.content) + bytes(round.reasoning);
+  let replyBytes =
+    Buffer.byteLength(round.content) + Buffer.byteLength(round.reasoning);
   const grow = (text: string) => {
-    replyBytes += bytes(text);
+    replyBytes += Buffer.byteLength(text);
     if (replyBytes > MAX_REPLY_BYTES) {
       throw new Error("the reply exceeded 1 MB");
     }

@@ -46,7 +46,7 @@ export function parseMessage(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") {
     throw new BadRequest("message must be text");
   }
-  if (new TextEncoder().encode(value).length > MAX_MESSAGE_BYTES) {
+  if (Buffer.byteLength(value) > MAX_MESSAGE_BYTES) {
     throw new BadRequest(`message must be at most ${MAX_MESSAGE_BYTES} bytes`);
   }
   return value;

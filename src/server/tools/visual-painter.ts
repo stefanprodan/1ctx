@@ -52,7 +52,7 @@ export function visualMessage(value: unknown): value is VisualMessage {
       "html" in value &&
       typeof value.html === "string" &&
       value.html.length <= 512 * 1024 &&
-      new TextEncoder().encode(value.html).byteLength <= 512 * 1024
+      Buffer.byteLength(value.html) <= 512 * 1024
     );
   }
   if (

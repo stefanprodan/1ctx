@@ -70,7 +70,7 @@ export function parseIgnoreText(value: unknown): string {
   if (typeof value !== "string") {
     throw new BadRequest("ignore must be text");
   }
-  if (new TextEncoder().encode(value).length > MAX_REPO_IGNORE_BYTES) {
+  if (Buffer.byteLength(value) > MAX_REPO_IGNORE_BYTES) {
     throw new BadRequest(
       `ignore must be at most ${MAX_REPO_IGNORE_BYTES / 1024} KiB`,
     );

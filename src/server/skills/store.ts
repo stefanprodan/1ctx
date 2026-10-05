@@ -452,7 +452,7 @@ export class SkillStore {
 export function summary(row: SkillRow, agents: string[]): SkillSummary {
   return summaryOf(
     row,
-    new TextEncoder().encode(row.body).byteLength,
+    Buffer.byteLength(row.body),
     row.files.map(({ path, bytes }) => ({ path, bytes })),
     agents,
   );

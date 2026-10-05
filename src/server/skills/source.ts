@@ -57,7 +57,7 @@ export function resolve(url: string, select = ""): ResolvedSource {
 }
 
 export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
-  if (new TextEncoder().encode(text).byteLength > MAX_INDEX_BYTES) {
+  if (Buffer.byteLength(text) > MAX_INDEX_BYTES) {
     throw new BadRequest("the index is too large");
   }
   let parsed: unknown;

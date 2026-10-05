@@ -42,8 +42,6 @@ export type DiscoveryResult = {
   tools: DiscoveredTool[];
 };
 
-const bytes = (text: string) => new TextEncoder().encode(text).byteLength;
-
 export function fingerprint(fields: {
   serverName: string;
   serverVersion: string;
@@ -67,7 +65,7 @@ function schemaOf(tool: ListedTool): {
   const inputSchema = { ...tool.inputSchema };
   if (inputSchema.properties === undefined) inputSchema.properties = {};
   const schemaJson = JSON.stringify(inputSchema);
-  const size = bytes(schemaJson);
+  const size = Buffer.byteLength(schemaJson);
   if (size <= MAX_TOOL_SCHEMA_BYTES) {
     return { inputSchema, schemaJson, size, unusable: null };
   }
@@ -134,7 +132,10 @@ export async function discover(
           typeof tool.description === "string" ? tool.description : "",
           MAX_TOOL_DESCRIPTION,
         );
-        total += bytes(tool.name) + bytes(description) + schema.size;
+        total +=
+          Buffer.byteLength(tool.name) +
+          Buffer.byteLength(description) +
+          schema.size;
         if (total > MAX_TOOLS_BYTES) {
           throw new Error(
             `the server's tools are over ${bytesWords(MAX_TOOLS_BYTES)}`,

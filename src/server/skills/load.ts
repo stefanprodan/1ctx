@@ -83,7 +83,7 @@ function filesFrom(source: Map<string, Uint8Array>): {
     files.push({
       path,
       content,
-      bytes: new TextEncoder().encode(content).byteLength,
+      bytes: Buffer.byteLength(content),
     });
   }
   return { files, dropped, droppedMore };

@@ -44,9 +44,9 @@ export function resultsFit(
     (sum, call) =>
       sum +
       chars * 6 +
-      new TextEncoder().encode(
+      Buffer.byteLength(
         JSON.stringify({ role: "tool", tool_call_id: call.id, content: "" }),
-      ).byteLength,
+      ),
     0,
   );
   return bound <= room;

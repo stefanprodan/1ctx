@@ -39,8 +39,6 @@ export type StreamDeps = {
   stream: (sessionId: string, frame: SocketEvent) => void;
 };
 
-const bytes = (s: string) => new TextEncoder().encode(s).byteLength;
-
 export function streamVisual(
   deps: StreamDeps,
   send: ActiveSend,
@@ -90,7 +88,8 @@ export function streamRetry(
 }
 
 function checkpoint(deps: StreamDeps, round: RoundState, now: number): void {
-  const size = bytes(round.content) + bytes(round.reasoning);
+  const size =
+    Buffer.byteLength(round.content) + Buffer.byteLength(round.reasoning);
   if (
     now - round.lastWriteAt < WRITE_EVERY_MS &&
     size - round.lastWriteSize < WRITE_EVERY_BYTES

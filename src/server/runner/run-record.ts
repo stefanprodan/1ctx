@@ -63,7 +63,7 @@ function receipts(rows: readonly Message[]): Receipt[] {
       const args = cutAt(oneLine(call.arguments), RECORD_ARGUMENT_CHARS);
       const done = paired?.status === "done";
       const outcome = done
-        ? `done (${new TextEncoder().encode(paired.content).byteLength} bytes)`
+        ? `done (${Buffer.byteLength(paired.content)} bytes)`
         : `failed: ${oneLine(
             paired?.error ||
               paired?.content ||

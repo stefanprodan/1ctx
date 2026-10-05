@@ -130,8 +130,6 @@ function memoryRequest(
   return request(send.policy, send.sessionId, messages, offered.tools);
 }
 
-const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
-
 // what the phase has spent, kept apart from the send's budget: the
 // main rounds may have spent theirs, which never cuts the phase
 type PhaseSpend = { calls: number; toolMs: number; resultBytes: number };
@@ -154,7 +152,7 @@ async function runCalls(
     if (result.error || call.name !== "memory_edit") clean = false;
     try {
       const stored = cutResult(result, send.policy.toolCaps.resultCut);
-      spend.resultBytes += bytes(stored.content);
+      spend.resultBytes += Buffer.byteLength(stored.content);
       deps.writer.finishTool(send, call, stored);
     } catch (error) {
       writeError ??= error;

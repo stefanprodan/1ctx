@@ -55,7 +55,7 @@ function text(value: unknown, name: string): string {
 function guidance(value: unknown, field: string, label: string, max: number) {
   if (typeof value !== "string") throw new BadRequest(`${field} must be text`);
   const cleaned = sanitize(value);
-  if (new TextEncoder().encode(cleaned).length > max) {
+  if (Buffer.byteLength(cleaned) > max) {
     throw new BadRequest(`${label} must be at most ${max} bytes`);
   }
   return cleaned;
@@ -80,7 +80,7 @@ function parseValues(
     if (instructions.trim() === "") {
       throw new BadRequest("instructions must not be blank");
     }
-    if (new TextEncoder().encode(instructions).length > MAX_MESSAGE_BYTES) {
+    if (Buffer.byteLength(instructions) > MAX_MESSAGE_BYTES) {
       throw new BadRequest(
         `instructions must be at most ${MAX_MESSAGE_BYTES} bytes`,
       );

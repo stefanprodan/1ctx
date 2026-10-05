@@ -150,7 +150,7 @@ export function parseSse(
     const split = /\r?\n\r?\n/.exec(rest);
     if (!split || split.index === undefined) break;
     const raw = rest.slice(0, split.index);
-    if (new TextEncoder().encode(raw).byteLength > MAX_SSE_FRAME_BYTES) {
+    if (Buffer.byteLength(raw) > MAX_SSE_FRAME_BYTES) {
       throw new Error(OVERSIZED_SSE_FRAME);
     }
     rest = rest.slice(split.index + split[0].length);
@@ -161,7 +161,7 @@ export function parseSse(
       .map((line) => line.slice(5).replace(/^ /, ""));
     if (data.length > 0) frames.push(data.join("\n"));
   }
-  if (new TextEncoder().encode(rest).byteLength > MAX_SSE_FRAME_BYTES) {
+  if (Buffer.byteLength(rest) > MAX_SSE_FRAME_BYTES) {
     throw new Error(OVERSIZED_SSE_FRAME);
   }
   return { frames, rest };

@@ -66,8 +66,6 @@ function looping(signatures: string[]): boolean {
   return last.every((s) => s === last[0]);
 }
 
-const bytes = (s: string) => new TextEncoder().encode(s).byteLength;
-
 // the loop; returns how the send should end, which run() hands to
 // terminate(). Terminal is rechecked after every await
 export async function toolLoop(
@@ -256,7 +254,7 @@ async function runCalls(
   let writeError: unknown = null;
   const store = (call: ToolCall, result: ToolResult) => {
     if (send.cause !== null) return;
-    send.budget.resultBytes += bytes(result.content);
+    send.budget.resultBytes += Buffer.byteLength(result.content);
     deps.writer.finishTool(send, call, result);
   };
   const settled = calls.map(async (call) => {
