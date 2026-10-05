@@ -6,17 +6,20 @@
 // the title into a box in the same place and the same type, so the
 // head keeps its height: Enter saves, Escape or leaving the box gives
 // the title back, and a refusal hangs under the box until the next
-// key. Download saves the chat as Markdown. Archive, for every member,
-// and Delete, offered to whoever the server lets delete, each ask once
-// in place, inside the menu: the action again does it, Keep closes the
-// question. A running chat cannot go or be archived, so both wait for
-// the end; Rename never does. A press outside or Escape
+// key. Copy link puts the page's address on the clipboard, for an
+// installed app that shows no address bar, and closes the menu once
+// the copy lands. Download saves the chat as Markdown. Archive, for every
+// member, and Delete, offered to whoever the server lets delete, each
+// ask once in place, inside the menu: the action again does it, Keep
+// closes the question. A running chat cannot go or be archived, so
+// both wait for the end; Rename never does. A press outside or Escape
 // closes the menu, and Escape gives the focus back to the title. The
 // heading is the title button alone, so the items are no part of the
 // page's title. The state is Menu.model.ts.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { copyText } from "../../lib/clipboard.ts";
 import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import {
@@ -75,17 +78,24 @@ export function Menu({
     state.value = menuStep(state.value, action);
   };
   const open = state.value.open;
+  const copyLink = () => {
+    void copyText(location.origin + location.pathname).then((ok) => {
+      if (ok) step("dismiss");
+    });
+  };
   const editing = state.value.editing;
+  // every focus here skips the scroll: the head is sticky, and the
+  // browser would bring it into view at its place atop the chat
   // the title button is mounted again only after the box goes, so the
   // focus it gets back is given on the render after
   const refocus = useRef(false);
   useEffect(() => {
     if (editing) {
-      box.current?.focus();
+      box.current?.focus({ preventScroll: true });
       box.current?.select();
     } else if (refocus.current) {
       refocus.current = false;
-      trigger.current?.focus();
+      trigger.current?.focus({ preventScroll: true });
     }
   }, [editing]);
   const edit = () => {
@@ -121,7 +131,8 @@ export function Menu({
       // fall to the page and a keyboard user would lose their place
       const within = root.current?.contains(document.activeElement) ?? false;
       step("dismiss");
-      if (within && !state.value.open) trigger.current?.focus();
+      if (within && !state.value.open)
+        trigger.current?.focus({ preventScroll: true });
     };
     document.addEventListener("pointerdown", onPress);
     document.addEventListener("keydown", onKey);
@@ -236,6 +247,10 @@ export function Menu({
                   <span>Rename</span>
                 </button>
               )}
+              <button type="button" class="menu-item" onClick={copyLink}>
+                <Icon name="copy" size={14} />
+                <span>Copy link</span>
+              </button>
               <a
                 class="menu-item"
                 href={download}

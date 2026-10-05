@@ -6,6 +6,7 @@
 // that each scroll to their place. Either closes on a click outside it
 // or on Escape.
 
+import { copyText } from "../../../lib/clipboard.ts";
 import { Icon, type IconName } from "../../../lib/icons.tsx";
 import { useMenu } from "../../../lib/menu.ts";
 import { scrollParent } from "../../../lib/scroll.ts";
@@ -39,8 +40,7 @@ export function fileActions(
   on: { rename: () => void; remove: () => void },
 ): MoreAction[] {
   const folder = foldersOf(name).at(-1) ?? "";
-  const copy = (value: string) => () =>
-    void navigator.clipboard?.writeText(value).catch(() => {});
+  const copy = (value: string) => () => void copyText(value);
   return [
     { label: "History", icon: "clock", href: history },
     { label: "Copy the text", icon: "copy", onPick: copy(text) },

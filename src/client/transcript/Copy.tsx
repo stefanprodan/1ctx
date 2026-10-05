@@ -5,16 +5,8 @@
 // page without clipboard access leaves the button as it is.
 
 import { useEffect, useState } from "preact/hooks";
+import { copyText } from "../lib/clipboard.ts";
 import { Icon } from "../lib/icons.tsx";
-
-async function copy(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -29,7 +21,7 @@ export function CopyButton({ text }: { text: string }) {
       class={`transcript-act${copied ? " transcript-act-done" : ""}`}
       title="Copy"
       aria-label="Copy"
-      onClick={() => void copy(text).then((ok) => ok && setCopied(true))}
+      onClick={() => void copyText(text).then((ok) => ok && setCopied(true))}
     >
       <Icon name={copied ? "check" : "copy"} size={14} />
     </button>
