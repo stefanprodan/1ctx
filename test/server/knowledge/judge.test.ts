@@ -87,7 +87,7 @@ test.each(cases)(
       entry("a/b"),
     ])) {
       const { files, result } = judge(order);
-      expect(files).toEqual([{ name: "a/b", text: "text", replaces: false }]);
+      expect(files).toEqual([{ name: "a/b", text: "text" }]);
       expect(result.saved).toEqual(["a/b"]);
       expect(result).toMatchObject({
         skippedTotal: entries.length + 1,
@@ -127,9 +127,9 @@ test("the judged result has no knowledge identities and keeps saved order", () =
     ]),
   ).toEqual({
     files: [
-      { name: "new-name.md", text: "text", replaces: false },
-      { name: "replace", text: "new", replaces: true },
-      { name: "empty", text: "", replaces: false },
+      { name: "new-name.md", text: "text" },
+      { name: "replace", text: "new" },
+      { name: "empty", text: "" },
     ],
     result: {
       added: 2,
@@ -319,7 +319,7 @@ test("every eligible ancestor loses while a rejected ancestor blocks nothing", (
 
 test("lowered file caps permit only smaller replacements and UTF-8 stays text", () => {
   expect(judge([entry("replace", "1234567")]).files).toEqual([
-    { name: "replace", text: "1234567", replaces: true },
+    { name: "replace", text: "1234567" },
   ]);
   expect(judge([entry("replace", "12345678")]).result.skipped).toMatchObject([
     { reason: "too-big" },
@@ -327,8 +327,8 @@ test("lowered file caps permit only smaller replacements and UTF-8 stays text", 
   expect(
     judge([entry("bom", "\ufeffok"), entry("replacement", "\ufffd")]).files,
   ).toEqual([
-    { name: "bom", text: "ok", replaces: false },
-    { name: "replacement", text: "\ufffd", replaces: false },
+    { name: "bom", text: "ok" },
+    { name: "replacement", text: "\ufffd" },
   ]);
 });
 

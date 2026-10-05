@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Live project text and its metadata over the migrated tables. Writes
-// keep post-image versions, and recent files come from live rows rather
-// than a saved catalog that could still name a deleted file.
 
 import type {
   KnowledgeAuthor,
@@ -11,7 +7,7 @@ import type {
   KnowledgeFile,
   KnowledgeTotals,
 } from "../../shared/contracts/knowledge.ts";
-import type { Db } from "../db/index.ts";
+import { kindOf } from "../../shared/knowledge.ts";
 import { newId, sha256 } from "../lib/ids.ts";
 import { tokens } from "../lib/tokens.ts";
 import {
@@ -20,23 +16,29 @@ import {
   type FullRaw,
   fileOf,
   type KnowledgeRow,
+  rowOf,
   summary,
 } from "./rows.ts";
-import { kindOf, lineCount } from "./text.ts";
+import { lineCount } from "./text.ts";
 import { KnowledgeVersions } from "./versions.ts";
 
 export { type KnowledgeRow, summary } from "./rows.ts";
+
+// the columns a text sets: bytes, lines, digest and tokens
+const measure = (text: string) =>
+  [
+    Buffer.byteLength(text),
+    lineCount(text),
+    sha256(text),
+    tokens(text),
+  ] as const;
 
 // a doc as a command mounts it, its text as bytes
 export type MountedDoc = KnowledgeFile & { data: Uint8Array };
 
 export class KnowledgeStore extends KnowledgeVersions {
-  constructor(private readonly filesDb: Db) {
-    super(filesDb);
-  }
-
   list(projectId: string): KnowledgeFile[] {
-    return this.filesDb
+    return this.db
       .query<FileRaw, [string]>(
         `select ${FILE_COLUMNS} from knowledge_files
        where project_id = ? order by name`,
@@ -46,22 +48,18 @@ export class KnowledgeStore extends KnowledgeVersions {
   }
 
   read(projectId: string): KnowledgeRow[] {
-    return this.filesDb
+    return this.db
       .query<FullRaw, [string]>(
         "select * from knowledge_files where project_id = ? order by name",
       )
       .all(projectId)
-      .map((raw) => ({
-        ...fileOf(raw),
-        text: raw.text,
-        digest: raw.digest,
-      }));
+      .map(rowOf);
   }
 
   // the live rows with their text as bytes, which a command's mount
   // transfers to its worker as they come from SQLite
   mounted(projectId: string): MountedDoc[] {
-    return this.filesDb
+    return this.db
       .query<FileRaw & { data: Uint8Array }, [string]>(
         `select ${FILE_COLUMNS}, cast(text as blob) as data
          from knowledge_files where project_id = ? order by name`,
@@ -96,7 +94,7 @@ export class KnowledgeStore extends KnowledgeVersions {
   // empty for a file gone
   text(projectId: string, id: string): string {
     return (
-      this.filesDb
+      this.db
         .query<{ text: string }, [string, string]>(
           "select text from knowledge_files where project_id = ? and id = ?",
         )
@@ -107,7 +105,7 @@ export class KnowledgeStore extends KnowledgeVersions {
   // its own statement, finalized at the end, since a cached one left
   // mid-step by a caller that stops early refuses its next use
   private *stream(sql: string, params: string[]): Generator<KnowledgeFile> {
-    const statement = this.filesDb.prepare<FileRaw, string[]>(sql);
+    const statement = this.db.prepare<FileRaw, string[]>(sql);
     try {
       for (const raw of statement.iterate(...params)) yield fileOf(raw);
     } finally {
@@ -116,37 +114,25 @@ export class KnowledgeStore extends KnowledgeVersions {
   }
 
   byId(projectId: string, id: string): KnowledgeRow | null {
-    const raw = this.filesDb
+    const raw = this.db
       .query<FullRaw, [string, string]>(
         "select * from knowledge_files where project_id = ? and id = ?",
       )
       .get(projectId, id);
-    return raw === null
-      ? null
-      : {
-          ...fileOf(raw),
-          text: raw.text,
-          digest: raw.digest,
-        };
+    return raw === null ? null : rowOf(raw);
   }
 
   byName(projectId: string, name: string): KnowledgeRow | null {
-    const raw = this.filesDb
+    const raw = this.db
       .query<FullRaw, [string, string]>(
         "select * from knowledge_files where project_id = ? and name = ?",
       )
       .get(projectId, name);
-    return raw === null
-      ? null
-      : {
-          ...fileOf(raw),
-          text: raw.text,
-          digest: raw.digest,
-        };
+    return raw === null ? null : rowOf(raw);
   }
 
   totals(projectId: string): KnowledgeTotals {
-    return this.filesDb
+    return this.db
       .query<KnowledgeTotals, [string]>(
         `select count(*) as files, coalesce(sum(bytes), 0) as bytes,
        coalesce(sum(tokens), 0) as tokens from knowledge_files
@@ -162,7 +148,7 @@ export class KnowledgeStore extends KnowledgeVersions {
 
   // the files changed last, newest first
   latest(projectId: string, limit: number): KnowledgeFile[] {
-    return this.filesDb
+    return this.db
       .query<FileRaw, [string, number]>(
         `select ${FILE_COLUMNS} from knowledge_files where project_id = ?
        order by updated_at desc, rowid desc limit ?`,
@@ -179,7 +165,7 @@ export class KnowledgeStore extends KnowledgeVersions {
     now: number,
   ): KnowledgeFile {
     const id = newId();
-    this.filesDb
+    this.db
       .query(
         `insert into knowledge_files
        (id, project_id, name, kind, text, bytes, lines, digest, tokens,
@@ -193,10 +179,7 @@ export class KnowledgeStore extends KnowledgeVersions {
         name,
         kindOf(name),
         text,
-        Buffer.byteLength(text),
-        lineCount(text),
-        sha256(text),
-        tokens(text),
+        ...measure(text),
         author.kind,
         author.id,
         author.name,
@@ -216,7 +199,7 @@ export class KnowledgeStore extends KnowledgeVersions {
     text: string,
     now: number,
   ): KnowledgeFile {
-    this.filesDb
+    this.db
       .query(
         `update knowledge_files set text = ?, bytes = ?, lines = ?, digest = ?,
        tokens = ?, revision = revision + 1, author_kind = ?, author_id = ?,
@@ -225,10 +208,7 @@ export class KnowledgeStore extends KnowledgeVersions {
       )
       .run(
         text,
-        Buffer.byteLength(text),
-        lineCount(text),
-        sha256(text),
-        tokens(text),
+        ...measure(text),
         author.kind,
         author.id,
         author.name,
@@ -250,7 +230,7 @@ export class KnowledgeStore extends KnowledgeVersions {
     name: string,
     now: number,
   ): KnowledgeFile {
-    this.filesDb
+    this.db
       .query(
         `update knowledge_files set name = ?, kind = ?,
        revision = revision + 1, author_kind = ?, author_id = ?,
@@ -286,7 +266,7 @@ export class KnowledgeStore extends KnowledgeVersions {
       updatedAt: now,
     };
     this.insert(file, "", true, current);
-    this.filesDb
+    this.db
       .query("delete from knowledge_files where project_id = ? and id = ?")
       .run(current.projectId, current.id);
     return file;

@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The request boundary for knowledge names, text and revisions. Files
-// use row ids in URLs because their names contain slashes; replacements
-// require a revision so a restore cannot silently overwrite a newer edit.
 
 import {
   type CreateKnowledgeFileRequest,
@@ -12,10 +8,14 @@ import {
   SEARCH_MAX,
   SEARCH_MIN,
 } from "../../shared/api/knowledge.ts";
-import { isKnowledgeName } from "../../shared/words.ts";
+import { textFromString } from "../../shared/knowledge.ts";
+import {
+  isKnowledgeName,
+  MAX_KNOWLEDGE_NAME,
+  MAX_KNOWLEDGE_SEGMENTS,
+} from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { textFromString } from "./text.ts";
 
 export function parseId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
@@ -27,7 +27,7 @@ export function parseId(value: unknown, name: string): string {
 export function parseName(value: unknown): string {
   if (!isKnowledgeName(value)) {
     throw new BadRequest(
-      "name must be 1 to 8 path segments of letters, digits, dots, dashes or underscores, at most 80 characters each and 200 total, never . or ..",
+      `name must be 1 to ${MAX_KNOWLEDGE_SEGMENTS} path segments of letters, digits, dots, dashes or underscores, at most 80 characters each and ${MAX_KNOWLEDGE_NAME} total, never . or ..`,
     );
   }
   return value;

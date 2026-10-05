@@ -15,9 +15,13 @@ import type { Db } from "../db/index.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
-import { checkUploadTotals } from "./check.ts";
+import { checkFile, checkUploadTotals } from "./check.ts";
 import { skippedName } from "./judge.ts";
-import { MAX_STAGED_ITEMS, UPLOAD_LEASE_MS } from "./limits.ts";
+import {
+  MAX_ANSWER_NAMES,
+  MAX_STAGED_ITEMS,
+  UPLOAD_LEASE_MS,
+} from "./limits.ts";
 
 export type UploadFile = {
   name: string;
@@ -164,33 +168,6 @@ export class UploadStore {
     if (removed === null) throw new NotFound("upload not found");
   }
 
-  check(
-    userId: string,
-    projectId: string,
-    ids: readonly string[],
-    now: number,
-  ): void {
-    this.checked(userId, projectId, ids, now);
-  }
-
-  claim(
-    userId: string,
-    projectId: string,
-    sessionId: string,
-    messageId: string,
-    ids: readonly string[],
-    caps: UploadCaps,
-    now: number,
-  ): MessageUpload[] {
-    return this.claimTurn(
-      projectId,
-      sessionId,
-      [{ userId, messageId, ids }],
-      caps,
-      now,
-    )[0]!;
-  }
-
   // The messages of one turn in order, each by its author: the tree is
   // read and written once, since each write upserts every file in it.
   claimTurn(
@@ -201,7 +178,7 @@ export class UploadStore {
     now: number,
   ): MessageUpload[][] {
     const staged = claims.map((claim) =>
-      this.checked(claim.userId, projectId, claim.ids, now),
+      this.check(claim.userId, projectId, claim.ids, now),
     );
     const ids = claims.flatMap((claim) => claim.ids);
     if (new Set(ids).size !== ids.length) throw new BadRequest(GONE);
@@ -219,11 +196,7 @@ export class UploadStore {
           .all(item.id!);
         for (const [position, file] of entries.entries()) {
           const previous = files.get(file.name)?.bytes ?? 0;
-          if (file.bytes > caps.knowledgeFileBytes && file.bytes >= previous) {
-            throw new BadRequest(
-              `${skippedName(file.name)} is ${file.bytes} bytes, the limit is ${caps.knowledgeFileBytes}`,
-            );
-          }
+          checkFile(skippedName(file.name), file.bytes, previous, caps);
           if (prefixConflict(file.name, files.keys()) !== null) {
             throw new Conflict(
               `${skippedName(file.name)} clashes with an uploaded file`,
@@ -371,7 +344,7 @@ export class UploadStore {
       .all(now).length;
   }
 
-  private checked(
+  check(
     userId: string,
     projectId: string,
     ids: readonly string[],
@@ -412,9 +385,9 @@ export class UploadStore {
       archive: input.archive,
       folder: input.folder,
       ...totals(files),
-      saved: input.result.saved.slice(0, 200).map(skippedName),
+      saved: input.result.saved.slice(0, MAX_ANSWER_NAMES).map(skippedName),
       skipped: input.result.skipped
-        .slice(0, 200)
+        .slice(0, MAX_ANSWER_NAMES)
         .map((skip) => ({ ...skip, name: skippedName(skip.name) })),
       skippedTotal: input.result.skippedTotal,
       renamed: input.result.renamed,

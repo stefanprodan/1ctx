@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Plain text search over a project's live files, a page at a time. No
-// index: the texts are read one at a time in name order, so memory stays
-// one file whatever the base holds.
 
 import {
   type KnowledgeSearchResponse,
@@ -168,8 +164,7 @@ function isLow(unit: number): boolean {
   return unit >= 0xdc00 && unit <= 0xdfff;
 }
 
-// one scan per user at a time; the scan is synchronous today, and this
-// holds should it ever yield
+// one scan per user at a time, should the scan ever yield
 export function oneAtATime<T>(
   running: Set<string>,
   userId: string,

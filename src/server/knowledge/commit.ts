@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Changes to the docs land together against the identities and revisions
-// they were made from. Caps are checked inside the caller's transaction
-// so a conflict cannot leave a partial commit.
 
 import type {
   KnowledgeAuthor,

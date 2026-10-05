@@ -5,7 +5,8 @@
 // store: the command worker loads this, never index.ts, so a command's
 // worker starts without the database, the archives or the renderer.
 
+export { textFromBytes } from "../../shared/knowledge.ts";
 export { checkFile, checkNames, checkUsage } from "./check.ts";
 export { languageOf } from "./languages.ts";
 export { parseName } from "./parse.ts";
-export { lineCount, textFromBytes } from "./text.ts";
+export { lineCount } from "./text.ts";

@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Admission for memory-backed work across all area instances: commands,
-// archives and staging share one process-wide bound on mounted bytes,
-// and a user runs one upload at a time.
+// Process slots and the one-upload-per-user admission, process-wide.
 
 import { UPLOAD_RUNNING } from "../../shared/uploads.ts";
 import type { Clock } from "../lib/clock.ts";

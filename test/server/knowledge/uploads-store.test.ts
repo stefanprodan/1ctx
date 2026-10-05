@@ -76,15 +76,13 @@ function fixture() {
     sessionId = ctx.session.id,
   ) =>
     transact(ctx.db, () => ({
-      result: uploads.claim(
-        userId,
+      result: uploads.claimTurn(
         ctx.projectId,
         sessionId,
-        messageId,
-        ids,
+        [{ userId, messageId, ids }],
         caps,
         ctx.now.value,
-      ),
+      )[0]!,
     }));
   const check = (ids: readonly string[]) =>
     uploads.check(userId, ctx.projectId, ids, ctx.now.value);
@@ -698,12 +696,10 @@ describe("upload store", () => {
         const before = ctx.read();
         expect(() =>
           transact(ctx.db, () => {
-            ctx.uploads.claim(
-              ctx.userId,
+            ctx.uploads.claimTurn(
               ctx.projectId,
               ctx.session.id,
-              "message-2",
-              [item.id!],
+              [{ userId: ctx.userId, messageId: "message-2", ids: [item.id!] }],
               ctx.caps,
               ctx.now.value,
             );
@@ -726,12 +722,10 @@ describe("upload store", () => {
       const item = ctx.stage();
       expect(() =>
         transact(ctx.db, () => {
-          ctx.uploads.claim(
-            ctx.userId,
+          ctx.uploads.claimTurn(
             ctx.projectId,
             ctx.session.id,
-            "message-1",
-            [item.id!],
+            [{ userId: ctx.userId, messageId: "message-1", ids: [item.id!] }],
             ctx.caps,
             ctx.now.value,
           );

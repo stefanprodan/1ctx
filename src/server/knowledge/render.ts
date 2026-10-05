@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A file as its page draws it, rendered at read and never stored, so a
-// renderer change reaches every file and version at once. A kept view is
-// keyed by what cannot change under it: a file's revision or a version.
+// A kept view is keyed by what cannot change under it.
 
 import type { KnowledgeRendered } from "../../shared/contracts/knowledge.ts";
 import { highlight, renderMarkdown } from "../render/index.ts";
