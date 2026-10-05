@@ -79,10 +79,13 @@ export async function teamAutomations(api: Api, admin: Who, d: Directory) {
 
 export type CapsMode = "default" | "max";
 
-// --caps as given: absent, or one of the two modes
-export function parseCaps(value: string | undefined): CapsMode | undefined {
-  if (value === undefined || value === "default" || value === "max")
-    return value;
+// --caps in a command line: absent, or one of the two modes; a bare
+// --caps is refused as a wrong value is
+export function parseCaps(argv: readonly string[]): CapsMode | undefined {
+  const at = argv.indexOf("--caps");
+  if (at < 0) return undefined;
+  const value = argv[at + 1];
+  if (value === "default" || value === "max") return value;
   throw new Error("--caps is default or max");
 }
 

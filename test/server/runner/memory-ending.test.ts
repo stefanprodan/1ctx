@@ -127,6 +127,7 @@ describe("the memory phase boundary", () => {
       version: VERSION,
       secureCookie: false,
       trustProxy: false,
+      cores: 1,
     });
     const send = fresh.sessions.lastSend(run.sessionId)!;
     expect(send).toMatchObject({
@@ -168,6 +169,7 @@ describe("the memory phase boundary", () => {
         version: VERSION,
         secureCookie: false,
         trustProxy: false,
+        cores: 1,
       });
     };
     const automation = await createAutomation(chat, {

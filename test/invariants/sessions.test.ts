@@ -752,6 +752,7 @@ describe("boot repair", () => {
         version: VERSION,
         secureCookie: false,
         trustProxy: false,
+        cores: 1,
       });
       stop();
 

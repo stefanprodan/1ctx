@@ -220,9 +220,17 @@ describe("the step's send caps", () => {
       "max",
       "max",
     ]);
-    expect(capsMode(8, parseCaps("default"))).toBe("default");
-    expect(capsMode(1, parseCaps("max"))).toBe("max");
-    expect(parseCaps(undefined)).toBeUndefined();
-    expect(() => parseCaps("maximum")).toThrow("--caps is default or max");
+    expect(
+      capsMode(8, parseCaps(["step", "8", "20", "--caps", "default"])),
+    ).toBe("default");
+    expect(capsMode(1, parseCaps(["--caps", "max", "--incident"]))).toBe("max");
+    expect(parseCaps(["step", "1", "20", "--incident"])).toBeUndefined();
+    for (const argv of [
+      ["--caps", "maximum"],
+      ["step", "1", "20", "--caps"],
+      ["--caps", "--incident"],
+    ]) {
+      expect(() => parseCaps(argv)).toThrow("--caps is default or max");
+    }
   });
 });

@@ -46,8 +46,7 @@ async function main() {
     console.error(usage);
     process.exit(2);
   }
-  const at = argv.indexOf("--caps");
-  const caps = parseCaps(at < 0 ? undefined : argv[at + 1]);
+  const caps = parseCaps(argv);
   const api = new Api({
     base: env("BASE"),
     password: process.env.PASSWORD,

@@ -16,7 +16,7 @@
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
-import { parseCaps } from "./driver/automations.ts";
+import { type CapsMode, parseCaps } from "./driver/automations.ts";
 import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
 import { failIfStuck, rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
@@ -365,8 +365,7 @@ function stopOnExit() {
   }
 }
 
-async function step(mult: string, minutes: string) {
-  const caps = parseCaps(flag("caps"));
+async function step(mult: string, minutes: string, caps?: CapsMode) {
   const label = flag("label") ?? `cluster-step-${mult}x`;
   const results = join(OUT_DIR, "results", label);
   mkdirSync(results, { recursive: true });
@@ -445,6 +444,8 @@ async function step(mult: string, minutes: string) {
 }
 
 async function main() {
+  // a typo fails before any cluster is touched
+  const caps = parseCaps(argv);
   checkTarget(context, ns);
   stopOnExit();
   const contexts = run(
@@ -480,7 +481,7 @@ async function main() {
         SETUP_MS,
       ),
     );
-  } else if (command === "step" && a && b) await step(a, b);
+  } else if (command === "step" && a && b) await step(a, b, caps);
   else if (command === "smoke") {
     await install();
     console.log(
