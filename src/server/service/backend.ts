@@ -22,11 +22,9 @@ export type ServiceState = {
 };
 
 export interface ServiceBackend {
-  // the name the manager knows the service by
   readonly name: string;
   // the stored program arguments, null when nothing is installed
   installed(): Promise<string[] | null>;
-  // does the manager hold the service now
   loaded(): Promise<boolean>;
   // write or replace the definition and start it; one that runs is
   // stopped first and has exited by the time the new one starts

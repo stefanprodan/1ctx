@@ -8,7 +8,6 @@ export interface PlistSpec {
   workingDirectory?: string;
   runAtLoad?: boolean;
   keepAlive?: boolean;
-  processType?: string;
   throttleInterval?: number;
   exitTimeOut?: number;
   standardOutPath?: string;
@@ -80,9 +79,6 @@ export function renderPlist(spec: PlistSpec): string {
   }
   if (spec.exitTimeOut !== undefined) {
     lines.push(key("ExitTimeOut"), `  <integer>${spec.exitTimeOut}</integer>`);
-  }
-  if (spec.processType !== undefined) {
-    lines.push(key("ProcessType"), stringValue(spec.processType));
   }
   if (spec.standardOutPath !== undefined) {
     lines.push(key("StandardOutPath"), stringValue(spec.standardOutPath));

@@ -102,8 +102,23 @@ const PROVISION_FLAGS = [
   "--help",
 ];
 
+// the flags that take the next argument as their value
+export const VALUED_FLAGS = [
+  "-f",
+  "--listen",
+  "--db",
+  "--secrets",
+  "--cache",
+  "--provision",
+  "--drain",
+];
+
+export function dataDir(home: string): string {
+  return join(home, ".1ctx");
+}
+
 export function defaultDb(home: string): string {
-  return join(home, ".1ctx", "1ctx.sqlite");
+  return join(dataDir(home), "1ctx.sqlite");
 }
 
 function parseListen(
@@ -138,17 +153,8 @@ export function parseCli(argv: string[], home: string = homedir()): Cli {
     if (provisioning && !PROVISION_FLAGS.includes(arg)) {
       return { kind: "error", message: `unknown provision option ${arg}` };
     }
-    const valued = [
-      "-f",
-      "--listen",
-      "--db",
-      "--secrets",
-      "--cache",
-      "--provision",
-      "--drain",
-    ];
     let value = "";
-    if (valued.includes(arg)) {
+    if (VALUED_FLAGS.includes(arg)) {
       const next = args[++i];
       if (next === undefined) {
         return { kind: "error", message: `${arg} needs a value` };
