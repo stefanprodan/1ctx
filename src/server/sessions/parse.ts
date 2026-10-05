@@ -26,7 +26,7 @@ import {
   MAX_SEARCH,
   MAX_TITLE,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   type FeedCursor,
@@ -220,25 +220,18 @@ export function parseStreamQuery(url: URL): {
   // the pick's own cursor
   alertBefore: RunsCursor | null;
 } {
-  const seen = new Set<string>();
-  for (const name of url.searchParams.keys()) {
-    if (
-      name !== "project" &&
-      name !== "q" &&
-      name !== "origin" &&
-      name !== "attention" &&
-      name !== "before"
-    ) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
-    if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
-    seen.add(name);
-  }
-  const project = url.searchParams.get("project");
-  const q = url.searchParams.get("q") ?? "";
-  const origin = url.searchParams.get("origin");
-  const attention = url.searchParams.get("attention");
-  const before = url.searchParams.get("before");
+  const get = queryParams(url, [
+    "project",
+    "q",
+    "origin",
+    "attention",
+    "before",
+  ]);
+  const project = get("project");
+  const q = get("q") ?? "";
+  const origin = get("origin");
+  const attention = get("attention");
+  const before = get("before");
   if (q.length > MAX_SEARCH) throw new BadRequest("q is too long");
   if (origin !== null && origin !== "chat" && origin !== "automation") {
     throw new BadRequest("origin must be chat or automation");

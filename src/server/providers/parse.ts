@@ -7,15 +7,8 @@ import {
   type CatalogKind,
   isCatalogKind,
 } from "../../shared/contracts/decider.ts";
-import {
-  isName,
-  isSecretName,
-  isWire,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { isSecretName, isWire } from "../../shared/words.ts";
+import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { azureBaseUrlProblem } from "./azure.ts";
 
@@ -23,15 +16,6 @@ const MAX_BASE_URL = 256;
 const MAX_QUERY = 100;
 // an agent's model id is capped the same
 export const MAX_MODEL_ID = 200;
-
-export function parseName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
-}
 
 // http or https, no query, no fragment, no trailing slash
 export function parseBaseUrl(value: unknown): string {
@@ -87,25 +71,22 @@ export function parseProvider(body: unknown): CreateProviderRequest {
   };
 }
 
-// ?q=: what was typed, trimmed; empty is allowed and matches nothing
-export function parseQuery(url: URL): string {
-  const q = url.searchParams.get("q") ?? "";
+// ?q=&kind=: what was typed, trimmed, where empty is allowed and
+// matches nothing, and which catalog to search, the chat models when absent
+export function parseCatalogQuery(url: URL): { q: string; kind: CatalogKind } {
+  const get = queryParams(url, ["q", "kind"]);
+  const q = get("q") ?? "";
   if (q.length > MAX_QUERY) throw new BadRequest("q is too long");
-  return q.trim();
-}
-
-// ?kind=: which catalog to search, the chat models when absent
-export function parseKind(url: URL): CatalogKind {
-  const kind = url.searchParams.get("kind") ?? "chat";
+  const kind = get("kind") ?? "chat";
   if (!isCatalogKind(kind)) {
     throw new BadRequest(`kind must be ${CATALOG_KINDS.join(" or ")}`);
   }
-  return kind;
+  return { q: q.trim(), kind };
 }
 
 // ?model=: an OpenRouter id, author/slug with an optional :variant
 export function parseModelQuery(url: URL): string {
-  const model = url.searchParams.get("model") ?? "";
+  const model = queryParams(url, ["model"])("model") ?? "";
   // a segment never starts with a dot, so none walks up the path
   if (model.length > MAX_MODEL_ID || !/^~?\w[\w.-]*\/\w[\w.:-]*$/.test(model)) {
     throw new BadRequest("model must be an OpenRouter model id");

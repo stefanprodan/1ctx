@@ -7,13 +7,12 @@ import type {
   DirectoryDecidersResponse,
 } from "../../shared/api/directory.ts";
 import type { DecisionId } from "../../shared/contracts/decision.ts";
-import { parseNoQuery } from "../lib/body.ts";
+import { parseName, parseNoQuery } from "../lib/body.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import type { ProvidersPort } from "./decide.ts";
 import { type DecisionStore, deciderIdFor } from "./decisions.ts";
-import { parseDeciderName } from "./parse.ts";
 import type { DeciderStore } from "./store.ts";
 
 // a decider's days in every project, the usage area's answer
@@ -40,7 +39,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       .map((d) => d.id);
   };
   const find = (name: unknown) => {
-    const decider = deps.store.byName(parseDeciderName(name));
+    const decider = deps.store.byName(parseName(name));
     if (decider === null) throw new NotFound("no such decider");
     return decider;
   };

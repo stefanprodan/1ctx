@@ -30,7 +30,7 @@ export {
   type DecisionUsageFields,
   decisionSlots,
 } from "./decisions.ts";
-export { parseZoneQuery } from "./parse.ts";
+export { parseZoneQuery, zoneParam } from "./parse.ts";
 export { type UsageFields, UsageStore } from "./store.ts";
 export {
   countByDay,

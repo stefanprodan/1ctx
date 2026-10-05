@@ -7,7 +7,7 @@ import type {
 } from "../../shared/api/skills.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isSkillName } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { validPath } from "../lib/paths.ts";
 import { MAX_SKILL_URL } from "./limits.ts";
@@ -61,10 +61,7 @@ export function parseAdd(body: unknown): AddSkillRequest {
 }
 
 export function parseFile(url: URL): string {
-  for (const key of url.searchParams.keys()) {
-    if (key !== "path") throw new BadRequest(`unknown query ${key}`);
-  }
-  const path = url.searchParams.get("path");
+  const path = queryParams(url, ["path"])("path");
   if (path === null || !validPath(path))
     throw new BadRequest("path is invalid");
   return path;

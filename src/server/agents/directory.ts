@@ -12,7 +12,7 @@ import type {
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { firstSentence } from "../../shared/mcp-catalog.ts";
 import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
-import { parseNoQuery } from "../lib/body.ts";
+import { parseName, parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -20,7 +20,6 @@ import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { parseAgentName } from "./parse.ts";
 import type { AgentTotalPort, ProvidersPort } from "./routes.ts";
 import type { AgentRow, AgentStore } from "./store.ts";
 
@@ -140,7 +139,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       path: "/api/directory/agents/:name",
       policy: "authenticated",
       handle(_req, ctx) {
-        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        const agent = deps.store.byName(parseName(ctx.params.name));
         if (agent === null) throw new NotFound("no such agent");
         const offered = agent.model.tools
           ? deps.tools.offered(
@@ -214,7 +213,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       path: "/api/directory/agents/:name/days",
       policy: "authenticated",
       handle(_req, ctx) {
-        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        const agent = deps.store.byName(parseName(ctx.params.name));
         if (agent === null) throw new NotFound("no such agent");
         const timeZone = parseZoneQuery(ctx.url);
         return json(deps.usage.agentDays(agent.id, timeZone));

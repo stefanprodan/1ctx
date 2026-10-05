@@ -14,7 +14,7 @@ import {
   MAX_KNOWLEDGE_NAME,
   MAX_KNOWLEDGE_SEGMENTS,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export function parseId(value: unknown, name: string): string {
@@ -73,14 +73,10 @@ export function parseRename(body: unknown): RenameKnowledgeFileRequest {
 export type SearchQuery = { q: string; after: string | null };
 
 export function parseSearch(url: URL): SearchQuery {
-  for (const key of url.searchParams.keys()) {
-    if (key !== "q" && key !== "after") {
-      throw new BadRequest(`unknown parameter ${key}`);
-    }
-  }
-  const qs = url.searchParams.getAll("q");
-  if (qs.length !== 1) throw new BadRequest("q must appear once");
-  const q = qs[0]!.trim();
+  const get = queryParams(url, ["q", "after"]);
+  const raw = get("q");
+  if (raw === null) throw new BadRequest("q must appear once");
+  const q = raw.trim();
   if (q.length < SEARCH_MIN || q.length > SEARCH_MAX) {
     throw new BadRequest(`q must be ${SEARCH_MIN} to ${SEARCH_MAX} characters`);
   }
@@ -88,11 +84,10 @@ export function parseSearch(url: URL): SearchQuery {
   if (/[\r\n]/.test(q)) {
     throw new BadRequest("q must be one line of text");
   }
-  const afters = url.searchParams.getAll("after");
-  if (afters.length > 1) throw new BadRequest("after must appear once");
-  if (afters.length === 0) return { q, after: null };
-  if (!isKnowledgeName(afters[0])) {
+  const after = get("after");
+  if (after === null) return { q, after: null };
+  if (!isKnowledgeName(after)) {
     throw new BadRequest("after must be a file name");
   }
-  return { q, after: afters[0] };
+  return { q, after };
 }

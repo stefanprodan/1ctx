@@ -44,7 +44,6 @@ export {
   parseIgnoreText,
   parseKind,
   parseRef,
-  parseRepoName,
   parseRepoUrl,
 } from "./parse.ts";
 export { type RepoFields, ReposStore, view } from "./store.ts";

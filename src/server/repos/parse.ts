@@ -14,14 +14,8 @@ import {
   MAX_REPO_IGNORE_LINES,
   REPO_KINDS,
 } from "../../shared/contracts/repo.ts";
-import {
-  isName,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
 import { parseKeyName } from "../credentials/index.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { type Checked, checkRef, normalizeUrl } from "./adapters.ts";
 import { parseIgnore } from "./rules.ts";
@@ -29,15 +23,6 @@ import { parseIgnore } from "./rules.ts";
 function checked<T>(result: Checked<T>): T {
   if (!result.ok) throw new BadRequest(result.error);
   return result.value;
-}
-
-export function parseRepoName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
 }
 
 // the normalized form; the host's kind is the caller's to apply
@@ -87,7 +72,7 @@ const FIELDS = ["url", "name", "kind", "ref", "keyName", "ignore"];
 
 const parsers = {
   url: parseRepoUrl,
-  name: parseRepoName,
+  name: parseName,
   kind: parseKind,
   ref: parseRef,
   keyName: parseRepoKey,

@@ -5,18 +5,37 @@
 // parsers start here: an object with exactly the fields it names, or
 // a 400 naming the stranger.
 
-import { isRecord } from "../../shared/words.ts";
+import {
+  isName,
+  isRecord,
+  MAX_NAME,
+  MIN_NAME,
+  NAME_CHARACTERS,
+} from "../../shared/words.ts";
 import { BadRequest, PayloadTooLarge } from "./errors.ts";
 
 export const MAX_BODY = 64 * 1024;
 // Shared with the upload budget without making web depend on knowledge.
 export const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
 
-// a route that takes no query answers a 400 to any parameter
-export function parseNoQuery(url: URL): void {
+// a query of the allowed names, each at most once, read by name
+export function queryParams(
+  url: URL,
+  allowed: readonly string[],
+): (name: string) => string | null {
+  const seen = new Set<string>();
   for (const name of url.searchParams.keys()) {
-    throw new BadRequest(`unknown parameter ${name}`);
+    if (!allowed.includes(name)) {
+      throw new BadRequest(`unknown parameter ${name}`);
+    }
+    if (seen.has(name)) throw new BadRequest(`${name} must appear once`);
+    seen.add(name);
   }
+  return (name) => url.searchParams.get(name);
+}
+
+export function parseNoQuery(url: URL): void {
+  queryParams(url, []);
 }
 
 // an object with exactly the given keys, or a 400 naming the stranger
@@ -29,6 +48,16 @@ export function fields(
     if (!allowed.includes(key)) throw new BadRequest(`unknown field ${key}`);
   }
   return body;
+}
+
+// an object's name, by the rule every named object shares
+export function parseName(value: unknown, field = "name"): string {
+  if (!isName(value)) {
+    throw new BadRequest(
+      `${field} must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
+    );
+  }
+  return value;
 }
 
 // a promise that rejects with the signal's reason once it aborts

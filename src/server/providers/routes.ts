@@ -15,12 +15,7 @@ import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { lastDays } from "../usage/index.ts";
 import { type Catalogs, gateway, servesDecisions } from "./catalog.ts";
-import {
-  parseKind,
-  parseModelQuery,
-  parseProvider,
-  parseQuery,
-} from "./parse.ts";
+import { parseCatalogQuery, parseModelQuery, parseProvider } from "./parse.ts";
 import { type ProviderRow, type ProviderStore, summary } from "./store.ts";
 
 export type AgentsPort = {
@@ -119,8 +114,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(_req, ctx) {
         const provider = find(ctx.params.id);
-        const q = parseQuery(ctx.url);
-        const kind = parseKind(ctx.url);
+        const { q, kind } = parseCatalogQuery(ctx.url);
         if (kind === "decisions" && !servesDecisions(provider.wire)) {
           throw new BadRequest(`${provider.name} serves no decision models`);
         }

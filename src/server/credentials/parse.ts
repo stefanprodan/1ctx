@@ -13,15 +13,8 @@ import {
   type HttpMethod,
   isHttpMethod,
 } from "../../shared/contracts/credential.ts";
-import {
-  HTTP_KEY_PREFIX,
-  isName,
-  isSecretName,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { HTTP_KEY_PREFIX, isSecretName } from "../../shared/words.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   type Checked,
@@ -38,15 +31,6 @@ const MAX_PROJECTS = 256;
 function checked<T>(result: Checked<T>): T {
   if (!result.ok) throw new BadRequest(result.error);
   return result.value;
-}
-
-export function parseName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
 }
 
 export function parseKeyName(value: unknown): string {

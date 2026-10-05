@@ -9,13 +9,10 @@ import type {
   StorageResponse,
   UsageResponse,
 } from "../../shared/api/admin.ts";
+import { parseNoQuery } from "../lib/body.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import {
-  parseNoQuery,
-  parseOverviewQuery,
-  parseUsageQuery,
-  parseZoneQuery,
-} from "./parse.ts";
+import { parseZoneQuery } from "../usage/index.ts";
+import { canonicalZone, parseOverviewQuery, parseUsageQuery } from "./parse.ts";
 
 export type RoutesDeps = {
   storage(timeZone: string): Promise<StorageResponse>;
@@ -59,7 +56,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/admin/storage",
       policy: "admin",
       async handle(_req, ctx) {
-        return json(await deps.storage(parseZoneQuery(ctx.url)));
+        return json(await deps.storage(canonicalZone(parseZoneQuery(ctx.url))));
       },
     },
     {

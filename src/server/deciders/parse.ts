@@ -6,14 +6,8 @@ import {
   type DecisionId,
   MAX_OPTION_TEXT,
 } from "../../shared/contracts/decision.ts";
-import {
-  isName,
-  isRecord,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { isRecord } from "../../shared/words.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { DecisionFields } from "./decisions.ts";
 
@@ -29,11 +23,7 @@ export type ParsedDecider = {
 
 export function parseDecider(body: unknown): ParsedDecider {
   const b = fields(body, ["name", "providerId", "model", "default"]);
-  if (!isName(b.name)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
+  const name = parseName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
@@ -48,21 +38,11 @@ export function parseDecider(body: unknown): ParsedDecider {
     throw new BadRequest("default must be true or false");
   }
   return {
-    name: b.name,
+    name,
     providerId: b.providerId,
     model: b.model,
     mark: b.default ?? null,
   };
-}
-
-// a decider's name as a path names it, by the same rule a save keeps
-export function parseDeciderName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
 }
 
 // a decision's whole settings: every option key of it exactly once

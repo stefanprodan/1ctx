@@ -47,12 +47,7 @@ import { type Scanner, workerScanner } from "./worker.ts";
 export { type AttentionInput, attention } from "./attention.ts";
 export { BOARD_KEEP_MS, KEEP_MS } from "./cache.ts";
 export { type Probe, type Reading, sampler } from "./load.ts";
-export {
-  parseNoQuery,
-  parseOverviewQuery,
-  parseUsageQuery,
-  parseZoneQuery,
-} from "./parse.ts";
+export { canonicalZone, parseOverviewQuery, parseUsageQuery } from "./parse.ts";
 
 export type OverviewDeps = {
   db: Db;

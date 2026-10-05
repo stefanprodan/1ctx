@@ -13,7 +13,6 @@ import {
 import { sanitize } from "../../shared/memory.ts";
 import {
   isAttentionMode,
-  isName,
   isRunFilter,
   MAX_ATTENTION_GUIDANCE,
   MAX_MEMORY_GUIDANCE,
@@ -23,7 +22,7 @@ import {
   RETENTION_DAYS,
   type RunFilter,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 
@@ -70,10 +69,7 @@ function parseValues(
   // a field a create leaves out takes its default
   const given = (name: string, fallback: unknown) =>
     Object.hasOwn(body, name) ? body[name] : fallback;
-  if (take("name")) {
-    if (!isName(body.name)) throw new BadRequest("invalid name");
-    out.name = body.name;
-  }
+  if (take("name")) out.name = parseName(body.name);
   if (take("agentId")) out.agentId = text(body.agentId, "agentId");
   if (take("instructions")) {
     const instructions = text(body.instructions, "instructions");
@@ -182,27 +178,16 @@ export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
   return parseValues(parsed, false);
 }
 
-function queryKeys(url: URL, allowed: string[]): void {
-  const seen = new Set<string>();
-  for (const name of url.searchParams.keys()) {
-    if (!allowed.includes(name)) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
-    if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
-    seen.add(name);
-  }
-}
-
 export function parseRunsQuery(url: URL): {
   filter: RunFilter | null;
   before: RunsCursor | null;
 } {
-  queryKeys(url, ["filter", "before"]);
-  const filter = url.searchParams.get("filter");
+  const get = queryParams(url, ["filter", "before"]);
+  const filter = get("filter");
   if (filter !== null && !isRunFilter(filter)) {
     throw new BadRequest("filter must be manual or attention");
   }
-  const before = url.searchParams.get("before");
+  const before = get("before");
   return {
     filter,
     before: before === null ? null : parseRunsCursor(before),
@@ -212,8 +197,7 @@ export function parseRunsQuery(url: URL): {
 // ?runs=delete deletes the automation's runs with it; without it they
 // stay, their automation gone
 export function parseDeleteAutomation(url: URL): { runs: boolean } {
-  queryKeys(url, ["runs"]);
-  const runs = url.searchParams.get("runs");
+  const runs = queryParams(url, ["runs"])("runs");
   if (runs !== null && runs !== "delete") {
     throw new BadRequest("runs must be delete");
   }
@@ -224,9 +208,9 @@ export function parseSchedulePreview(url: URL): {
   schedule: string;
   tz: string;
 } {
-  queryKeys(url, ["schedule", "tz"]);
-  const schedule = url.searchParams.get("schedule")?.trim();
-  const tz = url.searchParams.get("tz")?.trim();
+  const get = queryParams(url, ["schedule", "tz"]);
+  const schedule = get("schedule")?.trim();
+  const tz = get("tz")?.trim();
   if (schedule === undefined || schedule.length > MAX_SCHEDULE) {
     throw new BadRequest("invalid schedule");
   }

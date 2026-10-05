@@ -14,12 +14,12 @@ import {
 } from "../../shared/contracts/repo.ts";
 import { isName, PERSONAL_PROJECT_NAME } from "../../shared/words.ts";
 import { parseKeyName } from "../credentials/index.ts";
+import { parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   parseIgnoreText,
   parseKind,
   parseRef,
-  parseRepoName,
   parseRepoUrl,
 } from "../repos/index.ts";
 import { type Action, type Client, difference } from "./client.ts";
@@ -53,7 +53,7 @@ export function repository(value: unknown): RepositorySpec {
     project,
     ...optional<Omit<RepositorySpec, "project">>(b, {
       url: parseRepoUrl,
-      name: parseRepoName,
+      name: parseName,
       kind: parseKind,
       ref: parseRef,
       keyFrom: (v) => (v === null ? null : parseKeyName(v)),

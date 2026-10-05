@@ -10,15 +10,11 @@ import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   isAvatar,
   isMcpMode,
-  isName,
   MAX_CONTEXT_LENGTH,
-  MAX_NAME,
   MAX_SKILLS_PER_AGENT,
   MIN_CONTEXT_LENGTH,
-  MIN_NAME,
-  NAME_CHARACTERS,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_MODEL = 200;
@@ -47,16 +43,6 @@ export type ParsedAgent = Omit<
   // null leaves the default mark as it is
   mark: boolean | null;
 };
-
-// an agent's name as a path names it, by the same rule a save keeps
-export function parseAgentName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
-}
 
 function parseServers(value: unknown): AgentServer[] {
   if (!Array.isArray(value)) {
@@ -111,7 +97,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "skip4Bit",
     "default",
   ]);
-  const name = parseAgentName(b.name);
+  const name = parseName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
