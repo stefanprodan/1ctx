@@ -18,6 +18,7 @@ import {
   parseChange,
 } from "../../shared/capabilities.ts";
 import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
+import { cutText } from "../../shared/text.ts";
 import { MAX_UPLOADS_PER_MESSAGE } from "../../shared/uploads.ts";
 import {
   hasLineBreak,
@@ -263,9 +264,7 @@ export function parseStreamQuery(url: URL): {
 // the first line of the first message, cut to the cap
 export function titleFrom(text: string): string {
   const line = text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
-  return line.length > MAX_TITLE
-    ? `${line.slice(0, MAX_TITLE - 1).trimEnd()}…`
-    : line;
+  return cutText(line, MAX_TITLE);
 }
 
 // the feed's last line: the first non-empty line, its Markdown
@@ -280,7 +279,5 @@ export function lineFrom(text: string): string {
     .replace(/^(?:(?:#+|[-*+]|\d+\.)\s+|>\s*)+/, "")
     .replace(/\*\*|__|`+/g, "")
     .trim();
-  return stripped.length > MAX_LAST_LINE
-    ? `${stripped.slice(0, MAX_LAST_LINE - 1).trimEnd()}…`
-    : stripped;
+  return cutText(stripped, MAX_LAST_LINE);
 }

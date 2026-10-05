@@ -5,8 +5,9 @@
 // by the server's offer and the Directory. Environment neutral: no Bun,
 // no DOM, no packages.
 
-import { cutText, type PromptServer } from "./mcp.ts";
+import type { PromptServer } from "./mcp.ts";
 import { escapeText } from "./skills.ts";
+import { cutText } from "./text.ts";
 import { isRecord, type McpMode } from "./words.ts";
 
 // decision 19: the catalog of discovery mode, and the mode a send runs in

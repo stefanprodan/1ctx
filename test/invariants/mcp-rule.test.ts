@@ -14,7 +14,6 @@ import { changeNote } from "../../src/server/mcp/note.ts";
 import { wireTools } from "../../src/server/providers/index.ts";
 import {
   classify,
-  cutText,
   MAX_INSTRUCTIONS_BLOCK,
   MAX_SCHEMAS_BYTES,
   MAX_WIRE_DESCRIPTION,
@@ -42,6 +41,7 @@ import {
   resolveMode,
 } from "../../src/shared/mcp-catalog.ts";
 import { shapeName, shapeServerName } from "../../src/shared/names.ts";
+import { cutText } from "../../src/shared/text.ts";
 import { isPattern, isServerName } from "../../src/shared/words.ts";
 
 type Recorded = {

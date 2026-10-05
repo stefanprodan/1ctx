@@ -3,7 +3,7 @@
 //
 // The mark a run ends with (docs/automations.md, Attention).
 
-import { cutText } from "../../shared/mcp.ts";
+import { cutText } from "../../shared/text.ts";
 import { MAX_ATTENTION_REASON, type SendCause } from "../../shared/words.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { RunMark } from "../sessions/index.ts";

@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { lineFrom } from "../../src/server/sessions/index.ts";
+import { MAX_LAST_LINE } from "../../src/shared/contracts/session.ts";
 
 type Fixture = {
   name: string;
@@ -27,4 +28,9 @@ describe("lineFrom", () => {
       expect(lineFrom(input)).toBe(expected);
     });
   }
+});
+
+test("lineFrom never keeps half a surrogate pair", () => {
+  const start = "x".repeat(MAX_LAST_LINE - 2);
+  expect(lineFrom(`${start}\u{1F600}y`)).toBe(`${start}…`);
 });
