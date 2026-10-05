@@ -9,6 +9,22 @@ export type Handle = (
 ) => Promise<RouteOutcome>;
 
 export type Client = ReturnType<typeof client>;
+export type Action = "created" | "updated" | "unchanged";
+export type Counts = Record<Action, number>;
+
+export function idOf(
+  rows: { id: string; name: string }[],
+  name: string,
+): string {
+  const row = rows.find((row) => row.name === name);
+  if (!row) throw new Error(`no such reference ${name}`);
+  return row.id;
+}
+
+export function required<T>(value: T | undefined, field: string): T {
+  if (value === undefined) throw new Error(`spec.${field} is required`);
+  return value;
+}
 
 export function client(handle: Handle) {
   let cookie = "";

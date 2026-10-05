@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { type Db, heldByAnother, inspect, open, release } from "../db/index.ts";
-import type { Counts } from "./apply.ts";
+import type { Counts } from "./client.ts";
 import { readSources } from "./input.ts";
 import { loadKnowledge } from "./knowledge.ts";
 import { type Document, parse } from "./parse.ts";

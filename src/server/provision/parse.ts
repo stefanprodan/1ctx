@@ -65,6 +65,7 @@ export type Document = {
     spec: spec.Specs[K];
   } & (K extends "Project" ? { docs?: KnowledgeDoc[] } : unknown);
 }[Kind];
+export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
 export type { RepositorySpec } from "./repository.ts";
 export type {

@@ -23,26 +23,18 @@ import type {
 import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
 import type { SecretKind } from "../../shared/words.ts";
-import { type Client, difference } from "./client.ts";
+import {
+  type Action,
+  type Client,
+  difference,
+  idOf,
+  required,
+} from "./client.ts";
 import { decider } from "./decider.ts";
-import { type Document, KINDS } from "./parse.ts";
+import { type Document, KINDS, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 
-export type Action = "created" | "updated" | "unchanged";
-export type Counts = Record<Action, number>;
 export type Secret = (kind: SecretKind, name: string) => string | null;
-type Of<K extends Document["kind"]> = Extract<Document, { kind: K }>;
-
-function idOf(rows: { id: string; name: string }[], name: string): string {
-  const row = rows.find((row) => row.name === name);
-  if (!row) throw new Error(`no such reference ${name}`);
-  return row.id;
-}
-
-function required<T>(value: T | undefined, field: string): T {
-  if (value === undefined) throw new Error(`spec.${field} is required`);
-  return value;
-}
 
 async function user(
   api: Client,

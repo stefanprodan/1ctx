@@ -22,7 +22,7 @@ import {
   parseRepoName,
   parseRepoUrl,
 } from "../repos/index.ts";
-import { type Client, difference } from "./client.ts";
+import { type Action, type Client, difference } from "./client.ts";
 import { at, object, optional } from "./fields.ts";
 
 export type RepositorySpec = {
@@ -109,10 +109,7 @@ export function repositories(docs: Doc[], live: string[]): void {
   }
 }
 
-export async function applyRepository(
-  api: Client,
-  doc: Doc,
-): Promise<"created" | "updated" | "unchanged"> {
+export async function applyRepository(api: Client, doc: Doc): Promise<Action> {
   const { projects } = await api.call<ProjectsResponse>("GET", "/api/projects");
   const project = projects.find(
     (row) => row.kind === "team" && row.name === doc.spec.project,

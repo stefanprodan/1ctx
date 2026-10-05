@@ -43,6 +43,17 @@ export function optional<T>(
   return out;
 }
 
+// a spec of optional fields only: the validators name every allowed field
+export function optionalSpec<T>(
+  value: unknown,
+  validators: { [K in keyof Required<T>]: (value: unknown) => T[K] },
+): Partial<T> {
+  return optional<T>(
+    object(value, Object.keys(validators), "spec"),
+    validators,
+  );
+}
+
 export function boolean(value: unknown): boolean {
   if (typeof value !== "boolean") {
     throw new BadRequest("must be true or false");

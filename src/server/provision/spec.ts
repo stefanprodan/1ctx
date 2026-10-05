@@ -57,7 +57,15 @@ import {
 } from "../providers/index.ts";
 import { MAX_SKILL_URL, validPath } from "../skills/index.ts";
 import { parseHosts, parseWebDomains } from "../tools/index.ts";
-import { at, boolean, guarded, names, object, optional } from "./fields.ts";
+import {
+  at,
+  boolean,
+  guarded,
+  names,
+  object,
+  optional,
+  optionalSpec,
+} from "./fields.ts";
 import type { RepositorySpec } from "./repository.ts";
 
 export type UserSpec = {
@@ -82,7 +90,7 @@ const MAX_FOLDER_PATH = 1024;
 
 // relative and without "..", so the folder stays under the file's own
 // directory, the one staging copies
-export function folderPath(value: unknown): string {
+function folderPath(value: unknown): string {
   if (
     typeof value !== "string" ||
     value === "" ||
@@ -216,46 +224,33 @@ export function user(value: unknown): UserSpec {
 }
 
 export function project(value: unknown): ProjectSpec {
-  return optional<ProjectSpec>(
-    object(value, ["description", "members", "knowledge"], "spec"),
-    {
-      description: guarded(
-        isDescription,
-        `must be one trimmed line of at most ${MAX_DESCRIPTION} characters`,
-      ),
-      members: (v) => names(v, isUsername),
-      knowledge: folderPath,
-    },
-  );
+  return optionalSpec<ProjectSpec>(value, {
+    description: guarded(
+      isDescription,
+      `must be one trimmed line of at most ${MAX_DESCRIPTION} characters`,
+    ),
+    members: (v) => names(v, isUsername),
+    knowledge: folderPath,
+  });
 }
 
 export function credential(value: unknown): CredentialSpec {
-  return optional<CredentialSpec>(
-    object(
-      value,
-      ["keyFrom", "url", "header", "value", "methods", "projects"],
-      "spec",
-    ),
-    {
-      keyFrom: parseCredentialKey,
-      url: parsePrefix,
-      header: parseHeader,
-      value: parseTemplate,
-      methods: parseMethods,
-      projects: (v) => names(v, isName),
-    },
-  );
+  return optionalSpec<CredentialSpec>(value, {
+    keyFrom: parseCredentialKey,
+    url: parsePrefix,
+    header: parseHeader,
+    value: parseTemplate,
+    methods: parseMethods,
+    projects: (v) => names(v, isName),
+  });
 }
 
 export function provider(value: unknown): ProviderSpec {
-  const spec = optional<ProviderSpec>(
-    object(value, ["wire", "baseUrl", "keyFrom"], "spec"),
-    {
-      wire: guarded(isWire, "must be a known wire"),
-      baseUrl: parseBaseUrl,
-      keyFrom: parseKeyName,
-    },
-  );
+  const spec = optionalSpec<ProviderSpec>(value, {
+    wire: guarded(isWire, "must be a known wire"),
+    baseUrl: parseBaseUrl,
+    keyFrom: parseKeyName,
+  });
   const problem =
     spec.wire === "azure" && spec.baseUrl !== undefined
       ? azureBaseUrlProblem(spec.baseUrl)
@@ -270,42 +265,35 @@ const onlyTrue = (v: unknown): true => {
 };
 
 export function decider(value: unknown): DeciderSpec {
-  return optional<DeciderSpec>(
-    object(value, ["provider", "model", "default"], "spec"),
-    {
-      provider: guarded(isName, "must be a provider name"),
-      model: (v) => {
-        if (typeof v !== "string" || v === "" || v.length > MAX_DECIDER_MODEL) {
-          throw new BadRequest("must be a model id");
-        }
-        return v;
-      },
-      default: onlyTrue,
+  return optionalSpec<DeciderSpec>(value, {
+    provider: guarded(isName, "must be a provider name"),
+    model: (v) => {
+      if (typeof v !== "string" || v === "" || v.length > MAX_DECIDER_MODEL) {
+        throw new BadRequest("must be a model id");
+      }
+      return v;
     },
-  );
+    default: onlyTrue,
+  });
 }
 
 export function skill(value: unknown): SkillSpec {
-  const spec = optional<SkillSpec>(
-    object(value, ["url", "fromIndex", "path"], "spec"),
-    {
-      url: (v) => {
-        if (typeof v !== "string" || v === "" || v.length > MAX_SKILL_URL) {
-          throw new BadRequest("must be a URL within the length limit");
-        }
-        if (sourceKind(v) === null)
-          throw new BadRequest("must be http or https");
-        return v;
-      },
-      fromIndex: boolean,
-      path: (v) => {
-        if (typeof v !== "string" || (v !== "" && !validPath(v))) {
-          throw new BadRequest("must be a relative archive path");
-        }
-        return v;
-      },
+  const spec = optionalSpec<SkillSpec>(value, {
+    url: (v) => {
+      if (typeof v !== "string" || v === "" || v.length > MAX_SKILL_URL) {
+        throw new BadRequest("must be a URL within the length limit");
+      }
+      if (sourceKind(v) === null) throw new BadRequest("must be http or https");
+      return v;
     },
-  );
+    fromIndex: boolean,
+    path: (v) => {
+      if (typeof v !== "string" || (v !== "" && !validPath(v))) {
+        throw new BadRequest("must be a relative archive path");
+      }
+      return v;
+    },
+  });
   if (spec.path !== undefined) {
     if (
       spec.fromIndex ||
@@ -327,34 +315,17 @@ export function skill(value: unknown): SkillSpec {
 }
 
 export function mcpServer(value: unknown): McpServerSpec {
-  return optional<McpServerSpec>(
-    object(
-      value,
-      [
-        "url",
-        "keyFrom",
-        "read",
-        "write",
-        "instructionsOn",
-        "timeoutMs",
-        "readPatterns",
-        "writePatterns",
-        "excludedPatterns",
-      ],
-      "spec",
-    ),
-    {
-      url: parseUrl,
-      keyFrom: parseMcpKeyName,
-      read: boolean,
-      write: boolean,
-      instructionsOn: boolean,
-      timeoutMs: parseTimeout,
-      readPatterns: (v) => parsePatterns(v, "readPatterns"),
-      writePatterns: (v) => parsePatterns(v, "writePatterns"),
-      excludedPatterns: (v) => parsePatterns(v, "excludedPatterns"),
-    },
-  );
+  return optionalSpec<McpServerSpec>(value, {
+    url: parseUrl,
+    keyFrom: parseMcpKeyName,
+    read: boolean,
+    write: boolean,
+    instructionsOn: boolean,
+    timeoutMs: parseTimeout,
+    readPatterns: (v) => parsePatterns(v, "readPatterns"),
+    writePatterns: (v) => parsePatterns(v, "writePatterns"),
+    excludedPatterns: (v) => parsePatterns(v, "excludedPatterns"),
+  });
 }
 
 function servers(value: unknown): NonNullable<AgentSpec["servers"]> {
@@ -384,79 +355,57 @@ function servers(value: unknown): NonNullable<AgentSpec["servers"]> {
 }
 
 export function agent(value: unknown): AgentSpec {
-  return optional<AgentSpec>(
-    object(
-      value,
-      [
-        "provider",
-        "model",
-        "avatar",
-        "thinking",
-        "effort",
-        "prompt",
-        "skills",
-        "servers",
-        "mcpMode",
-        "contextLength",
-        "tools",
-        "upstream",
-        "skip4Bit",
-        "default",
-      ],
-      "spec",
-    ),
-    {
-      provider: guarded(isName, "must be a provider name"),
-      model: (v) => {
-        if (typeof v !== "string" || v === "" || v.length > MAX_MODEL) {
-          throw new BadRequest("must be a model id");
-        }
-        return v;
-      },
-      avatar: (v) => guarded(isAvatar, "must be a known avatar")(v ?? "bot"),
-      thinking: (v) => {
-        if (v !== null && v !== "on" && v !== "off") {
-          throw new BadRequest("must be on, off or null");
-        }
-        return v;
-      },
-      effort: (v) => {
-        if (v !== null && typeof v !== "string") {
-          throw new BadRequest("must be text or null");
-        }
-        return v;
-      },
-      prompt: (v) => {
-        const prompt = v ?? "";
-        if (typeof prompt !== "string" || prompt.length > MAX_PROMPT) {
-          throw new BadRequest(
-            `must be text of at most ${MAX_PROMPT} characters`,
-          );
-        }
-        return prompt.trim();
-      },
-      skills: (v) => names(v ?? [], isSkillName, MAX_SKILLS_PER_AGENT),
-      servers,
-      mcpMode: guarded(isMcpMode, "must be all, catalog or auto"),
-      // the range is the API's to hold
-      contextLength: (v) => {
-        if (v !== null && (typeof v !== "number" || !Number.isInteger(v))) {
-          throw new BadRequest("must be a whole number of tokens or null");
-        }
-        return v;
-      },
-      tools: boolean,
-      // the tag's shape is the API's to hold
-      upstream: (v) => {
-        if (v !== null && (typeof v !== "string" || v === "")) {
-          throw new BadRequest("must be an endpoint tag or null");
-        }
-        return v;
-      },
-      skip4Bit: boolean,
-      default: onlyTrue,
+  return optionalSpec<AgentSpec>(value, {
+    provider: guarded(isName, "must be a provider name"),
+    model: (v) => {
+      if (typeof v !== "string" || v === "" || v.length > MAX_MODEL) {
+        throw new BadRequest("must be a model id");
+      }
+      return v;
     },
-  );
+    avatar: (v) => guarded(isAvatar, "must be a known avatar")(v ?? "bot"),
+    thinking: (v) => {
+      if (v !== null && v !== "on" && v !== "off") {
+        throw new BadRequest("must be on, off or null");
+      }
+      return v;
+    },
+    effort: (v) => {
+      if (v !== null && typeof v !== "string") {
+        throw new BadRequest("must be text or null");
+      }
+      return v;
+    },
+    prompt: (v) => {
+      const prompt = v ?? "";
+      if (typeof prompt !== "string" || prompt.length > MAX_PROMPT) {
+        throw new BadRequest(
+          `must be text of at most ${MAX_PROMPT} characters`,
+        );
+      }
+      return prompt.trim();
+    },
+    skills: (v) => names(v ?? [], isSkillName, MAX_SKILLS_PER_AGENT),
+    servers,
+    mcpMode: guarded(isMcpMode, "must be all, catalog or auto"),
+    // the range is the API's to hold
+    contextLength: (v) => {
+      if (v !== null && (typeof v !== "number" || !Number.isInteger(v))) {
+        throw new BadRequest("must be a whole number of tokens or null");
+      }
+      return v;
+    },
+    tools: boolean,
+    // the tag's shape is the API's to hold
+    upstream: (v) => {
+      if (v !== null && (typeof v !== "string" || v === "")) {
+        throw new BadRequest("must be an endpoint tag or null");
+      }
+      return v;
+    },
+    skip4Bit: boolean,
+    default: onlyTrue,
+  });
 }
 
 export function tool(value: unknown, name: string): ToolSpec {

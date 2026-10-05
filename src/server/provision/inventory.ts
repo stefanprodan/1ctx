@@ -6,6 +6,7 @@
 
 import type { KnowledgeCaps } from "../limits/index.ts";
 import type { Inventory, ProjectDocs } from "./parse.ts";
+import { repoKey } from "./repository.ts";
 
 type Named = { list(): { name: string }[] };
 
@@ -37,7 +38,7 @@ export function inventoryOf(sources: InventorySources): Inventory {
       const project = sources.projects.byId(id)!.name;
       return sources.repos
         .forProject(id)
-        .map((row) => `${project}/${row.name}`);
+        .map((row) => repoKey(project, row.name));
     }),
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
