@@ -81,7 +81,7 @@ export function parseArgs(args: Record<string, unknown>): SearchArgs {
   return { query, domain };
 }
 
-export function retryAfterMs(header: string | null): number | null {
+export function searchRetryDelay(header: string | null): number | null {
   if (header === null) return 1000;
   const value = header.trim();
   if (value === "" || /^-\d+$/u.test(value)) return 1000;
@@ -177,7 +177,7 @@ async function post(
       signal,
     );
     if (response.status === 429) {
-      const delay = retryAfterMs(response.headers.get("retry-after"));
+      const delay = searchRetryDelay(response.headers.get("retry-after"));
       discard(response.body);
       if (attempt === 1 || delay === null || delay >= deadlineAt - Date.now()) {
         throw new Error("websearch rate limited, try again in a moment");

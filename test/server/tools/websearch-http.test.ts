@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  retryAfterMs,
+  searchRetryDelay,
   searchWeb,
 } from "../../../src/server/tools/builtin/websearch.ts";
 import {
@@ -53,13 +53,13 @@ describe("websearch HTTP policy", () => {
   });
 
   test("parses retry-after", () => {
-    expect(retryAfterMs(null)).toBe(1000);
-    expect(retryAfterMs("")).toBe(1000);
-    expect(retryAfterMs("-1")).toBe(1000);
-    expect(retryAfterMs("0")).toBe(0);
-    expect(retryAfterMs("2")).toBe(2000);
-    expect(retryAfterMs("30")).toBeNull();
-    expect(retryAfterMs("1.5")).toBeNull();
+    expect(searchRetryDelay(null)).toBe(1000);
+    expect(searchRetryDelay("")).toBe(1000);
+    expect(searchRetryDelay("-1")).toBe(1000);
+    expect(searchRetryDelay("0")).toBe(0);
+    expect(searchRetryDelay("2")).toBe(2000);
+    expect(searchRetryDelay("30")).toBeNull();
+    expect(searchRetryDelay("1.5")).toBeNull();
   });
 
   test("maps HTTP errors for both providers", async () => {
