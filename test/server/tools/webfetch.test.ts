@@ -8,7 +8,7 @@
 // suite never reaches a network; hosts are made up.
 
 import { describe, expect, test } from "bun:test";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   extractHtml,
   type FetchDependencies,
@@ -36,7 +36,7 @@ function context(signal = new AbortController().signal): ToolContext {
     signal,
     now: () => 0,
     budget,
-    caps: TOOL_CAPS,
+    caps: DEFAULT_LIMITS,
   };
 }
 
@@ -253,7 +253,7 @@ describe("fetch URL guard", () => {
   test("enforces the fetch budget", async () => {
     const shared: ToolBudget = {
       bashCalls: 0,
-      fetches: TOOL_CAPS.maxFetches,
+      fetches: DEFAULT_LIMITS.maxFetches,
       searches: 0,
       visualBytes: 0,
       visuals: 0,
@@ -264,7 +264,7 @@ describe("fetch URL guard", () => {
       signal: new AbortController().signal,
       now: () => 0,
       budget: shared,
-      caps: TOOL_CAPS,
+      caps: DEFAULT_LIMITS,
     };
     await expect(
       fetchText(
@@ -445,7 +445,7 @@ describe("fetch deadline", () => {
         visualBytes: 0,
         visuals: 0,
       },
-      caps: { ...TOOL_CAPS, fetchDeadlineMs: 20 },
+      caps: { ...DEFAULT_LIMITS, fetchDeadlineMs: 20 },
     };
     const deps: FetchDependencies = {
       fetch: ((_input: RequestInfo | URL, init?: RequestInit) =>

@@ -12,7 +12,7 @@ import {
 } from "../../../src/server/bash/queue.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
-import { DEFAULT_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import {
   commandCredentials,
@@ -38,7 +38,7 @@ const context = (): ToolContext => ({
   signal: new AbortController().signal,
   now: () => 0,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-  caps: TOOL_CAPS,
+  caps: DEFAULT_LIMITS,
 });
 
 const call = (args: unknown) => ({

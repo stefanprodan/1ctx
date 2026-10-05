@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { makeVisualizeTool } from "../../../src/server/tools/builtin/visualize.ts";
 import { parseHosts, parseToolPatch } from "../../../src/server/tools/parse.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
@@ -16,7 +16,12 @@ const context = (): ToolContext => ({
   signal: new AbortController().signal,
   now: () => 0,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-  caps: { ...TOOL_CAPS, visualBytes: 16, visualSendBytes: 24, maxVisuals: 10 },
+  caps: {
+    ...DEFAULT_LIMITS,
+    visualBytes: 16,
+    visualSendBytes: 24,
+    maxVisuals: 10,
+  },
 });
 const run = (args: unknown, ctx = context()) =>
   registry.run(

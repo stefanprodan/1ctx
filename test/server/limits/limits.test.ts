@@ -6,10 +6,8 @@ import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   DEFAULT_LIMITS,
   LIMIT_DEFINITIONS,
-  LOOP_LIMITS,
   limitsArea,
   sendsRunningDefault,
-  TOOL_CAPS,
 } from "../../../src/server/limits/index.ts";
 import { parseLimits } from "../../../src/server/limits/parse.ts";
 import type { LimitsResponse } from "../../../src/shared/api/limits.ts";
@@ -224,11 +222,11 @@ describe("limits area", () => {
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
       expect(rows.filter((row) => row.scope === "repos")).toHaveLength(4);
-      expect(LOOP_LIMITS).toMatchObject({
+      expect(DEFAULT_LIMITS).toMatchObject({
         rounds: 100,
         toolWorkTokens: 1_000_000,
       });
-      expect(TOOL_CAPS.maxBashCalls).toBe(100);
+      expect(DEFAULT_LIMITS.maxBashCalls).toBe(100);
     } finally {
       db.close();
     }

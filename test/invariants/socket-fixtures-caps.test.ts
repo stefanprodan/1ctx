@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_LIMITS, LOOP_LIMITS } from "../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { HTML_EVERY_MS } from "../../src/server/runner/stream.ts";
 import { settleRun } from "../helpers/automations.ts";
 import {
@@ -65,8 +65,9 @@ describe("socket fixtures for caps", () => {
       "too many at once",
     );
     watch(chat, conn, sessionId);
-    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
-      call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
+    const many = Array.from(
+      { length: DEFAULT_LIMITS.callsPerRound + 1 },
+      (_, i) => call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
     );
     toolRound(script, many);
     const r2 = await chat.scripted.next();
@@ -87,7 +88,7 @@ describe("socket fixtures for caps", () => {
         result: { content: "slow", error: false },
         onRun: () => {
           if (holder.chat)
-            holder.chat.app.now.value += LOOP_LIMITS.toolMs + 1000;
+            holder.chat.app.now.value += DEFAULT_LIMITS.toolMs + 1000;
         },
       },
     });
@@ -116,7 +117,7 @@ describe("socket fixtures for caps", () => {
     // follows
     const resultCut = 10_000;
     const resultBytes = 65_536;
-    const perRound = LOOP_LIMITS.callsPerRound;
+    const perRound = DEFAULT_LIMITS.callsPerRound;
     expect(resultCut * perRound).toBeGreaterThanOrEqual(resultBytes);
     const big = "x".repeat(resultCut + 5000);
     const plans: Record<string, ToolPlan> = {};
@@ -172,10 +173,10 @@ describe("socket fixtures for caps", () => {
     // answer row
     const resultCut = 10_000;
     const resultBytes = 65_536;
-    const perRound = LOOP_LIMITS.callsPerRound;
+    const perRound = DEFAULT_LIMITS.callsPerRound;
     const big = "x".repeat(resultCut + 5000);
     const plans: Record<string, ToolPlan> = {};
-    for (let r = 1; r <= LOOP_LIMITS.rounds; r++) {
+    for (let r = 1; r <= DEFAULT_LIMITS.rounds; r++) {
       for (let i = 0; i < perRound; i++) {
         plans[`r${r}c${i}`] = { result: { content: big, error: false } };
       }
@@ -186,7 +187,7 @@ describe("socket fixtures for caps", () => {
     const { detail, sessionId } = await startChat(chat, "keeps calling");
     watch(chat, conn, sessionId);
     let requests = 0;
-    for (let round = 1; round <= LOOP_LIMITS.rounds; round++) {
+    for (let round = 1; round <= DEFAULT_LIMITS.rounds; round++) {
       if (chat.app.sessions.send(detail.send.id)!.status !== "running") break;
       const script = await waitScript(chat.scripted, round);
       requests = round;
@@ -253,8 +254,9 @@ describe("socket fixtures for caps", () => {
     const conn = await watcher(chat);
     const { detail, script, sessionId } = await startChat(chat, "answer calls");
     watch(chat, conn, sessionId);
-    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
-      call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
+    const many = Array.from(
+      { length: DEFAULT_LIMITS.callsPerRound + 1 },
+      (_, i) => call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
     );
     toolRound(script, many);
     const answer = await chat.scripted.next();

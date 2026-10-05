@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { memoryChars } from "../../../src/shared/memory.ts";
 import { area, context, now, task } from "./memory.helpers.ts";
 
@@ -81,7 +81,9 @@ describe("memory tool refusals", () => {
       expect(result.content).toEndWith(
         `\n${currentNote}\n1,741 of 2,200 characters.`,
       );
-      expect(result.content.length).toBeLessThanOrEqual(TOOL_CAPS.resultCut);
+      expect(result.content.length).toBeLessThanOrEqual(
+        DEFAULT_LIMITS.resultCut,
+      );
       expect(handle.work!.entries).toEqual(entries);
       expect(handle.work!.operations).toEqual([]);
     }

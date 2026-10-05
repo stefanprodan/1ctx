@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { silent } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type { MemoryWork } from "../../../src/server/memory/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
 import {
@@ -48,7 +48,7 @@ export function area(): ToolsArea {
   });
 }
 
-export function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
+export function context(resultCut = DEFAULT_LIMITS.resultCut): ToolContext {
   return {
     actor: null,
     web: null,
@@ -61,7 +61,7 @@ export function context(resultCut = TOOL_CAPS.resultCut): ToolContext {
       visualBytes: 0,
       visuals: 0,
     },
-    caps: { ...TOOL_CAPS, resultCut },
+    caps: { ...DEFAULT_LIMITS, resultCut },
   };
 }
 

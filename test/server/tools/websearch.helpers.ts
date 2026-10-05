@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type { SearchProvider } from "../../../src/server/tools/builtin/search/types.ts";
 import type {
   Search,
@@ -47,7 +47,7 @@ export function context(
     signal,
     now: Date.now,
     budget: shared,
-    caps: { ...TOOL_CAPS, searchDeadlineMs: deadlineMs },
+    caps: { ...DEFAULT_LIMITS, searchDeadlineMs: deadlineMs },
   };
 }
 
