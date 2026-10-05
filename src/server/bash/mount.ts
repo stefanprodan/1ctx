@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A disposable mount keeps shared text and session scratch atomic without
-// holding a database transaction while the shell runs. The server's
-// thread admits the command, reads the rows and commits; the shell runs
-// in a worker, so a command that never yields holds no stream.
+// A disposable mount: no transaction is held while the shell runs.
 
 import type {
   KnowledgeAuthor,
@@ -171,11 +168,9 @@ export async function run(
   let phase: CommandPhase = "queue";
   // the worker's word when neither signal fired: a shutdown is an abort
   let ended: CommandCause = "error";
-  // a command that waited for its slots and then ran out of time says
-  // so first, so the model does not read its command as too slow
+  // a late start leads the result, so the command never reads as too slow
   let late = "";
-  // when the chat's turn came; the longer of its wait and the process
-  // slot's names who held the command up
+  // when the chat's turn came, to name the longer wait
   let turnAt: number | undefined;
   const ownChat = (now: number) =>
     (turnAt ?? now) - started >= now - (turnAt ?? now);

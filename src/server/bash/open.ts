@@ -62,6 +62,20 @@ function visualTitle(text: string, path: string): string {
   return hasLineBreak(base) ? "Visual" : cutText(base, MAX_TITLE);
 }
 
+const MOUNT_ROOTS = ["knowledge", "tmp", "uploads", "mcp", "repos"];
+
+// one of the trees, or under one
+export const underRoot = (path: string) =>
+  MOUNT_ROOTS.some(
+    (root) => path === `/${root}` || path.startsWith(`/${root}/`),
+  );
+
+// every prefix of an absolute path, the path itself last
+export function prefixes(path: string): string[] {
+  const parts = path.split("/").filter(Boolean);
+  return parts.map((_, index) => `/${parts.slice(0, index + 1).join("/")}`);
+}
+
 export const underKnowledge = (path: string) =>
   path === "/knowledge" || path.startsWith("/knowledge/");
 
@@ -76,21 +90,10 @@ export function mountPath(path: string): boolean {
     Buffer.byteLength(path) <= MAX_MOUNT_PATH_BYTES &&
     !/\p{Cc}/u.test(path) &&
     !hasLineBreak(path) &&
-    ["knowledge", "tmp", "uploads", "mcp", "repos"].includes(parts[0] ?? "") &&
+    MOUNT_ROOTS.includes(parts[0] ?? "") &&
     parts.every((part) => part !== "" && part !== "." && part !== "..") &&
     (!path.startsWith("/tmp/") || isScratchName(path.slice("/tmp/".length)))
   );
-}
-
-function mounted(path: string): boolean {
-  return ["/knowledge", "/tmp", "/uploads", "/mcp", "/repos"].some(
-    (root) => path === root || path.startsWith(`${root}/`),
-  );
-}
-
-function components(path: string): string[] {
-  const parts = path.split("/").filter(Boolean);
-  return parts.map((_, index) => `/${parts.slice(0, index + 1).join("/")}`);
 }
 
 function refusal(arg: string, words: string) {
@@ -188,7 +191,7 @@ export function makeOpenCommand(
       }
       const arg = args[0]!;
       const path = ctx.fs.resolvePath(ctx.cwd, arg);
-      if (!mounted(path)) return refusal(arg, "not in the mount");
+      if (!underRoot(path)) return refusal(arg, "not in the mount");
       // the server takes only what mountPath allows, so a name it would
       // refuse is refused here rather than failing the command
       if (!mountPath(path))
@@ -206,7 +209,7 @@ export function makeOpenCommand(
         return refusal(arg, "no such file");
       let final: FsStat | undefined;
       try {
-        for (const component of components(path)) {
+        for (const component of prefixes(path)) {
           const stat = await ctx.fs.lstat(component);
           if (stat.isSymbolicLink) return refusal(arg, "not a regular file");
           final = stat;

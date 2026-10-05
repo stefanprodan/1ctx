@@ -18,7 +18,6 @@ import {
   type DocsPort,
   run,
 } from "./mount.ts";
-import { heldSessions } from "./queue.ts";
 import { ScratchStore } from "./scratch.ts";
 import { commandWorkers } from "./worker.ts";
 
@@ -99,8 +98,7 @@ export function bashArea(deps: BashDeps): BashArea {
           events: [],
         };
       }),
-    sweep: (now) =>
-      scratch.sweep(now, deps.limits.current().scratchIdleDays, heldSessions()),
+    sweep: (now) => scratch.sweep(now, deps.limits.current().scratchIdleDays),
     close: () => workers.close(),
   };
 }

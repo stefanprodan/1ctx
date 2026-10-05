@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { acquireSession } from "../../../src/server/bash/queue.ts";
 import type {
   ScratchChanges,
   ScratchFile,
@@ -268,16 +269,15 @@ describe("scratch store", () => {
       write(ctx, 0, { written: [binary] }, boundary.id);
       ctx.now.value = 200;
       write(ctx, 0, { written: [empty] }, recent.id);
-      const held = new Set<string>();
-      expect(ctx.bash.scratch.sweep(101 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.sweep(101 + 86_400_000, 1)).toBe(1);
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();
       expect(ctx.bash.scratch.read(boundary.id).entries).toEqual([binary]);
       expect(ctx.bash.scratch.read(recent.id).entries).toEqual([empty]);
       expect(ctx.sessions.byId(ctx.session.id)).not.toBeNull();
-      expect(ctx.bash.scratch.sweep(102 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.sweep(102 + 86_400_000, 1)).toBe(1);
       expect(ctx.bash.scratch.read(boundary.id)).toEqual(blank);
-      expect(ctx.bash.scratch.sweep(201 + 86_400_000, 1, held)).toBe(1);
+      expect(ctx.bash.scratch.sweep(201 + 86_400_000, 1)).toBe(1);
       expect(ctx.db.query("select * from session_scratch").all()).toEqual([]);
       expect(ctx.db.query("select * from session_scratch_files").all()).toEqual(
         [],
@@ -287,20 +287,23 @@ describe("scratch store", () => {
     }
   });
 
-  test("skips a held session until it is released", () => {
+  test("skips a held session until it is released", async () => {
     const ctx = setup();
     try {
       const second = ctx.makeSession();
       write(ctx, 0, { written: [binary], cwd: "/tmp/work" });
       write(ctx, 0, { written: [empty] }, second.id);
       const before = ctx.bash.scratch.read(ctx.session.id);
-      const held = new Set([ctx.session.id]);
-      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
+      const release = await acquireSession(
+        ctx.session.id,
+        new AbortController().signal,
+      );
+      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7)).toBe(1);
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
       expect(usedAt(ctx)).toEqual({ used_at: 100 });
       expect(ctx.bash.scratch.read(second.id)).toEqual(blank);
-      held.clear();
-      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7, held)).toBe(1);
+      release();
+      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7)).toBe(1);
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();
     } finally {

@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A bash command runs here, off the thread that serves every stream: a
-// busy loop holds this thread alone, and the server ends the worker. The
-// worker builds the mount from the posted bytes, runs just-bash, reads
-// the tree back and answers once. It never opens the database or holds
-// a key: a kept MCP file and a fetch are requests the server answers.
+// Builds the mount from the posted bytes, runs just-bash and answers once.
 
 import {
   Bash,
@@ -19,7 +15,12 @@ import {
   stdoutAsBytes,
 } from "just-bash";
 import { KNOWLEDGE_COMMANDS } from "./commands.ts";
-import { makeOpenCommand, type OpenedRecord, underKnowledge } from "./open.ts";
+import {
+  makeOpenCommand,
+  type OpenedRecord,
+  prefixes,
+  underKnowledge,
+} from "./open.ts";
 import {
   type Answer,
   type FetchRequest,
@@ -189,13 +190,9 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     ["/uploads", job.uploads],
   ] as const;
   for (const [root, files] of trees)
-    for (const file of files) {
-      let path = `${root}/${file.name}`;
-      while (path !== root) {
-        path = path.slice(0, path.lastIndexOf("/"));
+    for (const file of files)
+      for (const path of prefixes(`${root}/${file.name}`).slice(0, -1))
         folders.set(path, Math.max(folders.get(path) ?? 0, file.mtime));
-      }
-    }
   for (const [path, mtime] of folders)
     await fs.utimes(path, new Date(mtime), new Date(mtime));
   // MCP results past the cut, read from the server on first read

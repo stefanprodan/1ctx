@@ -1,14 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The messages between the server's thread and a command worker. Every
-// file's bytes are transferred, never cloned, so a post costs the
-// server's thread next to nothing whatever the mount holds. The worker
-// runs untrusted commands and postMessage is not blocked inside them, so
-// the server takes a message only after checking its whole shape.
+// The worker messages; the server checks a message's whole shape first.
 
 import type { FetchResult } from "just-bash";
-import { isKnowledgeName, OPENED_KINDS } from "../../shared/words.ts";
+import { isKnowledgeName, isRecord, OPENED_KINDS } from "../../shared/words.ts";
 import { isScratchName } from "./names.ts";
 import type { OpenedRecord } from "./open.ts";
 
@@ -122,8 +118,6 @@ export type FromWorker =
 
 type Shape = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Shape =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 const isCount = (value: unknown): value is number =>
   Number.isSafeInteger(value) && (value as number) >= 0;
 const isInt = (value: unknown): value is number => Number.isSafeInteger(value);
@@ -144,7 +138,7 @@ const keys = (value: Shape, names: readonly string[]) =>
 
 function isOpened(value: unknown): value is OpenedRecord {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, [
       "path",
       "kind",
@@ -168,7 +162,7 @@ function isKnowledgeChange(
   value: unknown,
 ): value is Changes["knowledge"][number] {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, ["name", "text"]) &&
     isKnowledgeName(value.name) &&
     (value.text === null || isString(value.text))
@@ -177,7 +171,7 @@ function isKnowledgeChange(
 
 function isScratchEntry(value: unknown): value is ScratchEntry {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, ["path", "data", "mode"]) &&
     isScratchName(value.path) &&
     isBytes(value.data) &&
@@ -187,7 +181,7 @@ function isScratchEntry(value: unknown): value is ScratchEntry {
 
 function isChanges(value: unknown): value is Changes {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, ["knowledge", "written", "removed", "cwd"]) &&
     isList(value.knowledge, isKnowledgeChange) &&
     isList(value.written, isScratchEntry) &&
@@ -198,7 +192,7 @@ function isChanges(value: unknown): value is Changes {
 
 function isAnswer(value: unknown): value is Answer {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, [
       "stdout",
       "stderr",
@@ -229,7 +223,7 @@ function isHeader(value: unknown): value is [string, string] {
 
 function isFetchRequest(value: unknown): value is FetchRequest {
   return (
-    isObject(value) &&
+    isRecord(value) &&
     keys(value, [
       "method",
       "headers",
@@ -262,7 +256,7 @@ export function fromWorker(
   value: unknown,
   id: string,
 ): FromWorker | typeof MALFORMED | null {
-  if (!isObject(value) || value.id !== id) return null;
+  if (!isRecord(value) || value.id !== id) return null;
   switch (value.type) {
     case "phase":
       return keys(value, ["type", "id", "phase", "notice"]) &&

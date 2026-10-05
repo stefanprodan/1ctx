@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// MCP results kept past the context and embedded resources, owned by
-// their tool row and read by the mount under /mcp. The budget is applied
-// when a send starts, under the runner's lock, so the tree a command
-// mounts never loses a file while it reads. An ended session's files are
-// packed by the sessions job and unpacked by Fork, so the mount only
-// ever reads raw ones.
+// Kept MCP files, owned by their tool row and mounted under /mcp.
 
 import type { Db } from "../db/index.ts";
 
@@ -128,23 +123,34 @@ export function listKept(db: Db, sessionId: string): KeptEntry[] {
     }));
 }
 
-// the file's bytes, text read as a blob, so the command worker gets them
-// transferred rather than copied on the server's thread
+// text read as a blob, so the command worker gets the bytes transferred
+// rather than copied on the server's thread, and a frame of them unpacks
+// to the same file
+function keptBytes(
+  db: Db,
+  messageId: string,
+  position: number,
+): { raw: Uint8Array; packed: boolean } | null {
+  const row = db
+    .query<{ raw: Uint8Array | null; packed: number }, [string, number]>(
+      `select coalesce(cast(text as blob), data) as raw, packed
+       from mcp_kept_files where message_id = ? and position = ?`,
+    )
+    .get(messageId, position);
+  if (row === null) return null;
+  return { raw: row.raw ?? new Uint8Array(), packed: row.packed === 1 };
+}
+
 export function readKept(
   db: Db,
   messageId: string,
   position: number,
 ): Uint8Array | null {
-  const row = db
-    .query<{ data: Uint8Array | null; packed: number }, [string, number]>(
-      `select coalesce(cast(text as blob), data) as data, packed
-       from mcp_kept_files where message_id = ? and position = ?`,
-    )
-    .get(messageId, position);
+  const row = keptBytes(db, messageId, position);
   if (row === null) return null;
   // only ended sessions are packed, and they never mount
-  if (row.packed === 1) throw new Error(KEPT_PACKED_READ);
-  return row.data ?? new Uint8Array();
+  if (row.packed) throw new Error(KEPT_PACKED_READ);
+  return row.raw;
 }
 
 export function walkKept(db: Db, after: string, limit: number): string[] {
@@ -168,20 +174,13 @@ export function pendingKept(db: Db, sessionId: string): KeptPending[] {
     }));
 }
 
-// a file's stored bytes, text as its bytes: every reader takes a file
-// as bytes, so a frame of them unpacks to the same file
+// a file's stored bytes, packed or not
 export function readKeptRaw(
   db: Db,
   messageId: string,
   position: number,
 ): Uint8Array | null {
-  const row = db
-    .query<{ raw: Uint8Array | null }, [string, number]>(
-      `select coalesce(cast(text as blob), data) as raw from mcp_kept_files
-       where message_id = ? and position = ?`,
-    )
-    .get(messageId, position);
-  return row === null ? null : (row.raw ?? new Uint8Array());
+  return keptBytes(db, messageId, position)?.raw ?? null;
 }
 
 // on Bun's thread pool, so the event loop runs while a large file

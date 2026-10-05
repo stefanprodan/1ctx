@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mounted tree, read back in the command worker: what changed under
-// /knowledge and /tmp against the posted bytes, the discard notices for
-// the read-only trees, and the cwd the next command starts in. The
-// repositories are mounted over this tree, never in it, so nothing under
-// /repos is ever read back.
+// The tree read back in the worker; /repos is mounted over it, never read back.
 
 import type { BashOptions, IFileSystem, InMemoryFs } from "just-bash";
 import {
@@ -15,7 +11,7 @@ import {
   textFromBytes,
 } from "../knowledge/rules.ts";
 import { checkScratchNames, parseScratchName } from "./names.ts";
-import { mountPath, underKnowledge } from "./open.ts";
+import { mountPath, prefixes, underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
 
 const same = (a: Uint8Array, b: Uint8Array) =>
@@ -112,10 +108,10 @@ async function uploadsChanged(
   if (!root.isDirectory || root.isSymbolicLink) return true;
   const expected = new Map<string, Uint8Array | null>();
   for (const file of uploads) {
-    const parts = file.name.split("/");
-    for (let end = 1; end < parts.length; end++)
-      expected.set(`/uploads/${parts.slice(0, end).join("/")}`, null);
-    expected.set(`/uploads/${file.name}`, file.data);
+    const path = `/uploads/${file.name}`;
+    for (const folder of prefixes(path).slice(1, -1))
+      expected.set(folder, null);
+    expected.set(path, file.data);
   }
   for (const path of paths) {
     if (!path.startsWith("/uploads/")) continue;
@@ -138,11 +134,7 @@ async function uploadsChanged(
 // discarded all the same.
 function keptChanged(fs: InMemoryFs, kept: readonly string[]): boolean {
   const expected = new Set<string>();
-  for (const path of kept) {
-    const parts = path.split("/").filter(Boolean);
-    for (let end = 1; end <= parts.length; end++)
-      expected.add(`/${parts.slice(0, end).join("/")}`);
-  }
+  for (const path of kept) for (const at of prefixes(path)) expected.add(at);
   let seen = 0;
   for (const path of fs.getAllPaths()) {
     if (path !== "/mcp" && !path.startsWith("/mcp/")) continue;
@@ -196,19 +188,7 @@ export async function savedCwd(
   if (pwd === undefined || !pwd.startsWith("/")) return home(docs);
   const path = fs.resolvePath("/", pwd);
   // the cwd the server takes, as mountPath allows it
-  if (!mountPath(path)) return home(docs);
-  if (
-    !(docs && underKnowledge(path)) &&
-    path !== "/tmp" &&
-    path !== "/uploads" &&
-    path !== "/mcp" &&
-    path !== "/repos" &&
-    !path.startsWith("/tmp/") &&
-    !path.startsWith("/uploads/") &&
-    !path.startsWith("/mcp/") &&
-    !path.startsWith("/repos/")
-  )
-    return home(docs);
+  if (!mountPath(path) || (!docs && underKnowledge(path))) return home(docs);
   return (await directory(fs, path)) ? path : home(docs);
 }
 

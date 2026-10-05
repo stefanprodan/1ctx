@@ -1,14 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fetch curl calls in a mount with network. The request curl asked
-// for picks its fetch once: a URL under a credential's prefix goes
-// through that credential's own fetch, whose one allow-list entry is the
-// prefix and signs every hop, or is refused; any other URL goes through
-// the web fetch, which never signs. So a redirect off a prefix is
-// refused rather than sent unsigned, and one into a prefix from an
-// unsigned request stays unsigned. Every key the command read is
-// replaced in what comes back, and in any error, before curl sees it.
+// curl's fetch: under a credential prefix it signs or refuses; keys are
+// redacted.
 
 import {
   createSecureFetch,
