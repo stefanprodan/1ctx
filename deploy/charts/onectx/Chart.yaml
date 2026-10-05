@@ -1,8 +1,7 @@
 apiVersion: v2
 name: onectx
-description: One continuous context for agents.
+description: A self-hosted AI factory with continuous context.
 type: application
-# the release sets both from the tag: version without the v, appVersion with it
 version: 0.0.1
 appVersion: "v0.0.1"
 home: https://1ctx.dev
@@ -15,3 +14,5 @@ maintainers:
 keywords:
   - agents
   - llm
+annotations:
+  artifacthub.io/license: Apache-2.0
