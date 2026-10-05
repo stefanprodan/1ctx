@@ -30,21 +30,16 @@ import {
   MIN_PASSWORD,
   MIN_USERNAME,
   NAME_CHARACTERS,
+  passwordProblem,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-
-const bytes = (s: string) => new TextEncoder().encode(s).length;
 
 // a password as typed: anything up to the byte cap. The login parser
 // takes any length so an old password stays usable; a new one has a
 // floor as well
 function password(value: unknown, what: string, min = 1): string {
-  if (
-    typeof value !== "string" ||
-    value.length < min ||
-    bytes(value) > MAX_PASSWORD_BYTES
-  ) {
+  if (typeof value !== "string" || passwordProblem(value, min) !== null) {
     throw new BadRequest(
       `${what} must be a string of ${min} to ${MAX_PASSWORD_BYTES} bytes`,
     );

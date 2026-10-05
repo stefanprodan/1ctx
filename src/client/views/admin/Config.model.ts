@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ToolsResponse } from "../../../shared/api/tools.ts";
+import type { LimitName } from "../../../shared/contracts/limit.ts";
 import type {
   BuiltinToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
-import type { LimitName } from "../../../shared/words.ts";
 import {
   AGENTS_HREF,
   CONFIG_HREF,

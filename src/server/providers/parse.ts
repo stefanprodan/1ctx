@@ -7,15 +7,13 @@ import {
   type CatalogKind,
   isCatalogKind,
 } from "../../shared/contracts/decider.ts";
-import { isSecretName, isWire } from "../../shared/words.ts";
+import { isSecretName, isWire, MAX_MODEL } from "../../shared/words.ts";
 import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { azureBaseUrlProblem } from "./azure.ts";
 
 const MAX_BASE_URL = 256;
 const MAX_QUERY = 100;
-// an agent's model id is capped the same
-export const MAX_MODEL_ID = 200;
 
 // http or https, no query, no fragment, no trailing slash
 export function parseBaseUrl(value: unknown): string {
@@ -88,7 +86,7 @@ export function parseCatalogQuery(url: URL): { q: string; kind: CatalogKind } {
 export function parseModelQuery(url: URL): string {
   const model = queryParams(url, ["model"])("model") ?? "";
   // a segment never starts with a dot, so none walks up the path
-  if (model.length > MAX_MODEL_ID || !/^~?\w[\w.-]*\/\w[\w.:-]*$/.test(model)) {
+  if (model.length > MAX_MODEL || !/^~?\w[\w.-]*\/\w[\w.:-]*$/.test(model)) {
     throw new BadRequest("model must be an OpenRouter model id");
   }
   return model;

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { LimitsResponse } from "../../shared/api/limits.ts";
-import type { LimitRow } from "../../shared/contracts/limit.ts";
-import { LIMIT_NAMES } from "../../shared/words.ts";
+import { LIMIT_NAMES, type LimitRow } from "../../shared/contracts/limit.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";

@@ -3,7 +3,11 @@
 //
 // the code owns every default; a limits row is an admin's override alone
 
-import type { LimitName, LimitScope, LimitUnit } from "../../shared/words.ts";
+import type {
+  LimitName,
+  LimitScope,
+  LimitUnit,
+} from "../../shared/contracts/limit.ts";
 
 export type LoopLimits = {
   rounds: number;

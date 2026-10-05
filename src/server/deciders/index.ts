@@ -29,7 +29,6 @@ export {
   DecisionError,
   type DecisionQuestion,
 } from "../providers/index.ts";
-export { MAX_MODEL } from "./parse.ts";
 
 export type DecidersDeps = {
   db: Db;

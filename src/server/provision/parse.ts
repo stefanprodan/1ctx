@@ -16,9 +16,9 @@ import {
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD,
   PERSONAL_PROJECT_NAME,
+  passwordProblem,
   type SecretKind,
 } from "../../shared/words.ts";
-import { parseUserPassword } from "../access/index.ts";
 import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
@@ -254,8 +254,9 @@ export function preflight(
       } catch {
         return fail(field, `could not read secret ${name}.key`);
       }
-      if (value === null || value === "")
-        fail(field, `secret ${name}.key is missing or empty`);
+      if (value === null || value === "") {
+        return fail(field, `secret ${name}.key is missing or empty`);
+      }
       return value;
     };
     // an http- key a credential or a repository reads at its request
@@ -279,15 +280,11 @@ export function preflight(
             "user-",
             doc.spec.passwordFrom,
           );
-          if (!exists) {
-            try {
-              parseUserPassword({ password });
-            } catch {
-              fail(
-                "passwordFrom",
-                `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
-              );
-            }
+          if (!exists && passwordProblem(password) !== null) {
+            fail(
+              "passwordFrom",
+              `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
+            );
           }
         }
         break;

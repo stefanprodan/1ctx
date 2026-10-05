@@ -31,9 +31,10 @@ import {
   parseTz,
 } from "../access/index.ts";
 import {
-  MAX_MODEL,
-  MAX_PROMPT,
   MAX_SERVERS_PER_AGENT,
+  parseEffort,
+  parsePrompt,
+  parseThinking,
 } from "../agents/index.ts";
 import {
   parseKeyName as parseCredentialKey,
@@ -42,7 +43,7 @@ import {
   parsePrefix,
   parseTemplate,
 } from "../credentials/index.ts";
-import { MAX_MODEL as MAX_DECIDER_MODEL } from "../deciders/index.ts";
+import { parseModel } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   parseMcpKeyName,
@@ -267,12 +268,7 @@ const onlyTrue = (v: unknown): true => {
 export function decider(value: unknown): DeciderSpec {
   return optionalSpec<DeciderSpec>(value, {
     provider: guarded(isName, "must be a provider name"),
-    model: (v) => {
-      if (typeof v !== "string" || v === "" || v.length > MAX_DECIDER_MODEL) {
-        throw new BadRequest("must be a model id");
-      }
-      return v;
-    },
+    model: (v) => parseModel(v, null),
     default: onlyTrue,
   });
 }
@@ -357,34 +353,11 @@ function servers(value: unknown): NonNullable<AgentSpec["servers"]> {
 export function agent(value: unknown): AgentSpec {
   return optionalSpec<AgentSpec>(value, {
     provider: guarded(isName, "must be a provider name"),
-    model: (v) => {
-      if (typeof v !== "string" || v === "" || v.length > MAX_MODEL) {
-        throw new BadRequest("must be a model id");
-      }
-      return v;
-    },
+    model: (v) => parseModel(v, null),
     avatar: (v) => guarded(isAvatar, "must be a known avatar")(v ?? "bot"),
-    thinking: (v) => {
-      if (v !== null && v !== "on" && v !== "off") {
-        throw new BadRequest("must be on, off or null");
-      }
-      return v;
-    },
-    effort: (v) => {
-      if (v !== null && typeof v !== "string") {
-        throw new BadRequest("must be text or null");
-      }
-      return v;
-    },
-    prompt: (v) => {
-      const prompt = v ?? "";
-      if (typeof prompt !== "string" || prompt.length > MAX_PROMPT) {
-        throw new BadRequest(
-          `must be text of at most ${MAX_PROMPT} characters`,
-        );
-      }
-      return prompt.trim();
-    },
+    thinking: (v) => parseThinking(v, null),
+    effort: (v) => parseEffort(v, null),
+    prompt: (v) => parsePrompt(v, null),
     skills: (v) => names(v ?? [], isSkillName, MAX_SKILLS_PER_AGENT),
     servers,
     mcpMode: guarded(isMcpMode, "must be all, catalog or auto"),

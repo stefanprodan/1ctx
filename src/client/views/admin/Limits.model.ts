@@ -1,8 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { LimitRow } from "../../../shared/contracts/limit.ts";
-import type { LimitName } from "../../../shared/words.ts";
+import type { LimitName, LimitRow } from "../../../shared/contracts/limit.ts";
 import { pluralCommas } from "../../lib/format.ts";
 import { K, thousandsText, thousandsValue } from "../../lib/thousands.ts";
 

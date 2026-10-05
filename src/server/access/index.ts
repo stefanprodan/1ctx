@@ -45,7 +45,6 @@ export {
   parseEmail,
   parseFullName,
   parseTz,
-  parseUserPassword,
 } from "./parse.ts";
 
 export type AccessDeps = {

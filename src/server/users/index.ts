@@ -10,6 +10,7 @@
 import {
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD,
+  passwordProblem,
   type Role,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -102,22 +103,14 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
     deps.log.warn("admin not created", { file: ADMIN_FILE, reason: "missing" });
     return null;
   }
-  // the same cap the login parser applies, or the admin could never sign
-  // in; the same floor a new password has, or the first admin would be
-  // the one account allowed what the profile page refuses
-  if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
+  // the rule a new password has, or the first admin would be the one
+  // account allowed what the profile page refuses
+  const problem = passwordProblem(password);
+  if (problem !== null) {
     deps.log.warn("admin not created", {
       file: ADMIN_FILE,
-      reason: "too long",
-      limit: MAX_PASSWORD_BYTES,
-    });
-    return null;
-  }
-  if (password.length < MIN_PASSWORD) {
-    deps.log.warn("admin not created", {
-      file: ADMIN_FILE,
-      reason: "too short",
-      limit: MIN_PASSWORD,
+      reason: `too ${problem}`,
+      limit: problem === "long" ? MAX_PASSWORD_BYTES : MIN_PASSWORD,
     });
     return null;
   }

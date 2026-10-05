@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { WebAccess } from "../../shared/web.ts";
-import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
-import { parseUserPassword } from "../access/index.ts";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD,
+  passwordProblem,
+} from "../../shared/words.ts";
 import { messageOf } from "../lib/errors.ts";
 import { scrubValues } from "../lib/log.ts";
 import { ADMIN_SECRET } from "../users/index.ts";
@@ -22,16 +25,6 @@ export { inventoryOf, projectDocsOf } from "./inventory.ts";
 export { loadKnowledge } from "./knowledge.ts";
 export { type Document, type Inventory, parse } from "./parse.ts";
 export { type ProvisionResult, provisionPaths } from "./run.ts";
-
-// the rule a password change applies
-function validPassword(password: string): boolean {
-  try {
-    parseUserPassword({ password });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export type ProvisionDeps = {
   handle: Handle;
@@ -56,7 +49,7 @@ export function provisionArea(deps: ProvisionDeps) {
       deps.credentials,
     );
     const password = secret("user-", ADMIN_SECRET);
-    if (password === null || !validPassword(password)) {
+    if (password === null || passwordProblem(password) !== null) {
       throw new Error(
         `user/admin: user-admin.key must hold ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
       );

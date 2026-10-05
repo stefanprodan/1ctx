@@ -7,11 +7,9 @@ import {
   MAX_OPTION_TEXT,
 } from "../../shared/contracts/decision.ts";
 import { isRecord } from "../../shared/words.ts";
-import { fields, parseName } from "../lib/body.ts";
+import { fields, parseModel, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { DecisionFields } from "./decisions.ts";
-
-export const MAX_MODEL = 200;
 
 export type ParsedDecider = {
   name: string;
@@ -27,20 +25,14 @@ export function parseDecider(body: unknown): ParsedDecider {
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
-  if (
-    typeof b.model !== "string" ||
-    b.model === "" ||
-    b.model.length > MAX_MODEL
-  ) {
-    throw new BadRequest("model must be a model id");
-  }
+  const model = parseModel(b.model);
   if (b.default !== undefined && typeof b.default !== "boolean") {
     throw new BadRequest("default must be true or false");
   }
   return {
     name,
     providerId: b.providerId,
-    model: b.model,
+    model,
     mark: b.default ?? null,
   };
 }

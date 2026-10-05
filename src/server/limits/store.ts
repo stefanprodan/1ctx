@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { LimitName } from "../../shared/words.ts";
+import type { LimitName } from "../../shared/contracts/limit.ts";
 import type { Db } from "../db/index.ts";
 
 export type LimitOverride = {

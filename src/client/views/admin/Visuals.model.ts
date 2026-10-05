@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { LimitName } from "../../../shared/contracts/limit.ts";
 import { DEFAULT_VISUAL_HOSTS } from "../../../shared/contracts/tool.ts";
 import { parseVisualHosts } from "../../../shared/visual.ts";
-import type { LimitName } from "../../../shared/words.ts";
 import { lineError } from "./Tools.model.ts";
 
 export const VISUAL_LIMITS: readonly LimitName[] = [

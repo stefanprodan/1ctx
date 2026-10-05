@@ -11,7 +11,7 @@ import {
 } from "../../../src/server/limits/index.ts";
 import { parseLimits } from "../../../src/server/limits/parse.ts";
 import type { LimitsResponse } from "../../../src/shared/api/limits.ts";
-import { LIMIT_NAMES } from "../../../src/shared/words.ts";
+import { LIMIT_NAMES } from "../../../src/shared/contracts/limit.ts";
 import { testApp } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 

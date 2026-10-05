@@ -62,14 +62,16 @@ import {
   WEB_LIMITS,
 } from "../../../src/client/views/admin/WebAccess.model.ts";
 import type { ToolsResponse } from "../../../src/shared/api/tools.ts";
-import type { LimitRow } from "../../../src/shared/contracts/limit.ts";
+import {
+  LIMIT_NAMES,
+  type LimitRow,
+} from "../../../src/shared/contracts/limit.ts";
 import type {
   BuiltinToolSummary,
   SearchState,
   WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
 import type { WebAccess } from "../../../src/shared/web.ts";
-import { LIMIT_NAMES } from "../../../src/shared/words.ts";
 import { deferred } from "../../helpers/async.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import { admin as adminFixture } from "../../helpers/client-fixtures.ts";

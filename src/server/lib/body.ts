@@ -8,6 +8,7 @@
 import {
   isName,
   isRecord,
+  MAX_MODEL,
   MAX_NAME,
   MIN_NAME,
   NAME_CHARACTERS,
@@ -56,6 +57,20 @@ export function parseName(value: unknown, field = "name"): string {
     throw new BadRequest(
       `${field} must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
     );
+  }
+  return value;
+}
+
+// a field's rule as a 400; null leaves the name to a caller that puts
+// it in a path, as provision does
+export function refusal(field: string | null, rule: string): BadRequest {
+  return new BadRequest(field === null ? rule : `${field} ${rule}`);
+}
+
+// a provider's model id, as an agent or a decider names it
+export function parseModel(value: unknown, field: string | null = "model") {
+  if (typeof value !== "string" || value === "" || value.length > MAX_MODEL) {
+    throw refusal(field, "must be a model id");
   }
   return value;
 }
