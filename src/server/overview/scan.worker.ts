@@ -5,6 +5,7 @@
 // serves the streams.
 
 import { Database } from "bun:sqlite";
+import { messageOf } from "../lib/errors.ts";
 import {
   type MonthResult,
   month,
@@ -42,7 +43,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   } catch (error) {
     reply = {
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: messageOf(error),
     };
   } finally {
     db?.close();

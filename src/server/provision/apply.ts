@@ -23,6 +23,7 @@ import type {
 import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
 import type { SecretKind } from "../../shared/words.ts";
+import { messageOf } from "../lib/errors.ts";
 import {
   type Action,
   type Client,
@@ -155,9 +156,7 @@ async function docs(
       });
       report("updated", "Knowledge", `${doc.name}/${file.name}`);
     } catch (error) {
-      throw new Error(
-        `knowledge ${file.name}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      throw new Error(`knowledge ${file.name}: ${messageOf(error)}`);
     }
   }
 }
@@ -449,7 +448,7 @@ export async function apply(
         report(action, doc.kind, doc.name);
       } catch (error) {
         throw new Error(
-          `${doc.source}: ${doc.kind}/${doc.name}: ${error instanceof Error ? error.message : String(error)}`,
+          `${doc.source}: ${doc.kind}/${doc.name}: ${messageOf(error)}`,
         );
       }
     }

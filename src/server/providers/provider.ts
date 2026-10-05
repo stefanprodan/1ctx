@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Wire } from "../../shared/words.ts";
+import { messageOf } from "../lib/errors.ts";
 import { type Log, scrubValues } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import {
@@ -156,10 +157,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
         if (signal.aborted) return;
         yield {
           kind: "error",
-          message: scrubKey(
-            `${row.name} failed: ${err instanceof Error ? err.message : String(err)}`,
-            key,
-          ),
+          message: scrubKey(`${row.name} failed: ${messageOf(err)}`, key),
           ...(err instanceof Unanswered
             ? { unanswered: true, ...(err.timedOut ? { timedOut: true } : {}) }
             : {}),

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { MINUTE_MS } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
 import type {
@@ -365,10 +366,7 @@ export async function* streamChat(
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new Unanswered(
-      err instanceof Error ? err.message : String(err),
-      timedOut,
-    );
+    throw new Unanswered(messageOf(err), timedOut);
   } finally {
     clearTimeout(headersTimer);
   }

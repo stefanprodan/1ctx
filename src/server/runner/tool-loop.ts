@@ -13,6 +13,7 @@ import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { isMemoryTool } from "../tools/index.ts";
@@ -270,7 +271,7 @@ async function runCalls(
       if (immediate) store(call, stored);
     } catch (err) {
       writeError ??= err;
-      deps.fail(send, err instanceof Error ? err.message : String(err));
+      deps.fail(send, messageOf(err));
     }
     return stored;
   });
@@ -291,7 +292,7 @@ async function runCalls(
   try {
     await task;
   } catch (err) {
-    deps.fail(send, err instanceof Error ? err.message : String(err));
+    deps.fail(send, messageOf(err));
     throw err;
   } finally {
     const offered = send.policy.offered;

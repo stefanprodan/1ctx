@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type Clock, sleep } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { AUTOMATIC_HOLD_MS, REFRESH_INTERVAL_MS } from "./limits.ts";
@@ -65,7 +66,7 @@ export class RefreshCoordinator {
 
   // a failed refresh keeps the last good list and says why
   recordFailure(row: Pick<McpServerRow, "id" | "name">, error: unknown): void {
-    const words = error instanceof Error ? error.message : String(error);
+    const words = messageOf(error);
     this.deps.store.recordFailure(row.id, words, this.deps.clock());
     this.deps.log.warn("server refresh failed", {
       server: row.name,

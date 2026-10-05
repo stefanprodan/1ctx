@@ -6,6 +6,7 @@
 // that cannot fit refuse the write rather than hiding its outcome.
 
 import { cutAt } from "../../shared/text.ts";
+import { messageOf } from "../lib/errors.ts";
 
 const mark = (resultCut: number) =>
   `... output cut at ${resultCut} characters, narrow with grep or sed -n`;
@@ -58,7 +59,7 @@ export function refused(
   error: unknown,
   resultCut: number,
 ): { content: string; error: true; tail: number } {
-  const words = error instanceof Error ? error.message : String(error);
+  const words = messageOf(error);
   const exit = `exit ${exitCode}`;
   const whole = `nothing saved: ${words}`;
   // at most half the room past the mark, so some output always shows,
@@ -81,7 +82,7 @@ export function refused(
 }
 
 export function failed(error: unknown, resultCut: number) {
-  const words = error instanceof Error ? error.message : String(error);
+  const words = messageOf(error);
   return {
     content: cutAt(`nothing saved: ${words}`, resultCut),
     error: true,

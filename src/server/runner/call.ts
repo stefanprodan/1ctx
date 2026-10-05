@@ -4,6 +4,7 @@
 // One tool call as every phase runs it; each phase keeps its own order.
 
 import type { Clock } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "./policy.ts";
@@ -59,7 +60,7 @@ export async function runOne(
     result = await deps.tools.run(offered, call, ctx);
   } catch (error) {
     result = {
-      content: error instanceof Error ? error.message : String(error),
+      content: messageOf(error),
       error: true,
       failure: error,
     };

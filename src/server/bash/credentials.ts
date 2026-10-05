@@ -15,6 +15,7 @@ import {
 } from "just-bash";
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { urlPrefixes, type WebSnapshot } from "../../shared/web.ts";
+import { messageOf } from "../lib/errors.ts";
 
 const ALL_METHODS: HttpMethod[] = [
   "GET",
@@ -242,7 +243,7 @@ export function rebuildError(
   error: unknown,
   secrets: readonly Secret[],
 ): Error {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   const rebuilt = new Error(
     redactText(message.split("\n", 1)[0] ?? "", secrets),
   );

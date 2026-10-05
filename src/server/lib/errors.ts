@@ -4,6 +4,11 @@
 // An error with a status is what the router turns into a JSON body; any
 // other throw is a bug and propagates.
 
+// a throw's words, whatever was thrown
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,

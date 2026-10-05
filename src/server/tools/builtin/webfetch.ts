@@ -6,7 +6,7 @@
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { raceSignal } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
-import { ToolError } from "../../lib/errors.ts";
+import { messageOf, ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
@@ -374,7 +374,7 @@ export async function fetchText(
         try {
           url = parseFetchUrl(new URL(location, url).href, ctx.web);
         } catch (error) {
-          const reason = error instanceof Error ? error.message : String(error);
+          const reason = messageOf(error);
           throw new ToolError(
             `redirect refused: ${reason}`,
             "redirect refused",

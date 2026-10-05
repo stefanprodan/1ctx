@@ -10,7 +10,7 @@ import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Wire } from "../../shared/words.ts";
 import { readStream } from "../lib/body.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
-import { BadGateway } from "../lib/errors.ts";
+import { BadGateway, messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
@@ -138,9 +138,7 @@ export async function fetchJson(
   try {
     res = await fetcher(url, { headers, signal });
   } catch (err) {
-    throw new CatalogError(
-      `the provider did not answer: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    throw new CatalogError(`the provider did not answer: ${messageOf(err)}`);
   }
   if (!res.ok) throw new CatalogError(`the provider answered ${res.status}`);
   try {

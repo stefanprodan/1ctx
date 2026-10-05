@@ -5,6 +5,7 @@
 // its URL.
 
 import type { SecureFetch } from "just-bash";
+import { messageOf } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
 import {
   type Answer,
@@ -204,7 +205,7 @@ export function commandWorkers(
               request,
               error: {
                 name: error instanceof Error ? error.name : "Error",
-                message: error instanceof Error ? error.message : String(error),
+                message: messageOf(error),
               },
             });
           },

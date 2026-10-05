@@ -16,6 +16,7 @@ import type { Clock } from "../lib/clock.ts";
 import {
   Conflict,
   HttpError,
+  messageOf,
   NotFound,
   ServiceUnavailable,
 } from "../lib/errors.ts";
@@ -204,7 +205,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return json(response(row));
         } catch (error) {
           if (error instanceof ServiceUnavailable) throw error;
-          const words = error instanceof Error ? error.message : String(error);
+          const words = messageOf(error);
           deps.store.refreshFailed(
             before.id,
             cutCodePoints(words, MAX_REFRESH_ERROR),

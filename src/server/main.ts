@@ -19,6 +19,7 @@ import { type Db, open } from "./db/index.ts";
 import { PROCESS_SLOTS } from "./knowledge/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { HOUR_MS, wallClock } from "./lib/clock.ts";
+import { messageOf } from "./lib/errors.ts";
 import { errorFields, type LogFactory, logger, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { type ProvisionResult, provisionPaths } from "./provision/index.ts";
@@ -98,9 +99,7 @@ if (cli.kind === "provision") {
       output: console.log,
     });
   } catch (error) {
-    console.error(
-      `error: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    console.error(`error: ${messageOf(error)}`);
     process.exit(1);
   }
   process.exit(0);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { readStream } from "../lib/body.ts";
+import { messageOf } from "../lib/errors.ts";
 import { OPENROUTER_HEADERS } from "./openrouter.ts";
 import { keyOf, noKeyFile, type ProviderDeps, scrubKey } from "./provider.ts";
 import type { ProviderRow } from "./store.ts";
@@ -322,9 +323,7 @@ export async function requestDecisions(
       );
     }
     throw new DecisionError(
-      scrub(
-        `${row.name} did not answer: ${err instanceof Error ? err.message : String(err)}`,
-      ),
+      scrub(`${row.name} did not answer: ${messageOf(err)}`),
     );
   }
 }

@@ -9,7 +9,7 @@ import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { after, sleep } from "../lib/clock.ts";
-import { BadRequest } from "../lib/errors.ts";
+import { BadRequest, messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
@@ -148,11 +148,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         if (send.cause === null && error instanceof ProviderRefusal) {
           send.refusal = { status: error.status };
         }
-        void terminate(
-          send,
-          "failure",
-          error instanceof Error ? error.message : String(error),
-        );
+        void terminate(send, "failure", messageOf(error));
       }
       finalized = await endSend(
         { writer, phase: phaseDeps, pause, log: deps.log, attention: asks },

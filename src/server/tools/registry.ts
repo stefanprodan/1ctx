@@ -6,7 +6,7 @@
 
 import { parseArguments } from "../../shared/contracts/tool.ts";
 import { sanitize } from "../../shared/memory.ts";
-import { ToolError } from "../lib/errors.ts";
+import { messageOf, ToolError } from "../lib/errors.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
@@ -18,7 +18,7 @@ function describe(error: unknown, timeoutMs: number): string {
   if (error instanceof DOMException && error.name === "TimeoutError") {
     return `tool timed out after ${Math.round(timeoutMs / 1000)} seconds`;
   }
-  return error instanceof Error ? error.message : String(error);
+  return messageOf(error);
 }
 
 // a call's arguments as an object, or the words the model reads

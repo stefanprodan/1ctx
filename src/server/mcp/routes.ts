@@ -16,6 +16,7 @@ import type { Clock } from "../lib/clock.ts";
 import {
   BadGateway,
   Conflict,
+  messageOf,
   NotFound,
   ServiceUnavailable,
 } from "../lib/errors.ts";
@@ -49,7 +50,7 @@ export type UsagePort = {
 };
 
 function gateway(error: unknown): BadGateway {
-  return new BadGateway(error instanceof Error ? error.message : String(error));
+  return new BadGateway(messageOf(error));
 }
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {

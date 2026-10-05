@@ -16,7 +16,7 @@ import {
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
 import { cutCodePoints } from "../../shared/text.ts";
-import { ToolError } from "../lib/errors.ts";
+import { messageOf, ToolError } from "../lib/errors.ts";
 import { scrubValues } from "../lib/log.ts";
 import type { Fetcher } from "../providers/index.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
@@ -275,7 +275,7 @@ function errorText(
     text = error.message;
     logged = "MCP protocol error";
   } else {
-    text = error instanceof Error ? error.message : String(error);
+    text = messageOf(error);
     logged = "MCP call failed";
   }
   return new ToolError(cutCodePoints(scrubText(text, key), MAX_ERROR), logged);

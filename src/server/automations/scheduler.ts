@@ -8,7 +8,7 @@ import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { type Clock, HOUR_MS, MINUTE_MS, sleep } from "../lib/clock.ts";
-import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
+import { BadRequest, Conflict, HttpError, messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
@@ -256,7 +256,7 @@ export function scheduler(deps: Deps): Scheduler {
         dueAt,
         source: "schedule",
         outcome: "skipped",
-        reason: errText(error),
+        reason: messageOf(error),
         nextAt: nextFire(row.schedule, row.tz, now),
       };
     });
@@ -465,7 +465,3 @@ export function scheduler(deps: Deps): Scheduler {
 }
 
 type Started = { detail: SessionDetail; launch: () => void } | Waiting;
-
-function errText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

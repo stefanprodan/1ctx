@@ -14,6 +14,7 @@ import {
   type SecureFetch,
   stdoutAsBytes,
 } from "just-bash";
+import { messageOf } from "../lib/errors.ts";
 import { KNOWLEDGE_COMMANDS } from "./commands.ts";
 import {
   makeOpenCommand,
@@ -253,7 +254,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     return {
       ...printed,
       changes: null,
-      refused: error instanceof Error ? error.message : String(error),
+      refused: messageOf(error),
     };
   }
   const after = await savedCwd(mounted.fs, result.env.PWD, job.docs);
@@ -286,7 +287,7 @@ async function start(id: string, job: Job): Promise<void> {
     post({
       type: "failed",
       id,
-      message: error instanceof Error ? error.message : String(error),
+      message: messageOf(error),
     });
   } finally {
     jobs.delete(id);

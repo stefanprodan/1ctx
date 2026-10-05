@@ -14,6 +14,7 @@ import {
   type RunOptions,
   VALUED_FLAGS,
 } from "../lib/cli.ts";
+import { messageOf } from "../lib/errors.ts";
 import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
@@ -261,8 +262,6 @@ export async function runService(
   } catch (error) {
     if (error instanceof ServiceError) throw error;
     // the manager's own words: a launchctl failure, a file it could not write
-    throw new ServiceError(
-      error instanceof Error ? error.message : String(error),
-    );
+    throw new ServiceError(messageOf(error));
   }
 }

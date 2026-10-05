@@ -6,7 +6,7 @@
 import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { sleepUnless, wallClock } from "../../lib/clock.ts";
-import { ToolError } from "../../lib/errors.ts";
+import { messageOf, ToolError } from "../../lib/errors.ts";
 import { scrubValues } from "../../lib/log.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
@@ -293,7 +293,7 @@ export function makeWebsearchTool(
           await searchWeb(args, ctx, { provider, key: value }, dependencies),
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = messageOf(error);
         throw error instanceof ToolError
           ? new ToolError(scrub(message), error.logged)
           : new Error(scrub(message));

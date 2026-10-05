@@ -4,6 +4,7 @@
 import type { WebAccess } from "../../shared/web.ts";
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
 import { parseUserPassword } from "../access/index.ts";
+import { messageOf } from "../lib/errors.ts";
 import { scrubValues } from "../lib/log.ts";
 import { ADMIN_SECRET } from "../users/index.ts";
 import { apply, type Secret } from "./apply.ts";
@@ -93,9 +94,7 @@ export function provisionArea(deps: ProvisionDeps) {
         try {
           await api.call("POST", "/api/login", { username: "admin", password });
         } catch (error) {
-          throw new Error(
-            `user/admin: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          throw new Error(`user/admin: ${messageOf(error)}`);
         }
         try {
           await apply(api, documents, secret, report);
@@ -107,9 +106,7 @@ export function provisionArea(deps: ProvisionDeps) {
         );
         return counts;
       } catch (error) {
-        throw new Error(
-          scrub(error instanceof Error ? error.message : String(error)),
-        );
+        throw new Error(scrub(messageOf(error)));
       }
     },
   };
