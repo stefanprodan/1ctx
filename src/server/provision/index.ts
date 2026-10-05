@@ -4,6 +4,7 @@
 import type { WebAccess } from "../../shared/web.ts";
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
 import { parseUserPassword } from "../access/index.ts";
+import { scrubValues } from "../lib/log.ts";
 import { ADMIN_SECRET } from "../users/index.ts";
 import { apply, type Secret } from "./apply.ts";
 import { type Action, type Counts, client, type Handle } from "./client.ts";
@@ -73,13 +74,8 @@ export function provisionArea(deps: ProvisionDeps) {
         if (value !== null) values.add(value);
         return value;
       };
-      const scrub = (line: string) => {
-        let result = line;
-        for (const value of [...values].sort((a, b) => b.length - a.length)) {
-          result = result.replaceAll(value, "[redacted]");
-        }
-        return result.replace(/[\r\n]/g, " ");
-      };
+      const scrub = (line: string) =>
+        scrubValues(line, values, "[redacted]").replace(/[\r\n]/g, " ");
       const counts: Counts = { created: 0, updated: 0, unchanged: 0 };
       const report = (action: Action, kind: string, name: string) => {
         counts[action]++;

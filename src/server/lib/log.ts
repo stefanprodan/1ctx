@@ -211,14 +211,28 @@ export const silent: Log = {
   error() {},
 };
 
+// each value replaced by mark, the longest first, so a value inside
+// another never leaves the longer one's rest
+export function scrubValues(
+  text: string,
+  values: Iterable<string | null>,
+  mark: string,
+): string {
+  const found = [...values].filter((value): value is string => !!value);
+  let out = text;
+  for (const value of found.sort((a, b) => b.length - a.length)) {
+    out = out.replaceAll(value, mark);
+  }
+  return out;
+}
+
 export function scrubErrors(log: Log, values: () => string[]): Log {
   const scrub = (fields?: LogFields): LogFields | undefined => {
     if (typeof fields?.error !== "string") return fields;
-    let error = fields.error;
-    for (const value of values().sort((a, b) => b.length - a.length)) {
-      if (value !== "") error = error.replaceAll(value, "[key]");
-    }
-    return { ...fields, error: cut(error) };
+    return {
+      ...fields,
+      error: cut(scrubValues(fields.error, values(), "[key]")),
+    };
   };
   const write = (level: LogLevel) => (msg: string, fields?: LogFields) =>
     log[level](msg, scrub(fields));

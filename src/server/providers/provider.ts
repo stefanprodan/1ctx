@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Wire } from "../../shared/words.ts";
-import type { Log } from "../lib/log.ts";
+import { type Log, scrubValues } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import {
   azureChat,
@@ -56,7 +56,7 @@ export const noKeyFile = (row: Pick<ProviderRow, "name" | "keyName">) =>
   `${row.name} has no key file ${row.keyName}.key`;
 
 export function scrubKey(text: string, key: string | null): string {
-  return key === null ? text : text.replaceAll(key, "[key]");
+  return scrubValues(text, [key], "[key]");
 }
 
 // the messages as a fit counts them: a message's plain reasoning only

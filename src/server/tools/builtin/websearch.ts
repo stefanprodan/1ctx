@@ -7,6 +7,7 @@ import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { sleepUnless, wallClock } from "../../lib/clock.ts";
 import { ToolError } from "../../lib/errors.ts";
+import { scrubValues } from "../../lib/log.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
 import * as firecrawl from "./search/firecrawl.ts";
@@ -286,8 +287,7 @@ export function makeWebsearchTool(
       const value = key();
       // a provider may echo the key in an answer as well as an error, and
       // either would reach the model, the stored row and the UI
-      const scrub = (text: string) =>
-        value === null ? text : text.replaceAll(value, "[key]");
+      const scrub = (text: string) => scrubValues(text, [value], "[key]");
       try {
         return scrub(
           await searchWeb(args, ctx, { provider, key: value }, dependencies),

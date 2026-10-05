@@ -17,6 +17,7 @@ import {
 } from "@modelcontextprotocol/client";
 import { cutCodePoints } from "../../shared/text.ts";
 import { ToolError } from "../lib/errors.ts";
+import { scrubValues } from "../lib/log.ts";
 import type { Fetcher } from "../providers/index.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
@@ -54,7 +55,7 @@ export type ClientOptions = {
 };
 
 function scrubText(text: string, key: string | null): string {
-  return key === null || key === "" ? text : text.replaceAll(key, "[redacted]");
+  return scrubValues(text, [key], "[redacted]");
 }
 
 export function scrub<T>(value: T, key: string | null): T {
