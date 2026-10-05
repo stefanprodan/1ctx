@@ -16,7 +16,6 @@ export type Secrets = {
   // file is absent, empty or not a regular file, or larger than maxBytes,
   // which is checked before the file is read
   read(kind: string, name: string, maxBytes?: number): string | null;
-  has(kind: string, name: string): boolean;
   // the names alone, so a page can offer a pick without a value
   // crossing
   list(kind: string): string[];
@@ -46,9 +45,6 @@ export function secrets(dir: string): Secrets {
       }
       const value = readFileSync(path, "utf8").trim();
       return value === "" ? null : value;
-    },
-    has(kind, name) {
-      return existsSync(pathOf(kind, name));
     },
     list(kind) {
       if (!SECRET_KINDS.some((known) => known === kind)) {

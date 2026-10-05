@@ -113,7 +113,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 
 - **A secrets reader is bound to one kind.** One bare value per
   `<kind>-<name>.key`, the kind from `SECRET_KINDS`, the name by
-  `isSecretName`; `read()`, `has()` and `list()` refuse a name of
+  `isSecretName`; `read()` and `list()` refuse a name of
   another kind. `compose.ts` binds each area's reader; only provision,
   the Monitor's key checks (`overview/`) and the log scrubber read by
   kind.
