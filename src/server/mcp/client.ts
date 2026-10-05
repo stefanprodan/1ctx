@@ -16,10 +16,9 @@ import {
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
 import { ToolError } from "../lib/errors.ts";
+import type { Fetcher } from "../providers/index.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
-
-export type Fetcher = typeof fetch;
 
 export type ListedTool = {
   name: string;
@@ -323,13 +322,14 @@ export async function withClient<T>(
   options: ClientOptions,
   fn: (client: ClientView) => Promise<T>,
 ): Promise<T> {
+  const close = () => {
+    void transport.close().catch(() => undefined);
+  };
   const budget: Budget = {
     limit: options.bodyBytes,
     remaining: options.bodyBytes,
     over: false,
-    close: () => {
-      void transport.close().catch(() => undefined);
-    },
+    close,
   };
   const transport = new StreamableHTTPClientTransport(new URL(server.url), {
     fetch: budgetedFetch(deps.fetcher, budget, key),
@@ -351,9 +351,6 @@ export async function withClient<T>(
     options.timeoutMs,
   );
   const signal = AbortSignal.any([options.signal, timeout.signal]);
-  const close = () => {
-    void transport.close().catch(() => undefined);
-  };
   signal.addEventListener("abort", close);
   if (signal.aborted) close();
   let value: T | undefined;

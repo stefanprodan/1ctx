@@ -205,11 +205,32 @@ export class McpServerStore {
       .map(toolRow);
   }
 
+  // every server's tools in one query, each list by name
+  private allTools(): Map<string, McpToolRow[]> {
+    const out = new Map<string, McpToolRow[]>();
+    const raws = this.db
+      .query<RawTool, []>("select * from mcp_tools order by server_id, name")
+      .all();
+    for (const raw of raws) {
+      const list = out.get(raw.server_id) ?? [];
+      list.push(toolRow(raw));
+      out.set(raw.server_id, list);
+    }
+    return out;
+  }
+
   list(): McpServerRow[] {
+    const tools = this.allTools();
     return this.db
       .query<RawServer, []>("select * from mcp_servers order by name")
       .all()
-      .map((raw) => row(raw, this.tools(raw.id)));
+      .map((raw) => row(raw, tools.get(raw.id) ?? []));
+  }
+
+  exists(id: string): boolean {
+    return (
+      this.db.query("select 1 from mcp_servers where id = ?").get(id) !== null
+    );
   }
 
   byId(id: string): McpServerRow | null {
@@ -419,13 +440,14 @@ export class McpServerStore {
   }
 
   stale(before: number): McpServerRow[] {
+    const tools = this.allTools();
     return this.db
       .query<RawServer, [number]>(
         `select * from mcp_servers where checked_at < ?
          order by checked_at, name`,
       )
       .all(before)
-      .map((raw) => row(raw, this.tools(raw.id)));
+      .map((raw) => row(raw, tools.get(raw.id) ?? []));
   }
 
   agentServers(agentId: string): AgentServer[] {
@@ -453,7 +475,7 @@ export class McpServerStore {
       if (!link.read) {
         throw new BadRequest("a server needs read");
       }
-      if (this.byId(link.serverId) === null) {
+      if (!this.exists(link.serverId)) {
         throw new BadRequest("serverId is unknown");
       }
       seen.add(link.serverId);

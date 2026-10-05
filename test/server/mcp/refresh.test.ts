@@ -404,7 +404,6 @@ describe("MCP refresh coordinator", () => {
       usage: NO_USAGE,
       coordinator,
       clock: time.clock,
-      log: silent,
       hasSecret: () => false,
       keys: () => [],
       callTimeoutMs: () => 20_000,

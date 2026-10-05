@@ -13,6 +13,7 @@ type Validate = (input: unknown) => { valid: boolean; errorMessage?: string };
 // parses its offer's schemas afresh, so validators are kept by the
 // schema's text, and a full cache drops the engine with them
 export const MAX_VALIDATORS = 256;
+const MAX_LISTED = 40;
 let argumentValidator = new AjvJsonSchemaValidator();
 const validators = new Map<string, Validate | null>();
 
@@ -91,5 +92,3 @@ export function validateArguments(
     names.length === 0 ? "It takes no parameters." : `Its parameters: ${list}.`
   }`;
 }
-
-const MAX_LISTED = 40;

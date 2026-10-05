@@ -115,7 +115,15 @@ export function parseTimeout(value: unknown): number | null {
   return value;
 }
 
-function patterns(b: Record<string, unknown>) {
+const PATTERN_FIELDS = [
+  "readPatterns",
+  "writePatterns",
+  "excludedPatterns",
+] as const;
+
+function patterns(
+  b: Record<string, unknown>,
+): Record<(typeof PATTERN_FIELDS)[number], string[]> {
   return {
     readPatterns: parsePatterns(b.readPatterns, "readPatterns"),
     writePatterns: parsePatterns(b.writePatterns, "writePatterns"),
@@ -160,17 +168,8 @@ export function parsePatch(body: unknown): PatchMcpRequest {
     out.instructionsOn = boolean(b.instructionsOn, "instructionsOn");
   }
   if ("timeoutMs" in b) out.timeoutMs = parseTimeout(b.timeoutMs);
-  if ("readPatterns" in b) {
-    out.readPatterns = parsePatterns(b.readPatterns, "readPatterns");
-  }
-  if ("writePatterns" in b) {
-    out.writePatterns = parsePatterns(b.writePatterns, "writePatterns");
-  }
-  if ("excludedPatterns" in b) {
-    out.excludedPatterns = parsePatterns(
-      b.excludedPatterns,
-      "excludedPatterns",
-    );
+  for (const field of PATTERN_FIELDS) {
+    if (field in b) out[field] = parsePatterns(b[field], field);
   }
   return out;
 }

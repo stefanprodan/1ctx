@@ -20,7 +20,6 @@ import {
   ServiceUnavailable,
 } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { errorFields, type Log } from "../lib/log.ts";
 import { lastDays } from "../usage/index.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
@@ -33,7 +32,6 @@ export type RoutesDeps = {
   capabilities: { forget(key: string): void };
   coordinator: RefreshCoordinator;
   clock: Clock;
-  log: Log;
   hasSecret: (name: string) => boolean;
   keys: () => string[];
   callTimeoutMs: () => number;
@@ -78,6 +76,25 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
     return taken;
   }
+  // a discovery that fails is a 502, or a 404 when a delete stopped it
+  async function discovered(
+    endpoint: Pick<McpServerRow, "url" | "keyName">,
+    signal: AbortSignal,
+    id?: string,
+    failed?: (error: unknown) => void,
+  ): Promise<DiscoveryResult> {
+    try {
+      const found = await deps.discover(endpoint, signal);
+      signal.throwIfAborted();
+      return found;
+    } catch (error) {
+      if (signal.aborted && id !== undefined && deps.store.byId(id) === null) {
+        throw new NotFound("no such MCP server");
+      }
+      if (!signal.aborted) failed?.(error);
+      throw gateway(error);
+    }
+  }
   return [
     {
       method: "GET",
@@ -99,16 +116,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req) {
         const fields = parseCreate(await jsonBody(req));
-        const taken = run(`new:${fields.name}`, "candidate", async (signal) => {
-          let found: DiscoveryResult;
-          try {
-            found = await deps.discover(fields, signal);
-            signal.throwIfAborted();
-          } catch (error) {
-            throw gateway(error);
-          }
-          return deps.store.create(fields, found);
-        });
+        const taken = run(`new:${fields.name}`, "candidate", async (signal) =>
+          deps.store.create(fields, await discovered(fields, signal)),
+        );
         const row = await taken.promise;
         return json(response(row), 201);
       },
@@ -126,19 +136,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             url: endpoint.url ?? before.url,
             keyName: "keyName" in endpoint ? endpoint.keyName! : before.keyName,
           };
-          const taken = run(before.id, "candidate", async (signal) => {
-            let found: DiscoveryResult;
-            try {
-              found = await deps.discover(moved, signal);
-              signal.throwIfAborted();
-            } catch (error) {
-              if (signal.aborted && deps.store.byId(before.id) === null) {
-                throw new NotFound("no such MCP server");
-              }
-              throw gateway(error);
-            }
-            return deps.store.applyDiscovery(before.id, found, moved);
-          });
+          const taken = run(before.id, "candidate", async (signal) =>
+            deps.store.applyDiscovery(
+              before.id,
+              await discovered(moved, signal, before.id),
+              moved,
+            ),
+          );
           const row = await taken.promise;
           if (row === null) throw new NotFound("no such MCP server");
           return json(response(row));
@@ -182,28 +186,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(_req, ctx) {
         const before = find(ctx.params.id);
-        const taken = run(before.id, "refresh", async (signal) => {
-          let found: DiscoveryResult;
-          try {
-            found = await deps.discover(before, signal);
-            signal.throwIfAborted();
-          } catch (error) {
-            if (signal.aborted && deps.store.byId(before.id) === null) {
-              throw new NotFound("no such MCP server");
-            }
-            if (!signal.aborted) {
-              const words =
-                error instanceof Error ? error.message : String(error);
-              deps.store.recordFailure(before.id, words, deps.clock());
-              deps.log.warn("server refresh failed", {
-                server: before.name,
-                ...errorFields(error, false),
-              });
-            }
-            throw gateway(error);
-          }
-          return deps.store.applyDiscovery(before.id, found);
-        });
+        const taken = run(before.id, "refresh", async (signal) =>
+          deps.store.applyDiscovery(
+            before.id,
+            await discovered(before, signal, before.id, (error) =>
+              deps.coordinator.recordFailure(before, error),
+            ),
+          ),
+        );
         const row = await taken.promise;
         if (row === null) throw new NotFound("no such MCP server");
         return json(response(row));
