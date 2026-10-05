@@ -159,7 +159,9 @@ export type App = {
 
 const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
 
-function scrubbedLogs(options: ComposeOptions): LogFactory {
+export function scrubbedLogs(
+  options: Pick<ComposeOptions, "secret" | "secretNames" | "log">,
+): LogFactory {
   const { scrubbed } = httpKeys(options);
   return (area) =>
     scrubErrors(options.log(area), () =>
@@ -175,13 +177,8 @@ function scrubbedLogs(options: ComposeOptions): LogFactory {
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
   const log = scrubbedLogs(options);
-  // Ports that point down the list, at an area built after the one that
-  // holds them, are closures called once the list is complete: a user
-  // is made with its personal project, project routes ask sessions
-  // and access, an agent's delete reaches what runs on it, the
-  // session detail asks the runner for the reply in flight, and a freed
-  // place or a moved send cap wakes the queue's dispatcher, then the
-  // scheduler, so a user's waiting message takes a place before a run.
+  // ports to areas built later are closures, called once the list is
+  // complete
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
@@ -197,6 +194,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // the instance's start, as the overview reports it
   const startedAt = clock();
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
+  // the queue first, so a waiting message takes a place before a run
   const wake = () => {
     runner.queue.wake();
     automations.scheduler.wake();

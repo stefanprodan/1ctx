@@ -13,19 +13,13 @@ import icon512 from "../client/icon-512.png";
 import maskable from "../client/icon-maskable-512.png";
 import page from "../client/index.html";
 import type { SecretKind } from "../shared/words.ts";
-import { compose } from "./compose.ts";
-import { httpKeys, MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
+import { compose, scrubbedLogs } from "./compose.ts";
+import { MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
 import { type Db, open } from "./db/index.ts";
 import { PROCESS_SLOTS } from "./knowledge/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
 import { HOUR_MS, wallClock } from "./lib/clock.ts";
-import {
-  errorFields,
-  type LogFactory,
-  logger,
-  scrubErrors,
-  silent,
-} from "./lib/log.ts";
+import { errorFields, type LogFactory, logger, silent } from "./lib/log.ts";
 import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { type ProvisionResult, provisionPaths } from "./provision/index.ts";
 import { defaultDir, type Secrets, secrets } from "./secrets/index.ts";
@@ -50,9 +44,12 @@ const cli = parseCli(process.argv.slice(2));
 
 // an http- file is sized before it is read, and one past a key's room
 // is never read
-function readerOf(store: Secrets) {
-  return (kind: SecretKind, name: string) =>
-    store.read(kind, name, kind === "http-" ? MAX_KEY_FILE_BYTES : undefined);
+function portsOf(store: Secrets) {
+  return {
+    secret: (kind: SecretKind, name: string) =>
+      store.read(kind, name, kind === "http-" ? MAX_KEY_FILE_BYTES : undefined),
+    secretNames: (kind: SecretKind) => store.list(kind),
+  };
 }
 if (cli.kind === "error") fail(cli.message);
 if (cli.kind === "version") {
@@ -80,8 +77,7 @@ function provisioner(store: Secrets, log: LogFactory = () => silent) {
   return (db: Db) =>
     compose({
       db,
-      secret: readerOf(store),
-      secretNames: (kind) => store.list(kind),
+      ...portsOf(store),
       clock: wallClock,
       log,
       version: VERSION,
@@ -114,18 +110,8 @@ const { hostname, port, dbPath, secretsDir, cacheDir, provision } = cli.options;
 const { secureCookie, trustProxy, drain } = cli.options;
 
 const store = secrets(secretsDir ?? defaultDir(Bun.main, process.execPath));
-const keys = httpKeys({
-  secret: readerOf(store),
-  secretNames: (kind) => store.list(kind),
-});
-const log = scrubErrors(logger("1ctx"), () =>
-  (["provider-", "search-", "mcp-", "http-"] as const).flatMap((kind) =>
-    store.list(kind).flatMap((name) => {
-      const value = keys.scrubbed(kind, name);
-      return value === null ? [] : [value];
-    }),
-  ),
-);
+const ports = portsOf(store);
+const log = scrubbedLogs({ ...ports, log: logger })("1ctx");
 
 // applied before the server opens the db, so nothing it caches is stale
 let provisioned: ProvisionResult | null = null;
@@ -159,8 +145,7 @@ const applied =
 
 const app = await compose({
   db,
-  secret: readerOf(store),
-  secretNames: (kind) => store.list(kind),
+  ...ports,
   clock: wallClock,
   log: logger,
   version: VERSION,

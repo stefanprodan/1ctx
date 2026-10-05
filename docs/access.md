@@ -122,9 +122,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   one past `maxBytes`; `main.ts` caps `http-` files.
 - **A value is never logged, returned by a route or stored.** Routes
   list names alone. Provider, search, MCP and `http-` values are
-  scrubbed from logs. The kinds are listed twice, `SCRUB_KINDS` in
-  `compose.ts` and the startup logger in `main.ts`; a new kind joins
-  both.
+  scrubbed from logs, the kinds in `SCRUB_KINDS` in `compose.ts`.
 
 ## The socket
 
