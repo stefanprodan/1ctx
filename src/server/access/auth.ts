@@ -8,7 +8,7 @@ import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
-import { daysWindow } from "../usage/index.ts";
+import { daysWindow, zoneOrUtc } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
@@ -107,13 +107,7 @@ export function auth(deps: AuthDeps): Auth {
   const visit = (user: UserRow, now: number) => {
     const held = visited.get(user.id);
     if (held !== undefined && held.tz === user.tz && now < held.until) return;
-    let day: { days: string[]; until: number };
-    try {
-      day = daysWindow(now, user.tz, 1);
-    } catch {
-      // a zone the runtime does not know counts the day in UTC
-      day = daysWindow(now, "UTC", 1);
-    }
+    const day = daysWindow(now, zoneOrUtc(user.tz), 1);
     deps.visits.record(user.id, day.days[0]!, now);
     visited.set(user.id, { tz: user.tz, until: day.until });
   };

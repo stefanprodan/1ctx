@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Both usage routes and the chat export take the caller's zone; the
-// days route may also take how many weeks, up to the year. Anything
-// else is a 400, as every parser answers the unexpected.
+// the query parsers of the zone-taking routes
 
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
 import { BadRequest } from "../lib/errors.ts";

@@ -13,7 +13,7 @@ import { parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { type UsageWindow, usageWindow } from "../usage/index.ts";
+import { usageWindow, zoneOrUtc } from "../usage/index.ts";
 import { summary, type UserRow } from "../users/index.ts";
 import { parseUsername } from "./parse.ts";
 import type { VisitStore } from "./visits.ts";
@@ -98,14 +98,10 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const user = deps.users.byUsername(parseUsername(ctx.params.username));
         if (user === null) throw new NotFound("no such user");
         parseNoQuery(ctx.url);
-        let window: UsageWindow;
-        try {
-          window = usageWindow(deps.clock(), user.tz);
-        } catch {
-          // a zone the runtime does not know counts in UTC, as a visit does
-          window = usageWindow(deps.clock(), "UTC");
-        }
-        const { days, starts, since, until } = window;
+        const { days, starts, since, until } = usageWindow(
+          deps.clock(),
+          zoneOrUtc(user.tz),
+        );
         const usage = deps.activity.personDays(user.id, starts, until);
         // a visit is kept by the person's day, so it lands on that day
         const index = new Map(days.map((day, i) => [day, i]));

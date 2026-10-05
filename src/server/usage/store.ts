@@ -123,6 +123,21 @@ const countLive = (alias: string, column: "send_id" | "session_id") =>
   `count(distinct case when exists (select 1 from sends
      where sends.id = ${alias}.send_id) then ${alias}.${column} end)`;
 
+// the days of a window, each from its start to the next's, the last to
+// the window's end; binds the end, then the starts as a JSON array
+export const DAY_STARTS = `day_starts as materialized (
+  select cast(key as integer) as day_index,
+         cast(value as integer) as start_at,
+         lead(cast(value as integer), 1, ?) over (
+           order by cast(key as integer)
+         ) as end_at
+    from json_each(?)
+)`;
+
+// the turns and the tokens of a window's rows
+const SUMS = `${countLive("usage", "send_id")} as sends,
+  coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens`;
+
 export class UsageStore {
   constructor(private readonly db: Db) {}
 
@@ -213,14 +228,7 @@ export class UsageStore {
     const ids = JSON.stringify(projectIds);
     const rows = this.db
       .query<DayRaw, [number, string, string]>(
-        `with day_starts as materialized (
-           select cast(key as integer) as day_index,
-                  cast(value as integer) as start_at,
-                  lead(cast(value as integer), 1, ?) over (
-                    order by cast(key as integer)
-                  ) as end_at
-             from json_each(?)
-         ), project_ids as materialized (
+        `with ${DAY_STARTS}, project_ids as materialized (
            select cast(value as text) as project_id from json_each(?)
          )
          select p.project_id, d.day_index,
@@ -245,8 +253,7 @@ export class UsageStore {
     }
     const total = this.db
       .query<TotalRaw, [string, number, number]>(
-        `select ${countLive("usage", "send_id")} as sends,
-                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
+        `select ${SUMS}
            from usage
           where project_id in (select value from json_each(?))
             and created_at >= ? and created_at < ?`,
@@ -269,8 +276,7 @@ export class UsageStore {
           : ["project_id", by.projectId];
     return this.db
       .query<SendTotals, [string, number, number]>(
-        `select ${countLive("usage", "send_id")} as sends,
-                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens,
+        `select ${SUMS},
                 case when count(*) = 0 then 0 else sum(cost) end as cost
            from usage
           where ${column} = ? and created_at >= ? and created_at < ?`,
@@ -299,14 +305,7 @@ export class UsageStore {
     if (starts.length === 0) return { total: { sends: 0, tokens: 0 }, usage };
     const rows = this.db
       .query<Omit<DayRaw, "project_id">, [number, string, string]>(
-        `with day_starts as materialized (
-           select cast(key as integer) as day_index,
-                  cast(value as integer) as start_at,
-                  lead(cast(value as integer), 1, ?) over (
-                    order by cast(key as integer)
-                  ) as end_at
-             from json_each(?)
-         )
+        `with ${DAY_STARTS}
          select d.day_index,
                 ${countLive("u", "send_id")} as sends,
                 sum(u.prompt_tokens + u.completion_tokens) as tokens
@@ -322,8 +321,7 @@ export class UsageStore {
     }
     const total = this.db
       .query<TotalRaw, [string, number, number]>(
-        `select ${countLive("usage", "send_id")} as sends,
-                coalesce(sum(prompt_tokens + completion_tokens), 0) as tokens
+        `select ${SUMS}
            from usage
           where agent_id = ? and created_at >= ? and created_at < ?`,
       )

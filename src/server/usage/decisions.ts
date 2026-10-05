@@ -10,6 +10,7 @@ import type { DeciderDay } from "../../shared/api/directory.ts";
 import type { DecisionPurpose } from "../../shared/contracts/decision.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
+import { DAY_STARTS } from "./store.ts";
 
 export type DecisionUsageFields = {
   deciderId: string;
@@ -173,14 +174,7 @@ export class DecisionUsageStore {
     if (starts.length === 0) return { total, usage };
     const rows = this.db
       .query<DeciderDay & { day_index: number }, [number, string, string]>(
-        `with day_starts as materialized (
-           select cast(key as integer) as day_index,
-                  cast(value as integer) as start_at,
-                  lead(cast(value as integer), 1, ?) over (
-                    order by cast(key as integer)
-                  ) as end_at
-             from json_each(?)
-         )
+        `with ${DAY_STARTS}
          select d.day_index, count(*) as answers,
                 coalesce(sum(u.input_tokens), 0) as tokens
            from day_starts d
@@ -196,15 +190,5 @@ export class DecisionUsageStore {
       total.tokens += raw.tokens;
     }
     return { total, usage };
-  }
-
-  // newest first, for a test or a later page
-  list(limit = 100): DecisionUsageRow[] {
-    return this.db
-      .query<Raw, [number]>(
-        "select * from decision_usage order by created_at desc, id limit ?",
-      )
-      .all(limit)
-      .map(row);
   }
 }

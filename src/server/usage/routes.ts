@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Usage summaries for the cards, both in calendar days of the caller's
-// zone: the last seven for the aside and 53 ISO weeks for the heatmap. Which projects is access's call,
-// through a port, since access is built after this area.
+// zone: the last seven for the aside and 53 ISO weeks for the heatmap.
+// Which projects is access's call, through a port, since access is built
+// after this area.
 
 import type {
   DaysUsageResponse,
@@ -13,7 +14,7 @@ import type { Clock } from "../lib/clock.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { parseDaysUsageQuery, parseZoneQuery } from "./parse.ts";
 import type { UsageStore } from "./store.ts";
-import { usageWindow, weekWindow } from "./window.ts";
+import { daysWindow, usageWindow } from "./window.ts";
 
 export type AccessPort = {
   visibleProjectIds(userId: string): string[] | null;
@@ -55,7 +56,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const timeZone = parseZoneQuery(ctx.url);
-        const { since, until } = weekWindow(deps.clock(), timeZone);
+        // the last seven calendar days, so they match the heatmap's last cells
+        const { since, until } = daysWindow(deps.clock(), timeZone, 7);
         const projectIds =
           deps.access.visibleProjectIds(ctx.principal!.userId) ?? [];
         const body: WeekUsageResponse = {

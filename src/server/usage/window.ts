@@ -1,13 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The activity window: up to 53 ISO weeks in the caller's zone, Monday first,
-// today last, and the instant each day starts. A day is a calendar day,
-// so one across a DST change is 23 or 25 hours; nothing here divides a
-// timestamp, which would bucket by a fixed offset.
+// calendar windows in a zone; a day is a calendar day, never 24 h
 
 import type { Windowed } from "../../shared/api/admin.ts";
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
+import { isTimeZone } from "../../shared/words.ts";
 import { DAY_MS } from "../lib/clock.ts";
 
 export type UsageWindow = {
@@ -110,6 +108,10 @@ export function lastDays<T extends object>(
   return { since, until: now, ...read(since, now) };
 }
 
+// a zone the runtime does not know counts in UTC
+export const zoneOrUtc = (timeZone: string): string =>
+  isTimeZone(timeZone) ? timeZone : "UTC";
+
 const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
   new Intl.DateTimeFormat("en", {
     timeZone,
@@ -124,6 +126,11 @@ const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
     hourCycle: "h23",
   });
 
+const todayIn = (formatter: Intl.DateTimeFormat, now: number): CalendarDay => {
+  const { year, month, day } = localParts(formatter, now);
+  return { year, month, day };
+};
+
 // the days ending with today in the zone; how many can hang on today's
 // weekday, so the year starts on a Monday
 function calendarWindow(
@@ -132,8 +139,7 @@ function calendarWindow(
   span: (weekday: number) => number,
 ): UsageWindow {
   const formatter = zoneFormatter(timeZone);
-  const local = localParts(formatter, now);
-  const today = { year: local.year, month: local.month, day: local.day };
+  const today = todayIn(formatter, now);
   const weekday = utcDate(today).getUTCDay() || 7;
   const count = span(weekday);
   const first = addDays(today, 1 - count);
@@ -156,12 +162,6 @@ export function usageWindow(
   return calendarWindow(now, timeZone, (weekday) => (weeks - 1) * 7 + weekday);
 }
 
-// the aside's week: the last seven calendar days, today included, so its
-// numbers match the heatmap's last seven cells
-export function weekWindow(now: number, timeZone: string): UsageWindow {
-  return calendarWindow(now, timeZone, () => 7);
-}
-
 // the last `count` calendar days, today included, for another area's
 // daily series in the caller's zone
 export function daysWindow(
@@ -179,8 +179,7 @@ export function monthWindow(
   month: string,
 ): UsageWindow {
   const formatter = zoneFormatter(timeZone);
-  const local = localParts(formatter, now);
-  const today = { year: local.year, month: local.month, day: local.day };
+  const today = todayIn(formatter, now);
   const [year, number] = month.split("-").map(Number) as [number, number];
   const first = { year, month: number, day: 1 };
   const next =
