@@ -867,6 +867,23 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 400, admin: 400 },
   },
   {
+    method: "GET",
+    path: "/api/directory/deciders",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/directory/deciders/:name",
+    // the pattern's own ":" breaks the name rule: the parser's 400
+    expect: { anonymous: 401, member: 400, admin: 400 },
+  },
+  {
+    method: "GET",
+    path: "/api/directory/deciders/:name/days",
+    // the pattern's own ":" breaks the name rule: the parser's 400
+    expect: { anonymous: 401, member: 400, admin: 400 },
+  },
+  {
     // authenticated, and without the upgrade a signed-in caller gets
     // told to upgrade
     method: "GET",

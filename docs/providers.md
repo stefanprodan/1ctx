@@ -239,6 +239,15 @@ completions refuse function tools with any thinking.
   An option row exists only while its text differs from the code's;
   no `decisions` row means enabled with the default decider. A deleted
   decider nulls `decider_id`.
+- **Every signed-in user may see a decider** through
+  `deciders/directory.ts`: its name, model, the provider's name, the
+  catalog facts and the decisions it answers now (those naming it,
+  and those naming none when it is the default, a turned-off one left
+  out). Never a provider id, base URL, key name or decision text. Its
+  days are `deciderDays()`, Checks left out. Its page is
+  `/deciders/:name`, since a name is unique among deciders only, with
+  no `@` (a decider is no actor) and, as an agent's, no cost: answers
+  and tokens.
 - **A provider's usage is its chat and run rounds only.** Decider
   answers are `decision_usage` and appear in the decider's and the
   decision's usage, which have no output tokens. Every usage route

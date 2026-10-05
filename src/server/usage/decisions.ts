@@ -6,6 +6,7 @@
 // text so a row outlives its decider and provider; no delete removes it.
 
 import type { DecisionTotals } from "../../shared/api/deciders.ts";
+import type { DeciderDay } from "../../shared/api/directory.ts";
 import type { DecisionPurpose } from "../../shared/contracts/decision.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -157,6 +158,44 @@ export class DecisionUsageStore {
           where ${column} = ? and created_at >= ? and created_at < ?`,
       )
       .get(value, since, until)!;
+  }
+
+  // one decider's decisions per day in every project, its Checks left
+  // out: the decider page's heatmap. An answer is one row, so the days
+  // sum to the total
+  deciderDays(
+    deciderId: string,
+    starts: number[],
+    until: number,
+  ): { total: DeciderDay; usage: DeciderDay[] } {
+    const usage = starts.map(() => ({ answers: 0, tokens: 0 }));
+    const total = { answers: 0, tokens: 0 };
+    if (starts.length === 0) return { total, usage };
+    const rows = this.db
+      .query<DeciderDay & { day_index: number }, [number, string, string]>(
+        `with day_starts as materialized (
+           select cast(key as integer) as day_index,
+                  cast(value as integer) as start_at,
+                  lead(cast(value as integer), 1, ?) over (
+                    order by cast(key as integer)
+                  ) as end_at
+             from json_each(?)
+         )
+         select d.day_index, count(*) as answers,
+                coalesce(sum(u.input_tokens), 0) as tokens
+           from day_starts d
+          cross join decision_usage u
+          where u.decider_id = ? and u.purpose != 'check'
+            and u.created_at >= d.start_at and u.created_at < d.end_at
+          group by d.day_index`,
+      )
+      .all(until, JSON.stringify(starts), deciderId);
+    for (const raw of rows) {
+      usage[raw.day_index] = { answers: raw.answers, tokens: raw.tokens };
+      total.answers += raw.answers;
+      total.tokens += raw.tokens;
+    }
+    return { total, usage };
   }
 
   // newest first, for a test or a later page

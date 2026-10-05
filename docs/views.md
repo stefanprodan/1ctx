@@ -163,13 +163,13 @@ Flagged.
 
 ## Directory and projects
 
-- **The words are users and agents, never people,** in the page and in
-  the code.
+- **The words are users, agents and deciders, never people,** in the
+  page and in the code.
 - **Tabs that share a head are one view on several addresses.** The
   Directory's tabs, a user page's and an agent page's each route to
   one view, so a tab change keeps the head and its Activity card
-  mounted. The Directory loads both lists on either tab, so both tabs
-  carry a count.
+  mounted. The Directory loads every list on each tab, so every tab
+  carries a count.
 - **Every project has a Settings tab,** a team's after Members. An
   admin writes a team project's description and repositories there
   through the admin page's routes and entities, and a member reads

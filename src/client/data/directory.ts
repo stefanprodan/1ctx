@@ -1,19 +1,21 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Directory's two lists, each read whole on every visit, then a
-// user's page and an agent's page: one of each on screen, and the
-// pages seen before held by name so going back draws at once while
+// The Directory's three lists, each read whole on every visit, then a
+// user's, an agent's and a decider's page: one of each on screen, and
+// the pages seen before held by name so going back draws at once while
 // they load again. A load's answer is kept only while it is the latest
-// asked for, and all go when the signed-in user changes. A user's and
-// an agent's days are their own loads, so a page draws before its
-// heatmap.
+// asked for, and all go when the signed-in user changes. A page's days
+// are their own load, so a page draws before its heatmap.
 
 import { effect, signal } from "@preact/signals";
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
   DirectoryAgentsResponse,
+  DirectoryDeciderDaysResponse,
+  DirectoryDeciderResponse,
+  DirectoryDecidersResponse,
   DirectoryUserDaysResponse,
   DirectoryUserResponse,
   DirectoryUsersResponse,
@@ -49,6 +51,18 @@ export const agentDays = signal<{
   body: DirectoryAgentDaysResponse;
 } | null>(null);
 export const agentDaysFailed = signal(false);
+export const directoryDeciders = signal<
+  DirectoryDecidersResponse["deciders"] | null
+>(null);
+export const directoryDecidersError = signal<Failure | null>(null);
+export const deciderPage = signal<DirectoryDeciderResponse | null>(null);
+export const deciderPageError = signal<Failure | null>(null);
+// the days of the decider named in name; failed as the agent's are
+export const deciderDays = signal<{
+  name: string;
+  body: DirectoryDeciderDaysResponse;
+} | null>(null);
+export const deciderDaysFailed = signal(false);
 
 let owner: string | null = null;
 let usersTurn = 0;
@@ -57,10 +71,15 @@ let userTurn = 0;
 let userDaysTurn = 0;
 let agentTurn = 0;
 let daysTurn = 0;
+let decidersTurn = 0;
+let deciderTurn = 0;
+let deciderDaysTurn = 0;
 const userPages = new Held<DirectoryUserResponse>();
 const userDaysHeld = new Held<DirectoryUserDaysResponse>();
 const agentPages = new Held<DirectoryAgentResponse>();
 const agentDaysHeld = new Held<DirectoryAgentDaysResponse>();
+const deciderPages = new Held<DirectoryDeciderResponse>();
+const deciderDaysHeld = new Held<DirectoryDeciderDaysResponse>();
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -88,6 +107,17 @@ effect(() => {
   userDaysHeld.clear();
   agentPages.clear();
   agentDaysHeld.clear();
+  decidersTurn++;
+  deciderTurn++;
+  deciderDaysTurn++;
+  directoryDeciders.value = null;
+  directoryDecidersError.value = null;
+  deciderPage.value = null;
+  deciderPageError.value = null;
+  deciderDays.value = null;
+  deciderDaysFailed.value = false;
+  deciderPages.clear();
+  deciderDaysHeld.clear();
 });
 
 export async function loadDirectoryUsers(): Promise<void> {
@@ -205,5 +235,66 @@ export async function loadAgentDays(name: string): Promise<void> {
     // old one's days; a refresh that fails keeps the heatmap on screen
     agentDaysHeld.delete(name);
     if (agentDays.value?.name !== name) agentDaysFailed.value = true;
+  }
+}
+
+export async function loadDirectoryDeciders(): Promise<void> {
+  const turn = ++decidersTurn;
+  directoryDecidersError.value = null;
+  try {
+    const body = await api<DirectoryDecidersResponse>(
+      "/api/directory/deciders",
+    );
+    if (turn !== decidersTurn) return;
+    directoryDeciders.value = body.deciders;
+  } catch (err) {
+    if (turn !== decidersTurn) return;
+    if (directoryDeciders.value === null) {
+      directoryDecidersError.value = failure(err);
+    }
+  }
+}
+
+export async function loadDeciderPage(name: string): Promise<void> {
+  const turn = ++deciderTurn;
+  deciderPageError.value = null;
+  if (deciderPage.value?.decider.name !== name) {
+    deciderPage.value = deciderPages.get(name) ?? null;
+  }
+  try {
+    const body = await api<DirectoryDeciderResponse>(
+      `/api/directory/deciders/${encodeURIComponent(name)}`,
+    );
+    if (turn !== deciderTurn) return;
+    deciderPages.set(name, body);
+    deciderPage.value = body;
+  } catch (err) {
+    if (turn !== deciderTurn) return;
+    deciderPages.delete(name);
+    deciderPage.value = null;
+    deciderPageError.value = failure(err);
+  }
+}
+
+export async function loadDeciderDays(name: string): Promise<void> {
+  const turn = ++deciderDaysTurn;
+  deciderDaysFailed.value = false;
+  if (deciderDays.value?.name !== name) {
+    const held = deciderDaysHeld.get(name);
+    deciderDays.value = held === undefined ? null : { name, body: held };
+  }
+  try {
+    const body = await api<DirectoryDeciderDaysResponse>(
+      `/api/directory/deciders/${encodeURIComponent(name)}/days?tz=${encodeURIComponent(browserZone())}`,
+    );
+    if (turn !== deciderDaysTurn) return;
+    deciderDaysHeld.set(name, body);
+    deciderDays.value = { name, body };
+  } catch {
+    if (turn !== deciderDaysTurn) return;
+    // as the agent's: a held copy goes, a refresh that fails keeps the
+    // heatmap on screen
+    deciderDaysHeld.delete(name);
+    if (deciderDays.value?.name !== name) deciderDaysFailed.value = true;
   }
 }

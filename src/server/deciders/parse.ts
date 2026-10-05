@@ -58,6 +58,22 @@ export function parseDecider(body: unknown): ParsedDecider {
   };
 }
 
+// a decider's name as a path names it, by the same rule a save keeps
+export function parseDeciderName(value: unknown): string {
+  if (!isName(value)) {
+    throw new BadRequest(
+      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
+    );
+  }
+  return value;
+}
+
+export function parseNoQuery(url: URL): void {
+  for (const name of url.searchParams.keys()) {
+    throw new BadRequest(`unknown parameter ${name}`);
+  }
+}
+
 // a decision's whole settings: every option key of it exactly once
 export function parseDecision(id: DecisionId, body: unknown): DecisionFields {
   const b = fields(body, ["enabled", "deciderId", "options"]);
