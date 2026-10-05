@@ -13,6 +13,11 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
   an admin's override alone, merged by `limits.current()`. Importers
   take types and defaults from `limits/index.ts`; `tools/` never
   imports `runner/`.
+- **Only `sendsRunning`'s default moves, with the cores.** The area
+  reads `limitDefinitions(cores)`; `LIMIT_DEFINITIONS` and
+  `DEFAULT_LIMITS` are one core's, for floors, ceilings and tests.
+  Current values, the rows' `default`, the drop of an override equal to
+  the default and reset all use the computed one.
 - **The send caps stay ordered.** `sendsPerUser <= sendsPerProject <=
   sendsRunning`; a write breaking it is a 400.
 - **A change applies to the next send.** A send in flight keeps the

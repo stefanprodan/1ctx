@@ -15,6 +15,8 @@ import { pick, type Rand, rng, shuffle } from "../random.ts";
 import { HOUR } from "../shapes.ts";
 import type { Api, Who } from "./api.ts";
 import {
+  type CapsMode,
+  capsMode,
   type Planned,
   planAutomations,
   setCaps,
@@ -62,15 +64,15 @@ export type StepOptions = {
   // every chat in the incident's shape
   incident: boolean;
   personal: string;
+  // the send caps at every step, or by the step's multiple when absent
+  caps?: CapsMode;
 };
 
 export async function step(api: Api, admin: Who, d: Directory, o: StepOptions) {
   const { mult, minutes } = o;
   const r = rng(o.seed);
   const prepAt = now();
-  // the defaults at 1x and 2x, where what the scheduler does past a cap
-  // is the finding; the maximums from 4x on, so the machine shows
-  await setCaps(api, admin, mult >= HOUR.maxCapsFrom ? "max" : "default", mult);
+  await setCaps(api, admin, capsMode(mult, o.caps), mult);
 
   const chatCount = Math.round((HOUR.chats * mult * minutes) / 60);
   // a Poisson process given its count: uniform order statistics

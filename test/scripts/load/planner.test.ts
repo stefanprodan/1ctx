@@ -4,6 +4,10 @@
 import { describe, expect, test } from "bun:test";
 import { SERVERS, toolDef } from "../../../scripts/load/catalog.ts";
 import { dayPlan, offeredOf } from "../../../scripts/load/day.ts";
+import {
+  capsMode,
+  parseCaps,
+} from "../../../scripts/load/driver/automations.ts";
 import { createMcp } from "../../../scripts/load/fake-mcp.ts";
 import {
   createModel,
@@ -205,5 +209,20 @@ describe("the latency the fakes share", () => {
     expect(ms[2000]!).toBeLessThanOrEqual(60);
     expect(ms[3600]!).toBeGreaterThan(1000);
     expect(ms.at(-1)!).toBeLessThanOrEqual(3000);
+  });
+});
+
+describe("the step's send caps", () => {
+  test("follow the multiple unless --caps holds one mode", () => {
+    expect([1, 2, 4, 16].map((mult) => capsMode(mult))).toEqual([
+      "default",
+      "default",
+      "max",
+      "max",
+    ]);
+    expect(capsMode(8, parseCaps("default"))).toBe("default");
+    expect(capsMode(1, parseCaps("max"))).toBe("max");
+    expect(parseCaps(undefined)).toBeUndefined();
+    expect(() => parseCaps("maximum")).toThrow("--caps is default or max");
   });
 });

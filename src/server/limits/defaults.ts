@@ -78,6 +78,14 @@ export type QueueCaps = {
 export const scheduledShare = (cap: number): number =>
   Math.floor((cap * 3) / 4);
 
+// the process cap's default: a pod carries sends by its CPU, 48 a core,
+// half what a bench machine's core carried, since x86 cores run slower;
+// inside a container the cores are the CPU limit, floored
+export const sendsRunningDefault = (cores: number): number => {
+  const whole = Number.isFinite(cores) ? Math.floor(cores) : 1;
+  return Math.min(256, Math.max(64, 48 * whole));
+};
+
 // the days the hourly sweep archives an idle chat after, and deletes
 // an archived chat after; neither has an off value
 export type ChatCaps = {
@@ -110,6 +118,7 @@ export type LimitDefinition = {
   scope: LimitScope;
 };
 
+// the table on one core: limitDefinitions() moves the process cap
 export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   rounds: { default: 100, min: 1, max: 500, unit: "count", scope: "send" },
   callsPerRound: {
@@ -373,7 +382,7 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
     scope: "sends",
   },
   sendsRunning: {
-    default: 64,
+    default: sendsRunningDefault(1),
     min: 4,
     max: 256,
     unit: "count",
@@ -437,12 +446,28 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   },
 };
 
-export const DEFAULT_LIMITS = Object.fromEntries(
-  Object.entries(LIMIT_DEFINITIONS).map(([name, entry]) => [
-    name,
-    entry.default,
-  ]),
-) as Limits;
+// the table on the given cores; only the process cap's default moves
+export const limitDefinitions = (
+  cores: number,
+): Record<LimitName, LimitDefinition> => ({
+  ...LIMIT_DEFINITIONS,
+  sendsRunning: {
+    ...LIMIT_DEFINITIONS.sendsRunning,
+    default: sendsRunningDefault(cores),
+  },
+});
+
+export const defaultLimits = (cores: number): Limits =>
+  Object.fromEntries(
+    Object.entries(limitDefinitions(cores)).map(([name, entry]) => [
+      name,
+      entry.default,
+    ]),
+  ) as Limits;
+
+// the defaults on one core; a running server's are the limits area's,
+// on its cores
+export const DEFAULT_LIMITS = defaultLimits(1);
 
 export const LOOP_LIMITS: LoopLimits = {
   rounds: DEFAULT_LIMITS.rounds,

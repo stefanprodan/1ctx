@@ -10,15 +10,16 @@
 
 import type { LimitsResponse } from "../../shared/api/limits.ts";
 import type { LimitRow } from "../../shared/contracts/limit.ts";
-import { LIMIT_NAMES, type LimitName } from "../../shared/words.ts";
+import { LIMIT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
-  DEFAULT_LIMITS,
-  LIMIT_DEFINITIONS,
+  defaultLimits,
+  type LimitDefinition,
   type Limits,
+  limitDefinitions,
   type SendCaps,
 } from "./defaults.ts";
 import { routes } from "./routes.ts";
@@ -27,14 +28,17 @@ import { LimitStore } from "./store.ts";
 export {
   type ChatCaps,
   DEFAULT_LIMITS,
+  defaultLimits,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
   type Limits,
   LOOP_LIMITS,
   type LoopLimits,
+  limitDefinitions,
   type RepoCaps,
   type SendCaps,
   scheduledShare,
+  sendsRunningDefault,
   TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
@@ -42,6 +46,8 @@ export {
 export type LimitsDeps = {
   db: Db;
   clock: Clock;
+  // the cores the process may use, which size the process cap's default
+  cores: number;
   // a write moved a send cap, so a run waiting for a place may start
   wake?: () => void;
 };
@@ -66,28 +72,32 @@ function ordered(caps: SendCaps): void {
   }
 }
 
-function effectiveValue(name: LimitName, override?: number): number {
-  const entry = LIMIT_DEFINITIONS[name];
+function effectiveValue(entry: LimitDefinition, override?: number): number {
   return Math.max(entry.min, Math.min(entry.max, override ?? entry.default));
 }
 
 export function limitsArea(deps: LimitsDeps): LimitsArea {
   const store = new LimitStore(deps.db);
+  const definitions = limitDefinitions(deps.cores);
+  const defaults = defaultLimits(deps.cores);
   const current = (): Limits => {
-    const values = { ...DEFAULT_LIMITS };
+    const values = { ...defaults };
     for (const override of store.rows()) {
-      values[override.name] = effectiveValue(override.name, override.value);
+      values[override.name] = effectiveValue(
+        definitions[override.name],
+        override.value,
+      );
     }
     return values;
   };
   const rows = (): LimitRow[] => {
     const overrides = new Map(store.rows().map((row) => [row.name, row]));
     return LIMIT_NAMES.map((name) => {
-      const entry = LIMIT_DEFINITIONS[name];
+      const entry = definitions[name];
       const override = overrides.get(name);
       return {
         name,
-        value: effectiveValue(name, override?.value),
+        value: effectiveValue(entry, override?.value),
         default: entry.default,
         min: entry.min,
         max: entry.max,
@@ -116,7 +126,7 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
         for (const name of LIMIT_NAMES) {
           const value = values[name];
           if (value === undefined) continue;
-          if (value === LIMIT_DEFINITIONS[name].default) store.delete(name);
+          if (value === defaults[name]) store.delete(name);
           else store.set(name, value, now);
         }
         return { result: undefined };

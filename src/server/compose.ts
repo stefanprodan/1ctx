@@ -7,6 +7,7 @@
 // flags; the test helper calls it with a memory db and a fake clock,
 // so a test exercises the wiring the binary runs.
 
+import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
 import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
@@ -107,6 +108,8 @@ export type ComposeOptions = {
   activate?: boolean;
   // argon2id's cost; a test passes the least
   passwordCost?: PasswordCost;
+  // the cores the send caps are sized by; a test passes a fixed number
+  cores?: number;
 };
 
 export type App = {
@@ -198,7 +201,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner.queue.wake();
     automations.scheduler.wake();
   };
-  const limits = limitsArea({ db, clock, wake });
+  const limits = limitsArea({
+    db,
+    clock,
+    cores: options.cores ?? availableParallelism(),
+    wake,
+  });
   const usage = usageArea({
     db,
     clock,

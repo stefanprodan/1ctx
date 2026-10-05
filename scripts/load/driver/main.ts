@@ -6,7 +6,7 @@
 // server. Every line on stdout is one JSON event.
 //
 //   bun scripts/load/driver/main.ts setup [--max-mult M] [--docs N] [--parallel P]
-//   bun scripts/load/driver/main.ts step MULT MINUTES [--seed S] [--incident]
+//   bun scripts/load/driver/main.ts step MULT MINUTES [--seed S] [--incident] [--caps default|max]
 //   bun scripts/load/driver/main.ts turns N SECONDS [--seed S] [--tool-share X]
 //
 // env: BASE (the server), ADMIN (admin), PASSWORD (one for every user)
@@ -16,6 +16,7 @@
 import type { ProjectsResponse } from "../../../src/shared/api/projects.ts";
 import { KNOWLEDGE_FILES } from "../shapes.ts";
 import { Api } from "./api.ts";
+import { parseCaps } from "./automations.ts";
 import { assertFenced, fenceWeb, loadDirectory } from "./directory.ts";
 import { step } from "./hour.ts";
 import { failure } from "./log.ts";
@@ -31,7 +32,7 @@ const positional = argv.filter(
   (a, i) => !a.startsWith("--") && !argv[i - 1]?.startsWith("--"),
 );
 const usage =
-  "usage: main.ts setup [--max-mult M] [--docs N] [--parallel P] | step MULT MINUTES [--seed S] [--incident] | turns N SECONDS [--seed S] [--tool-share X]";
+  "usage: main.ts setup [--max-mult M] [--docs N] [--parallel P] | step MULT MINUTES [--seed S] [--incident] [--caps default|max] | turns N SECONDS [--seed S] [--tool-share X]";
 
 const env = (name: string) => {
   const value = process.env[name];
@@ -45,6 +46,8 @@ async function main() {
     console.error(usage);
     process.exit(2);
   }
+  const at = argv.indexOf("--caps");
+  const caps = parseCaps(at < 0 ? undefined : argv[at + 1]);
   const api = new Api({
     base: env("BASE"),
     password: process.env.PASSWORD,
@@ -81,6 +84,7 @@ async function main() {
       seed: flag("seed", a * 7919 + b),
       incident: argv.includes("--incident"),
       personal: personal.id,
+      caps,
     });
     return;
   }

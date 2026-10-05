@@ -225,6 +225,7 @@ describe("upload claim atomicity", () => {
         const limits = limitsArea({
           db: chat.app.db,
           clock: () => chat.app.now.value,
+          cores: 1,
         });
         registry.set = (active) => {
           original(active);
