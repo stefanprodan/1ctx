@@ -685,3 +685,23 @@ describe("Gemini errors", () => {
     expect(geminiError(message)).toBe(message);
   });
 });
+
+describe("Gemini body failures", () => {
+  test("a body the wire cannot build is an error event, never a throw", async () => {
+    const events: ChatEvent[] = [];
+    const fetcher = (async () => new Response("")) as unknown as typeof fetch;
+    const unknown = { ...request, reasoningEffort: "max" } as ChatRequest;
+    for await (const event of providerFor(row, {
+      fetcher,
+      secret: () => KEY,
+    }).chat(unknown, new AbortController().signal)) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      {
+        kind: "error",
+        message: "gemini failed: unknown Gemini thinking effort",
+      },
+    ]);
+  });
+});

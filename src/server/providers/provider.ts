@@ -156,34 +156,35 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
                 : buildOpenAiChatBody(req);
       const scrub = (message: string) =>
         key === null ? message : message.replaceAll(key, "[key]");
-      const events = azure
-        ? azureChat(req, {
-            open: (body) => {
-              const stream = azureEvents();
-              return streamChat(deps.fetcher, url, body, signal, {
-                mapEvents: stream.map,
-                ended: stream.ended,
-                thinking: stream.thinking,
-                headers,
-                ...timeout,
-              });
-            },
-            noneRefused,
-            providerId: row.id,
-            providerName: row.name,
-            ...(deps.log === undefined ? {} : { log: deps.log }),
-          })
-        : streamChat(deps.fetcher, url, chatBody(), signal, {
-            mapEvents: openRouter
-              ? openRouterEvents
-              : gemini
-                ? geminiEvents()
-                : chatEvents,
-            headers,
-            ...timeout,
-          });
+      const open = () =>
+        azure
+          ? azureChat(req, {
+              open: (body) => {
+                const stream = azureEvents();
+                return streamChat(deps.fetcher, url, body, signal, {
+                  mapEvents: stream.map,
+                  ended: stream.ended,
+                  thinking: stream.thinking,
+                  headers,
+                  ...timeout,
+                });
+              },
+              noneRefused,
+              providerId: row.id,
+              providerName: row.name,
+              ...(deps.log === undefined ? {} : { log: deps.log }),
+            })
+          : streamChat(deps.fetcher, url, chatBody(), signal, {
+              mapEvents: openRouter
+                ? openRouterEvents
+                : gemini
+                  ? geminiEvents()
+                  : chatEvents,
+              headers,
+              ...timeout,
+            });
       try {
-        for await (const event of events) {
+        for await (const event of open()) {
           if (event.kind !== "error") {
             yield event;
             continue;
