@@ -5,6 +5,7 @@
 // asks: every object by kind and name, and a team project's docs.
 
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { TOOL_NAMES } from "../tools/index.ts";
 import type { Inventory, ProjectDocs } from "./parse.ts";
 import { repoKey } from "./repository.ts";
 
@@ -45,7 +46,7 @@ export function inventoryOf(sources: InventorySources): Inventory {
     Skill: sources.skills.names(),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),
-    Tool: ["web", "websearch", "visualize"],
+    Tool: [...TOOL_NAMES],
   };
 }
 

@@ -22,6 +22,7 @@ import {
 import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
@@ -107,8 +108,7 @@ function document(value: unknown, source: string): Document {
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
-      Tool: (name: unknown): name is string =>
-        name === "web" || name === "websearch" || name === "visualize",
+      Tool: isToolName,
     }[kind];
     if (!guard(meta.name)) throw new Error("metadata.name is invalid");
     const name = meta.name;
@@ -138,7 +138,7 @@ function document(value: unknown, source: string): Document {
       case "Agent":
         return { ...base, kind, spec: spec.agent(b.spec) };
       case "Tool":
-        return { ...base, kind, spec: spec.tool(b.spec, name) };
+        return { ...base, kind, spec: spec.tool(b.spec, name as ToolName) };
     }
   } catch (error) {
     throw new Error(`${source}: ${label}: ${(error as Error).message}`);

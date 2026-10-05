@@ -24,6 +24,7 @@ import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
 import type { SecretKind } from "../../shared/words.ts";
 import { messageOf } from "../lib/errors.ts";
+import { isToolName } from "../tools/index.ts";
 import {
   type Action,
   type Client,
@@ -385,14 +386,13 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
 
 async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
   const found = await api.call<ToolsResponse>("GET", "/api/tools");
-  const before =
-    doc.name === "web"
-      ? found.access
-      : doc.name === "websearch"
-        ? found.search
-        : doc.name === "visualize"
-          ? found.visualize
-          : null;
+  const before = isToolName(doc.name)
+    ? {
+        web: found.access,
+        websearch: found.search,
+        visualize: found.visualize,
+      }[doc.name]
+    : null;
   if (!before) throw new Error("no such tool");
   const patch = difference(before, doc.spec);
   if (!Object.keys(patch).length) return "unchanged";

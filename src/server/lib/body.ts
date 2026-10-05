@@ -42,7 +42,7 @@ export function parseNoQuery(url: URL): void {
 // an object with exactly the given keys, or a 400 naming the stranger
 export function fields(
   body: unknown,
-  allowed: string[],
+  allowed: readonly string[],
 ): Record<string, unknown> {
   if (!isRecord(body)) throw new BadRequest("body must be an object");
   for (const key of Object.keys(body)) {

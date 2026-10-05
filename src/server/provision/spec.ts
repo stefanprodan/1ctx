@@ -58,7 +58,12 @@ import {
   parseKeyName,
 } from "../providers/index.ts";
 import { MAX_SKILL_URL } from "../skills/index.ts";
-import { parseHosts, parseWebDomains } from "../tools/index.ts";
+import {
+  parseHosts,
+  parseWebDomains,
+  TOOL_FIELDS,
+  type ToolName,
+} from "../tools/index.ts";
 import {
   at,
   boolean,
@@ -382,13 +387,8 @@ export function agent(value: unknown): AgentSpec {
   });
 }
 
-export function tool(value: unknown, name: string): ToolSpec {
-  const allowed =
-    name === "web"
-      ? ["mode", "domains"]
-      : name === "websearch"
-        ? ["provider"]
-        : ["enabled", "hosts"];
+export function tool(value: unknown, name: ToolName): ToolSpec {
+  const allowed = TOOL_FIELDS[name];
   const spec = optional<ToolSpec>(object(value, allowed, "spec"), {
     mode: guarded(isWebAccessMode, "mode must be off, all or listed"),
     domains: parseWebDomains,

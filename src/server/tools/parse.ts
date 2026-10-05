@@ -8,11 +8,20 @@ import { isSearchProvider } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export type ToolName = "web" | "websearch" | "visualize";
+export const TOOL_NAMES = ["web", "websearch", "visualize"] as const;
+export type ToolName = (typeof TOOL_NAMES)[number];
+export const isToolName = (value: unknown): value is ToolName =>
+  TOOL_NAMES.includes(value as ToolName);
+
+// the fields a change to each tool takes
+export const TOOL_FIELDS: Record<ToolName, readonly string[]> = {
+  web: ["mode", "domains"],
+  websearch: ["provider"],
+  visualize: ["enabled", "hosts"],
+};
 
 export function parseToolName(value: unknown): ToolName {
-  if (value !== "web" && value !== "websearch" && value !== "visualize")
-    throw new BadRequest("no such tool");
+  if (!isToolName(value)) throw new BadRequest("no such tool");
   return value;
 }
 
@@ -21,13 +30,9 @@ export function parseToolPatch(
   name?: ToolName,
 ): PatchToolRequest {
   const allowed =
-    name === "web"
-      ? ["mode", "domains"]
-      : name === "websearch"
-        ? ["provider"]
-        : name === "visualize"
-          ? ["enabled", "hosts"]
-          : ["mode", "domains", "enabled", "provider", "hosts"];
+    name === undefined
+      ? ["mode", "domains", "enabled", "provider", "hosts"]
+      : TOOL_FIELDS[name];
   const input = fields(body, allowed);
   const hasEnabled = Object.hasOwn(input, "enabled");
   const hasProvider = Object.hasOwn(input, "provider");

@@ -78,7 +78,14 @@ export {
   MEMORY_WRITE_RULES,
 } from "./builtin/memory.ts";
 export type { SkillsPort } from "./offer.ts";
-export { parseHosts, parseWebDomains } from "./parse.ts";
+export {
+  isToolName,
+  parseHosts,
+  parseWebDomains,
+  TOOL_FIELDS,
+  TOOL_NAMES,
+  type ToolName,
+} from "./parse.ts";
 export type {
   KeepPort,
   MemoryScope,
