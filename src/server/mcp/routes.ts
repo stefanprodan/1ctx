@@ -214,7 +214,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/mcp/:id",
       policy: "admin",
       handle(_req, ctx) {
-        deps.coordinator.abort(ctx.params.id);
         transact(deps.db, () => {
           const deleted = deps.store.deleteUnreferenced(ctx.params.id);
           if (deleted === "missing") throw new NotFound("no such MCP server");
@@ -224,6 +223,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           deps.capabilities.forget(mcpKey(ctx.params.id));
           return { result: undefined };
         });
+        // after the delete, so a refused one leaves a discovery running
+        deps.coordinator.abort(ctx.params.id);
         return new Response(null, { status: 204 });
       },
     },
