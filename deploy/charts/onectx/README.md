@@ -1,10 +1,15 @@
 # Helm chart for 1ctx
 
+A self-hosted AI factory with continuous context.
+
 ## Introduction
 
-[1ctx](https://1ctx.dev) is a self-hosted server where users chat with AI
-agents in projects and run them on schedules. This chart deploys 1ctx on
-Kubernetes.
+[1ctx](https://1ctx.dev) lets teams collaborate with sandboxed AI agents
+and schedule autonomous tasks, using shared project memory and knowledge.
+
+This chart deploys 1ctx on Kubernetes. See the
+[project README](https://github.com/stefanprodan/1ctx#highlights) for the
+full feature list.
 
 ## Prerequisites
 
@@ -16,16 +21,76 @@ Kubernetes.
 
 ## Installing the chart
 
-Create the namespace and the Secret with the admin password, then
-install the chart with the release name `onectx`:
+This example bootstraps an OpenRouter provider, an `assistant` agent and
+a `workspace` project. You need an [OpenRouter](https://openrouter.ai)
+API key.
+
+Create the namespace and the Secret with your admin password and API key:
 
 ```sh
 kubectl create namespace onectx
 kubectl -n onectx create secret generic onectx \
-  --from-literal=user-admin.key='<password>'
-helm install onectx oci://ghcr.io/stefanprodan/charts/onectx \
-  --namespace onectx
+  --from-literal=user-admin.key='<password>' \
+  --from-literal=provider-openrouter.key='<OpenRouter API key>'
 ```
+
+Save the following as `values.yaml`. The provider references the key in
+the Secret; no passwords or API keys go in this file.
+
+```yaml
+provision:
+  files:
+    instance.yaml: |
+      apiVersion: config.1ctx.dev/v1
+      kind: Provider
+      metadata:
+        name: openrouter
+      spec:
+        wire: openrouter
+        baseUrl: https://openrouter.ai/api/v1
+        keyFrom: provider-openrouter
+      ---
+      apiVersion: config.1ctx.dev/v1
+      kind: Agent
+      metadata:
+        name: assistant
+      spec:
+        provider: openrouter
+        model: openrouter/free
+        prompt: You are a helpful teammate. Answer directly.
+        default: true
+      ---
+      apiVersion: config.1ctx.dev/v1
+      kind: Project
+      metadata:
+        name: workspace
+      spec:
+        description: Shared work with AI agents.
+```
+
+Install the chart with these values:
+
+```sh
+helm install onectx oci://ghcr.io/stefanprodan/charts/onectx \
+  --namespace onectx --values values.yaml
+```
+
+Expose the service over HTTPS using an
+[Ingress or Gateway API route](#configure-ingress-or-gateway-api), then
+sign in as `admin` with the password you supplied in the Secret.
+
+Open the `workspace` project and start a chat with `assistant`. Add
+teammates to the project through the web UI.
+
+To change the provisioned objects, edit `values.yaml` and apply it:
+
+```sh
+helm upgrade onectx oci://ghcr.io/stefanprodan/charts/onectx \
+  --namespace onectx --values values.yaml
+```
+
+The chart rolls the pod and applies the objects at startup. Fields
+supplied in the YAML are reapplied, so keep those changes in `values.yaml`.
 
 ## Uninstalling the chart
 
@@ -74,8 +139,9 @@ the Gateway.
 
 ### Graceful shutdown
 
-On termination, 1ctx waits up to `drain` seconds for running chats and runs to
-finish. The pod termination grace period is `drain` plus 15 seconds.
+On termination, 1ctx waits up to `drain` seconds for active chats and
+scheduled tasks to finish. The pod termination grace period is `drain`
+plus 15 seconds.
 During the drain, readiness fails and liveness stays up.
 
 The startup probe allows 10 minutes for database migrations and
@@ -84,8 +150,9 @@ provisioning.
 ### Resource requests and limits
 
 The defaults request 1 CPU and 1 GiB of memory, with limits of 4 CPUs and 4 GiB.
-Increase resources as concurrent agent work grows. A memory limit can terminate
-the pod during a turn, while CPU throttling slows running work.
+Increase resources as concurrent agent work grows. Exceeding the memory
+limit can terminate the pod while an agent is working. CPU throttling
+slows agent work.
 
 ## Persistence
 
@@ -101,10 +168,10 @@ create or manage.
 
 Repository checkouts use an `emptyDir` mounted at `/cache`, not the database
 claim. The server trims it to the `repoCacheBytes` limit (10 GiB by
-default, set in Admin > Limits), but repositories used by running turns
+default, set in Admin > Limits), but repositories used by active agents
 can temporarily exceed it. If
 `cache.sizeLimit` or a pod `ephemeral-storage` limit is exceeded, the kubelet
-can evict the pod. Leave enough headroom for active turns.
+can evict the pod. Leave enough headroom for active agent work.
 
 ## Parameters
 
@@ -122,7 +189,7 @@ can evict the pod. Leave enough headroom for active turns.
 
 | Name | Description | Value |
 |---|---|---|
-| `drain` | Seconds to wait for running chats and runs during shutdown. Valid range is 0 to 3600 | `10` |
+| `drain` | Seconds to wait for active chats and scheduled tasks during shutdown. Valid range is 0 to 3600 | `10` |
 | `trustProxy` | Read the client address and scheme from `X-Forwarded-*` headers | `true` |
 | `secureCookie` | Mark the login cookie as `Secure`. Disable only when serving plain HTTP | `true` |
 | `secrets.existingSecret` | Existing Secret mounted at `/secrets` | `onectx` |
