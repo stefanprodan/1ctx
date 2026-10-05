@@ -24,7 +24,7 @@ import { BadRequest } from "../lib/errors.ts";
 export const MAX_MODEL = 200;
 export const MAX_PROMPT = 16_000;
 export const MAX_SERVERS_PER_AGENT = 50;
-export const MAX_UPSTREAM = 100;
+const MAX_UPSTREAM = 100;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,

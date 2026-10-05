@@ -36,7 +36,7 @@ import type { ProviderRow } from "../providers/index.ts";
 import { lastDays } from "../usage/index.ts";
 import { type ParsedAgent, parseAgent } from "./parse.ts";
 import { type PicksPort, startingOf } from "./starting.ts";
-import { type AgentFields, type AgentStore, summary } from "./store.ts";
+import type { AgentFields, AgentStore } from "./store.ts";
 
 export type ProvidersPort = {
   byId(id: string): ProviderRow | null;
@@ -69,7 +69,7 @@ export type AutomationsPort = {
 
 export type RunnerPort = {
   stopAgent(agentId: string): void;
-  // the messages waiting in its chats turn not sent
+  // wakes the queue so the agent's queued messages turn not sent
   queue: { wake(): void };
 };
 
@@ -213,11 +213,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         );
       }
       if (body.skip4Bit && body.upstream !== null) {
-        const listed = endpoints?.find((e) => e.tag === body.upstream);
+        const preferred = endpoints?.find((e) => e.tag === body.upstream);
         const fourBit =
-          listed === undefined
+          preferred === undefined
             ? isFourBitTag(body.upstream)
-            : fourBitEndpoint(listed);
+            : fourBitEndpoint(preferred);
         if (fourBit) {
           throw new BadRequest(
             `The preferred provider ${body.upstream} is a 4-bit host, which Skip 4-bit providers leaves out`,
@@ -264,7 +264,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const body: AgentsResponse = {
-          agents: deps.store.list().map(summary),
+          agents: deps.store.list(),
           activity: deps.sessions().agentActivity(),
         };
         return json(body);
@@ -284,7 +284,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           deps.mcp.setAgentServers(created.id, values.servers);
           return { result: deps.store.byId(created.id)! };
         });
-        const body: AgentResponse = { agent: summary(agent) };
+        const body: AgentResponse = { agent: agent };
         return json(body, 201);
       },
     },
@@ -305,7 +305,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           deps.mcp.setAgentServers(agent.id, values.servers);
           return { result: deps.store.byId(agent.id)! };
         });
-        const body: AgentResponse = { agent: summary(updated) };
+        const body: AgentResponse = { agent: updated };
         return json(body);
       },
     },
@@ -378,7 +378,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
-        const agents = deps.store.list().map(summary);
+        const agents = deps.store.list();
         const body: ProjectAgentsResponse = {
           agents,
           startsOn: startingOf(deps.store, deps.users, ctx.principal!.userId),

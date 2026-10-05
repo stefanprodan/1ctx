@@ -4,10 +4,10 @@
 // Agents: a name, an avatar, a provider and a model, and the system
 // prompt. The MCP capability owns the agent-to-server rows.
 
+import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import type { Mcp } from "../mcp/index.ts";
 import {
   directoryRoutes,
   type SkillsListPort,
@@ -19,6 +19,7 @@ import {
   type AutomationsPort,
   type CapabilitiesPort,
   type CredentialsPort,
+  type McpPort,
   type ProvidersPort,
   type ReposPort,
   type RunnerPort,
@@ -41,7 +42,7 @@ export type AgentsDeps = {
   clock: Clock;
   providers: ProvidersPort;
   skills: SkillsPort & SkillsListPort & { assigned(agentId: string): string[] };
-  mcp: Pick<Mcp, "agentServers" | "setAgentServers" | "switchableBy">;
+  mcp: McpPort & { agentServers(agentId: string): AgentServer[] };
   tools: ToolsPort & CapabilitiesPort;
   credentials: CredentialsPort;
   repos: ReposPort;
@@ -71,32 +72,9 @@ export function agentsArea(deps: AgentsDeps): Agents {
     byId: (id) => store.byId(id),
     usesProvider: (providerId) => store.usesProvider(providerId),
     routes: [
-      ...routes({
-        db: deps.db,
-        store,
-        providers: deps.providers,
-        skills: deps.skills,
-        mcp: deps.mcp,
-        tools: deps.tools,
-        credentials: deps.credentials,
-        repos: deps.repos,
-        access: deps.access,
-        sessions: deps.sessions,
-        automations: deps.automations,
-        runner: deps.runner,
-        users: deps.users,
-        usage: deps.usage,
-        clock: deps.clock,
-      }),
+      ...routes({ ...deps, store }),
       ...startingRoutes({ store, users: deps.users }),
-      ...directoryRoutes({
-        store,
-        usage: deps.usage,
-        providers: deps.providers,
-        skills: deps.skills,
-        tools: deps.tools,
-        clock: deps.clock,
-      }),
+      ...directoryRoutes({ ...deps, store }),
     ],
   };
 }
