@@ -237,12 +237,17 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     usage,
   });
-  // a deleted server or skill leaves no key behind in a chat or a task
+  // a deleted object leaves no key behind in a chat or a task; a
+  // repository was its project's, so only that project's rows are read
   const capabilities = {
-    forget(key: string) {
-      sessions.store.forgetCapability(key);
-      automations.store.forgetCapability(key);
+    forget(key: string, projectId?: string) {
+      sessions.store.forgetCapability(key, projectId);
+      automations.store.forgetCapability(key, projectId);
     },
+  };
+  const agentNames = {
+    byId: (id: string) => agents.byId(id),
+    byName: (name: string) => agents.store.byName(name),
   };
   const mcp: Mcp = mcpArea({
     db,
@@ -352,13 +357,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     projects: projects.store,
     keys: { readKey: (keyName) => credentials.readKey(keyName) },
-    // a deleted repository was its project's, so only its rows are read
-    capabilities: {
-      forget(key, projectId) {
-        sessions.store.forgetCapability(key, projectId);
-        automations.store.forgetCapability(key, projectId);
-      },
-    },
+    capabilities,
     cacheDir: options.cacheDir ?? null,
     // built here, at the compile root, so the binary finds its entry
     jobs:
@@ -391,10 +390,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("sessions"),
     access,
-    agents: {
-      byId: (id) => agents.byId(id),
-      byName: (name) => agents.store.byName(name),
-    },
+    agents: agentNames,
     live: (sessionId) => runner.live(sessionId),
     usage,
     limits,
@@ -439,10 +435,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: sessions.store,
     access,
     visible: (principal, id) => sessions.visible(principal, id),
-    agents: {
-      byId: (id) => agents.byId(id),
-      byName: (name) => agents.store.byName(name),
-    },
+    agents: agentNames,
     users,
     providers,
     tools,
@@ -522,9 +515,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     attention: () => {
       const keyed = (kind: SecretKind, name: string | null) =>
         name !== null && secret(kind, name) !== null;
-      const search =
-        configuredTools.store.rows().find((row) => row.name === "websearch")
-          ?.provider ?? null;
+      const search = configuredTools.store.row("websearch").provider;
       return {
         providers: providers.store.list().map((p) => ({
           name: p.name,

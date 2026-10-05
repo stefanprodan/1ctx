@@ -10,7 +10,12 @@ import type {
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
-import { alertColumns, alertOf, type RawAlert } from "../sessions/index.ts";
+import {
+  alertColumns,
+  alertOf,
+  forgetCapabilityIn,
+  type RawAlert,
+} from "../sessions/index.ts";
 
 export const MAX_AUTOMATIONS_PER_PROJECT = 20;
 
@@ -314,16 +319,7 @@ export class AutomationStore {
   }
 
   forgetCapability(key: string, projectId?: string): void {
-    this.db
-      .query(
-        `update automations set disabled_capabilities = (
-           select json_group_array(value order by value)
-           from json_each(automations.disabled_capabilities) where value != ?
-         ) where ${projectId === undefined ? "" : "project_id = ? and "}exists (
-           select 1 from json_each(automations.disabled_capabilities) where value = ?
-         )`,
-      )
-      .run(key, ...(projectId === undefined ? [] : [projectId]), key);
+    forgetCapabilityIn(this.db, "automations", key, projectId);
   }
 
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {

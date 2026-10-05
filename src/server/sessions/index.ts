@@ -53,6 +53,7 @@ export {
   type RawAlert,
 } from "./alerts.ts";
 export { refuseArchived } from "./archive.ts";
+export { forgetCapabilityIn } from "./capabilities.ts";
 export {
   parseFeedCursor,
   parseRunsCursor,

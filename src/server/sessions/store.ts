@@ -15,7 +15,7 @@ import {
   expiredAutomationRuns,
   type RunsQuery,
 } from "./automation.ts";
-import { forgetCapability as forget, setDisabled } from "./capabilities.ts";
+import { forgetCapabilityIn, setDisabled } from "./capabilities.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
   agents as readAgents,
@@ -226,7 +226,7 @@ export class SessionStore {
   }
 
   forgetCapability(key: string, projectId?: string): void {
-    forget(this.db, key, projectId);
+    forgetCapabilityIn(this.db, "sessions", key, projectId);
   }
 
   // the commits a turn mounted, on its first message
