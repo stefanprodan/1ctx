@@ -88,7 +88,7 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
 \x1b[1mSecrets:\x1b[0m
   user-admin.key         the first admin's password, read once when there
                          are no users; provision also uses it to sign in
-  <kind>-<name>.key      kinds: user, provider, search, mcp; the name is
+  <kind>-<name>.key      kinds: user, provider, search, mcp, http; the name is
                          1 to 48 lowercase letters, digits and dashes,
                          starting with a letter or a digit`;
 

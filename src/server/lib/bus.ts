@@ -19,9 +19,7 @@ import { errorFields, type Log } from "./log.ts";
 
 // the event map: one entry per event, payload by name
 export type BusEvents = {
-  // a user's logins were revoked (logout, a password change, the
-  // expiry sweep); the socket layer closes that login's connections,
-  // or every connection of the user when the login id is null
+  // every way a login ends; loginId null is all of the user's
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and

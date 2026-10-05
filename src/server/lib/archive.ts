@@ -119,6 +119,44 @@ function source(bytes: Uint8Array, signal: AbortSignal) {
   });
 }
 
+// One tar read's stages: each pipe's failure is seen at once and awaited
+// before the read ends, and close() stops whatever is still running.
+function tarPipeline(signal: AbortSignal) {
+  const stop = new AbortController();
+  const active = AbortSignal.any([signal, stop.signal]);
+  const pipes: Promise<{ ok: true } | { ok: false; error: unknown }>[] = [];
+  const pipe = (promise: Promise<void>) => {
+    pipes.push(
+      promise.then(
+        () => ({ ok: true as const }),
+        (error: unknown) => ({ ok: false as const, error }),
+      ),
+    );
+  };
+  const decoder = createTarDecoder({ strict: true });
+  const reader = decoder.readable.getReader();
+  return {
+    active,
+    pipe,
+    reader,
+    decode(stream: ReadableStream<Uint8Array>) {
+      pipe(stream.pipeTo(decoder.writable, { signal: active }));
+    },
+    async settle() {
+      for (const result of await Promise.all(pipes)) {
+        if (!result.ok) throw result.error;
+      }
+      running(active);
+    },
+    async close() {
+      stop.abort(new BadRequest("archive read stopped"));
+      // Cancellation can repeat the decode's error; the primary error wins.
+      await Promise.allSettled([reader.cancel(active.reason), ...pipes]);
+      reader.releaseLock();
+    },
+  };
+}
+
 async function tarPass(
   bytes: Uint8Array,
   gzip: boolean,
@@ -127,21 +165,11 @@ async function tarPass(
   manifest: ArchiveMember[],
   wanted?: Set<number>,
 ): Promise<void> {
-  const stop = new AbortController();
-  const active = AbortSignal.any([signal, stop.signal]);
+  const tar = tarPipeline(signal);
+  const { active, pipe, reader } = tar;
   const expanded = budget(caps.maxExpandedBytes);
   const bodyBytes = budget(caps.maxExpandedBytes);
   const declaredBytes = budget(caps.maxExpandedBytes);
-  const pipes: Promise<{ ok: true } | { ok: false; error: unknown }>[] = [];
-  const pipe = (promise: Promise<void>) => {
-    // Observe failures immediately and wait for every stage before returning.
-    pipes.push(
-      promise.then(
-        () => ({ ok: true as const }),
-        (error: unknown) => ({ ok: false as const, error }),
-      ),
-    );
-  };
   let stream = source(bytes, active);
   if (gzip) {
     const decompressor = new DecompressionStream("gzip");
@@ -171,9 +199,7 @@ async function tarPass(
     pipe(stream.pipeTo(counted.writable, { signal: active }));
     stream = counted.readable;
   }
-  const decoder = createTarDecoder({ strict: true });
-  const reader = decoder.readable.getReader();
-  pipe(stream.pipeTo(decoder.writable, { signal: active }));
+  tar.decode(stream);
   let index = 0;
   try {
     for (;;) {
@@ -210,15 +236,9 @@ async function tarPass(
       }
       index++;
     }
-    for (const result of await Promise.all(pipes)) {
-      if (!result.ok) throw result.error;
-    }
-    running(active);
+    await tar.settle();
   } finally {
-    stop.abort(new BadRequest("archive read stopped"));
-    // Cancellation can repeat the decode's error; the primary error wins.
-    await Promise.allSettled([reader.cancel(active.reason), ...pipes]);
-    reader.releaseLock();
+    await tar.close();
   }
 }
 
@@ -412,17 +432,8 @@ export async function streamTar(
   visit: (member: TarMember, body: ReadableStream<Uint8Array>) => Promise<void>,
 ): Promise<void> {
   running(signal);
-  const stop = new AbortController();
-  const active = AbortSignal.any([signal, stop.signal]);
-  const pipes: Promise<{ ok: true } | { ok: false; error: unknown }>[] = [];
-  const pipe = (promise: Promise<void>) => {
-    pipes.push(
-      promise.then(
-        () => ({ ok: true as const }),
-        (error: unknown) => ({ ok: false as const, error }),
-      ),
-    );
-  };
+  const tar = tarPipeline(signal);
+  const { active, pipe, reader } = tar;
   const { gzip, stream: raw } = await sniffed(input, active);
   let stream = raw;
   if (gzip) {
@@ -431,9 +442,7 @@ export async function streamTar(
     pipe(raw.pipeTo(writable, { signal: active }));
     stream = decompressor.readable;
   }
-  const decoder = createTarDecoder({ strict: true });
-  const reader = decoder.readable.getReader();
-  pipe(stream.pipeTo(decoder.writable, { signal: active }));
+  tar.decode(stream);
   try {
     for (;;) {
       running(active);
@@ -455,13 +464,8 @@ export async function streamTar(
       // a body read whole is closed, and cancelling it does nothing
       if (!body.locked) await body.cancel();
     }
-    for (const result of await Promise.all(pipes)) {
-      if (!result.ok) throw result.error;
-    }
-    running(active);
+    await tar.settle();
   } finally {
-    stop.abort(new BadRequest("archive read stopped"));
-    await Promise.allSettled([reader.cancel(active.reason), ...pipes]);
-    reader.releaseLock();
+    await tar.close();
   }
 }
