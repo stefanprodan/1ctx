@@ -15,6 +15,7 @@ import {
   MAX_PATTERNS,
   MCP_KEY_PREFIX,
   MCP_TIMEOUT_MS,
+  secretNameRule,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -53,8 +54,7 @@ export function parseMcpKeyName(value: unknown): string | null {
   if (value === null) return null;
   if (!isSecretName(MCP_KEY_PREFIX, value)) {
     throw new BadRequest(
-      `keyName must be ${MCP_KEY_PREFIX} followed by 1 to 48 lowercase ` +
-        "letters, digits and dashes, starting with a letter or digit, or null",
+      `keyName must be ${secretNameRule(MCP_KEY_PREFIX)}, or null`,
     );
   }
   return value;

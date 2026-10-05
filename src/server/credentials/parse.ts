@@ -13,32 +13,23 @@ import {
   type HttpMethod,
   isHttpMethod,
 } from "../../shared/contracts/credential.ts";
-import { HTTP_KEY_PREFIX, isSecretName } from "../../shared/words.ts";
-import { fields, parseName } from "../lib/body.ts";
-import { BadRequest } from "../lib/errors.ts";
 import {
-  type Checked,
-  checkHeaderName,
-  checkTemplate,
-  normalizePrefix,
-} from "./check.ts";
+  HTTP_KEY_PREFIX,
+  isSecretName,
+  secretNameRule,
+} from "../../shared/words.ts";
+import { fields, parseName } from "../lib/body.ts";
+import { BadRequest, checked } from "../lib/errors.ts";
+import { checkHeaderName, checkTemplate, normalizePrefix } from "./check.ts";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
 // more than any project may hold, so a list past it is a typo
 const MAX_PROJECTS = 256;
 
-function checked<T>(result: Checked<T>): T {
-  if (!result.ok) throw new BadRequest(result.error);
-  return result.value;
-}
-
 export function parseKeyName(value: unknown): string {
   if (!isSecretName(HTTP_KEY_PREFIX, value)) {
-    throw new BadRequest(
-      "keyName must be http- followed by 1 to 48 lowercase letters, " +
-        "digits and dashes, starting with a letter or digit",
-    );
+    throw new BadRequest(`keyName must be ${secretNameRule(HTTP_KEY_PREFIX)}`);
   }
   return value;
 }

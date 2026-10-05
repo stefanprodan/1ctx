@@ -7,7 +7,12 @@ import {
   type CatalogKind,
   isCatalogKind,
 } from "../../shared/contracts/decider.ts";
-import { isSecretName, isWire, MAX_MODEL } from "../../shared/words.ts";
+import {
+  isSecretName,
+  isWire,
+  MAX_MODEL,
+  secretNameRule,
+} from "../../shared/words.ts";
 import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { azureBaseUrlProblem } from "./azure.ts";
@@ -48,8 +53,7 @@ export function parseKeyName(value: unknown): string | null {
   if (value === null) return null;
   if (!isSecretName("provider-", value)) {
     throw new BadRequest(
-      "keyName must be provider- followed by 1 to 48 lowercase letters, " +
-        "digits and dashes, starting with a letter or digit, or null",
+      `keyName must be ${secretNameRule("provider-")}, or null`,
     );
   }
   return value;

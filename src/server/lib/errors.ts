@@ -73,6 +73,16 @@ export class ServiceUnavailable extends HttpError {
   }
 }
 
+// a pure rule's answer: the value, or the 400's words
+export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export const refused = (error: string) => ({ ok: false, error }) as const;
+
+export function checked<T>(result: Checked<T>): T {
+  if (!result.ok) throw new BadRequest(result.error);
+  return result.value;
+}
+
 // A failure whose message names what the caller sent or a server
 // answered (a path, a URL, a body): the caller reads the message, and
 // errorFields() logs only `logged`, a fixed phrase, since a log line

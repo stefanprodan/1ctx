@@ -16,14 +16,9 @@ import {
 } from "../../shared/contracts/repo.ts";
 import { parseKeyName } from "../credentials/index.ts";
 import { fields, parseName } from "../lib/body.ts";
-import { BadRequest } from "../lib/errors.ts";
-import { type Checked, checkRef, normalizeUrl } from "./adapters.ts";
+import { BadRequest, type Checked, checked } from "../lib/errors.ts";
+import { checkRef, normalizeUrl } from "./adapters.ts";
 import { parseIgnore } from "./rules.ts";
-
-function checked<T>(result: Checked<T>): T {
-  if (!result.ok) throw new BadRequest(result.error);
-  return result.value;
-}
 
 // the normalized form; the host's kind is the caller's to apply
 export const parseRepoUrl = (value: unknown) =>

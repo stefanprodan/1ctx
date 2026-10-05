@@ -198,6 +198,10 @@ export function isSecretName(kind: string, value: unknown): value is string {
     /^[a-z0-9][a-z0-9-]{0,47}$/.test(value.slice(kind.length))
   );
 }
+// isSecretName's rule in words, for a 400 that refuses a key name
+export const secretNameRule = (kind: SecretKind) =>
+  `${kind} followed by 1 to 48 lowercase letters, digits and dashes, ` +
+  "starting with a letter or digit";
 
 // an MCP server's own call timeout, null for the limits' callTimeoutMs
 export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
