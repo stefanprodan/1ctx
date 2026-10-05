@@ -4,10 +4,11 @@
 // A decider's page, open to every signed-in user: the model that judges
 // and how often it is asked. The head is the model, its provider,
 // window and price, then its answers per day in every project, then the
-// decisions it answers now, each by its icon and name alone: a
-// decision's question and an admin's text stay on the admin pages. The
-// aside is the model's facts and when the decider was added, with
-// Manage for an admin.
+// decisions it answers now, each drawn as the admin's Decisions list
+// draws it, from the words in code: its options and an admin's text
+// stay on the admin pages, and the row is no link, since a member
+// cannot open them. The aside is the model's facts and when the
+// decider was added, with Manage for an admin.
 
 import { useMemo } from "preact/hooks";
 import { shortModel, windowLine } from "../../agents/meta.ts";
@@ -154,14 +155,17 @@ export function Decider({ params }: { params: Params }) {
                 {shown.decisions.length === 0 && (
                   <RowsNote>No decision asks this decider.</RowsNote>
                 )}
-                {shown.decisions.map((id) => (
-                  <RowsLine key={id} flush>
-                    <RowsAvatar>
-                      <Icon name={DECISION_WORDS[id].icon} size={14} />
-                    </RowsAvatar>
-                    <RowsTitle name={id} mono />
-                  </RowsLine>
-                ))}
+                {shown.decisions.map((id) => {
+                  const words = DECISION_WORDS[id];
+                  return (
+                    <RowsLine key={id} flush>
+                      <RowsAvatar>
+                        <Icon name={words.icon} size={15} />
+                      </RowsAvatar>
+                      <RowsTitle name={words.title} sub={words.sub} />
+                    </RowsLine>
+                  );
+                })}
               </RowsCard>
             </Rows>
           </div>

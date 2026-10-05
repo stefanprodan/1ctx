@@ -7,11 +7,11 @@
 // the days count its answers in every project, an admin's Check left
 // out.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { DecisionUsageStore } from "../../../src/server/usage/decisions.ts";
 import type {
   DirectoryDeciderDaysResponse,
   DirectoryDeciderResponse,
-  DirectoryDecidersResponse,
 } from "../../../src/shared/api/directory.ts";
 import { DECISION_OPTIONS } from "../../../src/shared/contracts/decision.ts";
 import {
@@ -21,6 +21,7 @@ import {
   type TestApp,
   testApp,
 } from "../../helpers/app.ts";
+import { memoryDb } from "../../helpers/db.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -100,48 +101,62 @@ function answer(
 }
 
 describe("the deciders in the directory", () => {
-  test("a member lists every decider by name with the decisions it answers", async () => {
-    const { admin, member, jev, local, decide } = await setup();
-    const listed = async (): Promise<DirectoryDecidersResponse> => {
-      const res = await member.call("GET", "/api/directory/deciders");
-      expect(res.status).toBe(200);
-      return res.json();
-    };
-    // no decision names a decider, so the default answers it
-    expect(await listed()).toEqual({
+  test("a member lists every decider by name, with no decisions", async () => {
+    const { admin, member, jev, local } = await setup();
+    const res = await member.call("GET", "/api/directory/deciders");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
       deciders: [
-        {
-          id: jev,
-          name: "jev",
-          default: true,
-          model: "typesafe/jev-1.13",
-          decisions: ["run-attention"],
-        },
-        {
-          id: local,
-          name: "kev",
-          default: false,
-          model: "kev-latest",
-          decisions: [],
-        },
+        { id: jev, name: "jev", default: true, model: "typesafe/jev-1.13" },
+        { id: local, name: "kev", default: false, model: "kev-latest" },
       ],
     });
-    expect((await decide({ enabled: true, deciderId: local })).status).toBe(
-      200,
-    );
-    expect((await listed()).deciders.map((d) => d.decisions)).toEqual([
-      [],
-      ["run-attention"],
-    ]);
-    // a turned-off decision asks nobody
-    await decide({ enabled: false, deciderId: null });
-    expect((await listed()).deciders.map((d) => d.decisions)).toEqual([[], []]);
     expect((await admin.call("GET", "/api/directory/deciders")).status).toBe(
       200,
     );
     expect(
       (await member.call("GET", "/api/directory/deciders?x=1")).status,
     ).toBe(400);
+  });
+
+  test("a page lists the decisions naming it, and those naming none on the default", async () => {
+    const { admin, member, kev, local, decide } = await setup();
+    const answers = async (name: string) =>
+      (
+        (await (
+          await member.call("GET", `/api/directory/deciders/${name}`)
+        ).json()) as DirectoryDeciderResponse
+      ).decisions;
+    // no decision names a decider, so the default answers it
+    expect(await answers("jev")).toEqual(["run-attention"]);
+    expect(await answers("kev")).toEqual([]);
+    // the mark moves, and the decisions naming none follow it
+    const moved = await admin.call("PATCH", `/api/deciders/${local}`, {
+      body: {
+        name: "kev",
+        providerId: kev,
+        model: "kev-latest",
+        default: true,
+      },
+    });
+    expect(moved.status).toBe(200);
+    expect(await answers("jev")).toEqual([]);
+    expect(await answers("kev")).toEqual(["run-attention"]);
+    // a decision naming a decider stays with it whoever is the default
+    const jevId = (
+      (await (
+        await member.call("GET", "/api/directory/deciders/jev")
+      ).json()) as DirectoryDeciderResponse
+    ).decider.id;
+    expect((await decide({ enabled: true, deciderId: jevId })).status).toBe(
+      200,
+    );
+    expect(await answers("jev")).toEqual(["run-attention"]);
+    expect(await answers("kev")).toEqual([]);
+    // a turned-off decision asks nobody
+    await decide({ enabled: false, deciderId: jevId });
+    expect(await answers("jev")).toEqual([]);
+    expect(await answers("kev")).toEqual([]);
   });
 
   test("a decider's page names its provider and model, never the provider's id or a decision's text", async () => {
@@ -257,4 +272,28 @@ describe("the deciders in the directory", () => {
       true,
     );
   });
+});
+
+test("a decider's days seek its covering index by time", () => {
+  const db = memoryDb();
+  const query = spyOn(db, "query");
+  let sql: string;
+  try {
+    new DecisionUsageStore(db).deciderDays("x", [0], 1);
+    expect(query).toHaveBeenCalledTimes(1);
+    sql = query.mock.calls[0]![0];
+  } finally {
+    query.mockRestore();
+  }
+  const plan = db
+    .query<{ detail: string }, [number, string, string]>(
+      `explain query plan ${sql}`,
+    )
+    .all(1, "[0]", "x")
+    .map((row) => row.detail)
+    .join(" ");
+  expect(plan).toContain(
+    "USING COVERING INDEX decision_usage_decider (decider_id=? AND created_at>? AND created_at<?)",
+  );
+  db.close();
 });

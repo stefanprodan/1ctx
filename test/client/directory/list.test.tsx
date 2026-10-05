@@ -22,10 +22,12 @@ import {
   userPage,
 } from "../../../src/client/data/directory.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { searchList } from "../../../src/client/lib/search.ts";
 import { Agent } from "../../../src/client/views/directory/Agent.tsx";
 import { Decider } from "../../../src/client/views/directory/Decider.tsx";
 import {
   agentTabHref,
+  deciderFields,
   directoryTab,
   directoryTabs,
   switchItems,
@@ -109,14 +111,12 @@ beforeEach(() => {
       name: "jev",
       default: true,
       model: "typesafe/jev-1.13",
-      decisions: ["run-attention"],
     },
     {
       id: "d2",
       name: "kev",
       default: false,
       model: "kev-latest",
-      decisions: [],
     },
   ];
   directoryDecidersError.value = null;
@@ -167,13 +167,25 @@ describe("the directory", () => {
       expect(html).not.toContain("@jev");
       expect(html).toContain("default");
       expect(html).toContain("typesafe/jev-1.13");
-      expect(html).toContain("run-attention");
-      expect(html).toContain(">none<");
+      // the decisions show on the decider's page alone
+      expect(html).not.toContain("run-attention");
+      expect(html).not.toContain(">none<");
       // every tab carries its count
       expect(html).toMatch(/Users.*2.*Agents.*1.*Deciders.*2/s);
       expect(html).not.toContain('rows-go" href="/agents/coder"');
     },
   );
+
+  test("the Deciders tab searches the name and the model", () => {
+    const list = directoryDeciders.value!;
+    const names = (q: string) =>
+      searchList(list, q, deciderFields).shown.map((d) => d.name);
+    expect(names("")).toEqual(["jev", "kev"]);
+    expect(names("KEV")).toEqual(["kev"]);
+    expect(names("typesafe")).toEqual(["jev"]);
+    expect(searchList(list, "typesafe", deciderFields).count).toBe("1 of 2");
+    expect(names("run-attention")).toEqual([]);
+  });
 
   test.serial("the Deciders tab says when there are none", () => {
     path.value = "/directory/deciders";

@@ -11,6 +11,13 @@ export const MAX_BODY = 64 * 1024;
 // Shared with the upload budget without making web depend on knowledge.
 export const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
 
+// a route that takes no query answers a 400 to any parameter
+export function parseNoQuery(url: URL): void {
+  for (const name of url.searchParams.keys()) {
+    throw new BadRequest(`unknown parameter ${name}`);
+  }
+}
+
 // an object with exactly the given keys, or a 400 naming the stranger
 export function fields(
   body: unknown,

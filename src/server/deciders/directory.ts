@@ -13,12 +13,13 @@ import type {
   DirectoryDecidersResponse,
 } from "../../shared/api/directory.ts";
 import type { DecisionId } from "../../shared/contracts/decision.ts";
+import { parseNoQuery } from "../lib/body.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import type { ProvidersPort } from "./decide.ts";
 import type { DecisionStore } from "./decisions.ts";
-import { parseDeciderName, parseNoQuery } from "./parse.ts";
+import { parseDeciderName } from "./parse.ts";
 import type { DeciderStore } from "./store.ts";
 
 // a decider's days in every project, the usage area's answer
@@ -37,17 +38,14 @@ export type DirectoryDeps = {
 };
 
 export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
-  // the decisions each decider answers now, as decide() picks it: one
+  // the decisions a decider answers now, as decide() picks it: one
   // naming none asks the default, and a turned-off one asks nobody
-  const answered = (): Map<string, DecisionId[]> => {
+  const answered = (deciderId: string): DecisionId[] => {
     const defaultId = deps.store.defaultId();
-    const out = new Map<string, DecisionId[]>();
-    for (const decision of deps.decisions.list()) {
-      const id = decision.deciderId ?? defaultId;
-      if (!decision.enabled || id === null) continue;
-      out.set(id, [...(out.get(id) ?? []), decision.id]);
-    }
-    return out;
+    return deps.decisions
+      .list()
+      .filter((d) => d.enabled && (d.deciderId ?? defaultId) === deciderId)
+      .map((d) => d.id);
   };
   const find = (name: unknown) => {
     const decider = deps.store.byName(parseDeciderName(name));
@@ -61,7 +59,6 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         parseNoQuery(ctx.url);
-        const decisions = answered();
         const body: DirectoryDecidersResponse = {
           deciders: deps.store
             .list()
@@ -70,7 +67,6 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               name: decider.name,
               default: decider.default,
               model: decider.model,
-              decisions: decisions.get(decider.id) ?? [],
             }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         };
@@ -86,7 +82,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const body: DirectoryDeciderResponse = {
           decider,
           provider: deps.providers.byId(providerId)?.name ?? "",
-          decisions: answered().get(decider.id) ?? [],
+          decisions: answered(decider.id),
         };
         return json(body);
       },

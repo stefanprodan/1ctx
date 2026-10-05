@@ -14,7 +14,6 @@ import type {
 } from "../../../shared/api/directory.ts";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type { DecisionId } from "../../../shared/contracts/decision.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Role } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
@@ -253,10 +252,11 @@ export function directoryTabs(
   ];
 }
 
-// a decider's row ends on the decisions it answers, or none
-export function decisionsMeta(decisions: readonly DecisionId[]): string {
-  return decisions.length === 0 ? "none" : decisions.join(", ");
-}
+// what the Deciders tab's search reads: the name and the model
+export const deciderFields = (d: { name: string; model: string }) => [
+  d.name,
+  d.model,
+];
 
 // under a decider's model: the provider, the window and the input
 // price when the catalog knew them; a decision has no output to price

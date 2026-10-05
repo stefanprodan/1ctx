@@ -21,7 +21,6 @@ import { Decider } from "../../../src/client/views/directory/Decider.tsx";
 import {
   deciderAnswer,
   deciderLine,
-  decisionsMeta,
 } from "../../../src/client/views/directory/Directory.model.ts";
 import { ANSWER_WORDS } from "../../../src/client/views/projects/Activity.model.ts";
 import type {
@@ -192,12 +191,16 @@ describe("the decider's page", () => {
     expect(html).toContain(">Decisions<");
   });
 
-  test.serial("lists each decision by its icon and name alone", () => {
+  test.serial("lists each decision as the admin's list does, no link", () => {
     deciderPage.value = jev;
     const html = render(<Decider params={{ name: "jev" }} />);
-    expect(html).toContain(">run-attention<");
-    expect(html).not.toContain("Mark task runs");
+    expect(html).toContain(">Mark task runs that need attention<");
+    expect(html).toContain(">Backs up the agent's own mark<");
+    expect(html).not.toContain(">run-attention<");
+    expect(html).not.toContain("/admin/config/decisions");
+    // the options and their words stay on the admin pages
     expect(html).not.toContain("Needs attention");
+    expect(html).not.toContain("All good");
     deciderPage.value = { ...jev, decisions: [] };
     expect(render(<Decider params={{ name: "jev" }} />)).toContain(
       "No decision asks this decider.",
@@ -229,11 +232,6 @@ describe("the decider page's words", () => {
         default: false,
       }),
     ).toBe("router · 1M · free");
-  });
-
-  test("a row's decisions, or none", () => {
-    expect(decisionsMeta([])).toBe("none");
-    expect(decisionsMeta(["run-attention"])).toBe("run-attention");
   });
 
   test("the days are one series of answers keyed by the decider", () => {

@@ -38,7 +38,7 @@ import { Search } from "../../ui/Search.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import {
-  decisionsMeta,
+  deciderFields,
   directoryTab,
   directoryTabs,
   localTime,
@@ -125,11 +125,7 @@ function AgentsCard({ list }: { list: ListedAgent[] }) {
 // a decider is never an actor, so it has no @ and keeps the admin
 // lists' fixed avatar
 function DecidersCard({ list }: { list: ListedDecider[] }) {
-  const { q, shown, count } = useListSearch(list, (d) => [
-    d.name,
-    d.model,
-    ...d.decisions,
-  ]);
+  const { q, shown, count } = useListSearch(list, deciderFields);
   return (
     <RowsCard
       label="Deciders"
@@ -161,7 +157,6 @@ function DecidersCard({ list }: { list: ListedDecider[] }) {
               />
             }
           />
-          <RowsMeta>{decisionsMeta(d.decisions)}</RowsMeta>
         </RowsGo>
       ))}
     </RowsCard>

@@ -243,8 +243,9 @@ completions refuse function tools with any thinking.
   `deciders/directory.ts`: its name, model, the provider's name, the
   catalog facts and the decisions it answers now (those naming it,
   and those naming none when it is the default, a turned-off one left
-  out). Never a provider id, base URL, key name or decision text. Its
-  days are `deciderDays()`, Checks left out. Its page is
+  out), as ids the page draws with the admin list's code title and
+  sub. Never a provider id, base URL, key name, option or admin text.
+  Its days are `deciderDays()`, Checks left out. Its page is
   `/deciders/:name`, since a name is unique among deciders only, with
   no `@` (a decider is no actor) and, as an agent's, no cost: answers
   and tokens.

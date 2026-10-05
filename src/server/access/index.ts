@@ -45,7 +45,6 @@ export {
   parseAbout,
   parseEmail,
   parseFullName,
-  parseNoQuery,
   parseTz,
   parseUserPassword,
 } from "./parse.ts";

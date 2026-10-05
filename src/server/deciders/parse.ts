@@ -68,12 +68,6 @@ export function parseDeciderName(value: unknown): string {
   return value;
 }
 
-export function parseNoQuery(url: URL): void {
-  for (const name of url.searchParams.keys()) {
-    throw new BadRequest(`unknown parameter ${name}`);
-  }
-}
-
 // a decision's whole settings: every option key of it exactly once
 export function parseDecision(id: DecisionId, body: unknown): DecisionFields {
   const b = fields(body, ["enabled", "deciderId", "options"]);

@@ -108,19 +108,19 @@ export type DirectoryUserDaysResponse = {
 };
 
 // GET /api/directory/deciders: every decider by name, the model as its
-// id, and the decisions it answers now: those naming it, and those
-// naming none when it is the default, a turned-off one left out
+// id
 export type DirectoryDeciderRow = Pick<
   DeciderSummary,
   "id" | "name" | "default" | "model"
-> & { decisions: DecisionId[] };
+>;
 export type DirectoryDecidersResponse = { deciders: DirectoryDeciderRow[] };
 
 // a decider as every user sees it: no provider id
 export type DirectoryDecider = Omit<DeciderSummary, "providerId">;
 
 // GET /api/directory/deciders/:name; the provider's name and the
-// decisions it answers now, as the list's row has them
+// decisions it answers now: those naming it, and those naming none when
+// it is the default, a turned-off one left out
 export type DirectoryDeciderResponse = {
   decider: DirectoryDecider;
   provider: string;
