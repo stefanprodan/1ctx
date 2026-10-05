@@ -32,7 +32,7 @@ export const CUT_SHORT = "stopped before it finished";
 export type ReplyRowsDeps = {
   sessions: SessionsPort;
   usage: { record(fields: UsageFields): unknown };
-  render: (markdown: string, streaming: boolean) => string;
+  render: (markdown: string) => string;
 };
 
 export function finishReplyRow(
@@ -52,7 +52,7 @@ export function finishReplyRow(
     content: round.content,
     reasoning: round.reasoning,
     reasoningDetails: round.reasoningDetails,
-    html: deps.render(round.content, false),
+    html: deps.render(round.content),
     status,
     error,
     finishReason,

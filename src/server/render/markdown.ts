@@ -57,16 +57,12 @@ function codeBlock(text: string, info: string | undefined): string {
   );
 }
 
-const TABLE_ALIGNMENTS = new Map([
-  ["left", "left"],
-  ["center", "center"],
-  ["right", "right"],
-]);
+const TABLE_ALIGNMENTS = new Set(["left", "center", "right"]);
 
-export const tableAlign = (value: string | undefined) => {
-  const alignment = value ? TABLE_ALIGNMENTS.get(value) : undefined;
-  return alignment ? ` style="text-align:${alignment}"` : "";
-};
+export const tableAlign = (value: string | undefined) =>
+  value !== undefined && TABLE_ALIGNMENTS.has(value)
+    ? ` style="text-align:${value}"`
+    : "";
 
 const CALLBACKS = {
   text: (content: string) => escapeHtml(content),
@@ -119,11 +115,9 @@ const CALLBACKS = {
     `<td class="md-td"${tableAlign(meta?.align)}>${content}</td>`,
 };
 
-// Parser failures keep the reply readable. Streaming will control diagram
-// rendering when diagrams are added.
-export function renderMarkdown(md: string, streaming = false): string {
+// Parser failures keep the reply readable.
+export function renderMarkdown(md: string): string {
   if (md === "") return "";
-  void streaming;
   try {
     return Bun.markdown.render(md, CALLBACKS, OPTIONS);
   } catch {

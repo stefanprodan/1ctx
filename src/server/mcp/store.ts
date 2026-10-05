@@ -137,7 +137,7 @@ function codeFence(json: string): string {
 export function summary(
   server: McpServerRow,
   hasSecret: (name: string) => boolean,
-  render: (markdown: string, streaming?: boolean) => string,
+  render: (markdown: string) => string,
 ): McpServerSummary {
   const tools: McpToolSummary[] = server.tools.map((tool) => {
     const name = wireName(server.name, tool.name);
@@ -155,7 +155,7 @@ export function summary(
       description: tool.description,
       parameters: value as object,
       schemaJson: tool.inputSchema,
-      parametersHtml: render(codeFence(json), false),
+      parametersHtml: render(codeFence(json)),
     };
   });
   return {

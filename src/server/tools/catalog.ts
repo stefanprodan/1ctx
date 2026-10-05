@@ -52,10 +52,10 @@ export function schema(tool: Tool<string | ToolResult>): ChatTool {
 // the parameters as the page's highlighted JSON block
 export function parametersHtml(
   tool: ChatTool,
-  render: (markdown: string, streaming: boolean) => string,
+  render: (markdown: string) => string,
 ): string {
   const json = JSON.stringify(tool.parameters, null, 2);
-  return render(`\`\`\`json\n${json}\n\`\`\``, false);
+  return render(`\`\`\`json\n${json}\n\`\`\``);
 }
 
 const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
@@ -105,7 +105,7 @@ function withoutNames(tool: Tool): Tool {
 
 export function builtinCatalog(
   now: number,
-  render: (markdown: string, streaming: boolean) => string,
+  render: (markdown: string) => string,
 ): BuiltinToolSummary[] {
   const server: OfferedServer = {
     id: "",

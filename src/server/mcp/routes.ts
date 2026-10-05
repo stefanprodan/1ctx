@@ -36,7 +36,7 @@ export type RoutesDeps = {
   hasSecret: (name: string) => boolean;
   keys: () => string[];
   callTimeoutMs: () => number;
-  render: (markdown: string, streaming?: boolean) => string;
+  render: (markdown: string) => string;
   discover(
     endpoint: Pick<McpServerRow, "url" | "keyName">,
     signal: AbortSignal,

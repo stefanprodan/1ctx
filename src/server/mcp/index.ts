@@ -80,7 +80,7 @@ export type McpDeps = {
   keys: () => string[];
   // the limits' call timeout of the moment, for the form's hint
   callTimeoutMs: () => number;
-  render: (markdown: string, streaming?: boolean) => string;
+  render: (markdown: string) => string;
   capabilities: { forget(key: string): void };
   // a closure, sessions is built later
   usage: UsagePort;

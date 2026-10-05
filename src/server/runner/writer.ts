@@ -62,7 +62,7 @@ export type WriterDeps = {
   // a chat's snapshot of the project's note, started with its first send
   // and dropped by a summary, inside the caller's transaction
   views: StartDeps["views"] & { end(sessionId: string): void };
-  render: (markdown: string, streaming: boolean) => string;
+  render: (markdown: string) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;

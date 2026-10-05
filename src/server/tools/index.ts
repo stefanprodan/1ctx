@@ -96,7 +96,7 @@ export type ToolsDeps = {
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
-  render: (markdown: string, streaming: boolean) => string;
+  render: (markdown: string) => string;
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
