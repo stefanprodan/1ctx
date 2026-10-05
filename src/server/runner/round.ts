@@ -4,6 +4,7 @@
 // One provider round: request, stream, deltas to the writer, usage.
 
 import type { Message } from "../../shared/contracts/session.ts";
+import { bytesWords } from "../lib/bytes.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
@@ -242,7 +243,7 @@ async function streamRound(
   const grow = (text: string) => {
     replyBytes += Buffer.byteLength(text);
     if (replyBytes > MAX_REPLY_BYTES) {
-      throw new Error("the reply exceeded 1 MB");
+      throw new Error(`the reply exceeded ${bytesWords(MAX_REPLY_BYTES)}`);
     }
   };
   // heard: any event came, so the quiet timer runs; started: one reached
