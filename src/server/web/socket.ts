@@ -79,7 +79,7 @@ export type Socket = {
   // a stream frame to the watchers of the session
   stream(sessionId: string, frame: SocketEvent): void;
   closeAll(code: number, reason: string): void;
-  // the connections open, for a test and a log line
+  // open connections, for tests
   size(): number;
   // the users with a connection open
   online(): number;
@@ -87,6 +87,17 @@ export type Socket = {
   // stop listening to the bus
   dispose(): void;
 };
+
+// a login.revoked event names this principal's login, or every login of its user
+function signedOut(
+  principal: Principal,
+  revoked: { userId: string; loginId: string | null },
+): boolean {
+  return (
+    principal.userId === revoked.userId &&
+    (revoked.loginId === null || principal.loginId === revoked.loginId)
+  );
+}
 
 export function socketArea(deps: SocketDeps): Socket {
   const byUser = new Map<string, Set<Conn>>();
@@ -101,6 +112,33 @@ export function socketArea(deps: SocketDeps): Socket {
   ): void => {
     conn.data.closeCause = cause;
     conn.close(code, reason);
+  };
+
+  const revoke = (conn: Conn): void =>
+    serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+
+  // a locked tab hears no project's events
+  const sees = (conn: Conn, projectId: string): boolean =>
+    !conn.data.principal.mustChangePassword &&
+    conn.data.projects.has(projectId);
+
+  const join = (map: Map<string, Set<Conn>>, key: string, conn: Conn) => {
+    let set = map.get(key);
+    if (set === undefined) {
+      set = new Set();
+      map.set(key, set);
+    }
+    set.add(conn);
+  };
+
+  // the principal and its visible projects now, null for a user that is gone
+  const current = (
+    principal: Principal,
+  ): { principal: Principal; projects: string[] } | null => {
+    const next = deps.refresh(principal);
+    if (next === null) return null;
+    const projects = deps.visibleProjectIds(next.userId);
+    return projects === null ? null : { principal: next, projects };
   };
 
   const deliverText = (conn: Conn, text: string): void => {
@@ -151,22 +189,18 @@ export function socketArea(deps: SocketDeps): Socket {
   // the visible set again, from the rows: a project that left it is
   // announced and unwatched, a user that is gone is closed
   const recompute = (conn: Conn): void => {
-    const principal = deps.refresh(conn.data.principal);
-    if (principal === null) {
-      serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+    const now = current(conn.data.principal);
+    if (now === null) {
+      revoke(conn);
       return;
     }
+    const { principal } = now;
     const roleChanged = principal.role !== conn.data.principal.role;
     conn.data.principal = principal;
     // the tab's user carries the role the rail and the menus read, and
     // nothing else tells it the role moved
     if (roleChanged) deliver(conn, { type: "role", role: principal.role });
-    const ids = deps.visibleProjectIds(principal.userId);
-    if (ids === null) {
-      serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
-      return;
-    }
-    const next = new Set(ids);
+    const next = new Set(now.projects);
     for (const id of conn.data.projects) {
       if (next.has(id)) continue;
       conn.data.projects.delete(id);
@@ -207,12 +241,7 @@ export function socketArea(deps: SocketDeps): Socket {
   ): void => {
     let text: string | undefined;
     each((conn) => {
-      if (
-        conn.data.principal.mustChangePassword ||
-        !conn.data.projects.has(projectId)
-      ) {
-        return;
-      }
+      if (!sees(conn, projectId)) return;
       before?.(conn);
       text ??= JSON.stringify(frame());
       deliverText(conn, text);
@@ -234,12 +263,7 @@ export function socketArea(deps: SocketDeps): Socket {
         const { projectId, ...data } = event.data;
         let text: string | undefined;
         for (const conn of [...(watchers.get(data.sessionId) ?? [])]) {
-          if (
-            conn.data.principal.mustChangePassword ||
-            !conn.data.projects.has(projectId)
-          ) {
-            continue;
-          }
+          if (!sees(conn, projectId)) continue;
           text ??= JSON.stringify({ type: "queue", ...data });
           deliverText(conn, text);
         }
@@ -251,13 +275,8 @@ export function socketArea(deps: SocketDeps): Socket {
         const { userId, ...data } = event.data;
         let text: string | undefined;
         each((conn) => {
-          if (
-            conn.data.principal.userId !== userId ||
-            conn.data.principal.mustChangePassword ||
-            !conn.data.projects.has(data.projectId)
-          ) {
-            return;
-          }
+          if (conn.data.principal.userId !== userId) return;
+          if (!sees(conn, data.projectId)) return;
           text ??= JSON.stringify({ type: "notSent", ...data });
           deliverText(conn, text);
         });
@@ -314,39 +333,25 @@ export function socketArea(deps: SocketDeps): Socket {
         for (const data of pending) {
           const ids = event.data.userIds;
           if (ids !== null && !ids.includes(data.principal.userId)) continue;
-          const principal = deps.refresh(data.principal);
-          const projects =
-            principal === null
-              ? null
-              : deps.visibleProjectIds(principal.userId);
-          if (principal === null || projects === null) {
+          const now = current(data.principal);
+          if (now === null) {
             data.revoked = true;
           } else {
-            data.principal = principal;
-            data.projects = new Set(projects);
+            data.principal = now.principal;
+            data.projects = new Set(now.projects);
           }
         }
         break;
       case "login.revoked":
         each((conn) => {
-          const p = conn.data.principal;
-          if (
-            p.userId === event.data.userId &&
-            (event.data.loginId === null || p.loginId === event.data.loginId)
-          ) {
+          if (signedOut(conn.data.principal, event.data)) {
             // A close callback can lag behind the next committed write.
             forget(conn);
-            serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+            revoke(conn);
           }
         });
         for (const data of pending) {
-          const p = data.principal;
-          if (
-            p.userId === event.data.userId &&
-            (event.data.loginId === null || p.loginId === event.data.loginId)
-          ) {
-            data.revoked = true;
-          }
+          if (signedOut(data.principal, event.data)) data.revoked = true;
         }
         break;
     }
@@ -382,15 +387,10 @@ export function socketArea(deps: SocketDeps): Socket {
         user: conn.data.principal.username,
       });
       if (conn.data.revoked === true) {
-        serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+        revoke(conn);
         return;
       }
-      let set = byUser.get(conn.data.principal.userId);
-      if (set === undefined) {
-        set = new Set();
-        byUser.set(conn.data.principal.userId, set);
-      }
-      set.add(conn);
+      join(byUser, conn.data.principal.userId, conn);
       deliver(conn, {
         type: "hello",
         protocol: PROTOCOL,
@@ -410,7 +410,7 @@ export function socketArea(deps: SocketDeps): Socket {
       }
       const principal = deps.refresh(conn.data.principal);
       if (principal === null) {
-        serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+        revoke(conn);
         return;
       }
       conn.data.principal = principal;
@@ -425,12 +425,7 @@ export function socketArea(deps: SocketDeps): Socket {
       if (project === null || !conn.data.projects.has(project)) return;
       unwatch(conn);
       conn.data.watching = parsed.sessionId;
-      let set = watchers.get(parsed.sessionId);
-      if (set === undefined) {
-        set = new Set();
-        watchers.set(parsed.sessionId, set);
-      }
-      set.add(conn);
+      join(watchers, parsed.sessionId, conn);
       // registered before the snapshot is taken, so no frame falls
       // between the two
       deliver(conn, {
