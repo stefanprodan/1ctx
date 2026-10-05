@@ -245,4 +245,5 @@ One helper per job, never a copy in a view.
   browser's zone `browserZone()` in `lib/zone.ts`; picked ids
   `sameIds()` and `toggledId()` in `lib/ids.ts`; a skipped pick's
   reason `skipWords()` in `lib/pick.ts`; a row opening into view
-  `reveal()` in `lib/scroll.ts`.
+  `reveal()` in `lib/scroll.ts`; a copy `copyText()` in
+  `lib/clipboard.ts`, whose false leaves the button as it was.

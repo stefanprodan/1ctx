@@ -3,6 +3,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { copyText } from "../../lib/clipboard.ts";
 import { Icon } from "../../lib/icons.tsx";
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -88,12 +89,9 @@ export function PasswordField({
           aria-label={copied.value ? "Copied" : "Copy"}
           disabled={value === ""}
           onClick={() => {
-            void navigator.clipboard
-              .writeText(value)
-              .then(() => {
-                copied.value = true;
-              })
-              .catch(() => {});
+            void copyText(value).then((ok) => {
+              copied.value = ok;
+            });
           }}
         >
           <Icon name={copied.value ? "check" : "copy"} size={14} />
