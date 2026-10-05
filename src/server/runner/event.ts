@@ -20,8 +20,6 @@ export type Event = {
   };
   instructions: string;
   dueAt: number;
-  receivedAt: number;
-  key: null;
   deadlineMs: number | null;
   user: UserRow;
   project: ProjectRow;

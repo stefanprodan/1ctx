@@ -111,7 +111,6 @@ export function scheduler(deps: Deps): Scheduler {
     row: AutomationSummary,
     source: EventSource,
     dueAt: number,
-    receivedAt: number,
     resolved: Pick<Event, "user" | "project" | "agent">,
   ): Event => ({
     source,
@@ -127,8 +126,6 @@ export function scheduler(deps: Deps): Scheduler {
     },
     instructions: row.instructions,
     dueAt,
-    receivedAt,
-    key: null,
     deadlineMs: row.deadlineMs,
     ...resolved,
   });
@@ -180,7 +177,7 @@ export function scheduler(deps: Deps): Scheduler {
             throw new Conflict("still running");
           }
           holder.value = deps.runner.startRun(
-            eventFor(row, source, dueAt!, now, resolved),
+            eventFor(row, source, dueAt!, resolved),
           );
           const prepared = holder.value;
           const updated = deps.store.recordEvent(row.id, {
