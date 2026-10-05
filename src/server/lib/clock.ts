@@ -13,6 +13,26 @@ export const MINUTE_MS = 60_000;
 export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
+// "2026-09-14 20:10" in the zone: numbers only, so no runtime's wording
+// of a date moves a prompt or a file
+export function localMinute(timeZone: string): (ms: number) => string {
+  const format = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return (ms) => {
+    const part = Object.fromEntries(
+      format.formatToParts(ms).map((p) => [p.type, p.value]),
+    );
+    return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}`;
+  };
+}
+
 export type Sleep = { promise: Promise<void>; cancel: () => void };
 
 // resolves after ms on the clock; the cancel clears a real timer, and a

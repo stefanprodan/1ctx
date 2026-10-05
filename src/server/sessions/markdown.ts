@@ -6,6 +6,7 @@
 import { finishWords } from "../../shared/finish.ts";
 import { attachedLine, type MessageUpload } from "../../shared/uploads.ts";
 import type { MessageKind, MessageStatus } from "../../shared/words.ts";
+import { localMinute } from "../lib/clock.ts";
 
 export type ExportRow = {
   sendId: string;
@@ -30,7 +31,7 @@ export function chatMarkdown(
   rows: ExportRow[],
   timeZone: string,
 ): string {
-  const stamp = timestamp(timeZone);
+  const stamp = localMinute(timeZone);
   const parts = [`# ${escapeInline(title)}`];
   for (const turn of sends(rows)) {
     for (const user of turn.filter((row) => row.kind === "user")) {
@@ -131,26 +132,6 @@ function body(content: string): string {
 // file shows it as written rather than as markup
 function escapeInline(text: string): string {
   return text.replace(/\s+/g, " ").replace(/[\\`*_[\]<>#|~&]/g, "\\$&");
-}
-
-// a date a file sorts and a reader in the caller's zone recognises as
-// the time the transcript showed, whatever the locale
-function timestamp(timeZone: string): (ms: number) => string {
-  const format = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  return (ms) => {
-    const part = Object.fromEntries(
-      format.formatToParts(ms).map((p) => [p.type, p.value]),
-    );
-    return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}`;
-  };
 }
 
 // the header's filename is quoted ASCII, so anything else would need

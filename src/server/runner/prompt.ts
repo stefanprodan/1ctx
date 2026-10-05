@@ -18,6 +18,7 @@ import {
 } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
+import { localMinute } from "../lib/clock.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 
 // the UTC day, so the prefix holds until midnight for every author
@@ -49,20 +50,7 @@ function projectLine(
 function automationLine(
   automation: NonNullable<SendPolicy["automation"]>,
 ): string {
-  // numbers only, "2026-09-14 20:10", since runtimes word a medium date
-  // differently and the prompt should not move with them
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: automation.tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(automation.dueAt);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  const at = `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+  const at = localMinute(automation.tz)(automation.dueAt);
   const kind = automation.source === "manual" ? "manual" : "scheduled";
   return `This is a ${kind} run of the ${automation.name} automation, started at ${at} ${automation.tz}. You run autonomously. Do not ask questions. Do the task and stop.`;
 }
