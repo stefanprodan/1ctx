@@ -12,7 +12,7 @@ import type {
   McpToolSummary,
 } from "../../shared/contracts/mcp.ts";
 import { wireName } from "../../shared/mcp.ts";
-import { type Db, transact } from "../db/index.ts";
+import { type Db, parseStored, transact } from "../db/index.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { DiscoveredTool, DiscoveryResult } from "./discover.ts";
@@ -88,15 +88,6 @@ type RawAgentServer = {
   write: number;
 };
 
-function parsed<T>(text: string | null, fallback: T): T {
-  if (text === null) return fallback;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 function toolRow(raw: RawTool): McpToolRow {
   return {
     serverId: raw.server_id,
@@ -117,16 +108,16 @@ function row(raw: RawServer, tools: McpToolRow[]): McpServerRow {
     write: raw.write === 1,
     instructionsOn: raw.instructions_on === 1,
     timeoutMs: raw.timeout_ms,
-    readPatterns: parsed(raw.read_patterns, []),
-    writePatterns: parsed(raw.write_patterns, []),
-    excludedPatterns: parsed(raw.excluded_patterns, []),
+    readPatterns: parseStored(raw.read_patterns, []),
+    writePatterns: parseStored(raw.write_patterns, []),
+    excludedPatterns: parseStored(raw.excluded_patterns, []),
     serverName: raw.server_name,
     serverVersion: raw.server_version,
     protocolVersion: raw.protocol_version,
     instructions: raw.instructions,
     fingerprint: raw.fingerprint,
     checkedAt: raw.checked_at,
-    lastChange: parsed(raw.last_change, null),
+    lastChange: parseStored(raw.last_change, null),
     refreshError: raw.refresh_error,
     refreshFailedAt: raw.refresh_failed_at,
     createdAt: raw.created_at,

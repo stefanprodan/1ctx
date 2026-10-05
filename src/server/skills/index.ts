@@ -11,7 +11,6 @@ import { type AgentsPort, routes, type UsagePort } from "./routes.ts";
 import { SkillStore } from "./store.ts";
 import { switchable } from "./switchable.ts";
 
-export { validPath } from "../lib/paths.ts";
 export { parseSkillMd } from "./frontmatter.ts";
 export * from "./limits.ts";
 export { type LoadedSkill, loadSkill } from "./load.ts";

@@ -14,6 +14,17 @@ export type Db = Database;
 
 export type Transaction<T> = { result: T; events?: BusEvent[] };
 
+// a JSON column read leniently: null or text that does not parse gives
+// the fallback
+export function parseStored<T>(text: string | null, fallback: T): T {
+  if (text === null) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export type OpenedDb = { db: Db; migrations: string[] };
 
 export function open(path: string): OpenedDb {

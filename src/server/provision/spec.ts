@@ -45,6 +45,7 @@ import {
 } from "../credentials/index.ts";
 import { parseModel } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { validPath } from "../lib/paths.ts";
 import {
   parseMcpKeyName,
   parsePatterns,
@@ -56,7 +57,7 @@ import {
   parseBaseUrl,
   parseKeyName,
 } from "../providers/index.ts";
-import { MAX_SKILL_URL, validPath } from "../skills/index.ts";
+import { MAX_SKILL_URL } from "../skills/index.ts";
 import { parseHosts, parseWebDomains } from "../tools/index.ts";
 import {
   at,

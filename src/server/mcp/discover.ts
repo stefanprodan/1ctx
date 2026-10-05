@@ -15,7 +15,7 @@ import {
   DISCOVERY_BODY_BYTES,
   DISCOVERY_TIMEOUT_MS,
   MAX_INSTRUCTIONS,
-  MAX_SERVER_NAME,
+  MAX_REPORTED_SERVER_NAME,
   MAX_SERVER_VERSION,
   MAX_TOOL_DESCRIPTION,
   MAX_TOOL_SCHEMA_BYTES,
@@ -83,7 +83,7 @@ function schemaOf(tool: ListedTool): {
 export function identityOf(info: ClientInfo, key: string | null) {
   const raw = scrub(info, key);
   const identity = {
-    serverName: cutCodePoints(raw.serverName, MAX_SERVER_NAME),
+    serverName: cutCodePoints(raw.serverName, MAX_REPORTED_SERVER_NAME),
     serverVersion: cutCodePoints(raw.serverVersion, MAX_SERVER_VERSION),
     instructions: cutCodePoints(raw.instructions.trim(), MAX_INSTRUCTIONS),
   };

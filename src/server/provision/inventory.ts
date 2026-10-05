@@ -20,7 +20,7 @@ export type InventorySources = {
   repos: { forProject(projectId: string): { name: string }[] };
   providers: Named;
   deciders: Named;
-  skills: { summaries(agentNames: () => string[]): { name: string }[] };
+  skills: { names(): string[] };
   mcp: Named;
   agents: Named;
 };
@@ -42,7 +42,7 @@ export function inventoryOf(sources: InventorySources): Inventory {
     }),
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
-    Skill: sources.skills.summaries(() => []).map((row) => row.name),
+    Skill: sources.skills.names(),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),
     Tool: ["web", "websearch", "visualize"],

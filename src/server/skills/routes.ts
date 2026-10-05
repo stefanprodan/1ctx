@@ -59,7 +59,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   });
   const detail = (id: string): SkillResponse => {
     const body = deps.store.bodyOf(id);
-    const skill = deps.store.summaryById(id, deps.agents.agentNames);
+    const skill = deps.store.summaryById(id);
     if (body === null || skill === null) throw new NotFound("no such skill");
     return { skill, body: body.body };
   };
@@ -70,7 +70,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const body: SkillsResponse = {
-          skills: deps.store.summaries(deps.agents.agentNames),
+          skills: deps.store.summaries(),
         };
         return json(body);
       },

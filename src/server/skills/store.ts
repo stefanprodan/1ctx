@@ -3,7 +3,7 @@
 
 import type { SkillSummary } from "../../shared/contracts/skill.ts";
 import type { SkillSource } from "../../shared/words.ts";
-import { type Db, transact } from "../db/index.ts";
+import { type Db, parseStored, transact } from "../db/index.ts";
 import { Conflict } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { LoadedSkill } from "./load.ts";
@@ -57,26 +57,18 @@ type Raw = {
 type FileRaw = { path: string; content: string; bytes: number };
 type DroppedStored = SkillSummary["dropped"][number] & { more?: number };
 
-function parseJson<T>(value: string, fallback: T): T {
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 type Fields = Omit<SkillRow, "body" | "files">;
 
 // the columns every read of a skill shares
 function fieldsOf(raw: Omit<Raw, "body">): Fields {
-  const stored = parseJson<DroppedStored[]>(raw.dropped, []);
+  const stored = parseStored<DroppedStored[]>(raw.dropped, []);
   return {
     id: raw.id,
     name: raw.name,
     description: raw.description,
     license: raw.license,
     compatibility: raw.compatibility,
-    metadata: parseJson(raw.metadata, {}),
+    metadata: parseStored(raw.metadata, {}),
     allowedTools: raw.allowed_tools,
     sourceKind: raw.source_kind,
     sourceUrl: raw.source_url,
@@ -88,8 +80,7 @@ function fieldsOf(raw: Omit<Raw, "body">): Fields {
       .map(({ path, reason }) => ({ path, reason })),
     droppedMore: stored.find((item) => item.more !== undefined)?.more ?? 0,
     fetchedAt: raw.fetched_at,
-    lastChange:
-      raw.last_change === null ? null : parseJson(raw.last_change, null),
+    lastChange: parseStored(raw.last_change, null),
     refreshError: raw.refresh_error,
     refreshFailedAt: raw.refresh_failed_at,
     createdAt: raw.created_at,
@@ -150,11 +141,17 @@ export class SkillStore {
       .map((raw) => this.row(raw));
   }
 
+  names(): string[] {
+    return this.db
+      .query<{ name: string }, []>(
+        "select name from skills order by created_at, name",
+      )
+      .all()
+      .map((row) => row.name);
+  }
+
   // light: no body text or file content
-  summaries(
-    agentNames: (ids: string[]) => string[],
-    id?: string,
-  ): SkillSummary[] {
+  summaries(id?: string): SkillSummary[] {
     type LightRaw = Omit<Raw, "body"> & { body_bytes: number };
     const select = `select id, name, description, license, compatibility,
                 metadata, allowed_tools, source_kind, source_url,
@@ -179,7 +176,7 @@ export class SkillStore {
         fieldsOf(raw),
         raw.body_bytes,
         filesFor.all(raw.id),
-        agentNames(usedBy.all(raw.id).map((row) => row.agent_id)),
+        this.agentNames(usedBy.all(raw.id).map((row) => row.agent_id)),
       ),
     );
   }
@@ -219,11 +216,8 @@ export class SkillStore {
     return { ...raw, files };
   }
 
-  summaryById(
-    id: string,
-    agentNames: (ids: string[]) => string[],
-  ): SkillSummary | null {
-    return this.summaries(agentNames, id)[0] ?? null;
+  summaryById(id: string): SkillSummary | null {
+    return this.summaries(id)[0] ?? null;
   }
 
   fileOf(id: string, path: string): FileRaw | null {
