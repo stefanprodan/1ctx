@@ -1,18 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Rows to wire messages: every user message with its author's name, and
-// every reply and tool row that carries something. A work reply goes
-// back as an assistant message with its tool calls and a null content
-// when it has none; a tool row as role tool. Pairing is by (sendId,
-// round) and call order.
-//
-// The repair is pure: a work reply whose calls lack a complete set of
-// result rows is sent without its calls and without any of its
-// reasoning, as plain text if it has any, else skipped; an orphan tool
-// row is skipped. Another agent's turn in the chat goes as its answer
-// and its trace, never its calls, results or reasoning. Summary rows
-// never render here. Tested on fixtures, malformed histories among them.
+// Rows to wire messages; an incomplete work round goes as plain text.
 
 import type { Message } from "../../shared/contracts/session.ts";
 import { uploadsBlock } from "../../shared/uploads.ts";
@@ -23,7 +12,14 @@ import {
   type ToolCall,
 } from "../providers/index.ts";
 import type { Offered, SendPolicy } from "./policy.ts";
-import { trace, traceCalls, type Yours, yoursOf } from "./trace.ts";
+import {
+  roundKey,
+  toolRowsByRound,
+  trace,
+  traceCalls,
+  type Yours,
+  yoursOf,
+} from "./trace.ts";
 
 // who answered a send of the session: its agent and whether it was
 // summoned for the turn
@@ -100,21 +96,6 @@ function foreignTurn(
   const calls = trace(traceCalls(rows), yours);
   if (calls !== "") out.push({ role: "user", content: calls });
   return out;
-}
-
-// the tool result rows of one (sendId, round), in call order
-export function toolRowsByRound(
-  rows: readonly Message[],
-): Map<string, Message[]> {
-  const byRound = new Map<string, Message[]>();
-  for (const row of rows) {
-    if (row.kind !== "tool") continue;
-    const key = `${row.sendId}:${row.round}`;
-    const calls = byRound.get(key) ?? [];
-    calls.push(row);
-    byRound.set(key, calls);
-  }
-  return byRound;
 }
 
 // a round goes back with its calls only when every call has its
@@ -225,8 +206,7 @@ export function renderRows(
     if (row.status === "streaming") continue;
     const calls = row.toolCalls ?? [];
     if (row.slot === "work" && calls.length > 0) {
-      const key = `${row.sendId}:${row.round}`;
-      const resultRows = byRound.get(key);
+      const resultRows = byRound.get(roundKey(row));
       if (roundComplete(calls, resultRows)) {
         out.push(workMessage(row, calls, policy, lookups, sameProvider(row)));
         calls.forEach((call, index) => {

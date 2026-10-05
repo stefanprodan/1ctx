@@ -6,122 +6,74 @@ import type {
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
-import type { SocketEvent } from "../../shared/socket.ts";
+import type { SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { refuseArchived, type SessionRow } from "../sessions/index.ts";
-import type { UsageFields } from "../usage/index.ts";
-import { envelope, lastLine } from "./envelope.ts";
+import { answerLine, envelope } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
-import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
-import type { SessionsPort } from "./writer-port.ts";
+import { finalizeRound, type ReplyRowsDeps } from "./reply-rows.ts";
+import type { ActiveSend } from "./send.ts";
 
-type SummaryDeps = {
-  db: Db;
-  clock: Clock;
-  sessions: SessionsPort;
-  usage: { record(fields: UsageFields): unknown };
-  render: (markdown: string, streaming: boolean) => string;
-  stream: (sessionId: string, frame: SocketEvent) => void;
+type SummaryDeps = ReplyRowsDeps & { db: Db; clock: Clock };
+
+export type AfterAnswer = {
+  // the summary of a chat's turn, or the first work reply after a run
+  row: "summary" | "work";
+  status: Exclude<SessionStatus, "running">;
+  error: string | null;
+  counters: {
+    memoryRound?: number;
+    attentionRound?: number;
+    memoryFrom?: number;
+  };
 };
 
-function recordUsage(
+// the answer finished and the send's next row opened in one transaction;
+// its one envelope carries the answer as the chat's last line
+export function startAfterAnswer(
   deps: SummaryDeps,
   send: ActiveSend,
-  round: RoundState,
-  now: number,
-): void {
-  if (round.usage === null) return;
-  const fields: UsageFields = {
-    sendId: send.id,
-    sessionId: send.sessionId,
-    projectId: send.projectId,
-    userId: send.policy.userId,
-    agentId: send.policy.agentId,
-    providerId: send.policy.providerId,
-    model: send.policy.model,
-    round: send.roundNo,
-    promptTokens: round.usage.promptTokens,
-    completionTokens: round.usage.completionTokens,
-    cachedTokens: round.usage.cachedTokens,
-    reasoningTokens: round.usage.reasoningTokens,
-    cost: round.usage.cost,
-    contextLength: send.policy.contextLength,
-    upstream: round.upstream,
-    servedModel: round.servedModel,
-    now,
-  };
-  deps.usage.record(fields);
-}
-
-function finishAnswer(
-  deps: SummaryDeps,
-  send: ActiveSend,
-  round: RoundState,
-  now: number,
-): Message | null {
-  const thinkingMs =
-    round.thinkingMs ??
-    (round.reasoningStartedAt === null ? null : now - round.reasoningStartedAt);
-  recordUsage(deps, send, round, now);
-  unmarkAnswer(round, send.policy.agentName);
-  return deps.sessions.finishReply(round.messageId, {
-    content: round.content,
-    reasoning: round.reasoning,
-    reasoningDetails: round.reasoningDetails,
-    html: deps.render(round.content, false),
-    status: "done",
-    error: null,
-    finishReason: round.finishReason,
-    slot: "answer",
-    toolCalls: null,
-    ttftMs: round.ttftMs,
-    thinkingMs,
-    upstream: round.upstream,
-    servedModel: round.servedModel,
-    nativeFinish: round.nativeFinish,
-    finishedAt: now,
-  });
-}
-
-export function startSummary(deps: SummaryDeps, send: ActiveSend): Message {
-  const round = send.round;
-  if (round === null) throw new Error("the answer round is missing");
+  next: AfterAnswer,
+): Message {
   const now = deps.clock();
+  const round = send.roundNo + 1;
   return transact(deps.db, () => {
-    const answer = finishAnswer(deps, send, round, now);
-    const summary = deps.sessions.addSummary({
+    const answer = finalizeRound(deps, send, next.status, next.error, now);
+    const fields = {
       sessionId: send.sessionId,
       sendId: send.id,
-      round: send.roundNo + 1,
+      round,
       agentId: send.policy.agentId,
       model: send.policy.model,
       now,
-    });
+    };
+    let row: Message;
+    if (next.row === "summary") {
+      row = deps.sessions.addSummary(fields);
+    } else {
+      const created = deps.sessions.addReply(fields);
+      row = deps.sessions.markSlot(created.id, "work") ?? created;
+    }
     const sendRow = deps.sessions.bumpCounters(send.id, {
-      rounds: send.roundNo + 1,
+      ...next.counters,
+      rounds: round,
       toolCalls: send.budget.calls,
     })!;
     const session = deps.sessions.touch(send.sessionId, {
       status: "running",
       now,
     })!;
-    // the answer this transaction finished is the chat's last line, as
-    // it would be from finalizeSend
-    const last =
-      answer?.status === "done" && answer.slot === "answer"
-        ? lastLine(answer, send.policy.agentName)
-        : undefined;
     return {
-      result: summary,
+      result: row,
       events: [
         envelope(
           session,
-          answer ? [answer, summary] : [summary],
+          answer ? [answer, row] : [row],
           sendRow,
           [],
-          last,
+          answerLine(answer, send.policy.agentName),
         ),
       ],
     };

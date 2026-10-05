@@ -6,14 +6,11 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  type SessionRow,
-  type SessionStore,
-  sessionDetail,
-} from "../sessions/index.ts";
+import type { SessionRow, SessionStore } from "../sessions/index.ts";
 import type { SendPolicy } from "./policy.ts";
+import { logStart, reserve, startedDetail } from "./prepare.ts";
 import type { Registry } from "./registry.ts";
-import { type ActiveSend, live, newSend } from "./send.ts";
+import { type ActiveSend, newSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
 // the chat's last counted round, with the send and round that name its rows
@@ -80,11 +77,6 @@ export function compactSend(
             message.round === counted.round &&
             (message.kind === "reply" || message.kind === "summary"),
         )?.seq ?? null);
-  deps.registry.admit(
-    session.id,
-    { userId: policy.userId, projectId: policy.projectId },
-    policy.sendCaps,
-  );
   const sendId = newId();
   const summaryId = newId();
   const send = newSend({
@@ -106,7 +98,7 @@ export function compactSend(
     replyId: summaryId,
     now: deps.clock(),
   });
-  deps.registry.set(send);
+  const release = reserve(deps.registry, deps.wake, send);
   let started: ReturnType<Writer["startCompact"]>;
   try {
     started = deps.writer.startCompact({
@@ -117,25 +109,10 @@ export function compactSend(
       policy,
     });
   } catch (err) {
-    if (deps.registry.free(send)) deps.wake();
+    release();
     throw err;
   }
-  deps.log.info("send start", {
-    chat: session.id,
-    user: policy.username,
-    agent: policy.agentName,
-    provider: policy.providerName,
-    model: policy.model,
-    op: "compact",
-  });
+  logStart(deps.log, session.id, policy, "compact");
   void deps.run(send);
-  // a send starts only on a chat that is not archived, so no
-  // archive is read and its kept days go unused
-  return sessionDetail(
-    deps.sessions,
-    started.session,
-    live(send),
-    0,
-    policy.userId,
-  );
+  return startedDetail(deps.sessions, started.session, send, policy.userId);
 }

@@ -1,17 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The system prompt: the agent's name and project, the agent's prompt,
-// the user with what was written about them, the skills catalog and the
-// date. The model learns who it is and where before its instructions, as
-// a harness's prompt opens. A run belongs to its project, not to a
-// person, so the run's line takes the user's place.
-// The user comes after what is fixed per agent and project, since the
-// user changes with the author of a team chat, and a day, not a time, so
-// the prefix holds until midnight and a provider's cache with it. The
-// skills catalog arrives on the policy's offered snapshot; memory and
-// knowledge are captured once per send so a tool's writes cannot move
-// the prefix between rounds.
+// The system prompt; its order is fixed in docs/sessions.md.
 
 import {
   KNOWLEDGE,
@@ -28,9 +18,9 @@ import {
 } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
-import type { SendPolicy } from "./policy.ts";
+import { offers, type SendPolicy } from "./policy.ts";
 
-// the calendar day in UTC; the user's zone comes with the profile later
+// the UTC day, so the prefix holds until midnight for every author
 export function dateLine(now: number): string {
   return `Today is ${new Date(now).toISOString().slice(0, 10)}.`;
 }
@@ -98,28 +88,30 @@ export type RepoLines = {
 
 export const NO_REPO_LINES: RepoLines = { off: [], moved: [] };
 
+export type PromptPolicy = Pick<
+  SendPolicy,
+  | "prompt"
+  | "agentName"
+  | "summoned"
+  | "projectName"
+  | "projectKind"
+  | "projectDescription"
+  | "fullName"
+  | "username"
+  | "about"
+  | "tz"
+  | "automation"
+  | "offered"
+  | "projectMemory"
+  | "automationMemory"
+  | "knowledge"
+  | "disabledCapabilities"
+  | "mcpOff"
+  | "skillsOff"
+>;
+
 export function systemPrompt(
-  policy: Pick<
-    SendPolicy,
-    | "prompt"
-    | "agentName"
-    | "summoned"
-    | "projectName"
-    | "projectKind"
-    | "projectDescription"
-    | "fullName"
-    | "username"
-    | "about"
-    | "tz"
-    | "automation"
-    | "offered"
-    | "projectMemory"
-    | "automationMemory"
-    | "knowledge"
-    | "disabledCapabilities"
-    | "mcpOff"
-    | "skillsOff"
-  >,
+  policy: PromptPolicy,
   now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
@@ -147,7 +139,7 @@ export function systemPrompt(
     parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
   // a model that cannot call the tool is not told of the files behind it
-  const bash = policy.offered.tools.some((tool) => tool.name === "bash");
+  const bash = offers(policy.offered, "bash");
   const docsOff = policy.disabledCapabilities.includes(KNOWLEDGE);
   if (bash && !docsOff) {
     parts.push(knowledgeBlock(policy.knowledge.empty));

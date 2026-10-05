@@ -13,25 +13,28 @@ import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import type { Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { isMemoryTool } from "../tools/index.ts";
+import { runOne, toolContext } from "./call.ts";
 import { ASK_TOKENS } from "./context.ts";
-import type { ToolContext, ToolResult, ToolsPort } from "./policy.ts";
+import type { ToolResult, ToolsPort } from "./policy.ts";
+import { NOT_RUN_REPEAT, notRun } from "./reply-rows.ts";
 import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { failureFields, runRound } from "./round.ts";
-import { type ActiveSend, type CapReason, newRound } from "./send.ts";
+import { type ActiveSend, type CapReason, nextRound } from "./send.ts";
 import { dropTextCalls } from "./text-calls.ts";
-import { NOT_RUN_REPEAT, notRun, type Writer } from "./writer.ts";
+import type { Writer } from "./writer.ts";
 
 // the finish reason of an answer whose call written as text was dropped
-export const TEXT_CALL_REASON = "tool_text";
+const TEXT_CALL_REASON = "tool_text";
 // the finish reason of a work round whose repeated calls were refused
-export const REPEAT_REASON = "tool_repeat";
+const REPEAT_REASON = "tool_repeat";
 
 // how many identical rounds in a row are the loop check
-export const LOOP_REPEATS = 3;
+const LOOP_REPEATS = 3;
+
 export type LoopDeps = {
   round: RoundDeps;
   writer: Writer;
@@ -42,23 +45,14 @@ export type LoopDeps = {
   fail(send: ActiveSend, error: string): void;
 };
 
-// how the loop asks the send to end: a cause and, for the runner's own
-// reasons, the finish_reason to leave on the reply
-export type LoopEnd = {
-  cause: SendCause;
-  finishReason: string | null;
-  error: string | null;
-};
+// how the loop asks the send to end
+type LoopEnd = { cause: SendCause; error: string | null };
 
-const finish = (): LoopEnd => ({
-  cause: "finish",
-  finishReason: null,
-  error: null,
-});
+const finish = (): LoopEnd => ({ cause: "finish", error: null });
 
 // the names and arguments of a round's calls, sorted, so a repeat is
 // the same set whatever the order
-export function signature(calls: ToolCall[]): string {
+function signature(calls: ToolCall[]): string {
   return calls
     .map((call) => `${call.name}(${call.arguments})`)
     .sort()
@@ -104,11 +98,7 @@ export async function toolLoop(
 
     if (send.summarizing) {
       return round.content.trim() === ""
-        ? {
-            cause: "failure",
-            finishReason: round.finishReason,
-            error: "the summary came back empty",
-          }
+        ? { cause: "failure", error: "the summary came back empty" }
         : finish();
     }
     send.budget.tokens += round.spent;
@@ -139,9 +129,7 @@ export async function toolLoop(
         // a round with no usage holds its request estimate without the
         // answer, which must not pass as measured
         send.used = round.usage === null ? null : round.tokens;
-        send.roundNo += 1;
-        send.phase = "provider";
-        send.round = newRound(summary.id, summary.createdAt);
+        nextRound(send, summary, "provider");
         continue;
       }
       return finish();
@@ -170,7 +158,7 @@ export async function toolLoop(
         continue;
       }
       send.round = null;
-      return { cause: "finish", finishReason: send.answering, error: null };
+      return finish();
     }
 
     // a finish reason other than stop or tool_calls with calls present:
@@ -179,7 +167,7 @@ export async function toolLoop(
     if (reason !== "stop" && reason !== "tool_calls") {
       deps.writer.recordUnrun(send, reason, calls);
       send.round = null;
-      return { cause: "finish", finishReason: reason, error: null };
+      return finish();
     }
 
     // the loop check: three equal signatures in a row are refused once
@@ -272,51 +260,12 @@ async function runCalls(
     deps.writer.finishTool(send, call, result);
   };
   const settled = calls.map(async (call) => {
-    const callStarted = deps.clock();
-    const ctx: ToolContext = {
-      actor: {
-        projectId: send.projectId,
-        userId: send.policy.userId,
-        agentId: send.policy.agentId,
-        agentName: send.policy.agentName,
-        sessionId: send.sessionId,
-        origin: send.kind === "run" ? "automation" : "chat",
-      },
-      signal: send.controller.signal,
-      now: deps.clock,
-      budget: send.toolBudget,
-      caps: send.policy.toolCaps,
+    const ctx = toolContext(send, send.controller.signal, deps.clock, {
       web: send.policy.web,
       keep: send.keep,
       repos: send.repos?.tool ?? null,
-    };
-    let result: ToolResult;
-    try {
-      result = await deps.tools.run(send.policy.offered, call, ctx);
-    } catch (err) {
-      // a tool that throws is a failed result whose content is the error
-      result = {
-        content: err instanceof Error ? err.message : String(err),
-        error: true,
-        failure: err,
-      };
-    }
-    if (result.error) {
-      // a closed name: the model may call any name at all
-      const tool = deps.tools.logName?.(send.policy.offered, call) ?? "unknown";
-      deps.log.warn("tool failed", {
-        chat: send.sessionId,
-        tool,
-        duration: deps.clock() - callStarted,
-        ...(result.timedOut
-          ? { cause: "timeout" }
-          : errorFields(result.failure, false)),
-        // a bash command that saved nothing: where it ended and why
-        ...(result.ended === undefined
-          ? {}
-          : { phase: result.ended.phase, cause: result.ended.cause }),
-      });
-    }
+    });
+    const result = await runOne(deps, send, send.policy.offered, call, ctx);
     let stored = result;
     try {
       stored = cutResult(result, send.policy.toolCaps.resultCut);
@@ -369,9 +318,7 @@ function goToAnswer(
     finishReason: reason,
     ...previous,
   });
-  send.roundNo += 1;
-  send.phase = "provider";
-  send.round = newRound(reply.id, reply.createdAt);
+  nextRound(send, reply, "provider");
 }
 
 // between rounds while tools run: no row streams
@@ -380,17 +327,12 @@ function goToTools(send: ActiveSend): void {
   send.round = null;
 }
 
-// the next streaming reply: the round number bumps, phase back to
-// provider, a fresh round state on the send
 function startNextRound(deps: LoopDeps, send: ActiveSend): void {
-  const reply = deps.writer.startRound(send);
-  send.roundNo += 1;
-  send.phase = "provider";
-  send.round = newRound(reply.id, reply.createdAt);
+  nextRound(send, deps.writer.startRound(send), "provider");
 }
 
 // the cause a terminal transition set maps to a loop end; run() will
 // call terminate() with the same cause, which is a no-op the second time
 function endFor(cause: SendCause): LoopEnd {
-  return { cause, finishReason: null, error: null };
+  return { cause, error: null };
 }

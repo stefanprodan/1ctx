@@ -12,14 +12,14 @@ import { stableEnd } from "../render/index.ts";
 import type { ActiveSend, RoundState } from "./send.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
-export const WRITE_EVERY_MS = 250;
-export const WRITE_EVERY_BYTES = 2048;
+const WRITE_EVERY_MS = 250;
+const WRITE_EVERY_BYTES = 2048;
 // how often a reply is looked at for newly whole blocks to render; each
 // render goes whole to every watcher, so the gap grows with the html,
 // capped at HTML_CHARS_PER_MS and once a second
 export const HTML_EVERY_MS = 1000;
 export const HTML_MIN_MS = 100;
-export const HTML_CHARS_PER_MS = 32;
+const HTML_CHARS_PER_MS = 32;
 // only whole blocks render, so a paragraph still growing would stay
 // raw; past this with no render since the text began it renders whole.
 // Raw bold and links read worse than the small jump a cut paragraph

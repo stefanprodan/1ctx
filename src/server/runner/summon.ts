@@ -42,7 +42,7 @@ export function summonOf(
 }
 
 // a turn's summoned agent: one message at most, and alone
-export function turnSummon(
+function turnSummon(
   agents: Pick<SummonAgents, "byName">,
   chatAgent: string,
   texts: readonly string[],
@@ -92,7 +92,7 @@ export function summonGone(
 
 // a summoned turn never compacts, so it is refused when the chat's last
 // round, of whichever agent, already passes where its model compacts
-export function refuseTooLong(
+function refuseTooLong(
   agent: AgentRow,
   lastPrompt: number | null,
   reserve: number,
@@ -105,7 +105,7 @@ export function refuseTooLong(
 
 // the summoned agent a regenerate reruns on; a retired one is gone and
 // the user summons again
-export function summonedAgain(
+function summonedAgain(
   agents: Pick<SummonAgents, "byId">,
   agentId: string,
   retiredName: string | undefined,

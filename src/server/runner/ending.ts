@@ -5,6 +5,7 @@ import { errorFields, type Log } from "../lib/log.ts";
 import type { Attention } from "./attention.ts";
 import { attentionStep, hasAttentionStep } from "./attention-step.ts";
 import {
+  hasMemoryPhase,
   type MemoryPhaseDeps,
   memoryPhase,
   stopMainTools,
@@ -49,17 +50,6 @@ async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
     ...errorFields(lastError),
   });
   return false;
-}
-
-function hasMemoryPhase(send: ActiveSend): boolean {
-  return (
-    send.policy.automation?.ownMemory === true &&
-    send.policy.memoryOffered !== null &&
-    send.policy.memoryOffered.memory !== null &&
-    (send.cause === "finish" ||
-      send.cause === "deadline" ||
-      send.cause === "failure")
-  );
 }
 
 export async function endSend(

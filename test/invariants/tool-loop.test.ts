@@ -15,7 +15,7 @@ import { LOOP_LINE } from "../../src/server/runner/context.ts";
 import {
   NOT_RUN_LOOP,
   NOT_RUN_REPEAT,
-} from "../../src/server/runner/writer.ts";
+} from "../../src/server/runner/reply-rows.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, setLimits, startChat, waitScript } from "../helpers/chat.ts";
 import {

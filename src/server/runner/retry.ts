@@ -9,10 +9,10 @@
 import type { ChatEvent } from "../providers/index.ts";
 
 export const MAX_RETRIES = 3;
-export const RETRY_BASE_MS = 1000;
-export const RETRY_JITTER = 0.25;
+const RETRY_BASE_MS = 1000;
+const RETRY_JITTER = 0.25;
 export const MAX_RETRY_AFTER_MS = 30_000;
-export const RETRY_STATUSES: readonly number[] = [429, 500, 502, 503, 504];
+const RETRY_STATUSES: readonly number[] = [429, 500, 502, 503, 504];
 
 export type RetryState = {
   // the retries this round has made, and how many were headers waits

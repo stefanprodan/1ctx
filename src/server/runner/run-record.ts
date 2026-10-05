@@ -1,18 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The record of a run that a step after it reads in place of the run's
-// history: how the run ended, the task, the answer and a receipt per
-// tool call with the start of its result. Fetched pages would cost a
-// local model tens of seconds before its first token and a step needs
-// only what each call came back as. The memory phase and the attention
-// step each wrap it in their own prompt. Pure, over the rows and a token
-// count.
-//
-// The run is given as a record inside tags, under a system prompt of the
-// step's own: a model that reads the task again under the run's prompt
-// goes back to the task, fetching with tools it no longer has and
-// writing the answer again.
+// A record under the step's own prompt, so the model does not redo the task.
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
@@ -22,6 +11,7 @@ import {
   type ChatTool,
   requestText,
 } from "../providers/index.ts";
+import { roundKey, toolRowsByRound } from "./trace.ts";
 
 // These caps bound provider input, not any stored text.
 export const RECORD_ANSWER_CHARS = 8000;
@@ -72,18 +62,12 @@ function oneLine(text: string): string {
 }
 
 function receipts(rows: readonly Message[]): Receipt[] {
-  const tools = new Map<number, Message[]>();
-  for (const row of rows) {
-    if (row.kind !== "tool") continue;
-    const group = tools.get(row.round) ?? [];
-    group.push(row);
-    tools.set(row.round, group);
-  }
+  const tools = toolRowsByRound(rows);
   return rows.flatMap((row) => {
     if (row.kind !== "reply") return [];
     return (row.toolCalls ?? []).map((call, index) => {
       // Position keeps duplicate call ids distinct, as the writer does.
-      const result = tools.get(row.round)?.[index];
+      const result = tools.get(roundKey(row))?.[index];
       const paired = result?.toolCallId === call.id ? result : undefined;
       const name = paired?.toolName ?? call.name;
       const args = cut(oneLine(call.arguments), RECORD_ARGUMENT_CHARS);

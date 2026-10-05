@@ -1,26 +1,26 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-  Message,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
+import type { Message } from "../../shared/contracts/session.ts";
 import { type Db, transact } from "../db/index.ts";
 import { after, type Clock } from "../lib/clock.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import type { Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
-import { cacheKeyOf, historyMessages } from "./context.ts";
-import { envelope, lastLine } from "./envelope.ts";
+import { runOne, toolContext } from "./call.ts";
+import { historyMessages, request } from "./context.ts";
+import { envelope } from "./envelope.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { ContextLookups } from "./render.ts";
+import { NOT_RUN, OVER_ROUND, stopOpenTools } from "./reply-rows.ts";
+import { cutResult } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { failureFields, runRound } from "./round.ts";
-import { type ActiveSend, newRound } from "./send.ts";
+import { type ActiveSend, nextRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
-import { CUT_SHORT, NOT_RUN, statusOf } from "./writer.ts";
+import { statusOf } from "./writer.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
 export type MemoryCommitDeps = {
@@ -38,99 +38,52 @@ export function commitMemory(
   return skipped === 0 ? null : skipped;
 }
 
+export function hasMemoryPhase(send: ActiveSend): boolean {
+  return (
+    send.policy.automation?.ownMemory === true &&
+    send.policy.memoryOffered !== null &&
+    send.policy.memoryOffered.memory !== null &&
+    (send.cause === "finish" ||
+      send.cause === "deadline" ||
+      send.cause === "failure")
+  );
+}
+
 type PhaseRowsDeps = {
   db: Db;
   clock: Clock;
   sessions: SessionsPort;
 };
 
-function runningSession(
-  deps: PhaseRowsDeps,
-  send: ActiveSend,
-  now: number,
-): SessionSummary {
-  return deps.sessions.touch(send.sessionId, { status: "running", now })!;
-}
-
 export function stopMainTools(deps: PhaseRowsDeps, send: ActiveSend): void {
   if (send.openTools.size === 0) return;
   const now = deps.clock();
   transact(deps.db, () => {
-    const rows: Message[] = [];
-    for (const rowId of send.openTools.values()) {
-      const row = deps.sessions.finishTool(rowId, {
-        content: CUT_SHORT,
-        status: "stopped",
-        error: null,
-        finishedAt: now,
-      });
-      if (row !== null) rows.push(row);
-    }
+    const rows = stopOpenTools(deps.sessions, send, now);
     if (rows.length === 0) return { result: undefined, events: [] };
-    return {
-      result: undefined,
-      events: [envelope(runningSession(deps, send, now), rows, null)],
-    };
+    const session = deps.sessions.touch(send.sessionId, {
+      status: "running",
+      now,
+    })!;
+    return { result: undefined, events: [envelope(session, rows, null)] };
   });
   send.openTools = new Map();
 }
 
-export function startMemory(
-  deps: PhaseRowsDeps,
-  writer: Writer,
-  send: ActiveSend,
-): void {
+function startMemory(writer: Writer, send: ActiveSend): void {
   if (send.cause === null) throw new Error("the run has no ending");
-  const now = deps.clock();
   const memoryRound = send.roundNo + 1;
-  const started = transact(deps.db, () => {
-    const answer = writer.finalizeRound(
-      send,
-      statusOf(send.cause!),
-      send.error,
-      now,
-    );
-    const created = deps.sessions.addReply({
-      sessionId: send.sessionId,
-      sendId: send.id,
-      round: memoryRound,
-      agentId: send.policy.agentId,
-      model: send.policy.model,
-      now,
-    });
-    const reply = deps.sessions.markSlot(created.id, "work") ?? created;
-    // the first round after the run stays the attention step's, when
-    // it had one
-    const sendRow = deps.sessions.bumpCounters(send.id, {
-      memoryRound,
-      memoryFrom: memoryRound,
-      rounds: memoryRound,
-      toolCalls: send.budget.calls,
-    })!;
-    const session = runningSession(deps, send, now);
-    const last =
-      answer?.status === "done" && answer.slot === "answer"
-        ? lastLine(answer, send.policy.agentName)
-        : undefined;
-    return {
-      result: reply,
-      events: [
-        envelope(
-          session,
-          answer ? [answer, reply] : [reply],
-          sendRow,
-          [],
-          last,
-        ),
-      ],
-    };
+  // the first round after the run stays the attention step's, when it
+  // had one
+  const reply = writer.startAfterAnswer(send, {
+    row: "work",
+    status: statusOf(send.cause),
+    error: send.error,
+    counters: { memoryRound, memoryFrom: memoryRound },
   });
   send.memoryRound ??= memoryRound;
   send.memoryFrom = memoryRound;
-  send.roundNo = memoryRound;
-  send.phase = "memory";
-  send.round = newRound(started.id, started.createdAt);
-  send.round.slotMarked = true;
+  nextRound(send, reply, "memory");
 }
 
 function memoryRequest(
@@ -156,7 +109,7 @@ function memoryRequest(
       cause: send.cause,
       error: send.error,
       rows,
-      guidance: send.policy.automation?.memoryGuidance ?? "",
+      guidance: send.policy.automation.memoryGuidance,
       entries: offered.memory?.work?.entries ?? [],
     },
     {
@@ -174,23 +127,7 @@ function memoryRequest(
     tokens,
   );
   if (messages === null) return null;
-  return {
-    model: send.policy.model,
-    messages,
-    thinking: send.policy.thinking,
-    thinkingOff: send.policy.thinkingOff,
-    reasoningEffort: send.policy.effort,
-    cacheKey: cacheKeyOf(send.policy, send.sessionId),
-    upstream: send.policy.upstream,
-    skip4Bit: send.policy.skip4Bit,
-    ...(offered.tools.length > 0 ? { tools: offered.tools } : {}),
-  };
-}
-
-function cut(result: ToolResult, chars: number): ToolResult {
-  return result.content.length <= chars
-    ? result
-    : { ...result, content: result.content.slice(0, chars) };
+  return request(send.policy, send.sessionId, messages, offered.tools);
 }
 
 const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
@@ -211,53 +148,13 @@ async function runCalls(
   let writeError: unknown = null;
   let clean = true;
   const settled = calls.map(async (call) => {
-    const callStarted = deps.clock();
-    const ctx: ToolContext = {
-      actor: {
-        projectId: send.projectId,
-        userId: send.policy.userId,
-        agentId: send.policy.agentId,
-        agentName: send.policy.agentName,
-        sessionId: send.sessionId,
-        origin: send.kind === "run" ? "automation" : "chat",
-      },
-      signal,
-      now: deps.clock,
-      budget: send.toolBudget,
-      caps: send.policy.toolCaps,
-      web: null,
-    };
-    let result: ToolResult;
-    try {
-      result = await deps.tools.run(offered, call, ctx);
-    } catch (error) {
-      result = {
-        content: error instanceof Error ? error.message : String(error),
-        error: true,
-        failure: error,
-      };
-    }
-    if (result.error) {
-      // a closed name: the model may call any name at all
-      const tool = deps.tools.logName?.(offered, call) ?? "unknown";
-      deps.log.warn("tool failed", {
-        chat: send.sessionId,
-        tool,
-        duration: deps.clock() - callStarted,
-        ...(result.timedOut
-          ? { cause: "timeout" }
-          : errorFields(result.failure, false)),
-        // a bash command that saved nothing: where it ended and why
-        ...(result.ended === undefined
-          ? {}
-          : { phase: result.ended.phase, cause: result.ended.cause }),
-      });
-    }
+    const ctx = toolContext(send, signal, deps.clock, { web: null });
+    const result = await runOne(deps, send, offered, call, ctx);
     if (signal.aborted) return;
     if (result.error || call.name !== "memory_edit") clean = false;
-    const stored = cut(result, send.policy.toolCaps.resultCut);
-    spend.resultBytes += bytes(stored.content);
     try {
+      const stored = cutResult(result, send.policy.toolCaps.resultCut);
+      spend.resultBytes += bytes(stored.content);
       deps.writer.finishTool(send, call, stored);
     } catch (error) {
       writeError ??= error;
@@ -275,7 +172,6 @@ async function runCalls(
 
 // what a call the phase would not run is recorded with
 const LAST_ROUND = "not run: the memory phase was on its last round";
-const OVER_ROUND = "not run: too many calls in one round";
 
 // the phase runs under the same caps as a send but counts its own
 // spend, so main rounds that spent the send's budget never cut it
@@ -320,13 +216,13 @@ export async function memoryPhase(
 ): Promise<void> {
   const offered = send.policy.memoryOffered;
   if (
-    offered?.memory === null ||
     offered === null ||
+    offered.memory === null ||
     send.ending.signal.aborted
   ) {
     return;
   }
-  startMemory(deps, deps.writer, send);
+  startMemory(deps.writer, send);
   const controller = new AbortController();
   send.controller = controller;
   const stop = () => {
@@ -377,7 +273,6 @@ export async function memoryPhase(
       );
       spend.calls += calls.length;
       send.budget.calls = deps.writer.finishRound(send, names).toolCalls;
-      send.phase = "memory";
       send.round = null;
       const clean = await runCalls(
         deps,
@@ -392,12 +287,8 @@ export async function memoryPhase(
       if (clean || controller.signal.aborted || offered.memory.stopped) {
         return;
       }
-      const reply = deps.writer.startRound(send);
-      send.roundNo += 1;
+      nextRound(send, deps.writer.startRound(send), "memory");
       rounds += 1;
-      send.phase = "memory";
-      send.round = newRound(reply.id, reply.createdAt);
-      send.round.slotMarked = true;
     }
   } finally {
     disarm();

@@ -1,16 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One send in flight: its current round (null while a round's tools
-// run), its stream sequence, its budget across rounds, and the one
-// terminal transition. A send ends for one cause, whoever names it
-// first: terminate() is a compare-and-set, and the winner is the only
-// caller of finalizeSend. The lock is held until both the provider
-// iteration and the round's tools have let go, which drained says.
+// claim() is the one terminal compare-and-set; its winner finalizes
 
 import type {
   LiveRetry,
   LiveSend,
+  Message,
   VisualDraft,
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
@@ -116,11 +112,10 @@ export type ActiveSend = {
   signatures: string[];
   // the cap that forced the answer round, which asks for the answer in words
   answering: CapReason | null;
-  // a call in the answer round is asked again: a local server first
-  // with the same request, which its cached prefix answers in seconds,
-  // then every wire with no schemas, which leaves nothing to call
   // the loop check warned once: the next trip asks for the answer
   loopWarned: boolean;
+  // an answer round that calls is asked again: the same request on a
+  // local server, then with no schemas
   repeated: boolean;
   bare: boolean;
   // summary rounds ignore calls and are always the send's last round
@@ -226,6 +221,19 @@ export function newRound(messageId: string, now: number): RoundState {
     retry: null,
     slotMarked: false,
   };
+}
+
+// the round number bumps with the reply startRound or a phase opened; a
+// round after the run's answer is work from its start
+export function nextRound(
+  send: ActiveSend,
+  reply: Pick<Message, "id" | "createdAt">,
+  phase: SendPhase,
+): void {
+  send.roundNo += 1;
+  send.phase = phase;
+  send.round = newRound(reply.id, reply.createdAt);
+  send.round.slotMarked = phase === "memory" || phase === "attention";
 }
 
 export function newSend(fields: {

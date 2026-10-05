@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The session.changed envelope the writer publishes after each of its
-// transactions, and the stream's last line it carries when the
-// transaction wrote a user message or a finished answer. Out of the
-// writer so that file stays under the size rule.
+// The session.changed envelope each writer transaction publishes.
 
 import type {
   LastLine,
@@ -44,3 +41,12 @@ export const lastLine = (
   const text = lineFrom(message.content);
   return text === "" ? undefined : { seq: message.seq, author, text };
 };
+
+// the last line a finished answer gives, none for any other row
+export const answerLine = (
+  row: Message | null,
+  author: string,
+): LastLine | undefined =>
+  row?.status === "done" && row.slot === "answer"
+    ? lastLine(row, author)
+    : undefined;

@@ -47,19 +47,32 @@ export function yoursOf(offered: Pick<Offered, "mcp" | "skills">): Yours {
 // a display or a catalog lookup, not work: no line and no count
 const UNTRACED = new Set(["visualize", "mcp_describe"]);
 
+export const roundKey = (row: Pick<Message, "sendId" | "round">): string =>
+  `${row.sendId}:${row.round}`;
+
+// the tool result rows of one (sendId, round), in call order
+export function toolRowsByRound(
+  rows: readonly Message[],
+): Map<string, Message[]> {
+  const byRound = new Map<string, Message[]>();
+  for (const row of rows) {
+    if (row.kind !== "tool") continue;
+    const key = roundKey(row);
+    const calls = byRound.get(key) ?? [];
+    calls.push(row);
+    byRound.set(key, calls);
+  }
+  return byRound;
+}
+
 // the send's calls in order, each paired with its tool row by position
 // in its round, as the writer pairs them; a call with no row failed
 export function traceCalls(rows: readonly Message[]): TraceCall[] {
-  const results = new Map<string, Message[]>();
-  for (const row of rows) {
-    if (row.kind !== "tool") continue;
-    const key = `${row.sendId}:${row.round}`;
-    results.set(key, [...(results.get(key) ?? []), row]);
-  }
+  const results = toolRowsByRound(rows);
   const out: TraceCall[] = [];
   for (const row of rows) {
     if (row.kind !== "reply" || row.slot !== "work") continue;
-    const tools = results.get(`${row.sendId}:${row.round}`) ?? [];
+    const tools = results.get(roundKey(row)) ?? [];
     (row.toolCalls ?? []).forEach((call, index) => {
       if (UNTRACED.has(call.name)) return;
       const result = tools[index];
@@ -170,7 +183,7 @@ const SAVED_ANY = " saved …";
 // the saved docs, the fullest form first: one doc by its path, several
 // in one directory by it, else the first and a count; then shorter forms
 // down to a bare count. Never cut
-export function savedForms(saved: SavedDocs | null): string[] {
+function savedForms(saved: SavedDocs | null): string[] {
   if (saved === null || saved.count === 0) return [];
   const files = saved.count === 1 ? "1 file" : `${saved.count} files`;
   const inDir = saved.dir === null ? [] : [` saved ${files} in ${saved.dir}/`];
