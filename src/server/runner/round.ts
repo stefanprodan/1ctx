@@ -5,7 +5,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import { bytesWords } from "../lib/bytes.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, sleep, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
   type ChatEvent,
@@ -50,44 +50,6 @@ export const MAX_REPLY_BYTES = 1024 * 1024;
 type TimedNext =
   | { kind: "next"; result: IteratorResult<ChatEvent> }
   | { kind: "idle" };
-
-function sleep(clock: Clock, ms: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return {
-    promise:
-      clock.sleep?.(ms) ??
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms);
-      }),
-    cancel: () => {
-      if (timer !== undefined) clearTimeout(timer);
-    },
-  };
-}
-
-// false when the signal ended the wait
-async function pause(
-  clock: Clock,
-  ms: number,
-  signal: AbortSignal,
-): Promise<boolean> {
-  if (signal.aborted) return false;
-  if (ms <= 0) return true;
-  let stop = () => {};
-  const aborted = new Promise<void>((resolve) => {
-    stop = resolve;
-    signal.addEventListener("abort", stop, { once: true });
-  });
-  // listening first, so an abort however early ends the wait
-  const timer = sleep(clock, ms);
-  try {
-    await Promise.race([timer.promise, aborted]);
-  } finally {
-    timer.cancel();
-    signal.removeEventListener("abort", stop);
-  }
-  return !signal.aborted;
-}
 
 // idleMs is null before the first event: a local server says nothing
 // while it reads a long prompt, minutes for a cold 64k tokens, so only
@@ -299,7 +261,7 @@ async function streamRound(
           attempt: retry.retries,
           max: MAX_RETRIES,
         });
-        if (!(await pause(deps.clock, wait, signal))) return;
+        if (!(await sleepUnless(deps.clock, wait, signal))) return;
         heard = false;
         thinking = false;
         iterator = open();

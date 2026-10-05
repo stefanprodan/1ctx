@@ -47,6 +47,7 @@ import { makeSkillTools } from "./builtin/skill.ts";
 import { makeVisualizeTool } from "./builtin/visualize.ts";
 import { makeWebfetchTool } from "./builtin/webfetch.ts";
 import {
+  abortableSleep,
   makeWebsearchTool,
   type SearchDependencies,
 } from "./builtin/websearch.ts";
@@ -184,22 +185,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
   const searchDeps: SearchDependencies = deps.searchDeps ?? {
     fetch: deps.fetcher,
-    sleep: (ms, signal) =>
-      new Promise<void>((resolve, reject) => {
-        if (signal.aborted) {
-          reject(signal.reason);
-          return;
-        }
-        const timer = setTimeout(resolve, ms);
-        signal.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            reject(signal.reason);
-          },
-          { once: true },
-        );
-      }),
+    sleep: abortableSleep,
   };
 
   const toolsFor = (

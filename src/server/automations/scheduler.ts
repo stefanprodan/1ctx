@@ -7,7 +7,7 @@ import { DEFERRED_BY_RESTART, type EventSource } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
-import { type Clock, HOUR_MS, MINUTE_MS } from "../lib/clock.ts";
+import { type Clock, HOUR_MS, MINUTE_MS, sleep } from "../lib/clock.ts";
 import { BadRequest, Conflict, HttpError } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
@@ -403,9 +403,7 @@ export function scheduler(deps: Deps): Scheduler {
     const earliest = deps.store.earliest(waits.any || draining ? passAt : null);
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;
-    const sleeper =
-      deps.clock.sleep?.(ms) ??
-      new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const sleeper = sleep(deps.clock, ms).promise;
     const waking = new Promise<boolean>((resolve) => {
       wakeWait = () => resolve(true);
     });

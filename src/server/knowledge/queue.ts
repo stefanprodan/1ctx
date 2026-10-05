@@ -4,7 +4,7 @@
 // Process slots and the one-upload-per-user admission, process-wide.
 
 import { UPLOAD_RUNNING } from "../../shared/uploads.ts";
-import type { Clock } from "../lib/clock.ts";
+import { after, type Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, ServiceUnavailable } from "../lib/errors.ts";
 import { Queue } from "../lib/queue.ts";
 import { ARCHIVE_DEADLINE_MS, PROCESS_SLOTS } from "./limits.ts";
@@ -43,7 +43,7 @@ export async function withUpload<Input, Result>(
   const ends = clock() + ARCHIVE_DEADLINE_MS;
   const busy = new ServiceUnavailable("the server is busy, try again");
   let finished = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopTimer = () => {};
   let release: (() => void) | undefined;
   const expire = () => {
     if (!finished) deadline.abort(busy);
@@ -53,8 +53,7 @@ export async function withUpload<Input, Result>(
     signal.throwIfAborted();
   };
   try {
-    if (clock.sleep) void clock.sleep(ARCHIVE_DEADLINE_MS).then(expire);
-    else timer = setTimeout(expire, ARCHIVE_DEADLINE_MS);
+    stopTimer = after(clock, ARCHIVE_DEADLINE_MS, expire);
     const input = parse();
     release = await acquireProcess(signal);
     running();
@@ -65,7 +64,7 @@ export async function withUpload<Input, Result>(
     throw error;
   } finally {
     finished = true;
-    clearTimeout(timer);
+    stopTimer();
     release?.();
     releaseUser();
   }

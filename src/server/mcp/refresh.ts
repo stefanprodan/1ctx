@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, sleep } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { AUTOMATIC_HOLD_MS, REFRESH_INTERVAL_MS } from "./limits.ts";
@@ -127,16 +127,9 @@ export class RefreshCoordinator {
   }
 
   private wait(ms: number): Promise<void> {
-    if (this.deps.clock.sleep) {
-      return Promise.race([this.deps.clock.sleep(ms), this.closedWait]);
-    }
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      void this.closedWait.then(() => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+    const timer = sleep(this.deps.clock, ms);
+    void this.closedWait.then(timer.cancel);
+    return Promise.race([timer.promise, this.closedWait]);
   }
 
   start(): void {

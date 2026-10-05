@@ -5,6 +5,7 @@
 
 import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
+import { sleepUnless, wallClock } from "../../lib/clock.ts";
 import { ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
@@ -38,25 +39,15 @@ export type SearchDependencies = {
   sleep(ms: number, signal: AbortSignal): Promise<void>;
 };
 
-const defaults: SearchDependencies = {
-  fetch,
-  sleep: (ms, signal) =>
-    new Promise<void>((resolveSleep, reject) => {
-      if (signal.aborted) {
-        reject(signal.reason);
-        return;
-      }
-      const timer = setTimeout(resolveSleep, ms);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          reject(signal.reason);
-        },
-        { once: true },
-      );
-    }),
-};
+// rejects with the signal's reason once it aborts
+export async function abortableSleep(
+  ms: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!(await sleepUnless(wallClock, ms, signal))) throw signal.reason;
+}
+
+const defaults: SearchDependencies = { fetch, sleep: abortableSleep };
 
 function domainError(): never {
   throw new Error(

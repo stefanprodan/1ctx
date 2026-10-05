@@ -8,7 +8,7 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import { after } from "../lib/clock.ts";
+import { after, sleep } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
@@ -80,9 +80,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     clock: deps.clock,
     log: deps.log,
   };
-  const pause =
-    deps.clock.sleep ??
-    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const pause = (ms: number) => sleep(deps.clock, ms).promise;
   const historyOf = (send: ActiveSend) =>
     deps.sessions
       .messages(send.sessionId)
