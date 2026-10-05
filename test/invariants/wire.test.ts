@@ -28,6 +28,7 @@ async function build(secrets: Record<string, string>) {
     version: VERSION,
     secureCookie: false,
     trustProxy: false,
+    cores: 1,
   });
   return { app, fake };
 }

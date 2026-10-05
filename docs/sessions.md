@@ -33,6 +33,12 @@ that agent answers the one turn (see Summons).
   Run now and a scheduled run all count under `sendsPerUser`,
   `sendsPerProject` and `sendsRunning`. The user is whoever started it
   (typed, regenerated, compacted, pressed Run now), in every project.
+- **`sendsRunning` defaults to 48 a core, 64 to 256.** A pod carries
+  sends by its CPU; 48 is half what a bench machine's core carried, for
+  slower x86 cores. The cores are `availableParallelism()` (a container's CPU
+  limit), passed by `compose.ts` to the limits area; a test fixes them.
+  `GET /api/limits` answers the computed default, and an override stays
+  an absolute number.
 - **A scheduled run holds at most `scheduledShare()` of a cap.** It is
   not counted per user, and may take only three quarters of the
   project's and the process's caps, so users keep room. A send a user

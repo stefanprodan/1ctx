@@ -48,6 +48,7 @@ async function restart(
     secureCookie: false,
     trustProxy: false,
     tools: fake.tools,
+    cores: 1,
   });
   const detailReq = new Request(`${ORIGIN}/api/sessions/${sessionId}`, {
     headers: { cookie: chat.member.cookie!, host: "1ctx.test" },

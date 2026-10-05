@@ -4,6 +4,10 @@
 import { describe, expect, test } from "bun:test";
 import { SERVERS, toolDef } from "../../../scripts/load/catalog.ts";
 import { dayPlan, offeredOf } from "../../../scripts/load/day.ts";
+import {
+  capsMode,
+  parseCaps,
+} from "../../../scripts/load/driver/automations.ts";
 import { createMcp } from "../../../scripts/load/fake-mcp.ts";
 import {
   createModel,
@@ -205,5 +209,28 @@ describe("the latency the fakes share", () => {
     expect(ms[2000]!).toBeLessThanOrEqual(60);
     expect(ms[3600]!).toBeGreaterThan(1000);
     expect(ms.at(-1)!).toBeLessThanOrEqual(3000);
+  });
+});
+
+describe("the step's send caps", () => {
+  test("follow the multiple unless --caps holds one mode", () => {
+    expect([1, 2, 4, 16].map((mult) => capsMode(mult))).toEqual([
+      "default",
+      "default",
+      "max",
+      "max",
+    ]);
+    expect(
+      capsMode(8, parseCaps(["step", "8", "20", "--caps", "default"])),
+    ).toBe("default");
+    expect(capsMode(1, parseCaps(["--caps", "max", "--incident"]))).toBe("max");
+    expect(parseCaps(["step", "1", "20", "--incident"])).toBeUndefined();
+    for (const argv of [
+      ["--caps", "maximum"],
+      ["step", "1", "20", "--caps"],
+      ["--caps", "--incident"],
+    ]) {
+      expect(() => parseCaps(argv)).toThrow("--caps is default or max");
+    }
   });
 });

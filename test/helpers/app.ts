@@ -290,6 +290,9 @@ export async function testApp(
     // the repositories' cache and their fetches; none fetches nothing
     cacheDir?: string;
     repoJobs?: JobRunner;
+    // the cores the send caps are sized by; one, so the defaults are
+    // the host's floor on every machine
+    cores?: number;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -353,6 +356,7 @@ export async function testApp(
     drainMs: options.drainMs,
     cacheDir: options.cacheDir,
     repoJobs: options.repoJobs,
+    cores: options.cores ?? 1,
   });
   return {
     ...app,

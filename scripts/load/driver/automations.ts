@@ -77,10 +77,28 @@ export async function teamAutomations(api: Api, admin: Who, d: Directory) {
   return byName;
 }
 
+export type CapsMode = "default" | "max";
+
+// --caps in a command line: absent, or one of the two modes; a bare
+// --caps is refused as a wrong value is
+export function parseCaps(argv: readonly string[]): CapsMode | undefined {
+  const at = argv.indexOf("--caps");
+  if (at < 0) return undefined;
+  const value = argv[at + 1];
+  if (value === "default" || value === "max") return value;
+  throw new Error("--caps is default or max");
+}
+
+// the defaults at 1x and 2x, where what the scheduler does past a cap
+// is the finding; the maximums from 4x on, so the machine shows; --caps
+// holds one mode at every step
+export const capsMode = (mult: number, given?: CapsMode): CapsMode =>
+  given ?? (mult >= HOUR.maxCapsFrom ? "max" : "default");
+
 export async function setCaps(
   api: Api,
   admin: Who,
-  mode: "default" | "max",
+  mode: CapsMode,
   step: number,
 ) {
   const limits = await api.must<LimitsResponse>(admin, "GET", "/api/limits");

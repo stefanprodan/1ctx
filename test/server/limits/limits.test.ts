@@ -8,6 +8,7 @@ import {
   LIMIT_DEFINITIONS,
   LOOP_LIMITS,
   limitsArea,
+  sendsRunningDefault,
   TOOL_CAPS,
 } from "../../../src/server/limits/index.ts";
 import { parseLimits } from "../../../src/server/limits/parse.ts";
@@ -153,7 +154,7 @@ describe("limits area", () => {
     ({ name, ...definition }) => {
       const db = memoryDb();
       try {
-        const area = limitsArea({ db, clock: () => 100 });
+        const area = limitsArea({ db, clock: () => 100, cores: 1 });
         expect(LIMIT_NAMES).toContain(name);
         expect(LIMIT_DEFINITIONS[name]).toEqual(definition);
         expect(DEFAULT_LIMITS[name]).toBe(definition.default);
@@ -213,7 +214,7 @@ describe("limits area", () => {
   test("lists every limit once in its scope with the runtime defaults", () => {
     const db = memoryDb();
     try {
-      const rows = limitsArea({ db, clock: () => 100 }).rows();
+      const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
       expect(rows).toHaveLength(48);
       expect(new Set(rows.map((row) => row.name)).size).toBe(48);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
@@ -236,7 +237,7 @@ describe("limits area", () => {
   test("sendsRunning holds 4 to 256, 64 by default, never below the project's cap", () => {
     const db = memoryDb();
     try {
-      const area = limitsArea({ db, clock: () => 100 });
+      const area = limitsArea({ db, clock: () => 100, cores: 1 });
       expect(LIMIT_DEFINITIONS.sendsRunning).toEqual({
         default: 64,
         min: 4,
@@ -255,6 +256,86 @@ describe("limits area", () => {
   });
 
   test.each([
+    [1, 64],
+    [2, 96],
+    [4, 192],
+    [5, 240],
+    [6, 256],
+    [64, 256],
+    [0, 64],
+    [-2, 64],
+    [3.9, 144],
+    [Number.NaN, 64],
+  ])("sendsRunning's default on %p cores is %p", (cores, expected) => {
+    expect(sendsRunningDefault(cores)).toBe(expected);
+  });
+
+  test("a 4-core instance defaults sendsRunning to 192 and drops an override of 192", () => {
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100, cores: 4 });
+      expect(area.current().sendsRunning).toBe(192);
+      expect(area.rows().find((row) => row.name === "sendsRunning")).toEqual({
+        name: "sendsRunning",
+        value: 192,
+        default: 192,
+        min: 4,
+        max: 256,
+        unit: "count",
+        scope: "sends",
+        changedAt: null,
+      });
+      area.set({ sendsRunning: 64 }, 100);
+      expect(area.store.rows()).toEqual([
+        { name: "sendsRunning", value: 64, changedAt: 100 },
+      ]);
+      expect(area.current().sendsRunning).toBe(64);
+      area.set({ sendsRunning: 192 }, 110);
+      expect(area.store.rows()).toEqual([]);
+      area.set({ sendsRunning: 100 }, 120);
+      area.reset();
+      expect(area.current().sendsRunning).toBe(192);
+    } finally {
+      db.close();
+    }
+  });
+
+  test.each([0, 1])(
+    "on %p cores the project's cap fits under the process default",
+    (cores) => {
+      const db = memoryDb();
+      try {
+        const area = limitsArea({ db, clock: () => 100, cores });
+        const top = LIMIT_DEFINITIONS.sendsPerProject.max;
+        expect(top).toBeLessThanOrEqual(area.current().sendsRunning);
+        area.set({ sendsPerProject: top }, 100);
+        expect(area.current().sendsPerProject).toBe(top);
+        expect(() => area.set({ sendsRunning: top - 1 }, 110)).toThrow(
+          new BadRequest("sendsPerProject must not be above sendsRunning"),
+        );
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  test("the limits route answers the instance's cores", async () => {
+    const app = await testApp({ cores: 4 });
+    try {
+      const admin = app.client();
+      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      const res = await admin.call("GET", "/api/limits");
+      const body = (await res.json()) as LimitsResponse;
+      expect(
+        body.limits.find((row) => row.name === "sendsRunning"),
+      ).toMatchObject({ value: 192, default: 192, changedAt: null });
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
+  test.each([
     [
       { sendsPerUser: 16, sendsPerProject: 8 },
       "sendsPerUser must not be above sendsPerProject",
@@ -268,7 +349,7 @@ describe("limits area", () => {
     (values, error) => {
       const db = memoryDb();
       try {
-        const area = limitsArea({ db, clock: () => 100 });
+        const area = limitsArea({ db, clock: () => 100, cores: 1 });
         expect(() => area.set({ ...DEFAULT_LIMITS, ...values }, 100)).toThrow(
           new BadRequest(error),
         );
@@ -282,7 +363,7 @@ describe("limits area", () => {
   test("a write of one cap is ordered against the others' overrides", () => {
     const db = memoryDb();
     try {
-      const area = limitsArea({ db, clock: () => 100 });
+      const area = limitsArea({ db, clock: () => 100, cores: 1 });
       area.set({ sendsPerProject: 8, sendsPerUser: 8 }, 100);
       expect(() => area.set({ sendsPerProject: 6 }, 110)).toThrow(BadRequest);
       expect(() => area.set({ sendsPerUser: 9 }, 110)).toThrow(BadRequest);
@@ -303,6 +384,7 @@ describe("limits area", () => {
       const area = limitsArea({
         db,
         clock: () => 100,
+        cores: 1,
         wake: () => calls++,
       });
       area.set({ ...DEFAULT_LIMITS, rounds: 20 }, 100);
@@ -428,7 +510,7 @@ describe("limits area", () => {
     ({ stored, effective }) => {
       const db = memoryDb();
       try {
-        const area = limitsArea({ db, clock: () => 100 });
+        const area = limitsArea({ db, clock: () => 100, cores: 1 });
         area.store.set("knowledgeProjectBytes", stored, 50);
         expect(area.current().knowledgeProjectBytes).toBe(effective);
         expect(
@@ -464,7 +546,7 @@ describe("limits area", () => {
     ({ stored, effective }) => {
       const db = memoryDb();
       try {
-        const area = limitsArea({ db, clock: () => 100 });
+        const area = limitsArea({ db, clock: () => 100, cores: 1 });
         area.store.set("summaryMaxTokens", stored, 50);
         expect(area.current().summaryMaxTokens).toBe(effective);
         expect(
@@ -482,7 +564,11 @@ describe("limits area", () => {
   test("saves another scope when a stored override exceeds its ceiling", async () => {
     const app = await testApp();
     try {
-      const area = limitsArea({ db: app.db, clock: () => app.now.value });
+      const area = limitsArea({
+        db: app.db,
+        clock: () => app.now.value,
+        cores: 1,
+      });
       area.store.set("knowledgeProjectBytes", 256 * 1024 * 1024, 50);
       const admin = app.client();
       expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
@@ -518,7 +604,7 @@ describe("limits area", () => {
   test("round-trips all thirteen knowledge caps with their scope and units", () => {
     const db = memoryDb();
     try {
-      const area = limitsArea({ db, clock: () => 100 });
+      const area = limitsArea({ db, clock: () => 100, cores: 1 });
       const values = {
         ...DEFAULT_LIMITS,
         knowledgeFileBytes: 4096,
@@ -559,7 +645,7 @@ describe("limits area", () => {
 
   test("merges overrides and drops values restored to their defaults", () => {
     const db = memoryDb();
-    const area = limitsArea({ db, clock: () => 100 });
+    const area = limitsArea({ db, clock: () => 100, cores: 1 });
     expect(area.current()).toEqual(DEFAULT_LIMITS);
 
     area.set(
@@ -593,7 +679,7 @@ describe("limits area", () => {
 
   test("round-trips both compaction limits", () => {
     const db = memoryDb();
-    const area = limitsArea({ db, clock: () => 100 });
+    const area = limitsArea({ db, clock: () => 100, cores: 1 });
     area.set(
       {
         ...DEFAULT_LIMITS,
@@ -617,7 +703,7 @@ describe("limits area", () => {
 
   test("reset removes every override", () => {
     const db = memoryDb();
-    const area = limitsArea({ db, clock: () => 100 });
+    const area = limitsArea({ db, clock: () => 100, cores: 1 });
     area.set({ ...DEFAULT_LIMITS, rounds: 12, maxSearches: 7 }, 100);
     area.reset();
     expect(area.store.rows()).toEqual([]);

@@ -235,5 +235,6 @@ export async function recompose(
     trustProxy: false,
     activate: false,
     passwordCost: TEST_PASSWORD_COST,
+    cores: 1,
   });
 }

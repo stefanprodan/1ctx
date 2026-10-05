@@ -59,7 +59,8 @@ The busiest hour at 1x, 09:00 to 10:00: 250 chats of ~3.4 turns, 1 to
 half of them in a 5-minute burst at the hour's start; one incident
 chat with four devs; 100 watchers, 10 of them admins. A step replays
 the first 20 minutes at MULT times every count, the burst included.
-From 4x the send caps go to their maximums.
+From 4x the send caps go to their maximums; `step --caps default|max`
+holds one mode at every step.
 
 ## The databases
 
@@ -136,6 +137,7 @@ make kind-image                           # the branch's image, tag dev
 make load-cluster ARGS="install"          # namespace, Secret, fakes, chart
 make load-cluster ARGS="setup --max-mult 16" # automations, team docs
 make load-cluster ARGS="step 1 20"        # one step, logs to out/results/
+make load-cluster ARGS="step 8 20 --caps default" # past 4x on the defaults
 make load-cluster ARGS="smoke"            # install, setup, step 1 5
 ```
 
