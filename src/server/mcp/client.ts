@@ -15,6 +15,7 @@ import {
   type Tool,
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
+import { cutCodePoints } from "../../shared/text.ts";
 import { ToolError } from "../lib/errors.ts";
 import type { Fetcher } from "../providers/index.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
@@ -51,11 +52,6 @@ export type ClientOptions = {
   timeoutMs: number;
   bodyBytes: number;
 };
-
-export function cut(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return [...text].slice(0, max).join("");
-}
 
 function scrubText(text: string, key: string | null): string {
   return key === null || key === "" ? text : text.replaceAll(key, "[redacted]");
@@ -281,7 +277,7 @@ function errorText(
     text = error instanceof Error ? error.message : String(error);
     logged = "MCP call failed";
   }
-  return new ToolError(cut(scrubText(text, key), MAX_ERROR), logged);
+  return new ToolError(cutCodePoints(scrubText(text, key), MAX_ERROR), logged);
 }
 
 async function cleanup(

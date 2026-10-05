@@ -9,6 +9,7 @@ import type {
   SkillsResponse,
 } from "../../shared/api/skills.ts";
 import { skillKey } from "../../shared/capabilities.ts";
+import { cutCodePoints } from "../../shared/text.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -206,7 +207,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const words = error instanceof Error ? error.message : String(error);
           deps.store.refreshFailed(
             before.id,
-            [...words].slice(0, MAX_REFRESH_ERROR).join(""),
+            cutCodePoints(words, MAX_REFRESH_ERROR),
             deps.clock(),
           );
           deps.log.warn("skill refresh failed", {

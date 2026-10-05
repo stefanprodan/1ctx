@@ -10,6 +10,7 @@
 
 import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
+import { cutAt, oneLine } from "../../shared/text.ts";
 import type { Offered } from "../tools/index.ts";
 
 export const TRACE_HEADING = "Calls in this turn, results not included:";
@@ -90,8 +91,6 @@ export function traceCalls(rows: readonly Message[]): TraceCall[] {
   return out;
 }
 
-const flat = (text: string) => text.replace(/\s+/g, " ").trim();
-
 // a catalog call names the MCP tool and carries its arguments inside
 function unwrapped(text: string): Pick<TraceCall, "name" | "arguments"> {
   const args = toolArguments(text);
@@ -123,26 +122,26 @@ const text = (args: Record<string, unknown>, key: string) =>
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = toolArguments(call.arguments);
   if (args === null) {
-    return call.name === "memory_edit" ? "" : flat(call.arguments);
+    return call.name === "memory_edit" ? "" : oneLine(call.arguments);
   }
   switch (call.name) {
     case "bash":
       // a line ending in an odd run of backslashes continues; an even run
       // is escaped backslashes and ends the command
-      return flat(
+      return oneLine(
         text(args, "command")
           .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
           .split("\n", 1)[0] ?? "",
       );
     case "websearch":
-      return flat(text(args, "query"));
+      return oneLine(text(args, "query"));
     case "webfetch":
-      return flat(text(args, "url"));
+      return oneLine(text(args, "url"));
     case "skill":
     case "skill_file":
-      return flat(text(args, "name"));
+      return oneLine(text(args, "name"));
     case "memory_edit":
-      return flat(
+      return oneLine(
         [
           `action=${text(args, "action")}`,
           ...(text(args, "topic") === ""
@@ -151,19 +150,15 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
         ].join(" "),
       );
   }
-  if (call.name.startsWith("mcp__")) return flat(pairs(args));
-  if (typeof args.path === "string") return flat(args.path);
-  return flat(pairs(args));
+  if (call.name.startsWith("mcp__")) return oneLine(pairs(args));
+  if (typeof args.path === "string") return oneLine(args.path);
+  return oneLine(pairs(args));
 }
 
-// cut at a code point, never inside a surrogate pair
+// cutText without its trimEnd: the trace's bytes stay as they were
 function cut(value: string, chars: number): string {
   if (value.length <= chars) return value;
-  if (chars <= 1) return "";
-  let end = chars - 1;
-  const last = value.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end--;
-  return `${value.slice(0, end)}…`;
+  return chars <= 1 ? "" : `${cutAt(value, chars - 1)}…`;
 }
 
 // the reading agent lacks the tool: another agent's MCP tool or skill
@@ -205,7 +200,7 @@ export function traceLine(call: TraceCall, yours: Yours): string {
   const forms = savedForms(call.saved);
   const least = forms.length === 0 ? 0 : SAVED_ANY.length;
   const name = cut(
-    flat(call.name),
+    oneLine(call.name),
     TRACE_LINE_CHARS - status.length - 1 - mark.length - least,
   );
   const fixed = name.length + 1 + status.length + mark.length;

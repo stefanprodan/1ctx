@@ -4,6 +4,7 @@
 import { defineCommand, type FsStat, latin1FromBytes } from "just-bash";
 import type { OpenedFile } from "../../shared/contracts/session.ts";
 import { kindOf } from "../../shared/knowledge.ts";
+import { cutAt } from "../../shared/text.ts";
 import {
   hasLineBreak,
   MAX_TITLE,
@@ -13,7 +14,6 @@ import { languageOf, lineCount, textFromBytes } from "../knowledge/rules.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { MAX_OPENS_PER_COMMAND } from "./commands.ts";
 import { isScratchName, MAX_MOUNT_PATH_BYTES } from "./names.ts";
-import { cutText } from "./output.ts";
 
 export type OpenedRecord = OpenedFile & { text: string };
 
@@ -59,7 +59,7 @@ function visualTitle(text: string, path: string): string {
   }
   // a scratch name may be long or break a line, which a title may not
   const base = baseName(path);
-  return hasLineBreak(base) ? "Visual" : cutText(base, MAX_TITLE);
+  return hasLineBreak(base) ? "Visual" : cutAt(base, MAX_TITLE);
 }
 
 const MOUNT_ROOTS = ["knowledge", "tmp", "uploads", "mcp", "repos"];

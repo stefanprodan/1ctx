@@ -8,6 +8,7 @@
 // nothing is sent.
 
 import { sanitize } from "../../../shared/memory.ts";
+import { cutCodePoints } from "../../../shared/text.ts";
 import { hasLineBreak, MAX_ATTENTION_REASON } from "../../../shared/words.ts";
 import type { AttentionHandle, Tool } from "../types.ts";
 
@@ -54,13 +55,9 @@ function oneLine(value: unknown): string | null {
   if (typeof value !== "string" || hasLineBreak(value.trim())) return null;
   const reason = sanitize(value);
   if (reason === "") return null;
-  const chars = [...reason];
-  return chars.length <= MAX_ATTENTION_REASON
+  return [...reason].length <= MAX_ATTENTION_REASON
     ? reason
-    : `${chars
-        .slice(0, MAX_ATTENTION_REASON - 1)
-        .join("")
-        .trimEnd()}…`;
+    : `${cutCodePoints(reason, MAX_ATTENTION_REASON - 1).trimEnd()}…`;
 }
 
 // the reason as stored; a throw is the model's to write again

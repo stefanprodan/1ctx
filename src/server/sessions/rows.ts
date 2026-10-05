@@ -10,6 +10,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import { cutAt } from "../../shared/text.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   ArchiveReason,
@@ -242,11 +243,10 @@ export function offWire(row: Message): Message {
 
 // the display cut, in characters, never inside a surrogate pair
 export function cutResult(content: string): { content: string; cut: boolean } {
-  if (content.length <= RESULT_DISPLAY_CHARS) return { content, cut: false };
-  let end = RESULT_DISPLAY_CHARS;
-  const last = content.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end--;
-  return { content: content.slice(0, end), cut: true };
+  return {
+    content: cutAt(content, RESULT_DISPLAY_CHARS),
+    cut: content.length > RESULT_DISPLAY_CHARS,
+  };
 }
 
 export type RawSend = {

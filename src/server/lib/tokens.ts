@@ -4,6 +4,7 @@
 // o200k counts, an estimate for non-OpenAI models; one encoding, each is large
 
 import { countTokens } from "gpt-tokenizer/encoding/o200k_base";
+import { cutAt } from "../../shared/text.ts";
 
 // a special token's text (<|im_start|>, <|endoftext|>) in a chat or a
 // file is counted as plain text: the library throws on it by default
@@ -44,7 +45,5 @@ export function cutToTokens(text: string, max: number): string {
   for (let count = tokens(cut); count > max; count = tokens(cut)) {
     cut = cut.slice(0, Math.floor((cut.length * max) / count));
   }
-  // a cut between the halves of a surrogate pair drops the lone half
-  const last = cut.charCodeAt(cut.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return cutAt(text, cut.length);
 }

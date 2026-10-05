@@ -5,6 +5,7 @@
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { cutAt, oneLine } from "../../shared/text.ts";
 import type { SendCause, Wire } from "../../shared/words.ts";
 import {
   type ChatMessageIn,
@@ -50,17 +51,6 @@ export type RecordContext = {
   reserve: number;
 };
 
-export function cut(text: string, chars: number): string {
-  if (text.length <= chars) return text;
-  const last = text.charCodeAt(chars - 1);
-  if (last >= 0xd800 && last <= 0xdbff) chars--;
-  return text.slice(0, chars);
-}
-
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
 function receipts(rows: readonly Message[]): Receipt[] {
   const tools = toolRowsByRound(rows);
   return rows.flatMap((row) => {
@@ -70,7 +60,7 @@ function receipts(rows: readonly Message[]): Receipt[] {
       const result = tools.get(roundKey(row))?.[index];
       const paired = result?.toolCallId === call.id ? result : undefined;
       const name = paired?.toolName ?? call.name;
-      const args = cut(oneLine(call.arguments), RECORD_ARGUMENT_CHARS);
+      const args = cutAt(oneLine(call.arguments), RECORD_ARGUMENT_CHARS);
       const done = paired?.status === "done";
       const outcome = done
         ? `done (${new TextEncoder().encode(paired.content).byteLength} bytes)`
@@ -80,15 +70,15 @@ function receipts(rows: readonly Message[]): Receipt[] {
               "not run: no result was recorded",
           )}`;
       return {
-        line: cut(`- ${name} ${args}: ${outcome}`, RECORD_RECEIPTS_CHARS),
-        excerpt: done ? cut(paired.content, RECORD_EXCERPT_CHARS) : "",
+        line: cutAt(`- ${name} ${args}: ${outcome}`, RECORD_RECEIPTS_CHARS),
+        excerpt: done ? cutAt(paired.content, RECORD_EXCERPT_CHARS) : "",
       };
     });
   });
 }
 
 function receiptText(receipt: Receipt): string {
-  return cut(
+  return cutAt(
     receipt.excerpt === ""
       ? receipt.line
       : `${receipt.line}\n  Excerpt: ${receipt.excerpt}`,
@@ -131,7 +121,7 @@ export function recordParts(input: RecordInput): RecordParts {
     cause: input.cause,
     error: input.error,
     task: task.content,
-    answer: cut(answerRow?.content ?? "", RECORD_ANSWER_CHARS),
+    answer: cutAt(answerRow?.content ?? "", RECORD_ANSWER_CHARS),
     answerLabel:
       answerRow?.slot === "answer" ? "Run's answer" : "Last work text",
     items: lastReceipts(receipts(rows)),
@@ -200,7 +190,7 @@ export function fitRecord(
   while (current.answer.length > 0) {
     current = {
       ...current,
-      answer: cut(current.answer, Math.floor(current.answer.length / 2)),
+      answer: cutAt(current.answer, Math.floor(current.answer.length / 2)),
     };
     messages = build(current);
     if (fits(messages)) return messages;

@@ -1,12 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { cutCodePoints } from "../../shared/text.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Fetcher } from "../providers/index.ts";
 import {
   type ClientInfo,
-  cut,
   type ListedTool,
   scrub,
   withClient,
@@ -85,9 +85,9 @@ function schemaOf(tool: ListedTool): {
 export function identityOf(info: ClientInfo, key: string | null) {
   const raw = scrub(info, key);
   const identity = {
-    serverName: cut(raw.serverName, MAX_SERVER_NAME),
-    serverVersion: cut(raw.serverVersion, MAX_SERVER_VERSION),
-    instructions: cut(raw.instructions.trim(), MAX_INSTRUCTIONS),
+    serverName: cutCodePoints(raw.serverName, MAX_SERVER_NAME),
+    serverVersion: cutCodePoints(raw.serverVersion, MAX_SERVER_VERSION),
+    instructions: cutCodePoints(raw.instructions.trim(), MAX_INSTRUCTIONS),
   };
   return {
     ...identity,
@@ -130,7 +130,7 @@ export async function discover(
         }
         seen.add(tool.name);
         const schema = schemaOf(tool);
-        const description = cut(
+        const description = cutCodePoints(
           typeof tool.description === "string" ? tool.description : "",
           MAX_TOOL_DESCRIPTION,
         );

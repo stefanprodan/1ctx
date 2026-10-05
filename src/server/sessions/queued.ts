@@ -12,6 +12,7 @@ import {
   QUEUED_PREVIEW,
   type QueuedMessage,
 } from "../../shared/contracts/session.ts";
+import { cutAt } from "../../shared/text.ts";
 import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
@@ -75,11 +76,10 @@ const row = (raw: RawQueued): QueuedRow => ({
 // the text cut at QUEUED_PREVIEW characters, never inside a surrogate
 // pair
 function preview(text: string): { text: string; cut: boolean } {
-  if (text.length <= QUEUED_PREVIEW) return { text, cut: false };
-  let end = QUEUED_PREVIEW;
-  const last = text.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end--;
-  return { text: text.slice(0, end), cut: true };
+  return {
+    text: cutAt(text, QUEUED_PREVIEW),
+    cut: text.length > QUEUED_PREVIEW,
+  };
 }
 
 // a row on the wire: whole for the detail and an answer, a preview on

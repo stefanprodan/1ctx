@@ -7,7 +7,7 @@
 
 import type { PromptServer } from "./mcp.ts";
 import { escapeText } from "./skills.ts";
-import { cutText } from "./text.ts";
+import { cutText, oneLine } from "./text.ts";
 import { isRecord, type McpMode } from "./words.ts";
 
 // decision 19: the catalog of discovery mode, and the mode a send runs in
@@ -26,7 +26,7 @@ const ABBREVIATION = /(?:^|[^\p{L}\p{N}_])(?:e\.g|i\.e)$/iu;
 
 // the first sentence of a description, on one line, cut at the line cap
 export function firstSentence(text: string): string {
-  const line = text.replace(/\s+/g, " ").trim();
+  const line = oneLine(text);
   let sentence = line;
   for (const end of line.matchAll(SENTENCE_END)) {
     const before = line.slice(0, end.index);

@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { cutCodePoints } from "../../shared/text.ts";
 import {
   isSkillName,
   MAX_SKILL_COMPATIBILITY,
@@ -34,7 +35,6 @@ const KNOWN = new Set([
   "allowed-tools",
 ]);
 
-const cut = (text: string, cap: number) => [...text].slice(0, cap).join("");
 const fail = (line: number, words: string): never => {
   throw new BadRequest(`line ${line}: ${words}`);
 };
@@ -159,7 +159,7 @@ export function parseSkillMd(text: string): ParsedSkill {
         const metaValue = scalar(item[2]!, i + 1);
         if (metaKey === "") fail(i + 1, "metadata key is empty");
         if (count < MAX_METADATA_KEYS) {
-          metadata[cut(metaKey, MAX_METADATA_KEY)] = cut(
+          metadata[cutCodePoints(metaKey, MAX_METADATA_KEY)] = cutCodePoints(
             metaValue,
             MAX_METADATA_VALUE,
           );
@@ -187,14 +187,14 @@ export function parseSkillMd(text: string): ParsedSkill {
   if (description === "") throw new BadRequest("the skill has no description");
   return {
     name,
-    description: cut(description, MAX_SKILL_DESCRIPTION),
-    license: cut((values.get("license") ?? "").trim(), MAX_LICENSE),
-    compatibility: cut(
+    description: cutCodePoints(description, MAX_SKILL_DESCRIPTION),
+    license: cutCodePoints((values.get("license") ?? "").trim(), MAX_LICENSE),
+    compatibility: cutCodePoints(
       (values.get("compatibility") ?? "").trim(),
       MAX_SKILL_COMPATIBILITY,
     ),
     metadata,
-    allowedTools: cut(
+    allowedTools: cutCodePoints(
       (values.get("allowed-tools") ?? "").trim(),
       MAX_ALLOWED_TOOLS,
     ),
