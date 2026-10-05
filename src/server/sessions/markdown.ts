@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A chat as a Markdown file: what a person reads in the main column,
-// without the fold. Rows are grouped by send the way the transcript
-// groups them, so a turn that was stopped, failed or cut says so under
-// its partial answer instead of passing for a finished one, and a turn
-// that ended with no answer still leaves its line. Summaries are
-// context for the model, not conversation, so they stay out.
+// Grouped by send as the transcript is; summaries stay out.
 
 import { finishWords } from "../../shared/finish.ts";
 import { attachedLine, type MessageUpload } from "../../shared/uploads.ts";

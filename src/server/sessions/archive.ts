@@ -10,7 +10,7 @@ import type { Db } from "../db/index.ts";
 import { Conflict } from "../lib/errors.ts";
 import type { SessionRow } from "./rows.ts";
 
-export const ARCHIVED = "the chat is archived";
+const ARCHIVED = "the chat is archived";
 
 // an archived chat takes no turn and no new title; stop stays allowed
 export function refuseArchived(session: { archived: unknown }): void {

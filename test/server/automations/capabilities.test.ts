@@ -184,7 +184,7 @@ describe("automation capability sets", () => {
         expect((await fork.json()).session.disabledCapabilities).toEqual([
           "web",
         ]);
-        const runs = chat.app.sessions.runs(automation.id);
+        const runs = chat.app.sessions.runs({ automationId: automation.id });
         expect(runs.rows[0]?.session.disabledCapabilities).toEqual(["web"]);
         const second = await launch();
         expect(events[1]?.automation.disabledCapabilities).toEqual([]);

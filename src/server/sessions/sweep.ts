@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The hourly chats sweep, also run at startup before the listener: an
-// ordered list of steps, each over at most a fixed number of chats per
-// pass so a backlog never holds the start; the rest waits an hour. One
-// transaction per chat with its own catch, so one bad row never stops
-// the rest; a step's query has its own catch too.
 
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";

@@ -1,18 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The stream, one session, its rename and its deletion. The routes that
-// start or stop a send live in the runner, which sits below this area.
-// What may be seen is access's call: a session in a project the caller
-// may not see is the same 404 as one that is not there. A team chat's
-// rename and delete belong to its owner or an admin; a delete waits for
-// the chat to end, a rename does not. Anyone who sees a chat may
-// archive it, which makes it read-only for good.
+// Starting and stopping a send are the runner's routes.
 
 import type {
   ForkSessionResponse,
   OpenedFileResponse,
-  SessionResponse,
   SessionsResponse,
   ToolResultResponse,
 } from "../../shared/api/sessions.ts";
@@ -26,7 +19,8 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { archivedEvent, refuseArchived } from "./archive.ts";
-import type { AlertArgs } from "./list.ts";
+import { detail } from "./detail.ts";
+import type { AlertQuery } from "./list.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import { openedFileResponse } from "./opened.ts";
 import {
@@ -76,28 +70,17 @@ export type RoutesDeps = {
   // turns them not sent
   wakeQueue(): void;
   // the feed's Flagged pick
-  alerts(...args: AlertArgs): SessionsResponse;
+  alerts(query: AlertQuery): SessionsResponse;
 };
 
-export function detail(
-  store: SessionStore,
+function ownerOrAdmin(
+  principal: Principal,
   session: SessionRow,
-  live: LiveSend | null,
-  keptDays: number,
-  // who reads it: a not-sent message shows to its author alone
-  viewerId: string | null,
-): SessionResponse {
-  return {
-    session,
-    forkedFrom: store.forkedFrom(session.id),
-    messages: store.messages(session.id).map(offWire),
-    send: store.lastSend(session.id),
-    live,
-    authors: store.authors(session.id),
-    agents: store.agents(session.id),
-    archive: store.archiveOf(session.id, keptDays),
-    queued: store.queue.ofChat(session.id, viewerId),
-  };
+  verb: "renames" | "deletes",
+): void {
+  if (session.ownerId !== principal.userId && principal.role !== "admin") {
+    throw new Forbidden(`only the owner or an admin ${verb} a chat`);
+  }
 }
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -115,8 +98,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             ? (deps.access.visibleProjectIds(principal.userId) ?? [])
             : [deps.access.project(principal, project).id];
         const body: SessionsResponse = query.attention
-          ? deps.alerts(ids, q, query.alertBefore)
-          : deps.store.list(ids, q, query.origin, query.before);
+          ? deps.alerts({ projectIds: ids, q, before: query.alertBefore })
+          : deps.store.list({
+              projectIds: ids,
+              q,
+              origin: query.origin,
+              before: query.before,
+            });
         return json(body);
       },
     },
@@ -283,12 +271,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
-        if (
-          session.ownerId !== principal.userId &&
-          principal.role !== "admin"
-        ) {
-          throw new Forbidden("only the owner or an admin renames a chat");
-        }
+        ownerOrAdmin(principal, session, "renames");
         refuseArchived(session);
         const { title } = parseRenameSession(
           await jsonBody(req, MAX_SMALL_BODY),
@@ -369,12 +352,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
-        if (
-          session.ownerId !== principal.userId &&
-          principal.role !== "admin"
-        ) {
-          throw new Forbidden("only the owner or an admin deletes a chat");
-        }
+        ownerOrAdmin(principal, session, "deletes");
         transact(deps.db, () => {
           // the row is the truth after repair, and the runner keeps it
           // running while it holds the lock

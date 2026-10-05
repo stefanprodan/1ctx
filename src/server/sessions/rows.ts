@@ -1,8 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The wire rows and their database shapes. Keeping the translations
-// separate leaves the store focused on queries and writes.
 
 import type {
   Message,
@@ -168,7 +165,15 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
     as prompt_tokens,
    messages.created_at, messages.finished_at`;
 
-const toolCalls = (raw: string | null): ToolCall[] | null => {
+// a JSON list column: null when absent or empty
+export function listOrNull<T>(raw: string | null): T[] | null {
+  if (!raw) return null;
+  const list: T[] = JSON.parse(raw);
+  return list.length > 0 ? list : null;
+}
+
+// the same for a column a provider's record fills, which may not parse
+export function safeListOrNull<T>(raw: string | null): T[] | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -176,19 +181,10 @@ const toolCalls = (raw: string | null): ToolCall[] | null => {
   } catch {
     return null;
   }
-};
-
-export function messageUploads(raw: string | null): MessageUpload[] | null {
-  if (!raw) return null;
-  const record: MessageUpload[] = JSON.parse(raw);
-  return record.length > 0 ? record : null;
 }
 
-function messageFiles(raw: string | null): OpenedFile[] | null {
-  if (!raw) return null;
-  const record: OpenedFile[] = JSON.parse(raw);
-  return record.length > 0 ? record : null;
-}
+export const listJson = (xs: readonly unknown[] | null | undefined) =>
+  xs?.length ? JSON.stringify(xs) : null;
 
 const parseSavedDocs = (raw: string | null): SavedDocs | null =>
   raw ? JSON.parse(raw) : null;
@@ -206,8 +202,8 @@ export const message = (raw: RawMessage): Message => ({
   content: raw.content,
   // a packed tool row's content is empty; its size is kept beside it
   resultBytes: raw.kind === "tool" ? raw.packed_bytes : null,
-  uploads: raw.kind === "user" ? messageUploads(raw.uploads) : null,
-  files: raw.kind === "tool" ? messageFiles(raw.files) : null,
+  uploads: raw.kind === "user" ? listOrNull<MessageUpload>(raw.uploads) : null,
+  files: raw.kind === "tool" ? listOrNull<OpenedFile>(raw.files) : null,
   saved: raw.kind === "tool" ? parseSavedDocs(raw.saved) : null,
   promptTokens:
     raw.kind === "summary" && raw.status === "done" ? raw.prompt_tokens : null,
@@ -216,7 +212,7 @@ export const message = (raw: RawMessage): Message => ({
   status: raw.status,
   error: raw.error,
   finishReason: raw.finish_reason,
-  toolCalls: toolCalls(raw.tool_calls),
+  toolCalls: safeListOrNull<ToolCall>(raw.tool_calls),
   toolCallId: raw.tool_call_id,
   toolName: raw.tool_name,
   model: raw.model,

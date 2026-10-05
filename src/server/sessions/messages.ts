@@ -2,19 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
+import type { MessageUpload } from "../../shared/uploads.ts";
 import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 import type { OpenedRecord } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
+import type { ReasoningDetail } from "../providers/index.ts";
 import { writeOpenedFiles } from "./opened-store.ts";
 import {
+  listJson,
   MESSAGE_COLUMNS,
   message,
   type RawMessage,
   type ReplyFinish,
 } from "./rows.ts";
 
-type AgentMessageFields = {
+export type AgentMessageFields = {
   id?: string;
   sessionId: string;
   sendId: string;
@@ -32,13 +35,53 @@ export function nextSeq(db: Db, sessionId: string): number {
     .get(sessionId)!.n;
 }
 
-function read(db: Db, id: string): Message {
+export function readMessage(db: Db, id: string): Message | null {
   const raw = db
     .query<RawMessage, [string]>(
       `select ${MESSAGE_COLUMNS} from messages where id = ?`,
     )
-    .get(id)!;
-  return message(raw);
+    .get(id);
+  return raw ? message(raw) : null;
+}
+
+export function readMessages(db: Db, sessionId: string): Message[] {
+  return db
+    .query<RawMessage, [string]>(
+      `select ${MESSAGE_COLUMNS} from messages where session_id = ? order by seq`,
+    )
+    .all(sessionId)
+    .map(message);
+}
+
+export function addUserMessage(
+  db: Db,
+  fields: {
+    id?: string;
+    sessionId: string;
+    sendId: string;
+    userId: string;
+    content: string;
+    uploads?: MessageUpload[] | null;
+    now: number;
+  },
+): Message {
+  const id = fields.id ?? newId();
+  db.query(
+    `insert into messages (id, session_id, seq, kind, send_id, round,
+       user_id, content, uploads, status, created_at, finished_at)
+     values (?, ?, ?, 'user', ?, 1, ?, ?, ?, 'done', ?, ?)`,
+  ).run(
+    id,
+    fields.sessionId,
+    nextSeq(db, fields.sessionId),
+    fields.sendId,
+    fields.userId,
+    fields.content,
+    listJson(fields.uploads),
+    fields.now,
+    fields.now,
+  );
+  return readMessage(db, id)!;
 }
 
 export function addAgentMessage(
@@ -63,7 +106,7 @@ export function addAgentMessage(
     fields.model,
     fields.now,
   );
-  return read(db, id);
+  return readMessage(db, id)!;
 }
 
 export function addToolRows(
@@ -93,7 +136,7 @@ export function addToolRows(
       call.toolName,
       call.now,
     );
-    return read(db, id);
+    return readMessage(db, id)!;
   });
 }
 
@@ -108,7 +151,7 @@ export type ToolFinish = {
 };
 
 // a command may write hundreds of docs; the row keeps the first paths
-export const SAVED_PATHS = 50;
+const SAVED_PATHS = 50;
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
 
@@ -161,17 +204,13 @@ export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
       .run(
         fields.content,
         fields.reasoning,
-        fields.reasoningDetails.length > 0
-          ? JSON.stringify(fields.reasoningDetails)
-          : null,
+        listJson(fields.reasoningDetails),
         fields.html,
         fields.status,
         fields.error,
         fields.finishReason,
         fields.slot,
-        fields.toolCalls && fields.toolCalls.length > 0
-          ? JSON.stringify(fields.toolCalls)
-          : null,
+        listJson(fields.toolCalls),
         fields.ttftMs,
         fields.thinkingMs,
         fields.upstream,
@@ -180,6 +219,57 @@ export function finishReply(db: Db, id: string, fields: ReplyFinish): boolean {
         fields.finishedAt,
         id,
       ).changes > 0
+  );
+}
+
+export function writeReply(
+  db: Db,
+  id: string,
+  fields: {
+    content: string;
+    reasoning: string;
+    reasoningDetails: ReasoningDetail[];
+  },
+): boolean {
+  return (
+    db
+      .query(
+        "update messages set content = ?, reasoning = ?, reasoning_details = ? where id = ? and status = 'streaming'",
+      )
+      .run(
+        fields.content,
+        fields.reasoning,
+        listJson(fields.reasoningDetails),
+        id,
+      ).changes > 0
+  );
+}
+
+export function capWork(db: Db, id: string, finishReason: string): boolean {
+  return (
+    db
+      .query(
+        "update messages set finish_reason = ? where id = ? and kind = 'reply' and slot = 'work' and status = 'done'",
+      )
+      .run(finishReason, id).changes > 0
+  );
+}
+
+// guarded by the null slot, so a second call delta writes nothing
+export function markRoundWork(db: Db, id: string): boolean {
+  const sql =
+    "update messages set slot = 'work' where id = ? and kind = 'reply' and status = 'streaming' and slot is null";
+  return db.query(sql).run(id).changes > 0;
+}
+
+// the repair places a reply before it ends it
+export function markSlot(db: Db, id: string, slot: "work" | "answer"): boolean {
+  return (
+    db
+      .query(
+        "update messages set slot = ? where id = ? and kind = 'reply' and slot is null",
+      )
+      .run(slot, id).changes > 0
   );
 }
 

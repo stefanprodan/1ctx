@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// What a person did per day, for their page: the messages they wrote
-// in chats, the chats they started and the runs they started by hand.
-// A fork's copied messages keep the instant they were first written,
-// before the fork was made, so only a message no older than its chat
-// is theirs to count there. A run's instructions are a user message
-// too, which the chat origin leaves out.
 
 import type { AgentActivity } from "../../shared/api/agents.ts";
 import type {
@@ -37,6 +30,7 @@ export function personDays(
          join sessions s on s.id = m.session_id
         where m.user_id = ? and m.kind = 'user'
           and m.created_at >= ? and m.created_at < ?
+          -- a fork's copied messages keep their first time
           and s.origin = 'chat' and m.created_at >= s.created_at
        union all
        select created_at as at

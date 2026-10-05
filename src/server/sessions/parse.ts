@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The session request parsers: a new chat, a message, a rename, and the
-// feed's filters. A message is any text up to the byte cap, not
-// blank; a title is one line up to the title cap.
 
 import type {
   CreateSessionRequest,
@@ -38,9 +34,10 @@ import {
   type RunsCursor,
 } from "./cursor.ts";
 
-// the body cap: the message plus the JSON around it
+// a capabilities change at its largest
 export const MAX_REGENERATE_BODY =
   MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) + 128;
+// the body cap: the message plus the JSON around it
 export const MAX_SESSION_BODY = MAX_MESSAGE_BYTES + 1024 + MAX_REGENERATE_BODY;
 export const MAX_SMALL_BODY = 1024;
 

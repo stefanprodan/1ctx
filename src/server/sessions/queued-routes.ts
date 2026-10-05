@@ -1,15 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A queued message is its author's alone to edit or remove, an admin's
-// included, each change naming the revision it saw so a start that took
-// the row first wins. Each answers the queue as the caller sees it at
-// the revision its commit made, so a tab never puts back a row a
-// queue frame already moved past; the author reads a row whole for an
-// Edit, since a frame carries its text cut. Home reads the caller's
-// not-sent messages by their own query, never through the feed, and
-// discards only the ones it names. An edit is checked for a summon of
-// no agent as a queued message is, with the same 400.
 
 import type {
   DiscardNotSentResponse,

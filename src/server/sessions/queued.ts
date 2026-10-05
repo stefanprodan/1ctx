@@ -18,6 +18,7 @@ import type { BusEvent } from "../lib/bus.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import { notSentOf } from "./not-sent.ts";
+import { listJson } from "./rows.ts";
 
 // a chat's queue starts as one turn, so it holds at most what one turn
 // opens with
@@ -218,7 +219,7 @@ export class QueueStore {
         fields.sessionId,
         fields.authorId,
         fields.text,
-        fields.uploads?.length ? JSON.stringify(fields.uploads) : null,
+        listJson(fields.uploads),
         fields.capabilities === undefined
           ? null
           : JSON.stringify(fields.capabilities),
@@ -252,14 +253,6 @@ export class QueueStore {
   // what the detail shows: every queued row, and the viewer's not sent
   ofChat(sessionId: string, viewerId: string | null): QueuedMessage[] {
     return chatQueue(this.db, sessionId, viewerId);
-  }
-
-  chatCount(sessionId: string): number {
-    return this.db
-      .query<{ n: number }, [string]>(
-        "select count(*) as n from queued_messages where session_id = ? and state = 'queued'",
-      )
-      .get(sessionId)!.n;
   }
 
   // queued and not sent together, the rows queuedPerUser bounds

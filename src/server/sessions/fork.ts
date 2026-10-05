@@ -10,14 +10,9 @@ import { copyKeptFiles } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
+import { readMessages } from "./messages.ts";
 import { packedText } from "./pack.ts";
-import {
-  MESSAGE_COLUMNS,
-  message,
-  type RawMessage,
-  type RawSend,
-  type SessionRow,
-} from "./rows.ts";
+import type { RawSend, SessionRow } from "./rows.ts";
 
 type ForkSend = Pick<SendSummary, "id" | "kind" | "memoryRound">;
 
@@ -79,12 +74,7 @@ export function forkPoint(
 }
 
 export function readForkPoint(db: Db, sessionId: string, messageId: string) {
-  const rows = db
-    .query<RawMessage, [string]>(
-      `select ${MESSAGE_COLUMNS} from messages where session_id = ? order by seq`,
-    )
-    .all(sessionId)
-    .map(message);
+  const rows = readMessages(db, sessionId);
   const sends = db
     .query<ForkSend, [string]>(
       "select id, kind, memory_round as memoryRound from sends where session_id = ?",

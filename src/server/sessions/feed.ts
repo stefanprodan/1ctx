@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a feed row carries beyond the session: its last send and the
-// last line a person or the agent wrote, both read for every listed
-// id in one query each, so the list costs a few queries however long
-// it is. The line is cut in SQL before it reaches the process, so a
-// reply of a megabyte weighs nothing here.
+// The line is cut in SQL, so a large reply never reaches the process.
 
 import type { EnvelopeRow, FeedRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
@@ -267,7 +263,6 @@ export const ENVELOPE_ROW = `select agents.name as agent,
   left join agents turn on turn.id = last.agent_id
   where sessions.id = ?`;
 
-/** What a session envelope carries of its feed row, or null when gone. */
 export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
   const raw = db.query<RawEnvelopeRow, [string]>(ENVELOPE_ROW).get(sessionId);
   if (raw === null) return null;

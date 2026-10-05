@@ -305,7 +305,7 @@ that agent answers the one turn (see Summons).
 - **Rename and delete are the owner's or an admin's;** anyone else
   gets 403. A rename is allowed while the chat runs, since a send never
   writes the title. A delete waits for the end.
-- **Every delete goes through `deleteSession()`**
+- **Every delete goes through `removeSession()`**
   (`sessions/delete.ts`): the route, a task's retention and the sweep.
   The foreign keys take the dependents.
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`

@@ -7,7 +7,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
-import { MESSAGE_COLUMNS, message, type RawMessage } from "./rows.ts";
+import { readMessage } from "./messages.ts";
 
 // users: the turn's user messages in seq order, nothing but them between
 // the first and the last
@@ -39,11 +39,8 @@ export function replaceSendRows(
   for (const user of users) move.run(newSendId, user.id);
   const remove = db.query("delete from sends where id = ?");
   for (const sendId of removedSendIds) remove.run(sendId);
-  const read = db.query<RawMessage, [string]>(
-    `select ${MESSAGE_COLUMNS} from messages where id = ?`,
-  );
   return {
-    users: users.map((user) => message(read.get(user.id)!)),
+    users: users.map((user) => readMessage(db, user.id)!),
     removedMessageIds,
   };
 }

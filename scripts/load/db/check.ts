@@ -115,16 +115,24 @@ export function validate(
     const visible = projects
       .visibleFor(u.id, u.role === "admin")
       .map((p) => p.id);
-    const [page, pageMs] = timed(() => store.list(visible, ""));
+    const [page, pageMs] = timed(() =>
+      store.list({ projectIds: visible, q: "" }),
+    );
     const cursor = page.next === null ? null : parseFeedCursor(page.next);
     const [second, secondMs] = timed(() =>
-      store.list(visible, "", null, cursor),
+      store.list({ projectIds: visible, q: "", before: cursor }),
     );
-    const [chats, chatsMs] = timed(() => store.list(visible, "", "chat"));
-    const [runs, runsMs] = timed(() => store.list(visible, "", "automation"));
-    const [search, searchMs] = timed(() => store.list(visible, "incident"));
+    const [chats, chatsMs] = timed(() =>
+      store.list({ projectIds: visible, q: "", origin: "chat" }),
+    );
+    const [runs, runsMs] = timed(() =>
+      store.list({ projectIds: visible, q: "", origin: "automation" }),
+    );
+    const [search, searchMs] = timed(() =>
+      store.list({ projectIds: visible, q: "incident" }),
+    );
     const [miss, missMs] = timed(() =>
-      feedRead(v, visible, "zzzz-no-such-title"),
+      feedRead(v, { projectIds: visible, q: "zzzz-no-such-title" }),
     );
     const running = (s: { session: { status: string } }) =>
       s.session.status === "running";

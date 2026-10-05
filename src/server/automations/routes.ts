@@ -398,11 +398,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(req, ctx) {
         const automation = visible(ctx.principal!, ctx.params.id);
         const { filter, before } = parseRunsQuery(new URL(req.url));
-        const body: AutomationRunsResponse = deps.sessions.runs(
-          automation.id,
+        const body: AutomationRunsResponse = deps.sessions.runs({
+          automationId: automation.id,
           filter,
           before,
-        );
+        });
         return json(body);
       },
     },

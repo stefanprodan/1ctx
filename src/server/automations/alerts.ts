@@ -12,7 +12,11 @@ import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { AlertChange } from "../runner/index.ts";
-import { endedAfter, MARKED, type SessionStore } from "../sessions/index.ts";
+import {
+  endedAfter,
+  openAlertRuns,
+  type SessionStore,
+} from "../sessions/index.ts";
 import type { AutomationStore } from "./store.ts";
 
 export type AlertsDeps = {
@@ -82,9 +86,7 @@ const closeEmpty = (db: Db, id: string) =>
     .query(
       `update automations set attention_since = null, revision = revision + 1
        where id = ? and attention_since is not null and not exists (
-         select 1 from sessions marked indexed by sessions_marked
-         where marked.automation_id = automations.id and marked.${MARKED}
-           and marked.last_activity_at >= automations.attention_since)`,
+         select 1 ${openAlertRuns("automations")})`,
     )
     .run(id).changes > 0;
 

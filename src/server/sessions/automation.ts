@@ -15,17 +15,17 @@ import { feedRows } from "./feed.ts";
 import type { RawSession, SessionRow, UsagePort } from "./rows.ts";
 import { FEED_LIMIT, session } from "./rows.ts";
 
-export type RunsArgs = [
-  automationId: string,
-  filter?: RunFilter | null,
-  before?: RunsCursor | null,
-  limit?: number,
-];
+export type RunsQuery = {
+  automationId: string;
+  filter?: RunFilter | null;
+  before?: RunsCursor | null;
+  limit?: number;
+};
 
 export function automationRuns(
   db: Db,
   usage: UsagePort,
-  ...[automationId, filter = null, before = null, limit = FEED_LIMIT]: RunsArgs
+  { automationId, filter = null, before = null, limit = FEED_LIMIT }: RunsQuery,
 ): AutomationRunsResponse {
   const condition =
     filter === "manual"

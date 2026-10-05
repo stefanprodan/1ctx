@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The place of a row in a listed order, so a later page starts after
-// it. The feed's order is running first, then last activity newest
-// first, then id; the runs' drops the rank, since an automation never
-// runs twice at once. A cursor is a place, not a row: one naming a
-// deleted row still pages. Paging is not a snapshot: a row that moves
-// above the cursor is not on a later page.
+// A cursor is a place, not a row: one naming a deleted row still pages.
 
 import { BadRequest } from "../lib/errors.ts";
 import type { RawSession } from "./rows.ts";
