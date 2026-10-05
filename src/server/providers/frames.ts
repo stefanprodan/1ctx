@@ -132,6 +132,7 @@ export function frameEvents(body: any): ChatEvent[] {
   if (body?.usage && typeof body.usage === "object") {
     const usage = body.usage;
     const cached = usage.prompt_tokens_details?.cached_tokens;
+    const written = usage.prompt_tokens_details?.cache_write_tokens;
     const reasoning = usage.completion_tokens_details?.reasoning_tokens;
     events.push({
       kind: "usage",
@@ -139,6 +140,7 @@ export function frameEvents(body: any): ChatEvent[] {
         promptTokens: num(usage.prompt_tokens),
         completionTokens: num(usage.completion_tokens),
         cachedTokens: typeof cached === "number" ? cached : null,
+        cacheWriteTokens: typeof written === "number" ? written : null,
         reasoningTokens: typeof reasoning === "number" ? reasoning : null,
         cost: typeof usage.cost === "number" ? usage.cost : null,
       },

@@ -287,7 +287,9 @@ export async function* azureChat(
 type Deployment = { id?: unknown; model?: unknown; status?: unknown };
 
 // the deployments a request can name, undescribed: Azure gives no
-// window, tools flag or price. A further page is an error, never a cut
+// window, tools flag or price. The deployed model is kept in listedAs,
+// so the catalog finds it in models.dev whatever the deployment is
+// named. A further page is an error, never a cut
 export function parseDeployments(body: unknown): CatalogMatch[] {
   const list = (body ?? {}) as Record<string, unknown>;
   if (
@@ -317,6 +319,7 @@ export function parseDeployments(body: unknown): CatalogMatch[] {
       thinkingRequired: false,
       reasoningKnown: false,
       described: false,
+      listedAs: model,
     });
   }
   return out;

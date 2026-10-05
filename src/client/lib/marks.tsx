@@ -2,26 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The marks of the services a provider can be, drawn in the current
-// colour so they sit in a tile like the icons. OpenRouter's is the
-// glyph of its official logo (openrouter.ai/press), the wordmark left
-// out; the box is the glyph's own bounds, squared. Gemini's is the
-// spark and OpenCode's the frame of its identity mark, as Simple Icons
-// traces them (CC0), in their 24 box.
+// colour so they sit in a tile like the icons. Each is the provider's
+// logo from models.dev (models.dev/logos/<id>.svg) in its own box. The
+// OpenAI wires speak for many servers, so they keep the cloud.
 
 import type { Wire } from "../../shared/words.ts";
 
-const OPENROUTER =
-  "M303.9475,17.19926c42.79734,0,77.48933,34.69327,77.48933,77.48933s-34.69199,77.48933-77.48933,77.48933l76.86166,76.86244c9.76367,9.76313,2.84903,26.45667-10.95697,26.45667h-220.88335c-71.32686,0-129.14889-57.82202-129.14889-129.14889S77.64197,17.19926,148.96884,17.19926h154.97866ZM148.96884,68.85881c-42.79607,0-77.48933,34.69327-77.48933,77.48933s34.69327,77.48933,77.48933,77.48933,77.48933-34.69327,77.48933-77.48933-34.69327-77.48933-77.48933-77.48933Z";
+const OPENROUTER_PATH =
+  "M728.039 234C819.325 234 893.323 308.62 893.323 400.668C893.323 492.716 819.325 567.336 728.039 567.336L891.984 732.656C912.81 753.655 898.061 789.56 868.613 789.56H397.472C245.333 789.56 122 665.193 122 511.78C122 358.367 245.333 234 397.472 234H728.039ZM397.472 345.112C306.189 345.112 232.189 419.732 232.189 511.78C232.189 603.828 306.189 678.448 397.472 678.448C488.756 678.448 562.756 603.828 562.756 511.78C562.756 419.732 488.756 345.112 397.472 345.112Z";
 
-const GEMINI =
-  "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81";
+const GOOGLE_PATH =
+  "M37 20.034C27.8809 20.5837 20.5808 27.8809 20.0326 37H19.966C19.4163 27.8809 12.1177 20.5837 3 20.034V19.9674C12.1191 19.4163 19.4163 12.1191 19.966 3H20.0326C20.5822 12.1191 27.8809 19.4163 37 19.9674V20.034Z";
 
-const OPENCODE = "M22 24H2V0h20zM17 4.8H7v14.4h10z";
+const OPENCODE_GO_PATH =
+  "M19.4004 21H5V3H19.4004V6.59961H8.59961V17.4004H15.7998V13.7998H12.2002V10.2002H19.4004V21Z";
+
+const AZURE_PATH =
+  "M21.68 7.58398L11.296 29.68L4 29.6L12.144 15.584L21.68 7.58398ZM22.8 9.32798L36 32.416H11.584L26.464 29.76L18.672 20.496L22.8 9.32798Z";
 
 const MARKS: Partial<Record<Wire, { d: string; box: string }>> = {
-  openrouter: { d: OPENROUTER, box: "19.8 -34.45 361.6 361.6" },
-  gemini: { d: GEMINI, box: "0 0 24 24" },
-  opencode: { d: OPENCODE, box: "0 0 24 24" },
+  openrouter: { d: OPENROUTER_PATH, box: "0 0 1024 1024" },
+  gemini: { d: GOOGLE_PATH, box: "0 0 40 40" },
+  opencode: { d: OPENCODE_GO_PATH, box: "0 0 24 24" },
+  azure: { d: AZURE_PATH, box: "0 0 40 40" },
 };
 
 // whether the wire has a mark; a server without one shows the cloud

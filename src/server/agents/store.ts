@@ -25,6 +25,7 @@ type Raw = {
   thinking_required: number;
   reasoning_known: number;
   model_described: number;
+  listed_as: string | null;
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
@@ -55,6 +56,7 @@ const row = (
     thinkingRequired: raw.thinking_required === 1,
     reasoningKnown: raw.reasoning_known === 1,
     described: raw.model_described === 1,
+    ...(raw.listed_as !== null && { listedAs: raw.listed_as }),
   },
   thinking: raw.thinking,
   effort: raw.effort,
@@ -175,9 +177,10 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           thinking_required, reasoning_known, model_described, thinking,
-           effort, prompt, mcp_mode, upstream, skip_4bit, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           thinking_required, reasoning_known, model_described, listed_as,
+           thinking, effort, prompt, mcp_mode, upstream, skip_4bit,
+           created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -194,6 +197,7 @@ export class AgentStore {
         m.thinkingRequired ? 1 : 0,
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
+        m.listedAs ?? null,
         fields.thinking,
         fields.effort,
         fields.prompt,
@@ -212,7 +216,7 @@ export class AgentStore {
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
            tools = ?, reasoning = ?, thinking_required = ?,
-           reasoning_known = ?, model_described = ?, thinking = ?,
+           reasoning_known = ?, model_described = ?, listed_as = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?
          where id = ? and deleted_at is null`,
       )
@@ -230,6 +234,7 @@ export class AgentStore {
         m.thinkingRequired ? 1 : 0,
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
+        m.listedAs ?? null,
         fields.thinking,
         fields.effort,
         fields.prompt,

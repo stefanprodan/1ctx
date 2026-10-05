@@ -7,6 +7,10 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentRow } from "../../../src/server/agents/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import { modelPrice } from "../../../src/server/providers/index.ts";
+import models from "../../../src/server/providers/models.json" with {
+  type: "json",
+};
 import {
   buildPolicy,
   type SendPolicy,
@@ -246,5 +250,33 @@ describe("send policy upstream", () => {
     expect(routed("openrouter").skip4Bit).toBe(true);
     expect(routed("openai-compatible").skip4Bit).toBe(false);
     expect(routed(null).skip4Bit).toBe(false);
+  });
+});
+
+describe("send policy price", () => {
+  const priced = (wire: SendPolicy["wire"], listedAs?: string) =>
+    buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent: { ...agent, model: { ...agent.model, listedAs } },
+      wire,
+      now: 1,
+      tools: null,
+      knowledge: { empty: true },
+      limits: DEFAULT_LIMITS,
+    }).price;
+
+  test("is the models.dev rates of the agent's listed model", () => {
+    const id = Object.keys(models.providers.azure).find(
+      (m) => modelPrice("azure", m) !== null,
+    )!;
+    expect(priced("azure", id)).toEqual(modelPrice("azure", id));
+  });
+
+  test("is null with no listed model, no wire or an OpenAI wire", () => {
+    const id = Object.keys(models.providers.azure)[0]!;
+    expect(priced("azure")).toBeNull();
+    expect(priced(null, id)).toBeNull();
+    expect(priced("openai-compatible", id)).toBeNull();
   });
 });

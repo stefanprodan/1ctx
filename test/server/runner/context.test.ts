@@ -105,6 +105,7 @@ const policy: SendPolicy = {
   wire: "openai-compatible",
   model: "org/model",
   contextLength: 1000,
+  price: null,
   prompt: "You write Go.",
   thinking: true,
   thinkingOff: false,

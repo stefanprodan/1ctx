@@ -53,6 +53,7 @@ import { m0044 } from "./0044-attention-round.ts";
 import { m0045 } from "./0045-open-attention.ts";
 import { m0046 } from "./0046-azure.ts";
 import { m0047 } from "./0047-decision-usage-decider.ts";
+import { m0048 } from "./0048-agent-listed-as.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -102,4 +103,5 @@ export const MIGRATIONS: Migration[] = [
   m0045,
   m0046,
   m0047,
+  m0048,
 ];

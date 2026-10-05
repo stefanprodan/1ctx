@@ -241,6 +241,7 @@ describe("strict stream", () => {
         promptTokens: 29,
         completionTokens: 151,
         cachedTokens: null,
+        cacheWriteTokens: null,
         reasoningTokens: null,
         cost: null,
       },

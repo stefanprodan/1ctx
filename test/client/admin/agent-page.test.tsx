@@ -21,6 +21,7 @@ import {
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import { tabOf } from "../../../src/client/views/admin/AgentPage.tsx";
 import { AgentSkills } from "../../../src/client/views/admin/AgentSkills.tsx";
+import { windowText } from "../../../src/client/views/admin/Agents.model.ts";
 import { NewAgent } from "../../../src/client/views/admin/NewAgent.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
@@ -296,6 +297,41 @@ describe("the model draft", () => {
       upstream: null,
       skip4Bit: true,
     });
+  });
+
+  test("a pick of an undescribed row starts at its models.dev window and tools", () => {
+    const d = AgentDrafts.blank("pr1");
+    const suggested = { ...stated, contextLength: 1_048_576, tools: true };
+    d.pick(suggested, false);
+    expect(d.windowText.value).toBe(windowText(1_048_576));
+    expect(d.takesTools.value).toBe(true);
+    expect(d.suggested.value).toBe(true);
+    // the exact window goes out while the text is untouched
+    expect(d.modelBody("openai-compatible")).toMatchObject({
+      contextLength: 1_048_576,
+      tools: true,
+    });
+    // a cancel brings the hint back with the fields it belongs to
+    d.change();
+    d.suggested.value = false;
+    d.cancel();
+    expect(d.suggested.value).toBe(true);
+    // a row with no window starts blank, tools off
+    d.pick({ ...stated, contextLength: null, tools: true }, false);
+    expect(d.windowText.value).toBe("");
+    expect(d.takesTools.value).toBe(false);
+    expect(d.suggested.value).toBe(false);
+  });
+
+  test("a re-pick of the same model with a price now is a change to save", () => {
+    const d = AgentDrafts.of(agent);
+    d.change();
+    d.pick(agent.model, false);
+    expect(d.modelDirty(agent, "openrouter")).toBe(false);
+    d.pick({ ...agent.model, promptPrice: 9, completionPrice: 9 }, false);
+    expect(d.modelDirty(agent, "openrouter")).toBe(true);
+    d.pick({ ...agent.model, listedAs: "flash" }, false);
+    expect(d.modelDirty(agent, "openrouter")).toBe(true);
   });
 
   test("a pick clears what belonged to another model", () => {

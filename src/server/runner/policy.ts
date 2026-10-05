@@ -25,7 +25,13 @@ import {
 import type { AgentRow } from "../agents/index.ts";
 import type { Limits, LoopLimits, SendCaps } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import type { ChatRequest, ToolCall } from "../providers/index.ts";
+import {
+  type ChatRequest,
+  type ModelPrice,
+  modelPrice,
+  modelSource,
+  type ToolCall,
+} from "../providers/index.ts";
 import type {
   MemoryScope,
   Offered,
@@ -90,6 +96,9 @@ export type SendPolicy = {
   wire: Wire | null;
   model: string;
   contextLength: number | null;
+  // the models.dev rates of the agent's model, null when none price it;
+  // a round whose reply has no cost is priced by them
+  price: ModelPrice | null;
   prompt: string;
   thinking: boolean;
   // the agent's own Off, not a default that resolved to off
@@ -164,6 +173,13 @@ const NONE: Offered = {
   credentials: [],
   credentialsOff: [],
   web: null,
+};
+
+const priceOf = (wire: Wire | null, listedAs: string | undefined) => {
+  const source = wire === null ? null : modelSource(wire);
+  return source === null || listedAs === undefined
+    ? null
+    : modelPrice(source, listedAs);
 };
 
 export function buildPolicy(input: {
@@ -257,6 +273,7 @@ export function buildPolicy(input: {
     providerId: agent.providerId,
     providerName: input.providerName ?? "",
     wire: input.wire ?? null,
+    price: priceOf(input.wire ?? null, agent.model.listedAs),
     model: agent.model.id,
     contextLength: agent.model.contextLength,
     prompt: agent.prompt,

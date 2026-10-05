@@ -10,6 +10,7 @@ import type { DecisionId } from "../contracts/decision.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
 import type { DirectoryUser, UserSummary } from "../contracts/user.ts";
+import type { Wire } from "../words.ts";
 import type { DayUsage } from "./usage.ts";
 
 // GET /api/directory/users: the enabled users by username, with the
@@ -75,6 +76,9 @@ export type DirectoryMcp = {
 export type DirectoryAgentResponse = {
   agent: AgentSummary;
   provider: string;
+  // the provider's wire, null when its row is gone; OpenCode Go's price
+  // reads "subscription"
+  wire: Wire | null;
   skills: DirectorySkill[];
   tools: DirectoryTool[];
   mcp: DirectoryMcp;

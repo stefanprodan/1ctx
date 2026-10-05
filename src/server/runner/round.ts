@@ -17,6 +17,7 @@ import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
   type ChatEvent,
   type ChatRequest,
+  costOf,
   mergeReasoningDetail,
   requestTokens,
   type Usage,
@@ -383,7 +384,10 @@ async function streamRound(
         break;
       case "usage": {
         const previous = round.usage;
-        round.usage = event.usage;
+        round.usage = {
+          ...event.usage,
+          cost: costOf(event.usage, send.policy.wire, send.policy.price),
+        };
         send.promptTokens +=
           event.usage.promptTokens - (previous?.promptTokens ?? 0);
         send.completionTokens +=

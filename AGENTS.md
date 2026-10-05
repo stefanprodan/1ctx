@@ -50,6 +50,7 @@ make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
 make staging-status     # what the staging service says
 make load-db PRESET=bench|small  # a load test database in scripts/load/out/
 make load-bench ARGS="..."  # compare builds under load; load-cluster on kind, load-summary
+make models         # refresh src/server/providers/models.json from models.dev
 ```
 
 The preview is a local, throwaway instance for trying a change. It runs

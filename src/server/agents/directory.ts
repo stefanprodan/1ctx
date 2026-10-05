@@ -177,6 +177,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const body: DirectoryAgentResponse = {
           agent: summary(agent),
           provider: provider?.name ?? "",
+          wire,
           skills: deps.skills
             .forAgent(agent.id)
             .map((skill) => ({

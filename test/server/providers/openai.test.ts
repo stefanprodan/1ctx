@@ -265,6 +265,7 @@ describe("OpenAI chat events", () => {
           promptTokens: 12,
           completionTokens: 4,
           cachedTokens: 7,
+          cacheWriteTokens: null,
           reasoningTokens: 2,
           cost: null,
         },
@@ -284,6 +285,7 @@ describe("OpenAI chat events", () => {
           promptTokens: 1,
           completionTokens: 1,
           cachedTokens: null,
+          cacheWriteTokens: null,
           reasoningTokens: null,
           cost: 0.002,
         },
@@ -367,6 +369,7 @@ describe("OpenAI chat stream", () => {
       promptTokens: 46,
       completionTokens: 80,
       cachedTokens: 0,
+      cacheWriteTokens: null,
       reasoningTokens: null,
       cost: null,
     });

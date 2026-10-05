@@ -6,6 +6,7 @@
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import type { Wire } from "../../shared/words.ts";
 
 // "128K", "1M"; empty when the catalog did not say
 export function windowLine(contextLength: number | null): string {
@@ -18,12 +19,15 @@ export function windowLine(contextLength: number | null): string {
 
 const money = (n: number) => `$${Number(n.toPrecision(3))}`;
 
-// "$0.14 / $0.28" per million tokens, "free" when both are zero, empty
-// when the catalog did not say
+// "$0.14 / $0.28" per million tokens, "free" when both are zero,
+// "subscription" on OpenCode Go, a flat plan, empty when the catalog did
+// not say
 export function priceLine(
   promptPrice: number | null,
   completionPrice: number | null,
+  wire: Wire | null = null,
 ): string {
+  if (wire === "opencode") return "subscription";
   if (promptPrice === null || completionPrice === null) return "";
   if (promptPrice === 0 && completionPrice === 0) return "free";
   return `${money(promptPrice)} / ${money(completionPrice)}`;
@@ -31,10 +35,10 @@ export function priceLine(
 
 // "1M · $0.15 / $0.6 · tools · reasoning": what a row says about a
 // model, only the parts the catalog gave
-export function modelMeta(m: CatalogMatch): string {
+export function modelMeta(m: CatalogMatch, wire: Wire | null = null): string {
   return [
     windowLine(m.contextLength),
-    priceLine(m.promptPrice, m.completionPrice),
+    priceLine(m.promptPrice, m.completionPrice, wire),
     m.tools ? "tools" : "",
     m.reasoning ? "reasoning" : "",
   ]

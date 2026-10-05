@@ -21,7 +21,11 @@ export type ProviderSummary = {
 // what the catalog says about one model: the window, the prices in USD
 // per million tokens (null when the catalog did not say) and the flags.
 // A catalog that lists only ids leaves `described` false, and an admin
-// states the window and the tools flag on the agent in its place
+// states the window and the tools flag on the agent in its place; the
+// server fills both from models.dev where it lists the model, as a
+// suggestion. `listedAs` is the model's models.dev id on a dedicated
+// wire (an Azure deployment's model), which an agent keeps for its
+// cost; absent on the other wires
 export type CatalogMatch = {
   id: string;
   name: string;
@@ -36,6 +40,7 @@ export type CatalogMatch = {
   // false means it never does; only OpenRouter and Gemini do
   reasoningKnown: boolean;
   described: boolean;
+  listedAs?: string;
 };
 
 // one provider serving a model behind OpenRouter: the tag a request

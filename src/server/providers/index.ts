@@ -55,6 +55,7 @@ export {
   parseCatalog,
   search,
   servesDecisions,
+  withModelsDev,
 } from "./catalog.ts";
 export { fetchEndpoints, parseEndpoints } from "./endpoints.ts";
 export {
@@ -64,6 +65,12 @@ export {
   geminiEvents,
   parseCatalog as parseGeminiCatalog,
 } from "./gemini.ts";
+export {
+  costOf,
+  type ModelPrice,
+  modelPrice,
+  modelSource,
+} from "./models.ts";
 export { wireTools } from "./openai.ts";
 export { buildChatBody as buildOpenCodeChatBody } from "./opencode.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";

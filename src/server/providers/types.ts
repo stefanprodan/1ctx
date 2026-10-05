@@ -82,6 +82,9 @@ export type Usage = {
   promptTokens: number;
   completionTokens: number;
   cachedTokens: number | null;
+  // the prompt tokens written to the cache, which some models bill
+  // apart; Azure and OpenRouter report them
+  cacheWriteTokens: number | null;
   reasoningTokens: number | null;
   // USD
   cost: number | null;
