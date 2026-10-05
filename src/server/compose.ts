@@ -572,7 +572,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     overview.start();
   }
   const routes: RouteDescriptor[] = [
-    ...users.routes,
     ...usage.routes,
     ...limits.routes,
     ...providers.routes,

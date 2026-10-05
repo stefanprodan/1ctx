@@ -14,29 +14,25 @@ import {
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import {
   account,
   meOf,
   profile,
   summary,
+  type UserFields,
   type UserRow,
   UserStore,
 } from "./store.ts";
 
-export { account, meOf, profile, summary, type UserRow, UserStore };
-
-export type UserFields = {
-  username: string;
-  fullName: string;
-  email: string;
-  role: Role;
-  // UTC when left out: the first admin, whose zone nobody typed
-  tz?: string;
-  passwordHash: string;
-  mustChangePassword: boolean;
-  now: number;
+export {
+  account,
+  meOf,
+  profile,
+  summary,
+  type UserFields,
+  type UserRow,
+  UserStore,
 };
 
 export const ADMIN_USERNAME = "admin";
@@ -93,12 +89,12 @@ export function verifyPassword(
   return Bun.password.verify(password, hash);
 }
 
-// When the users table is empty and user-admin.key holds a password, create
-// the admin with its hash and drop the plain value. A non-empty table
-// ignores the file, so it bootstraps and never resets.
 // nobody can sign in until this file is right, so every line names it
 const ADMIN_FILE = `${ADMIN_SECRET}.key`;
 
+// When the users table is empty and user-admin.key holds a password, create
+// the admin with its hash and drop the plain value. A non-empty table
+// ignores the file, so it bootstraps and never resets.
 export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
   if (deps.store.count() > 0) return null;
   const password = deps.secret(ADMIN_SECRET);
@@ -173,7 +169,6 @@ export type Users = {
   nobodyHash(): Promise<string>;
   // the first admin from user-admin.key, once the areas it is made with exist
   bootstrap(): Promise<UserRow | null>;
-  routes: RouteDescriptor[];
 };
 
 export function usersArea(deps: UsersDeps): Users {
@@ -206,6 +201,5 @@ export function usersArea(deps: UsersDeps): Users {
       return nobody;
     },
     bootstrap: () => bootstrap({ ...userDeps, ...deps, passwordCost: cost }),
-    routes: [],
   };
 }

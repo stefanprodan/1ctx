@@ -18,6 +18,20 @@ export type UserRow = Profile & {
   agentId: string | null;
 };
 
+export type UserFields = {
+  username: string;
+  fullName: string;
+  email: string;
+  about?: string;
+  role: Role;
+  // UTC when left out: the first admin, whose zone nobody typed
+  tz?: string;
+  passwordHash: string;
+  mustChangePassword: boolean;
+  disabled?: boolean;
+  now: number;
+};
+
 type Raw = {
   id: string;
   username: string;
@@ -119,33 +133,26 @@ export class UserStore {
     return raw ? row(raw) : null;
   }
 
-  create(fields: {
-    username: string;
-    fullName: string;
-    email: string;
-    role: Role;
-    tz?: string;
-    passwordHash: string;
-    mustChangePassword: boolean;
-    now: number;
-  }): UserRow {
+  create(fields: UserFields): UserRow {
     const id = newId();
     this.db
       .query(
         `insert into users
-          (id, username, full_name, email, role, tz, password_hash,
-           must_change_password, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, username, full_name, email, about, role, tz, password_hash,
+           must_change_password, disabled, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         fields.username,
         fields.fullName,
         fields.email,
+        fields.about ?? "",
         fields.role,
         fields.tz ?? DEFAULT_TZ,
         fields.passwordHash,
         fields.mustChangePassword ? 1 : 0,
+        fields.disabled ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;

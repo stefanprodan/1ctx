@@ -130,20 +130,10 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             tz: parsed.tz,
             passwordHash,
             mustChangePassword: parsed.mustChangePassword ?? true,
+            about: parsed.about,
+            disabled: parsed.disabled,
             now: deps.clock(),
           });
-          if (parsed.about !== undefined && parsed.about !== created.about) {
-            deps.users.setDetails(created.id, {
-              fullName: created.fullName,
-              about: parsed.about,
-            });
-          }
-          if (
-            parsed.disabled !== undefined &&
-            parsed.disabled !== created.disabled
-          ) {
-            deps.users.setDisabled(created.id, parsed.disabled);
-          }
           return { result: find(created.id) };
         });
         const body: UserResponse = { user: oneUser(user) };
