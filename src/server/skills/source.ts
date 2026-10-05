@@ -6,6 +6,7 @@ import { sourceForm } from "../../shared/skills.ts";
 import { isSkillName, type SkillSource } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { normalizePath, validPath } from "../lib/paths.ts";
+import { httpUrl } from "./fetch.ts";
 import { MAX_INDEX_BYTES, MAX_INDEX_ENTRIES } from "./limits.ts";
 
 export type ResolvedSource = {
@@ -20,8 +21,6 @@ export type Picked = {
   skillMd: Uint8Array;
   files: Map<string, Uint8Array>;
 };
-
-export { normalizePath, validPath } from "../lib/paths.ts";
 
 export function resolve(url: string, select = ""): ResolvedSource {
   const form = sourceForm(url);
@@ -55,24 +54,6 @@ export function resolve(url: string, select = ""): ResolvedSource {
     fetchUrl: form.url,
     select,
   };
-}
-
-function absoluteUrl(value: unknown, base: string): string {
-  if (typeof value !== "string") throw new BadRequest("index URL is missing");
-  let url: URL;
-  try {
-    url = new URL(value, base);
-  } catch {
-    throw new BadRequest("index URL is invalid");
-  }
-  if (
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.username !== "" ||
-    url.password !== ""
-  ) {
-    throw new BadRequest("index URL must be http or https");
-  }
-  return url.href;
 }
 
 export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
@@ -113,19 +94,20 @@ export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
     ) {
       throw new BadRequest(`index entry ${entry.name} has an invalid digest`);
     }
+    if (typeof entry.url !== "string") {
+      throw new BadRequest("index URL is missing");
+    }
     return {
       name: entry.name,
       type: entry.type,
       description: entry.description,
-      url: absoluteUrl(entry.url, indexUrl),
+      url: httpUrl(entry.url, "index URL", indexUrl).href,
       digest: entry.digest,
     };
   });
 }
 
 export function pick(files: Map<string, Uint8Array>, path: string): Picked {
-  // the archive member count is bounded in fetch.ts before pick runs;
-  // here the keys are normalized and their paths validated
   const normalized = new Map<string, Uint8Array>();
   for (const [name, bytes] of files) {
     const clean = normalizePath(name);

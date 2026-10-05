@@ -46,21 +46,31 @@ async function readCapped(
   }
 }
 
-function checkedUrl(text: string): URL {
+// an http or https URL with no user info, else a 400 naming the label
+export function httpUrl(text: string, label: string, base?: string): URL {
   let url: URL;
   try {
-    url = new URL(text);
+    url = new URL(text, base);
   } catch {
-    throw new BadRequest("URL is invalid");
+    throw new BadRequest(`${label} is invalid`);
   }
   if (
     (url.protocol !== "http:" && url.protocol !== "https:") ||
     url.username !== "" ||
     url.password !== ""
   ) {
-    throw new BadRequest("URL must be http or https");
+    throw new BadRequest(`${label} must be http or https`);
   }
   return url;
+}
+
+// strict UTF-8, or null for bytes that are not
+export function utf8(bytes: Uint8Array): string | null {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 export async function download(
@@ -70,9 +80,16 @@ export async function download(
   cap: number = MAX_DOWNLOAD_BYTES,
   headers?: Record<string, string>,
 ): Promise<Uint8Array> {
-  let url = checkedUrl(input);
+  let url = httpUrl(input, "URL");
   const timeout = AbortSignal.timeout(FETCH_DEADLINE_MS);
   const signal = AbortSignal.any([shutdown, timeout]);
+  const failed = () => {
+    if (shutdown.aborted)
+      return new ServiceUnavailable("server is shutting down");
+    if (timeout.aborted)
+      return new BadGateway(`the host ${url.host} timed out`);
+    return new BadGateway(`the host ${url.host} did not answer`);
+  };
   for (let redirects = 0; ; redirects++) {
     let response: Response;
     try {
@@ -82,11 +99,7 @@ export async function download(
         ...(headers === undefined ? {} : { headers }),
       });
     } catch {
-      if (shutdown.aborted)
-        throw new ServiceUnavailable("server is shutting down");
-      if (timeout.aborted)
-        throw new BadGateway(`the host ${url.host} timed out`);
-      throw new BadGateway(`the host ${url.host} did not answer`);
+      throw failed();
     }
     if (response.status >= 300 && response.status < 400) {
       // the body of a redirect is never read; free it before the hop
@@ -98,7 +111,7 @@ export async function download(
         );
       if (redirects >= 3)
         throw new BadGateway(`the host ${url.host} redirected too many times`);
-      url = checkedUrl(new URL(location, url).href);
+      url = httpUrl(new URL(location, url).href, "URL");
       continue;
     }
     if (!response.ok) {
@@ -116,11 +129,7 @@ export async function download(
       return await readCapped(response.body, cap, "the download is too large");
     } catch (error) {
       if (error instanceof BadRequest) throw error;
-      if (shutdown.aborted)
-        throw new ServiceUnavailable("server is shutting down");
-      if (timeout.aborted)
-        throw new BadGateway(`the host ${url.host} timed out`);
-      throw new BadGateway(`the host ${url.host} did not answer`);
+      throw failed();
     }
   }
 }
@@ -169,12 +178,8 @@ export async function fetchSource(
       ),
     };
   }
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new BadRequest("the response is not UTF-8 text");
-  }
+  const text = utf8(bytes);
+  if (text === null) throw new BadRequest("the response is not UTF-8 text");
   if (!text.startsWith("---") && !text.startsWith("\uFEFF---")) {
     throw new BadRequest("the response is not a SKILL.md");
   }
@@ -189,11 +194,7 @@ export async function fetchText(
   headers?: Record<string, string>,
 ): Promise<{ bytes: Uint8Array; text: string }> {
   const bytes = await download(fetcher, url, shutdown, cap, headers);
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new BadRequest("the response is not UTF-8 text");
-  }
+  const text = utf8(bytes);
+  if (text === null) throw new BadRequest("the response is not UTF-8 text");
   return { bytes, text };
 }

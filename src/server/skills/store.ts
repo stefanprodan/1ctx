@@ -65,6 +65,69 @@ function parseJson<T>(value: string, fallback: T): T {
   }
 }
 
+type Fields = Omit<SkillRow, "body" | "files">;
+
+// the columns every read of a skill shares
+function fieldsOf(raw: Omit<Raw, "body">): Fields {
+  const stored = parseJson<DroppedStored[]>(raw.dropped, []);
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description,
+    license: raw.license,
+    compatibility: raw.compatibility,
+    metadata: parseJson(raw.metadata, {}),
+    allowedTools: raw.allowed_tools,
+    sourceKind: raw.source_kind,
+    sourceUrl: raw.source_url,
+    sourceSelect: raw.source_select,
+    sourceDigest: raw.source_digest,
+    digest: raw.digest,
+    dropped: stored
+      .filter((item) => item.more === undefined)
+      .map(({ path, reason }) => ({ path, reason })),
+    droppedMore: stored.find((item) => item.more !== undefined)?.more ?? 0,
+    fetchedAt: raw.fetched_at,
+    lastChange:
+      raw.last_change === null ? null : parseJson(raw.last_change, null),
+    refreshError: raw.refresh_error,
+    refreshFailedAt: raw.refresh_failed_at,
+    createdAt: raw.created_at,
+  };
+}
+
+function summaryOf(
+  fields: Fields,
+  bodyBytes: number,
+  files: { path: string; bytes: number }[],
+  agents: string[],
+): SkillSummary {
+  return {
+    id: fields.id,
+    name: fields.name,
+    description: fields.description,
+    license: fields.license,
+    compatibility: fields.compatibility,
+    metadata: fields.metadata,
+    allowedTools: fields.allowedTools,
+    sourceKind: fields.sourceKind,
+    sourceUrl: fields.sourceUrl,
+    sourceSelect: fields.sourceSelect,
+    sourceDigest: fields.sourceDigest,
+    digest: fields.digest,
+    bodyBytes,
+    files,
+    dropped: fields.dropped,
+    droppedMore: fields.droppedMore,
+    fetchedAt: fields.fetchedAt,
+    lastChange: fields.lastChange,
+    refreshError: fields.refreshError,
+    refreshFailedAt: fields.refreshFailedAt,
+    agents,
+    createdAt: fields.createdAt,
+  };
+}
+
 export class SkillStore {
   constructor(
     private readonly db: Db,
@@ -72,40 +135,12 @@ export class SkillStore {
   ) {}
 
   private row(raw: Raw): SkillRow {
-    const stored = parseJson<DroppedStored[]>(raw.dropped, []);
-    const more = stored.find((item) => item.more !== undefined)?.more ?? 0;
-    const dropped = stored
-      .filter((item) => item.more === undefined)
-      .map(({ path, reason }) => ({ path, reason }));
     const files = this.db
       .query<FileRaw, [string]>(
         "select path, content, bytes from skill_files where skill_id = ? order by path",
       )
       .all(raw.id);
-    return {
-      id: raw.id,
-      name: raw.name,
-      description: raw.description,
-      body: raw.body,
-      license: raw.license,
-      compatibility: raw.compatibility,
-      metadata: parseJson(raw.metadata, {}),
-      allowedTools: raw.allowed_tools,
-      sourceKind: raw.source_kind,
-      sourceUrl: raw.source_url,
-      sourceSelect: raw.source_select,
-      sourceDigest: raw.source_digest,
-      digest: raw.digest,
-      dropped,
-      droppedMore: more,
-      fetchedAt: raw.fetched_at,
-      lastChange:
-        raw.last_change === null ? null : parseJson(raw.last_change, null),
-      refreshError: raw.refresh_error,
-      refreshFailedAt: raw.refresh_failed_at,
-      createdAt: raw.created_at,
-      files,
-    };
+    return { ...fieldsOf(raw), body: raw.body, files };
   }
 
   list(): SkillRow[] {
@@ -115,65 +150,40 @@ export class SkillStore {
       .map((raw) => this.row(raw));
   }
 
-  // the list route: every row as a summary without loading the body
-  // text or any file content, so twenty skills of 20 KB stay light.
-  // bodyBytes is the UTF-8 byte length from SQLite, file bytes are the
-  // stored column
-  summaries(agentNames: (ids: string[]) => string[]): SkillSummary[] {
+  // light: no body text or file content
+  summaries(
+    agentNames: (ids: string[]) => string[],
+    id?: string,
+  ): SkillSummary[] {
     type LightRaw = Omit<Raw, "body"> & { body_bytes: number };
-    const rows = this.db
-      .query<LightRaw, []>(
-        `select id, name, description, license, compatibility, metadata,
-                allowed_tools, source_kind, source_url, source_select,
-                source_digest, digest, dropped, fetched_at, last_change,
-                refresh_error, refresh_failed_at, created_at,
+    const select = `select id, name, description, license, compatibility,
+                metadata, allowed_tools, source_kind, source_url,
+                source_select, source_digest, digest, dropped, fetched_at,
+                last_change, refresh_error, refresh_failed_at, created_at,
                 length(cast(body as blob)) as body_bytes
-           from skills order by created_at, name`,
-      )
-      .all();
+           from skills`;
+    const rows =
+      id === undefined
+        ? this.db
+            .query<LightRaw, []>(`${select} order by created_at, name`)
+            .all()
+        : this.db.query<LightRaw, [string]>(`${select} where id = ?`).all(id);
     const filesFor = this.db.query<{ path: string; bytes: number }, [string]>(
       "select path, bytes from skill_files where skill_id = ? order by path",
     );
     const usedBy = this.db.query<{ agent_id: string }, [string]>(
       "select agent_id from agent_skills where skill_id = ? order by agent_id",
     );
-    return rows.map((raw) => {
-      const stored = parseJson<DroppedStored[]>(raw.dropped, []);
-      const more = stored.find((item) => item.more !== undefined)?.more ?? 0;
-      const dropped = stored
-        .filter((item) => item.more === undefined)
-        .map(({ path, reason }) => ({ path, reason }));
-      const agents = agentNames(usedBy.all(raw.id).map((row) => row.agent_id));
-      return {
-        id: raw.id,
-        name: raw.name,
-        description: raw.description,
-        license: raw.license,
-        compatibility: raw.compatibility,
-        metadata: parseJson(raw.metadata, {}),
-        allowedTools: raw.allowed_tools,
-        sourceKind: raw.source_kind,
-        sourceUrl: raw.source_url,
-        sourceSelect: raw.source_select,
-        sourceDigest: raw.source_digest,
-        digest: raw.digest,
-        bodyBytes: raw.body_bytes,
-        files: filesFor.all(raw.id),
-        dropped,
-        droppedMore: more,
-        fetchedAt: raw.fetched_at,
-        lastChange:
-          raw.last_change === null ? null : parseJson(raw.last_change, null),
-        refreshError: raw.refresh_error,
-        refreshFailedAt: raw.refresh_failed_at,
-        agents,
-        createdAt: raw.created_at,
-      };
-    });
+    return rows.map((raw) =>
+      summaryOf(
+        fieldsOf(raw),
+        raw.body_bytes,
+        filesFor.all(raw.id),
+        agentNames(usedBy.all(raw.id).map((row) => row.agent_id)),
+      ),
+    );
   }
 
-  // the skill body and its file paths, without loading any file content:
-  // the `skill` tool reads the body but names the files, never reads them
   // the SKILL.md text alone, for a count of its tokens
   bodyText(id: string): string | null {
     return (
@@ -185,6 +195,7 @@ export class SkillStore {
     );
   }
 
+  // the body and file paths; the skill tool never reads file content
   bodyOf(id: string): {
     id: string;
     name: string;
@@ -212,7 +223,7 @@ export class SkillStore {
     id: string,
     agentNames: (ids: string[]) => string[],
   ): SkillSummary | null {
-    return this.summaries(agentNames).find((row) => row.id === id) ?? null;
+    return this.summaries(agentNames, id)[0] ?? null;
   }
 
   fileOf(id: string, path: string): FileRaw | null {
@@ -391,10 +402,8 @@ export class SkillStore {
       }));
   }
 
-  // the agent's skills as its page needs them without their bodies: when
-  // each was fetched, how many files it holds besides SKILL.md, and its
-  // digest, which moves with its content, so a count taken from the body
-  // can be kept until it does
+  // the digest moves with the content, so a token count is kept until it
+  // does
   versions(
     agentId: string,
   ): { id: string; digest: string; fetchedAt: number; files: number }[] {
@@ -441,30 +450,12 @@ export class SkillStore {
 }
 
 export function summary(row: SkillRow, agents: string[]): SkillSummary {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    license: row.license,
-    compatibility: row.compatibility,
-    metadata: row.metadata,
-    allowedTools: row.allowedTools,
-    sourceKind: row.sourceKind,
-    sourceUrl: row.sourceUrl,
-    sourceSelect: row.sourceSelect,
-    sourceDigest: row.sourceDigest,
-    digest: row.digest,
-    bodyBytes: new TextEncoder().encode(row.body).byteLength,
-    files: row.files.map(({ path, bytes }) => ({ path, bytes })),
-    dropped: row.dropped,
-    droppedMore: row.droppedMore,
-    fetchedAt: row.fetchedAt,
-    lastChange: row.lastChange,
-    refreshError: row.refreshError,
-    refreshFailedAt: row.refreshFailedAt,
+  return summaryOf(
+    row,
+    new TextEncoder().encode(row.body).byteLength,
+    row.files.map(({ path, bytes }) => ({ path, bytes })),
     agents,
-    createdAt: row.createdAt,
-  };
+  );
 }
 
 export function loaded(row: SkillRow): LoadedSkill {

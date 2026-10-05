@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { BadGateway, BadRequest, ServiceUnavailable } from "../lib/errors.ts";
+import { validPath } from "../lib/paths.ts";
 import { download, fetchText } from "./fetch.ts";
 import {
   FETCH_DEADLINE_MS,
@@ -10,7 +11,7 @@ import {
   MAX_INDEX_BYTES,
   MAX_TAR_BYTES,
 } from "./limits.ts";
-import { type Picked, validPath } from "./source.ts";
+import type { Picked } from "./source.ts";
 
 export type GithubFolder = {
   owner: string;
