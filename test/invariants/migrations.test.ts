@@ -59,11 +59,24 @@ const EXPECTED_IDS = [
   "0045-open-attention",
   "0046-azure",
   "0047-decision-usage-decider",
+  "0048-agent-listed-as",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
 const KEPT_COLUMNS =
   "(message_id, position, session_id, folder, dir, name, bytes, text, data)";
+
+// columns a later migration adds, left out where a test compares rows
+// from before its own migration with rows after every migration
+const LATER_COLUMNS = ["listed_as"];
+const earlier = (rows: unknown[]) =>
+  rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row as Record<string, unknown>).filter(
+        ([key]) => !LATER_COLUMNS.includes(key),
+      ),
+    ),
+  );
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
   EXPECTED_IDS.slice(EXPECTED_IDS.indexOf(first));
@@ -1011,7 +1024,7 @@ describe("the schema", () => {
         .all();
     const rows = () =>
       ["sessions", "sends", "messages", "usage", "agents"].map((table) =>
-        db.query(`select * from ${table} order by id`).all(),
+        earlier(db.query(`select * from ${table} order by id`).all()),
       );
     const keys = (name: string) =>
       db
@@ -1276,6 +1289,7 @@ describe("the schema", () => {
               attention_round: _______,
               memory_from: ________,
               attention_since: _________,
+              listed_as: __________,
               ...rest
             }) => rest,
           ),
@@ -1489,12 +1503,39 @@ describe("the schema", () => {
     }
   });
 
+  test("0048 keeps the model id of agents on a dedicated wire", () => {
+    const db = seed(MIGRATIONS.slice(0, 47));
+    try {
+      db.exec(`
+        insert into providers (id, name, wire, base_url, key_name, created_at)
+          values ('az', 'azure', 'azure', 'https://a.test', 'provider-az', 5),
+            ('ge', 'gemini', 'gemini', 'https://g.test', 'provider-ge', 5);
+        insert into agents (id, name, provider_id, model, model_name,
+            created_at)
+          values ('b', 'sol', 'az', 'gpt-6.1-sol', 'gpt-6.1-sol', 5),
+            ('c', 'prod', 'az', 'prod-sol', 'prod-sol (gpt-6.1-sol)', 5),
+            ('d', 'flash', 'ge', 'gemini-3.8-flash', 'Gemini 3.8 Flash', 5);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0048-agent-listed-as"));
+      expect(
+        db.query("select id, listed_as from agents order by id").all(),
+      ).toEqual([
+        { id: "a", listed_as: null },
+        { id: "b", listed_as: "gpt-6.1-sol" },
+        { id: "c", listed_as: "gpt-6.1-sol" },
+        { id: "d", listed_as: "gemini-3.8-flash" },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0046 widens the wire check and keeps every provider", () => {
     const db = seed(MIGRATIONS.slice(0, 45));
     const tables = ["providers", "agents", "deciders", "sends"];
     const rows = () =>
       tables.map((table) =>
-        db.query(`select * from ${table} order by rowid`).all(),
+        earlier(db.query(`select * from ${table} order by rowid`).all()),
       );
     try {
       db.exec(`
@@ -1547,7 +1588,7 @@ describe("the schema", () => {
       "sends",
       "usage",
     ];
-    // the columns 0043 adds after it
+    // the columns 0043 and later add after it
     const rows = () =>
       tables.map((table) =>
         db
@@ -1561,6 +1602,7 @@ describe("the schema", () => {
               attention_source: __,
               attention_round: ___,
               memory_from: ____,
+              listed_as: _____,
               ...rest
             }) => rest,
           ),
@@ -2539,6 +2581,7 @@ describe("0008 search tavily migration", () => {
             is_default: 0,
             deleted_at: null,
             skip_4bit: 0,
+            listed_as: null,
           })),
         );
         db.exec(`

@@ -30,6 +30,7 @@ type ModelDraft = {
   windowText: string;
   windowSaved: number | null;
   takesTools: boolean;
+  suggested: boolean;
 };
 
 export class AgentDrafts {
@@ -49,6 +50,9 @@ export class AgentDrafts {
   // the stored window the text was shown from, sent back when untouched
   windowSaved: number | null = null;
   readonly takesTools = signal(false);
+  // the window and tools are models.dev's for the model picked, not yet
+  // changed; the hint says so
+  readonly suggested = signal(false);
   // the model the upstream was chosen for: a tag names a provider of it
   upstreamOf: string | null = null;
   readonly changing = signal(false);
@@ -98,6 +102,7 @@ export class AgentDrafts {
     this.windowText.value = windowText(agent.model.contextLength);
     this.windowSaved = agent.model.contextLength;
     this.takesTools.value = agent.model.tools;
+    this.suggested.value = false;
     this.changing.value = false;
     this.before = null;
   }
@@ -158,6 +163,7 @@ export class AgentDrafts {
       windowText: this.windowText.value,
       windowSaved: this.windowSaved,
       takesTools: this.takesTools.value,
+      suggested: this.suggested.value,
     };
     this.changing.value = true;
   }
@@ -178,6 +184,7 @@ export class AgentDrafts {
       this.windowText.value = b.windowText;
       this.windowSaved = b.windowSaved;
       this.takesTools.value = b.takesTools;
+      this.suggested.value = b.suggested;
     }
     this.before = null;
     this.changing.value = false;
@@ -188,9 +195,13 @@ export class AgentDrafts {
     if (model.id !== this.upstreamOf) this.upstream.value = null;
     this.upstreamOf = model.id;
     if (resetThinking) this.thinking.value = null;
-    this.windowText.value = "";
-    this.windowSaved = null;
-    this.takesTools.value = false;
+    // an undescribed row carries models.dev's window and tools, if any:
+    // the fields start there, and the exact window is sent untouched
+    const suggested = !model.described && model.contextLength !== null;
+    this.windowText.value = suggested ? windowText(model.contextLength) : "";
+    this.windowSaved = suggested ? model.contextLength : null;
+    this.takesTools.value = suggested && model.tools;
+    this.suggested.value = suggested;
     this.before = null;
     this.changing.value = false;
   }
@@ -260,6 +271,10 @@ export class AgentDrafts {
       model?.thinkingRequired !== agent.model.thinkingRequired ||
       model?.reasoningKnown !== agent.model.reasoningKnown ||
       model?.reasoning !== agent.model.reasoning ||
+      // and one whose catalog now prices it, or names its models.dev id
+      model?.promptPrice !== agent.model.promptPrice ||
+      model?.completionPrice !== agent.model.completionPrice ||
+      model?.listedAs !== agent.model.listedAs ||
       this.thinking.value !== agent.thinking ||
       sentEffort(model, this.thinking.value, this.effort.value, wire) !==
         agent.effort ||

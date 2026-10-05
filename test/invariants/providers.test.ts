@@ -7,6 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../src/server/lib/errors.ts";
+import { modelPrice } from "../../src/server/providers/index.ts";
 import {
   parseBaseUrl,
   parseKeyName,
@@ -256,13 +257,15 @@ describe("GET /api/providers/:id/catalog", () => {
         id: "gemini-3.8-flash",
         name: "Gemini 3.8 Flash",
         contextLength: 1048576,
-        promptPrice: null,
-        completionPrice: null,
+        // the window is the catalog's own; the prices are models.dev's
+        promptPrice: modelPrice("google", "gemini-3.8-flash")!.input,
+        completionPrice: modelPrice("google", "gemini-3.8-flash")!.output,
         tools: true,
         reasoning: true,
         thinkingRequired: false,
         reasoningKnown: true,
         described: true,
+        listedAs: "gemini-3.8-flash",
       });
       const agent = await client.call("POST", "/api/agents", {
         body: {

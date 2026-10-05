@@ -297,11 +297,13 @@ export function Agent({ params }: { params: Params }) {
                 {priceLine(
                   shown.agent.model.promptPrice,
                   shown.agent.model.completionPrice,
+                  shown.wire,
                 ) !== "" && (
                   <AsideLine label="Price">
                     {priceLine(
                       shown.agent.model.promptPrice,
                       shown.agent.model.completionPrice,
+                      shown.wire,
                     )}
                   </AsideLine>
                 )}
@@ -342,6 +344,7 @@ export function Agent({ params }: { params: Params }) {
                   shown.provider,
                   shown.agent.model,
                   shown.agent.default,
+                  shown.wire,
                 )}
               </WhoLine>
             </Who>

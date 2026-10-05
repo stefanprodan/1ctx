@@ -13,6 +13,7 @@ import {
   geminiEvents,
   type ProviderRow,
   parseGeminiCatalog as parseCatalog,
+  withModelsDev,
 } from "../../../src/server/providers/index.ts";
 import {
   parseSse,
@@ -198,7 +199,7 @@ describe("Gemini catalog", () => {
   test("uses the native path and key header, never bearer auth", async () => {
     const fake = fakeFetch();
     expect(await fetchCatalog(fake.fetcher, row, KEY)).toEqual(
-      parseCatalog(catalog),
+      parseCatalog(catalog).map((m) => withModelsDev(m, "gemini")),
     );
     await fetchCatalog(fake.fetcher, row, null);
     expect(fake.calls.map((call) => call.url)).toEqual([
@@ -497,6 +498,7 @@ describe("Gemini stream", () => {
         completionTokens: 372,
         reasoningTokens: 371,
         cachedTokens: null,
+        cacheWriteTokens: null,
         cost: null,
       },
     });
@@ -625,6 +627,7 @@ describe("Gemini stream", () => {
             completionTokens: total - 15,
             reasoningTokens: null,
             cachedTokens: 7,
+            cacheWriteTokens: null,
             cost: null,
           },
         },

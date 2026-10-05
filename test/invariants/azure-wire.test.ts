@@ -7,7 +7,10 @@
 // cannot stop thinking, which comes back cut with no text.
 
 import { describe, expect, test } from "bun:test";
-import type { ReasoningDetail } from "../../src/server/providers/index.ts";
+import {
+  modelPrice,
+  type ReasoningDetail,
+} from "../../src/server/providers/index.ts";
 import { type Answer, azureFetch, refusal, stream } from "../helpers/azure.ts";
 import { AZURE_MODEL, type ChatApp, chatApp, tick } from "../helpers/chat.ts";
 
@@ -229,6 +232,39 @@ describe("the azure wire in a chat", () => {
       });
       // a default round leaves the level to the model
       expect(next.reasoning).toEqual({ summary: "auto" });
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+});
+
+describe("the azure wire's cost", () => {
+  test("a turn's usage row carries the cost at the deployed model's rates", async () => {
+    const { chat, fake } = await azureChat();
+    try {
+      queue(fake, stream("chat-text-after-tool.sse"));
+      const sessionId = await start(chat, "say hi");
+      const agent = chat.app.db
+        .query<{ listed_as: string | null }, [string]>(
+          "select listed_as from agents where id = ?",
+        )
+        .get(chat.agentId);
+      expect(agent?.listed_as).toBe(AZURE_MODEL);
+      const row = chat.app.db
+        .query<{ cost: number | null }, [string]>(
+          "select cost from usage where session_id = ?",
+        )
+        .get(sessionId)!;
+      // the recording: 1,316 in, of them 1,313 written to the cache and
+      // none read, and 1,412 out
+      const price = modelPrice("azure", AZURE_MODEL)!;
+      expect(row.cost).toBeCloseTo(
+        (3 * price.input + 1313 * price.cacheWrite + 1412 * price.output) /
+          1_000_000,
+        12,
+      );
+      expect(row.cost).toBeGreaterThan(0);
     } finally {
       await chat.app.shutdown();
       chat.app.db.close();

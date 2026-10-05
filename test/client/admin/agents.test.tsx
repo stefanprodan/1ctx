@@ -152,6 +152,10 @@ describe("the words", () => {
     expect(priceLine(0.14, 0.28)).toBe("$0.14 / $0.28");
     expect(priceLine(0, 0)).toBe("free");
     expect(priceLine(null, 1)).toBe("");
+    // OpenCode Go is a flat plan, whatever the row carries
+    expect(priceLine(null, null, "opencode")).toBe("subscription");
+    expect(priceLine(0.4, 1.6, "opencode")).toBe("subscription");
+    expect(priceLine(0.14, 0.28, "azure")).toBe("$0.14 / $0.28");
     expect(keyLine(null, false)).toBe("no key");
     expect(keyLine("provider-router", true)).toBe("provider-router.key");
     expect(keyLine("provider-router", false)).toBe(

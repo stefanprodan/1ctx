@@ -33,6 +33,26 @@ with probabilities.
   such a model does the agents API take `contextLength` and `tools` (a
   400 otherwise), and a window is required with tools on, since the
   tool loop weighs it.
+- **models.dev is embedded, never fetched.** `models.json` holds the
+  window, tools flag and canonical name of the Azure, Google and
+  OpenCode Go models, and prices (USD per million tokens, `tiers` won
+  over `context_over_200k`) for Azure and Google only. `make models`
+  rewrites it; the diff is committed. Hosts are never matched.
+- **A chat catalog row takes what models.dev adds** (`withModelsDev`).
+  A dedicated wire finds the row in its provider, by the deployed model
+  on Azure, and keeps that id as `listedAs`; a row with no price takes
+  the base rates. An undescribed row takes the window (the input cap
+  where listed) and tools as a suggestion the agent page starts from.
+  An OpenAI wire's undescribed row takes them from a model of that name
+  in any of the three, the smaller window on a clash, never a price. A
+  window outside the agent bounds is never suggested.
+- **A round's cost is the reply's own** (OpenRouter and systemone
+  report it), else 0 on `opencode` (a flat plan, read "subscription"),
+  else, on `azure` and `gemini`, the sum at the rates of the agent's
+  `listedAs` (`costOf`): uncached input, cache reads and writes at
+  their rates (the input rate where models.dev lists none), the
+  highest tier the prompt passes. Null when nothing prices it, as on
+  the OpenAI wires.
 - **A chat failure is an error event, never a throw.** The runner
   finishes a round on one channel. A stop by the caller's signal ends
   the stream with no event. The key is read at each request, so a

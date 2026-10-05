@@ -19,6 +19,7 @@ import {
   parseDeployments,
   requestTokens,
   wireTokens,
+  withModelsDev,
 } from "../../../src/server/providers/index.ts";
 import { providerFor } from "../../../src/server/providers/provider.ts";
 import { EFFORTS, isEffort, isWire } from "../../../src/shared/words.ts";
@@ -329,6 +330,7 @@ describe("the azure wire", () => {
             promptTokens: 99,
             completionTokens: 1197,
             cachedTokens: 0,
+            cacheWriteTokens: 0,
             reasoningTokens: 1176,
             cost: null,
           },
@@ -746,12 +748,17 @@ describe("the azure wire", () => {
         ["gpt-6-luna", "gpt-6-luna", false],
         ["gpt-6.1-sol", "gpt-6.1-sol", false],
       ]);
-      expect(models[0]).toMatchObject({
+      const parsed = parseDeployments(
+        JSON.parse(azureFixture("deployments.json")),
+      );
+      expect(parsed[0]).toMatchObject({
         contextLength: null,
         tools: false,
         reasoning: false,
         reasoningKnown: false,
+        listedAs: "gpt-6-luna",
       });
+      expect(models).toEqual(parsed.map((m) => withModelsDev(m, "azure")));
     });
 
     test("names the model beside a deployment named otherwise, and skips one not ready", () => {

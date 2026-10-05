@@ -15,7 +15,7 @@ import type {
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
-import type { Role } from "../../../shared/words.ts";
+import type { Role, Wire } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
 import { ago, tokensText } from "../../lib/format.ts";
 import {
@@ -93,11 +93,12 @@ export function agentLine(
   provider: string,
   model: CatalogMatch,
   isDefault = false,
+  wire: Wire | null = null,
 ): string {
   return [
     provider,
     windowLine(model.contextLength),
-    priceLine(model.promptPrice, model.completionPrice),
+    priceLine(model.promptPrice, model.completionPrice, wire),
     isDefault ? "default" : "",
   ]
     .filter((s) => s !== "")

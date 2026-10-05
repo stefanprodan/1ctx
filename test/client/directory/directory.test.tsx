@@ -83,6 +83,7 @@ const agent: DirectoryAgentResponse = {
     createdAt: 0,
   },
   provider: "router",
+  wire: "openrouter",
   skills: [
     {
       id: "s1",

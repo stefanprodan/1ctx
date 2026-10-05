@@ -11,10 +11,12 @@ import {
   DECIDER_WIRES,
 } from "../../shared/contracts/decider.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
+import type { Wire } from "../../shared/words.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
+import { factsByName, modelFacts, modelPrice, modelSource } from "./models.ts";
 import type { ProviderRow } from "./store.ts";
 import { CatalogError, type Fetcher } from "./types.ts";
 
@@ -185,7 +187,36 @@ export async function fetchCatalog(
       ? parseDeployments(body)
       : parseCatalog(body);
   if (models.length === 0) throw new CatalogError("the catalog is empty");
-  return models;
+  return kind === "chat"
+    ? models.map((m) => withModelsDev(m, provider.wire))
+    : models;
+}
+
+// what models.dev adds to a chat catalog row. On a dedicated wire the
+// row is found in its own provider, by the deployed model on Azure: an
+// undescribed row takes its window and tools, a suggestion the admin
+// may change before saving, a row with no price takes the base rates,
+// and listedAs keeps the id for the cost, listed or not, so a later
+// refresh of the file prices an agent saved before it. An OpenAI wire's
+// undescribed row takes the window and tools of a model of that name,
+// never a price
+export function withModelsDev(m: CatalogMatch, wire: Wire): CatalogMatch {
+  const { listedAs: _, ...row } = m;
+  const source = modelSource(wire);
+  if (source === null) {
+    const facts = m.described ? null : factsByName(m.id);
+    return facts === null ? row : { ...row, ...facts };
+  }
+  const id = m.listedAs ?? m.id;
+  const facts = modelFacts(source, id);
+  const price = modelPrice(source, id);
+  const out: CatalogMatch = { ...row, listedAs: id };
+  if (!m.described && facts !== null) Object.assign(out, facts);
+  if (price !== null && m.promptPrice === null) {
+    out.promptPrice = price.input;
+    out.completionPrice = price.output;
+  }
+  return out;
 }
 
 export function search(

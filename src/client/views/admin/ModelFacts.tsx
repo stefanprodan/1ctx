@@ -15,6 +15,7 @@ export function ModelFacts({
   save,
   window,
   tools,
+  suggested = false,
   busy,
   onWindow,
   onTools,
@@ -22,6 +23,8 @@ export function ModelFacts({
   save: Pick<Save, "fieldError">;
   window: string;
   tools: boolean;
+  // the window is models.dev's, not yet changed
+  suggested?: boolean;
   busy: boolean;
   onWindow: (value: string) => void;
   onTools: (value: boolean) => void;
@@ -44,7 +47,9 @@ export function ModelFacts({
           <FieldError save={save} field="contextLength" />
         ) : (
           <span class="hint">
-            Thousands of tokens. The catalog does not list this model's window.
+            {suggested
+              ? "Thousands of tokens. Suggested by models.dev."
+              : "Thousands of tokens. The catalog does not list this model's window."}
           </span>
         )}
       </label>

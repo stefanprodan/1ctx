@@ -57,6 +57,7 @@ function terminalEvents(body: any, calls: boolean, refused: boolean) {
   const usage = response.usage;
   if (usage && typeof usage === "object") {
     const cached = usage.input_tokens_details?.cached_tokens;
+    const written = usage.input_tokens_details?.cache_write_tokens;
     const reasoning = usage.output_tokens_details?.reasoning_tokens;
     events.push({
       kind: "usage",
@@ -64,6 +65,7 @@ function terminalEvents(body: any, calls: boolean, refused: boolean) {
         promptTokens: num(usage.input_tokens),
         completionTokens: num(usage.output_tokens),
         cachedTokens: typeof cached === "number" ? cached : null,
+        cacheWriteTokens: typeof written === "number" ? written : null,
         reasoningTokens: typeof reasoning === "number" ? reasoning : null,
         cost: null,
       },

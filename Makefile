@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -95,3 +95,6 @@ load-summary: ## Print the results table of load runs (ARGS="label ...", all whe
 
 load-smoke: ## Run the bench for 30 s at N=2 on a tiny database
 	@bun run load-smoke
+
+models: ## Refresh the embedded model windows, tools and prices from models.dev
+	@bun run models

@@ -59,12 +59,14 @@ export function ModelFields({
         providers={byName(rows)}
         providerId={d.providerId.value}
         model={
-          picked === null ? null : { id: picked.id, meta: modelMeta(picked) }
+          picked === null
+            ? null
+            : { id: picked.id, meta: modelMeta(picked, wire) }
         }
         changing={d.changing.value}
         cancellable={d.cancellable}
         currentId={currentId}
-        matchMeta={modelMeta}
+        matchMeta={(m) => modelMeta(m, wire)}
         autofocus={!fresh}
         onChange={() => d.change()}
         onCancel={() => d.cancel()}
@@ -78,9 +80,11 @@ export function ModelFields({
               save={save}
               window={d.windowText.value}
               tools={d.takesTools.value}
+              suggested={d.suggested.value}
               busy={busy}
               onWindow={(value) => {
                 d.windowText.value = value;
+                d.suggested.value = false;
                 save.touch();
               }}
               onTools={(value) => {
