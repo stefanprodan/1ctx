@@ -14,7 +14,7 @@ import { refuseArchived, type SessionRow } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import { envelope, lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
-import type { ActiveSend, RoundState } from "./send.ts";
+import { type ActiveSend, type RoundState, unmarkAnswer } from "./send.ts";
 import type { SessionsPort } from "./writer-port.ts";
 
 type SummaryDeps = {
@@ -65,6 +65,7 @@ function finishAnswer(
     round.thinkingMs ??
     (round.reasoningStartedAt === null ? null : now - round.reasoningStartedAt);
   recordUsage(deps, send, round, now);
+  unmarkAnswer(round, send.policy.agentName);
   return deps.sessions.finishReply(round.messageId, {
     content: round.content,
     reasoning: round.reasoning,
