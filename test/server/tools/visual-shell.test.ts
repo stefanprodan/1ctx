@@ -1,27 +1,29 @@
 import { expect, test } from "bun:test";
 import { measureVisual } from "../../../src/server/tools/visual-height.ts";
-import type {
-  VisualAttribute,
-  VisualElement,
-  VisualScript,
-  VisualTree,
+import {
+  cleanVisual,
+  inertVisual,
+  type VisualAttribute,
+  type VisualElement,
+  type VisualScript,
+  type VisualTree,
+  visualAttributeRule,
+  visualElementRule,
+  visualScript,
 } from "../../../src/server/tools/visual-inert.ts";
-import { bootVisual } from "../../../src/server/tools/visual-painter.ts";
+import {
+  bootVisual,
+  visualConnect,
+  visualMessage,
+} from "../../../src/server/tools/visual-painter.ts";
 import {
   visualContrast,
   visualGround,
   visualSchemeQuery,
 } from "../../../src/server/tools/visual-scheme.ts";
 import {
-  cleanVisual,
-  inertVisual,
-  visualAttributeRule,
-  visualConnect,
   visualCsp,
   visualDocument,
-  visualElementRule,
-  visualMessage,
-  visualScript,
   visualShell,
 } from "../../../src/server/tools/visual-shell.ts";
 import {

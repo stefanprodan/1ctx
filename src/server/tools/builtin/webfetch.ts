@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The webfetch tool: a plain fetch that follows redirects, cuts the body
-// at the cap and reaches under the deadline. Listed access checks every
-// origin before a request, including redirects. The fetch comes from the dependency, so the
-// suite passes a fake and never leaves the process. The body cap, the
-// deadline and the result cut come from the tool caps on the context.
+// Listed access checks every origin, redirects included.
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { bytesWords } from "../../lib/bytes.ts";
@@ -15,11 +11,6 @@ import type { Tool, ToolContext } from "../types.ts";
 function cutNote(maxBytes: number): string {
   return `<error>Content truncated at ${bytesWords(maxBytes)}.</error>`;
 }
-
-// what reaches the network; a test passes a fake
-export type FetchDependencies = {
-  fetch: typeof fetch;
-};
 
 type MediaType = {
   type: string;
@@ -337,8 +328,7 @@ function integerArgument(
 export async function fetchText(
   args: Record<string, unknown>,
   ctx: ToolContext,
-  version: string,
-  dependencies: FetchDependencies = { fetch },
+  fetcher: typeof fetch = fetch,
 ): Promise<string> {
   if (typeof args.url !== "string" || args.url === "") {
     throw new Error("url must be a non-empty string");
@@ -366,10 +356,9 @@ export async function fetchText(
 
     while (true) {
       deadline.throwIfAborted();
-      const response = await dependencies.fetch(url.href, {
+      const response = await fetcher(url.href, {
         method: "GET",
         headers: {
-          "User-Agent": `1ctx/${version}`,
           Accept:
             "text/html, text/plain, application/json, application/xml, text/*;q=0.9",
         },
@@ -425,10 +414,8 @@ export async function fetchText(
   }
 }
 
-// the tool the area builds per send, with the version bound
 export function makeWebfetchTool(
-  version: string,
-  dependencies: FetchDependencies = { fetch },
+  fetcher: typeof fetch = fetch,
   web: WebSnapshot | null = null,
 ): Tool {
   return {
@@ -462,6 +449,6 @@ export function makeWebfetchTool(
       required: ["url"],
       additionalProperties: false,
     },
-    run: (args, ctx) => fetchText(args, ctx, version, dependencies),
+    run: (args, ctx) => fetchText(args, ctx, fetcher),
   };
 }

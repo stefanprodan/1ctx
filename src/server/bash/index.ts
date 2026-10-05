@@ -119,7 +119,6 @@ export {
   KEPT_UNPACK_ERROR,
   type KeptFile,
   type KeptPending,
-  type KeptWrite,
   keptPath,
   pendingKept,
   readKeptRaw,
@@ -127,6 +126,6 @@ export {
   writeKeptFiles,
   writeKeptFrame,
 } from "./kept.ts";
-export type { CommandRepos } from "./mount.ts";
+export type { CommandResult } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";
 export type { CommandEnd, JobRepo } from "./protocol.ts";

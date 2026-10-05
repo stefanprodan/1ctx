@@ -29,7 +29,6 @@ export function area(): ToolsArea {
     secret: () => null,
     clock: () => now,
     log: silent,
-    version: "vtest",
     render: (markdown) => markdown,
     skills,
     memory: {

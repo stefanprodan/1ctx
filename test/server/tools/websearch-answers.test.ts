@@ -97,7 +97,6 @@ describe("Exa answers", () => {
         { query: "find" },
         context(),
         search("exa", "bad"),
-        "vtest",
         dependencies(async () => exaResponse(badKey)),
       ),
     );
@@ -109,7 +108,6 @@ describe("Exa answers", () => {
         { query: "find" },
         context(),
         search("exa"),
-        "vtest",
         dependencies(async () => exaResponse(badKey)),
       ),
     );

@@ -9,19 +9,19 @@ import { describe, expect, test } from "bun:test";
 import {
   ATTENTION_DESCRIPTION,
   attentionDescription,
+  checkReason,
   makeAttentionTool,
-  parseReason,
 } from "../../../src/server/tools/builtin/attention.ts";
 import { MAX_ATTENTION_REASON } from "../../../src/shared/words.ts";
 
 describe("the reason", () => {
   test("is one line, trimmed and cleaned", () => {
-    expect(parseReason("  podinfo is not ready \n")).toBe(
+    expect(checkReason("  podinfo is not ready \n")).toBe(
       "podinfo is not ready",
     );
-    expect(parseReason("a\u0000b")).toBe("ab");
+    expect(checkReason("a\u0000b")).toBe("ab");
     for (const bad of ["", " \t ", "a\nb", "a\rb", "a b", null, 3]) {
-      expect(parseReason(bad)).toBeNull();
+      expect(() => checkReason(bad)).toThrow("reason must be one line.");
     }
   });
 
@@ -43,7 +43,7 @@ describe("the reason", () => {
       "none / null",
       "[placeholder]",
     ]) {
-      expect(parseReason(filler)).toBeNull();
+      expect(() => checkReason(filler)).toThrow("not a placeholder");
     }
     for (const real of [
       "test-flux is not ready",
@@ -51,14 +51,14 @@ describe("the reason", () => {
       "the ok check failed",
       "n/a: the cluster was unreachable",
     ]) {
-      expect(parseReason(real)).toBe(real);
+      expect(checkReason(real)).toBe(real);
     }
   });
 
   test("a long one is cut to the cap in characters, not code units", () => {
     const emoji = "\u{1F525}".repeat(MAX_ATTENTION_REASON);
-    expect(parseReason(emoji)).toBe(emoji);
-    const cut = parseReason(`${emoji}x`)!;
+    expect(checkReason(emoji)).toBe(emoji);
+    const cut = checkReason(`${emoji}x`)!;
     expect([...cut]).toHaveLength(MAX_ATTENTION_REASON);
     expect(cut.endsWith("…")).toBeTrue();
   });

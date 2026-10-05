@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The Firecrawl wire: a search over its v2 endpoint, answered as JSON.
-// Nothing here reads a key file or reaches the network; the area passes
-// the key, the version and the deadline, the caller does the request.
 
 import { isRecord } from "../../../../shared/words.ts";
 import { formatHits, jsonObject, unexpected } from "./answer.ts";
@@ -23,12 +21,10 @@ const MIN_TIMEOUT_MS = 1000;
 export function buildRequest(
   args: SearchArgs,
   key: string | null,
-  version: string,
   deadlineMs: number,
 ): ProviderRequest {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "User-Agent": `1ctx/${version}`,
   };
   if (key !== null) headers.Authorization = `Bearer ${key}`;
   return {

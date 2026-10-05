@@ -43,7 +43,6 @@ function setup(large = false, bash?: Parameters<typeof toolsArea>[0]["bash"]) {
     secret: () => null,
     clock: () => 1,
     log: silent,
-    version: "test",
     render: (text) => text,
     skills: { forAgent: () => [], body: () => null, file: () => null },
     mcp,

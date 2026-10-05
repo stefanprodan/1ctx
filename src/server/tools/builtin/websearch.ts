@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The websearch tool. The provider is chosen once per send (the area's
-// offered()); the key is read by the area from the secrets port at each
-// call and passed here, never held by the runner. This file reaches the
-// network only through the fetch dependency, so the suite passes a fake
-// and never leaves the process. The body cap and the deadline come from
-// the tool caps on the context.
+// The websearch tool; the network only through the fetch dependency.
 
 import { bytesWords } from "../../lib/bytes.ts";
 import { ToolError } from "../../lib/errors.ts";
@@ -28,16 +23,13 @@ const WIRES = { exa, firecrawl, tavily } satisfies Record<
     buildRequest(
       args: SearchArgs,
       key: string | null,
-      version: string,
       deadlineMs: number,
     ): ProviderRequest;
     parseAnswer(body: string, contentType: string | null, key: boolean): string;
   }
 >;
 
-// the provider chosen for the send and the key read for this call; the
-// key is null when there is no file, and the call runs keyless on the
-// same provider, never a switch to another (decision 3)
+// the key read for this call, null for keyless on the same provider
 export type Search = { provider: SearchProvider; key: string | null };
 
 export type SearchDependencies = {
@@ -272,7 +264,6 @@ export async function searchWeb(
   args: Record<string, unknown>,
   ctx: ToolContext,
   search: Search,
-  version: string,
   dependencies: SearchDependencies = defaults,
 ): Promise<string> {
   const parsed = parseArgs(args);
@@ -286,7 +277,7 @@ export async function searchWeb(
   // the provider's timeout and the retry wait follow whichever ends first
   const effectiveMs = Math.min(deadlineMs, ctx.caps.callTimeoutMs);
   const wire = WIRES[provider];
-  const request = wire.buildRequest(parsed, key, version, effectiveMs);
+  const request = wire.buildRequest(parsed, key, effectiveMs);
   const parse = wire.parseAnswer;
   const timeout = AbortSignal.timeout(deadlineMs);
   const signal = AbortSignal.any([ctx.signal, timeout]);
@@ -313,12 +304,10 @@ export async function searchWeb(
 const DESCRIPTION =
   "Search the web. Describe the page you want in a sentence, not keywords. Set domain to limit the results to one site. Returns titles, URLs and excerpts. Call webfetch on a result's URL to read the whole page. Searches have a per-send budget, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
 
-// the tool the area builds per send, with the provider chosen and the
-// version bound; the key is passed in per call by the area
+// the provider is chosen per send; the key is read at each call
 export function makeWebsearchTool(
   key: () => string | null,
   provider: SearchProvider,
-  version: string,
   dependencies: SearchDependencies = defaults,
 ): Tool {
   return {
@@ -351,13 +340,7 @@ export function makeWebsearchTool(
         value === null ? text : text.replaceAll(value, "[key]");
       try {
         return scrub(
-          await searchWeb(
-            args,
-            ctx,
-            { provider, key: value },
-            version,
-            dependencies,
-          ),
+          await searchWeb(args, ctx, { provider, key: value }, dependencies),
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

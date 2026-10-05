@@ -410,7 +410,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret("search-", name),
     clock,
     log: log("tools"),
-    version: options.version,
     render: renderMarkdown,
     skills,
     mcp,

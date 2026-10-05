@@ -97,7 +97,7 @@ export function runMemory(
     const result = handle.stopped
       ? stoppedResult()
       : await new Registry(makeMemoryTools(handle)).run(call, ctx);
-    if (call.name === "memory_edit") handle.recordEdit(!result.error);
+    handle.recordEdit(!result.error);
     return result.error
       ? {
           error: true,

@@ -1,3 +1,6 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
 // Each function runs inside the frame from its source text, so none may
 // reach outside its own body.
 

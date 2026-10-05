@@ -1,3 +1,6 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
 export type VisualScript = { type: string; src: string | null; text: string };
 export type VisualAttribute = { name: string; value: string };
 export type VisualTree = { children: ArrayLike<VisualElement> };

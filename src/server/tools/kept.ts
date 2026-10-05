@@ -1,10 +1,6 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An MCP result as the context and /mcp get it. What the context cannot
-// hold is kept whole under /mcp and the context gets its start and the
-// path; an embedded resource is inlined when it is small text and kept
-// as a file otherwise, never both.
 // The path lines are the result's tail, so every later cut keeps them.
 
 import { type KeptFile, keptPath } from "../bash/index.ts";
@@ -176,7 +172,7 @@ export function shapeMcpResult(
       text !== null ? Buffer.byteLength(text) : (data?.byteLength ?? 0);
     const at = folder();
     files.push({ folder: number, dir: at, name, text, data, bytes });
-    return keptPath(folder(), name);
+    return keptPath(at, name);
   };
 
   // the text as resultText gives it, a large resource left to its file

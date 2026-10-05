@@ -134,14 +134,24 @@ function scrubbed(
   };
 }
 
-export function makeBashTool(
-  bash?: Pick<BashCapability, "run">,
-  web: WebSnapshot | null = null,
+export type BashToolOptions = {
+  bash?: Pick<BashCapability, "run">;
+  web?: WebSnapshot | null;
+  visuals?: boolean;
+  credentials?: BashCredentials;
+  keys?: CredentialKeysPort;
+  // false while the send has the project docs off
+  docs?: boolean;
+};
+
+export function makeBashTool({
+  bash,
+  web = null,
   visuals = true,
-  credentials: BashCredentials = NONE,
-  keys?: CredentialKeysPort,
+  credentials = NONE,
+  keys,
   docs = true,
-): Tool<ToolResult> {
+}: BashToolOptions = {}): Tool<ToolResult> {
   return {
     name: "bash",
     // past the mount's own backstop, so its words end a stuck command

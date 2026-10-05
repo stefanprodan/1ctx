@@ -19,7 +19,6 @@ function setup() {
     db,
     clock: () => 1,
     log: silent,
-    version: "test",
     render: (text) => text,
     secret: () => null,
     skills: {
@@ -184,8 +183,8 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
     agentName: "agent",
     origin: "chat",
   };
-  const tool = makeBashTool(
-    {
+  const tool = makeBashTool({
+    bash: {
       async run(_project, _session, _author, _command, caps, signal) {
         expect(caps).toEqual({
           callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
@@ -201,7 +200,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
       },
     },
     web,
-  );
+  });
   expect(tool.description).toContain("host9.test and 2 more");
   expect(tool.description).not.toContain("host10.test");
   expect(tool.description).toContain("Save downloads in /tmp");

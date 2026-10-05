@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // webfetch as a plain fetch: the URL guard, HTML extraction, slicing, the
-// redirect limit, the body cut, the media-type and charset handling, the
-// deadline and the User-Agent. There is no address classification, no
+// redirect limit, the body cut, the media-type and charset handling and
+// the deadline. There is no address classification, no
 // resolver and no reachable-set (decision 2). The fetch is a fake, so the
 // suite never reaches a network; hosts are made up.
 
@@ -11,7 +11,6 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   extractHtml,
-  type FetchDependencies,
   fetchText,
   makeWebfetchTool,
   parseFetchUrl,
@@ -42,11 +41,9 @@ function context(signal = new AbortController().signal): ToolContext {
 
 function dependencies(
   response: (input: string, init: RequestInit) => Response | Promise<Response>,
-): FetchDependencies {
-  return {
-    fetch: (async (input, init) =>
-      response(String(input), init ?? {})) as typeof fetch,
-  };
+): typeof fetch {
+  return (async (input, init) =>
+    response(String(input), init ?? {})) as typeof fetch;
 }
 
 function textResponse(
@@ -60,8 +57,8 @@ function textResponse(
   return new Response(text, { ...init, headers });
 }
 
-const run = (args: Record<string, unknown>, deps: FetchDependencies) =>
-  fetchText(args, context(), "vtest", deps);
+const run = (args: Record<string, unknown>, deps: typeof fetch) =>
+  fetchText(args, context(), deps);
 
 describe("listed web access", () => {
   test("the schema names every listed host and changes with the full list", () => {
@@ -70,9 +67,9 @@ describe("listed web access", () => {
       (_, index) => `host${index}.test`,
     );
     const deps = dependencies(() => textResponse());
-    const first = makeWebfetchTool("test", deps, { mode: "listed", domains });
+    const first = makeWebfetchTool(deps, { mode: "listed", domains });
     expect(first.description).toContain(domains.join(", "));
-    const changed = makeWebfetchTool("test", deps, {
+    const changed = makeWebfetchTool(deps, {
       mode: "listed",
       domains: [...domains.slice(0, 11), "another.test"],
     });
@@ -95,7 +92,6 @@ describe("listed web access", () => {
     const result = fetchText(
       { url },
       ctx,
-      "test",
       dependencies(() => {
         calls++;
         return textResponse("page");
@@ -117,7 +113,6 @@ describe("listed web access", () => {
     const result = fetchText(
       { url: "https://docs.test/start" },
       ctx,
-      "test",
       dependencies(() => {
         calls++;
         return new Response(null, {
@@ -139,7 +134,6 @@ describe("listed web access", () => {
     const result = await fetchText(
       { url: "https://docs.test/start" },
       ctx,
-      "test",
       dependencies((url) => {
         requested.push(url);
         if (requested.length === 1)
@@ -188,7 +182,7 @@ describe("fetch URL guard", () => {
     ).rejects.toThrow("url must be a non-empty string");
   });
 
-  test("sets the User-Agent and manual redirect", async () => {
+  test("normalizes the host and asks for manual redirects", async () => {
     let input = "";
     let options: RequestInit | undefined;
     const deps = dependencies((url, init) => {
@@ -199,7 +193,6 @@ describe("fetch URL guard", () => {
     const result = await run({ url: "https://PUBLIC.EXAMPLE./path?q=1" }, deps);
     expect(result).toBe("page");
     expect(input).toBe("https://public.example/path?q=1");
-    expect(new Headers(options?.headers).get("user-agent")).toBe("1ctx/vtest");
     expect(options?.redirect).toBe("manual");
   });
 
@@ -270,7 +263,6 @@ describe("fetch URL guard", () => {
       fetchText(
         { url: "https://public.example/" },
         ctx,
-        "vtest",
         dependencies(() => textResponse()),
       ),
     ).rejects.toThrow("fetch limit reached");
@@ -291,7 +283,6 @@ describe("fetch response", () => {
         max_length: 500,
       },
       context(),
-      "vtest",
       deps,
     );
     expect(result).toBe(
@@ -311,7 +302,6 @@ describe("fetch response", () => {
         max_length: 500,
       },
       ctx,
-      "vtest",
       dependencies(
         () =>
           new Response(bytes, { headers: { "content-type": "text/plain" } }),
@@ -447,27 +437,22 @@ describe("fetch deadline", () => {
       },
       caps: { ...DEFAULT_LIMITS, fetchDeadlineMs: 20 },
     };
-    const deps: FetchDependencies = {
-      fetch: ((_input: RequestInfo | URL, init?: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(init.signal?.reason),
-          );
-        })) as typeof fetch,
-    };
+    const deps = ((_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(init.signal?.reason),
+        );
+      })) as typeof fetch;
     await expect(
-      fetchText({ url: "https://public.example/" }, ctx, "vtest", deps),
+      fetchText({ url: "https://public.example/" }, ctx, deps),
     ).rejects.toThrow("fetch timed out after 0.02 seconds");
   });
 });
 
 describe("webfetch tool wrapper", () => {
-  test("makeWebfetchTool carries the name, schema and version", async () => {
-    const deps = dependencies((_url, init) => {
-      expect(new Headers(init.headers).get("user-agent")).toBe("1ctx/v9");
-      return textResponse("page");
-    });
-    const tool = makeWebfetchTool("v9", deps);
+  test("makeWebfetchTool carries the name and the fetcher", async () => {
+    const deps = dependencies(() => textResponse("page"));
+    const tool = makeWebfetchTool(deps);
     expect(tool.name).toBe("webfetch");
     expect(await tool.run({ url: "https://public.example/" }, context())).toBe(
       "page",

@@ -122,10 +122,10 @@ export function builtinCatalog(
   const skill = { id: "", name: "", description: "", hasFiles: true };
   const tools = fillYear(
     [
-      makeBashTool(undefined, { mode: "all", domains: [] }, true),
+      makeBashTool({ web: { mode: "all", domains: [] } }),
       datetimeTool,
-      makeWebfetchTool(""),
-      makeWebsearchTool(() => null, "exa", ""),
+      makeWebfetchTool(),
+      makeWebsearchTool(() => null, "exa"),
       ...makeSkillTools([skill], {
         body: () => null,
         file: () => null,

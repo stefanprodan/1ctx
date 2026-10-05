@@ -17,7 +17,6 @@ function setup() {
     db,
     clock: () => 1,
     log: silent,
-    version: "test",
     render: (text) => text,
     secret: () => null,
     skills: { forAgent: () => [], body: () => null, file: () => null },

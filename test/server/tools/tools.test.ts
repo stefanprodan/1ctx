@@ -90,7 +90,6 @@ function area(
     secret: (name) => secrets[name] ?? null,
     clock: () => now,
     log: silent,
-    version: "vtest",
     render: (md) => md,
     skills,
   });

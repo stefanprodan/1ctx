@@ -8,12 +8,7 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider } from "../../shared/words.ts";
-import type {
-  CommandEnd,
-  JobRepo,
-  KeptFile,
-  OpenedRecord,
-} from "../bash/index.ts";
+import type { CommandResult, JobRepo, KeptFile } from "../bash/index.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
@@ -73,21 +68,12 @@ export type ToolContext = {
   repos?: SendRepos | null;
 };
 
-export type ToolResult = {
-  content: string;
-  error: boolean;
-  tail?: number;
-  opened?: OpenedRecord[];
-  // the /knowledge paths a bash command wrote, stored on its row
-  saved?: string[];
+export type ToolResult = CommandResult & {
   // MCP results and resources kept under /mcp, written with the row
   kept?: KeptFile[];
-  // Kept in memory for the log and deliberately omitted from stored rows.
+  // for the log only, never on a stored row
   failure?: unknown;
   timedOut?: boolean;
-  // where a bash command that saved nothing ended, for the log; finishTool
-  // stores fields by name, so it never reaches a row
-  ended?: CommandEnd;
 };
 
 export type Tool<T extends string | ToolResult = string> = {
