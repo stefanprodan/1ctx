@@ -84,16 +84,18 @@ export function Menu({
     });
   };
   const editing = state.value.editing;
+  // every focus here skips the scroll: the head is sticky, and the
+  // browser would bring it into view at its place atop the chat
   // the title button is mounted again only after the box goes, so the
   // focus it gets back is given on the render after
   const refocus = useRef(false);
   useEffect(() => {
     if (editing) {
-      box.current?.focus();
+      box.current?.focus({ preventScroll: true });
       box.current?.select();
     } else if (refocus.current) {
       refocus.current = false;
-      trigger.current?.focus();
+      trigger.current?.focus({ preventScroll: true });
     }
   }, [editing]);
   const edit = () => {
@@ -129,7 +131,8 @@ export function Menu({
       // fall to the page and a keyboard user would lose their place
       const within = root.current?.contains(document.activeElement) ?? false;
       step("dismiss");
-      if (within && !state.value.open) trigger.current?.focus();
+      if (within && !state.value.open)
+        trigger.current?.focus({ preventScroll: true });
     };
     document.addEventListener("pointerdown", onPress);
     document.addEventListener("keydown", onKey);
