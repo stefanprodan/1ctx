@@ -5,7 +5,7 @@
 
 import type { RepoError } from "../../shared/contracts/repo.ts";
 import type { Clock } from "../lib/clock.ts";
-import { newId } from "../lib/ids.ts";
+import { newId, sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { Queue } from "../lib/queue.ts";
 import type { Limits } from "../limits/index.ts";
@@ -55,9 +55,6 @@ export const fail = (error: RepoError): Failure => ({
 export const asTree = (done: Fetched): Tree =>
   done.ok || done.error !== "no commit" ? done : fail("host unreachable");
 
-export const hash = (text: string, length: number) =>
-  new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, length);
-
 // the kind whose endpoints a row reaches: github.com and gitlab.com fix
 // it, any other host takes the row's
 export const endpointKind = (row: Pick<RepoRow, "url" | "kind">) =>
@@ -67,7 +64,7 @@ export const endpointKind = (row: Pick<RepoRow, "url" | "kind">) =>
 // from a host, a repository or a tarball. One URL as two kinds is two
 // repositories, each tree proved by its own endpoints
 export const sourceOf = (row: Pick<RepoRow, "url" | "kind">) =>
-  hash(`${endpointKind(row)} ${row.url}`, 16);
+  sha256(`${endpointKind(row)} ${row.url}`).slice(0, 16);
 
 // who fetches: a failure with one key, or with none, is never another's
 const signerOf = (row: RepoRow) => row.keyName ?? "";

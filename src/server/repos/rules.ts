@@ -6,6 +6,7 @@
 // Patterns and paths are matched as UTF-8 bytes, as git matches them.
 
 import { DEFAULT_REPO_IGNORE as DEFAULT_IGNORE } from "../../shared/contracts/repo.ts";
+import { sha256 } from "../lib/ids.ts";
 
 export interface IgnorePattern {
   /** the pattern as bytes, without its `!`, leading `/` and trailing `/` */
@@ -52,10 +53,7 @@ export function ignoreKey(text: string): string {
     .split("\n")
     .map((line) => line.replace(/\r$/, ""));
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-  return new Bun.CryptoHasher("sha256")
-    .update(lines.join("\n"))
-    .digest("hex")
-    .slice(0, 12);
+  return sha256(lines.join("\n")).slice(0, 12);
 }
 
 const encoder = new TextEncoder();

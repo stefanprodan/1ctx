@@ -6,6 +6,7 @@
 import type { RepoError } from "../../shared/contracts/repo.ts";
 import { readStream } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
+import { sha256 } from "../lib/ids.ts";
 import { type Adapter, adapter, isCommit } from "./adapters.ts";
 import type { RepoCache } from "./cache.ts";
 import type { RepoAuth, RepoHeader } from "./check.ts";
@@ -16,7 +17,6 @@ import {
   type Fetched,
   type Fetches,
   fail,
-  hash,
   sourceOf,
 } from "./fetches.ts";
 import {
@@ -110,7 +110,7 @@ const lookupKey = (row: RepoRow) =>
   `${endpointKind(row)}\n${row.url}\n${row.ref}\n${row.keyName ?? ""}`;
 
 // a stored ETag is prefixed by its lookup's, so another lookup never sends it
-const etagScope = (row: RepoRow) => `${hash(lookupKey(row), 12)} `;
+const etagScope = (row: RepoRow) => `${sha256(lookupKey(row)).slice(0, 12)} `;
 
 export const scopedEtag = (row: RepoRow, etag: string | null) =>
   etag === null ? null : `${etagScope(row)}${etag}`;

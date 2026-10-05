@@ -7,6 +7,7 @@ import type {
 } from "../../shared/contracts/skill.ts";
 import type { SkillSource } from "../../shared/words.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
+import { sha256 } from "../lib/ids.ts";
 import { cleanText } from "./clean.ts";
 import { type Fetched, fetchSource, fetchText, utf8 } from "./fetch.ts";
 import { parseSkillMd } from "./frontmatter.ts";
@@ -43,11 +44,6 @@ export type LoadedSkill = {
 export type LoadSelection =
   | { path?: string }
   | { name: string; digest: string };
-
-const byteDigest = (bytes: Uint8Array) =>
-  new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
-const textDigest = (text: string) =>
-  new Bun.CryptoHasher("sha256").update(text).digest("hex");
 
 function filesFrom(source: Map<string, Uint8Array>): {
   files: LoadedFile[];
@@ -107,7 +103,7 @@ function digestOf(skill: {
   const files = skill.files
     .slice()
     .sort((a, b) => a.path.localeCompare(b.path))
-    .map((file) => `${file.path}\0${textDigest(file.content)}`);
+    .map((file) => `${file.path}\0${sha256(file.content)}`);
   const dropped = skill.dropped
     .slice()
     .sort((a, b) => a.path.localeCompare(b.path))
@@ -126,7 +122,7 @@ function digestOf(skill: {
     dropped,
     droppedMore: skill.droppedMore,
   };
-  return textDigest(JSON.stringify(shape));
+  return sha256(JSON.stringify(shape));
 }
 
 export async function discover(
@@ -184,7 +180,7 @@ export async function loadSkill(
       throw new Conflict("the index changed, look again");
     }
     const fetched = await fetchSource(fetcher, entry.url, shutdown);
-    const actual = `sha256:${byteDigest(fetched.bytes)}`;
+    const actual = `sha256:${sha256(fetched.bytes)}`;
     if (actual !== entry.digest) {
       throw new BadRequest(`digest ${actual} does not match ${entry.digest}`);
     }

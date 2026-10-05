@@ -19,6 +19,6 @@ export function newToken(): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-export function sha256(value: string): string {
+export function sha256(value: string | Uint8Array): string {
   return new Bun.CryptoHasher("sha256").update(value).digest("hex");
 }
