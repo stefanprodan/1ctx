@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Catalogs are parsed once, cached an hour per provider and searched
-// server-side so the browser never sees the whole list. The wire picks
-// the catalog's shape and authentication.
 
 import {
   CATALOG_KINDS,
@@ -13,18 +9,21 @@ import {
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Wire } from "../../shared/words.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
+import { BadGateway } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import { factsByName, modelFacts, modelPrice, modelSource } from "./models.ts";
+import { keyOf } from "./provider.ts";
 import type { ProviderRow } from "./store.ts";
 import { CatalogError, type Fetcher } from "./types.ts";
+import { authHeaders, endpoint } from "./wires.ts";
 
 export { CatalogError, type Fetcher } from "./types.ts";
 
-export const CATALOG_TTL_MS = HOUR_MS;
-export const CATALOG_TIMEOUT_MS = 10_000;
-export const SEARCH_LIMIT = 20;
+const CATALOG_TTL_MS = HOUR_MS;
+const CATALOG_TIMEOUT_MS = 10_000;
+const SEARCH_LIMIT = 20;
 // more than a catalog: what is dropped unread past it
 export const MAX_CATALOG_BYTES = 8 * 1024 * 1024;
 
@@ -129,40 +128,28 @@ export async function readCapped(res: Response, max: number): Promise<string> {
 
 // a server that ignores the query answers its whole list, which is
 // what a local decisions server serves
-export const DECISIONS_PATH = "/models?output_modalities=decisions";
+const DECISIONS_PATH = "/models?output_modalities=decisions";
 
 export const servesDecisions = (wire: string): boolean =>
   (DECIDER_WIRES as readonly string[]).includes(wire);
 
-export async function fetchCatalog(
-  fetcher: Fetcher,
-  provider: Pick<ProviderRow, "wire" | "baseUrl">,
-  key: string | null,
-  kind: CatalogKind = "chat",
-): Promise<CatalogMatch[]> {
-  let res: Response;
-  const gemini = provider.wire === "gemini";
-  const azure = provider.wire === "azure";
-  if (kind === "decisions" && !servesDecisions(provider.wire)) {
-    throw new CatalogError("the provider serves no decision models");
+// a catalog that does not answer is the 502 a route sends
+export async function gateway<T>(work: Promise<T>): Promise<T> {
+  try {
+    return await work;
+  } catch (err) {
+    if (err instanceof CatalogError) throw new BadGateway(err.message);
+    throw err;
   }
-  const path =
-    kind === "decisions"
-      ? DECISIONS_PATH
-      : gemini
-        ? "/models?pageSize=1000"
-        : "/models";
-  const headers: Record<string, string> =
-    key === null
-      ? {}
-      : gemini
-        ? { "x-goog-api-key": key }
-        : azure
-          ? { "api-key": key }
-          : { authorization: `Bearer ${key}` };
-  const url = azure
-    ? azureUrls(provider.baseUrl).catalog
-    : `${provider.baseUrl.replace(/\/+$/, "")}${path}`;
+}
+
+// one GET within the catalog's wait, its body capped and read as JSON
+export async function fetchJson(
+  fetcher: Fetcher,
+  url: string,
+  headers: Record<string, string>,
+): Promise<unknown> {
+  let res: Response;
   try {
     res = await fetcher(url, {
       headers,
@@ -174,32 +161,63 @@ export async function fetchCatalog(
     );
   }
   if (!res.ok) throw new CatalogError(`the provider answered ${res.status}`);
-  let body: unknown;
   try {
-    body = JSON.parse(await readCapped(res, MAX_CATALOG_BYTES));
+    return JSON.parse(await readCapped(res, MAX_CATALOG_BYTES));
   } catch (err) {
     if (err instanceof CatalogError) throw err;
     throw new CatalogError("the provider did not answer with JSON");
   }
-  const models = gemini
-    ? parseGeminiCatalog(body)
-    : azure
-      ? parseDeployments(body)
-      : parseCatalog(body);
+}
+
+type WireCatalog = {
+  url(baseUrl: string): string;
+  parse(body: unknown): CatalogMatch[];
+};
+
+const OPENAI_CATALOG: WireCatalog = {
+  url: (base) => endpoint(base, "/models"),
+  parse: parseCatalog,
+};
+
+const CATALOGS: Record<Wire, WireCatalog> = {
+  openrouter: OPENAI_CATALOG,
+  "openai-compatible": OPENAI_CATALOG,
+  "openai-strict": OPENAI_CATALOG,
+  opencode: OPENAI_CATALOG,
+  gemini: {
+    url: (base) => endpoint(base, "/models?pageSize=1000"),
+    parse: parseGeminiCatalog,
+  },
+  azure: { url: (base) => azureUrls(base).catalog, parse: parseDeployments },
+};
+
+export async function fetchCatalog(
+  fetcher: Fetcher,
+  provider: Pick<ProviderRow, "wire" | "baseUrl">,
+  key: string | null,
+  kind: CatalogKind = "chat",
+): Promise<CatalogMatch[]> {
+  if (kind === "decisions" && !servesDecisions(provider.wire)) {
+    throw new CatalogError("the provider serves no decision models");
+  }
+  const catalog = CATALOGS[provider.wire];
+  const url =
+    kind === "decisions"
+      ? endpoint(provider.baseUrl, DECISIONS_PATH)
+      : catalog.url(provider.baseUrl);
+  const body = await fetchJson(
+    fetcher,
+    url,
+    authHeaders(provider.wire, key, "catalog"),
+  );
+  const models = catalog.parse(body);
   if (models.length === 0) throw new CatalogError("the catalog is empty");
   return kind === "chat"
     ? models.map((m) => withModelsDev(m, provider.wire))
     : models;
 }
 
-// what models.dev adds to a chat catalog row. On a dedicated wire the
-// row is found in its own provider, by the deployed model on Azure: an
-// undescribed row takes its window and tools, a suggestion the admin
-// may change before saving, a row with no price takes the base rates,
-// and listedAs keeps the id for the cost, listed or not, so a later
-// refresh of the file prices an agent saved before it. An OpenAI wire's
-// undescribed row takes the window and tools of a model of that name,
-// never a price
+// models.dev's window, tools and price for a chat row (docs/providers.md)
 export function withModelsDev(m: CatalogMatch, wire: Wire): CatalogMatch {
   const { listedAs: _, ...row } = m;
   const source = modelSource(wire);
@@ -276,8 +294,7 @@ export class Catalogs {
     }
     const running = this.inflight.get(id);
     if (running) return running;
-    const key =
-      provider.keyName === null ? null : this.deps.secret(provider.keyName);
+    const key = keyOf(provider, this.deps.secret);
     // kept only while it is still the fetch wanted: a forget() while it
     // ran means the provider is gone and nothing is cached for it
     const run = fetchCatalog(this.deps.fetcher, provider, key, kind)

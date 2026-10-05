@@ -1,8 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The provider request parsers: a new provider, the catalog query and
-// the model whose endpoints are asked for.
 
 import type { CreateProviderRequest } from "../../shared/api/providers.ts";
 import {
@@ -22,8 +19,8 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { azureBaseUrlProblem } from "./azure.ts";
 
-export const MAX_BASE_URL = 256;
-export const MAX_QUERY = 100;
+const MAX_BASE_URL = 256;
+const MAX_QUERY = 100;
 // an agent's model id is capped the same
 export const MAX_MODEL_ID = 200;
 

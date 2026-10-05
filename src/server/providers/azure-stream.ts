@@ -1,17 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The azure wire's stream: Responses API events as ChatEvents. Summary
-// text is reasoning, with a blank line before each later part or item
-// so two summaries never run together. Output text, and a refusal, are
-// content. A function call opens with its item, grows by its argument
-// deltas and takes the item's whole arguments when it ends, as both
-// reference clients do. Each finished reasoning item, and each message's
-// phase, is a record kept for the next request to send back. The
-// terminal event carries the usage and the finish and ends the read,
-// since Responses sends no [DONE].
 
-import { errorStatus, parseFrame } from "./frames.ts";
+import { errorStatus, num, parseFrame } from "./frames.ts";
 import type { ChatEvent } from "./types.ts";
 
 const TERMINAL = new Set([
@@ -19,9 +9,6 @@ const TERMINAL = new Set([
   "response.incomplete",
   "response.failed",
 ]);
-
-const num = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) ? value : 0;
 
 const text = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
@@ -85,7 +72,7 @@ function terminalEvents(body: any, calls: boolean, refused: boolean) {
   return events;
 }
 
-export type AzureStream = {
+type AzureStream = {
   map(json: string): ChatEvent[];
   // the terminal event came
   ended(): boolean;
@@ -128,22 +115,29 @@ export function azureEvents(): AzureStream {
     return show(delta);
   };
 
+  // a call opened by its item, with the arguments it came with
+  const callDelta = (
+    index: number,
+    item: any,
+    opening: string,
+  ): ChatEvent[] => {
+    calls = true;
+    args.set(index, opening);
+    return [
+      {
+        kind: "toolCallDelta",
+        index,
+        ...(text(item.call_id) ? { id: item.call_id } : {}),
+        ...(text(item.name) ? { name: item.name } : {}),
+        ...(opening ? { arguments: opening } : {}),
+      },
+    ];
+  };
+
   const itemDone = (index: number, item: any): ChatEvent[] => {
     if (item?.type === "function_call") {
       const whole = text(item.arguments);
-      if (!args.has(index)) {
-        calls = true;
-        args.set(index, whole ?? "");
-        return [
-          {
-            kind: "toolCallDelta",
-            index,
-            ...(text(item.call_id) ? { id: item.call_id } : {}),
-            ...(text(item.name) ? { name: item.name } : {}),
-            ...(whole ? { arguments: whole } : {}),
-          },
-        ];
-      }
+      if (!args.has(index)) return callDelta(index, item, whole ?? "");
       if (whole === undefined || whole === args.get(index)) return [];
       args.set(index, whole);
       return [{ kind: "toolCallDone", index, arguments: whole }];
@@ -198,12 +192,10 @@ export function azureEvents(): AzureStream {
       thinking.delete(index);
       if (TERMINAL.has(type)) thinking.clear();
     }
-    return mapType(body);
+    return mapType(body, index);
   };
 
-  const mapType = (body: any): ChatEvent[] => {
-    const index =
-      typeof body?.output_index === "number" ? body.output_index : 0;
+  const mapType = (body: any, index: number): ChatEvent[] => {
     switch (body?.type) {
       case "response.reasoning_summary_text.delta":
       case "response.reasoning_text.delta":
@@ -217,18 +209,7 @@ export function azureEvents(): AzureStream {
       case "response.output_item.added": {
         const item = body.item;
         if (item?.type !== "function_call") return [];
-        calls = true;
-        const opening = text(item.arguments) ?? "";
-        args.set(index, opening);
-        return [
-          {
-            kind: "toolCallDelta",
-            index,
-            ...(text(item.call_id) ? { id: item.call_id } : {}),
-            ...(text(item.name) ? { name: item.name } : {}),
-            ...(opening ? { arguments: opening } : {}),
-          },
-        ];
+        return callDelta(index, item, text(item.arguments) ?? "");
       }
       case "response.function_call_arguments.delta": {
         const delta = text(body.delta);

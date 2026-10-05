@@ -1,13 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// One SSE frame of the OpenAI chat wire as ChatEvents: the reasoning,
-// the content, the tool call fragments, the finish and the usage. A
-// wire with more in its frames parses once and adds its own events.
 
 import type { ChatEvent, ReasoningDetail } from "./types.ts";
 
-const num = (value: unknown) =>
+export const num = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
 
 export function chatEvents(json: string): ChatEvent[] {

@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The providers, all for admins: the list, a new one, its deletion and
-// the catalog search, and who serves a model behind OpenRouter. A
-// provider an agent or a decider runs on cannot go; whether one does is
-// the agents and deciders ports' answer.
 
 import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
@@ -16,10 +11,10 @@ import type {
 import type { Endpoint } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadGateway, BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { lastDays } from "../usage/index.ts";
-import { CatalogError, type Catalogs, servesDecisions } from "./catalog.ts";
+import { type Catalogs, gateway, servesDecisions } from "./catalog.ts";
 import {
   parseKind,
   parseModelQuery,
@@ -129,16 +124,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         if (kind === "decisions" && !servesDecisions(provider.wire)) {
           throw new BadRequest(`${provider.name} serves no decision models`);
         }
-        let matches: CatalogResponse["matches"] = [];
-        if (q !== "") {
-          try {
-            matches = await deps.catalogs.search(provider, q, kind);
-          } catch (err) {
-            if (err instanceof CatalogError) throw new BadGateway(err.message);
-            throw err;
-          }
-        }
-        const body: CatalogResponse = { matches };
+        const body: CatalogResponse = {
+          matches:
+            q === ""
+              ? []
+              : await gateway(deps.catalogs.search(provider, q, kind)),
+        };
         return json(body);
       },
     },

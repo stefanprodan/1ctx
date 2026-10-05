@@ -1,32 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The OpenRouter wire: the OpenAI chat wire with a bearer key, the
-// reasoning object in place of a thinking flag, usage with cost on the
-// last frame, and the per-family message rules an upstream needs. The
-// catalog half is catalog.ts.
-//
-// Verified on 2026-09-10 against the live API (the recorded frames under
-// test/fixtures/providers/openrouter/): reasoning streams as
-// delta.reasoning, tool calls in the OpenAI shape, usage rides on a
-// final chunk that repeats the finish reason, keep-alive comments
-// precede the first token, and a free endpoint refuses with an HTTP 429
-// whose body names the upstream pool.
 
 import { NOT_FOUR_BIT } from "../../shared/quantization.ts";
-import {
-  buildChatBody as buildOpenAiChatBody,
-  frameEvents,
-  parseFrame,
-} from "./openai.ts";
+import { frameEvents, parseFrame } from "./frames.ts";
+import { baseChatBody } from "./openai.ts";
 import type { ChatEvent, ChatRequest, ReasoningDetail } from "./types.ts";
 
-// The breakpoints an Anthropic upstream caches at: the system prompt,
-// then the last two turns, so the previous turn's prefix is read while
-// this turn's is written. Only Claude models get them (OpenCode's rule;
-// the other upstreams cache on their own or not at all, and their wire
-// stays the plain one). A breakpoint needs the content as parts.
-export const CACHE_BREAKPOINTS = 2;
+export const OPENROUTER_HEADERS = {
+  "http-referer": "https://1ctx.dev",
+  "x-title": "1ctx",
+};
+
+// only Claude models take breakpoints: the system prompt and the last
+// two turns
+const CACHE_BREAKPOINTS = 2;
 export function takesCacheBreakpoints(model: string): boolean {
   const id = model.toLowerCase();
   return id.includes("claude") || id.includes("anthropic");
@@ -103,20 +90,8 @@ export function mergeReasoningDetail(
   return items.map((item, i) => (i === at ? merged : item));
 }
 
-// The request body: the shared wire, reasoning as OpenRouter's object,
-// usage asked for on the last frame, the session id as session_id (the
-// sticky routing key: every turn goes to the upstream that holds the
-// cached prefix; prompt_cache_key is only its fallback), the preferred
-// upstream as provider.order, the precisions allowed as
-// provider.quantizations and the per-family message rules above.
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = buildOpenAiChatBody(req, {
-    reasoningDetails: true,
-    includeThinkingFlag: false,
-  });
-  delete body.prompt_cache_key;
-  delete body.reasoning_effort;
-  delete body.stream_options;
+  const body = baseChatBody(req, { reasoningDetails: true });
   if (req.cacheKey) body.session_id = req.cacheKey;
   // order, never only: a tag that stopped serving is skipped, so the
   // preference costs a discount and never the turn
@@ -181,9 +156,11 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }
 
-// the HTTP error path joins the status and the body; the body is
-// OpenRouter's JSON, whose upstream text is what the user needs
-export function openRouterError(message: string): string {
-  const m = /^HTTP (\d+): (.*)$/s.exec(message);
-  return m ? `OpenRouter ${m[1]}: ${errorText(m[2])}` : message;
+// a refused request's body is OpenRouter's JSON, whose upstream text is
+// what the user needs
+export function openRouterError(
+  status: number,
+  body: string,
+): { message: string } {
+  return { message: `OpenRouter ${status}: ${errorText(body)}` };
 }

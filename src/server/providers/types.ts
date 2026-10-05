@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The chat wire as the runner sees it: one request shape in, one event
-// stream out, whatever the provider behind it. A wire adapter translates
-// its server's names into these and nothing else crosses.
 
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { Effort, Wire } from "../../shared/words.ts";
@@ -22,12 +18,8 @@ export type ChatTool = {
   parameters: object;
 };
 
-// One item of OpenRouter's reasoning_details: reasoning.text (with the
-// signature an Anthropic upstream needs back), reasoning.summary or
-// reasoning.encrypted (OpenAI's opaque blob). Kept whole and sent back as
-// received, since the upstream verifies the sequence. The azure wire
-// keeps its own records here too: reasoning (the summary and the
-// encrypted blob of one output item) and phase.
+// an OpenRouter reasoning_details item, or an azure reasoning or phase
+// record; sent back as received
 export type ReasoningDetail = {
   type: string;
   index?: number;
@@ -53,13 +45,10 @@ export type ChatRequest = {
   model: string;
   messages: ChatMessageIn[];
   thinking: boolean;
-  // the agent chose Off, as against a default or a summary without
-  // thinking: a strict server refuses the field that turns thinking off
-  // on a model that never thinks, so it is sent only on this word
+  // the agent chose Off; a strict server refuses the off field on a
+  // model that never thinks
   thinkingOff?: boolean;
-  // a short round that wants the least thinking (leastThinking()), as
-  // against a default that resolved to off: only a wire with a word for
-  // no thinking that a default must not send reads it
+  // the least thinking for a short round; azure alone reads it
   least?: boolean;
   reasoningEffort?: Effort | null;
   temperature?: number | null;
@@ -143,7 +132,6 @@ export type ChatEvent =
       param?: string;
     };
 
-// one provider row, ready to talk to
 export interface Provider {
   readonly id: string;
   readonly wire: Wire;
