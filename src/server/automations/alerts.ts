@@ -1,11 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// One open alert per automation: attention_since, set by the end of a
-// run with a mark and cleared by a clean one or a dismiss, each in the
-// transaction of the write that causes it. A decider's word comes after
-// its run ended, so a word on a run older than the automation's last
-// ended one changes nothing: the newer run already said.
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
@@ -17,7 +11,7 @@ import {
   openAlertRuns,
   type SessionStore,
 } from "../sessions/index.ts";
-import type { AutomationStore } from "./store.ts";
+import { type AutomationStore, automationChanged } from "./store.ts";
 
 export type AlertsDeps = {
   db: Db;
@@ -90,11 +84,6 @@ const closeEmpty = (db: Db, id: string) =>
     )
     .run(id).changes > 0;
 
-const changed = (automation: AutomationSummary): BusEvent => ({
-  type: "automation.changed",
-  data: { projectId: automation.projectId, automation },
-});
-
 export function alerts(deps: AlertsDeps): Alerts {
   const { db, store } = deps;
 
@@ -106,15 +95,15 @@ export function alerts(deps: AlertsDeps): Alerts {
     if (change === "close") {
       if (!closeAlert(db, run.automationId)) return [];
       const row = store.byId(run.automationId);
-      return row === null ? [] : [changed(row)];
+      return row === null ? [] : [automationChanged(row)];
     }
     const opened = openAlert(db, run.automationId, run.endedAt);
     if (!opened) touchAlert(db, run.automationId);
     const row = store.byId(run.automationId);
     if (row === null) return [];
-    if (!opened) return [changed(row)];
+    if (!opened) return [automationChanged(row)];
     return [
-      changed(row),
+      automationChanged(row),
       {
         type: "automation.attention",
         data: {
@@ -159,12 +148,15 @@ export function alerts(deps: AlertsDeps): Alerts {
     pruned(id, endedAt) {
       if (!closeEmpty(db, id) && !touchSince(db, id, endedAt)) return [];
       const row = store.byId(id);
-      return row === null ? [] : [changed(row)];
+      return row === null ? [] : [automationChanged(row)];
     },
     dismiss(id) {
       const closed = closeAlert(db, id);
       const automation = store.byId(id)!;
-      return { automation, events: closed ? [changed(automation)] : [] };
+      return {
+        automation,
+        events: closed ? [automationChanged(automation)] : [],
+      };
     },
   };
 }

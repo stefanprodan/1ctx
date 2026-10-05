@@ -44,6 +44,7 @@ import type { Scheduler } from "./scheduler.ts";
 import {
   type AutomationFields,
   type AutomationStore,
+  automationChanged,
   MAX_AUTOMATIONS_PER_PROJECT,
   RETIRED,
 } from "./store.ts";
@@ -69,10 +70,6 @@ export type RoutesDeps = {
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  const changed = (automation: AutomationSummary) => ({
-    type: "automation.changed" as const,
-    data: { projectId: automation.projectId, automation },
-  });
   const visible = (principal: Principal, id: string) => {
     const row = deps.store.byId(id);
     if (row === null) throw new NotFound("no such automation");
@@ -153,7 +150,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             ownerId: principal.userId,
           };
           const created = deps.store.create({ ...fields, nextAt, now });
-          return { result: created, events: [changed(created)] };
+          return { result: created, events: [automationChanged(created)] };
         });
         deps.scheduler.wake();
         const response: AutomationResponse = { automation };
@@ -257,23 +254,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
                 ? nextFire(next.schedule, next.tz, now)
                 : current.nextAt;
           const updated = deps.store.update(current.id, {
-            agentId: next.agentId,
-            name: next.name,
-            instructions: next.instructions,
-            schedule: next.schedule,
-            tz: next.tz,
-            deadlineMs: next.deadlineMs,
-            retentionDays: next.retentionDays,
+            ...next,
             nextAt,
-            ownMemory: next.ownMemory,
-            memoryGuidance: next.memoryGuidance,
-            attentionMode: next.attentionMode,
-            attentionGuidance: next.attentionGuidance,
-            disabledCapabilities: next.disabledCapabilities,
-            rerunOnRestart: next.rerunOnRestart,
             now,
           })!;
-          return { result: updated, events: [changed(updated)] };
+          return { result: updated, events: [automationChanged(updated)] };
         });
         deps.scheduler.wake();
         const body: AutomationResponse = { automation };
@@ -295,7 +280,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             principal.userId,
             deps.clock(),
           )!;
-          return { result: updated, events: [changed(updated)] };
+          return { result: updated, events: [automationChanged(updated)] };
         });
         deps.scheduler.wake();
         return json({ automation } satisfies AutomationResponse);
@@ -318,7 +303,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             nextFire(current.schedule, current.tz, now),
             now,
           )!;
-          return { result: updated, events: [changed(updated)] };
+          return { result: updated, events: [automationChanged(updated)] };
         });
         deps.scheduler.wake();
         return json({ automation } satisfies AutomationResponse);

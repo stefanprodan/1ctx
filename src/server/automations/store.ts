@@ -123,6 +123,27 @@ export type AutomationFields = Pick<
   | "rerunOnRestart"
 >;
 
+export type AutomationEdit = Omit<AutomationFields, "projectId" | "ownerId"> & {
+  nextAt: number | null;
+  now: number;
+};
+
+// a fire's outcome; a run names its session and a schedule moves next_at
+export type EventFields = {
+  at: number;
+  dueAt: number;
+  source: EventSource;
+  outcome: EventOutcome;
+  reason: string | null;
+  nextAt?: number;
+  runSessionId?: string;
+};
+
+export const automationChanged = (automation: AutomationSummary) => ({
+  type: "automation.changed" as const,
+  data: { projectId: automation.projectId, automation },
+});
+
 export class AutomationStore {
   private wakeup: () => void = () => {};
 
@@ -250,26 +271,7 @@ export class AutomationStore {
     return this.byId(id)!;
   }
 
-  update(
-    id: string,
-    fields: Pick<
-      AutomationSummary,
-      | "agentId"
-      | "name"
-      | "instructions"
-      | "schedule"
-      | "tz"
-      | "deadlineMs"
-      | "retentionDays"
-      | "nextAt"
-      | "ownMemory"
-      | "memoryGuidance"
-      | "attentionMode"
-      | "attentionGuidance"
-      | "disabledCapabilities"
-      | "rerunOnRestart"
-    > & { now: number },
-  ): AutomationSummary | null {
+  update(id: string, fields: AutomationEdit): AutomationSummary | null {
     this.db
       .query(
         `update automations set agent_id = ?, name = ?, instructions = ?,
@@ -336,95 +338,29 @@ export class AutomationStore {
     return this.byId(id);
   }
 
-  recordEvent(
-    id: string,
-    fields: {
-      at: number;
-      dueAt: number;
-      source: EventSource;
-      outcome: EventOutcome;
-      reason: string | null;
-      nextAt?: number | null;
-      runSessionId?: string;
-    },
-  ): AutomationSummary | null {
-    if (fields.runSessionId === undefined) {
-      if (fields.nextAt === undefined) {
-        this.db
-          .query(
-            `update automations set last_event_at = ?, last_event_due_at = ?,
-               last_event_source = ?, last_event_outcome = ?,
-               last_event_reason = ?, revision = revision + 1,
-               updated_at = ? where id = ?`,
-          )
-          .run(
-            fields.at,
-            fields.dueAt,
-            fields.source,
-            fields.outcome,
-            fields.reason,
-            fields.at,
-            id,
-          );
-      } else {
-        this.db
-          .query(
-            `update automations set last_event_at = ?, last_event_due_at = ?,
-               last_event_source = ?, last_event_outcome = ?,
-               last_event_reason = ?, next_at = ?, revision = revision + 1,
-               updated_at = ? where id = ?`,
-          )
-          .run(
-            fields.at,
-            fields.dueAt,
-            fields.source,
-            fields.outcome,
-            fields.reason,
-            fields.nextAt,
-            fields.at,
-            id,
-          );
-      }
-    } else if (fields.nextAt === undefined) {
-      this.db
-        .query(
-          `update automations set last_event_at = ?, last_event_due_at = ?,
-             last_event_source = ?, last_event_outcome = ?,
-             last_event_reason = ?, last_run_session_id = ?,
-             last_run_status = 'running', revision = revision + 1,
-             updated_at = ? where id = ?`,
-        )
-        .run(
-          fields.at,
-          fields.dueAt,
-          fields.source,
-          fields.outcome,
-          fields.reason,
-          fields.runSessionId,
-          fields.at,
-          id,
-        );
-    } else {
-      this.db
-        .query(
-          `update automations set last_event_at = ?, last_event_due_at = ?,
-             last_event_source = ?, last_event_outcome = ?,
-             last_event_reason = ?, next_at = ?, last_run_session_id = ?,
-             last_run_status = 'running', revision = revision + 1,
-             updated_at = ? where id = ?`,
-        )
-        .run(
-          fields.at,
-          fields.dueAt,
-          fields.source,
-          fields.outcome,
-          fields.reason,
-          fields.nextAt,
-          fields.runSessionId,
-          fields.at,
-          id,
-        );
-    }
+  recordEvent(id: string, fields: EventFields): AutomationSummary | null {
+    const runSessionId = fields.runSessionId ?? null;
+    this.db
+      .query(
+        `update automations set last_event_at = ?, last_event_due_at = ?,
+           last_event_source = ?, last_event_outcome = ?,
+           last_event_reason = ?, next_at = coalesce(?, next_at),
+           last_run_session_id = coalesce(?, last_run_session_id),
+           last_run_status = iif(? is null, last_run_status, 'running'),
+           revision = revision + 1, updated_at = ? where id = ?`,
+      )
+      .run(
+        fields.at,
+        fields.dueAt,
+        fields.source,
+        fields.outcome,
+        fields.reason,
+        fields.nextAt ?? null,
+        runSessionId,
+        runSessionId,
+        fields.at,
+        id,
+      );
     return this.byId(id);
   }
 

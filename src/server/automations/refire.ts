@@ -1,16 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// At start, the automations that ask to run again what a restart cut:
-// those whose last run's send ended with cause shutdown (the drain's
-// end) or restart (a crash, ended by repair). The list is memory only,
-// so a second restart before a row fires finds the cut run still last
-// and lists it again. The pass fires each as due now with source
-// restart, through the checks and the cap waits of a scheduled fire.
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { SessionStore } from "../sessions/index.ts";
+import { type RecordDeps, recordOn } from "./events.ts";
 import type { AutomationStore } from "./store.ts";
+
+const RESTARTING = "restarting";
 
 // the cut run, which must still be the row's last when it fires, and
 // when it was listed, the restart run's due time
@@ -60,4 +56,22 @@ export function withCut(
     else rows.push(row);
   }
   return rows;
+}
+
+// during a drain a due row records a deferred event, once per due time,
+// and keeps its next_at, so the next start fires it
+export function deferDue(deps: RecordDeps, id: string, now: number): void {
+  const deferred = recordOn(deps, id, "defer failed", (row, dueAt) =>
+    dueAt > now ||
+    (row.lastEventOutcome === "deferred" && row.lastEventDueAt === dueAt)
+      ? null
+      : {
+          at: now,
+          dueAt,
+          source: "schedule",
+          outcome: "deferred",
+          reason: RESTARTING,
+        },
+  );
+  if (deferred) deps.log.info("defer", { automation: id });
 }

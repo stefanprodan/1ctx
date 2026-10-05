@@ -51,12 +51,25 @@ function text(value: unknown, name: string): string {
   return value;
 }
 
+// text the agent reads, cleaned, at most max bytes
+function guidance(value: unknown, field: string, label: string, max: number) {
+  if (typeof value !== "string") throw new BadRequest(`${field} must be text`);
+  const cleaned = sanitize(value);
+  if (new TextEncoder().encode(cleaned).length > max) {
+    throw new BadRequest(`${label} must be at most ${max} bytes`);
+  }
+  return cleaned;
+}
+
 function parseValues(
   body: Record<string, unknown>,
   required: boolean,
 ): PatchAutomationRequest {
   const out: PatchAutomationRequest = {};
   const take = (name: string) => required || Object.hasOwn(body, name);
+  // a field a create leaves out takes its default
+  const given = (name: string, fallback: unknown) =>
+    Object.hasOwn(body, name) ? body[name] : fallback;
   if (take("name")) {
     if (!isName(body.name)) throw new BadRequest("invalid name");
     out.name = body.name;
@@ -103,58 +116,38 @@ function parseValues(
     out.ownMemory = body.ownMemory;
   }
   if (take("rerunOnRestart")) {
-    const value = Object.hasOwn(body, "rerunOnRestart")
-      ? body.rerunOnRestart
-      : false;
+    const value = given("rerunOnRestart", false);
     if (typeof value !== "boolean") {
       throw new BadRequest("rerunOnRestart must be boolean");
     }
     out.rerunOnRestart = value;
   }
   if (take("memoryGuidance")) {
-    const value = Object.hasOwn(body, "memoryGuidance")
-      ? body.memoryGuidance
-      : "";
-    if (typeof value !== "string") {
-      throw new BadRequest("memoryGuidance must be text");
-    }
-    const guidance = sanitize(value);
-    if (new TextEncoder().encode(guidance).length > MAX_MEMORY_GUIDANCE) {
-      throw new BadRequest(
-        `memory guidance must be at most ${MAX_MEMORY_GUIDANCE} bytes`,
-      );
-    }
-    out.memoryGuidance = guidance;
+    out.memoryGuidance = guidance(
+      given("memoryGuidance", ""),
+      "memoryGuidance",
+      "memory guidance",
+      MAX_MEMORY_GUIDANCE,
+    );
   }
   if (take("attentionMode")) {
-    const value = Object.hasOwn(body, "attentionMode")
-      ? body.attentionMode
-      : "agent";
+    const value = given("attentionMode", "agent");
     if (!isAttentionMode(value)) {
       throw new BadRequest("attentionMode must be off, agent or decider");
     }
     out.attentionMode = value;
   }
   if (take("attentionGuidance")) {
-    const value = Object.hasOwn(body, "attentionGuidance")
-      ? body.attentionGuidance
-      : "";
-    if (typeof value !== "string") {
-      throw new BadRequest("attentionGuidance must be text");
-    }
-    const guidance = sanitize(value);
-    if (new TextEncoder().encode(guidance).length > MAX_ATTENTION_GUIDANCE) {
-      throw new BadRequest(
-        `attention guidance must be at most ${MAX_ATTENTION_GUIDANCE} bytes`,
-      );
-    }
-    out.attentionGuidance = guidance;
+    out.attentionGuidance = guidance(
+      given("attentionGuidance", ""),
+      "attentionGuidance",
+      "attention guidance",
+      MAX_ATTENTION_GUIDANCE,
+    );
   }
   if (take("disabledCapabilities")) {
     const parsed = parseSet(
-      Object.hasOwn(body, "disabledCapabilities")
-        ? body.disabledCapabilities
-        : [],
+      given("disabledCapabilities", []),
       "disabledCapabilities",
     );
     if (!parsed.ok) throw new BadRequest(parsed.error);

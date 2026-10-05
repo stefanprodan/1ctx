@@ -14,10 +14,11 @@ import { type ProjectRow, visible } from "../projects/index.ts";
 import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
-import { type Cut, cutRuns, stillCut, withCut } from "./refire.ts";
+import { recordOn } from "./events.ts";
+import { type Cut, cutRuns, deferDue, stillCut, withCut } from "./refire.ts";
 import { nextFire } from "./schedule.ts";
-import { type AutomationStore, RETIRED } from "./store.ts";
-import { deferDue, replaceMissed, type Waiting, Waits } from "./waits.ts";
+import { type AutomationStore, automationChanged, RETIRED } from "./store.ts";
+import { replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = MINUTE_MS;
 const SWEEP_MS = HOUR_MS;
@@ -69,11 +70,6 @@ export function scheduler(deps: Deps): Scheduler {
     resolve?.();
   };
 
-  const changed = (automation: AutomationSummary) => ({
-    type: "automation.changed" as const,
-    data: { projectId: automation.projectId, automation },
-  });
-
   const ownerFor = (
     row: AutomationSummary,
   ): {
@@ -101,9 +97,8 @@ export function scheduler(deps: Deps): Scheduler {
 
   const manualFor = (
     row: AutomationSummary,
-    actor: UserRow | null,
+    actor: UserRow,
   ): { user: UserRow; project: ProjectRow; agent: AgentRow } => {
-    if (actor === null) throw new BadRequest("the user is gone");
     const project = deps.projects.byId(row.projectId);
     if (project === null) throw new Conflict("no such automation");
     if (row.agentRetired) throw new Conflict(RETIRED);
@@ -138,7 +133,8 @@ export function scheduler(deps: Deps): Scheduler {
     ...resolved,
   });
 
-  const start = (
+  // one try at a fire; actor is the user of a manual one, else null
+  const attempt = (
     id: string,
     source: EventSource,
     actor: UserRow | null,
@@ -179,7 +175,7 @@ export function scheduler(deps: Deps): Scheduler {
             : undefined;
         try {
           const resolved =
-            source === "manual" ? manualFor(row, actor) : ownerFor(row);
+            actor === null ? ownerFor(row) : manualFor(row, actor);
           if (deps.sessions.runningAutomation(row.id)) {
             throw new Conflict("still running");
           }
@@ -205,7 +201,7 @@ export function scheduler(deps: Deps): Scheduler {
           recorded.value = { msg: "fire", user: resolved.user.username };
           return {
             result: { detail: prepared.detail, launch: prepared.launch },
-            events: [changed(updated)],
+            events: [automationChanged(updated)],
           };
         } catch (err) {
           holder.value?.abandon();
@@ -230,7 +226,7 @@ export function scheduler(deps: Deps): Scheduler {
             nextAt,
           })!;
           recorded.value = { msg: "skip", reason: err.message };
-          return { result: null, events: [changed(updated)] };
+          return { result: null, events: [automationChanged(updated)] };
         }
       });
       if (recorded.value?.msg === "fire") {
@@ -253,29 +249,17 @@ export function scheduler(deps: Deps): Scheduler {
   };
 
   const recordUnexpected = (id: string, error: unknown): void => {
-    try {
-      transact(deps.db, () => {
-        const row = deps.store.byId(id);
-        if (row === null || row.suspendedAt !== null || row.nextAt === null) {
-          return { result: undefined };
-        }
-        const now = deps.clock();
-        const updated = deps.store.recordEvent(row.id, {
-          at: now,
-          dueAt: row.nextAt,
-          source: "schedule",
-          outcome: "skipped",
-          reason: errText(error),
-          nextAt: nextFire(row.schedule, row.tz, now),
-        })!;
-        return { result: undefined, events: [changed(updated)] };
-      });
-    } catch (writeError) {
-      deps.log.error("skip record failed", {
-        automation: id,
-        ...errorFields(writeError),
-      });
-    }
+    recordOn(deps, id, "skip record failed", (row, dueAt) => {
+      const now = deps.clock();
+      return {
+        at: now,
+        dueAt,
+        source: "schedule",
+        outcome: "skipped",
+        reason: errText(error),
+        nextAt: nextFire(row.schedule, row.tz, now),
+      };
+    });
   };
 
   const fire = async (id: string): Promise<SessionDetail | null> => {
@@ -286,7 +270,7 @@ export function scheduler(deps: Deps): Scheduler {
     const seen = waits.generation;
     const source = cut.has(id) ? "restart" : "schedule";
     try {
-      const result = start(id, source, null);
+      const result = attempt(id, source, null);
       if (result !== null && "wait" in result) {
         waits.block(id, result, seen, deps.clock());
         return null;
@@ -345,7 +329,7 @@ export function scheduler(deps: Deps): Scheduler {
         );
         if (updated === null) return { result: undefined };
         count++;
-        return { result: undefined, events: [changed(updated)] };
+        return { result: undefined, events: [automationChanged(updated)] };
       });
     }
     return count;
@@ -365,7 +349,7 @@ export function scheduler(deps: Deps): Scheduler {
         );
         return {
           result: undefined,
-          events: updated === null ? [] : [changed(updated)],
+          events: updated === null ? [] : [automationChanged(updated)],
         };
       });
     } catch (err) {
@@ -466,7 +450,7 @@ export function scheduler(deps: Deps): Scheduler {
     pass,
     fire,
     runNow(row, user) {
-      const result = start(row.id, "manual", user);
+      const result = attempt(row.id, "manual", user);
       if (result === null || "wait" in result) {
         throw new Conflict("no such automation");
       }

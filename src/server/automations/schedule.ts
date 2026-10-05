@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { MAX_SCHEDULE, MAX_TZ } from "../../shared/words.ts";
+import { isTimeZone, MAX_SCHEDULE } from "../../shared/words.ts";
 import { MINUTE_MS } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -66,30 +66,19 @@ function checkGap(schedule: string): void {
   }
 }
 
-function checkZone(tz: string): void {
-  if (tz === "" || tz.length > MAX_TZ)
-    throw new BadRequest("invalid time zone");
+function parseNext(schedule: string, from: number, tz: string): Date | null {
   try {
-    new Intl.DateTimeFormat("en", { timeZone: tz }).format(0);
+    return Bun.cron.parse(schedule, from, { tz });
   } catch {
-    throw new BadRequest("invalid time zone");
+    throw new BadRequest("invalid schedule");
   }
 }
 
 export function nextFire(schedule: string, tz: string, from: number): number {
-  let date: Date | null;
-  try {
-    date = Bun.cron.parse(schedule, from, { tz });
-  } catch {
-    throw new BadRequest("invalid schedule");
-  }
+  let date = parseNext(schedule, from, tz);
   if (date === null) throw new BadRequest("schedule never fires");
   if (date.getTime() > from) return date.getTime();
-  try {
-    date = Bun.cron.parse(schedule, from + MINUTE_MS, { tz });
-  } catch {
-    throw new BadRequest("invalid schedule");
-  }
+  date = parseNext(schedule, from + MINUTE_MS, tz);
   if (date === null || date.getTime() <= from) {
     throw new BadRequest("schedule never fires");
   }
@@ -112,12 +101,12 @@ export function nextFires(
 export function checkSchedule(
   schedule: string,
   tz: string,
-  from = Date.now(),
+  from: number,
 ): number {
   if (schedule === "" || schedule.length > MAX_SCHEDULE) {
     throw new BadRequest("invalid schedule");
   }
-  checkZone(tz);
+  if (!isTimeZone(tz)) throw new BadRequest("invalid time zone");
   checkGap(schedule);
   return nextFire(schedule, tz, from);
 }
