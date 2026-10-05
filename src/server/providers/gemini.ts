@@ -3,6 +3,7 @@
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { canStopThinking } from "../../shared/thinking.ts";
+import { isRecord } from "../../shared/words.ts";
 import { frameEvents, num, parseFrame } from "./frames.ts";
 import { baseChatBody } from "./openai.ts";
 import { CatalogError, type ChatEvent, type ChatRequest } from "./types.ts";
@@ -27,9 +28,7 @@ const EXCLUDED_WORDS = [
 ];
 
 const record = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  isRecord(value) ? value : {};
 
 export function parseCatalog(body: unknown): CatalogMatch[] {
   const catalog = record(body);

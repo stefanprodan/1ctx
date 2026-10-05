@@ -7,6 +7,7 @@ import type {
 } from "../../shared/api/memory.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import { checkEntries, MEMORY_CHARS, normalize } from "../../shared/memory.ts";
+import { isRecord } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -26,7 +27,7 @@ export function parseSaveMemory(body: unknown): SaveMemoryRequest {
   }
   const entries = normalize(
     value.entries.map((raw: unknown, index): MemoryEntry => {
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      if (!isRecord(raw)) {
         throw new BadRequest(`entry ${index + 1} must have a topic and text`);
       }
       const entry = fields(raw, ["topic", "text"]);

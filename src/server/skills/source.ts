@@ -3,7 +3,7 @@
 
 import type { IndexEntry } from "../../shared/contracts/skill.ts";
 import { sourceForm } from "../../shared/skills.ts";
-import { isSkillName, type SkillSource } from "../../shared/words.ts";
+import { isRecord, isSkillName, type SkillSource } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { normalizePath, validPath } from "../lib/paths.ts";
 import { httpUrl } from "./fetch.ts";
@@ -66,19 +66,19 @@ export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
   } catch {
     throw new BadRequest("the index is not JSON");
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     throw new BadRequest("the index must be an object");
   }
-  const skills = (parsed as Record<string, unknown>).skills;
+  const skills = parsed.skills;
   if (!Array.isArray(skills)) throw new BadRequest("the index has no skills");
   if (skills.length > MAX_INDEX_ENTRIES) {
     throw new BadRequest("the index has too many skills");
   }
   return skills.map((value, index) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    if (!isRecord(value)) {
       throw new BadRequest(`index entry ${index + 1} must be an object`);
     }
-    const entry = value as Record<string, unknown>;
+    const entry = value;
     if (!isSkillName(entry.name)) {
       throw new BadRequest(`index entry ${index + 1} has an invalid name`);
     }

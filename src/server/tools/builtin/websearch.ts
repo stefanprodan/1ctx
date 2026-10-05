@@ -3,6 +3,7 @@
 //
 // The websearch tool; the network only through the fetch dependency.
 
+import { isRecord } from "../../../shared/words.ts";
 import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { sleepUnless, wallClock } from "../../lib/clock.ts";
@@ -130,16 +131,9 @@ function serverText(text: string): string {
 function errorFromBody(body: string): string | null {
   try {
     const value = JSON.parse(body);
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return null;
-    }
-    const record = value as Record<string, unknown>;
+    if (!isRecord(value)) return null;
     // Tavily nests its words under detail
-    const detail = record.detail;
-    const error =
-      typeof detail === "object" && detail !== null && !Array.isArray(detail)
-        ? (detail as Record<string, unknown>).error
-        : record.error;
+    const error = isRecord(value.detail) ? value.detail.error : value.error;
     return typeof error === "string" ? serverText(error) : null;
   } catch {
     return null;

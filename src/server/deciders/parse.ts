@@ -8,6 +8,7 @@ import {
 } from "../../shared/contracts/decision.ts";
 import {
   isName,
+  isRecord,
   MAX_NAME,
   MIN_NAME,
   NAME_CHARACTERS,
@@ -80,7 +81,7 @@ export function parseDecision(id: DecisionId, body: unknown): DecisionFields {
     throw new BadRequest("deciderId must be an id or null");
   }
   const raw = b.options;
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     throw new BadRequest("options must be an object");
   }
   const keys = DECISION_OPTIONS[id].map((o) => o.key);

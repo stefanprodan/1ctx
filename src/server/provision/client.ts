@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { isRecord } from "../../shared/words.ts";
 import type { Method, RouteOutcome } from "../lib/http.ts";
 
 export type Handle = (
@@ -81,7 +82,7 @@ function equal(a: unknown, b: unknown): boolean {
 }
 
 function stable(value: unknown): string | undefined {
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+  if (isRecord(value)) {
     return JSON.stringify(
       Object.fromEntries(
         Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),

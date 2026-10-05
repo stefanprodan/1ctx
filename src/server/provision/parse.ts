@@ -9,6 +9,7 @@ import {
 import type { WebAccess } from "../../shared/web.ts";
 import {
   isName,
+  isRecord,
   isServerName,
   isSkillName,
   isUsername,
@@ -81,10 +82,7 @@ export type {
 } from "./spec.ts";
 
 function document(value: unknown, source: string): Document {
-  const raw =
-    typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
+  const raw = isRecord(value) ? value : {};
   const metadata = raw.metadata as Record<string, unknown> | undefined;
   const label = `${typeof raw.kind === "string" ? raw.kind : "?"}/${
     typeof metadata?.name === "string" ? metadata.name : "?"

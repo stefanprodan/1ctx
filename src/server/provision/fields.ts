@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { isRecord } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export function object(
@@ -8,7 +9,7 @@ export function object(
   allowed: readonly string[],
   path: string,
 ): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(`${path || "document"} must be an object`);
   }
   for (const key of Object.keys(value)) {

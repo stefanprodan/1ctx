@@ -5,6 +5,7 @@
 // parsers start here: an object with exactly the fields it names, or
 // a 400 naming the stranger.
 
+import { isRecord } from "../../shared/words.ts";
 import { BadRequest, PayloadTooLarge } from "./errors.ts";
 
 export const MAX_BODY = 64 * 1024;
@@ -23,13 +24,11 @@ export function fields(
   body: unknown,
   allowed: string[],
 ): Record<string, unknown> {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    throw new BadRequest("body must be an object");
-  }
+  if (!isRecord(body)) throw new BadRequest("body must be an object");
   for (const key of Object.keys(body)) {
     if (!allowed.includes(key)) throw new BadRequest(`unknown field ${key}`);
   }
-  return body as Record<string, unknown>;
+  return body;
 }
 
 // a promise that rejects with the signal's reason once it aborts
