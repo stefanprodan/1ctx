@@ -18,8 +18,9 @@ import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { archivedEvent, refuseArchived } from "./archive.ts";
+import { refuseArchived } from "./archive.ts";
 import { detail } from "./detail.ts";
+import { envelope } from "./envelope.ts";
 import type { AlertQuery } from "./list.ts";
 import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import { openedFileResponse } from "./opened.ts";
@@ -31,7 +32,7 @@ import {
   parseStreamQuery,
   parseVisualParams,
 } from "./parse.ts";
-import { cutResult, offWire, type SessionRow } from "./rows.ts";
+import { cutResult, type SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 import { readVisual } from "./visual.ts";
 
@@ -248,17 +249,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           };
           return {
             result,
-            events: [
-              {
-                type: "session.changed" as const,
-                data: {
-                  projectId: session.projectId,
-                  session,
-                  messages: messages.map(offWire),
-                  send: null,
-                },
-              },
-            ],
+            events: [envelope(session, messages, null)],
           };
         });
         return json(body, 201);
@@ -285,17 +276,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const row = deps.store.rename(session.id, title)!;
           return {
             result: row,
-            events: [
-              {
-                type: "session.changed" as const,
-                data: {
-                  projectId: row.projectId,
-                  session: row,
-                  messages: [],
-                  send: deps.store.lastSend(row.id),
-                },
-              },
-            ],
+            events: [envelope(row, [], deps.store.lastSend(row.id))],
           };
         });
         return json(
@@ -338,7 +319,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           )!;
           return {
             result: undefined,
-            events: [archivedEvent(row, deps.store.lastSend(row.id))],
+            events: [envelope(row, [], deps.store.lastSend(row.id))],
           };
         });
         deps.wakeQueue();

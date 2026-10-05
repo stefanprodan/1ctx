@@ -1,36 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The session.changed envelope each writer transaction publishes.
 
-import type {
-  LastLine,
-  Message,
-  SendSummary,
-  SessionSummary,
-} from "../../shared/contracts/session.ts";
-import type { BusEvent } from "../lib/bus.ts";
-import { lineFrom, offWire } from "../sessions/index.ts";
-
-export const envelope = (
-  session: SessionSummary,
-  messages: Message[],
-  send: SendSummary | null,
-  removedMessageIds: string[] = [],
-  last?: LastLine,
-  messagesCut = false,
-): BusEvent => ({
-  type: "session.changed",
-  data: {
-    projectId: session.projectId,
-    session,
-    messages: messages.map(offWire),
-    ...(removedMessageIds.length > 0 ? { removedMessageIds } : {}),
-    send,
-    ...(last === undefined ? {} : { last }),
-    ...(messagesCut ? { messagesCut: true as const } : {}),
-  },
-});
+import type { LastLine, Message } from "../../shared/contracts/session.ts";
+import { lineFrom } from "../sessions/index.ts";
 
 // undefined for a row with nothing to say, so the envelope keeps the
 // line the client holds rather than showing an empty one

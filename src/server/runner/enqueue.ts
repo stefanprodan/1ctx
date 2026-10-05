@@ -18,9 +18,10 @@ import {
   queuedOnWire,
   type SessionRow,
   type SessionStore,
+  type SummonAgents,
+  summonOf,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
-import { type SummonAgents, summonOf } from "./summon.ts";
 
 export type EnqueueDeps = {
   db: Db;

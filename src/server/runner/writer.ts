@@ -16,8 +16,9 @@ import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent } from "../providers/index.ts";
+import { envelope } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
-import { answerLine, envelope } from "./envelope.ts";
+import { answerLine } from "./envelope.ts";
 import { type AlertsPort, alertEvents, runMark } from "./marks.ts";
 import type { ToolResult } from "./policy.ts";
 import {

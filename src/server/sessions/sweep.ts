@@ -7,7 +7,7 @@ import type { BusEvent } from "../lib/bus.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
-import { archivedEvent } from "./archive.ts";
+import { envelope } from "./envelope.ts";
 import { PACKABLE } from "./pack.ts";
 import type { SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
@@ -104,7 +104,7 @@ function steps(deps: SweepDeps): Step[] {
           return null;
         }
         const row = store.archive(id, "idle", null, now);
-        return row === null ? null : [archivedEvent(row, store.lastSend(id))];
+        return row === null ? null : [envelope(row, [], store.lastSend(id))];
       },
     },
     {

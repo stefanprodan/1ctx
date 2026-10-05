@@ -26,9 +26,10 @@ import {
   visualCounts,
   webCounts,
 } from "./activity.ts";
-import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
+import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { detail, sessionInfo } from "./detail.ts";
+import { envelope } from "./envelope.ts";
 import { envelopeRow } from "./feed.ts";
 import { listAlerts } from "./list.ts";
 import { type KeptPacker, keptPacker } from "./pack-kept.ts";
@@ -40,7 +41,7 @@ import {
   routes,
   type UploadsPort,
 } from "./routes.ts";
-import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
+import type { SessionRow, UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
@@ -59,6 +60,7 @@ export {
   parseRunsCursor,
   type RunsCursor,
 } from "./cursor.ts";
+export { envelope } from "./envelope.ts";
 export {
   chatMarkdown,
   type ExportRow,
@@ -96,6 +98,7 @@ export {
 } from "./rows.ts";
 export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
+export { type SummonAgents, summonOf } from "./summon.ts";
 
 export const RESTART_ERROR = "the server restarted";
 
@@ -208,7 +211,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     archiveAgent: (agentId, now) =>
       agentChats(deps.db, agentId).flatMap((id) => {
         const row = store.archive(id, "agent", null, now);
-        return row === null ? [] : [archivedEvent(row, store.lastSend(row.id))];
+        return row === null ? [] : [envelope(row, [], store.lastSend(row.id))];
       }),
     personDays: (userId, starts, until) =>
       personDays(deps.db, userId, starts, until),
@@ -251,15 +254,9 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         const rows = store.repair(deps.clock(), RESTART_ERROR);
         return {
           result: rows,
-          events: rows.map((repaired) => ({
-            type: "session.changed" as const,
-            data: {
-              projectId: repaired.session.projectId,
-              session: repaired.session,
-              messages: repaired.messages.map(offWire),
-              send: repaired.send,
-            },
-          })),
+          events: rows.map((repaired) =>
+            envelope(repaired.session, repaired.messages, repaired.send),
+          ),
         };
       });
       if (touched.length > 0) {

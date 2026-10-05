@@ -10,8 +10,12 @@ import type { SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
-import { refuseArchived, type SessionRow } from "../sessions/index.ts";
-import { answerLine, envelope } from "./envelope.ts";
+import {
+  envelope,
+  refuseArchived,
+  type SessionRow,
+} from "../sessions/index.ts";
+import { answerLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
 import { finalizeRound, type ReplyRowsDeps } from "./reply-rows.ts";
 import type { ActiveSend } from "./send.ts";

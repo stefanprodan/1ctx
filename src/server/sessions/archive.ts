@@ -4,11 +4,9 @@
 // Archiving is for good: the row keeps why and when, and only a manual
 // archive names who.
 
-import type { SendSummary } from "../../shared/contracts/session.ts";
 import type { ArchiveReason } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { Conflict } from "../lib/errors.ts";
-import type { SessionRow } from "./rows.ts";
 
 const ARCHIVED = "the chat is archived";
 
@@ -61,13 +59,4 @@ export function agentRunning(db: Db, agentId: string): number {
          as n`,
     )
     .get(agentId, agentId)!.n;
-}
-
-// the one envelope an archive, an attention mark or a queued message's
-// change publishes: the row, no messages
-export function archivedEvent(row: SessionRow, send: SendSummary | null) {
-  return {
-    type: "session.changed" as const,
-    data: { projectId: row.projectId, session: row, messages: [], send },
-  };
 }

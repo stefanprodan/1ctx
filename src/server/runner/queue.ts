@@ -20,6 +20,7 @@ import {
   queueChanged,
   type SessionRow,
   type SessionStore,
+  type SummonAgents,
   type WaitingCursor,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
@@ -35,7 +36,7 @@ import {
   RunCapacity,
 } from "./registry.ts";
 import { ClaimLost, type QueuedClaim } from "./start.ts";
-import { type SummonAgents, summonGone, summons, turnBatch } from "./summon.ts";
+import { summonGone, summons, turnBatch } from "./summon.ts";
 import { claimsOf, messagesOf, type TurnMessage } from "./turn.ts";
 
 // passes one wake may run before it hands the rest to a later turn
