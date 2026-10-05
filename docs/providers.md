@@ -37,7 +37,10 @@ with probabilities.
   window, tools flag and canonical name of the Azure, Google and
   OpenCode Go models, and prices (USD per million tokens, `tiers` won
   over `context_over_200k`) for Azure and Google only. `make models`
-  rewrites it; the diff is committed. Hosts are never matched.
+  rewrites it; the diff is committed. The weekly `models.yml` workflow
+  runs it and opens or updates one PR on `models-refresh`, its body
+  `bun scripts/models.ts --diff`; it is merged by hand. Hosts are never
+  matched.
 - **A chat catalog row takes what models.dev adds** (`withModelsDev`).
   A dedicated wire finds the row in its provider, by the deployed model
   on Azure, and keeps that id as `listedAs`; a row with no price takes

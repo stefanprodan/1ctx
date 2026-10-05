@@ -6,7 +6,9 @@
 // flag and canonical name, and for the per-token ones its prices in USD
 // per million tokens. OpenRouter describes and prices its own; OpenCode
 // Go is a flat plan, so it carries no prices. Run by hand (make
-// models); the file is committed and embedded.
+// models) or by the weekly models workflow; the file is committed and
+// embedded. With --diff it prints the committed file against the
+// written one as Markdown, the refresh PR's body.
 
 import { join } from "node:path";
 
@@ -109,7 +111,110 @@ export function extract(
   return providers;
 }
 
-if (import.meta.main) {
+type Listed = {
+  window?: number;
+  tools?: boolean;
+  canonical?: string;
+  price?: Rates & { tiers?: (Rates & { above: number })[] };
+};
+
+export type File = { providers: Record<string, Record<string, Listed>> };
+
+const RATES = ["input", "output", "cacheRead", "cacheWrite"] as const;
+
+// a model as flat named values, so a change to one tier rate is one row
+function facts(m: Listed): Map<string, string> {
+  const out = new Map<string, string>();
+  if (m.window !== undefined)
+    out.set("window", m.window.toLocaleString("en-US"));
+  out.set("tools", m.tools ? "yes" : "no");
+  if (m.canonical) out.set("canonical", m.canonical);
+  const sets = [
+    ["", m.price],
+    ...(m.price?.tiers ?? []).map((t) => [
+      ` above ${t.above.toLocaleString("en-US")}`,
+      t,
+    ]),
+  ] as [string, Rates | undefined][];
+  for (const [suffix, r] of sets) {
+    for (const k of RATES) {
+      if (r?.[k] !== undefined) out.set(`${k}${suffix}`, `$${r[k]}`);
+    }
+  }
+  return out;
+}
+
+const cell = (v: string | undefined) => v ?? "none";
+
+// the Markdown of what changed, removals first; empty when nothing did
+export function diff(before: File, after: File): string {
+  const sections: string[] = [];
+  const ids = [
+    ...new Set([
+      ...Object.keys(before.providers),
+      ...Object.keys(after.providers),
+    ]),
+  ].sort();
+  for (const id of ids) {
+    const was = before.providers[id] ?? {};
+    const now = after.providers[id] ?? {};
+    const removed: string[] = [];
+    const added: string[] = [];
+    const changed: string[] = [];
+    const names = [
+      ...new Set([...Object.keys(was), ...Object.keys(now)]),
+    ].sort();
+    for (const name of names) {
+      const a = was[name];
+      const b = now[name];
+      if (!b) {
+        removed.push(`| ${name} | removed | | |`);
+        continue;
+      }
+      const fb = facts(b);
+      if (!a) {
+        const all = [...fb].map(([k, v]) => `${k} ${v}`).join(", ");
+        added.push(`| ${name} | added | | ${all} |`);
+        continue;
+      }
+      const fa = facts(a);
+      for (const k of new Set([...fa.keys(), ...fb.keys()])) {
+        if (fa.get(k) === fb.get(k)) continue;
+        changed.push(
+          `| ${name} | ${k} | ${cell(fa.get(k))} | ${cell(fb.get(k))} |`,
+        );
+      }
+    }
+    const rows = [...removed, ...added, ...changed];
+    if (rows.length === 0) continue;
+    sections.push(
+      [
+        `### ${id}`,
+        "",
+        "| Model | Change | Was | Now |",
+        "|---|---|---|---|",
+        ...rows,
+      ].join("\n"),
+    );
+  }
+  if (sections.length === 0) return "";
+  return [
+    `Refreshed from ${SOURCE}. A removed model leaves the agents priced by it with no cost from the next build.`,
+    ...sections,
+  ].join("\n\n");
+}
+
+if (import.meta.main && Bun.argv.includes("--diff")) {
+  const committed = Bun.spawnSync(
+    ["git", "show", "HEAD:src/server/providers/models.json"],
+    { cwd: join(import.meta.dir, "..") },
+  );
+  if (!committed.success) throw new Error("no committed models.json");
+  const before = JSON.parse(committed.stdout.toString()) as File;
+  const after = (await Bun.file(OUT).json()) as File;
+  const out = diff(before, after);
+  if (out) console.log(out);
+} else if (import.meta.main) {
   const res = await fetch(SOURCE);
   if (!res.ok) throw new Error(`${SOURCE}: ${res.status}`);
   const providers = extract(await res.json());
