@@ -13,13 +13,12 @@ import icon512 from "../client/icon-512.png";
 import maskable from "../client/icon-maskable-512.png";
 import page from "../client/index.html";
 import type { SecretKind } from "../shared/words.ts";
-import { TOUCH_AFTER_MS } from "./access/index.ts";
 import { compose } from "./compose.ts";
 import { httpKeys, MAX_KEY_FILE_BYTES } from "./credentials/index.ts";
 import { type Db, open } from "./db/index.ts";
 import { PROCESS_SLOTS } from "./knowledge/index.ts";
 import { HELP, parseCli } from "./lib/cli.ts";
-import { wallClock } from "./lib/clock.ts";
+import { HOUR_MS, wallClock } from "./lib/clock.ts";
 import {
   errorFields,
   type LogFactory,
@@ -175,7 +174,12 @@ const app = await compose({
 app.sweep();
 app.mcpStart();
 app.keptStart();
-setInterval(() => app.sweep(), TOUCH_AFTER_MS);
+// sweep() logs its own failure; a throw in a timer would exit Bun
+setInterval(() => {
+  try {
+    app.sweep();
+  } catch {}
+}, HOUR_MS);
 
 const { server, stop } = serve({
   hostname,
