@@ -37,16 +37,13 @@ export function fileHref(
   return `${project(projectId)}/files/${encodeURIComponent(fileId)}${at}`;
 }
 
-// a past revision's page; the file itself when it is the latest
-export function revisionHref(
+// a revision's page, what it changed from the one before; the latest
+// too, since the file's own page shows only its text
+export const revisionHref = (
   projectId: string,
   fileId: string,
   revision: number,
-  latest?: number,
-): string {
-  const file = fileHref(projectId, fileId);
-  return revision === latest ? file : `${file}?revision=${revision}`;
-}
+): string => `${fileHref(projectId, fileId)}?revision=${revision}`;
 
 export const historyHref = (projectId: string, fileId: string): string =>
   `${fileHref(projectId, fileId)}?history`;

@@ -218,10 +218,11 @@ export function FileView({
   const onRestoreRevision = () =>
     void save.act("restore", async () => {
       if (past === null) return;
-      const row = await saveFile(projectId, fileId, past.text, file.revision);
+      // over the newest revision the page knows of, as its count says
+      const row = await saveFile(projectId, fileId, past.text, latest.revision);
       restored.value = {
         from: past.revision,
-        replaced: file.revision,
+        replaced: latest.revision,
         revision: row.revision,
       };
       navigate(href);
@@ -264,7 +265,7 @@ export function FileView({
     saveable: text.value !== baseText.value || conflict,
     renameReady:
       pathReady(path.value.trim()) && path.value.trim() !== file.name,
-    restorable: past !== null && past.revision !== file.revision,
+    restorable: past !== null && past.revision !== latest.revision,
     more: fileActions(
       projectId,
       file.name,
@@ -369,6 +370,7 @@ export function FileView({
         file={file}
         history={historyOf(fileId)}
         revision={revision}
+        latest={latest.revision}
         now={now}
       />
     );

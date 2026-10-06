@@ -14,6 +14,7 @@ import {
   docVersions,
 } from "../../../../../src/client/data/knowledge-history.ts";
 import { MAX_DIFF_LINES } from "../../../../../src/client/lib/diff.ts";
+import { LatestChanges } from "../../../../../src/client/views/knowledge/file/Changes.tsx";
 import {
   DeletedDoc,
   NotFound,
@@ -45,14 +46,20 @@ test("Markdown reads rendered, with Preview and Source; ?line= is Source", () =>
   });
   const html = render(<Reader file={md} href={HREF} line={null} now={0} />);
   expect(html).toContain('class="docpage-md md-wide"');
-  expect(html).toContain(">Preview</button>");
-  expect(html).toContain('aria-pressed="true">Preview');
+  expect(html).toContain('aria-pressed="true" title="Preview"');
   // two headings are no outline
   expect(html).not.toContain('aria-label="Outline"');
+  // the latest revision's change is a view beside them; the first
+  // changed nothing
+  expect(html).toContain('aria-pressed="false" title="Changes"');
+  const first = render(
+    <Reader file={{ ...md, revision: 1 }} href={HREF} line={null} now={0} />,
+  );
+  expect(first).toContain('disabled title="Changes"');
   const lit = render(<Reader file={md} href={HREF} line={2} now={0} />);
   expect(lit).not.toContain('class="docpage-md md-wide"');
   expect(lit).toContain('class="source-num source-lit"');
-  expect(lit).toContain('aria-pressed="true">Source');
+  expect(lit).toContain('aria-pressed="true" title="Source"');
 });
 
 test.serial("HTML draws as a visual only while visualize is switchable", () => {
@@ -63,7 +70,7 @@ test.serial("HTML draws as a visual only while visualize is switchable", () => {
   });
   const off = render(<Reader file={page} href={HREF} line={null} now={0} />);
   expect(off).not.toContain("visual-card");
-  expect(off).not.toContain(">Preview</button>");
+  expect(off).not.toContain('title="Preview"');
   switchable.value = ["web", "visualize"];
   const on = render(<Reader file={page} href={HREF} line={null} now={0} />);
   expect(on).toContain('class="docpage-visual"');
@@ -104,15 +111,38 @@ test.serial("a past revision: its steps and what it changed", () => {
         versions: versions.map(({ text: _, ...v }) => v),
       }}
       revision={2}
+      latest={3}
       now={0}
     />,
   );
   expect(html).toContain("Revision 2 of 3");
   expect(html).toContain(`href="${HREF}?revision=1"`);
-  // the newer step would be the file as it is: none
-  expect(html).not.toContain(`href="${HREF}?revision=3"`);
+  // the newer step is the latest's own page, with what it changed
+  expect(html).toContain(`href="${HREF}?revision=3"`);
   expect(html).toContain("What revision 2 changed from revision 1");
   expect(html).toContain('class="diff"');
+});
+
+test("a file with no preview switches between Changes and Source", () => {
+  const html = render(
+    <Reader file={fileView()} href={HREF} line={null} now={0} />,
+  );
+  expect(html).toContain('aria-pressed="false" title="Changes"');
+  expect(html).toContain('aria-pressed="true" title="Source"');
+  expect(html).not.toContain('title="Preview"');
+});
+
+test.serial("the file's Changes: the latest against the one before", () => {
+  hold({ 2: "a: 2\n", 3: "a: 3\n" });
+  const html = render(<LatestChanges file={fileView({ text: "a: 3\n" })} />);
+  expect(html).toContain("What revision 3 changed from revision 2");
+  expect(html).toContain('class="diff"');
+  // a history held from before the file's last write still compares
+  // with the newest revision under it
+  const ahead = render(
+    <LatestChanges file={fileView({ revision: 4, text: "a: 4\n" })} />,
+  );
+  expect(ahead).toContain("What revision 4 changed from revision 3");
 });
 
 test.serial("a change too large to compare offers the text alone", () => {
@@ -126,11 +156,12 @@ test.serial("a change too large to compare offers the text alone", () => {
         versions: versions.map(({ text: _, ...v }) => v),
       }}
       revision={2}
+      latest={3}
       now={0}
     />,
   );
   expect(html).toContain("Too large to compare");
-  expect(html).not.toContain(">Changes</button>");
+  expect(html).not.toContain('title="Changes"');
   expect(html).toContain('class="source"');
 });
 

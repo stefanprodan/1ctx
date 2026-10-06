@@ -166,13 +166,13 @@ export function OutlineMenu({
         class="btn btn-small"
         aria-haspopup="menu"
         aria-expanded={open.value}
+        title="Outline"
         aria-label="Outline"
         onClick={() => {
           open.value = !open.value;
         }}
       >
         <Icon name="list" size={12} />
-        <span class="docpage-word">Outline</span>
       </button>
       {open.value && (
         <div class="menu docpage-menu docpage-outline" role="menu">

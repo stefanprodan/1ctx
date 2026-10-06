@@ -51,7 +51,7 @@ const versions = (from: number, to: number): KnowledgeVersion[] =>
     deleted: false,
   }));
 
-test("ten rows, the newest the file itself, then Show more", () => {
+test("ten rows, each its revision's page, then Show more", () => {
   const html = render(
     <History
       file={file}
@@ -61,7 +61,7 @@ test("ten rows, the newest the file itself, then Show more", () => {
   );
   expect(html).toContain("History</span> · 20 revisions kept");
   expect(html.match(/class="rows-line rows-go"/g)?.length).toBe(10);
-  expect(html).toContain('href="/projects/p1/knowledge/files/f1"');
+  expect(html).toContain('href="/projects/p1/knowledge/files/f1?revision=24"');
   expect(html).toContain('href="/projects/p1/knowledge/files/f1?revision=23"');
   expect(html.replace(/<[^>]*>/g, "")).toContain("@sre · 3 lines · latest");
   expect(html).toContain("Show more");

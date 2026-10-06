@@ -146,6 +146,8 @@ const PATHS = {
     "M1.5 4.5a1 1 0 0 1 1-1h3.3l1.4 1.5h6.3a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z",
   archive: "M2 3h12v3H2zM3 6v7.5h10V6M6.5 9h3",
   visual: "M2 2.5h12v11H2zM5 11V8M8 11V5.5M11 11V7",
+  // a plus over a minus: what a revision changed
+  diff: "M8 2.5v6M5 5.5h6M5 12.5h6",
   // lines with a dot each: a list of headings
   list: "M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01",
   // three dots: a menu of more actions

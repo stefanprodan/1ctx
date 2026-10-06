@@ -59,12 +59,7 @@ export function History({
           {shown.map((version) => (
             <RowsGo
               key={version.id}
-              href={revisionHref(
-                file.projectId,
-                file.id,
-                version.revision,
-                file.revision,
-              )}
+              href={revisionHref(file.projectId, file.id, version.revision)}
             >
               <RowsTitle
                 mono

@@ -72,13 +72,24 @@ test("a segmented switch presses the picked option and names it", () => {
       class="own"
       options={[
         { value: "a", label: "A" },
-        { value: "b", label: "B", disabled: true },
+        { value: "b", label: "B", disabled: true, title: "Why not" },
       ]}
       value="a"
       onPick={noop}
     />,
   );
   expect(html).toMatch(/<fieldset\b[^>]*aria-label="Show"/);
+  // a worded option keeps its words as its name, the title describes
+  expect(html).toContain('title="Why not">B<');
+  const icons = render(
+    <Seg
+      label="Show"
+      options={[{ value: "a", label: <i />, title: "Preview" }]}
+      value="a"
+      onPick={noop}
+    />,
+  );
+  expect(icons).toContain('title="Preview" aria-label="Preview"');
   for (const name of ["seg-small", "seg-invalid", "own"]) {
     expect(html).toMatch(new RegExp(`class="[^"]*\\b${name}\\b`));
   }

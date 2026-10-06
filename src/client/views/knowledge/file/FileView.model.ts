@@ -40,7 +40,7 @@ export type HeadFacts = {
   restored: boolean;
   // the page was reached by a Restore from the bin (?restored)
   unbinned: boolean;
-  // the file as it is, neither the history nor a past revision
+  // the file as it is, neither the history nor a revision's page
   reading: boolean;
   revision: boolean;
 };
