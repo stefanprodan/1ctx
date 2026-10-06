@@ -3,6 +3,7 @@
 
 import type { LinkPurpose } from "../../shared/api/access.ts";
 import type { Db } from "../db/index.ts";
+import { HOUR_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 
 // a link an email carries; its token hash is set when the email is sent
@@ -130,10 +131,12 @@ export class LinkStore {
           .run(userId, purpose).changes;
   }
 
-  // used or not, a link past its expiry is of no use
+  // used or not, a link past its expiry is of no use; it stays an hour
+  // more, past the email's last retry, so that retry mints it again
+  // rather than dropping as revoked (use() and live() check expiry)
   sweep(now: number): number {
     return this.db
       .query("delete from user_links where expires_at <= ?")
-      .run(now).changes;
+      .run(now - HOUR_MS).changes;
   }
 }

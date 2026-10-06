@@ -260,6 +260,43 @@ describe("what ends a link", () => {
     await e.app.shutdown();
   });
 
+  test("the sweep leaves a link an hour past its expiry", async () => {
+    const { e } = await withLinks();
+    const expiries = () =>
+      e.app.db
+        .query<{ expires_at: number }, [string]>(
+          "select expires_at from user_links where user_id = ?",
+        )
+        .all(e.maria.id)
+        .map((row) => row.expires_at);
+    const latest = Math.max(...expiries());
+    e.app.now.value = latest + 59 * 60_000;
+    e.app.sweep();
+    expect(expiries()).toContain(latest);
+    e.app.now.value = latest + 60 * 60_000;
+    e.app.sweep();
+    expect(expiries()).not.toContain(latest);
+    await e.app.shutdown();
+  });
+
+  test("a sweep between tries leaves a failing link email failing", async () => {
+    const e = await emailApp();
+    e.app.emailSender.result = "timeout";
+    await e.app
+      .client()
+      .call("POST", "/api/login/link", { body: { username: "maria" } });
+    await e.app.linkAsks();
+    for (let minute = 0; minute < 60; minute++) {
+      if (minute === 30) e.app.sweep();
+      await e.send();
+      e.app.now.value += 60_000;
+    }
+    expect(e.app.emailSender.sent.length).toBe(4);
+    expect(e.logs.events.some((ev) => ev.msg === "email dropped")).toBe(false);
+    expect(e.app.email.attention()?.failed).toBe(1);
+    await e.app.shutdown();
+  });
+
   test("the sweep takes links past their expiry", async () => {
     const { e } = await withLinks();
     e.app.now.value += 8 * 24 * 60 * 60_000;

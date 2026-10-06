@@ -60,11 +60,11 @@ from `emailOn` in `GET /api/me`.
   `/api/login/link` answer 202 with no body before any lookup. The
   lookup and the outbox write run after the answer (`links.ask()`),
   which the shutdown awaits; an ask after that point answers the same
-  and does nothing. A missing, disabled or placeholder
-  account, or one with a live link of that purpose, gets nothing. Only
-  the login limit answers 429. A must-change user who asks for a sign
-  in link gets a reset link, since the forced change asks for a
-  current password they may never have known.
+  and does nothing. A missing, disabled or placeholder account, or one
+  with a live link of that purpose or its email still queued, gets
+  nothing. Only the login limit answers 429. A must-change user who
+  asks for a sign in link gets a reset link, since the forced change
+  asks for a current password they may never have known.
 - **Asks are capped** at 3 link emails per user a day and 50 per
   instance an hour, counted on outbox rows; over either the ask does
   nothing and logs `link ask capped`. An admin's links are not counted.
@@ -73,7 +73,9 @@ from `emailOn` in `GET /api/me`.
   `prepare` stores the token's hash and starts the expiry at each try:
   reset 30 minutes, sign in 15, invite 7 days. One unused link per user
   and purpose: a new one replaces the old and its queued email.
-  Expired links go with the logins' sweep.
+  Expired links go with the logins' sweep an hour after expiry, so an
+  email's last retry still mints its link. Using a link and every read
+  check expiry themselves.
 - **A link never acts on a GET,** since email scanners open links.
   `GET /api/links/:token` names the purpose and the username with no
   side effect and `no-store`; unknown, used, expired and a disabled
