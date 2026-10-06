@@ -15,6 +15,12 @@ import {
   type LogLevel,
   silent,
 } from "../../src/server/lib/log.ts";
+import type {
+  Mailer,
+  Outgoing,
+  SendResult,
+  SmtpServer,
+} from "../../src/server/mail/index.ts";
 import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import {
@@ -220,6 +226,26 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
 }
 export const VERSION = "v0.0.0-test";
 
+// what reaches the SMTP server: every message kept, each answered with
+// result, so the suite never opens a socket
+export type FakeMailer = {
+  mailer: Mailer;
+  sent: { server: SmtpServer; mail: Outgoing }[];
+  result: SendResult;
+};
+
+export function fakeMailer(): FakeMailer {
+  const fake: FakeMailer = {
+    sent: [],
+    result: "sent",
+    mailer: async (server, mail) => {
+      fake.sent.push({ server, mail });
+      return fake.result;
+    },
+  };
+  return fake;
+}
+
 export type CollectedLog = {
   level: LogLevel;
   area: string;
@@ -250,6 +276,8 @@ export type TestApp = App & {
   now: { value: number };
   // what the fake fetch was asked
   fetched: FakeCall[];
+  // what the fake mailer was handed, and its next answer
+  mailer: FakeMailer;
   // one cookie jar per client: a browser tab, or another user's
   client(address?: string): TestClient;
 };
@@ -293,6 +321,7 @@ export async function testApp(
     // the cores the send caps are sized by; one, so the defaults are
     // the host's floor on every machine
     cores?: number;
+    mailer?: FakeMailer;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -323,6 +352,7 @@ export async function testApp(
       ? "hunter2-test"
       : options.adminPassword;
   const fake = fakeFetch();
+  const mailer = options.mailer ?? fakeMailer();
   // read at each call, so a test may replace or delete a key it passed
   const given = options.secrets ?? {};
   const values = (): Record<string, string> => ({
@@ -357,12 +387,14 @@ export async function testApp(
     cacheDir: options.cacheDir,
     repoJobs: options.repoJobs,
     cores: options.cores ?? 1,
+    mailer: mailer.mailer,
   });
   return {
     ...app,
     db,
     now,
     fetched: fake.calls,
+    mailer,
     client(address = "127.0.0.1") {
       const client: TestClient = {
         cookie: null,

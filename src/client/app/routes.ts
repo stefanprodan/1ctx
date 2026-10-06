@@ -40,6 +40,7 @@ import {
 } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
+import { loadMail } from "../data/mail.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -727,6 +728,13 @@ export const ROUTES: Route[] = [
     load: async () => {
       await Promise.all([loadTools(), loadCredentials()]);
     },
+  },
+  {
+    path: "/admin/config/mail",
+    view: lazy(() => import("../views/admin/Mail.tsx").then((m) => m.Mail)),
+    title: () => "Mail",
+    role: "admin",
+    load: loadMail,
   },
   {
     path: "/admin/config/visuals",

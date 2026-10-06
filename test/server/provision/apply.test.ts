@@ -80,7 +80,7 @@ describe("provision through the composed app", () => {
       expect(lines[0]).toBe("bootstrapped user/admin from user-admin.key");
       // the bootstrapped admin is not an object in the file, so it is
       // said on its own line and counted nowhere
-      expect(counts.created).toBe(9);
+      expect(counts.created).toBe(10);
       expect(counts.created + counts.updated + counts.unchanged).toBe(
         docs.length,
       );
@@ -89,6 +89,7 @@ describe("provision through the composed app", () => {
         .map((line) => line.split(" ")[1]?.split("/")[0]);
       expect(kinds).toEqual([
         "user",
+        "mail",
         "project",
         "credential",
         "repository",
@@ -108,6 +109,16 @@ describe("provision through the composed app", () => {
         about: "A test teammate.",
       });
       expect(app.projects.personal(zed.id)?.name).toBe("personal");
+      expect(app.mail.settings()).toMatchObject({
+        host: "smtp.people.test",
+        port: 465,
+        security: "tls",
+        username: null,
+        keyName: null,
+        fromAddress: "1ctx@people.test",
+        fromName: "1ctx",
+        publicAddress: "https://1ctx.people.test",
+      });
       const projectId = app.projects.teamProjectIds()[0]!;
       expect(app.projects.byId(projectId)?.name).toBe("nebula");
       expect(app.projects.isMember(projectId, zed.id)).toBeTrue();

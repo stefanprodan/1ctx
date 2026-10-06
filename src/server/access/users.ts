@@ -156,7 +156,11 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             usernameAvailable(patch.username, user.id);
             deps.users.setUsername(user.id, patch.username);
           }
-          if (patch.email !== undefined && patch.email !== user.email) {
+          // saving the held address makes it real too
+          if (
+            patch.email !== undefined &&
+            (patch.email !== user.email || user.emailPlaceholder)
+          ) {
             emailAvailable(patch.email, user.id);
             deps.users.setEmail(user.id, patch.email);
           }

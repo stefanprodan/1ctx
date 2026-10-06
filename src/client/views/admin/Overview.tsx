@@ -85,7 +85,7 @@ function Attention() {
       </RowsCard>
     ) : null;
   }
-  const rows = answer.items.map((item) => attentionRow(item, now));
+  const rows = answer.items.map((item) => attentionRow(item, now, answer.mail));
   return (
     <RowsCard
       label="Needs attention"

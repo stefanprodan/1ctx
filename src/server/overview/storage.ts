@@ -61,6 +61,8 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "credentials",
     "credential_projects",
     "repos",
+    "mail_settings",
+    "mail_outbox",
     "migrations",
     "sqlite_schema",
   ],

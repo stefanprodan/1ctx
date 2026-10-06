@@ -59,6 +59,7 @@ const casey: AdminUser = {
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: false,
+  emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: [],
 };

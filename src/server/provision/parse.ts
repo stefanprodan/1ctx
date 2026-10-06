@@ -24,11 +24,13 @@ import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
+import { MAIL_REQUIRED, mailSpec } from "./mail.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
   "User",
+  "Mail",
   "Project",
   "Credential",
   "Repository",
@@ -69,6 +71,7 @@ export type Document = {
 }[Kind];
 export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
+export type { MailSpec } from "./mail.ts";
 export type { RepositorySpec } from "./repository.ts";
 export type {
   AgentSpec,
@@ -100,6 +103,7 @@ function document(value: unknown, source: string): Document {
     const meta = object(b.metadata, ["name"], "metadata");
     const guard = {
       User: isUsername,
+      Mail: isName,
       Project: isName,
       Credential: isName,
       Repository: isName,
@@ -121,6 +125,8 @@ function document(value: unknown, source: string): Document {
     switch (kind) {
       case "User":
         return { ...base, kind, spec: spec.user(b.spec) };
+      case "Mail":
+        return { ...base, kind, spec: mailSpec(b.spec) };
       case "Project":
         return { ...base, kind, spec: spec.project(b.spec) };
       case "Credential":
@@ -156,6 +162,13 @@ function duplicate(documents: Document[]): void {
       );
     }
     seen.set(key, doc.source);
+  }
+  // the instance has one SMTP server
+  const servers = documents.filter((doc) => doc.kind === "Mail");
+  if (servers.length > 1) {
+    throw new Error(
+      `${servers[1]!.source}: Mail/${servers[1]!.name}: one Mail object per instance (first Mail/${servers[0]!.name})`,
+    );
   }
   // one default of a kind, since a second would take the mark from the
   // first
@@ -289,6 +302,13 @@ export function preflight(
         }
         break;
       }
+      case "Mail":
+        // any name updates the one server held
+        if (inventory.Mail.length === 0) required([...MAIL_REQUIRED]);
+        if (typeof doc.spec.keyFrom === "string") {
+          readSecret("keyFrom", "email-", doc.spec.keyFrom);
+        }
+        break;
       case "Project":
         for (const name of doc.spec.members ?? [])
           reference("members", "User", name);

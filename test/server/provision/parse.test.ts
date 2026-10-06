@@ -26,6 +26,7 @@ const fixture = async (name: string): Promise<Source> => ({
 });
 const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
+  Mail: [],
   Project: [],
   Credential: [],
   Repository: [],
@@ -413,6 +414,42 @@ describe("provision preflight", () => {
       check(docs, { [kind]: [name] });
     },
   );
+
+  test("one Mail per instance, whole when new, its key file present", () => {
+    const mail = {
+      host: "SMTP.people.test",
+      port: 465,
+      security: "tls",
+      username: "api_token",
+      keyFrom: "email-relay",
+      fromAddress: "1ctx@people.test",
+      publicAddress: "https://1ctx.people.test/",
+    };
+    const [doc] = parse([source("Mail", "relay", mail)]);
+    expect(doc?.spec).toEqual({
+      ...mail,
+      host: "smtp.people.test",
+      publicAddress: "https://1ctx.people.test",
+    });
+    expect(() =>
+      parse([source("Mail", "relay", mail), source("Mail", "other", mail)]),
+    ).toThrow("one Mail object per instance");
+    expect(() =>
+      parse([source("Mail", "relay", { ...mail, publicAddress: "http://x" })]),
+    ).toThrow("spec.publicAddress");
+    expect(() =>
+      check(parse([source("Mail", "relay", { port: 587 })])),
+    ).toThrow("spec.host is required for a new object");
+    // any name updates the server held
+    expect(() =>
+      check(parse([source("Mail", "other", { port: 587 })]), {
+        Mail: ["mail"],
+      }),
+    ).not.toThrow();
+    expect(() => check([doc!])).toThrow(
+      "spec.keyFrom secret email-relay.key is missing or empty",
+    );
+  });
 
   test("a Decider names a provider that exists or is in the input", () => {
     const docs = parse([

@@ -13,6 +13,17 @@ spec:
   mustChangePassword: false
 ---
 apiVersion: config.1ctx.dev/v1
+kind: Mail
+metadata:
+  name: relay
+spec:
+  host: smtp.people.test
+  port: 465
+  security: tls
+  fromAddress: 1ctx@people.test
+  publicAddress: https://1ctx.people.test
+---
+apiVersion: config.1ctx.dev/v1
 kind: Project
 metadata:
   name: nebula

@@ -121,6 +121,7 @@ export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
     role: "admin",
     passwordHash: await hashPassword(password, deps.passwordCost),
     mustChangePassword: false,
+    emailPlaceholder: true,
     now: deps.clock(),
   });
   deps.log.info("admin created", { user: ADMIN_USERNAME, file: ADMIN_FILE });

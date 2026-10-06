@@ -62,7 +62,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
-  in `UTC`.
+  in `UTC`. The first admin's made-up address is marked a placeholder
+  until an admin saves one (`docs/mail.md`).
 - **Every change to who sees what publishes `access.changed`.** A role
   change, a team project created or deleted, a member added or removed.
   Without it the socket keeps the old set.
@@ -121,8 +122,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   empty file, a non-regular file after links (a FIFO could block) and
   one past `maxBytes`; `main.ts` caps `http-` files.
 - **A value is never logged, returned by a route or stored.** Routes
-  list names alone. Provider, search, MCP and `http-` values are
-  scrubbed from logs, the kinds in `SCRUB_KINDS` in `compose.ts`.
+  list names alone. Provider, search, MCP, `http-` and `email-` values
+  are scrubbed from logs, the kinds in `SCRUB_KINDS` in `compose.ts`.
 
 ## The socket
 

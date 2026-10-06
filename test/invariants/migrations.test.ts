@@ -60,6 +60,7 @@ const EXPECTED_IDS = [
   "0046-azure",
   "0047-decision-usage-decider",
   "0048-agent-listed-as",
+  "0049-mail",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -68,7 +69,7 @@ const KEPT_COLUMNS =
 
 // columns a later migration adds, left out where a test compares rows
 // from before its own migration with rows after every migration
-const LATER_COLUMNS = ["listed_as"];
+const LATER_COLUMNS = ["listed_as", "email_placeholder"];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
     Object.fromEntries(
@@ -1503,6 +1504,47 @@ describe("the schema", () => {
     }
   });
 
+  test("0049 marks only the made-up addresses and adds an empty outbox", () => {
+    const db = seed(MIGRATIONS.slice(0, 48));
+    try {
+      db.exec(`
+        insert into users (id, username, full_name, email, role,
+            password_hash, created_at)
+          values ('ad', 'admin', 'Admin', 'admin@1ctx.dev', 'admin', 'x', 0),
+            ('b', 'bea', 'Bea', 'bea@1ctx.dev', 'member', 'x', 0),
+            ('c', 'cai', 'Cai', 'someone@1ctx.dev', 'member', 'x', 0);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0049-mail"));
+      expect(
+        db.query("select id, email_placeholder from users order by id").all(),
+      ).toEqual([
+        { id: "ad", email_placeholder: 1 },
+        { id: "b", email_placeholder: 1 },
+        { id: "c", email_placeholder: 0 },
+        { id: "u", email_placeholder: 0 },
+      ]);
+      expect(db.query("select count(*) as n from mail_outbox").get()).toEqual({
+        n: 0,
+      });
+      expect(() =>
+        db.exec(`
+          insert into mail_outbox (id, kind, user_id, message_id,
+              next_attempt_at, created_at, updated_at)
+            values ('o', 'spam', 'u', '<o@x>', 0, 0, 0)
+        `),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec(`
+          insert into mail_settings (id, host, port, security,
+              from_address, public_address, updated_at)
+            values (2, 'h', 25, 'tls', 'a@b.c', 'https://x', 0)
+        `),
+      ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0048 keeps the model id of agents on a dedicated wire", () => {
     const db = seed(MIGRATIONS.slice(0, 47));
     try {
@@ -1603,6 +1645,7 @@ describe("the schema", () => {
               attention_round: ___,
               memory_from: ____,
               listed_as: _____,
+              email_placeholder: ______,
               ...rest
             }) => rest,
           ),

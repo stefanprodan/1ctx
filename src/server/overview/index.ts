@@ -165,9 +165,16 @@ export function overviewArea(deps: OverviewDeps): Overview {
       name,
     );
   };
-  const needs = (): AttentionResponse => ({
-    items: attention(deps.attention()),
-  });
+  const needs = (): AttentionResponse => {
+    const input = deps.attention();
+    return {
+      items: attention(input),
+      mail:
+        input.mail === null
+          ? null
+          : { queued: input.mail.queued, failed: input.mail.failed },
+    };
+  };
   const probe = deps.probe ?? processProbe();
   const samples = sampler({ clock: deps.clock, probe });
   samples.sample();

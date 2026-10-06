@@ -33,6 +33,7 @@ import {
   required,
 } from "./client.ts";
 import { decider } from "./decider.ts";
+import { applyMail } from "./mail.ts";
 import { type Document, KINDS, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 
@@ -413,6 +414,9 @@ export async function apply(
         switch (doc.kind) {
           case "User":
             action = await user(api, doc, secret);
+            break;
+          case "Mail":
+            action = await applyMail(api, doc);
             break;
           case "Project": {
             const made = await project(api, doc);

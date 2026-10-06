@@ -7,6 +7,7 @@ import {
   CONFIG_HREF,
   DECIDERS_HREF,
   DECISIONS_HREF,
+  MAIL_HREF,
   MCP_HREF,
   MONITOR_HREF,
   PROJECTS_HREF,
@@ -64,6 +65,7 @@ export const ZONES: Zone[] = [
       { label: "Skills", href: SKILLS_HREF },
       { label: "Visuals", href: VISUALS_HREF },
       { label: "Web access", href: WEB_HREF },
+      { label: "Mail", href: MAIL_HREF },
     ],
   },
 ];

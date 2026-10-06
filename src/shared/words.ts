@@ -184,10 +184,12 @@ export const SECRET_KINDS = [
   "search-",
   "mcp-",
   "http-",
+  "email-",
 ] as const;
 export type SecretKind = (typeof SECRET_KINDS)[number];
 export const MCP_KEY_PREFIX = "mcp-" satisfies SecretKind;
 export const HTTP_KEY_PREFIX = "http-" satisfies SecretKind;
+export const EMAIL_KEY_PREFIX = "email-" satisfies SecretKind;
 
 export function isSecretName(kind: string, value: unknown): value is string {
   return (

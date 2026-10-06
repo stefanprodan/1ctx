@@ -14,7 +14,8 @@ admin's attention, the server's load), Usage by month and Storage.
   `name` are null in every answer, with its owner given.
 - **Attention and load are read at each request, never cached.**
   Attention is what needs an admin: a missing key, a failed MCP or skill
-  refresh (`overview/attention.ts`), not a run's attention mark; load is
+  refresh, mail that failed for good with the outbox's counts
+  (`overview/attention.ts`), not a run's attention mark; load is
   the process's CPU and memory, the running sends and the queue. Load
   reads memory, save the queue's counts, one statement over its partial
   indexes.

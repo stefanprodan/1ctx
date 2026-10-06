@@ -62,8 +62,11 @@ export function userFieldOf(message: string): UserField | undefined {
   return undefined;
 }
 
+// a placeholder is never mailed, so it is not shown as an address
 export function metaLine(user: UserAccount): string {
-  return `@${user.username} · ${user.email}`;
+  return `@${user.username} · ${
+    user.emailPlaceholder ? "No real email" : user.email
+  }`;
 }
 
 function todayIn(tz: string, now: number): string {

@@ -29,6 +29,8 @@ export type UserFields = {
   passwordHash: string;
   mustChangePassword: boolean;
   disabled?: boolean;
+  // the address was made up, as the first admin's is
+  emailPlaceholder?: boolean;
   now: number;
 };
 
@@ -45,6 +47,7 @@ type Raw = {
   disabled: number;
   must_change_password: number;
   agent_id: string | null;
+  email_placeholder: number;
 };
 
 const row = (raw: Raw): UserRow => ({
@@ -59,6 +62,7 @@ const row = (raw: Raw): UserRow => ({
   createdAt: raw.created_at,
   disabled: raw.disabled !== 0,
   mustChangePassword: raw.must_change_password !== 0,
+  emailPlaceholder: raw.email_placeholder !== 0,
   agentId: raw.agent_id,
 });
 
@@ -81,6 +85,7 @@ export const account = (user: UserRow): UserAccount => ({
   createdAt: user.createdAt,
   disabled: user.disabled,
   mustChangePassword: user.mustChangePassword,
+  emailPlaceholder: user.emailPlaceholder,
 });
 
 export const profile = (user: UserRow): Profile => ({
@@ -139,8 +144,8 @@ export class UserStore {
       .query(
         `insert into users
           (id, username, full_name, email, about, role, tz, password_hash,
-           must_change_password, disabled, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           must_change_password, disabled, email_placeholder, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -153,6 +158,7 @@ export class UserStore {
         fields.passwordHash,
         fields.mustChangePassword ? 1 : 0,
         fields.disabled ? 1 : 0,
+        fields.emailPlaceholder ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -170,8 +176,11 @@ export class UserStore {
       .run(username, id);
   }
 
+  // an address an admin saves is a real one
   setEmail(id: string, email: string): void {
-    this.db.query("update users set email = ? where id = ?").run(email, id);
+    this.db
+      .query("update users set email = ?, email_placeholder = 0 where id = ?")
+      .run(email, id);
   }
 
   setTz(id: string, tz: string): void {

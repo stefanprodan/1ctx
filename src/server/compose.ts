@@ -9,7 +9,11 @@
 
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
-import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
+import {
+  EMAIL_KEY_PREFIX,
+  MCP_KEY_PREFIX,
+  type SecretKind,
+} from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
@@ -27,6 +31,7 @@ import { userAgent, withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
+import { type Mail, type Mailer, mailArea, smtpMailer } from "./mail/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import {
   type MemoryArea,
@@ -110,6 +115,8 @@ export type ComposeOptions = {
   passwordCost?: PasswordCost;
   // the cores the send caps are sized by; a test passes a fixed number
   cores?: number;
+  // what reaches the SMTP server; a test passes a fake that records
+  mailer?: Mailer;
 };
 
 export type App = {
@@ -134,6 +141,7 @@ export type App = {
   chat: Providers["chat"];
   // the one way a user is made: with its personal project
   createUser: Users["createUser"];
+  mail: Mail;
   runner: Runner;
   socket: Socket;
   routes: RouteDescriptor[];
@@ -157,7 +165,13 @@ export type App = {
   shutdown(cut?: Promise<void>): Promise<ShutdownResult & DrainResult>;
 };
 
-const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
+const SCRUB_KINDS: SecretKind[] = [
+  "provider-",
+  "search-",
+  "mcp-",
+  "http-",
+  "email-",
+];
 
 export function scrubbedLogs(
   options: Pick<ComposeOptions, "secret" | "secretNames" | "log">,
@@ -190,6 +204,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
+  });
+  const mail = mailArea({
+    db,
+    clock,
+    log: log("mail"),
+    secret: (name) => secret(EMAIL_KEY_PREFIX, name),
+    keys: () => options.secretNames?.(EMAIL_KEY_PREFIX) ?? [],
+    users,
+    mailer: options.mailer ?? smtpMailer(),
   });
   // the instance's start, as the overview reports it
   const startedAt = clock();
@@ -540,6 +563,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           provider: search,
           hasKey: keyed("search-", search === null ? null : `search-${search}`),
         },
+        mail: mail.attention(),
       };
     },
     // built here, at the compile root, so the binary finds its entry
@@ -558,10 +582,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
+    mail.start();
   }
   const routes: RouteDescriptor[] = [
     ...usage.routes,
     ...limits.routes,
+    ...mail.routes,
     ...providers.routes,
     ...deciders.routes,
     ...mcp.routes,
@@ -609,6 +635,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         skills: skills.store,
         mcp: mcp.store,
         agents: agents.store,
+        mail,
       }),
   });
   const sweepLog = log("sweep");
@@ -632,6 +659,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     catalogs: providers.catalogs,
     chat: providers.chat,
     createUser: users.createUser,
+    mail,
     runner,
     socket,
     routes,
@@ -652,8 +680,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
         // an idle chat archived may hold messages that now cannot start
         if (chats.chats_archived > 0) runner.queue.wake();
         const notSent = sessions.sweepNotSent(now);
+        const mailRows = mail.sweep(now);
         const removed =
-          logins + visits + knowledgeRows + scratchRows + digests + notSent;
+          logins +
+          visits +
+          knowledgeRows +
+          scratchRows +
+          digests +
+          notSent +
+          mailRows;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
@@ -662,6 +697,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             bash: scratchRows,
             digests,
             not_sent: notSent,
+            mail: mailRows,
             removed,
             ...chats,
           });
@@ -684,6 +720,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       // first: from here every message is queued for the next start
       runner.queue.close();
       automations.drain();
+      // no row is taken from here; the one in flight ends below
+      const mailing = mail.stop();
       repos.close();
       // no kept files batch starts from here; the wait below is for the
       // one in flight, its compression and its commit
@@ -696,6 +734,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
+      await (cut === undefined ? mailing : Promise.race([mailing, cut]));
+      mail.dispose();
       await packing;
       overview.close();
       socket.dispose();

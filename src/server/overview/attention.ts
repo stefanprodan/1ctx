@@ -17,6 +17,15 @@ export type AttentionInput = {
   skills: { name: string; refreshFailedAt: number | null }[];
   credentials: { name: string; key: KeyState }[];
   search: { provider: string | null; hasKey: boolean };
+  // null until mail is set up
+  mail: {
+    keyName: string | null;
+    hasKey: boolean;
+    queued: number;
+    failed: number;
+    lastFailure: string | null;
+    lastFailedAt: number | null;
+  } | null;
 };
 
 const KEY_ORDER: AttentionKind[] = [
@@ -25,6 +34,7 @@ const KEY_ORDER: AttentionKind[] = [
   "credential-key",
   "credential-unusable",
   "search-key",
+  "mail-key",
 ];
 
 export function attention(input: AttentionInput): AttentionItem[] {
@@ -43,6 +53,10 @@ export function attention(input: AttentionInput): AttentionItem[] {
   }
   if (input.search.provider !== null && !input.search.hasKey) {
     key("search-key", input.search.provider);
+  }
+  const mail = input.mail;
+  if (mail !== null && mail.keyName !== null && !mail.hasKey) {
+    key("mail-key", mail.keyName);
   }
   keys.sort(
     (a, b) =>
@@ -72,6 +86,16 @@ export function attention(input: AttentionInput): AttentionItem[] {
             },
           ],
     ),
+    // the newest failure's word stands for every failed row
+    ...(mail?.lastFailure && mail.lastFailedAt !== null
+      ? [
+          {
+            kind: "mail-failed" as const,
+            name: mail.lastFailure,
+            at: mail.lastFailedAt,
+          },
+        ]
+      : []),
   ].sort((a, b) => b.at - a.at || a.name.localeCompare(b.name));
   return [...keys, ...failed];
 }

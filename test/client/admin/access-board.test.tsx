@@ -41,6 +41,7 @@ const person = (
   createdAt: 0,
   disabled: false,
   mustChangePassword: false,
+  emailPlaceholder: false,
   lastVisitDay: "2026-09-28",
   projectIds: [],
   ...over,

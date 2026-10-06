@@ -164,7 +164,16 @@ function ProfileCard({ user, saving }: CardProps) {
           ) : undefined,
         })}
       >
-        <UserFields who={who} save={card.save} onChange={card.set} />
+        <UserFields
+          who={who}
+          save={card.save}
+          emailHint={
+            user.emailPlaceholder
+              ? "No real email, so no mail goes here."
+              : undefined
+          }
+          onChange={card.set}
+        />
       </Setting>
     </SettingForm>
   );

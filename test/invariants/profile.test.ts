@@ -29,6 +29,8 @@ describe("GET /api/profile", () => {
         createdAt: app.now.value,
         disabled: false,
         mustChangePassword: false,
+        // the first admin's address is made up
+        emailPlaceholder: true,
       },
     });
   });

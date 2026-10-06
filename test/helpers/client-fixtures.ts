@@ -21,6 +21,7 @@ export const user = (over: Partial<AdminUser> = {}): AdminUser => ({
   tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
+  emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: [],
   ...over,

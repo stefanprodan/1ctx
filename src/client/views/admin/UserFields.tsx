@@ -19,6 +19,7 @@ function Text({
   name,
   value,
   type,
+  hint,
   save,
   onInput,
 }: {
@@ -26,9 +27,11 @@ function Text({
   name: keyof Who;
   value: string;
   type?: string;
+  hint?: string;
   save: Save;
   onInput: (e: Event) => void;
 }) {
+  const invalid = save.fieldError(name) !== null;
   return (
     <label class="field">
       <span class="label label-required">{label}</span>
@@ -36,14 +39,18 @@ function Text({
         name={name}
         type={type}
         aria-required="true"
-        aria-invalid={save.fieldError(name) !== null || undefined}
+        aria-invalid={invalid || undefined}
         autocomplete="off"
         spellcheck={false}
         disabled={save.busy}
         value={value}
         onInput={onInput}
       />
-      <FieldError save={save} field={name} />
+      {hint !== undefined && !invalid ? (
+        <span class="hint">{hint}</span>
+      ) : (
+        <FieldError save={save} field={name} />
+      )}
     </label>
   );
 }
@@ -51,11 +58,13 @@ function Text({
 export function UserFields({
   who,
   save,
+  emailHint,
   onChange,
   children,
 }: {
   who: Who;
   save: Save;
+  emailHint?: string;
   onChange: (patch: Partial<Who>) => void;
   children?: ComponentChildren;
 }) {
@@ -82,6 +91,7 @@ export function UserFields({
         name="email"
         type="email"
         value={who.email}
+        hint={emailHint}
         save={save}
         onInput={(e) =>
           onChange({ email: (e.currentTarget as HTMLInputElement).value })

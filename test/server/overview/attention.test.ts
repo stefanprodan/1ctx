@@ -19,6 +19,7 @@ const none: AttentionInput = {
   skills: [],
   credentials: [],
   search: { provider: null, hasKey: false },
+  mail: null,
 };
 
 describe("attention", () => {
@@ -41,6 +42,7 @@ describe("attention", () => {
         skills: [{ name: "plan", refreshFailedAt: null }],
         credentials: [{ name: "gh", key: "ok" }],
         search: { provider: null, hasKey: false },
+        mail: null,
       }),
     ).toEqual([]);
   });
@@ -68,6 +70,7 @@ describe("attention", () => {
         { name: "gh", key: "missing" },
       ],
       search: { provider: "exa", hasKey: false },
+      mail: null,
     });
     expect(items).toEqual([
       { kind: "provider-key", name: "alpha", at: null },

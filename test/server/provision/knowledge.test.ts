@@ -53,6 +53,7 @@ const docsOf = (documents: Document[]) =>
 
 const inventory: Inventory = {
   User: ["admin"],
+  Mail: [],
   Project: ["nebula"],
   Credential: [],
   Repository: [],

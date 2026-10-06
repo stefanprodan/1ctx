@@ -55,6 +55,7 @@ const casey: AdminUser = {
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
   mustChangePassword: true,
+  emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: ["p1"],
 };
@@ -82,6 +83,9 @@ describe("the words", () => {
     "the handle with the email, the role and when last active",
     () => {
       expect(metaLine(casey)).toBe("@casey · casey@example.com");
+      expect(metaLine({ ...casey, emailPlaceholder: true })).toBe(
+        "@casey · No real email",
+      );
       expect(stateLine(root, NOW)).toBe("admin · active today");
       expect(stateLine(casey, NOW)).toBe("member · password to change");
       expect(stateLine({ ...casey, disabled: true }, NOW)).toBe(

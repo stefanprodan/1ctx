@@ -23,6 +23,8 @@ export type UserAccount = UserSummary & {
   createdAt: number;
   disabled: boolean;
   mustChangePassword: boolean;
+  // made up, not the user's: never mailed until an admin saves one
+  emailPlaceholder: boolean;
 };
 
 export type Profile = UserAccount & { about: string };
