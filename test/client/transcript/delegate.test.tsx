@@ -33,6 +33,7 @@ import type {
   Message,
   SessionDetail,
 } from "../../../src/shared/contracts/session.ts";
+import { filesPart, NOT_COPIED } from "../../../src/shared/subagents.ts";
 
 function row(changes: Partial<Message> & Pick<Message, "id" | "seq">): Message {
   return {
@@ -147,7 +148,6 @@ const work = (changes: Partial<ChildWork> = {}): ChildWork => ({
   sessionId: "child-1",
   status: "done",
   tokens: 110,
-  cost: 0.004,
   rows: childRows(),
   ...changes,
 });
@@ -219,10 +219,8 @@ describe("a delegate group", () => {
         work({ status: "stopped" }),
       ),
     ).toBe("stopped");
-    expect(childHead("done", work())).toBe("done · 110 tokens · <$0.01");
-    expect(childHead("running", work({ tokens: 0, cost: null }))).toBe(
-      "running",
-    );
+    expect(childHead("done", work())).toBe("done · 110 tokens");
+    expect(childHead("running", work({ tokens: 0 }))).toBe("running");
   });
 
   test("holds the child's rounds and closes with its answer", () => {
@@ -264,13 +262,11 @@ describe("a child's rows on the client", () => {
     const stale = work({
       status: "running",
       tokens: 40,
-      cost: null,
       rows: [{ ...childRows()[2]!, status: "streaming" }],
     });
     const merged = mergeWork(ended, stale);
     expect(merged.status).toBe("done");
     expect(merged.tokens).toBe(110);
-    expect(merged.cost).toBe(0.004);
     expect(merged.rows.find((r) => r.id === "c-tool")?.status).toBe("done");
     expect(merged.rows.map((r) => r.id)).toEqual([
       "c-user",
@@ -327,6 +323,37 @@ describe("a delegate call's own result", () => {
     },
   );
 
+  test("keeps only the files part of a finished child's result", () => {
+    expect(
+      filesPart("It is noon.\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/notes.md"),
+    ).toBe("Files in /tmp/sub-1/:\n/tmp/sub-1/notes.md");
+    expect(filesPart("It is noon.")).toBe("");
+    // both groups, the second after a single newline
+    expect(
+      filesPart(
+        `Done.\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/a.md\n${NOT_COPIED}\n/tmp/big.bin`,
+      ),
+    ).toBe(
+      `Files in /tmp/sub-1/:\n/tmp/sub-1/a.md\n${NOT_COPIED}\n/tmp/big.bin`,
+    );
+    // only what did not come back
+    expect(filesPart(`Done.\n\n${NOT_COPIED}\n/tmp/big.bin`)).toBe(
+      `${NOT_COPIED}\n/tmp/big.bin`,
+    );
+    // a heading-like line inside the answer is the answer's
+    expect(
+      filesPart(
+        "Files in /tmp/repo/ worth reading: a.ts\n\nFiles in /tmp/repo/ hold the logs.\nDone.\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/notes.md\nand 3 more in /tmp/sub-1/",
+      ),
+    ).toBe(
+      "Files in /tmp/sub-1/:\n/tmp/sub-1/notes.md\nand 3 more in /tmp/sub-1/",
+    );
+    // the page's display cut
+    expect(filesPart("Done.\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/a\n...")).toBe(
+      "Files in /tmp/sub-1/:\n/tmp/sub-1/a\n...",
+    );
+  });
+
   test.serial("closes the group with what the parent got back", () => {
     onScreen();
     takeChildren("root", [{ messageId: "delegate-1", child: work() }]);
@@ -335,7 +362,7 @@ describe("a delegate call's own result", () => {
         "delegate-1",
         {
           status: "done",
-          content: "It is noon.\nFiles copied to /tmp/sub-1/: notes.md",
+          content: "It is noon.\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/notes.md",
           bytes: 50,
           cut: false,
         },
@@ -343,11 +370,34 @@ describe("a delegate call's own result", () => {
     ]);
     const html = drawn(rootRows());
     expect(html).toContain("transcript-child-title");
-    expect(html).toContain("Files copied to /tmp/sub-1/: notes.md");
-    // the answer comes before the parent's result
+    expect(html).toContain("/tmp/sub-1/notes.md");
+    // the answer is drawn once, before the files it wrote
+    expect(html.split("It is noon.").length - 1).toBe(1);
     expect(html.indexOf("<p>It is noon.</p>")).toBeLessThan(
-      html.indexOf("Files copied"),
+      html.indexOf("Files in /tmp/sub-1/"),
     );
+  });
+});
+
+describe("a child that did not finish", () => {
+  test.serial("closes the group with the whole result", () => {
+    onScreen();
+    takeChildren("root", [
+      { messageId: "delegate-1", child: work({ status: "failed" }) },
+    ]);
+    toolResults.value = new Map([
+      [
+        "delegate-1",
+        {
+          status: "done",
+          content: "The subagent failed: the provider refused.",
+          bytes: 42,
+          cut: false,
+        },
+      ],
+    ]);
+    const html = drawn(rootRows());
+    expect(html).toContain("The subagent failed: the provider refused.");
   });
 });
 

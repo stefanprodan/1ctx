@@ -48,12 +48,6 @@ export function mergeWork(held: ChildWork | null, next: ChildWork): ChildWork {
     sessionId: next.sessionId,
     status: ended ? held.status : next.status,
     tokens: Math.max(held.tokens, next.tokens),
-    cost:
-      held.cost === null
-        ? next.cost
-        : next.cost === null
-          ? held.cost
-          : Math.max(held.cost, next.cost),
     rows: mergeRows(held.rows, next.rows),
   };
 }

@@ -4,10 +4,7 @@
 // A subagent's prompt, result and places, on fixtures.
 
 import { describe, expect, test } from "bun:test";
-import {
-  childResult,
-  NOT_COPIED,
-} from "../../../src/server/runner/child-result.ts";
+import { childResult } from "../../../src/server/runner/child-result.ts";
 import {
   freeSlot,
   noChildren,
@@ -27,6 +24,7 @@ import { cutResult } from "../../../src/server/runner/results.ts";
 import type { ActiveSend } from "../../../src/server/runner/send.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
+import { NOT_COPIED } from "../../../src/shared/subagents.ts";
 import { tick } from "../../helpers/chat.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10, 0, 0);

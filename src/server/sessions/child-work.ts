@@ -11,9 +11,9 @@ import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { offWire } from "./rows.ts";
 
-type TallyRaw = { status: SessionStatus; tokens: number; cost: number | null };
+type TallyRaw = { status: SessionStatus; tokens: number };
 
-// the child's status and the tokens and cost of every round it ran,
+// the child's status and the tokens of every round it ran,
 // with the rows given; null when the session is gone or is no child
 export function childWork(
   db: Db,
@@ -24,9 +24,7 @@ export function childWork(
     .query<TallyRaw, [string]>(
       `select sessions.status,
          (select coalesce(sum(prompt_tokens + completion_tokens), 0)
-            from usage where usage.session_id = sessions.id) as tokens,
-         (select sum(cost) from usage where usage.session_id = sessions.id)
-           as cost
+            from usage where usage.session_id = sessions.id) as tokens
        from sessions
        where id = ? and parent_session_id is not null`,
     )
@@ -36,7 +34,6 @@ export function childWork(
     sessionId,
     status: raw.status,
     tokens: raw.tokens,
-    cost: raw.cost,
     rows: rows.map(offWire),
   };
 }

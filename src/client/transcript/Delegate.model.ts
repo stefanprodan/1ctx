@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A delegate call's group in the work fold (docs/subagents.md): headed
-// by its description, the child's status, tokens and cost, holding the
+// by its description, the child's status and tokens, holding the
 // child's rounds and closed by its answer. The child's calls are its
 // own: the fold's count is the parent's calls, a delegate one of them.
 
 import type { ChildWork, Message } from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
-import { money, tokensText } from "../lib/format.ts";
+import { tokensText } from "../lib/format.ts";
 import { type CallNode, type WorkRound, workRounds } from "./rows.ts";
 import { ranCall } from "./Tool.model.ts";
 
@@ -50,7 +50,6 @@ export function childStatus(row: Message, work: ChildWork | null): ChildStatus {
 export function childHead(status: ChildStatus, work: ChildWork | null): string {
   const parts: string[] = [status];
   if (work !== null && work.tokens > 0) parts.push(tokensText(work.tokens));
-  if (work?.cost != null) parts.push(money(work.cost));
   return parts.join(" · ");
 }
 

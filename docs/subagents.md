@@ -136,8 +136,8 @@ is its root.
 - **A child's rows reach the root's watchers alone.** The hook
   publishes `child.changed` (`childChanged()`), built inside the
   child's transaction: the rows it changed in the transcript's wire
-  shape (`offWire`), the child's status, and the tokens and cost of
-  every round it ran, keyed by the root's `delegate` row. The socket
+  shape (`offWire`), the child's status, and the tokens of every
+  round it ran, keyed by the root's `delegate` row. The socket
   sends it as the `child` frame to the root's watchers that hold its
   project, as `queue`; never to a project's other connections, the feed
   or another project. Rows appear as each round and call starts and
@@ -155,11 +155,13 @@ is its root.
 - **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
   shut until opened like a call. Its head is the description, then the
   status (running while the root's row runs, then the child's own:
-  done, failed or stopped), the child's tokens and its cost when a
-  round stated one. Open, it shows the task, the child's rounds drawn
-  by the fold's own `Rounds` and `Tool`, the child's answer, and closes
-  with the parent's own result (a failure's words, the files copied
-  back). A call refused before its child began is an ordinary `Tool`
+  done, failed or stopped) and the child's tokens, never a price, as
+  chats show none. Open, it shows the task, the child's rounds drawn
+  by the fold's own `Rounds` and `Tool`, the child's answer once, then only
+  the files part of the parent's result (`filesPart()` in
+  `shared/subagents.ts`, whose headings the server writes too). A failed,
+  stopped or answerless child, or a result that failed to load, closes
+  with the whole result. A call refused before its child began is an ordinary `Tool`
   row (`isDelegate()`). Two calls are two groups.
 - **The client keeps a child's rows by `delegate` row**
   (`data/session-children.ts`) for the chat on screen: the frames and

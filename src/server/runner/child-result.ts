@@ -6,6 +6,7 @@
 // later cut keeps them. The child's session id goes on the tool row,
 // never in the text.
 
+import { filesHeading, NOT_COPIED } from "../../shared/subagents.ts";
 import { cutAt } from "../../shared/text.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { ToolResult } from "./policy.ts";
@@ -47,17 +48,12 @@ function listed(
   return out;
 }
 
-// what did not come back: past the parent's /tmp caps, or a name its
-// rule refuses there
-export const NOT_COPIED =
-  "Not copied back, over this chat's /tmp limits or names:";
-
 // the files part, headings counted, at most a quarter of the cut, so the
 // answer always shows; each group gets an even share
 function filesTail(end: ChildEnd, resultCut: number): string {
   const groups = [
     {
-      head: `Files in /tmp/${end.folder}/:`,
+      head: filesHeading(end.folder),
       lines: end.copied,
       more: (n: number) => MORE(n, end.folder),
     },

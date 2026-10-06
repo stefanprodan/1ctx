@@ -149,7 +149,7 @@ describe("send policy thinking", () => {
     expect(policy({}).limits).toMatchObject({
       childrenAtOnce: 2,
       childrenPerSend: 4,
-      childAnswerChars: 8000,
+      childAnswerChars: 12_000,
     });
   });
 

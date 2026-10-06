@@ -7,6 +7,7 @@
 // child's calls are drawn by the rows the fold draws the parent's with.
 
 import { useEffect } from "preact/hooks";
+import { filesPart } from "../../shared/subagents.ts";
 import { childWork, loadChild } from "../data/session-children.ts";
 import { loadToolResult, toolResults } from "../data/session-values.ts";
 import { Icon } from "../lib/icons.tsx";
@@ -52,6 +53,13 @@ export function Delegate({ node }: { node: CallNode }) {
   const status = childStatus(row, work);
   const view = childView(work?.rows ?? []);
   const task = taskOf(node);
+  // a finished child's answer is drawn once; only its files follow it
+  const answered =
+    status === "done" &&
+    !shown.err &&
+    view.answer !== null &&
+    view.answer.html !== "";
+  const files = answered ? filesPart(shown.text) : "";
   return (
     <details
       class={`transcript-fold${status === "running" ? " transcript-fold-live" : ""}${
@@ -101,7 +109,12 @@ export function Delegate({ node }: { node: CallNode }) {
             dangerouslySetInnerHTML={{ __html: view.answer.html }}
           />
         )}
-        {row.status !== "streaming" && (
+        {row.status !== "streaming" && answered && files !== "" && (
+          <div class="transcript-tool-detail">
+            <Value text={files} />
+          </div>
+        )}
+        {row.status !== "streaming" && !answered && (
           <div class="transcript-tool-detail">
             <div class="transcript-tool-label">{shown.label}</div>
             <Value text={shown.text} failed={shown.err} />

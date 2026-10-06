@@ -29,7 +29,7 @@ export type DelegatePort = (
 ) => Promise<ToolResult>;
 
 export const DELEGATE_DESCRIPTION =
-  "Hand a task to a subagent: a fresh copy of you with your tools, less delegate, memory and email, that can write only to its own /tmp. Delegate work that would fill your context with material you need once: exploring a repository, reading many files or long MCP results, web research. Independent tasks run in parallel when you call delegate several times in one round. Answer small questions yourself, and keep work that needs this conversation. The subagent sees nothing but task and a copy of your /tmp, so put everything it needs in task: the goal, where to look, what to return. It answers briefly; files it writes come back under /tmp/<name>/, listed in the result.";
+  "Hand a task to a subagent, a fresh copy of you that works in its own context and answers briefly. Several delegate calls in one reply run together, a few at a time: when the work splits into independent parts, such as two repositories or two topics, send one call per part together in a single reply. Delegate work that would fill your context with material you need once: exploring a repository, reading many files or long MCP results, web research. Answer small questions yourself, and keep work that needs this conversation. A subagent has your tools less delegate, memory, email, visuals and MCP writes, and writes only to its own /tmp. It sees nothing but task and a copy of your /tmp, so put everything it needs in task: the goal, where to look, what to return. Files it writes come back under /tmp/<name>/, listed in the result.";
 
 export function makeDelegateTool(): Tool {
   return {
