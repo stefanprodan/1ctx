@@ -171,9 +171,19 @@ export class MailStore {
     });
   }
 
-  // sent or dropped: nothing of it is kept
+  // dropped: nothing of it is kept
   remove(id: string): void {
     this.db.query("delete from mail_outbox where id = ?").run(id);
+  }
+
+  // the text goes; the row stays a day for the caps counted on rows
+  sent(id: string, now: number): void {
+    this.db
+      .query(
+        `update mail_outbox set status = 'sent', subject = null, body = null,
+           claimed_at = null, updated_at = ? where id = ?`,
+      )
+      .run(now, id);
   }
 
   retry(id: string, attempts: number, at: number, now: number): void {
@@ -206,12 +216,15 @@ export class MailStore {
       .get()!.at;
   }
 
-  sweep(before: number): number {
+  // sent rows past sentBefore, failed ones past failedBefore
+  sweep(sentBefore: number, failedBefore: number): number {
     return this.db
       .query(
-        "delete from mail_outbox where status = 'failed' and updated_at < ?",
+        `delete from mail_outbox
+         where (status = 'sent' and updated_at < ?)
+           or (status = 'failed' and updated_at < ?)`,
       )
-      .run(before).changes;
+      .run(sentBefore, failedBefore).changes;
   }
 
   counts(): OutboxCounts {

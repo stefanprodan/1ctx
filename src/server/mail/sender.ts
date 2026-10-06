@@ -22,10 +22,17 @@ import {
 import type { Address, Mailer, SendResult, SmtpServer } from "./smtp.ts";
 import type { MailStore, OutboxRow } from "./store.ts";
 
-// a pass at least this often, so a stale claim is taken again
+// a pass at least this often, so a stale claim is taken again; also
+// the pause after a pass that threw, which no wake cuts short
 const PASS_MS = MINUTE_MS;
 
-export type MailContent = { subject: string; text: string; html?: string };
+// fromName in place of the server's, as an agent's "<agent> via 1ctx"
+export type MailContent = {
+  subject: string;
+  text: string;
+  html?: string;
+  fromName?: string;
+};
 
 // a kind's last word before SMTP: the text to send, built now (a link
 // mail mints its token here), or a word that drops the row
@@ -62,6 +69,7 @@ export function sender(deps: SenderDeps): Sender {
   let running = false;
   let epoch = 0;
   let wakeWait: (() => void) | null = null;
+  let haltWait: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
   let loop: Promise<void> = Promise.resolve();
 
@@ -135,11 +143,20 @@ export function sender(deps: SenderDeps): Sender {
       return;
     }
     if (typeof content === "string") return dropped(row, content);
-    if (content === null || hasControl(content.subject)) return broken(row);
+    if (
+      content === null ||
+      hasControl(content.subject) ||
+      (content.fromName !== undefined && hasControl(content.fromName))
+    ) {
+      return broken(row);
+    }
     let result: SendResult;
     try {
       result = await deps.mailer(ready.server, {
-        from: ready.from,
+        from: {
+          name: content.fromName ?? ready.from.name,
+          address: ready.from.address,
+        },
         to: { name: user.fullName, address: user.email },
         subject: content.subject,
         text: content.text,
@@ -157,7 +174,7 @@ export function sender(deps: SenderDeps): Sender {
       failed(row, result);
       return;
     }
-    deps.store.remove(row.id);
+    deps.store.sent(row.id, deps.clock());
     deps.log.info("mail sent", fields(row));
   };
 
@@ -174,28 +191,36 @@ export function sender(deps: SenderDeps): Sender {
     return taken;
   };
 
+  // a wake ends it only when wakeable; a stop always does
+  const pause = async (ms: number, wakeable: boolean): Promise<void> => {
+    const timer = sleep(deps.clock, ms);
+    const ended = new Promise<void>((resolve) => {
+      haltWait = resolve;
+      if (wakeable) wakeWait = resolve;
+    });
+    await Promise.race([timer.promise, ended]);
+    timer.cancel();
+  };
+
   const wait = async (): Promise<void> => {
     const earliest = deps.ready() === null ? null : deps.store.earliest();
     const ms =
       earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - deps.clock());
-    if (ms <= 0) return;
-    const timer = sleep(deps.clock, ms);
-    const waking = new Promise<void>((resolve) => {
-      wakeWait = resolve;
-    });
-    await Promise.race([timer.promise, waking]);
-    timer.cancel();
+    if (ms > 0) await pause(ms, true);
   };
 
+  // anything a pass or a wait throws (the db, a key file) is logged and
+  // waited out, so the loop outlives it and never spins on it
   const run = async (mine: number) => {
     const live = () => running && epoch === mine;
     while (live()) {
       try {
         await pass(live);
+        if (live()) await wait();
       } catch (err) {
         deps.log.error("mail pass failed", errorFields(err));
+        if (live()) await pause(PASS_MS, false);
       }
-      if (live()) await wait();
     }
   };
 
@@ -213,6 +238,9 @@ export function sender(deps: SenderDeps): Sender {
     stop() {
       running = false;
       wake();
+      const halt = haltWait;
+      haltWait = null;
+      halt?.();
       return loop;
     },
     wake,

@@ -32,6 +32,7 @@ function build(secureCookie: boolean) {
   });
   const access = accessArea({
     db,
+    mail: { enabled: () => false },
     clock: () => 0,
     log: silent,
     secureCookie,

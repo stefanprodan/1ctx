@@ -41,29 +41,38 @@ the sender, and the admin's Mail page under Config.
   is activated, wakes on `mail.queued` and on a timer from the clock,
   and on shutdown takes no new row and waits for the one in flight. A
   claim older than a minute belongs to a dead process and is taken
-  again.
+  again. A throw in a pass or a wait is logged and waited out for a
+  minute on the clock, which no wake cuts short, so it never spins. A
+  key file that cannot be read is a missing one: mail is off.
 - **Each row has one `Message-ID`,** kept across retries, so a send
   repeated after a crash reads as one mail.
-- **Backoff is 1, 5 and 30 minutes, then failed.** A sent row is
-  deleted. A failed row keeps its kind, user, word and times, never the
-  text, for 7 days; the hourly sweep removes it then.
+- **Backoff is 1, 5 and 30 minutes, then failed.** A sent row becomes
+  `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it;
+  a failed row keeps its word for 7 days. Neither keeps the text, and
+  the hourly sweep removes them. A dropped row is deleted. A chat's
+  delete leaves its rows with no session, so the project's cap keeps
+  counting them.
+- **A kind's mail may carry its own From name** (`fromName`, as
+  "<agent> via 1ctx"); the address is always the server's.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
   may drop it too (`opted-out`, `no-access`).
-- **A placeholder address is marked, never guessed.** The users'
-  `email_placeholder` is set for the bootstrap admin and was set by
-  the migration for every `<username>@1ctx.dev`. An admin saving an
-  address clears it. A placeholder is never mailed.
+- **An address on `1ctx.dev` is a placeholder.** Seeded and
+  bootstrapped users get one, so the project's own domain is never
+  mailed. The users' `email_placeholder` follows the address's domain,
+  exactly `1ctx.dev`, at every create and every email edit, and the
+  migration set it the same way. A placeholder is never mailed.
 
 ## The page
 
 - **The Mail page saves the server as one card,** since `PUT` takes
   every field and nothing is held before the first save.
 - **Send test shows the word as a sentence** (`resultLine()`), never
-  the server's text. It is off while mail is off or the admin's own
-  address is a placeholder. The Users pages say "No real email" for a
-  placeholder.
+  the server's text. It is off while mail is off, while the form has
+  unsaved edits and while the admin's own address is a placeholder; a
+  save clears its last result. The Users pages say "No real email" for
+  a placeholder only while mail is on (`mailOn` in `GET /api/users`).
 
 ## Words and logs
 
@@ -81,5 +90,5 @@ the sender, and the admin's Mail page under Config.
 - **`testApp()` passes a fake mailer** that records every message and
   answers with `result`, so the suite never opens a socket to a mail
   server. `smtp.ts` is tested against the fake server in
-  `test/helpers/smtp.ts` on loopback, which trusts the fixture's
-  self-signed certificate as its CA.
+  `test/helpers/smtp.ts` on loopback, TLS on connect or upgraded by
+  STARTTLS, with the fixture's self-signed certificate as the only CA.

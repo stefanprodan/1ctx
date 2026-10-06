@@ -10,6 +10,7 @@ import { zoneStep } from "../../app/zones.ts";
 import { me } from "../../data/me.ts";
 import { projects, projectsError } from "../../data/projects.ts";
 import {
+  mailOn,
   setUserProjects,
   updateUser,
   users,
@@ -168,7 +169,7 @@ function ProfileCard({ user, saving }: CardProps) {
           who={who}
           save={card.save}
           emailHint={
-            user.emailPlaceholder
+            mailOn.value && user.emailPlaceholder
               ? "No real email, so no mail goes here."
               : undefined
           }

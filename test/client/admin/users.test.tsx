@@ -83,8 +83,12 @@ describe("the words", () => {
     "the handle with the email, the role and when last active",
     () => {
       expect(metaLine(casey)).toBe("@casey · casey@example.com");
-      expect(metaLine({ ...casey, emailPlaceholder: true })).toBe(
+      expect(metaLine({ ...casey, emailPlaceholder: true }, true)).toBe(
         "@casey · No real email",
+      );
+      // with mail off the page reads as it did before mail
+      expect(metaLine({ ...casey, emailPlaceholder: true })).toBe(
+        "@casey · casey@example.com",
       );
       expect(stateLine(root, NOW)).toBe("admin · active today");
       expect(stateLine(casey, NOW)).toBe("member · password to change");

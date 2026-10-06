@@ -107,6 +107,7 @@ describe("the Mail words", () => {
     expect(testLine(response())).toBe(
       "Sends a test mail to root@example.test.",
     );
+    expect(testLine(response(), true)).toBe("Save the changes to test them.");
     expect(testLine(response({ to: null }))).toBe(
       "Your account has no real email.",
     );

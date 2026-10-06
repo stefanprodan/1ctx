@@ -6,6 +6,7 @@
 // signed-in admin once their address is a real one.
 
 import { describe, expect, test } from "bun:test";
+import { transact } from "../../../src/server/db/index.ts";
 import type {
   MailResponse,
   MailTestResponse,
@@ -129,14 +130,75 @@ describe("the mail routes", () => {
     await app.shutdown();
   });
 
-  test("save an admin's held address as a real one", async () => {
+  test("mark every address on the project's domain a placeholder", async () => {
     const { app, admin } = await signedIn();
-    const me = app.users.byUsername("admin")!;
-    const res = await admin.call("PATCH", `/api/users/${me.id}`, {
-      body: { email: me.email },
+    const made = await admin.call("POST", "/api/users", {
+      body: {
+        username: "maria",
+        fullName: "Maria",
+        email: "maria@1ctx.dev",
+        role: "member",
+        tz: "UTC",
+        password: "maria-password",
+      },
     });
-    expect(res.status).toBe(200);
-    expect(app.users.byUsername("admin")!.emailPlaceholder).toBe(false);
+    expect(made.status).toBe(201);
+    const maria = (await made.json()).user;
+    expect(maria.emailPlaceholder).toBe(true);
+    const edit = async (email: string) => {
+      const res = await admin.call("PATCH", `/api/users/${maria.id}`, {
+        body: { email },
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()).user.emailPlaceholder;
+    };
+    expect(await edit("maria@example.test")).toBe(false);
+    expect(await edit("maria@1ctx.dev")).toBe(true);
+    // a subdomain is someone's mailbox, the project's own domain is not
+    expect(await edit("maria@mail.1ctx.dev")).toBe(false);
+    await app.shutdown();
+  });
+
+  test("say on the users list whether mail is on", async () => {
+    const { app, admin } = await signedIn();
+    const mailOn = async () =>
+      (await (await admin.call("GET", "/api/users")).json()).mailOn;
+    expect(await mailOn()).toBe(false);
+    await admin.call("PUT", "/api/admin/mail", { body: SERVER });
+    expect(await mailOn()).toBe(true);
+    await app.shutdown();
+  });
+
+  test("never start the sender in an app that is not activated", async () => {
+    const app = await testApp({
+      activate: false,
+      secrets: { "email-relay": "secret-pass" },
+    });
+    app.mail.store.saveSettings(SERVER, app.now.value);
+    const admin = app.users.byUsername("admin");
+    expect(admin).toBeNull();
+    const user = app.createUser({
+      username: "ann",
+      fullName: "Ann",
+      email: "ann@example.test",
+      role: "member",
+      passwordHash: "x",
+      mustChangePassword: false,
+      now: app.now.value,
+    });
+    transact(app.db, () => ({
+      result: undefined,
+      events: app.mail.enqueue({
+        kind: "notice",
+        userId: user.id,
+        subject: "Hi",
+        body: "x",
+      }),
+    }));
+    app.now.value += 60 * 60_000;
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(app.mailer.sent).toEqual([]);
+    expect(app.mail.store.counts().queued).toBe(1);
     await app.shutdown();
   });
 

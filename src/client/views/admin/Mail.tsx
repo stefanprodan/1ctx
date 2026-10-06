@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useSignal } from "@preact/signals";
+import { type Signal, useSignal } from "@preact/signals";
 import type { MailResponse } from "../../../shared/api/mail.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { mail, mailError, saveMail, testMail } from "../../data/mail.ts";
@@ -38,6 +38,12 @@ export function Mail() {
   const state = mail.value;
   const error = mailError.value;
   const off = state === null ? null : offLine(state);
+  // held here, so Send test knows the form has unsaved edits
+  const drafted = useSignal<MailDraft | null>(null);
+  const dirty =
+    state !== null &&
+    drafted.value !== null &&
+    mailDirty(drafted.value, state.settings);
   return (
     <Page
       steps={[zoneStep("Config")]}
@@ -48,8 +54,13 @@ export function Mail() {
       {state && (
         <SettingStack>
           {off !== null && <SettingAlert>{off}</SettingAlert>}
-          <Server state={state} />
-          <Test state={state} />
+          <Server state={state} drafted={drafted} />
+          {/* a save starts it over, so an old result never stays */}
+          <Test
+            key={state.settings?.updatedAt ?? 0}
+            state={state}
+            dirty={dirty}
+          />
         </SettingStack>
       )}
     </Page>
@@ -62,7 +73,6 @@ function Text({
   draft,
   save,
   type,
-  mono,
   required,
   placeholder,
   onInput,
@@ -72,7 +82,6 @@ function Text({
   draft: MailDraft;
   save: Save;
   type?: string;
-  mono?: boolean;
   required?: boolean;
   placeholder?: string;
   onInput: (value: string) => void;
@@ -83,7 +92,6 @@ function Text({
       <input
         name={field}
         type={type}
-        class={mono ? "mail-mono" : undefined}
         aria-required={required || undefined}
         aria-invalid={save.fieldError(field) !== null || undefined}
         autocomplete="off"
@@ -102,8 +110,13 @@ function Text({
 }
 
 // null until an edit, so a load that lands late shows through
-function Server({ state }: { state: MailResponse }) {
-  const drafted = useSignal<MailDraft | null>(null);
+function Server({
+  state,
+  drafted,
+}: {
+  state: MailResponse;
+  drafted: Signal<MailDraft | null>;
+}) {
   const latest = useLatest(state);
   const save = useSave(async () => {
     const got = mailBody(drafted.value ?? draftOf(latest.current.settings));
@@ -118,7 +131,7 @@ function Server({ state }: { state: MailResponse }) {
   const text = (
     label: string,
     field: MailField,
-    extra: { type?: string; mono?: boolean; placeholder?: string } = {},
+    extra: { type?: string; placeholder?: string } = {},
   ) => (
     <Text
       label={label}
@@ -153,11 +166,8 @@ function Server({ state }: { state: MailResponse }) {
         }
       >
         <div class="pair">
-          {text("Host", "host", {
-            mono: true,
-            placeholder: "smtp.example.com",
-          })}
-          {text("Port", "port", { mono: true })}
+          {text("Host", "host", { placeholder: "smtp.example.com" })}
+          {text("Port", "port")}
           <div class="field pair-wide">
             <span class="label label-required">Security</span>
             <Seg
@@ -174,7 +184,7 @@ function Server({ state }: { state: MailResponse }) {
               }}
             />
           </div>
-          {text("Username", "username", { mono: true })}
+          {text("Username", "username")}
           <div class="field">
             <span class="label">Password key file</span>
             <Select
@@ -203,7 +213,6 @@ function Server({ state }: { state: MailResponse }) {
           {text("From name", "fromName")}
           <div class="pair-wide">
             {text("Public address", "publicAddress", {
-              mono: true,
               placeholder: "https://1ctx.example.com",
             })}
           </div>
@@ -213,19 +222,22 @@ function Server({ state }: { state: MailResponse }) {
   );
 }
 
-function Test({ state }: { state: MailResponse }) {
+// it mails through the saved server, so it waits while edits are not
+function Test({ state, dirty }: { state: MailResponse; dirty: boolean }) {
   const send = useAction();
   const result = useSignal<string | null>(null);
   const failed = useSignal(false);
   return (
     <Setting
       title="Send test"
-      line={testLine(state)}
+      line={testLine(state, dirty)}
       action={
         <button
           type="button"
           class="btn btn-small"
-          disabled={send.busy.value || !state.enabled || state.to === null}
+          disabled={
+            send.busy.value || dirty || !state.enabled || state.to === null
+          }
           onClick={() =>
             void send.run(async () => {
               result.value = null;

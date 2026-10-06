@@ -449,6 +449,10 @@ describe("provision preflight", () => {
     expect(() => check([doc!])).toThrow(
       "spec.keyFrom secret email-relay.key is missing or empty",
     );
+    const { keyFrom: _, ...nameOnly } = mail;
+    expect(() => check(parse([source("Mail", "relay", nameOnly)]))).toThrow(
+      "spec.keyFrom is required with spec.username",
+    );
   });
 
   test("a Decider names a provider that exists or is in the input", () => {

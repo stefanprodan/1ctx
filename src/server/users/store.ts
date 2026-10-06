@@ -29,10 +29,14 @@ export type UserFields = {
   passwordHash: string;
   mustChangePassword: boolean;
   disabled?: boolean;
-  // the address was made up, as the first admin's is
-  emailPlaceholder?: boolean;
   now: number;
 };
+
+// the project's own domain: a seeded or bootstrapped user's address,
+// never a mailbox, so mail never goes to it
+export const PLACEHOLDER_DOMAIN = "1ctx.dev";
+export const isPlaceholderEmail = (email: string): boolean =>
+  email.slice(email.lastIndexOf("@") + 1) === PLACEHOLDER_DOMAIN;
 
 type Raw = {
   id: string;
@@ -158,7 +162,7 @@ export class UserStore {
         fields.passwordHash,
         fields.mustChangePassword ? 1 : 0,
         fields.disabled ? 1 : 0,
-        fields.emailPlaceholder ? 1 : 0,
+        isPlaceholderEmail(fields.email) ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -176,11 +180,10 @@ export class UserStore {
       .run(username, id);
   }
 
-  // an address an admin saves is a real one
   setEmail(id: string, email: string): void {
     this.db
-      .query("update users set email = ?, email_placeholder = 0 where id = ?")
-      .run(email, id);
+      .query("update users set email = ?, email_placeholder = ? where id = ?")
+      .run(email, isPlaceholderEmail(email) ? 1 : 0, id);
   }
 
   setTz(id: string, tz: string): void {

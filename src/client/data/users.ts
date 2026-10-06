@@ -23,6 +23,8 @@ import { usageSlot } from "./slot.ts";
 
 export const users = signal<AdminUser[] | null>(null);
 export const usersError = signal<Failure | null>(null);
+// mail is set up, so a placeholder address is said as one
+export const mailOn = signal(false);
 export const userUsage = usageSlot<SendTotalsResponse>(
   (id) => `/api/users/${encodeURIComponent(id)}/usage`,
 );
@@ -36,6 +38,7 @@ effect(() => {
   owner = id;
   users.value = null;
   usersError.value = null;
+  mailOn.value = false;
 });
 
 onProjectMembers((projectId, memberIds) => {
@@ -66,7 +69,10 @@ export async function loadUsers(): Promise<void> {
   usersError.value = null;
   try {
     const body = await api<UsersResponse>("/api/users");
-    if (owner === forUser && turn === mine) users.value = body.users;
+    if (owner === forUser && turn === mine) {
+      users.value = body.users;
+      mailOn.value = body.mailOn;
+    }
   } catch (err) {
     if (owner === forUser && turn === mine) usersError.value = failure(err);
   }

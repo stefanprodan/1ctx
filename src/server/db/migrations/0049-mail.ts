@@ -5,12 +5,13 @@ import type { Migration } from "../migration.ts";
 
 // The instance's SMTP server, one row whose password is a key file it
 // names, and the outbox every mail goes through: written in the
-// transaction that causes it, taken by the sender, deleted once sent.
-// A failed row keeps its kind, user, word and times, never the text.
-// The kinds are every mail the instance will send, and a row may be
-// kept as sent for a cap counted on rows, so neither needs a rebuild.
-// An email made from the username on the placeholder domain was never
-// a real address, so it is marked and never mailed.
+// transaction that causes it and taken by the sender. A sent row keeps
+// its kind, user, project and times for a day, so a daily cap counts
+// it, and a failed one its word for a week; neither keeps the text.
+// The kinds are every mail the instance will send, so a later one
+// needs no rebuild. A chat's delete leaves its sent rows to the cap.
+// An address on the project's own domain is a seeded one, never a
+// mailbox, so it is marked and never mailed.
 export const m0049: Migration = {
   id: "0049-mail",
   up(db) {
@@ -34,7 +35,7 @@ export const m0049: Migration = {
           'notice', 'agent', 'alert')),
         user_id text not null references users(id) on delete cascade,
         project_id text references projects(id) on delete cascade,
-        session_id text references sessions(id) on delete cascade,
+        session_id text references sessions(id) on delete set null,
         subject text,
         body text,
         message_id text not null unique,
@@ -51,11 +52,13 @@ export const m0049: Migration = {
       create index mail_outbox_due on mail_outbox(status, next_attempt_at);
       create index mail_outbox_project on mail_outbox(project_id, created_at)
         where project_id is not null;
+      create index mail_outbox_session on mail_outbox(session_id, created_at)
+        where session_id is not null;
 
       alter table users add column email_placeholder integer not null
         default 0 check (email_placeholder in (0, 1));
       update users set email_placeholder = 1
-        where email = username || '@1ctx.dev';
+        where substr(email, instr(email, '@') + 1) = '1ctx.dev';
     `);
   },
 };

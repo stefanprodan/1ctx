@@ -60,6 +60,28 @@ describe("the smtp mailer", () => {
     }
   });
 
+  test("upgrades with starttls before the login", async () => {
+    const smtp = fakeSmtp({
+      starttls: true,
+      auth: { user: "api_token", pass: "secret-pass" },
+    });
+    try {
+      const sent = await trusting(
+        server(smtp.port, { security: "starttls" }),
+        mail,
+      );
+      expect(sent).toBe("sent");
+      expect(smtp.received).toHaveLength(1);
+      expect(smtp.received[0]!.auth).toBe("api_token");
+      // nothing past the upgrade is read in the clear
+      const upgrade = smtp.commands.indexOf("STARTTLS");
+      expect(upgrade).toBeGreaterThan(-1);
+      expect(smtp.commands.indexOf("AUTH PLAIN")).toBeGreaterThan(upgrade);
+    } finally {
+      smtp.stop();
+    }
+  });
+
   test("verifies the certificate", async () => {
     const smtp = fakeSmtp({ tls: true });
     try {

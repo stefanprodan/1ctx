@@ -60,6 +60,8 @@ export type UsersRoutesDeps = {
   projects: UsersProjectsPort;
   usage: UsersUsagePort;
   clock: Clock;
+  // a placeholder address is shown only while mail is on
+  mail: { enabled(): boolean };
 };
 
 export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
@@ -103,6 +105,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const visits = deps.visits.latest();
         const teams = teamIds();
         const body: UsersResponse = {
+          mailOn: deps.mail.enabled(),
           users: deps.users
             .list()
             .map((user) =>
@@ -156,11 +159,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             usernameAvailable(patch.username, user.id);
             deps.users.setUsername(user.id, patch.username);
           }
-          // saving the held address makes it real too
-          if (
-            patch.email !== undefined &&
-            (patch.email !== user.email || user.emailPlaceholder)
-          ) {
+          if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);
             deps.users.setEmail(user.id, patch.email);
           }

@@ -65,6 +65,7 @@ export type AccessDeps = {
   activity: ActivityPort;
   // a closure, the socket is built after access
   presence: PresencePort;
+  mail: { enabled(): boolean };
 };
 
 export type Access = Auth & {
@@ -111,6 +112,7 @@ export function accessArea(deps: AccessDeps): Access {
         projects: deps.projects,
         usage: deps.usage,
         clock: deps.clock,
+        mail: deps.mail,
       }),
       ...boardRoutes({
         visits,

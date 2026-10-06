@@ -34,6 +34,8 @@ export const BACKOFF_MS = [MINUTE_MS, 5 * MINUTE_MS, 30 * MINUTE_MS] as const;
 // a claim this old belongs to a process that died mid-send
 export const STALE_CLAIM_MS = MINUTE_MS;
 export const FAILED_KEEP_MS = 7 * DAY_MS;
+// a sent row, for the caps counted per day
+export const SENT_KEEP_MS = DAY_MS;
 
 // when the row is tried again after its attempts-th failure, or null
 // when it has failed for good

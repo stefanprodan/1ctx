@@ -10,7 +10,8 @@ export type AdminUser = UserAccount & {
   projectIds: string[];
 };
 
-export type UsersResponse = { users: AdminUser[] };
+// mailOn: mail is set up, so a placeholder address is worth saying
+export type UsersResponse = { users: AdminUser[]; mailOn: boolean };
 export type UserResponse = { user: AdminUser };
 export type CreateUserRequest = {
   username: string;

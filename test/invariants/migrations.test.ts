@@ -1504,15 +1504,16 @@ describe("the schema", () => {
     }
   });
 
-  test("0049 marks only the made-up addresses and adds an empty outbox", () => {
+  test("0049 marks the project's domain and adds an empty outbox", () => {
     const db = seed(MIGRATIONS.slice(0, 48));
     try {
       db.exec(`
         insert into users (id, username, full_name, email, role,
             password_hash, created_at)
-          values ('ad', 'admin', 'Admin', 'admin@1ctx.dev', 'admin', 'x', 0),
+          values ('ad', 'root', 'Admin', 'admin@1ctx.dev', 'admin', 'x', 0),
             ('b', 'bea', 'Bea', 'bea@1ctx.dev', 'member', 'x', 0),
-            ('c', 'cai', 'Cai', 'someone@1ctx.dev', 'member', 'x', 0);
+            ('c', 'cai', 'Cai', 'someone@1ctx.dev', 'member', 'x', 0),
+            ('d', 'dan', 'Dan', 'dan@mail.1ctx.dev', 'member', 'x', 0);
       `);
       expect(migrate(db)).toEqual(expectedFrom("0049-mail"));
       expect(
@@ -1520,7 +1521,8 @@ describe("the schema", () => {
       ).toEqual([
         { id: "ad", email_placeholder: 1 },
         { id: "b", email_placeholder: 1 },
-        { id: "c", email_placeholder: 0 },
+        { id: "c", email_placeholder: 1 },
+        { id: "d", email_placeholder: 0 },
         { id: "u", email_placeholder: 0 },
       ]);
       expect(db.query("select count(*) as n from mail_outbox").get()).toEqual({
@@ -1540,6 +1542,34 @@ describe("the schema", () => {
             values (2, 'h', 25, 'tls', 'a@b.c', 'https://x', 0)
         `),
       ).toThrow(/CHECK/);
+      // a chat's delete keeps its sent rows for the project's cap, and
+      // finds them by index, never a scan
+      db.exec(`
+        insert into mail_outbox (id, kind, user_id, project_id, session_id,
+            message_id, status, next_attempt_at, created_at, updated_at)
+          values ('o', 'agent', 'u', 'p', 'sess', '<o@x>', 'sent', 0, 0, 0)
+      `);
+      // the lookup a parent's delete runs, a bound key as SQLite binds it
+      const plan = (column: string) =>
+        db
+          .query<{ detail: string }, [string]>(
+            `explain query plan select 1 from mail_outbox where ${column} = ?`,
+          )
+          .all("x")
+          .map((row) => row.detail)
+          .join("; ");
+      expect(plan("session_id")).toMatch(
+        /^SEARCH mail_outbox USING (COVERING )?INDEX mail_outbox_session/,
+      );
+      expect(plan("project_id")).toMatch(
+        /^SEARCH mail_outbox USING (COVERING )?INDEX mail_outbox_project/,
+      );
+      db.exec("delete from sessions where id = 'sess'");
+      expect(
+        db
+          .query("select session_id, project_id, status from mail_outbox")
+          .all(),
+      ).toEqual([{ session_id: null, project_id: "p", status: "sent" }]);
     } finally {
       db.close();
     }

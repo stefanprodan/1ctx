@@ -145,8 +145,9 @@ export function offLine(state: MailResponse): string | null {
   return `Mail is off: ${settings.keyName}.key is missing.`;
 }
 
-export function testLine(state: MailResponse): string {
+export function testLine(state: MailResponse, dirty = false): string {
   if (state.to === null) return "Your account has no real email.";
+  if (dirty) return "Save the changes to test them.";
   return `Sends a test mail to ${state.to}.`;
 }
 

@@ -1,10 +1,6 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .mail-mono {
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
   .mail-result {
     margin: 0;
     font-size: var(--text-ui);

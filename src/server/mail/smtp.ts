@@ -92,8 +92,9 @@ export function failureOf(error: unknown): MailFailure {
     : "other";
 }
 
-// options: a CA to trust beside the system's and shorter timeouts, for
-// the tests' server on loopback alone
+// options, for the tests' server on loopback alone: a CA that replaces
+// the default roots, so only that certificate verifies, and shorter
+// timeouts
 export function smtpMailer(
   options: { ca?: string; timeouts?: Partial<typeof SMTP_TIMEOUTS> } = {},
 ): Mailer {

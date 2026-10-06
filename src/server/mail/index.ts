@@ -25,6 +25,7 @@ import {
   linkOf,
   type MailKind,
   messageIdOf,
+  SENT_KEEP_MS,
 } from "./rules.ts";
 import { type Prepare, sender } from "./sender.ts";
 import type { Address, Mailer, SmtpServer } from "./smtp.ts";
@@ -108,7 +109,8 @@ export type Mail = {
   dispose(): void;
   wake(): void;
   pass(): Promise<number>;
-  // failed rows past their week; the count removed
+  // sent rows past their day, failed ones past their week; the count
+  // removed
   sweep(now: number): number;
   attention(): MailAttention | null;
 };
@@ -116,12 +118,20 @@ export type Mail = {
 export function mailArea(deps: MailDeps): Mail {
   const store = new MailStore(deps.db);
   const prepares = new Map<MailKind, Prepare>();
+  // a key file that cannot be read is a missing one: mail is off
+  const secret = (name: string): string | null => {
+    try {
+      return deps.secret(name);
+    } catch {
+      return null;
+    }
+  };
   const hasKey = (settings: MailSettings) =>
-    settings.keyName === null || deps.secret(settings.keyName) !== null;
+    settings.keyName === null || secret(settings.keyName) !== null;
   const ready = (): { server: SmtpServer; from: Address } | null => {
     const s = store.settings();
     if (s === null) return null;
-    const password = s.keyName === null ? null : deps.secret(s.keyName);
+    const password = s.keyName === null ? null : secret(s.keyName);
     if (s.keyName !== null && password === null) return null;
     return {
       server: {
@@ -227,7 +237,7 @@ export function mailArea(deps: MailDeps): Mail {
     dispose: () => loop.dispose(),
     wake: () => loop.wake(),
     pass: () => loop.pass(),
-    sweep: (now) => store.sweep(now - FAILED_KEEP_MS),
+    sweep: (now) => store.sweep(now - SENT_KEEP_MS, now - FAILED_KEEP_MS),
     attention() {
       const settings = store.settings();
       if (settings === null) return null;

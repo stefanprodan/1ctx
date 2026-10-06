@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { transact } from "../../../src/server/db/index.ts";
-import { mailArea } from "../../../src/server/mail/index.ts";
+import { type Mailer, mailArea } from "../../../src/server/mail/index.ts";
 import { UserStore } from "../../../src/server/users/index.ts";
 import type { PutMailRequest } from "../../../src/shared/api/mail.ts";
 import { collectLogs, fakeMailer } from "../../helpers/app.ts";
@@ -27,14 +27,38 @@ const SERVER: PutMailRequest = {
 
 const MINUTE = 60_000;
 
-function setup(options: { key?: boolean } = {}) {
+// resolves once check() holds, checked at each notify(); no timer
+function waiter() {
+  const waits: { check: () => boolean; resolve: () => void }[] = [];
+  return {
+    until: (check: () => boolean) =>
+      new Promise<void>((resolve) => {
+        if (check()) resolve();
+        else waits.push({ check, resolve });
+      }),
+    notify() {
+      for (const wait of [...waits]) {
+        if (!wait.check()) continue;
+        waits.splice(waits.indexOf(wait), 1);
+        wait.resolve();
+      }
+    },
+  };
+}
+
+function setup(options: { key?: boolean; mailer?: Mailer } = {}) {
   const db = memoryDb();
   let now = 1_000_000;
   const sleepers = new Set<{ at: number; resolve: () => void }>();
+  // how many sleeps the loop began, so a test knows it is waiting
+  let sleeps = 0;
+  const slept = waiter();
   const clock = Object.assign(() => now, {
     sleep: (ms: number) =>
       new Promise<void>((resolve) => {
         sleepers.add({ at: now + ms, resolve });
+        sleeps++;
+        slept.notify();
       }),
   });
   const move = (ms: number) => {
@@ -56,6 +80,14 @@ function setup(options: { key?: boolean } = {}) {
     now,
   });
   const fake = fakeMailer();
+  const called = waiter();
+  let calls = 0;
+  const mailer: Mailer = (server, mail) => {
+    const result = (options.mailer ?? fake.mailer)(server, mail);
+    calls++;
+    called.notify();
+    return result;
+  };
   const logs = collectLogs();
   const keys: Record<string, string> =
     options.key === false ? {} : { "email-relay": "secret-pass" };
@@ -66,7 +98,7 @@ function setup(options: { key?: boolean } = {}) {
     secret: (name) => keys[name] ?? null,
     keys: () => Object.keys(keys),
     users,
-    mailer: fake.mailer,
+    mailer,
   });
   mail.store.saveSettings(SERVER, now);
   const enqueue = (over: { subject?: string } = {}) =>
@@ -89,6 +121,7 @@ function setup(options: { key?: boolean } = {}) {
           next_attempt_at: number;
           failure: string | null;
           subject: string | null;
+          body: string | null;
           message_id: string;
         },
         []
@@ -106,15 +139,31 @@ function setup(options: { key?: boolean } = {}) {
     rows,
     move,
     now: () => now,
+    // the loop's next sleep, counted from now
+    sleeping: () => {
+      const seen = sleeps;
+      return slept.until(() => sleeps > seen);
+    },
+    // the mailer handed n messages
+    mailed: (n: number) => called.until(() => calls >= n),
   };
 }
 
 describe("the sender", () => {
-  test("sends a row to the user as they are now and deletes it", async () => {
+  test("sends a row to the user as they are now and keeps it a day", async () => {
     const t = setup();
     t.enqueue();
     expect(t.rows()).toHaveLength(1);
     expect(await t.mail.pass()).toBe(1);
+    // the text goes; the row stays for the daily cap
+    expect(t.rows()).toEqual([
+      expect.objectContaining({ status: "sent", subject: null, body: null }),
+    ]);
+    expect(await t.mail.pass()).toBe(0);
+    t.move(24 * 60 * MINUTE - 1);
+    expect(t.mail.sweep(t.now())).toBe(0);
+    t.move(2);
+    expect(t.mail.sweep(t.now())).toBe(1);
     expect(t.rows()).toEqual([]);
     expect(t.fake.sent).toHaveLength(1);
     const { server, mail } = t.fake.sent[0]!;
@@ -233,15 +282,24 @@ describe("the sender", () => {
     const seen: string[] = [];
     t.mail.register("notice", (row, user) => {
       seen.push(user.id);
-      return row.subject === "veto"
-        ? "opted-out"
-        : { subject: "Built now", text: "Fresh" };
+      if (row.subject === "veto") return "opted-out";
+      if (row.subject === "bad") {
+        return { subject: "Hi", text: "x", fromName: "Bot\r\nBcc: x" };
+      }
+      return { subject: "Built now", text: "Fresh", fromName: "sre via 1ctx" };
     });
     t.enqueue({ subject: "veto" });
     t.enqueue();
-    expect(await t.mail.pass()).toBe(2);
-    expect(seen).toEqual([t.user.id, t.user.id]);
+    t.enqueue({ subject: "bad" });
+    expect(await t.mail.pass()).toBe(3);
+    expect(seen).toEqual([t.user.id, t.user.id, t.user.id]);
     expect(t.fake.sent.map((s) => s.mail.subject)).toEqual(["Built now"]);
+    expect(t.fake.sent[0]!.mail.from).toEqual({
+      name: "sre via 1ctx",
+      address: "mail@example.test",
+    });
+    // a From name that is not one line fails for good, never sent
+    expect(t.rows().map((r) => r.status)).toEqual(["sent", "failed"]);
     expect(() => t.mail.register("notice", () => "gone")).toThrow();
   });
 
@@ -280,30 +338,100 @@ describe("the sender", () => {
   });
 
   test.serial(
-    "wakes after the commit, on its timer, and drains on stop",
+    "wakes after the commit, on its timer, and ends on stop",
     async () => {
       const t = setup();
+      let asleep = t.sleeping();
       t.mail.start();
-      const settle = async (sent: number) => {
-        for (let i = 0; i < 100 && t.fake.sent.length < sent; i++) {
-          await Bun.sleep(1);
-        }
-        expect(t.fake.sent).toHaveLength(sent);
-      };
+      await asleep;
+      asleep = t.sleeping();
       t.enqueue();
-      await settle(1);
+      await t.mailed(1);
+      await asleep;
       t.fake.result = "timeout";
+      asleep = t.sleeping();
       t.enqueue();
-      await settle(2);
+      await t.mailed(2);
+      await asleep;
       // the backoff's minute on the clock, not a wake
+      asleep = t.sleeping();
       t.move(MINUTE);
-      await settle(3);
+      await t.mailed(3);
+      await asleep;
       await t.mail.stop();
+      // the loop has ended: nothing a clock or a commit does sends
       t.fake.result = "sent";
       t.move(5 * MINUTE);
-      await Bun.sleep(5);
-      expect(t.fake.sent).toHaveLength(3);
+      t.mail.wake();
+      expect(await t.mail.pass()).toBe(1);
+      expect(t.fake.sent).toHaveLength(4);
       t.mail.dispose();
     },
   );
+
+  test.serial("outlives a throw while waiting, without spinning", async () => {
+    const t = setup();
+    let asleep = t.sleeping();
+    t.mail.start();
+    await asleep;
+    const earliest = t.mail.store.earliest.bind(t.mail.store);
+    let throws = 1;
+    t.mail.store.earliest = () => {
+      if (throws-- > 0) throw new Error("database is locked");
+      return earliest();
+    };
+    asleep = t.sleeping();
+    t.enqueue();
+    await t.mailed(1);
+    await asleep;
+    expect(t.logs.events.map((e) => e.msg)).toContain("mail pass failed");
+    // the pause after a throw is the clock's, not cut short by a wake
+    asleep = t.sleeping();
+    t.enqueue();
+    expect(t.fake.sent).toHaveLength(1);
+    t.move(MINUTE);
+    await t.mailed(2);
+    await asleep;
+    await t.mail.stop();
+    t.mail.dispose();
+  });
+
+  test.serial("stop waits for the send in flight", async () => {
+    let release = () => {};
+    const held = new Promise<"sent">((resolve) => {
+      release = () => resolve("sent");
+    });
+    const t = setup({
+      mailer: async () => held,
+    });
+    const asleep = t.sleeping();
+    t.mail.start();
+    await asleep;
+    t.enqueue();
+    await t.mailed(1);
+    let stopped = false;
+    const stopping = t.mail.stop().then(() => {
+      stopped = true;
+    });
+    await Promise.resolve();
+    expect(stopped).toBe(false);
+    expect(t.rows()[0]?.status).toBe("queued");
+    release();
+    await stopping;
+    expect(t.rows()[0]?.status).toBe("sent");
+    t.mail.dispose();
+  });
+
+  test("a key file that cannot be read turns mail off", async () => {
+    const t = setup();
+    t.enqueue();
+    const read = t.keys;
+    Object.defineProperty(read, "email-relay", {
+      get() {
+        throw new Error("EACCES");
+      },
+    });
+    expect(t.mail.enabled()).toBe(false);
+    expect(await t.mail.pass()).toBe(0);
+  });
 });

@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Socket } from "bun";
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", "mail", name), "utf8");
@@ -34,7 +35,8 @@ export type FakeSmtp = {
 export function fakeSmtp(
   options: {
     tls?: boolean;
-    // advertised only: the server cannot upgrade
+    // offered on a plain connection and upgraded with the fixture's
+    // certificate; left out, the server answers STARTTLS with a 502
     starttls?: boolean;
     // the AUTH PLAIN pair it accepts; any other answers 535
     auth?: { user: string; pass: string };
@@ -51,84 +53,104 @@ export function fakeSmtp(
     auth: string | null;
     from: string;
     to: string[];
+    secure: boolean;
+  };
+  const tls = { cert: LOOPBACK_CERT, key: LOOPBACK_KEY };
+  const fresh = (secure: boolean): State => ({
+    buffer: "",
+    data: null,
+    auth: null,
+    from: "",
+    to: [],
+    secure,
+  });
+  const onData = (socket: Socket<State>, chunk: Uint8Array) => {
+    const state = socket.data;
+    state.buffer += new TextDecoder().decode(chunk);
+    for (;;) {
+      const end = state.buffer.indexOf("\r\n");
+      if (end === -1) return;
+      const line = state.buffer.slice(0, end);
+      state.buffer = state.buffer.slice(end + 2);
+      if (state.data !== null) {
+        if (line === ".") {
+          received.push({
+            auth: state.auth,
+            from: state.from,
+            to: state.to,
+            data: state.data.join("\r\n"),
+          });
+          state.data = null;
+          socket.write("250 queued\r\n");
+        } else {
+          state.data.push(line);
+        }
+        continue;
+      }
+      const [verb, ...rest] = line.split(" ");
+      const word = verb.toUpperCase();
+      commands.push(word === "AUTH" ? `AUTH ${rest[0]}` : line);
+      if (word === "EHLO" || word === "HELO") {
+        const lines = [
+          "250-fake",
+          ...(options.starttls && !state.secure ? ["250-STARTTLS"] : []),
+          "250-AUTH PLAIN",
+          "250 8BITMIME",
+        ];
+        socket.write(`${lines.join("\r\n")}\r\n`);
+      } else if (word === "AUTH") {
+        const pair = Buffer.from(rest[1] ?? "", "base64")
+          .toString("utf8")
+          .split("\0");
+        const ok =
+          options.auth !== undefined &&
+          pair[1] === options.auth.user &&
+          pair[2] === options.auth.pass;
+        state.auth = ok ? pair[1] : null;
+        socket.write(ok ? "235 ok\r\n" : "535 bad credentials\r\n");
+      } else if (word === "MAIL") {
+        state.from = line.slice(line.indexOf(":") + 1).trim();
+        state.to = [];
+        socket.write("250 ok\r\n");
+      } else if (word === "RCPT") {
+        if (options.rejectRecipient) {
+          socket.write("550 no such user\r\n");
+        } else {
+          state.to.push(line.slice(line.indexOf(":") + 1).trim());
+          socket.write("250 ok\r\n");
+        }
+      } else if (word === "DATA") {
+        state.data = [];
+        socket.write("354 go on\r\n");
+      } else if (word === "QUIT") {
+        socket.write("221 bye\r\n");
+        socket.end();
+      } else if (word === "STARTTLS" && options.starttls && !state.secure) {
+        socket.write("220 go ahead\r\n");
+        // the session starts over inside TLS, as RFC 3207 says
+        socket.upgradeTLS<State>({
+          data: fresh(true),
+          tls,
+          socket: { data: onData },
+        });
+        return;
+      } else if (word === "RSET" || word === "NOOP") {
+        socket.write("250 ok\r\n");
+      } else {
+        socket.write("502 not here\r\n");
+      }
+    }
   };
   const server = Bun.listen<State>({
     hostname: "127.0.0.1",
     port: 0,
-    ...(options.tls ? { tls: { cert: LOOPBACK_CERT, key: LOOPBACK_KEY } } : {}),
+    ...(options.tls ? { tls } : {}),
     socket: {
       open(socket) {
-        socket.data = { buffer: "", data: null, auth: null, from: "", to: [] };
+        socket.data = fresh(options.tls === true);
         if (!options.silent) socket.write("220 fake ESMTP\r\n");
       },
-      data(socket, chunk) {
-        const state = socket.data;
-        state.buffer += new TextDecoder().decode(chunk);
-        for (;;) {
-          const end = state.buffer.indexOf("\r\n");
-          if (end === -1) return;
-          const line = state.buffer.slice(0, end);
-          state.buffer = state.buffer.slice(end + 2);
-          if (state.data !== null) {
-            if (line === ".") {
-              received.push({
-                auth: state.auth,
-                from: state.from,
-                to: state.to,
-                data: state.data.join("\r\n"),
-              });
-              state.data = null;
-              socket.write("250 queued\r\n");
-            } else {
-              state.data.push(line);
-            }
-            continue;
-          }
-          const [verb, ...rest] = line.split(" ");
-          const word = verb.toUpperCase();
-          commands.push(word === "AUTH" ? `AUTH ${rest[0]}` : line);
-          if (word === "EHLO" || word === "HELO") {
-            const lines = [
-              "250-fake",
-              ...(options.starttls ? ["250-STARTTLS"] : []),
-              "250-AUTH PLAIN",
-              "250 8BITMIME",
-            ];
-            socket.write(`${lines.join("\r\n")}\r\n`);
-          } else if (word === "AUTH") {
-            const pair = Buffer.from(rest[1] ?? "", "base64")
-              .toString("utf8")
-              .split("\0");
-            const ok =
-              options.auth !== undefined &&
-              pair[1] === options.auth.user &&
-              pair[2] === options.auth.pass;
-            state.auth = ok ? pair[1] : null;
-            socket.write(ok ? "235 ok\r\n" : "535 bad credentials\r\n");
-          } else if (word === "MAIL") {
-            state.from = line.slice(line.indexOf(":") + 1).trim();
-            state.to = [];
-            socket.write("250 ok\r\n");
-          } else if (word === "RCPT") {
-            if (options.rejectRecipient) {
-              socket.write("550 no such user\r\n");
-            } else {
-              state.to.push(line.slice(line.indexOf(":") + 1).trim());
-              socket.write("250 ok\r\n");
-            }
-          } else if (word === "DATA") {
-            state.data = [];
-            socket.write("354 go on\r\n");
-          } else if (word === "QUIT") {
-            socket.write("221 bye\r\n");
-            socket.end();
-          } else if (word === "RSET" || word === "NOOP") {
-            socket.write("250 ok\r\n");
-          } else {
-            socket.write("502 not here\r\n");
-          }
-        }
-      },
+      data: onData,
     },
   });
   return {

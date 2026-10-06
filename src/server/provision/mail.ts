@@ -44,6 +44,19 @@ export const MAIL_REQUIRED = [
   "publicAddress",
 ] as const;
 
+// a new server's login, checked offline: both halves or neither
+export function newMailPair(spec: MailSpec): string | null {
+  const username = spec.username ?? null;
+  const keyFrom = spec.keyFrom ?? null;
+  if (username !== null && keyFrom === null) {
+    return "spec.keyFrom is required with spec.username";
+  }
+  if (username === null && keyFrom !== null) {
+    return "spec.username is required with spec.keyFrom";
+  }
+  return null;
+}
+
 export function mailSpec(value: unknown): MailSpec {
   return optionalSpec<MailSpec>(value, {
     host: parseHost,

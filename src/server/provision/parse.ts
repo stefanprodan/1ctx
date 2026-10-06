@@ -24,7 +24,7 @@ import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
-import { MAIL_REQUIRED, mailSpec } from "./mail.ts";
+import { MAIL_REQUIRED, mailSpec, newMailPair } from "./mail.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
 
@@ -304,7 +304,13 @@ export function preflight(
       }
       case "Mail":
         // any name updates the one server held
-        if (inventory.Mail.length === 0) required([...MAIL_REQUIRED]);
+        if (inventory.Mail.length === 0) {
+          required([...MAIL_REQUIRED]);
+          const pair = newMailPair(doc.spec);
+          if (pair !== null) {
+            throw new Error(`${doc.source}: Mail/${doc.name}: ${pair}`);
+          }
+        }
         if (typeof doc.spec.keyFrom === "string") {
           readSecret("keyFrom", "email-", doc.spec.keyFrom);
         }

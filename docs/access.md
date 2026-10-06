@@ -62,8 +62,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
-  in `UTC`. The first admin's made-up address is marked a placeholder
-  until an admin saves one (`docs/mail.md`).
+  in `UTC`. An address on `1ctx.dev` is a placeholder, never mailed
+  (`docs/mail.md`).
 - **Every change to who sees what publishes `access.changed`.** A role
   change, a team project created or deleted, a member added or removed.
   Without it the socket keeps the old set.
