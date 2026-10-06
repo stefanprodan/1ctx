@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The frame around what an agent wrote, and an automation's alert: a
-// subject under the instance's tag, a fixed line saying who wrote it
-// where, the agent's text set apart, and one trusted link back. Both
+// subject under the instance's tag, then 1ctx's own lines first, who
+// wrote it where and the one trusted link back, then the agent's text
+// below a rule. The text is never quoted: mail clients fold quoted
+// lines as history. 1ctx's lines are always the first of the body, and
+// the agent's text in the HTML sits in its own bordered block. Both
 // are built when the row is queued and stored with it, so the email
 // says what the agent wrote then, whatever is renamed later. The link
 // is stored as a path and built at the send, from the public address
@@ -24,15 +27,16 @@ export const sessionPath = (
 ): string =>
   `/${origin === "automation" ? "run" : "chat"}/${encodeURIComponent(sessionId)}`;
 
-// an email framed but for its link: the text and the HTML before the
-// closing line, its words and the path the link opens
+// an email framed but for its link: 1ctx's line, the link's words and
+// the path it opens, and the text below them in both parts
 export type Framed = {
   subject: string;
   fromName?: string;
+  head: string;
+  open: string;
+  path: string;
   text: string;
   html: string;
-  foot: string;
-  path: string;
 };
 
 // what a row stores in its body: the frame but its subject
@@ -44,13 +48,8 @@ const page = (parts: string[]) =>
 const linkHtml = (words: string, link: string) =>
   `<p>${escapeHtml(words)} <a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`;
 
-// the agent's text in the plain part, every line quoted as the HTML's
-// blockquote sets it apart, so none can pass for a line of the frame
-const quoted = (text: string) =>
-  text
-    .split("\n")
-    .map((line) => (line === "" ? ">" : `> ${line}`))
-    .join("\n");
+// a rule between 1ctx's lines and the text, in the plain part
+const RULE = "----";
 
 // the project as the recipient knows it: a personal project is theirs
 const placeOf = (project: { name: string; kind: "personal" | "team" }) =>
@@ -61,8 +60,12 @@ export function withLink(framed: Framed, link: string): EmailContent {
   return {
     subject: framed.subject,
     ...(framed.fromName === undefined ? {} : { fromName: framed.fromName }),
-    text: `${framed.text}${framed.foot} ${link}\n`,
-    html: page([framed.html, linkHtml(framed.foot, link)]),
+    text: `${framed.head}\n${framed.open} ${link}\n\n${RULE}\n\n${framed.text}\n`,
+    html: page([
+      `<p>${escapeHtml(framed.head)}</p>`,
+      linkHtml(framed.open, link),
+      `<div style="margin:16px 0 0;padding:0 12px;border-left:3px solid">${framed.html}</div>`,
+    ]),
   };
 }
 
@@ -82,13 +85,11 @@ export function agentEmail(input: AgentEmail): Framed {
   return {
     subject: `${SUBJECT_TAG}${input.subject}`,
     fromName: `${input.agent} via 1ctx`,
-    text: `${head}\n\n----\n\n${quoted(body.text)}\n\n----\n\n`,
-    html: [
-      `<p>${escapeHtml(head)}</p>`,
-      `<blockquote style="margin:16px 0;padding:0 12px;border-left:3px solid">${body.html}</blockquote>`,
-    ].join(""),
-    foot: `Open the ${where}:`,
+    head,
+    open: `Open the ${where}:`,
     path: sessionPath(input.origin, input.sessionId),
+    text: body.text,
+    html: body.html,
   };
 }
 
@@ -111,13 +112,11 @@ export function alertEmail(input: AlertEmail): Framed {
       : stripBidi(input.reason);
   return {
     subject: `${SUBJECT_TAG}${name} needs attention`,
-    text: `${head}\n\n${quoted(why)}\n\n`,
-    html: [
-      `<p>${escapeHtml(head)}</p>`,
-      `<blockquote style="margin:16px 0;padding:0 12px;border-left:3px solid"><p>${escapeHtml(why)}</p></blockquote>`,
-    ].join(""),
-    foot: "Open the run:",
+    head,
+    open: "Open the run:",
     path: sessionPath("automation", input.sessionId),
+    text: why,
+    html: `<p>${escapeHtml(why)}</p>`,
   };
 }
 

@@ -114,27 +114,29 @@ profile pages show of email. The links themselves are in
   one check is `sessionPrepare()` in `frame.ts`.
 - **The email frames what the agent wrote** (`email/frame.ts`). The
   subject starts `[1ctx] `; an agent's From name is "<agent> via 1ctx",
-  an alert's the server's. A fixed line says who wrote it where
-  ("your personal project" for the reader's own), the agent's text
-  sits in a blockquote, and the one trusted link, built by `link()` to
-  the chat or run (`sessionPath()`, the client's paths), closes it. An
-  alert carries the run's reason, or says a decider marked it.
+  an alert's the server's. 1ctx's lines come first: who wrote it where
+  ("your personal project" for the reader's own) and the one trusted
+  link, built by `link()` to the chat or run (`sessionPath()`, the
+  client's paths). Then a rule, and the agent's text in a plain block
+  with a left border. An alert carries the run's reason, or says a
+  decider marked it.
 - **The agent's Markdown has its own renderer** (`renderEmailMarkdown()`
   in `render/email.ts`), HTML and plain text from one parse. A link is
   written as its full address, never its label, and only an `http(s)`
   one is an anchor; an image is dropped; a raw HTML block is dropped
   and a span stays escaped text; no class, no script, no image; only a
-  table cell's alignment and the frame's blockquote carry an inline
-  style.
+  table cell's alignment and the frame's block carry an inline style.
 - **A link shows what it opens.** An href is parsed with `new URL()`:
   one that fails, is not `http(s)` or holds a user or a password is
   plain text with no anchor; else the anchor shows and opens `url.href`,
   which percent-encodes a bidi control. The rendered text loses its
   bidi controls, and a subject holding one is refused (`badSubject()`
   in `rules.ts`, also the tool's parser), while a name keeps its marks.
-- **The plain part quotes what the agent wrote.** Every line of the
-  agent's text, and of an alert's reason, starts `> `, so none reads
-  as a line of the frame.
+- **The agent's text is never quoted.** Mail clients fold `> ` lines
+  and a blockquote as history. 1ctx's lines are always the first of
+  the body, and the agent's text, or an alert's reason, follows them in
+  its own bordered block. A subject holding `://` is refused, since it
+  shows above the body.
 
 ## The pages
 

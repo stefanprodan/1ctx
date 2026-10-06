@@ -14,7 +14,9 @@ import { stripBidi } from "../../shared/words.ts";
 import { escapeHtml, tableAlign } from "./markdown.ts";
 
 // raw HTML blocks reach the html callback, which drops them; spans stay
-// text, escaped like any other
+// text, escaped like any other. A bare URL stays text: Bun's autolinks
+// break the markup around a URL that ends inside emphasis, and mail
+// clients link a bare URL themselves
 const OPTIONS = { noHtmlSpans: true } as const;
 
 // the address a link shows and opens: an http(s) URL with no user

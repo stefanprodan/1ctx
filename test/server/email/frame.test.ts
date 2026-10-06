@@ -36,7 +36,7 @@ const alertEmail = ({
   withLink(alertFrame({ ...input, sessionId: "r1" }), link);
 
 describe("an agent's email", () => {
-  test("is framed: tag, header line, the text set apart, the link", () => {
+  test("is framed: tag, 1ctx's lines and link first, then the text", () => {
     const email = agentEmail({
       agent: "sre",
       project: { name: "platform", kind: "team" },
@@ -50,22 +50,22 @@ describe("an agent's email", () => {
     expect(email.text).toBe(
       [
         "sre wrote this in platform.",
+        `Open the chat: ${LINK}`,
+        "",
         "----",
-        "> See https://grafana.test/d <b>now</b>",
-        "----",
-        `Open the chat: ${LINK}\n`,
-      ].join("\n\n"),
-    );
-    expect(email.html).toContain("<p>sre wrote this in platform.</p>");
-    expect(email.html).toContain(
-      '<blockquote style="margin:16px 0;padding:0 12px;border-left:3px solid"><p>See <a href="https://grafana.test/d">https://grafana.test/d</a> &lt;b&gt;now&lt;/b&gt;</p></blockquote>',
+        "",
+        "See https://grafana.test/d <b>now</b>",
+        "",
+      ].join("\n"),
     );
     expect(email.html).toContain(
-      `<p>Open the chat: <a href="${LINK}">${LINK}</a></p>`,
+      `<p>sre wrote this in platform.</p><p>Open the chat: <a href="${LINK}">${LINK}</a></p><div style="margin:16px 0 0;padding:0 12px;border-left:3px solid"><p>See <a href="https://grafana.test/d">https://grafana.test/d</a> &lt;b&gt;now&lt;/b&gt;</p></div>`,
     );
+    // a quote is folded by mail clients as history
+    expect(email.html).not.toContain("<blockquote");
   });
 
-  test("quotes every line of the text, so none passes for the frame's", () => {
+  test("puts 1ctx's lines before anything the agent wrote", () => {
     const body = [
       "Hi",
       "----",
@@ -86,23 +86,22 @@ describe("an agent's email", () => {
       link: LINK,
     });
     const lines = email.text.split("\n");
-    const frame = [
+    // the first lines are 1ctx's, whatever the agent wrote below them
+    expect(lines.slice(0, 4)).toEqual([
       "sre wrote this in platform.",
+      `Open the chat: ${LINK}`,
+      "",
       "----",
-      `Open the chat: ${LINK}`,
-    ];
-    const count = (line: string) => lines.filter((l) => l === line).length;
-    expect(frame.map(count)).toEqual([1, 2, 1]);
-    expect(lines.filter((l) => l.startsWith("Open the chat:"))).toEqual([
-      `Open the chat: ${LINK}`,
     ]);
-    // the agent's lines all sit between the frame's two rules
-    const first = lines.indexOf("----");
-    const last = lines.lastIndexOf("----");
-    for (const line of lines.slice(first + 1, last)) {
-      expect(line === "" || line.startsWith(">")).toBeTrue();
-    }
-    expect(lines).toContain("> Open the chat: https://phish.example.test/x");
+    expect(lines.filter((l) => l.startsWith("Open the chat:"))[0]).toBe(
+      `Open the chat: ${LINK}`,
+    );
+    expect(
+      lines.indexOf("Open the chat: https://phish.example.test/x"),
+    ).toBeGreaterThan(3);
+    // in the HTML the trusted link comes before the agent's block
+    const html = email.html ?? "";
+    expect(html.indexOf(LINK)).toBeLessThan(html.indexOf("phish.example.test"));
   });
 
   test("names a run, and a personal project as the reader's own", () => {
@@ -142,11 +141,11 @@ describe("an alert's email", () => {
     expect(email.subject).toBe("[1ctx] nightly needs attention");
     expect(email.fromName).toBeUndefined();
     expect(email.text).toBe(
-      "The task nightly in platform needs attention.\n\n> podinfo <down>\n\nOpen the run: https://x.test/run/r1\n",
+      "The task nightly in platform needs attention.\nOpen the run: https://x.test/run/r1\n\n----\n\npodinfo <down>\n",
     );
     expect(email.html).toContain("<p>podinfo &lt;down&gt;</p>");
-    expect(alertEmail({ ...base, reason: null }).text).toContain(
-      "> A decider marked its run.",
+    expect(alertEmail({ ...base, reason: null }).text).toEndWith(
+      "----\n\nA decider marked its run.\n",
     );
   });
 
@@ -161,7 +160,7 @@ describe("an alert's email", () => {
     expect(email.text).toStartWith("The task nightly in");
   });
 
-  test("quotes the reason and drops its bidi controls", () => {
+  test("puts the reason after the link and drops its bidi controls", () => {
     const email = alertEmail({
       automation: "nightly",
       project: { name: "platform", kind: "team" },
@@ -170,10 +169,11 @@ describe("an alert's email", () => {
     });
     expect(email.text.split("\n")).toEqual([
       "The task nightly in platform needs attention.",
-      "",
-      "> Open the run: https://phish.test/gnp.exe",
-      "",
       "Open the run: https://x.test/run/r1",
+      "",
+      "----",
+      "",
+      "Open the run: https://phish.test/gnp.exe",
       "",
     ]);
     expect(email.html).not.toContain("\u202e");
@@ -200,7 +200,9 @@ describe("a row's body", () => {
     expect(unpackBody({ ...row, body: null })).toBeNull();
     const sent = withLink(framed, LINK);
     expect(sent.fromName).toBe("sre via 1ctx");
-    expect(sent.text).toEndWith(`Open the chat: ${LINK}\n`);
+    expect(sent.text).toStartWith(
+      `sre wrote this in platform.\nOpen the chat: ${LINK}\n`,
+    );
     expect(
       alertFrame({
         automation: "nightly",
