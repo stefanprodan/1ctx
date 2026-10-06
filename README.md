@@ -23,9 +23,9 @@ data kept on your server.
 
 ## Highlights
 
-- **Working and long-term memory.** Review and edit project notes, undo
-  changes, and restore earlier versions of shared knowledge files.
-  Scheduled tasks can keep their own working memory.
+- **Memory with provenance.** Every knowledge revision records who wrote
+  it and in which chat or task. See its changes, roll back, or undo a
+  project note. Scheduled tasks pick up where the last run left off.
 - **Scheduled tasks.** Run an agent on a cron schedule in your time zone,
   or start a task by hand. Set deadlines and let agents flag results that
   need your attention.
