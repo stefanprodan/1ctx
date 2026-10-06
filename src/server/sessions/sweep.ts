@@ -7,6 +7,7 @@ import type { BusEvent } from "../lib/bus.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
+import { ROOT } from "./children.ts";
 import { envelope } from "./envelope.ts";
 import { PACKABLE } from "./pack.ts";
 import type { SessionRow } from "./rows.ts";
@@ -38,14 +39,18 @@ export type ChatSweep = {
   runs_deleted: number;
 };
 
-// the sessions that ended and still hold a result worth packing
+// the roots that ended and still hold a result worth packing, theirs
+// or a child's; a child is packed with its root, never alone
 const packable = (db: Db, which: string, limit: number): string[] =>
   db
     .query<{ id: string }, [number]>(
       `select id from sessions
-       where ${which} and status <> 'running'
-         and exists (select 1 from messages
-           where messages.session_id = sessions.id and ${PACKABLE})
+       where ${which} and ${ROOT} and status <> 'running'
+         and (exists (select 1 from messages
+             where messages.session_id = sessions.id and ${PACKABLE})
+           or exists (select 1 from sessions child
+             join messages on messages.session_id = child.id
+             where child.parent_session_id = sessions.id and ${PACKABLE}))
        order by last_activity_at, id limit ?`,
     )
     .all(limit)
@@ -87,7 +92,7 @@ function steps(deps: SweepDeps): Step[] {
         db
           .query<{ id: string }, [number, number]>(
             `select id from sessions
-             where origin = 'chat' and archived_at is null
+             where origin = 'chat' and archived_at is null and ${ROOT}
                and last_activity_at < ? and status <> 'running'
              order by last_activity_at limit ?`,
           )
@@ -162,7 +167,7 @@ function steps(deps: SweepDeps): Step[] {
         db
           .query<{ id: string }, [number, number]>(
             `select id from sessions
-             where origin = 'chat' and archived_at < ?
+             where origin = 'chat' and archived_at < ? and ${ROOT}
                and status <> 'running'
              order by archived_at limit ?`,
           )
@@ -188,7 +193,7 @@ function steps(deps: SweepDeps): Step[] {
           .query<{ id: string }, [number, number]>(
             `select id from sessions
              where origin = 'automation' and automation_id is null
-               and last_activity_at < ? and status <> 'running'
+               and ${ROOT} and last_activity_at < ? and status <> 'running'
              order by last_activity_at limit ?`,
           )
           .all(deleteBefore(now, caps), limit)

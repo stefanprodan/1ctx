@@ -64,6 +64,7 @@ export class AgentDrafts {
   readonly skills = signal<string[]>([]);
   readonly servers = signal<AgentServer[]>([]);
   readonly mode = signal<McpMode>("auto");
+  readonly subagents = signal(false);
 
   constructor(readonly agentId: string) {}
 
@@ -74,6 +75,7 @@ export class AgentDrafts {
     drafts.resetSkills(agent);
     drafts.resetServers(agent);
     drafts.resetMode(agent);
+    drafts.resetSubagents(agent);
     return drafts;
   }
 
@@ -119,6 +121,10 @@ export class AgentDrafts {
     this.mode.value = agent.mcpMode;
   }
 
+  resetSubagents(agent: AgentSummary): void {
+    this.subagents.value = agent.subagents;
+  }
+
   save<T>(call: () => Promise<T>): Promise<T> {
     return holding(this.saving, call);
   }
@@ -137,6 +143,7 @@ export class AgentDrafts {
     if (!this.skillsDirty(before)) this.resetSkills(after);
     if (!this.serversDirty(before)) this.resetServers(after);
     if (!this.modeDirty(before)) this.resetMode(after);
+    if (!this.subagentsDirty(before)) this.resetSubagents(after);
     const untouched =
       !this.changing.value &&
       this.providerId.value === before.providerId &&
@@ -297,6 +304,10 @@ export class AgentDrafts {
 
   modeDirty(agent: AgentSummary): boolean {
     return this.mode.value !== agent.mcpMode;
+  }
+
+  subagentsDirty(agent: AgentSummary): boolean {
+    return this.subagents.value !== agent.subagents;
   }
 }
 

@@ -7,6 +7,7 @@
 import type { ArchiveReason } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { Conflict } from "../lib/errors.ts";
+import { ROOT } from "./children.ts";
 
 const ARCHIVED = "the chat is archived";
 
@@ -41,6 +42,7 @@ export function agentChats(db: Db, agentId: string): string[] {
     .query<{ id: string }, [string]>(
       `select id from sessions
        where agent_id = ? and origin = 'chat' and archived_at is null
+         and ${ROOT}
        order by created_at, id`,
     )
     .all(agentId)
@@ -48,12 +50,13 @@ export function agentChats(db: Db, agentId: string): string[] {
 }
 
 // chats and runs on the agent with a send in flight, and the other
-// chats it answers a summoned turn in now
+// chats it answers a summoned turn in now; a child runs only under its
+// root's send, which counts it
 export function agentRunning(db: Db, agentId: string): number {
   return db
     .query<{ n: number }, [string, string]>(
       `select (select count(*) from sessions
-                where agent_id = ? and status = 'running')
+                where agent_id = ? and status = 'running' and ${ROOT})
             + (select count(*) from sends
                 where agent_id = ? and status = 'running' and summoned = 1)
          as n`,

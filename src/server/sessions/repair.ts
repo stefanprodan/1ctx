@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Each repaired session gets its own revision and envelope rather than
-// a global change nobody hears.
+// a global change nobody hears; a subagent's child is ended the same
+// way but publishes nothing, since no list or watch ever shows it.
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
@@ -30,6 +31,16 @@ export function repairRows(
     .all()
     .map((r) => r.id);
   if (ids.length === 0) return [];
+  const children = new Set(
+    db
+      .query<{ id: string }, [string]>(
+        `select id from sessions
+         where id in (select value from json_each(?))
+           and parent_session_id is not null`,
+      )
+      .all(JSON.stringify(ids))
+      .map((r) => r.id),
+  );
   // the reply rows about to end need a slot; a null one becomes an
   // answer before its status moves, so the not-streaming check holds
   db.query(
@@ -62,11 +73,14 @@ export function repairRows(
   db.query(
     "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
   ).run(error, now);
-  return ids.map((id) => {
-    const session = reads.touch(id);
-    const messages = changedByStatus
-      .filter((row) => row.session_id === id)
-      .map((row) => reads.message(row.id));
-    return { session, messages, send: reads.lastSend(id) };
-  });
+  for (const id of children) reads.touch(id);
+  return ids
+    .filter((id) => !children.has(id))
+    .map((id) => {
+      const session = reads.touch(id);
+      const messages = changedByStatus
+        .filter((row) => row.session_id === id)
+        .map((row) => reads.message(row.id));
+      return { session, messages, send: reads.lastSend(id) };
+    });
 }

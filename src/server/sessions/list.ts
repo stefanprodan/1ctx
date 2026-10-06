@@ -3,6 +3,7 @@
 
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";
+import { ROOT } from "./children.ts";
 import {
   type FeedCursor,
   feedAfter,
@@ -53,7 +54,7 @@ function arm(
   return {
     sql: `select * from sessions indexed by ${index}
       where project_id in (select value from json_each(?)) and ${kind}
-        and ${titleLike("title")} ${rank === null ? "" : `and (status = 'running') = ${rank}`}
+        and ${ROOT} and ${titleLike("title")} ${rank === null ? "" : `and (status = 'running') = ${rank}`}
         ${at} ${order} limit ?`,
     args: [projects, ...search, ...args, limit],
   };
@@ -62,6 +63,7 @@ function arm(
 // A miss reads every retained run of each visible automation, so the
 // index carries the order and the title: the walk never leaves it. The
 // cursor applies after the choice, so a passed automation never returns.
+// A child session never has an automation, so these picks read roots.
 function newestRuns(
   projects: string,
   search: [string, string],

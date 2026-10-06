@@ -17,6 +17,30 @@ import { memoryDb } from "../../helpers/db.ts";
 
 const budgetLimits = [
   {
+    name: "childrenAtOnce",
+    default: 2,
+    min: 1,
+    max: 4,
+    unit: "count",
+    scope: "send",
+  },
+  {
+    name: "childrenPerSend",
+    default: 4,
+    min: 1,
+    max: 16,
+    unit: "count",
+    scope: "send",
+  },
+  {
+    name: "childAnswerChars",
+    default: 8000,
+    min: 1000,
+    max: 50_000,
+    unit: "chars",
+    scope: "send",
+  },
+  {
     name: "rounds",
     default: 100,
     min: 1,
@@ -213,9 +237,9 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(48);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(48);
-      expect(rows.filter((row) => row.scope === "send")).toHaveLength(12);
+      expect(rows).toHaveLength(51);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(51);
+      expect(rows.filter((row) => row.scope === "send")).toHaveLength(15);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "sends")).toHaveLength(5);
@@ -432,7 +456,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(48);
+      expect(body.limits).toHaveLength(51);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

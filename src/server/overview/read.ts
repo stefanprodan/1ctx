@@ -2,10 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { statSync } from "node:fs";
-import type { Db } from "../db/index.ts";
+import { CHILD_SESSIONS, type Db } from "../db/index.ts";
 
 // a quarter hour of UTC, which every zone's midnight falls on
 export const SLOT_MS = 900_000;
+
+// a send of a root session, as a condition on the sends row named: a
+// subagent's child is no turn or run of its own, though its tokens
+// count
+export const ROOT_SEND = (sends: string) =>
+  `${sends}.session_id not in (${CHILD_SESSIONS})`;
 
 export type ProjectRow = {
   id: string;

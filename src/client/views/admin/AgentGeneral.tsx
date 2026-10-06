@@ -17,6 +17,7 @@ import { Setting, SettingDelete, SettingForm } from "../../ui/Setting.tsx";
 import { AgentModel } from "./AgentModel.tsx";
 import { cardBody, cardFieldOf, deleteLine } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
+import { AgentSubagents } from "./AgentSubagents.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import { NameFields } from "./NameFields.tsx";
@@ -32,6 +33,7 @@ export function AgentGeneral({
     <>
       <Identity agent={agent} drafts={drafts} />
       <AgentModel agent={agent} drafts={drafts} />
+      <AgentSubagents agent={agent} drafts={drafts} />
       <SettingDelete
         title={`Delete @${agent.name}`}
         line={deleteLine(factsFor(agent.id)?.impact ?? null)}

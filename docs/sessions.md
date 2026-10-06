@@ -312,6 +312,23 @@ that agent answers the one turn (see Summons).
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.
 
+## Child sessions
+
+- **A child session is a subagent's.** `parent_session_id` names its
+  root and `parent_message_id` the root's tool row; both or neither,
+  and either delete takes the child with every row but its usage. It
+  has the root's project, owner, agent and origin, never an
+  automation (`store.create()` refuses one), so a run's picks and a
+  task's retention meet roots alone. Its links never change.
+- **No route or watch reaches a child.** `visible()` reads roots alone
+  (`store.root()`), so every session route and `watch` answers it as
+  the 404 "no such chat".
+- **Every list or count of chats, runs or turns reads roots.** A
+  sessions query adds `ROOT` (`sessions/children.ts`); a sends or
+  usage count tests the row's session against `CHILD_SESSIONS`
+  (`db/index.ts`), built once a statement. Tokens and cost read every
+  row. Restart repair ends a child's rows and publishes nothing for it.
+
 ## Queries and indexes
 
 - **The server never runs `ANALYZE`.** A sessions query must plan well
@@ -323,6 +340,9 @@ that agent answers the one turn (see Summons).
 - **A lookup by status alone reads the table,** since the running rank
   sits behind the project. Lookups by project use the feed index's
   prefix.
+- **The partial feed and sweep indexes repeat `ROOT`,** and
+  `sessions_feed` carries `parent_session_id`, so the feed's root check
+  never leaves the index.
 - **`sessions_automation` is partial** (`automation_id is not null`).
   An `is null` lookup uses `sessions_feed_unowned` or
   `sessions_orphan_runs`. All's per-automation pick is the one walk

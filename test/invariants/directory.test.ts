@@ -286,6 +286,33 @@ describe("the directory", () => {
     ).toBe(404);
   });
 
+  test("an agent's page lists the subagents tool while its switch is on", async () => {
+    const chat = await chatApp();
+    const names = async () => {
+      const body: DirectoryAgentResponse = await (
+        await chat.member.call("GET", "/api/directory/agents/coder")
+      ).json();
+      return body.tools.map((t) => t.name);
+    };
+    expect(await names()).not.toContain("delegate");
+    chat.app.db
+      .query("update agents set subagents = 1 where id = ?")
+      .run(chat.agentId);
+    expect(await names()).toEqual([
+      "bash",
+      "datetime",
+      "delegate",
+      "memory_edit",
+      "visualize",
+      "webfetch",
+    ]);
+    // a model that takes no tools is offered none
+    chat.app.db
+      .query("update agents set tools = 0 where id = ?")
+      .run(chat.agentId);
+    expect(await names()).toEqual([]);
+  });
+
   test("malformed names are the parser's 400, a well formed stranger a 404", async () => {
     const chat = await chatApp();
     for (const path of [

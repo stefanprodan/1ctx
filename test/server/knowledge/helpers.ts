@@ -77,6 +77,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,
+    subagents: false,
     now: now.value,
   });
   const sessions = new SessionStore(

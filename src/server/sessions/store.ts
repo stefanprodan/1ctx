@@ -16,6 +16,7 @@ import {
   type RunsQuery,
 } from "./automation.ts";
 import { forgetCapabilityIn, setDisabled } from "./capabilities.ts";
+import { descendants, ROOT } from "./children.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
   agents as readAgents,
@@ -109,6 +110,22 @@ export class SessionStore {
     return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
+  // the session when it is a root, null when gone or a subagent's child,
+  // which no route or watch may reach
+  root(id: string): SessionRow | null {
+    const raw = this.db
+      .query<RawSession, [string]>(
+        `select * from sessions where id = ? and ${ROOT}`,
+      )
+      .get(id);
+    return raw ? session(raw, this.usage.latest(raw.id)) : null;
+  }
+
+  // the child sessions under a root, which go wherever it goes
+  children(id: string): string[] {
+    return descendants(this.db, id);
+  }
+
   list(query: ListQuery): SessionsResponse {
     return listSessions(this.db, this.usage, query);
   }
@@ -117,15 +134,20 @@ export class SessionStore {
     return automationRuns(this.db, this.usage, query);
   }
 
+  // a child belongs to its root's automation through the root alone, so
+  // a run's picks and its task's retention only ever meet roots
   create(fields: CreateSession): SessionRow {
+    if (fields.parent && fields.automationId) {
+      throw new Error("a child session has no automation");
+    }
     const id = fields.id ?? newId();
     this.db
       .query(
         `insert into sessions (id, project_id, owner_id, agent_id, origin,
            automation_id, run_source, title, status, revision, created_at,
            last_activity_at, forked_from_session_id, forked_from_message_id,
-           disabled_capabilities)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+           disabled_capabilities, parent_session_id, parent_message_id)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -142,6 +164,8 @@ export class SessionStore {
         fields.forkedFromSessionId ?? null,
         fields.forkedFromMessageId ?? null,
         JSON.stringify(fields.disabledCapabilities ?? []),
+        fields.parent?.sessionId ?? null,
+        fields.parent?.messageId ?? null,
       );
     return this.byId(id)!;
   }
@@ -204,16 +228,25 @@ export class SessionStore {
     now: number,
   ): SessionRow | null {
     if (!archiveRow(this.db, id, reason, by, now)) return null;
-    if (reason !== "agent" && !this.scratch.held().has(id)) {
-      this.scratch.drop(id);
+    const children = this.children(id);
+    for (const child of children) archiveRow(this.db, child, reason, by, now);
+    if (reason !== "agent") {
+      const held = this.scratch.held();
+      for (const one of [id, ...children]) {
+        if (!held.has(one)) this.scratch.drop(one);
+        packRows(this.db, one);
+      }
     }
-    if (reason !== "agent") packRows(this.db, id);
     return this.byId(id);
   }
 
-  // the session's large tool results compressed; never one that runs
+  // the session's large tool results compressed, its children's with
+  // them; never one that runs
   pack(id: string): number {
-    return packRows(this.db, id);
+    return [id, ...this.children(id)].reduce(
+      (n, one) => n + packRows(this.db, one),
+      0,
+    );
   }
 
   // a tool row's whole text, packed or not
@@ -273,7 +306,7 @@ export class SessionStore {
   count(projectId: string): number {
     return this.db
       .query<{ n: number }, [string]>(
-        "select count(*) as n from sessions where project_id = ?",
+        `select count(*) as n from sessions where project_id = ? and ${ROOT}`,
       )
       .get(projectId)!.n;
   }
@@ -282,7 +315,8 @@ export class SessionStore {
     return (
       this.db
         .query<{ n: number }, [string]>(
-          "select count(*) as n from sessions where project_id = ? and status = 'running'",
+          `select count(*) as n from sessions
+           where project_id = ? and status = 'running' and ${ROOT}`,
         )
         .get(projectId)!.n > 0
     );

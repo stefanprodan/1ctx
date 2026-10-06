@@ -69,6 +69,7 @@ const agent: AgentSummary = {
   mcpMode: "auto",
   upstream: "vendor/fp8",
   skip4Bit: false,
+  subagents: false,
   default: false,
   createdAt: 0,
 };
@@ -126,6 +127,7 @@ describe("a card's body", () => {
       mcpMode: "auto",
       upstream: "vendor/fp8",
       skip4Bit: false,
+      subagents: false,
     });
     expect(body).not.toHaveProperty("contextLength");
     expect(body).not.toHaveProperty("default");
@@ -285,6 +287,25 @@ describe("the model draft", () => {
     // an edited filter stays when another card's save moves the row
     d.follow(agent, { ...agent, prompt: "Be kind." });
     expect(d.skip4Bit.value).toBe(true);
+  });
+
+  test("the subagents switch is its own edit, sent whole and followed when untouched", () => {
+    const d = AgentDrafts.of(agent);
+    expect(d.subagentsDirty(agent)).toBe(false);
+    // another card's save sends the saved switch back as it was
+    expect(cardBody(agent, { prompt: "x" }, rows).subagents).toBe(false);
+    d.subagents.value = true;
+    expect(d.subagentsDirty(agent)).toBe(true);
+    expect(
+      cardBody(agent, { subagents: d.subagents.value }, rows).subagents,
+    ).toBe(true);
+    // an edited switch stays when another card's save moves the row
+    d.follow(agent, { ...agent, prompt: "Be kind." });
+    expect(d.subagents.value).toBe(true);
+    d.resetSubagents(agent);
+    // an untouched one follows the row
+    d.follow(agent, { ...agent, subagents: true });
+    expect(d.subagents.value).toBe(true);
   });
 
   test("a new agent's body carries the host filter", () => {

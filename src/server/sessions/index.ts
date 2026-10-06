@@ -180,8 +180,10 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.scratch,
     deps.pruned,
   );
+  // a subagent's child is never a chat of its own: every route and
+  // watch by its id is the same 404 as a missing one
   const visible = (principal: Principal, id: string): SessionRow => {
-    const session = store.byId(id);
+    const session = store.root(id);
     if (session === null) throw new NotFound("no such chat");
     try {
       deps.access.project(principal, session.projectId);

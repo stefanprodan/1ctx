@@ -59,6 +59,7 @@ const agent: AgentRow = {
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,
+  subagents: false,
   default: false,
   createdAt: 1,
 };
@@ -141,6 +142,14 @@ describe("send policy thinking", () => {
     expect(policy({}).limits).toMatchObject({
       contextReserve: 20_000,
       summaryMaxTokens: 4096,
+    });
+  });
+
+  test("copies the subagent limits onto the send", () => {
+    expect(policy({}).limits).toMatchObject({
+      childrenAtOnce: 2,
+      childrenPerSend: 4,
+      childAnswerChars: 8000,
     });
   });
 

@@ -61,10 +61,12 @@ export type KeptPacker = {
 // ended and not due for deletion, by key: a chat archived within
 // archivedDeleteDays, an orphaned run inside the same cut (the sweep's),
 // a task's run within its retention (the scheduler's); each a >= where
-// its deleter has a <
-export const KEPT_STILL = `select sessions.id as id from sessions
+// its deleter has a <. A child is judged by its root, which it goes with
+export const KEPT_STILL = `select own.id as id from sessions own
+  join sessions on sessions.id = coalesce(own.parent_session_id, own.id)
   left join automations on automations.id = sessions.automation_id
-  where sessions.id = ?3 and sessions.status <> 'running'
+  where own.id = ?3 and own.status <> 'running'
+    and sessions.status <> 'running'
     and ((sessions.origin = 'chat' and sessions.archived_at >= ?1)
       or (sessions.origin = 'automation' and sessions.automation_id is null
         and sessions.last_activity_at >= ?1)

@@ -68,4 +68,10 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   skipped. The main thread only reads, copies and writes; both scale
   with a file's size, about 5 ms for 32 MiB. Fork unpacks what it
   copies (`docs/bash.md`).
+- **A child session goes with its root, never alone.** Archiving a
+  root archives its children with the same reason, and packs and frees
+  them when it packs and frees its own. The sweep's steps pick roots,
+  and a root is packable when it or a child holds a packable row.
+  Deleting a root takes its children by foreign key. A child's kept
+  files are judged by its root (`KEPT_STILL`).
 - **No sweep vacuums.** SQLite reuses freed pages.

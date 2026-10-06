@@ -207,7 +207,7 @@ function sessions(db: Db): SessionSum[] {
     `select k.session_id as id, sum(${KEPT_BYTES}) as bytes
        from mcp_kept_files k group by k.session_id`,
   );
-  return db
+  const rows = db
     .query<
       {
         id: string;
@@ -216,23 +216,63 @@ function sessions(db: Db): SessionSum[] {
         automationId: string | null;
         archived: number;
         title: string;
+        parentId: string | null;
       },
       []
     >(
       `select id, project_id as projectId, origin, automation_id as automationId,
-              archived_at is not null as archived, title from sessions`,
+              archived_at is not null as archived, title,
+              parent_session_id as parentId from sessions`,
     )
     .all()
-    .map((row) => ({
-      ...row,
-      archived: row.archived === 1,
-      messages: byMessage.get(row.id)?.count ?? 0,
-      messageBytes: byMessage.get(row.id)?.bytes ?? 0,
-      openedBytes: opened.get(row.id) ?? 0,
-      uploadBytes: uploads.get(row.id) ?? 0,
-      scratchBytes: scratch.get(row.id) ?? 0,
-      mcpBytes: mcp.get(row.id) ?? 0,
+    .map(({ parentId, ...row }) => ({
+      parentId,
+      sum: {
+        ...row,
+        archived: row.archived === 1,
+        messages: byMessage.get(row.id)?.count ?? 0,
+        messageBytes: byMessage.get(row.id)?.bytes ?? 0,
+        openedBytes: opened.get(row.id) ?? 0,
+        uploadBytes: uploads.get(row.id) ?? 0,
+        scratchBytes: scratch.get(row.id) ?? 0,
+        mcpBytes: mcp.get(row.id) ?? 0,
+      },
     }));
+  return foldChildren(rows);
+}
+
+const FOLDED = [
+  "messageBytes",
+  "openedBytes",
+  "uploadBytes",
+  "scratchBytes",
+  "mcpBytes",
+] as const;
+
+// a subagent's child is no chat or run of its own: its bytes count in
+// its root's, which it is deleted with; the messages stay the root's,
+// the count its chat shows
+function foldChildren(
+  rows: { parentId: string | null; sum: SessionSum }[],
+): SessionSum[] {
+  const parents = new Map(rows.map((row) => [row.sum.id, row.parentId]));
+  const roots = new Map<string, SessionSum>();
+  for (const row of rows) {
+    if (row.parentId === null) roots.set(row.sum.id, row.sum);
+  }
+  for (const row of rows) {
+    if (row.parentId === null) continue;
+    let up: string | null | undefined = row.parentId;
+    const seen = new Set<string>();
+    while (up && !roots.has(up) && !seen.has(up)) {
+      seen.add(up);
+      up = parents.get(up);
+    }
+    const root = up ? roots.get(up) : undefined;
+    if (root === undefined) continue;
+    for (const field of FOLDED) root[field] += row.sum[field];
+  }
+  return [...roots.values()];
 }
 
 function knowledge(db: Db): KnowledgeSum[] {

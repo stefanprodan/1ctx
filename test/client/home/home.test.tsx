@@ -113,6 +113,7 @@ describe("Home", () => {
         mcpMode: "auto",
         upstream: null,
         skip4Bit: false,
+        subagents: false,
         default: false,
         createdAt: 1_756_684_800_000,
       },

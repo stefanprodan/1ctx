@@ -246,6 +246,7 @@ describe("the agents", () => {
       mcpMode: "auto",
       upstream: null,
       skip4Bit: false,
+      subagents: false,
       // the first agent is the default until an admin marks another
       default: true,
       createdAt: app.now.value,
@@ -254,6 +255,42 @@ describe("the agents", () => {
       agents: [agent],
       activity: [],
     });
+  });
+
+  test("the subagents switch starts off, saves, reads back and drops when left out", async () => {
+    const { app, client, provider } = await setup();
+    const body = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: flash.id,
+    };
+    const made = await client.call("POST", "/api/agents", { body });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    expect(agent.subagents).toBe(false);
+    const on = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, subagents: true },
+    });
+    expect(on.status).toBe(200);
+    expect((await on.json()).agent.subagents).toBe(true);
+    const listed = await (await client.call("GET", "/api/agents")).json();
+    expect(listed.agents[0].subagents).toBe(true);
+    expect(
+      app.db.query("select subagents from agents where id = ?").get(agent.id),
+    ).toEqual({ subagents: 1 });
+    const odd = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...body, subagents: "yes" },
+    });
+    expect(odd.status).toBe(400);
+    expect(await odd.json()).toEqual({
+      error: "subagents must be true or false",
+    });
+    // the route takes the whole agent: left out is off
+    const off = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body,
+    });
+    expect((await off.json()).agent.subagents).toBe(false);
   });
 
   test("a model that always or never thinks drops the thinking word", async () => {

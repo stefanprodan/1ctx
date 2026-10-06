@@ -15,7 +15,7 @@ import {
   byProjects,
   type GroupRow,
 } from "./breakdowns.ts";
-import { inMemory, SLOT_MS, sizeOf, snapshot } from "./read.ts";
+import { inMemory, ROOT_SEND, SLOT_MS, sizeOf, snapshot } from "./read.ts";
 
 export type RangeInput = {
   now: number;
@@ -84,6 +84,7 @@ function sendSlots(db: Db, bounds: Bounds): SendSlot[] {
     .query<SendSlot, Bounds>(
       `select started_at / ${SLOT_MS} as slot, ${SEND_SUMS}
          from sends where started_at >= ? and started_at < ?
+           and ${ROOT_SEND("sends")}
          group by slot order by slot`,
     )
     .all(...bounds);
@@ -135,6 +136,7 @@ function ended(db: Db, bounds: Bounds): Ended {
          where kind != 'run' and status != 'running'
            and finished_at is not null
            and started_at >= ? and started_at < ?
+           and ${ROOT_SEND("sends")}
          order by started_at`,
     )
     .all(...bounds);
@@ -146,6 +148,7 @@ function actives(db: Db, bounds: Bounds): Actives {
     .query<{ user: string; slot: number }, Bounds>(
       `select user_id as user, started_at / ${SLOT_MS} as slot
          from sends where started_at >= ? and started_at < ?
+           and ${ROOT_SEND("sends")}
          group by user, slot order by slot`,
     )
     .all(...bounds);

@@ -63,6 +63,7 @@ const EXPECTED_IDS = [
   "0049-email",
   "0050-user-links",
   "0051-agent-email",
+  "0052-subagents",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -71,7 +72,14 @@ const KEPT_COLUMNS =
 
 // columns a later migration adds, left out where a test compares rows
 // from before its own migration with rows after every migration
-const LATER_COLUMNS = ["listed_as", "email_placeholder", "email_from_agents"];
+const LATER_COLUMNS = [
+  "listed_as",
+  "email_placeholder",
+  "email_from_agents",
+  "subagents",
+  "parent_session_id",
+  "parent_message_id",
+];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
     Object.fromEntries(
@@ -1352,7 +1360,10 @@ describe("the schema", () => {
       ]);
       const existing = indexes();
       expect(MIGRATIONS[38]?.rebuilds).toEqual(["sessions", "automations"]);
-      expect(migrate(db)).toEqual(expectedFrom("0039-restart-runs"));
+      // 0052 remakes the feed indexes, so the rebuild is read alone
+      expect(migrate(db, MIGRATIONS.slice(0, 39))).toEqual([
+        "0039-restart-runs",
+      ]);
       expect(rows()).toEqual(before);
       expect(indexes()).toEqual(existing);
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
@@ -1409,7 +1420,7 @@ describe("the schema", () => {
       expect(
         db.query("select count(*) as n from queued_messages").get(),
       ).toEqual({ n: 0 });
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db)).toEqual(expectedFrom("0040-repos"));
     } finally {
       db.close();
     }
@@ -1665,6 +1676,65 @@ describe("the schema", () => {
     }
   });
 
+  test("0052 starts every agent off and every session a root, children cascading", () => {
+    const db = seed(MIGRATIONS.slice(0, 51));
+    try {
+      const sessions = db.query("select * from sessions order by rowid").all();
+      expect(migrate(db)).toEqual(expectedFrom("0052-subagents"));
+      expect(
+        earlier(db.query("select * from sessions order by rowid").all()),
+      ).toEqual(earlier(sessions));
+      expect(
+        db
+          .query(
+            "select subagents, parent_session_id, parent_message_id from agents, sessions",
+          )
+          .all(),
+      ).toEqual([
+        { subagents: 0, parent_session_id: null, parent_message_id: null },
+      ]);
+      expect(() => db.exec("update agents set subagents = 2")).toThrow(/CHECK/);
+      db.exec(`
+        insert into sessions (id, project_id, owner_id, agent_id, origin,
+            title, status, created_at, last_activity_at, parent_session_id,
+            parent_message_id)
+          values ('kid', 'p', 'u', 'a', 'chat', 'kid', 'done', 1, 1, 'sess',
+            'm2');
+        insert into sends (id, session_id, kind, user_id, agent_id,
+            provider_id, provider_name, model, status, first_message_id,
+            started_at)
+          values ('ks', 'kid', 'chat', 'u', 'a', 'pr', 'prov', 'm', 'done',
+            'km', 1);
+        insert into messages (id, session_id, seq, kind, send_id, round,
+            user_id, content, status, created_at)
+          values ('km', 'kid', 1, 'user', 'ks', 1, 'u', 'task', 'done', 1);
+      `);
+      db.exec("delete from messages where id = 'm2'");
+      expect(
+        db.query("select count(*) as n from sessions where id = 'kid'").get(),
+      ).toEqual({ n: 0 });
+      expect(
+        db.query("select count(*) as n from sends where id = 'ks'").get(),
+      ).toEqual({ n: 0 });
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      // the partial indexes leave a child out
+      const partial = db
+        .query<{ name: string }, []>(
+          `select name from sqlite_schema where type = 'index'
+             and sql like '%parent_session_id is null%' order by name`,
+        )
+        .all()
+        .map((row) => row.name);
+      expect(partial).toEqual([
+        "sessions_feed_unowned",
+        "sessions_idle",
+        "sessions_orphan_runs",
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0048 keeps the model id of agents on a dedicated wire", () => {
     const db = seed(MIGRATIONS.slice(0, 47));
     try {
@@ -1781,6 +1851,9 @@ describe("the schema", () => {
               listed_as: _____,
               email_placeholder: ______,
               email_from_agents: _______,
+              subagents: ________,
+              parent_session_id: _________,
+              parent_message_id: __________,
               ...rest
             }) => rest,
           ),
@@ -2760,6 +2833,7 @@ describe("0008 search tavily migration", () => {
             deleted_at: null,
             skip_4bit: 0,
             listed_as: null,
+            subagents: 0,
           })),
         );
         db.exec(`

@@ -36,6 +36,9 @@ export type CreateSession = {
   runSource?: EventSource | null;
   forkedFromSessionId?: string | null;
   forkedFromMessageId?: string | null;
+  // a subagent's child session: its root and the root's tool row that
+  // started it, both or neither
+  parent?: { sessionId: string; messageId: string } | null;
   status?: SessionStatus;
   disabledCapabilities?: readonly string[];
   title: string;
@@ -77,6 +80,8 @@ export type RawSession = {
   attention_by: string | null;
   attention_reason: string | null;
   attention_source: AttentionSource | null;
+  parent_session_id: string | null;
+  parent_message_id: string | null;
 };
 
 export type UsagePort = {

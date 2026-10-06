@@ -326,6 +326,8 @@ describe("POST /api/sessions/:id/fork", () => {
         attention_by: null,
         attention_reason: null,
         attention_source: null,
+        parent_session_id: null,
+        parent_message_id: null,
       });
       expect(copied.live).toBeNull();
       expect(copied.send?.kind).toBe("compact");

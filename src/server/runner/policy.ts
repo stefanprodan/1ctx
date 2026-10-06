@@ -318,6 +318,9 @@ export function buildPolicy(input: {
       summaryMaxTokens: input.limits.summaryMaxTokens,
       memoryPhaseMs: input.limits.memoryPhaseMs,
       memoryPhaseRounds: input.limits.memoryPhaseRounds,
+      childrenAtOnce: input.limits.childrenAtOnce,
+      childrenPerSend: input.limits.childrenPerSend,
+      childAnswerChars: input.limits.childAnswerChars,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

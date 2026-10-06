@@ -60,6 +60,8 @@ instance's database, creating or updating what they name.
   deleted agent creates a new agent. The automations the delete paused
   stay on the retired one, and there is no `Automation` kind to move
   them (`docs/automations.md`).
+- **An `Agent`'s `subagents` is a boolean.** A new agent without it is
+  off; left out on an update it stays.
 - **`default: true` is the only value for an `Agent` or `Decider`.**
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.

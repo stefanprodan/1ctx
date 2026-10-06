@@ -20,6 +20,11 @@ export type LoopLimits = {
   summaryMaxTokens: number;
   memoryPhaseMs: number;
   memoryPhaseRounds: number;
+  // a send's subagents: running together, started in all, and the
+  // characters of an answer it reads back
+  childrenAtOnce: number;
+  childrenPerSend: number;
+  childAnswerChars: number;
 };
 
 export type ToolCaps = {
@@ -140,6 +145,9 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   summaryMaxTokens: limit(4096, 1000, 32_000, "tokens", "send"),
   memoryPhaseMs: limit(120_000, 10_000, 600_000, "ms", "send"),
   memoryPhaseRounds: limit(4, 1, 20, "count", "send"),
+  childrenAtOnce: limit(2, 1, 4, "count", "send"),
+  childrenPerSend: limit(4, 1, 16, "count", "send"),
+  childAnswerChars: limit(8000, 1000, 50_000, "chars", "send"),
   callTimeoutMs: limit(20_000, 1000, 600_000, "ms", "call"),
   resultCut: limit(50_000, 1000, 500_000, "chars", "call"),
   maxBashCalls: limit(100, 1, 1000, "count", "call"),

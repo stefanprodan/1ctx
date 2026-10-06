@@ -40,6 +40,11 @@ admin's attention, the server's load), Usage by month and Storage.
   the window is left out.
 - **Sends and tokens are summed apart and joined by key.** A send has
   many usage rows, so a join before the sum counts it many times.
+- **A child session's sends are no turns.** Turns, runs, lengths,
+  active users and an agent's last use read root sends alone; its
+  tokens and cost count under the root's project, user and agent.
+  Storage folds a child's bytes into its root, which alone is a chat
+  or run there.
 - **A model's row is the model that answered** (`served_model`).
 - **`cost` is the rounds' alone.** Decisions are summed into their own
   fields. A cost total is 0 with no rows and null when rows came and

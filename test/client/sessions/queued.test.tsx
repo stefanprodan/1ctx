@@ -748,6 +748,7 @@ describe("the composer while a turn runs", () => {
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,
+    subagents: false,
     default: true,
     createdAt: 0,
   };

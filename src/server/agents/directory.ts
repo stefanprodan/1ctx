@@ -30,7 +30,16 @@ const LISTED = new Set<string>([
   ...WEB_TOOLS,
   "bash",
   "memory_edit",
+  "delegate",
 ]);
+
+// the Subagents switch's tool, listed from the switch while no offer
+// carries it
+const DELEGATE = {
+  name: "delegate",
+  description: "Hands a task to a fresh copy of this agent.",
+  provider: null,
+};
 
 // the page's lists read by name, whatever order a send offers them in
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -175,14 +184,20 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               files: (byId.get(skill.id)?.files ?? 0) + 1,
             }))
             .sort(byName),
-          tools: offered.tools
-            .filter((tool) => LISTED.has(tool.name))
-            .map((tool) => ({
-              name: tool.name,
-              description: firstSentence(tool.description),
-              provider: tool.name === "websearch" ? offered.search : null,
-            }))
-            .sort(byName),
+          tools: [
+            ...offered.tools
+              .filter((tool) => LISTED.has(tool.name))
+              .map((tool) => ({
+                name: tool.name,
+                description: firstSentence(tool.description),
+                provider: tool.name === "websearch" ? offered.search : null,
+              })),
+            ...(agent.subagents &&
+            agent.model.tools &&
+            !offered.tools.some((tool) => tool.name === DELEGATE.name)
+              ? [DELEGATE]
+              : []),
+          ].sort(byName),
           mcp: {
             servers: offered.mcp
               .map((server) => ({

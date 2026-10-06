@@ -94,6 +94,18 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Memory rounds",
     text: "Provider requests a run may make updating memory.",
   },
+  childrenAtOnce: {
+    label: "Subagents at once",
+    text: "Subagents of one turn running together. More wait.",
+  },
+  childrenPerSend: {
+    label: "Subagents per turn",
+    text: "Subagents one turn may start. More are refused.",
+  },
+  childAnswerChars: {
+    label: "Subagent answer",
+    text: "What the agent reads of a subagent's answer.",
+  },
   runDeadlineMs: {
     label: "Run deadline",
     text: "How long one run may take.",
