@@ -9,6 +9,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type App, compose } from "../../src/server/compose.ts";
 import type { Db } from "../../src/server/db/index.ts";
+import type {
+  EmailSender,
+  Outgoing,
+  SendResult,
+  SmtpServer,
+} from "../../src/server/email/index.ts";
 import {
   type LogFactory,
   type LogFields,
@@ -220,6 +226,26 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
 }
 export const VERSION = "v0.0.0-test";
 
+// what reaches the SMTP server: every message kept, each answered with
+// result, so the suite never opens a socket
+export type FakeEmailSender = {
+  emailSender: EmailSender;
+  sent: { server: SmtpServer; message: Outgoing }[];
+  result: SendResult;
+};
+
+export function fakeEmailSender(): FakeEmailSender {
+  const fake: FakeEmailSender = {
+    sent: [],
+    result: "sent",
+    emailSender: async (server, message) => {
+      fake.sent.push({ server, message });
+      return fake.result;
+    },
+  };
+  return fake;
+}
+
 export type CollectedLog = {
   level: LogLevel;
   area: string;
@@ -250,6 +276,8 @@ export type TestApp = App & {
   now: { value: number };
   // what the fake fetch was asked
   fetched: FakeCall[];
+  // what the fake sender was handed, and its next answer
+  emailSender: FakeEmailSender;
   // one cookie jar per client: a browser tab, or another user's
   client(address?: string): TestClient;
 };
@@ -293,6 +321,7 @@ export async function testApp(
     // the cores the send caps are sized by; one, so the defaults are
     // the host's floor on every machine
     cores?: number;
+    emailSender?: FakeEmailSender;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -323,6 +352,7 @@ export async function testApp(
       ? "hunter2-test"
       : options.adminPassword;
   const fake = fakeFetch();
+  const emailSender = options.emailSender ?? fakeEmailSender();
   // read at each call, so a test may replace or delete a key it passed
   const given = options.secrets ?? {};
   const values = (): Record<string, string> => ({
@@ -357,12 +387,14 @@ export async function testApp(
     cacheDir: options.cacheDir,
     repoJobs: options.repoJobs,
     cores: options.cores ?? 1,
+    emailSender: emailSender.emailSender,
   });
   return {
     ...app,
     db,
     now,
     fetched: fake.calls,
+    emailSender,
     client(address = "127.0.0.1") {
       const client: TestClient = {
         cookie: null,

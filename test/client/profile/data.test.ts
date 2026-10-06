@@ -22,6 +22,8 @@ const casey: Profile = {
   tz: "UTC",
   disabled: false,
   mustChangePassword: false,
+  emailPlaceholder: false,
+  emailFromAgents: false,
   about: "",
   role: "member",
   createdAt: 1,

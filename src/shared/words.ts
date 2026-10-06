@@ -53,26 +53,30 @@ export function isFullName(value: unknown): value is string {
 }
 
 export const MAX_EMAIL = 254;
-const WHITESPACE = /\s/;
+// a strict subset of RFC 5322's addr-spec: a dot-atom local part and a
+// host name. The SMTP library rewrites anything looser (a trailing ">")
+// into another address, past the placeholder rule and the unique index
+const LOCAL =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+const LABEL = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+// letters, or an internationalized one in its xn-- form
+const TOP = /^(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})$/;
 export function isEmail(value: unknown): value is string {
   if (
     typeof value !== "string" ||
     value.length < 3 ||
-    value.length > MAX_EMAIL ||
-    value !== value.trim() ||
-    LINE_BREAK.test(value) ||
-    WHITESPACE.test(value)
+    value.length > MAX_EMAIL
   ) {
     return false;
   }
   const at = value.indexOf("@");
   if (at <= 0 || at !== value.lastIndexOf("@")) return false;
-  const domain = value.slice(at + 1);
-  const labels = domain.split(".");
+  const labels = value.slice(at + 1).split(".");
   return (
+    LOCAL.test(value.slice(0, at)) &&
     labels.length >= 2 &&
-    labels.every((label) => label.length > 0) &&
-    labels[labels.length - 1].length >= 2
+    labels.every((label) => LABEL.test(label)) &&
+    TOP.test(labels[labels.length - 1]!)
   );
 }
 
@@ -184,10 +188,12 @@ export const SECRET_KINDS = [
   "search-",
   "mcp-",
   "http-",
+  "email-",
 ] as const;
 export type SecretKind = (typeof SECRET_KINDS)[number];
 export const MCP_KEY_PREFIX = "mcp-" satisfies SecretKind;
 export const HTTP_KEY_PREFIX = "http-" satisfies SecretKind;
+export const EMAIL_KEY_PREFIX = "email-" satisfies SecretKind;
 
 export function isSecretName(kind: string, value: unknown): value is string {
   return (
@@ -370,10 +376,19 @@ export const VISUAL_FRAME_BYTES = 512 * 1024;
 export const MAX_TITLE = 80;
 // a title is one line by the same rule as a full name
 export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
+// the marks and embeds, overrides and isolates that reorder what
+// follows them, so a text shows other than it reads
+const BIDI = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+export const hasBidi = (value: string) => BIDI.test(value);
+export const stripBidi = (value: string) =>
+  value.replace(new RegExp(BIDI.source, "g"), "");
 export const MAX_SEARCH = 100;
 
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
 export type WebTool = (typeof WEB_TOOLS)[number];
+
+// the tool an agent emails users with, off until an admin turns it on
+export const EMAIL_TOOL = "email_user";
 
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has

@@ -25,10 +25,17 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
+import {
+  SMTP_REQUIRED,
+  type SmtpLogin,
+  smtpPair,
+  smtpServerSpec,
+} from "./smtp.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
   "User",
+  "SmtpServer",
   "Project",
   "Credential",
   "Repository",
@@ -70,6 +77,7 @@ export type Document = {
 export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
 export type { RepositorySpec } from "./repository.ts";
+export type { SmtpLogin, SmtpServerSpec } from "./smtp.ts";
 export type {
   AgentSpec,
   CredentialSpec,
@@ -100,6 +108,7 @@ function document(value: unknown, source: string): Document {
     const meta = object(b.metadata, ["name"], "metadata");
     const guard = {
       User: isUsername,
+      SmtpServer: isName,
       Project: isName,
       Credential: isName,
       Repository: isName,
@@ -121,6 +130,8 @@ function document(value: unknown, source: string): Document {
     switch (kind) {
       case "User":
         return { ...base, kind, spec: spec.user(b.spec) };
+      case "SmtpServer":
+        return { ...base, kind, spec: smtpServerSpec(b.spec) };
       case "Project":
         return { ...base, kind, spec: spec.project(b.spec) };
       case "Credential":
@@ -156,6 +167,13 @@ function duplicate(documents: Document[]): void {
       );
     }
     seen.set(key, doc.source);
+  }
+  // the instance has one SMTP server
+  const servers = documents.filter((doc) => doc.kind === "SmtpServer");
+  if (servers.length > 1) {
+    throw new Error(
+      `${servers[1]!.source}: SmtpServer/${servers[1]!.name}: one SmtpServer object per instance (first SmtpServer/${servers[0]!.name})`,
+    );
   }
   // one default of a kind, since a second would take the mark from the
   // first
@@ -225,6 +243,8 @@ export function preflight(
   web: Pick<WebAccess, "mode" | "domains">,
   projectDocs: ProjectDocs,
   credentials: CredentialsView,
+  // the held SMTP server's login, null when none is held
+  smtp: SmtpLogin | null = null,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -286,6 +306,19 @@ export function preflight(
               `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
             );
           }
+        }
+        break;
+      }
+      case "SmtpServer": {
+        // any name updates the one server held
+        if (inventory.SmtpServer.length === 0) required([...SMTP_REQUIRED]);
+        // over the held login, so a half pair fails before any apply
+        const pair = smtpPair(doc.spec, smtp);
+        if (pair !== null) {
+          throw new Error(`${doc.source}: SmtpServer/${doc.name}: ${pair}`);
+        }
+        if (typeof doc.spec.keyFrom === "string") {
+          readSecret("keyFrom", "email-", doc.spec.keyFrom);
         }
         break;
       }

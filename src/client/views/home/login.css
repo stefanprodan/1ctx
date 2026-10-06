@@ -47,4 +47,20 @@
   .login-error {
     margin: 0;
   }
+
+  .login-forgot {
+    align-self: flex-end;
+  }
+
+  .login-note {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+
+  .login-title {
+    margin: 0;
+    font-size: var(--text-title);
+    color: var(--fg);
+  }
 }

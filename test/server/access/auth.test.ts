@@ -32,6 +32,17 @@ function build(secureCookie: boolean) {
   });
   const access = accessArea({
     db,
+    email: {
+      enabled: () => false,
+      link: () => {
+        throw new Error("email is off");
+      },
+      enqueue: () => [],
+      register: () => {},
+      dropQueued: () => 0,
+      hasQueued: () => false,
+      countAsked: () => 0,
+    },
     clock: () => 0,
     log: silent,
     secureCookie,

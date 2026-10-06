@@ -9,8 +9,8 @@ draws is in `docs/views.md`.
 - **Views never fetch.** `data/` owns the entities and every call; a
   view reads signals. A route names its `load` in `app/routes.ts`,
   and `app/loading.ts` starts it when the path, the query or the
-  signed-in user changes, before the view renders. `reload()` runs it
-  again.
+  signed-in user changes, before the view renders. A public route's
+  loads for anyone, once per address. `reload()` runs it again.
 - **Every route is one `lazy()` entry in `app/routes.ts`.** The rail
   is computed from that table.
 - **Only the latest answer lands.** A later load or a write

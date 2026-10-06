@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Access: logins, the principal, the login, logout and me routes, the
-// signed-in profile routes, and admin user management.
+// links an email carries, the signed-in profile routes, and admin user
+// management.
 
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -26,10 +27,24 @@ import {
   directoryRoutes,
 } from "./directory.ts";
 import {
+  type UsersPort as LinkRoutesUsersPort,
+  linkRoutes,
+} from "./link-routes.ts";
+import { LinkStore } from "./link-store.ts";
+import {
+  type EmailPort,
+  type UsersPort as LinksUsersPort,
+  links as linksOf,
+} from "./links.ts";
+import {
   type UsersPort as ProfileUsersPort,
   profileRoutes,
 } from "./profile.ts";
-import { type UsersPort as LoginUsersPort, routes } from "./routes.ts";
+import {
+  type UsersPort as LoginUsersPort,
+  loginGuard,
+  routes,
+} from "./routes.ts";
 import { LoginStore } from "./store.ts";
 import {
   type UsersPort as AdminUsersPort,
@@ -57,7 +72,9 @@ export type AccessDeps = {
     LoginUsersPort &
     ProfileUsersPort &
     AdminUsersPort &
-    DirectoryUsersPort;
+    DirectoryUsersPort &
+    LinksUsersPort &
+    LinkRoutesUsersPort;
   projects: AuthProjectsPort & DirectoryProjectsPort & UsersProjectsPort;
   usage: UsersUsagePort & BoardUsagePort;
   // a person's posts, chats and manual runs: a closure, since sessions
@@ -65,17 +82,26 @@ export type AccessDeps = {
   activity: ActivityPort;
   // a closure, the socket is built after access
   presence: PresencePort;
+  email: EmailPort;
 };
 
 export type Access = Auth & {
   // drop the visits past every window; how many went
   sweepVisits(): number;
+  // drop the links past their expiry, used or not; how many went
+  sweepLinks(): number;
+  // the work a link ask left after its answer, for the shutdown and tests
+  settled(): Promise<void>;
+  // at shutdown: a link ask from here answers and does nothing; resolves
+  // once every one before ran
+  closeLinks(): Promise<void>;
   routes: RouteDescriptor[];
 };
 
 export function accessArea(deps: AccessDeps): Access {
   const logins = new LoginStore(deps.db);
   const visits = new VisitStore(deps.db);
+  const linkStore = new LinkStore(deps.db);
   const built = auth({
     db: deps.db,
     logins,
@@ -85,9 +111,21 @@ export function accessArea(deps: AccessDeps): Access {
     clock: deps.clock,
     secureCookie: deps.secureCookie,
   });
+  const links = linksOf({
+    db: deps.db,
+    clock: deps.clock,
+    log: deps.log,
+    store: linkStore,
+    users: deps.users,
+    email: deps.email,
+  });
+  const guard = loginGuard(deps.clock, deps.log);
   return {
     ...built,
     sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
+    sweepLinks: () => linkStore.sweep(deps.clock()),
+    settled: () => links.settled(),
+    closeLinks: () => links.close(),
     routes: [
       ...routes({
         db: deps.db,
@@ -95,11 +133,27 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         clock: deps.clock,
         log: deps.log,
+        guard,
+        email: deps.email,
+      }),
+      ...linkRoutes({
+        db: deps.db,
+        auth: built,
+        logins,
+        store: linkStore,
+        links,
+        users: deps.users,
+        email: deps.email,
+        clock: deps.clock,
+        log: deps.log,
+        guard,
       }),
       ...profileRoutes({
         db: deps.db,
         logins,
         users: deps.users,
+        links,
+        email: deps.email,
         clock: deps.clock,
         log: deps.log,
       }),
@@ -111,6 +165,8 @@ export function accessArea(deps: AccessDeps): Access {
         projects: deps.projects,
         usage: deps.usage,
         clock: deps.clock,
+        email: deps.email,
+        links,
       }),
       ...boardRoutes({
         visits,

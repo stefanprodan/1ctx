@@ -23,6 +23,8 @@ import { usageSlot } from "./slot.ts";
 
 export const users = signal<AdminUser[] | null>(null);
 export const usersError = signal<Failure | null>(null);
+// email is set up, so a placeholder address is said as one
+export const emailOn = signal(false);
 export const userUsage = usageSlot<SendTotalsResponse>(
   (id) => `/api/users/${encodeURIComponent(id)}/usage`,
 );
@@ -36,6 +38,7 @@ effect(() => {
   owner = id;
   users.value = null;
   usersError.value = null;
+  emailOn.value = false;
 });
 
 onProjectMembers((projectId, memberIds) => {
@@ -66,7 +69,10 @@ export async function loadUsers(): Promise<void> {
   usersError.value = null;
   try {
     const body = await api<UsersResponse>("/api/users");
-    if (owner === forUser && turn === mine) users.value = body.users;
+    if (owner === forUser && turn === mine) {
+      users.value = body.users;
+      emailOn.value = body.emailOn;
+    }
   } catch (err) {
     if (owner === forUser && turn === mine) usersError.value = failure(err);
   }
@@ -108,6 +114,15 @@ export async function resetPassword(
 ): Promise<void> {
   await api(`/api/users/${encodeURIComponent(id)}/password`, "POST", body);
   await reread();
+}
+
+// an email with a link to choose a password; nothing changes on the row
+// until it is used
+export async function sendUserLink(
+  id: string,
+  kind: "reset-link" | "invite",
+): Promise<void> {
+  await api(`/api/users/${encodeURIComponent(id)}/${kind}`, "POST");
 }
 
 // a failure is the saving card's, since the page keeps the list it has

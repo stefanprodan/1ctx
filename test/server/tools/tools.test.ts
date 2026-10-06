@@ -150,6 +150,7 @@ describe("offered", () => {
       "websearch",
       "visualize",
       "web",
+      "email_user",
     ]);
     tools.store.setAccess("off", [], now);
     expect(tools.offered(now, "").tools.map((tool) => tool.name)).toEqual([

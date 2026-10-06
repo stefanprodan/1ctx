@@ -6,6 +6,7 @@ import {
   applyChange,
   credentialKey,
   credentialOf,
+  EMAIL,
   isCapabilityKey,
   KNOWLEDGE,
   MAX_CAPABILITY_KEY,
@@ -24,6 +25,16 @@ import {
 } from "../../src/shared/capabilities.ts";
 
 describe("capability keys", () => {
+  test("email_user is a kind alone, like the visualize tool", () => {
+    expect(EMAIL).toBe("email");
+    expect(isCapabilityKey(EMAIL)).toBe(true);
+    expect(isCapabilityKey("email:x")).toBe(false);
+    expect(parseSet([WEB, EMAIL], "set")).toEqual({
+      ok: true,
+      set: ["email", "web"],
+    });
+  });
+
   test("the visualize tool is a kind alone, like web access", () => {
     expect(isCapabilityKey(VISUALIZE)).toBe(true);
     expect(serverOf(VISUALIZE)).toBeNull();

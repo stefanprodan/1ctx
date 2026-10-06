@@ -60,6 +60,9 @@ const EXPECTED_IDS = [
   "0046-azure",
   "0047-decision-usage-decider",
   "0048-agent-listed-as",
+  "0049-email",
+  "0050-user-links",
+  "0051-agent-email",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -68,7 +71,7 @@ const KEPT_COLUMNS =
 
 // columns a later migration adds, left out where a test compares rows
 // from before its own migration with rows after every migration
-const LATER_COLUMNS = ["listed_as"];
+const LATER_COLUMNS = ["listed_as", "email_placeholder", "email_from_agents"];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
     Object.fromEntries(
@@ -939,6 +942,8 @@ describe("the schema", () => {
       { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
       { name: "visualize", enabled: 1, provider: null, updated_at: 0 },
       { name: "web", enabled: 1, provider: null, updated_at: 0 },
+      // off until an admin turns it on
+      { name: "email_user", enabled: 0, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -1503,6 +1508,163 @@ describe("the schema", () => {
     }
   });
 
+  test("0049 marks the project's domain and adds an empty outbox", () => {
+    const db = seed(MIGRATIONS.slice(0, 48));
+    try {
+      db.exec(`
+        insert into users (id, username, full_name, email, role,
+            password_hash, created_at)
+          values ('ad', 'root', 'Admin', 'admin@1ctx.dev', 'admin', 'x', 0),
+            ('b', 'bea', 'Bea', 'bea@1ctx.dev', 'member', 'x', 0),
+            ('c', 'cai', 'Cai', 'someone@1ctx.dev', 'member', 'x', 0),
+            ('d', 'dan', 'Dan', 'dan@team.1ctx.dev', 'member', 'x', 0);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0049-email"));
+      expect(
+        db.query("select id, email_placeholder from users order by id").all(),
+      ).toEqual([
+        { id: "ad", email_placeholder: 1 },
+        { id: "b", email_placeholder: 1 },
+        { id: "c", email_placeholder: 1 },
+        { id: "d", email_placeholder: 0 },
+        { id: "u", email_placeholder: 0 },
+      ]);
+      expect(db.query("select count(*) as n from email_outbox").get()).toEqual({
+        n: 0,
+      });
+      expect(() =>
+        db.exec(`
+          insert into email_outbox (id, kind, user_id, message_id,
+              next_attempt_at, created_at, updated_at)
+            values ('o', 'spam', 'u', '<o@x>', 0, 0, 0)
+        `),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec(`
+          insert into smtp_settings (id, host, port, security,
+              from_address, public_address, updated_at)
+            values (2, 'h', 25, 'tls', 'a@b.c', 'https://x', 0)
+        `),
+      ).toThrow(/CHECK/);
+      // a chat's delete keeps its sent rows for the project's cap, and
+      // finds them by index, never a scan
+      db.exec(`
+        insert into email_outbox (id, kind, user_id, project_id, session_id,
+            message_id, status, next_attempt_at, created_at, updated_at)
+          values ('o', 'agent', 'u', 'p', 'sess', '<o@x>', 'sent', 0, 0, 0)
+      `);
+      // the lookup a parent's delete runs, a bound key as SQLite binds it
+      const plan = (column: string) =>
+        db
+          .query<{ detail: string }, [string]>(
+            `explain query plan select 1 from email_outbox where ${column} = ?`,
+          )
+          .all("x")
+          .map((row) => row.detail)
+          .join("; ");
+      expect(plan("session_id")).toMatch(
+        /^SEARCH email_outbox USING (COVERING )?INDEX email_outbox_session/,
+      );
+      expect(plan("project_id")).toMatch(
+        /^SEARCH email_outbox USING (COVERING )?INDEX email_outbox_project/,
+      );
+      db.exec("delete from sessions where id = 'sess'");
+      expect(
+        db
+          .query("select session_id, project_id, status from email_outbox")
+          .all(),
+      ).toEqual([{ session_id: null, project_id: "p", status: "sent" }]);
+      // the sender's and the caps' reads search an index, and the claim
+      // needs no sort of its own
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail);
+      expect(
+        plans(
+          `select * from email_outbox
+           where status = 'queued' and next_attempt_at <= ?
+             and (claimed_at is null or claimed_at <= ?)
+           order by next_attempt_at, created_at limit 1`,
+          1,
+          1,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING INDEX email_outbox_due (status=? AND next_attempt_at<?)",
+      ]);
+      for (const sql of [
+        `delete from email_outbox where user_id = ? and status = 'queued'
+         and kind in (?, ?) and asked = 0`,
+        `update email_outbox set status = 'dropped' where user_id = ?
+         and status = 'queued' and kind in (?, ?) and asked = 1`,
+      ]) {
+        expect(plans(sql, "u", "reset", "signin")).toEqual([
+          "SEARCH email_outbox USING INDEX email_outbox_queued (user_id=? AND kind=?)",
+        ]);
+      }
+      expect(
+        plans(
+          `select count(*) as n from email_outbox
+           where user_id = ? and kind = ? and status = 'queued'`,
+          "u",
+          "signin",
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_queued (user_id=? AND kind=?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where automation_id = ? and created_at >= ?`,
+          "x",
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_automation (automation_id=? AND created_at>?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where asked = 1 and user_id = ? and created_at >= ?`,
+          "u",
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked (user_id=? AND created_at>?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where asked = 1 and created_at >= ?`,
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked_at (created_at>?)",
+      ]);
+      // an alert row goes with its automation, whose cap is gone with it
+      db.exec(`
+        insert into automations (id, project_id, owner_id, agent_id, name,
+            instructions, schedule, tz, retention_days, created_at,
+            updated_at)
+          values ('au', 'p', 'u', 'a', 'daily', 'do', '0 9 * * *', 'UTC', 7,
+            0, 0);
+        insert into email_outbox (id, kind, user_id, project_id,
+            automation_id, message_id, next_attempt_at, created_at,
+            updated_at)
+          values ('al', 'alert', 'u', 'p', 'au', '<al@x>', 0, 0, 0);
+        delete from automations where id = 'au';
+      `);
+      expect(db.query("select id from email_outbox").all()).toEqual([
+        { id: "o" },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0048 keeps the model id of agents on a dedicated wire", () => {
     const db = seed(MIGRATIONS.slice(0, 47));
     try {
@@ -1515,8 +1677,22 @@ describe("the schema", () => {
           values ('b', 'sol', 'az', 'gpt-6.1-sol', 'gpt-6.1-sol', 5),
             ('c', 'prod', 'az', 'prod-sol', 'prod-sol (gpt-6.1-sol)', 5),
             ('d', 'flash', 'ge', 'gemini-3.8-flash', 'Gemini 3.8 Flash', 5);
+        update tools set enabled = 0, updated_at = 7 where name = 'webfetch';
+        update tools set provider = 'tavily', updated_at = 8
+          where name = 'websearch';
+        update tools set hosts = '["a.test","b.test"]', mode = 'listed',
+          updated_at = 9 where name = 'web';
       `);
+      const tools = db.query("select * from tools order by rowid").all();
       expect(migrate(db)).toEqual(expectedFrom("0048-agent-listed-as"));
+      // 0051 rebuilds tools: every row and field an admin set is kept
+      expect(
+        db
+          .query(
+            "select * from tools where name != 'email_user' order by rowid",
+          )
+          .all(),
+      ).toEqual(tools);
       expect(
         db.query("select id, listed_as from agents order by id").all(),
       ).toEqual([
@@ -1603,6 +1779,8 @@ describe("the schema", () => {
               attention_round: ___,
               memory_from: ____,
               listed_as: _____,
+              email_placeholder: ______,
+              email_from_agents: _______,
               ...rest
             }) => rest,
           ),
@@ -2642,13 +2820,13 @@ test("a test's memory database is a fresh migrate", () => {
   const first = memoryDb();
   const second = memoryDb();
   try {
-    // a full migrate leaves the web access row beside the three tool rows
+    // a full migrate leaves the web access row beside the tool rows
     expect(
       fresh
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch", "visualize", "web"]);
+    ).toEqual(["webfetch", "websearch", "visualize", "web", "email_user"]);
     expect(state(first)).toEqual(state(fresh));
     first.exec("create table scratch (a int)");
     expect(state(second)).toEqual(state(fresh));

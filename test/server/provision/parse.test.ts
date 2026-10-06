@@ -12,6 +12,7 @@ import {
   type Kind,
   parse,
   preflight,
+  type SmtpLogin,
   type Source,
 } from "../../../src/server/provision/parse.ts";
 import {
@@ -26,6 +27,7 @@ const fixture = async (name: string): Promise<Source> => ({
 });
 const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
+  SmtpServer: [],
   Project: [],
   Credential: [],
   Repository: [],
@@ -413,6 +415,81 @@ describe("provision preflight", () => {
       check(docs, { [kind]: [name] });
     },
   );
+
+  test("one SmtpServer per instance, whole when new, its key file present", () => {
+    const smtp = {
+      host: "SMTP.people.test",
+      port: 465,
+      security: "tls",
+      username: "api_token",
+      keyFrom: "email-relay",
+      fromAddress: "1ctx@people.test",
+      publicAddress: "https://1ctx.people.test/",
+    };
+    const [doc] = parse([source("SmtpServer", "relay", smtp)]);
+    expect(doc?.spec).toEqual({
+      ...smtp,
+      host: "smtp.people.test",
+      publicAddress: "https://1ctx.people.test",
+    });
+    expect(() =>
+      parse([
+        source("SmtpServer", "relay", smtp),
+        source("SmtpServer", "other", smtp),
+      ]),
+    ).toThrow("one SmtpServer object per instance");
+    expect(() =>
+      parse([
+        source("SmtpServer", "relay", { ...smtp, publicAddress: "http://x" }),
+      ]),
+    ).toThrow("spec.publicAddress");
+    expect(() =>
+      check(parse([source("SmtpServer", "relay", { port: 587 })])),
+    ).toThrow("spec.host is required for a new object");
+    // any name updates the server held
+    expect(() =>
+      check(parse([source("SmtpServer", "other", { port: 587 })]), {
+        SmtpServer: ["smtp"],
+      }),
+    ).not.toThrow();
+    expect(() => check([doc!])).toThrow(
+      "spec.keyFrom secret email-relay.key is missing or empty",
+    );
+    const { keyFrom: _, ...nameOnly } = smtp;
+    expect(() =>
+      check(parse([source("SmtpServer", "relay", nameOnly)])),
+    ).toThrow("spec.keyFrom is required with spec.username");
+  });
+
+  test("an SmtpServer update keeps the held login whole", () => {
+    const update = (spec: object, held: SmtpLogin) =>
+      preflight(
+        parse([source("SmtpServer", "relay", spec)]),
+        inventory({ SmtpServer: ["smtp"] }),
+        () => "secret-pass",
+        web,
+        noDocs,
+        creds,
+        held,
+      );
+    const none = { username: null, keyName: null };
+    const login = { username: "api_token", keyName: "email-relay" };
+    expect(() => update({ username: "api_token" }, none)).toThrow(
+      "SmtpServer/relay: spec.keyFrom is required with spec.username",
+    );
+    expect(() => update({ keyFrom: "email-relay" }, none)).toThrow(
+      "spec.username is required with spec.keyFrom",
+    );
+    expect(() => update({ username: null }, login)).toThrow(
+      "spec.username is required with spec.keyFrom",
+    );
+    // a half the document omits is the held one
+    expect(() => update({ username: "other" }, login)).not.toThrow();
+    expect(() => update({ port: 587 }, login)).not.toThrow();
+    expect(() =>
+      update({ username: null, keyFrom: null }, login),
+    ).not.toThrow();
+  });
 
   test("a Decider names a provider that exists or is in the input", () => {
     const docs = parse([

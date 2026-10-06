@@ -38,6 +38,9 @@ const section = (
       knowledge={{ live: true, on: true, reason: null }}
       knowledgeOn={knowledgeOn}
       onKnowledge={() => {}}
+      email={null}
+      emailOn
+      onEmail={() => {}}
       servers={[]}
       mcpOff={[]}
       onServer={() => {}}

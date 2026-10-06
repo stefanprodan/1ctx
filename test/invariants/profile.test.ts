@@ -9,6 +9,7 @@ import { PASSWORD_LIMIT } from "../../src/server/access/profile.ts";
 import { subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import { testApp } from "../helpers/app.ts";
+import { SMTP } from "../helpers/links.ts";
 
 describe("GET /api/profile", () => {
   test("answers the signed-in user's row without the hash", async () => {
@@ -29,7 +30,11 @@ describe("GET /api/profile", () => {
         createdAt: app.now.value,
         disabled: false,
         mustChangePassword: false,
+        // the first admin's address is made up
+        emailPlaceholder: true,
+        emailFromAgents: false,
       },
+      emailOn: false,
     });
   });
 });
@@ -109,6 +114,7 @@ describe("POST /api/profile/password", () => {
       expect((await here.call("GET", "/api/me")).status).toBe(200);
       expect(await (await elsewhere.call("GET", "/api/me")).json()).toEqual({
         user: null,
+        emailOn: false,
       });
       expect((await app.client().login("admin", "hunter2-test")).status).toBe(
         401,
@@ -149,6 +155,7 @@ describe("POST /api/profile/password", () => {
     expect((await winner.call("GET", "/api/me")).status).toBe(200);
     expect(await (await loser.call("GET", "/api/me")).json()).toEqual({
       user: null,
+      emailOn: false,
     });
     expect((await app.client().login("admin", password)).status).toBe(200);
     expect((await app.client().login("admin", other)).status).toBe(401);
@@ -181,5 +188,51 @@ describe("POST /api/profile/password", () => {
     expect((await guess()).status).toBe(429);
     app.now.value += 61_000;
     expect((await guess()).status).toBe(403);
+  });
+});
+
+describe("PUT /api/profile/email", () => {
+  test("turns email from agents on and off, and says when email is on", async () => {
+    const app = await testApp({ secrets: { "email-relay": "secret-pass" } });
+    await app.email.stop();
+    const client = app.client();
+    await client.login("admin", "hunter2-test");
+    const before = await (await client.call("GET", "/api/profile")).json();
+    expect(before.emailOn).toBe(false);
+    expect(before.user.emailFromAgents).toBe(false);
+
+    expect(
+      (await client.call("PUT", "/api/admin/smtp", { body: SMTP })).status,
+    ).toBe(200);
+    const on = await client.call("PUT", "/api/profile/email", {
+      body: { fromAgents: true },
+    });
+    expect(on.status).toBe(200);
+    expect(await on.json()).toMatchObject({
+      emailOn: true,
+      user: { emailFromAgents: true },
+    });
+    const id = app.users.byUsername("admin")!.id;
+    expect(app.users.byId(id)!.emailFromAgents).toBe(true);
+
+    const off = await client.call("PUT", "/api/profile/email", {
+      body: { fromAgents: false },
+    });
+    expect((await off.json()).user.emailFromAgents).toBe(false);
+    expect(app.users.byId(id)!.emailFromAgents).toBe(false);
+  });
+
+  test("takes a boolean and nothing else", async () => {
+    const app = await testApp();
+    const client = app.client();
+    await client.login("admin", "hunter2-test");
+    for (const body of [
+      {},
+      { fromAgents: "yes" },
+      { fromAgents: true, x: 1 },
+    ]) {
+      const res = await client.call("PUT", "/api/profile/email", { body });
+      expect(res.status).toBe(400);
+    }
   });
 });

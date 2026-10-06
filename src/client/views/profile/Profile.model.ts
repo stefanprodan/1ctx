@@ -5,6 +5,7 @@
 // server applies, so a slip is caught without a round trip, and the
 // server's word is still the last.
 
+import type { Profile } from "../../../shared/contracts/user.ts";
 import {
   isFullName,
   MAX_ABOUT,
@@ -67,4 +68,13 @@ export function passwordProblem(
     return "The new password is the same as the current one";
   if (again !== next) return "The two new passwords differ";
   return null;
+}
+
+// where email from agents goes, or why none can
+export function emailSectionText(
+  user: Pick<Profile, "email" | "emailPlaceholder">,
+): string {
+  return user.emailPlaceholder
+    ? "Your account has no real email. Ask an admin to set one."
+    : `Sent to ${user.email}.`;
 }

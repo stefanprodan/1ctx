@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// the signed-in user's own page and password change
+// the signed-in user's own page, password change and email from agents
 
 import type { ProfileResponse } from "../../shared/api/profile.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -12,7 +12,12 @@ import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { profile, type UserRow, verifyPassword } from "../users/index.ts";
-import { parsePasswordChange, parseProfile } from "./parse.ts";
+import type { Links } from "./links.ts";
+import {
+  parseEmailSettings,
+  parsePasswordChange,
+  parseProfile,
+} from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 import type { LoginStore } from "./store.ts";
 
@@ -26,12 +31,16 @@ export type UsersPort = {
   setPasswordHash(id: string, hash: string): void;
   hashPassword(password: string): Promise<string>;
   setMustChangePassword(id: string, required: boolean): void;
+  setEmailFromAgents(id: string, on: boolean): void;
 };
 
 export type ProfileDeps = {
   db: Db;
   logins: LoginStore;
   users: UsersPort;
+  links: Pick<Links, "revoke" | "notice">;
+  // the page offers the switch only while email is on
+  email: { enabled(): boolean };
   clock: Clock;
   log: Log;
 };
@@ -44,6 +53,10 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
     if (user === null) throw new Unauthorized("signed out");
     return user;
   };
+  const answer = (user: UserRow): ProfileResponse => ({
+    user: profile(user),
+    emailOn: deps.email.enabled(),
+  });
   return [
     {
       method: "GET",
@@ -51,9 +64,7 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
       policy: "authenticated",
       passwordChange: true,
       handle(_req, ctx) {
-        const body: ProfileResponse = {
-          user: profile(self(ctx.principal!.userId)),
-        };
+        const body = answer(self(ctx.principal!.userId));
         return json(body);
       },
     },
@@ -73,8 +84,22 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           deps.users.setTz(id, details.tz);
           return { result: self(id) };
         });
-        const body: ProfileResponse = { user: profile(user) };
+        const body = answer(user);
         return json(body);
+      },
+    },
+    {
+      method: "PUT",
+      path: "/api/profile/email",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const { fromAgents } = parseEmailSettings(await jsonBody(req));
+        const id = ctx.principal!.userId;
+        const user = transact(deps.db, () => {
+          deps.users.setEmailFromAgents(id, fromAgents);
+          return { result: self(id) };
+        });
+        return json(answer(user));
       },
     },
     {
@@ -100,13 +125,19 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           deps.users.setPasswordHash(user.id, hash);
           deps.users.setMustChangePassword(user.id, false);
           const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
+          // a link asked for before the change would undo it
+          deps.links.revoke(user.id);
+          const changed = self(user.id);
           return {
-            result: self(user.id),
-            events: revoked > 0 ? [loginRevoked(user.id, null)] : [],
+            result: changed,
+            events: [
+              ...(revoked > 0 ? [loginRevoked(user.id, null)] : []),
+              ...deps.links.notice(changed, "changed", ctx.address),
+            ],
           };
         });
         deps.log.info("password changed", { user: user.username });
-        const body: ProfileResponse = { user: profile(updated) };
+        const body = answer(updated);
         return json(body);
       },
     },

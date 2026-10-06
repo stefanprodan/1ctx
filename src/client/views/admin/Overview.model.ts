@@ -4,6 +4,7 @@
 import type {
   AttentionItem,
   AttentionKind,
+  AttentionResponse,
   LoadResponse,
   OverviewDay,
   OverviewResponse,
@@ -17,6 +18,7 @@ import {
   dayMonth,
   elapsed,
   money,
+  plural,
   pluralCommas,
   share,
   size,
@@ -27,6 +29,7 @@ import {
   configMcpHref,
   configProviderHref,
   configSkillHref,
+  SMTP_HREF,
   WEB_HREF,
 } from "../../lib/hrefs.ts";
 
@@ -225,8 +228,10 @@ const ATTENTION: Record<
   {
     what: string;
     line: string;
-    icon: "mcp" | "skill" | "key";
+    icon: "mcp" | "skill" | "key" | "email";
     href: (name: string) => string;
+    // the name is a phrase, not an object's name, so it is not mono
+    phrase?: boolean;
   }
 > = {
   "provider-key": {
@@ -259,6 +264,25 @@ const ATTENTION: Record<
     line: "key file missing",
     href: () => WEB_HREF,
   },
+  "smtp-key": {
+    icon: "key",
+    what: "SMTP",
+    line: "key file missing",
+    href: () => SMTP_HREF,
+  },
+  "links-paused": {
+    icon: "email",
+    what: "Email",
+    line: "capped for this hour",
+    href: () => SMTP_HREF,
+    phrase: true,
+  },
+  "email-failed": {
+    icon: "email",
+    what: "Email",
+    line: "failed",
+    href: () => SMTP_HREF,
+  },
   "mcp-refresh": {
     icon: "mcp",
     what: "MCP Server",
@@ -273,14 +297,36 @@ const ATTENTION: Record<
   },
 };
 
-export function attentionRow(item: AttentionItem, now: number) {
+// a failed email is named by its word, with the outbox's counts
+function emailLine(
+  at: number,
+  now: number,
+  email: AttentionResponse["email"],
+): string {
+  const failed = email?.failed ?? 1;
+  const queued = email?.queued ?? 0;
+  const line = `${plural(failed, "email")} failed, the last ${ago(at, now)}`;
+  return queued > 0 ? `${line}, ${count(queued)} queued` : line;
+}
+
+export function attentionRow(
+  item: AttentionItem,
+  now: number,
+  email: AttentionResponse["email"] = null,
+) {
   const words = ATTENTION[item.kind];
   return {
     key: `${item.kind}:${item.name}`,
     name: item.name,
-    line: item.at === null ? words.line : `${words.line} ${ago(item.at, now)}`,
+    line:
+      item.at === null
+        ? words.line
+        : item.kind === "email-failed"
+          ? emailLine(item.at, now, email)
+          : `${words.line} ${ago(item.at, now)}`,
     what: words.what,
     icon: words.icon,
+    mono: words.phrase !== true,
     href: words.href(item.name),
   };
 }

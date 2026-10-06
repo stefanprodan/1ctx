@@ -99,6 +99,7 @@ describe("tools administration", () => {
     expect(Object.keys(body).sort()).toEqual([
       "access",
       "builtin",
+      "emailUser",
       "search",
       "visualize",
     ]);

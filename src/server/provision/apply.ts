@@ -35,6 +35,7 @@ import {
 import { decider } from "./decider.ts";
 import { type Document, KINDS, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
+import { applySmtpServer } from "./smtp.ts";
 
 export type Secret = (kind: SecretKind, name: string) => string | null;
 
@@ -391,6 +392,7 @@ async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
         web: found.access,
         websearch: found.search,
         visualize: found.visualize,
+        email_user: found.emailUser,
       }[doc.name]
     : null;
   if (!before) throw new Error("no such tool");
@@ -413,6 +415,9 @@ export async function apply(
         switch (doc.kind) {
           case "User":
             action = await user(api, doc, secret);
+            break;
+          case "SmtpServer":
+            action = await applySmtpServer(api, doc);
             break;
           case "Project": {
             const made = await project(api, doc);

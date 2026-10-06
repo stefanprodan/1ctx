@@ -11,6 +11,7 @@
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import {
   credentialOf,
+  EMAIL,
   KNOWLEDGE,
   repoOf,
   serverOf,
@@ -317,6 +318,7 @@ export function draftOf(
       web: true,
       visuals: true,
       knowledge: true,
+      email: true,
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
@@ -339,6 +341,7 @@ export function draftOf(
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
+    email: !a.disabledCapabilities.includes(EMAIL),
     mcpOff: a.disabledCapabilities.filter((key) => serverOf(key) !== null),
     skillsOff: a.disabledCapabilities.filter((key) => skillOf(key) !== null),
     credentialsOff: a.disabledCapabilities.filter(

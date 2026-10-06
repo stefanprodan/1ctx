@@ -29,6 +29,8 @@ const user: UserRow = {
   createdAt: 1,
   disabled: false,
   mustChangePassword: false,
+  emailPlaceholder: false,
+  emailFromAgents: false,
   agentId: null,
 };
 

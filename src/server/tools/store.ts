@@ -2,11 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { WebAccessMode } from "../../shared/web.ts";
-import type { SearchProvider, WebTool } from "../../shared/words.ts";
+import type {
+  EMAIL_TOOL,
+  SearchProvider,
+  WebTool,
+} from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 
+// a row per web tool, the web's own and email_user's
+type RowName = WebTool | "web" | typeof EMAIL_TOOL;
+
 export type ToolRow = {
-  name: WebTool | "web";
+  name: RowName;
   enabled: boolean;
   provider: SearchProvider | null;
   hosts: string[];
@@ -15,7 +22,7 @@ export type ToolRow = {
 };
 
 type Raw = {
-  name: WebTool | "web";
+  name: RowName;
   enabled: number;
   provider: SearchProvider | null;
   hosts: string;
@@ -69,7 +76,11 @@ export class ToolStore {
       .run(mode, JSON.stringify(domains), now);
   }
 
-  setEnabled(name: WebTool, enabled: boolean, now: number): void {
+  setEnabled(
+    name: WebTool | typeof EMAIL_TOOL,
+    enabled: boolean,
+    now: number,
+  ): void {
     this.db
       .query("update tools set enabled = ?, updated_at = ? where name = ?")
       .run(enabled ? 1 : 0, now, name);

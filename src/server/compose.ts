@@ -9,7 +9,11 @@
 
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
-import { MCP_KEY_PREFIX, type SecretKind } from "../shared/words.ts";
+import {
+  EMAIL_KEY_PREFIX,
+  MCP_KEY_PREFIX,
+  type SecretKind,
+} from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
@@ -17,6 +21,12 @@ import { type BashArea, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
+import {
+  type Email,
+  type EmailSender,
+  emailArea,
+  smtpSender,
+} from "./email/index.ts";
 import {
   acquireProcess,
   type KnowledgeArea,
@@ -110,6 +120,8 @@ export type ComposeOptions = {
   passwordCost?: PasswordCost;
   // the cores the send caps are sized by; a test passes a fixed number
   cores?: number;
+  // what reaches the SMTP server; a test passes a fake that records
+  emailSender?: EmailSender;
 };
 
 export type App = {
@@ -134,6 +146,7 @@ export type App = {
   chat: Providers["chat"];
   // the one way a user is made: with its personal project
   createUser: Users["createUser"];
+  email: Email;
   runner: Runner;
   socket: Socket;
   routes: RouteDescriptor[];
@@ -141,9 +154,11 @@ export type App = {
   provision: Provision;
   repaired: number;
   reconciled: number;
-  // drop expired logins and sweep the chats; called at start and every
-  // hour; the rows removed, not the chats swept
+  // drop expired logins and links and sweep the chats; called at start
+  // and every hour; the rows removed, not the chats swept
   sweep(): number;
+  // the work a link ask left after its 202
+  linkAsks(): Promise<void>;
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
@@ -157,7 +172,13 @@ export type App = {
   shutdown(cut?: Promise<void>): Promise<ShutdownResult & DrainResult>;
 };
 
-const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
+const SCRUB_KINDS: SecretKind[] = [
+  "provider-",
+  "search-",
+  "mcp-",
+  "http-",
+  "email-",
+];
 
 export function scrubbedLogs(
   options: Pick<ComposeOptions, "secret" | "secretNames" | "log">,
@@ -190,6 +211,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
+  });
+  const email = emailArea({
+    db,
+    clock,
+    log: log("email"),
+    secret: (name) => secret(EMAIL_KEY_PREFIX, name),
+    keys: () => options.secretNames?.(EMAIL_KEY_PREFIX) ?? [],
+    users,
+    emailSender: options.emailSender ?? smtpSender(),
   });
   // the instance's start, as the overview reports it
   const startedAt = clock();
@@ -304,6 +334,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     capabilities,
     repos: { usingKeys: () => repos.usingKeys() },
   });
+  // who an agent's email or an alert may reach: a user who can open the
+  // project, so no email tells anyone what the app would not show them
+  const canOpen = (userId: string, projectId: string) =>
+    access.visibleProjectIds(userId)?.includes(projectId) ?? false;
+  const outbox = {
+    enabled: () => email.enabled(),
+    link: (path: string) => email.link(path),
+    enqueue: email.enqueue,
+    register: email.register,
+  };
   const access: Access = accessArea({
     db,
     clock,
@@ -318,6 +358,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     activity: { personDays: (...args) => sessions.personDays(...args) },
     presence: { onlineUserIds: () => socket.onlineUserIds() },
+    email,
   });
   agents = agentsArea({
     db,
@@ -416,6 +457,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
       visuals: (since, until) => sessions.visualCounts(since, until),
       web: (since, until) => sessions.webCounts(since, until),
     },
+    email: {
+      enabled: outbox.enabled,
+      outbox: {
+        ...outbox,
+        countSession: (sessionId, kind, since) =>
+          email.store.countSession(sessionId, kind, since),
+        countProject: (projectId, kind, since) =>
+          email.store.countProject(projectId, kind, since),
+      },
+      users,
+      canOpen,
+      projects: projects.store,
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
@@ -491,6 +545,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner,
     markAttention: (sessionId, attention, by) =>
       sessions.markAttention(sessionId, attention, by),
+    email: {
+      outbox: {
+        ...outbox,
+        countAlerts: (automationId, since) =>
+          email.store.countAlerts(automationId, since),
+      },
+      canOpen,
+    },
     deciderOn: () => {
       const decision = deciders.decision("run-attention");
       const named =
@@ -540,6 +602,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           provider: search,
           hasKey: keyed("search-", search === null ? null : `search-${search}`),
         },
+        email: email.attention(),
       };
     },
     // built here, at the compile root, so the binary finds its entry
@@ -558,10 +621,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
+    email.start();
   }
   const routes: RouteDescriptor[] = [
     ...usage.routes,
     ...limits.routes,
+    ...email.routes,
     ...providers.routes,
     ...deciders.routes,
     ...mcp.routes,
@@ -598,6 +663,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
       docs: knowledge.store,
     }),
     credentials: { key: credentials.keyState, list: credentials.bindings },
+    smtp: () => {
+      const held = email.settings();
+      return held && { username: held.username, keyName: held.keyName };
+    },
     inventory: () =>
       inventoryOf({
         users,
@@ -609,6 +678,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         skills: skills.store,
         mcp: mcp.store,
         agents: agents.store,
+        email,
       }),
   });
   const sweepLog = log("sweep");
@@ -632,6 +702,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     catalogs: providers.catalogs,
     chat: providers.chat,
     createUser: users.createUser,
+    email,
     runner,
     socket,
     routes,
@@ -642,6 +713,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sweep: () => {
       try {
         const logins = access.sweep();
+        const links = access.sweepLinks();
         const visits = access.sweepVisits();
         const now = clock();
         const knowledgeRows = knowledge.sweep(now);
@@ -652,16 +724,26 @@ export async function compose(options: ComposeOptions): Promise<App> {
         // an idle chat archived may hold messages that now cannot start
         if (chats.chats_archived > 0) runner.queue.wake();
         const notSent = sessions.sweepNotSent(now);
+        const emailRows = email.sweep(now);
         const removed =
-          logins + visits + knowledgeRows + scratchRows + digests + notSent;
+          logins +
+          links +
+          visits +
+          knowledgeRows +
+          scratchRows +
+          digests +
+          notSent +
+          emailRows;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
+            links,
             visits,
             knowledge: knowledgeRows,
             bash: scratchRows,
             digests,
             not_sent: notSent,
+            emails: emailRows,
             removed,
             ...chats,
           });
@@ -672,6 +754,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         throw error;
       }
     },
+    linkAsks: () => access.settled(),
     mcpStart: () => mcp.start(),
     keptStart: () => sessions.kept.start(),
     packKept: () => sessions.kept.pass(),
@@ -684,6 +767,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       // first: from here every message is queued for the next start
       runner.queue.close();
       automations.drain();
+      // no row is taken from here; the one in flight ends below
+      const emailStopped = email.stop();
       repos.close();
       // no kept files batch starts from here; the wait below is for the
       // one in flight, its compression and its commit
@@ -696,6 +781,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
+      // a link ask answered before here writes its row; one after does
+      // nothing, since the listener still serves until the db closes
+      await access.closeLinks();
+      if (cut === undefined) await emailStopped;
+      else {
+        await Promise.race([emailStopped, cut]);
+        // a send the cut left in flight must not write once the db closes
+        email.halt();
+      }
+      email.dispose();
       await packing;
       overview.close();
       socket.dispose();

@@ -19,6 +19,7 @@ const none: AttentionInput = {
   skills: [],
   credentials: [],
   search: { provider: null, hasKey: false },
+  email: null,
 };
 
 describe("attention", () => {
@@ -41,6 +42,7 @@ describe("attention", () => {
         skills: [{ name: "plan", refreshFailedAt: null }],
         credentials: [{ name: "gh", key: "ok" }],
         search: { provider: null, hasKey: false },
+        email: null,
       }),
     ).toEqual([]);
   });
@@ -68,6 +70,7 @@ describe("attention", () => {
         { name: "gh", key: "missing" },
       ],
       search: { provider: "exa", hasKey: false },
+      email: null,
     });
     expect(items).toEqual([
       { kind: "provider-key", name: "alpha", at: null },
@@ -80,6 +83,29 @@ describe("attention", () => {
       { kind: "mcp-refresh", name: "github", at: 100 },
       { kind: "skill-refresh", name: "old", at: 50 },
     ]);
+  });
+});
+
+describe("email's attention", () => {
+  test("puts paused link emails after the key files", () => {
+    // paused only while email is on, so its key file is there
+    const email = {
+      keyName: "email-relay",
+      hasKey: true,
+      queued: 0,
+      failed: 0,
+      lastFailure: null,
+      lastFailedAt: null,
+      linksPaused: true,
+    };
+    const search = { provider: "exa" as const, hasKey: false };
+    expect(attention({ ...none, search, email })).toEqual([
+      { kind: "search-key", name: "exa", at: null },
+      { kind: "links-paused", name: "Link emails", at: null },
+    ]);
+    expect(
+      attention({ ...none, email: { ...email, linksPaused: false } }),
+    ).toEqual([]);
   });
 });
 

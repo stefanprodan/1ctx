@@ -35,7 +35,7 @@ import type {
   SearchState,
 } from "../../../src/shared/contracts/tool.ts";
 import type { WebAccess as Access } from "../../../src/shared/web.ts";
-import { admin } from "../../helpers/client-fixtures.ts";
+import { admin, emailUser } from "../../helpers/client-fixtures.ts";
 
 const tool = (
   name: BuiltinToolSummary["name"],
@@ -73,6 +73,7 @@ const response = (
     hosts: [],
     updatedAt: 0,
   },
+  emailUser: emailUser(),
 });
 
 const limit = (changes: Partial<LimitRow>): LimitRow => ({

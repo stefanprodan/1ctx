@@ -22,6 +22,7 @@ const repository = (name: string, spec: Record<string, unknown> = {}) =>
 
 const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   User: [],
+  SmtpServer: [],
   Project: ["platform", "finops"],
   Credential: [],
   Repository: [],

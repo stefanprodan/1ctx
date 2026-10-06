@@ -4,6 +4,7 @@
 import type { AdminUser } from "../../src/shared/api/users.ts";
 import type { DeciderSummary } from "../../src/shared/contracts/decider.ts";
 import type { ProviderSummary } from "../../src/shared/contracts/provider.ts";
+import type { EmailToolSummary } from "../../src/shared/contracts/tool.ts";
 import type { Me } from "../../src/shared/contracts/user.ts";
 
 export const admin = (over: Partial<Me> = {}): Me => ({
@@ -17,10 +18,11 @@ export const admin = (over: Partial<Me> = {}): Me => ({
 
 export const user = (over: Partial<AdminUser> = {}): AdminUser => ({
   ...admin(),
-  email: "admin@1ctx.dev",
+  email: "admin@example.test",
   tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
+  emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: [],
   ...over,
@@ -50,5 +52,20 @@ export const decider = (
   promptPrice: 0.04,
   default: true,
   createdAt: 0,
+  ...over,
+});
+
+// email_user as GET /api/tools answers it: off, email not set up
+export const emailUser = (
+  over: Partial<EmailToolSummary> = {},
+): EmailToolSummary => ({
+  name: "email_user",
+  description: "Email users who can open this chat or run, by username.",
+  parameters: {},
+  parametersHtml: "",
+  tokens: 150,
+  enabled: false,
+  emailOn: false,
+  updatedAt: 0,
   ...over,
 });

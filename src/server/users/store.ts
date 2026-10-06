@@ -32,6 +32,12 @@ export type UserFields = {
   now: number;
 };
 
+// the project's own domain: a seeded or bootstrapped user's address,
+// never an inbox, so email never goes to it
+export const PLACEHOLDER_DOMAIN = "1ctx.dev";
+export const isPlaceholderEmail = (email: string): boolean =>
+  email.slice(email.lastIndexOf("@") + 1) === PLACEHOLDER_DOMAIN;
+
 type Raw = {
   id: string;
   username: string;
@@ -45,6 +51,8 @@ type Raw = {
   disabled: number;
   must_change_password: number;
   agent_id: string | null;
+  email_placeholder: number;
+  email_from_agents: number;
 };
 
 const row = (raw: Raw): UserRow => ({
@@ -59,6 +67,8 @@ const row = (raw: Raw): UserRow => ({
   createdAt: raw.created_at,
   disabled: raw.disabled !== 0,
   mustChangePassword: raw.must_change_password !== 0,
+  emailPlaceholder: raw.email_placeholder !== 0,
+  emailFromAgents: raw.email_from_agents !== 0,
   agentId: raw.agent_id,
 });
 
@@ -81,11 +91,13 @@ export const account = (user: UserRow): UserAccount => ({
   createdAt: user.createdAt,
   disabled: user.disabled,
   mustChangePassword: user.mustChangePassword,
+  emailPlaceholder: user.emailPlaceholder,
 });
 
 export const profile = (user: UserRow): Profile => ({
   ...account(user),
   about: user.about,
+  emailFromAgents: user.emailFromAgents,
 });
 
 export class UserStore {
@@ -139,8 +151,8 @@ export class UserStore {
       .query(
         `insert into users
           (id, username, full_name, email, about, role, tz, password_hash,
-           must_change_password, disabled, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           must_change_password, disabled, email_placeholder, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -153,6 +165,7 @@ export class UserStore {
         fields.passwordHash,
         fields.mustChangePassword ? 1 : 0,
         fields.disabled ? 1 : 0,
+        isPlaceholderEmail(fields.email) ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -171,7 +184,9 @@ export class UserStore {
   }
 
   setEmail(id: string, email: string): void {
-    this.db.query("update users set email = ? where id = ?").run(email, id);
+    this.db
+      .query("update users set email = ?, email_placeholder = ? where id = ?")
+      .run(email, isPlaceholderEmail(email) ? 1 : 0, id);
   }
 
   setTz(id: string, tz: string): void {
@@ -198,6 +213,12 @@ export class UserStore {
     this.db
       .query("update users set disabled = ? where id = ?")
       .run(disabled ? 1 : 0, id);
+  }
+
+  setEmailFromAgents(id: string, on: boolean): void {
+    this.db
+      .query("update users set email_from_agents = ? where id = ?")
+      .run(on ? 1 : 0, id);
   }
 
   setMustChangePassword(id: string, required: boolean): void {

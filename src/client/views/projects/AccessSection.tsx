@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The task editor's Access step: one list of switches, the web with
-// the project's credentials after it, visuals, the project docs, then
+// the project's credentials after it, visuals, the project docs, email
+// while the instance offers it, then
 // the picked agent's MCP servers and skills, and the project's
 // repositories. Each row's meta says what it is, a repository's the ref
 // it follows. A switch that cannot be flipped is off and faint, its meta
@@ -77,6 +78,9 @@ export function AccessSection({
   knowledge,
   knowledgeOn,
   onKnowledge,
+  email,
+  emailOn,
+  onEmail,
   servers,
   mcpOff,
   onServer,
@@ -103,6 +107,10 @@ export function AccessSection({
   // the draft has the project docs on
   knowledgeOn: boolean;
   onKnowledge: () => void;
+  // null while the instance does not offer email
+  email: WebItem | null;
+  emailOn: boolean;
+  onEmail: () => void;
   // the picked agent's servers, none when its model takes no tools
   servers: readonly SwitchableServer[];
   mcpOff: readonly string[];
@@ -163,6 +171,19 @@ export function AccessSection({
       knowledgeOn,
       onKnowledge,
     ),
+    ...(email === null
+      ? []
+      : [
+          builtin(
+            "email",
+            "Email",
+            "email",
+            "the email_user tool",
+            email,
+            emailOn,
+            onEmail,
+          ),
+        ]),
     ...servers.map((server) => {
       const key = mcpKey(server.id);
       return {

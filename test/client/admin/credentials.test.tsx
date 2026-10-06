@@ -45,7 +45,10 @@ import type {
   HttpMethod,
 } from "../../../src/shared/contracts/credential.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
-import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
+import {
+  admin as adminFixture,
+  emailUser,
+} from "../../helpers/client-fixtures.ts";
 
 const admin = adminFixture({ fullName: "Admin" });
 
@@ -467,6 +470,7 @@ describe("the pages", () => {
         hosts: [],
         updatedAt: 0,
       },
+      emailUser: emailUser(),
     };
     const html = render(<CredentialList />);
     expect(html).toContain(

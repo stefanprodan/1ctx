@@ -20,6 +20,60 @@ export const ROLE_CHOICES: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
 ];
 
+// how a new user gets a first password: with email on, an invite by
+// default, so the admin never holds it
+export type FirstPassword = "invite" | "password";
+export const FIRST_PASSWORD_CHOICES: { value: FirstPassword; label: string }[] =
+  [
+    { value: "invite", label: "Send an invite" },
+    { value: "password", label: "Set a password" },
+  ];
+
+// what the new user form sends for the first password
+export function firstPasswordOf(
+  emailOn: boolean,
+  pick: FirstPassword,
+  password: string,
+): { invite: true } | { password: string } {
+  return emailOn && pick === "invite" ? { invite: true } : { password };
+}
+
+// the card that emails a user a link: an invite again while they have
+// not chosen a password, else a reset
+export function linkCardWords(user: UserAccount): {
+  kind: "invite" | "reset-link";
+  title: string;
+  line: string;
+  button: string;
+  sent: string;
+} {
+  const sent = `Sent to ${user.email}.`;
+  if (user.disabled) {
+    return {
+      kind: "reset-link",
+      title: "Reset password",
+      line: "Enable them first.",
+      button: "Send reset link",
+      sent,
+    };
+  }
+  return user.mustChangePassword
+    ? {
+        kind: "invite",
+        title: "Invite",
+        line: "Emails a new link to choose a password. The last one stops working.",
+        button: "Send invite",
+        sent,
+      }
+    : {
+        kind: "reset-link",
+        title: "Reset password",
+        line: `Emails ${user.fullName} a link to choose a new password. It works for 30 minutes.`,
+        button: "Send reset link",
+        sent,
+      };
+}
+
 // the server holds the username rule
 export function usernameProblem(value: string): string | null {
   return value.trim() === "" ? "Enter a username" : null;
@@ -62,8 +116,12 @@ export function userFieldOf(message: string): UserField | undefined {
   return undefined;
 }
 
-export function metaLine(user: UserAccount): string {
-  return `@${user.username} · ${user.email}`;
+// with email on a placeholder is never emailed, so it is not shown as
+// an address; with email off the page reads as it did before email
+export function metaLine(user: UserAccount, emailOn = false): string {
+  return `@${user.username} · ${
+    emailOn && user.emailPlaceholder ? "No real email" : user.email
+  }`;
 }
 
 function todayIn(tz: string, now: number): string {

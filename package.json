@@ -61,6 +61,7 @@
     "ipaddr.js": "2.2.0",
     "modern-tar": "0.8.5",
     "node-liblzma": "2.2.0",
+    "nodemailer": "10.0.15",
     "papaparse": "5.7.0",
     "preact": "10.29.8",
     "preact-render-to-string": "6.7.0",

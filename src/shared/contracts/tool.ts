@@ -10,6 +10,7 @@
 
 import {
   type BuiltinTool,
+  type EMAIL_TOOL,
   isRecord,
   type SearchProvider,
   type WebTool,
@@ -100,6 +101,15 @@ export type WebToolSummary = ToolSchema & {
   name: Extract<WebTool, "visualize">;
   enabled: boolean;
   hosts: string[];
+  updatedAt: number;
+};
+
+// email_user, off until an admin turns it on; no send is offered it
+// while email is not set up (emailOn), whatever enabled says
+export type EmailToolSummary = ToolSchema & {
+  name: typeof EMAIL_TOOL;
+  enabled: boolean;
+  emailOn: boolean;
   updatedAt: number;
 };
 

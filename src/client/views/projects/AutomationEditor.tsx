@@ -16,7 +16,7 @@ import type { AutomationSummary } from "../../../shared/contracts/automation.ts"
 import { RETENTION_DAYS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
-import { switchItem } from "../../composer/Add.model.ts";
+import { emailItem, switchItem } from "../../composer/Add.model.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   automationError,
@@ -145,12 +145,8 @@ function Editor({
   // the saved agent was deleted: no save until another is picked
   const gone = retiredPick(automation, d.agentId);
   const live = agents.filter((a) => retiredPick(automation, a.id) === null);
-  const kind = (key: string) =>
-    switchItem(key, {
-      tools: takesTools,
-      switchable: switchable.value,
-      off: false,
-    });
+  const input = { tools: takesTools, switchable: switchable.value, off: false };
+  const kind = (key: string) => switchItem(key, input);
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
       {!editable && (
@@ -260,6 +256,9 @@ function Editor({
         knowledge={kind(KNOWLEDGE)}
         knowledgeOn={d.knowledge}
         onKnowledge={() => set({ knowledge: !d.knowledge })}
+        email={emailItem(input)}
+        emailOn={d.email}
+        onEmail={() => set({ email: !d.email })}
         servers={takesTools ? shown().servers : []}
         mcpOff={d.mcpOff}
         onServer={(key) => set({ mcpOff: toggledId(d.mcpOff, key) })}

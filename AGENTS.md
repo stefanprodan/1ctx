@@ -10,7 +10,8 @@ them on schedules (automations), with shared knowledge and memory.
   official npm only, `bun install --ignore-scripts`. A new package needs
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
-  and only `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
+  only `server/email/smtp.ts` imports `nodemailer`, and only
+  `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
   patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
   and unknown types are not read as regular files, and cancelling an
   entry's body never drops the next entry's, which hung the stream;
@@ -116,9 +117,9 @@ since a relative URL inside the binary resolves against `src/server`.
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`) and fails
-every other. `chat.ts` drives a chat
-with a scripted provider stream. `auth-cases.ts` is the authorization
-matrix.
+every other, and a fake email sender that keeps every message. `smtp.ts`
+is a fake SMTP server on loopback. `chat.ts` drives a chat with a
+scripted provider stream. `auth-cases.ts` is the authorization matrix.
 
 ## Docs
 
@@ -130,17 +131,18 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
 | `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed), the admin pages |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
+| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
-| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
+| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
+| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

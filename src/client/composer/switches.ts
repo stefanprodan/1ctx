@@ -10,6 +10,7 @@
 import { useEffect, useRef } from "preact/hooks";
 import {
   CREDENTIAL,
+  EMAIL,
   KNOWLEDGE,
   MCP,
   MEMORY,
@@ -30,6 +31,7 @@ import {
 } from "../data/capabilities.ts";
 import {
   agentMoved,
+  emailItem,
   reposItem,
   serversItem,
   skillsItem,
@@ -68,12 +70,12 @@ export function useSwitches({
     if (agent !== null) lastAgent.current = agent;
   }, [chat, agent]);
   const offKey = (key: string) => isOff(chat, off, key);
-  const item = (key: string) =>
-    switchItem(key, {
-      tools: readable,
-      switchable: switchable.value,
-      off: offKey(key),
-    });
+  const input = (key: string) => ({
+    tools: readable,
+    switchable: switchable.value,
+    off: offKey(key),
+  });
+  const item = (key: string) => switchItem(key, input(key));
   const web = item(WEB);
   return {
     web,
@@ -85,6 +87,7 @@ export function useSwitches({
     visuals: item(VISUALIZE),
     knowledge: item(KNOWLEDGE),
     memory: item(MEMORY),
+    email: emailItem(input(EMAIL)),
     servers: serversItem({
       tools: readable,
       servers: (agent === null ? undefined : servers.value[agent]) ?? [],

@@ -132,7 +132,7 @@ export function App() {
   // one who must change the password they were handed lands on the
   // profile, where the server lets them go
   useEffect(() => {
-    if (!user) return;
+    if (!user || m?.route.bare) return;
     if (user.mustChangePassword) {
       if (m?.route.path !== "/profile") navigate("/profile", true);
       return;
@@ -142,6 +142,11 @@ export function App() {
     else if (m === null || m.route.path === "/login") navigate("/", true);
   }, [user, m, path.value]);
 
+  // a page an email links to reads the same signed in or not
+  if (m?.route.bare) {
+    const View = m.route.view;
+    return <View params={m.params} />;
+  }
   if (user === undefined) {
     // a public page needs nobody, so a slow or hanging first load does
     // not hold the sign-in form back

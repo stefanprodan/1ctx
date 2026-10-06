@@ -44,6 +44,7 @@ test("unknown and partial kinds are not secret kinds", () => {
     "search-",
     "mcp-",
     "http-",
+    "email-",
   ]);
   for (const kind of ["", "user", "webhook-", "unknown-", "provider-a"]) {
     expect(isSecretName(kind, `${kind}token`)).toBe(false);

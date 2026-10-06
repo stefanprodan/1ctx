@@ -43,6 +43,31 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
+    path: "/api/login/forgot",
+    body: { username: "nobody" },
+    // public; email is off in the matrix, so there is no such feature
+    expect: { anonymous: 404, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/login/link",
+    body: { username: "nobody" },
+    expect: { anonymous: 404, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/links/:token",
+    // public: no such link, a null link for everyone
+    expect: { anonymous: 200, member: 200, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/links/:token",
+    body: {},
+    expect: { anonymous: 404, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
     path: "/api/logout",
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
@@ -61,6 +86,12 @@ export const AUTH_CASES: AuthCase[] = [
     method: "PATCH",
     path: "/api/profile",
     body: { fullName: "Casey", about: "", tz: "UTC" },
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/profile/email",
+    body: { fromAgents: true },
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
@@ -120,6 +151,17 @@ export const AUTH_CASES: AuthCase[] = [
     path: "/api/users/:id/password",
     body: { password: "longenough" },
     expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/users/:id/reset-link",
+    // admin: email is off in the matrix
+    expect: { anonymous: 401, member: 403, admin: 409 },
+  },
+  {
+    method: "POST",
+    path: "/api/users/:id/invite",
+    expect: { anonymous: 401, member: 403, admin: 409 },
   },
   {
     method: "GET",
@@ -249,6 +291,32 @@ export const AUTH_CASES: AuthCase[] = [
     method: "DELETE",
     path: "/api/limits",
     expect: { anonymous: 401, member: 403, admin: 204 },
+  },
+  {
+    method: "GET",
+    path: "/api/admin/smtp",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/admin/smtp",
+    body: {
+      host: "smtp.example.test",
+      port: 465,
+      security: "tls",
+      username: null,
+      keyName: null,
+      fromAddress: "noreply@example.test",
+      fromName: "1ctx",
+      publicAddress: "https://1ctx.example.test",
+    },
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/admin/smtp/test",
+    // admin: the bootstrap admin's address is a placeholder
+    expect: { anonymous: 401, member: 403, admin: 409 },
   },
   {
     method: "GET",

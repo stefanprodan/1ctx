@@ -74,7 +74,10 @@ import type {
 import type { WebAccess } from "../../../src/shared/web.ts";
 import { deferred } from "../../helpers/async.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
-import { admin as adminFixture } from "../../helpers/client-fixtures.ts";
+import {
+  admin as adminFixture,
+  emailUser,
+} from "../../helpers/client-fixtures.ts";
 
 const admin = adminFixture();
 
@@ -224,6 +227,7 @@ const body = (visualize = fetchTool, web = access): ToolsResponse => ({
   access: web,
   search,
   visualize,
+  emailUser: emailUser(),
 });
 const search: SearchState = {
   provider: "exa",
@@ -678,6 +682,22 @@ describe("the Config board", () => {
     ).toBe(false);
     const hidden = body({ ...fetchTool, enabled: false });
     expect(offered(hidden.visualize, hidden)).toBe(false);
+    // email_user takes the admin's switch and a server set up
+    const email = (over: Partial<ToolsResponse["emailUser"]>) => ({
+      ...state,
+      emailUser: emailUser(over),
+    });
+    const on = email({ enabled: true, emailOn: true });
+    expect(offered(on.emailUser, on)).toBe(true);
+    expect(builtinsOf(on).map((t) => t.name)).toEqual([
+      "datetime",
+      "email_user",
+      "visualize",
+    ]);
+    const noServer = email({ enabled: true, emailOn: false });
+    expect(offered(noServer.emailUser, noServer)).toBe(false);
+    const switched = email({ enabled: false, emailOn: true });
+    expect(offered(switched.emailUser, switched)).toBe(false);
   });
 
   test.serial(

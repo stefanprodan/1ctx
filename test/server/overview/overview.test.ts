@@ -48,6 +48,7 @@ const NO_ATTENTION = () => ({
   skills: [],
   credentials: [],
   search: { provider: null, hasKey: false },
+  email: null,
 });
 
 async function overview(

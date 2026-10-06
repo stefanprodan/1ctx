@@ -13,6 +13,7 @@ import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { type AlertEmailDeps, alertEmails } from "./alert-email.ts";
 import { type Alerts, alerts } from "./alerts.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
@@ -39,6 +40,8 @@ export type AutomationsDeps = {
   deciderOn(): boolean;
   // the decider's chance on a run, in the caller's transaction
   markAttention(sessionId: string, attention: number, by: string): boolean;
+  // the owner's email when an alert opens; none emails nobody
+  email?: Pick<AlertEmailDeps, "outbox" | "canOpen">;
 };
 
 export type Automations = {
@@ -66,6 +69,17 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     store,
     sessions: deps.sessions,
     markAttention: deps.markAttention,
+    emails:
+      deps.email &&
+      alertEmails({
+        ...deps.email,
+        clock: deps.clock,
+        log: deps.log,
+        users: deps.users,
+        projects: deps.projects,
+        reason: (sessionId) =>
+          deps.sessions.byId(sessionId)?.attentionReason ?? null,
+      }),
   });
   return {
     store,

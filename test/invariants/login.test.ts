@@ -95,7 +95,7 @@ describe("login", () => {
     const client = app.client();
     const nobody = await client.call("GET", "/api/me");
     expect(nobody.status).toBe(200);
-    expect(await nobody.json()).toEqual({ user: null });
+    expect(await nobody.json()).toEqual({ user: null, emailOn: false });
     await client.login("admin", "hunter2-test");
     const res = await client.call("GET", "/api/me");
     expect(res.status).toBe(200);
@@ -108,6 +108,7 @@ describe("login", () => {
     client.cookie = "login=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
+      emailOn: false,
     });
   });
 });
@@ -130,6 +131,7 @@ describe("logout", () => {
     client.cookie = token;
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
+      emailOn: false,
     });
   });
 
@@ -156,6 +158,7 @@ describe("expiry", () => {
     app.now.value += LOGIN_TTL_MS;
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
+      emailOn: false,
     });
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
       n: 0,
@@ -273,11 +276,13 @@ describe("sweep", () => {
       msg: "sweep",
       fields: {
         logins: 1,
+        links: 0,
         visits: 0,
         knowledge: 0,
         bash: 0,
         digests: 0,
         not_sent: 0,
+        emails: 0,
         removed: 1,
         chats_archived: 0,
         chats_packed: 0,

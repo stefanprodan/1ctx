@@ -18,6 +18,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import {
   account,
+  isPlaceholderEmail,
   meOf,
   profile,
   summary,
@@ -28,6 +29,7 @@ import {
 
 export {
   account,
+  isPlaceholderEmail,
   meOf,
   profile,
   summary,
@@ -152,6 +154,7 @@ export type Users = {
   clearAgent(agentId: string): void;
   setDisabled(id: string, disabled: boolean): void;
   setMustChangePassword(id: string, required: boolean): void;
+  setEmailFromAgents(id: string, on: boolean): void;
   setPasswordHash(id: string, hash: string): void;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
@@ -185,6 +188,7 @@ export function usersArea(deps: UsersDeps): Users {
     setDisabled: (id, disabled) => store.setDisabled(id, disabled),
     setMustChangePassword: (id, required) =>
       store.setMustChangePassword(id, required),
+    setEmailFromAgents: (id, on) => store.setEmailFromAgents(id, on),
     setPasswordHash: (id, hash) => store.setPasswordHash(id, hash),
     countAdmins: () => store.countAdmins(),
     createUser: (fields) => createUser(userDeps, fields),

@@ -44,6 +44,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   config: [
     "users",
     "logins",
+    "user_links",
     "visits",
     "projects",
     "memberships",
@@ -61,6 +62,8 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "credentials",
     "credential_projects",
     "repos",
+    "smtp_settings",
+    "email_outbox",
     "migrations",
     "sqlite_schema",
   ],

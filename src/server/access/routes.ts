@@ -3,7 +3,8 @@
 //
 // Login, logout and me. Login is rate limited per address and answers a
 // wrong username and a wrong password the same way, after the same hash
-// work, so neither leaks which one was wrong.
+// work, so neither leaks which one was wrong. The sign-in field takes a
+// username or an email.
 
 import { isIP } from "node:net";
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
@@ -13,10 +14,16 @@ import { jsonBody } from "../lib/body.ts";
 import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
-import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import {
+  json,
+  type Principal,
+  type RouteContext,
+  type RouteDescriptor,
+} from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { meOf, type UserRow, verifyPassword } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
+import { byLoginName } from "./links.ts";
 import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 
@@ -33,6 +40,7 @@ const meOfPrincipal = (p: Principal): Me => ({
 
 export type UsersPort = {
   byUsername(username: string): UserRow | null;
+  byEmail(email: string): UserRow | null;
   nobodyHash(): Promise<string>;
 };
 
@@ -42,10 +50,30 @@ export type RoutesDeps = {
   users: UsersPort;
   clock: Clock;
   log: Log;
+  guard(ctx: RouteContext): void;
+  // the sign-in page offers the email links
+  email: { enabled(): boolean };
 };
 
-export function routes(deps: RoutesDeps): RouteDescriptor[] {
+// the per-address limit of every sign-in route: a login, an ask for a
+// link and a link used share one window
+export function loginGuard(
+  clock: Clock,
+  log: Log,
+): (ctx: RouteContext) => void {
   const limit = new RateLimit(LOGIN_LIMIT, LOGIN_WINDOW_MS);
+  return (ctx) => {
+    if (limit.hit(ctx.address, clock())) return;
+    if (limit.closed(ctx.address)) {
+      log.warn("login limited", {
+        addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
+      });
+    }
+    throw new TooManyRequests("too many sign-in attempts. Wait a minute");
+  };
+}
+
+export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
     {
       method: "POST",
@@ -53,14 +81,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       async handle(req, ctx) {
         const addr = isIP(ctx.address) === 0 ? "invalid" : ctx.address;
-        if (!limit.hit(ctx.address, deps.clock())) {
-          if (limit.closed(ctx.address)) {
-            deps.log.warn("login limited", { addr });
-          }
-          throw new TooManyRequests("too many sign-in attempts. Wait a minute");
-        }
+        deps.guard(ctx);
         const { username, password } = parseLogin(await jsonBody(req));
-        const user = deps.users.byUsername(username);
+        const user = byLoginName(deps.users, username);
         const ok = await verifyPassword(
           password,
           user?.passwordHash ?? (await deps.users.nobodyHash()),
@@ -74,7 +97,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const opened = transact(deps.db, () => {
           // Password verification yields. Re-read under the write transaction so
           // a disable, reset or rename that won meanwhile cannot open a login.
-          const current = deps.users.byUsername(username);
+          const current = byLoginName(deps.users, username);
           if (
             current === null ||
             current.id !== user.id ||
@@ -115,7 +138,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       handle(_req, ctx) {
         const p = ctx.principal;
-        const body: MeResponse = { user: p ? meOfPrincipal(p) : null };
+        const body: MeResponse = {
+          user: p ? meOfPrincipal(p) : null,
+          emailOn: deps.email.enabled(),
+        };
         return json(body);
       },
     },

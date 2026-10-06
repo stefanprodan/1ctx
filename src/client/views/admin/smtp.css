@@ -1,0 +1,8 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .smtp-result {
+    margin: 0;
+    font-size: var(--text-ui);
+  }
+}

@@ -10,7 +10,8 @@ export type AdminUser = UserAccount & {
   projectIds: string[];
 };
 
-export type UsersResponse = { users: AdminUser[] };
+// emailOn: email is set up, so a placeholder address is worth saying
+export type UsersResponse = { users: AdminUser[]; emailOn: boolean };
 export type UserResponse = { user: AdminUser };
 export type CreateUserRequest = {
   username: string;
@@ -18,7 +19,9 @@ export type CreateUserRequest = {
   email: string;
   role: Role;
   tz: string;
-  password: string;
+  // one of the two: a typed password, or an invite by email that sets it
+  password?: string;
+  invite?: true;
   about?: string;
   disabled?: boolean;
   mustChangePassword?: boolean;

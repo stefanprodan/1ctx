@@ -11,6 +11,7 @@ import {
   openAlertRuns,
   type SessionStore,
 } from "../sessions/index.ts";
+import type { AlertEmails } from "./alert-email.ts";
 import { type AutomationStore, automationChanged } from "./store.ts";
 
 export type AlertsDeps = {
@@ -19,6 +20,8 @@ export type AlertsDeps = {
   sessions: Pick<SessionStore, "byId">;
   // the decider's chance on a run, in the caller's transaction
   markAttention(sessionId: string, attention: number, by: string): boolean;
+  // the owner's email when an alert opens; none emails nobody
+  emails?: AlertEmails;
 };
 
 export type Alerts = {
@@ -103,6 +106,7 @@ export function alerts(deps: AlertsDeps): Alerts {
     if (row === null) return [];
     if (!opened) return [automationChanged(row)];
     return [
+      ...(deps.emails?.opened(row, run.sessionId) ?? []),
       automationChanged(row),
       {
         type: "automation.attention",

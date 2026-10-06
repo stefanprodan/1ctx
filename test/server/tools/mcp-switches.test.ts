@@ -315,6 +315,7 @@ test.each(["all", "catalog"] as const)(
             agentName: "coder",
             sessionId: "session",
             origin: "chat",
+            sendStartedAt: 0,
           },
         },
       );
