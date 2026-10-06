@@ -183,6 +183,21 @@ export type Message = {
   finishedAt: number | null;
 };
 
+// a subagent's work under its parent's delegate row: the child's
+// status, the tokens and cost of every round it ran (cost null while no
+// round stated one) and its rows, in the transcript's shape. A frame
+// carries the rows a transaction changed; the route carries them all
+export type ChildWork = {
+  sessionId: string;
+  status: SessionStatus;
+  tokens: number;
+  cost: number | null;
+  rows: Message[];
+};
+
+// a child's work keyed by the parent's delegate row
+export type ChildOf = { messageId: string; child: ChildWork };
+
 // the last row a person or the agent wrote to a chat, as the feed
 // shows it: a user message, or an answer reply that is done. The
 // author is the username or the agent's name; the text is the first

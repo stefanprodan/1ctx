@@ -57,7 +57,7 @@ function isMainReply(message: Message): boolean {
 
 type ResultQueue = { rows: Message[]; next: number };
 
-function workRounds(rows: Message[]): WorkRound[] {
+export function workRounds(rows: Message[]): WorkRound[] {
   const replies: Message[] = [];
   const results = new Map<number, Map<string, ResultQueue>>();
   for (const row of rows) {

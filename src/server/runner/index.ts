@@ -8,7 +8,6 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import type { BusEvent } from "../lib/bus.ts";
 import { after, sleep } from "../lib/clock.ts";
 import { BadRequest, messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
@@ -19,7 +18,7 @@ import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
 import { liveAuthor, principalOf } from "./authors.ts";
 import { chatFor } from "./chat-guard.ts";
-import { delegate } from "./child.ts";
+import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
@@ -58,9 +57,7 @@ export { FINALIZE_RETRY_MS };
 export function runnerArea(deps: RunnerDeps): Runner {
   const registry = new Registry();
   const asks = attention(deps.attention, deps.log);
-  // a child's rows reach no watcher yet; the parent's watchers will get
-  // them here, keyed by the delegate row (link.rowId)
-  const childRows = (): BusEvent[] => [];
+  const childRows = childRowsTo(deps.db);
   const writer = new Writer({
     db: deps.db,
     clock: deps.clock,

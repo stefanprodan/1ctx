@@ -845,6 +845,7 @@ describe("the envelope row read", () => {
       sessionProject: () => null,
       live: () => null,
       queue: () => ({ revision: 0, rows: [] }),
+      children: () => [],
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -875,6 +876,7 @@ describe("the envelope row read", () => {
       sessionProject: () => null,
       live: () => null,
       queue: () => ({ revision: 0, rows: [] }),
+      children: () => [],
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -901,6 +903,7 @@ describe("the envelope row read", () => {
       sessionProject: () => null,
       live: () => null,
       queue: () => ({ revision: 0, rows: [] }),
+      children: () => [],
       envelopeRow() {
         throw new Error("disk I/O error");
       },

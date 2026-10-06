@@ -51,6 +51,7 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
     live: () => null,
     envelopeRow: () => null,
     queue: () => ({ revision: 0, rows: [] }),
+    children: () => [],
     ...overrides,
   });
   built.push(socket);

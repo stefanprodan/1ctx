@@ -4,6 +4,7 @@
 // Starting and stopping a send are the runner's routes.
 
 import type {
+  ChildWorkResponse,
   ForkSessionResponse,
   OpenedFileResponse,
   SessionsResponse,
@@ -19,6 +20,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { refuseArchived } from "./archive.ts";
+import { childOf, childWork } from "./child-work.ts";
 import { detail } from "./detail.ts";
 import { envelope } from "./envelope.ts";
 import type { AlertQuery } from "./list.ts";
@@ -157,10 +159,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const session = deps.visible(ctx.principal!, ctx.params.id);
         const messageId = parseMessageId(ctx.params.messageId);
         const message = deps.store.message(messageId);
+        // a subagent's tool row is read under its root, as its rows are
         if (
           message === null ||
-          message.sessionId !== session.id ||
-          message.kind !== "tool"
+          message.kind !== "tool" ||
+          (message.sessionId !== session.id &&
+            !childOf(deps.db, message.sessionId, session.id))
         ) {
           throw new NotFound("no such tool result");
         }
@@ -170,6 +174,30 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           ...cutResult(text),
           bytes: Buffer.byteLength(text, "utf8"),
         };
+        return json(body);
+      },
+    },
+    {
+      // a subagent's rows, keyed by the chat's delegate row: the chat's
+      // access is the child's, and the child's own id reaches nothing
+      method: "GET",
+      path: "/api/sessions/:id/messages/:messageId/child",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        const session = deps.visible(ctx.principal!, ctx.params.id);
+        const messageId = parseMessageId(ctx.params.messageId);
+        const message = deps.store.message(messageId);
+        const childId =
+          message?.sessionId === session.id &&
+          message.kind === "tool" &&
+          message.toolName === "delegate"
+            ? (message.childSessionId ?? null)
+            : null;
+        const body: ChildWorkResponse | null =
+          childId === null
+            ? null
+            : childWork(deps.db, childId, deps.store.messages(childId));
+        if (body === null) throw new NotFound("no such subagent");
         return json(body);
       },
     },

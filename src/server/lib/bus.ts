@@ -9,6 +9,7 @@
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type {
+  ChildOf,
   LastLine,
   Message,
   QueuedMessage,
@@ -43,6 +44,9 @@ export type BusEvents = {
     turn: boolean;
     rows: QueuedMessage[];
   };
+  // a subagent's rows changed: for the watchers of its root alone,
+  // keyed by the root's delegate row
+  "child.changed": { projectId: string; sessionId: string } & ChildOf;
   // a user's not-sent rows in a chat changed: the rows as they are now,
   // each text a preview, for that user's connections alone
   "queue.mine": {

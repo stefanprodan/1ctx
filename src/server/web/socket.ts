@@ -10,7 +10,7 @@
 // a test drives the module with fakes.
 
 import type { EnvelopeRow } from "../../shared/api/sessions.ts";
-import type { LiveSend } from "../../shared/contracts/session.ts";
+import type { ChildOf, LiveSend } from "../../shared/contracts/session.ts";
 import {
   isSocketCommand,
   PROTOCOL,
@@ -68,6 +68,8 @@ export type SocketDeps = {
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chat's queued rows as the queue frame carries them
   queue(sessionId: string): QueueFrame;
+  // each running subagent's rows so far
+  children(sessionId: string): ChildOf[];
 };
 
 export type Socket = {
@@ -257,14 +259,17 @@ export function socketArea(deps: SocketDeps): Socket {
           row: row(event),
         }));
         break;
-      case "queue.changed": {
-        // every row's text is a preview, so the frame stays small; it goes
-        // to the chat's watchers alone, as the stream frames do
+      case "queue.changed":
+      case "child.changed": {
+        // every queued row's text is a preview and a child frame carries
+        // only the rows changed, so each stays small; both go to the
+        // chat's watchers alone, as the stream frames do
         const { projectId, ...data } = event.data;
+        const type = event.type === "child.changed" ? "child" : "queue";
         let text: string | undefined;
         for (const conn of [...(watchers.get(data.sessionId) ?? [])]) {
           if (!sees(conn, projectId)) continue;
-          text ??= JSON.stringify({ type: "queue", ...data });
+          text ??= JSON.stringify({ type, ...data });
           deliverText(conn, text);
         }
         break;
@@ -428,11 +433,14 @@ export function socketArea(deps: SocketDeps): Socket {
       join(watchers, parsed.sessionId, conn);
       // registered before the snapshot is taken, so no frame falls
       // between the two
+      const live = deps.live(parsed.sessionId);
+      const children = live === null ? [] : deps.children(parsed.sessionId);
       deliver(conn, {
         type: "watched",
         sessionId: parsed.sessionId,
-        live: deps.live(parsed.sessionId),
+        live,
         queue: deps.queue(parsed.sessionId),
+        ...(children.length > 0 ? { children } : {}),
       });
     },
     drain(conn) {

@@ -202,8 +202,8 @@ connections watching that session.
 - **A durable frame goes to the connections holding its project.** It
   is built and encoded once, on the first connection in its audience,
   so an unseen event costs nothing. A `session` frame's `row` holds only
-  fields that read the same for every viewer. `queue` goes only to the
-  chat's watchers, `notSent` only to its author.
+  fields that read the same for every viewer. `queue` and `child` go
+  only to the chat's watchers, `notSent` only to its author.
 - **Stream frames go to the session's watchers.** `watch` is authorized
   through the sessions port, and the watcher is registered before the
   `watched` snapshot, so no frame falls between.

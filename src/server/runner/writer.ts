@@ -67,10 +67,11 @@ export type WriterDeps = {
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;
-  // a subagent's changed rows, after its transaction commits: the
-  // frames its parent's watchers get. A child publishes no envelope, so
-  // nothing of it reaches a list, a feed or another connection
-  childRows(link: ChildLink, rows: Message[]): BusEvent[];
+  // a subagent's changed rows, inside its transaction: the frames its
+  // parent's watchers get after the commit. A child publishes no
+  // envelope, so nothing of it reaches a list, a feed or another
+  // connection
+  childRows(link: ChildLink, sessionId: string, rows: Message[]): BusEvent[];
 };
 
 // a subagent's rows stream to nobody: no watch reaches its session
@@ -106,7 +107,7 @@ export class Writer {
   ): BusEvent[] {
     return send.child === null
       ? [event()]
-      : this.deps.childRows(send.child, rows);
+      : this.deps.childRows(send.child, send.sessionId, rows);
   }
 
   private streams(send: ActiveSend): WriterDeps {

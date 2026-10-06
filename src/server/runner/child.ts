@@ -19,6 +19,7 @@ import { messageOf } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
+import { childChanged } from "../sessions/index.ts";
 import {
   type DelegateInput,
   type ToolContext,
@@ -54,9 +55,22 @@ export type ChildDeps = {
   sendsRunning(): number;
   wake(): void;
   // the writer's hook: a child's rows to its parent's watchers
-  childRows(link: ChildLink, rows: Message[]): BusEvent[];
+  childRows(link: ChildLink, sessionId: string, rows: Message[]): BusEvent[];
   messages(sessionId: string): Message[];
 };
+
+// the writer's hook: a child's rows to its parent's watchers alone,
+// keyed by the delegate row
+export const childRowsTo =
+  (db: Db) =>
+  (link: ChildLink, sessionId: string, rows: Message[]): BusEvent[] =>
+    childChanged(db, {
+      projectId: link.parent.projectId,
+      rootId: link.parent.sessionId,
+      messageId: link.rowId,
+      childId: sessionId,
+      rows,
+    });
 
 // the policy a subagent runs under: its parent's snapshot, its own
 // offer and prompt, and what is left of the parent's deadline
@@ -180,7 +194,10 @@ function startChild(
       now,
     });
     deps.sessions.touch(sessionId, { status: "running", now });
-    return { result: undefined, events: deps.childRows(link, [task, reply]) };
+    return {
+      result: undefined,
+      events: deps.childRows(link, sessionId, [task, reply]),
+    };
   });
   const send = newSend({
     id: sendId,

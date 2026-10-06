@@ -16,6 +16,7 @@ import { baseName } from "../lib/tree.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { fileKey, visualKey } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
+import { childRow, childRowIds, resetChildren } from "./session-children.ts";
 
 export type StoredVisual =
   | { status: "loading" }
@@ -42,6 +43,7 @@ export function resetValues(): void {
   for (const request of requests.values()) request.abort();
   requests.clear();
   detail = null;
+  resetChildren();
   toolResults.value = new Map();
   toolVisuals.value = new Map();
   openedFiles.value = new Map();
@@ -51,7 +53,8 @@ export function resetValues(): void {
 export function syncValues(next: SessionDetail): void {
   if (detail !== null && detail.session.id !== next.session.id) resetValues();
   detail = next;
-  const keys = new Set<string>();
+  // a subagent's rows keep their results while the chat is on screen
+  const keys = new Set<string>(childRowIds());
   for (const row of next.messages) {
     keys.add(row.id);
     row.toolCalls?.forEach((_, index) => {
@@ -101,7 +104,8 @@ export function cancelVisual(messageId: string, index: number): void {
 
 export async function loadToolResult(messageId: string): Promise<void> {
   if (!detail || toolResults.value.has(messageId)) return;
-  const row = detail.messages.find((row) => row.id === messageId);
+  const row =
+    detail.messages.find((row) => row.id === messageId) ?? childRow(messageId);
   if (row?.kind !== "tool" || row.status === "streaming") return;
   const request = new AbortController();
   requests.set(messageId, request);

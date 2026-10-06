@@ -21,7 +21,7 @@ const { useFoldOpen } = folds();
 
 // a value is cut to a few lines, Show all in its fade, never a scroll box
 // of its own; once open it stays whole until the fold closes
-function Value({ text, failed }: { text: string; failed?: boolean }) {
+export function Value({ text, failed }: { text: string; failed?: boolean }) {
   const { el, open, long } = useCut<HTMLDivElement>([text]);
   return (
     <Fold

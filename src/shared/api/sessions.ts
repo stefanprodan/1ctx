@@ -8,6 +8,7 @@ import type { CapabilityChange } from "../capabilities.ts";
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { AutomationAlert } from "../contracts/automation.ts";
 import type {
+  ChildWork,
   LastLine,
   OpenedFile,
   QueuedMessage,
@@ -69,6 +70,9 @@ export type ToolResultResponse = {
   bytes: number;
   cut: boolean;
 };
+
+// GET /api/sessions/:id/messages/:messageId/child
+export type ChildWorkResponse = ChildWork;
 
 export type ToolVisualResponse = {
   title: string;

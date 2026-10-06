@@ -1,8 +1,9 @@
 # Subagents
 
 Governs the `delegate` tool, child sessions, the child loop and the
-child rows: `src/server/sessions/children.ts` and what reads or writes a
-child elsewhere. A send, the writer and the caps are in
+child rows: `src/server/sessions/children.ts`, `child-work.ts`, the
+client's `data/session-children.ts` and `transcript/Delegate*`, and
+what reads or writes a child elsewhere. A send, the writer and the caps are in
 `docs/sessions.md`; archive, packing and the sweep in
 `docs/archive.md`; what the Monitor counts in `docs/monitor.md`.
 
@@ -23,9 +24,10 @@ is its root.
   `insertSend()` takes `child: true` and refuses a mark that does not
   match its session, so every reader of turns tests the row it already
   reads.
-- **No route or watch reaches a child.** `visible()` reads roots alone
-  (`store.root()`), so every session route and `watch` answers it as
-  the 404 "no such chat".
+- **No route or watch reaches a child by its own id.** `visible()`
+  reads roots alone (`store.root()`), so every session route and
+  `watch` answers it as the 404 "no such chat". Its rows are read under
+  its root (below).
 - **Every list or count of chats, runs or turns reads roots.** A
   sessions query adds `ROOT` (`sessions/children.ts`); a sends or
   usage count adds `child = 0` on the send. Tokens and cost read every
@@ -74,9 +76,9 @@ is its root.
   with `send.child` set. It never reaches `endSend()`: no attention
   step, memory phase or decider, and it never compacts.
 - **Its writer publishes no envelope.** Every transaction of a child
-  goes through `WriterDeps.childRows(link, rows)`, the one hook for
-  frames to the parent's watchers, keyed by `link.rowId`; it answers
-  none yet. Its stream frames go nowhere.
+  goes through `WriterDeps.childRows(link, sessionId, rows)`, the one
+  hook for frames to the parent's watchers (`childRowsTo()`). Its
+  stream frames go nowhere.
 - **It ends at the parent's deadline,** `startedAt + deadlineMs` of the
   parent, never a fresh one. The parent's abort (stop, deadline,
   delete, drain, shutdown) ends it with that cause, and the parent's
@@ -128,3 +130,38 @@ is its root.
   the `open` text (`withoutOpen()`), so it names the same
   repositories. Its repos handle shares the parent's trees and never
   takes the parent's mount notices.
+
+## The parent's work fold
+
+- **A child's rows reach the root's watchers alone.** The hook
+  publishes `child.changed` (`childChanged()`), built inside the
+  child's transaction: the rows it changed in the transcript's wire
+  shape (`offWire`), the child's status, and the tokens and cost of
+  every round it ran, keyed by the root's `delegate` row. The socket
+  sends it as the `child` frame to the root's watchers that hold its
+  project, as `queue`; never to a project's other connections, the feed
+  or another project. Rows appear as each round and call starts and
+  ends, never as streamed text.
+- **A watch mid-turn gets the running children.** The `watched` answer
+  carries `children`, each child whose `delegate` row still runs, with
+  every row so far (`runningChildren()`), only while a send is in
+  flight.
+- **`GET /api/sessions/:id/messages/:messageId/child` reads a child.**
+  It answers when the chat is `visible()`, the message is that chat's
+  `delegate` row and the row has a child; 404 otherwise. The result
+  route reads a child's tool row under its root (`childOf()`); no other
+  route takes a child's row.
+- **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
+  shut until opened like a call. Its head is the description, then the
+  status (running while the root's row runs, then the child's own:
+  done, failed or stopped), the child's tokens and its cost when a
+  round stated one. Open, it shows the task, the child's rounds drawn
+  by the fold's own `Rounds` and `Tool`, and closes with the child's
+  answer. Two calls are two groups.
+- **The client keeps a child's rows by `delegate` row**
+  (`data/session-children.ts`) for the chat on screen: the frames and
+  the watch's answer land on what is held, an ended row never goes
+  back to running, and a group opened with nothing held reads the route
+  once.
+- **The fold counts the root's calls.** A `delegate` call is one of
+  them; the child's calls are its own and never in the fold's count.
