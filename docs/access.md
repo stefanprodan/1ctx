@@ -110,6 +110,9 @@ from `emailOn` in `GET /api/me`.
   `/reset-link` sends a reset. Each is a 409 while email is off and for
   a disabled user or a placeholder. The typed reset stays.
 - **A user PATCH never takes a password.** A reset is its own route.
+- **Email from agents is the user's own switch.** Only `PUT
+  /api/profile/email` sets it, off by default; no admin route or
+  provisioned field does (`docs/email.md`).
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts

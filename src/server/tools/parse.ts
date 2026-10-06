@@ -4,11 +4,16 @@
 import type { PatchToolRequest } from "../../shared/api/tools.ts";
 import { MAX_VISUAL_HOSTS, visualOrigin } from "../../shared/visual.ts";
 import { isWebAccessMode, parseDomains } from "../../shared/web.ts";
-import { isSearchProvider } from "../../shared/words.ts";
+import { EMAIL_TOOL, isSearchProvider } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export const TOOL_NAMES = ["web", "websearch", "visualize"] as const;
+export const TOOL_NAMES = [
+  "web",
+  "websearch",
+  "visualize",
+  EMAIL_TOOL,
+] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 export const isToolName = (value: unknown): value is ToolName =>
   TOOL_NAMES.includes(value as ToolName);
@@ -18,6 +23,7 @@ export const TOOL_FIELDS: Record<ToolName, readonly string[]> = {
   web: ["mode", "domains"],
   websearch: ["provider"],
   visualize: ["enabled", "hosts"],
+  [EMAIL_TOOL]: ["enabled"],
 };
 
 export function parseToolName(value: unknown): ToolName {

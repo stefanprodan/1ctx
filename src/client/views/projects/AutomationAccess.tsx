@@ -21,6 +21,7 @@ export function AccessLines({ row }: { row: AutomationSummary }) {
       )}
       {!access.visuals && <AsideLine label="Visuals">Off</AsideLine>}
       {!access.knowledge && <AsideLine label="Knowledge">Off</AsideLine>}
+      {!access.email && <AsideLine label="Email">Off</AsideLine>}
       {access.mcpOff.length > 0 && (
         <AsideLine label="MCP off">{access.mcpOff.join(", ")}</AsideLine>
       )}

@@ -7,6 +7,7 @@
 
 import type {
   BuiltinToolSummary,
+  EmailToolSummary,
   SearchState,
   WebToolSummary,
 } from "../contracts/tool.ts";
@@ -21,11 +22,13 @@ export type ToolsResponse = {
   access: WebAccess;
   search: SearchState;
   visualize: WebToolSummary;
+  emailUser: EmailToolSummary;
 };
 
 // PATCH /api/tools/:name. `web` takes the mode and the domains, and
 // `listed` needs at least one host, given or stored. `websearch` takes
-// the provider, null for None. `visualize` takes its switch and hosts.
+// the provider, null for None. `visualize` takes its switch and hosts,
+// `email_user` its switch.
 // Any other name, any other field and an empty body are a 400.
 export type PatchToolRequest = {
   mode?: WebAccessMode;

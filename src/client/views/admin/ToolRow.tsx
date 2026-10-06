@@ -3,6 +3,7 @@
 
 import type {
   BuiltinToolSummary,
+  EmailToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { firstSentence, tokensText } from "../../lib/format.ts";
@@ -17,7 +18,7 @@ export function ToolRow({
   onToggle,
   offered,
 }: {
-  tool: BuiltinToolSummary | WebToolSummary;
+  tool: BuiltinToolSummary | WebToolSummary | EmailToolSummary;
   open: boolean;
   onToggle: () => void;
   // the Config board's list: Off while no turn is offered it

@@ -9,6 +9,7 @@ import { loadSmtp, smtp, smtpError } from "../../../src/client/data/smtp.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import type { SmtpDraft } from "../../../src/client/views/admin/Smtp.model.ts";
 import {
+  agentEmailLine,
   draftOf,
   offLine,
   resultLine,
@@ -127,6 +128,16 @@ describe("the SMTP words", () => {
     expect(resultLine("auth", null)).toBe(
       "Sign in failed. Check the username and the key file.",
     );
+  });
+});
+
+describe("the agents' email switch", () => {
+  test("says what it means, waiting for the server when it is not set up", () => {
+    expect(agentEmailLine(false, true)).toBe("Agents cannot email users.");
+    expect(agentEmailLine(true, false)).toBe(
+      "Agents can email users once the server is set up.",
+    );
+    expect(agentEmailLine(true, true)).toContain("turned email from agents on");
   });
 });
 

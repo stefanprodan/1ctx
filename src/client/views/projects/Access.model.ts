@@ -8,6 +8,7 @@
 
 import {
   credentialKey,
+  EMAIL,
   KNOWLEDGE,
   mcpKey,
   repoKey,
@@ -28,6 +29,8 @@ export type AccessDraft = {
   visuals: boolean;
   // its runs may read and edit the project docs
   knowledge: boolean;
+  // its runs may email users, while the instance offers email
+  email: boolean;
   // the keys of the MCP servers its runs go without
   mcpOff: readonly string[];
   // the keys of the skills its runs go without
@@ -49,6 +52,7 @@ export function disabledOf(d: AccessDraft, shown: Shown = {}): string[] {
     ...(d.web ? [] : [WEB]),
     ...(d.visuals ? [] : [VISUALIZE]),
     ...(d.knowledge ? [] : [KNOWLEDGE]),
+    ...(d.email ? [] : [EMAIL]),
     ...kept(
       servers.map((server) => mcpKey(server.id)),
       d.mcpOff,
@@ -79,6 +83,7 @@ export function accessOf(
   web: boolean;
   visuals: boolean;
   knowledge: boolean;
+  email: boolean;
   mcpOff: string[];
   skillsOff: string[];
   credentialsOff: string[];
@@ -90,6 +95,7 @@ export function accessOf(
     web,
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
+    email: !a.disabledCapabilities.includes(EMAIL),
     mcpOff: servers
       .filter((server) => a.disabledCapabilities.includes(mcpKey(server.id)))
       .map((server) => server.name)

@@ -139,11 +139,11 @@ change it in the same commit as the code that changes a rule.
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
-| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals |
+| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
-| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, the SMTP page, the pages of email links |
+| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

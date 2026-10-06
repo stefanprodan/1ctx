@@ -6,8 +6,9 @@
 
 import type { Profile } from "../contracts/user.ts";
 
-// GET /api/profile, and the answer of every write to it
-export type ProfileResponse = { user: Profile };
+// GET /api/profile, and the answer of every write to it; emailOn says
+// whether email is set up, so the page offers email from agents
+export type ProfileResponse = { user: Profile; emailOn: boolean };
 
 // PATCH /api/profile
 export type UpdateProfileRequest = {
@@ -15,6 +16,9 @@ export type UpdateProfileRequest = {
   about: string;
   tz: string;
 };
+
+// PUT /api/profile/email: whether agents and alerts may email the user
+export type EmailSettingsRequest = { fromAgents: boolean };
 
 // POST /api/profile/password: the current password proves it is the
 // user, the next one replaces it and every other login is revoked

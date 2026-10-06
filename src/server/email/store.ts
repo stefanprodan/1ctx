@@ -218,6 +218,27 @@ export class EmailStore {
       .run(attempts, failure, now, id);
   }
 
+  // the rows of a kind written for a session at or after since, sent,
+  // failed or queued: a cap per send
+  countSession(sessionId: string, kind: EmailKind, since: number): number {
+    return this.db
+      .query<{ n: number }, [string, string, number]>(
+        `select count(*) as n from email_outbox
+         where session_id = ? and kind = ? and created_at >= ?`,
+      )
+      .get(sessionId, kind, since)!.n;
+  }
+
+  // the same for a project: a cap per day
+  countProject(projectId: string, kind: EmailKind, since: number): number {
+    return this.db
+      .query<{ n: number }, [string, string, number]>(
+        `select count(*) as n from email_outbox
+         where project_id = ? and kind = ? and created_at >= ?`,
+      )
+      .get(projectId, kind, since)!.n;
+  }
+
   // the next time a row is due, a claimed one aside
   earliest(): number | null {
     return this.db

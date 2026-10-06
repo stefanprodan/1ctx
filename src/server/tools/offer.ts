@@ -5,6 +5,7 @@
 
 import {
   credentialKey,
+  EMAIL,
   KNOWLEDGE,
   MEMORY,
   mcpKey,
@@ -18,7 +19,11 @@ import { type PromptServer, promptSnapshot } from "../../shared/mcp.ts";
 import { mcpCatalog, resolveMode } from "../../shared/mcp-catalog.ts";
 import { catalog } from "../../shared/skills.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
-import type { McpMode, SearchProvider } from "../../shared/words.ts";
+import {
+  EMAIL_TOOL,
+  type McpMode,
+  type SearchProvider,
+} from "../../shared/words.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
@@ -68,6 +73,8 @@ type OfferDeps = {
   mcp: Pick<Mcp, "offered">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   credentials?: CredentialsPort;
+  // the admin's email_user row is on and email is set up
+  emailOn?(): boolean;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -242,6 +249,9 @@ export function offered(
     // and the skill read the admin's row alone
     ...(visuals && !disabledCapabilities.includes(VISUALIZE)
       ? ["visualize"]
+      : []),
+    ...(deps.emailOn?.() && !disabledCapabilities.includes(EMAIL)
+      ? [EMAIL_TOOL]
       : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,

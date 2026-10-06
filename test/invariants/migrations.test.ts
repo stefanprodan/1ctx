@@ -62,6 +62,7 @@ const EXPECTED_IDS = [
   "0048-agent-listed-as",
   "0049-email",
   "0050-user-links",
+  "0051-agent-email",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -70,7 +71,7 @@ const KEPT_COLUMNS =
 
 // columns a later migration adds, left out where a test compares rows
 // from before its own migration with rows after every migration
-const LATER_COLUMNS = ["listed_as", "email_placeholder"];
+const LATER_COLUMNS = ["listed_as", "email_placeholder", "email_from_agents"];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
     Object.fromEntries(
@@ -941,6 +942,8 @@ describe("the schema", () => {
       { name: "websearch", enabled: 1, provider: null, updated_at: 0 },
       { name: "visualize", enabled: 1, provider: null, updated_at: 0 },
       { name: "web", enabled: 1, provider: null, updated_at: 0 },
+      // off until an admin turns it on
+      { name: "email_user", enabled: 0, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -1677,6 +1680,7 @@ describe("the schema", () => {
               memory_from: ____,
               listed_as: _____,
               email_placeholder: ______,
+              email_from_agents: _______,
               ...rest
             }) => rest,
           ),
@@ -2716,13 +2720,13 @@ test("a test's memory database is a fresh migrate", () => {
   const first = memoryDb();
   const second = memoryDb();
   try {
-    // a full migrate leaves the web access row beside the three tool rows
+    // a full migrate leaves the web access row beside the tool rows
     expect(
       fresh
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch", "visualize", "web"]);
+    ).toEqual(["webfetch", "websearch", "visualize", "web", "email_user"]);
     expect(state(first)).toEqual(state(fresh));
     first.exec("create table scratch (a int)");
     expect(state(second)).toEqual(state(fresh));

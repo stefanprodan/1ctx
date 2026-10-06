@@ -32,6 +32,16 @@ import type { Address, EmailSender, SmtpServer } from "./smtp.ts";
 import { EmailStore } from "./store.ts";
 
 export {
+  type AgentEmail,
+  type AlertEmail,
+  agentEmail,
+  alertEmail,
+  packBody,
+  SUBJECT_TAG,
+  sessionPath,
+  unpackBody,
+} from "./frame.ts";
+export {
   pairProblem,
   parseFromAddress,
   parseFromName,

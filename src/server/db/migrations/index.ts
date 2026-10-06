@@ -56,6 +56,7 @@ import { m0047 } from "./0047-decision-usage-decider.ts";
 import { m0048 } from "./0048-agent-listed-as.ts";
 import { m0049 } from "./0049-email.ts";
 import { m0050 } from "./0050-user-links.ts";
+import { m0051 } from "./0051-agent-email.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -108,4 +109,5 @@ export const MIGRATIONS: Migration[] = [
   m0048,
   m0049,
   m0050,
+  m0051,
 ];

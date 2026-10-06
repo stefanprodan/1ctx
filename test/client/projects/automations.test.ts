@@ -25,7 +25,10 @@ import {
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
-import { accessOf } from "../../../src/client/views/projects/Access.model.ts";
+import {
+  accessOf,
+  disabledOf,
+} from "../../../src/client/views/projects/Access.model.ts";
 import {
   automationFieldOf,
   automationPageOf,
@@ -422,6 +425,7 @@ describe("the form", () => {
       web: true,
       visuals: true,
       knowledge: true,
+      email: true,
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
@@ -621,6 +625,21 @@ describe("the form", () => {
     ]);
   });
 
+  test("the saved set keeps email off with the built-ins", () => {
+    const draft = {
+      web: true,
+      visuals: true,
+      knowledge: true,
+      email: false,
+      mcpOff: [],
+      skillsOff: [],
+      credentialsOff: [],
+      reposOff: [],
+    };
+    expect(disabledOf(draft)).toEqual(["email"]);
+    expect(disabledOf({ ...draft, email: true })).toEqual([]);
+  });
+
   test("the page's aside names what the row keeps its runs from", () => {
     const servers = [
       { id: "b2", name: "github", tools: 42 },
@@ -634,6 +653,7 @@ describe("the form", () => {
       web: true,
       visuals: true,
       knowledge: true,
+      email: true,
       mcpOff: [],
       skillsOff: [],
       credentialsOff: [],
@@ -641,6 +661,7 @@ describe("the form", () => {
     });
     const row = automation({
       disabledCapabilities: [
+        "email",
         "knowledge",
         "mcp:a1",
         "mcp:b2",
@@ -658,6 +679,7 @@ describe("the form", () => {
       web: false,
       visuals: false,
       knowledge: false,
+      email: false,
       mcpOff: ["flux", "github"],
       skillsOff: ["gitops", "visualize"],
       credentialsOff: [],

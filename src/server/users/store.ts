@@ -52,6 +52,7 @@ type Raw = {
   must_change_password: number;
   agent_id: string | null;
   email_placeholder: number;
+  email_from_agents: number;
 };
 
 const row = (raw: Raw): UserRow => ({
@@ -67,6 +68,7 @@ const row = (raw: Raw): UserRow => ({
   disabled: raw.disabled !== 0,
   mustChangePassword: raw.must_change_password !== 0,
   emailPlaceholder: raw.email_placeholder !== 0,
+  emailFromAgents: raw.email_from_agents !== 0,
   agentId: raw.agent_id,
 });
 
@@ -95,6 +97,7 @@ export const account = (user: UserRow): UserAccount => ({
 export const profile = (user: UserRow): Profile => ({
   ...account(user),
   about: user.about,
+  emailFromAgents: user.emailFromAgents,
 });
 
 export class UserStore {
@@ -210,6 +213,12 @@ export class UserStore {
     this.db
       .query("update users set disabled = ? where id = ?")
       .run(disabled ? 1 : 0, id);
+  }
+
+  setEmailFromAgents(id: string, on: boolean): void {
+    this.db
+      .query("update users set email_from_agents = ? where id = ?")
+      .run(on ? 1 : 0, id);
   }
 
   setMustChangePassword(id: string, required: boolean): void {

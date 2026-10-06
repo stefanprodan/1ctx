@@ -334,6 +334,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     capabilities,
     repos: { usingKeys: () => repos.usingKeys() },
   });
+  // who an agent's email or an alert may reach: a user who can open the
+  // project, so no email tells anyone what the app would not show them
+  const canOpen = (userId: string, projectId: string) =>
+    access.visibleProjectIds(userId)?.includes(projectId) ?? false;
+  const outbox = {
+    enabled: () => email.enabled(),
+    link: (path: string) => email.link(path),
+    enqueue: email.enqueue,
+    register: email.register,
+  };
   const access: Access = accessArea({
     db,
     clock,
@@ -447,6 +457,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
       visuals: (since, until) => sessions.visualCounts(since, until),
       web: (since, until) => sessions.webCounts(since, until),
     },
+    email: {
+      enabled: outbox.enabled,
+      outbox: {
+        ...outbox,
+        countSession: (sessionId, kind, since) =>
+          email.store.countSession(sessionId, kind, since),
+        countProject: (projectId, kind, since) =>
+          email.store.countProject(projectId, kind, since),
+      },
+      users,
+      canOpen,
+      projects: projects.store,
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({
@@ -522,6 +545,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner,
     markAttention: (sessionId, attention, by) =>
       sessions.markAttention(sessionId, attention, by),
+    email: { outbox, canOpen },
     deciderOn: () => {
       const decision = deciders.decision("run-attention");
       const named =

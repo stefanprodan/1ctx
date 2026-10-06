@@ -3,7 +3,7 @@
 //
 // The plus at the start of the composer's row and its menu, placed as
 // the agent list is. Add files opens the file picker. Web access,
-// Visuals, Knowledge and Memory are switches, drawn as the rail's
+// Visuals, Knowledge, Memory and Email are switches, drawn as the rail's
 // theme switch is, and flipping one leaves the menu open. MCP servers,
 // Skills and Repositories each swap the menu's rows for a switch per
 // server, skill or repository, and so does Web access when the project
@@ -15,6 +15,7 @@ import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import {
+  EMAIL,
   KNOWLEDGE,
   MEMORY,
   VISUALIZE,
@@ -123,6 +124,7 @@ export function Add({
   visuals,
   knowledge,
   memory,
+  email,
   servers,
   skills,
   repos,
@@ -137,6 +139,8 @@ export function Add({
   visuals: WebItem;
   knowledge: WebItem;
   memory: WebItem;
+  // null while the instance does not offer email
+  email: WebItem | null;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
@@ -270,6 +274,14 @@ export function Add({
             item={memory}
             onFlip={() => onFlip(MEMORY)}
           />
+          {email !== null && (
+            <SwitchItem
+              name="Email"
+              icon="email"
+              item={email}
+              onFlip={() => onFlip(EMAIL)}
+            />
+          )}
           {(["servers", "skills", "repos"] as const).map((name) => {
             const item = items[name];
             return item === null ? null : (

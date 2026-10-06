@@ -30,6 +30,7 @@ const user: UserRow = {
   disabled: false,
   mustChangePassword: false,
   emailPlaceholder: false,
+  emailFromAgents: false,
   agentId: null,
 };
 

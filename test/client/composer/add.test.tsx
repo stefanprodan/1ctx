@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
+  emailItem,
   onWords,
   panelessOf,
   reposItem,
@@ -15,6 +16,7 @@ import {
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import {
+  EMAIL,
   KNOWLEDGE,
   MEMORY,
   VISUALIZE,
@@ -144,6 +146,26 @@ describe("the Memory item", () => {
     expect(
       switchItem(WEB, { tools: true, switchable: [MEMORY], off: false }).reason,
     ).toBe("Turned off by an admin");
+  });
+});
+
+describe("the Email item", () => {
+  test("is absent until the instance offers email, then a switch", () => {
+    expect(emailItem({ tools: true, switchable: null, off: false })).toBeNull();
+    expect(
+      emailItem({ tools: true, switchable: [WEB], off: false }),
+    ).toBeNull();
+    expect(emailItem({ tools: true, switchable: [EMAIL], off: false })).toEqual(
+      { live: true, on: true, reason: null },
+    );
+    expect(emailItem({ tools: true, switchable: [EMAIL], off: true })).toEqual({
+      live: true,
+      on: false,
+      reason: null,
+    });
+    expect(
+      emailItem({ tools: false, switchable: [EMAIL], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
   });
 });
 

@@ -122,20 +122,47 @@ words.
     (`docs/bash.md`), and drops the knowledge block.
   - `memory`: drops a chat's `memory_edit`; the note stays in the
     prompt. It means nothing in a run.
+  - `email`: drops `email_user` only.
   - `mcp:<id>`, `skill:<id>`, `credential:<id>`: removed before the
     offer is built, so nothing of them reaches the send.
 - **Each off key adds its line to the prompt.** The lines are
   `WEB_OFF_LINE`, `VISUALIZE_OFF_LINE`, `KNOWLEDGE_OFF_LINE`,
-  `MEMORY_OFF_LINE`, `mcpOffLine()` and `skillsOffLine()`, added only
+  `MEMORY_OFF_LINE`, `EMAIL_OFF_LINE`, `mcpOffLine()` and
+  `skillsOffLine()`, added only
   when the send offers tools (the knowledge line only with `bash`).
   They exist because history may still show what the switch turned
   off. `tools.capabilities()` lists the switchable keys: `web`
-  unless the mode is off, `visualize` while its row is on, and
-  `knowledge` and `memory` always.
+  unless the mode is off, `visualize` while its row is on, `email`
+  while `email_user` is offered, and `knowledge` and `memory` always.
 - **A delete forgets its key.** Deleting an MCP server, a skill or a
   credential forgets `mcp:`, `skill:` or `credential:<id>` in sessions
   and automations in the same transaction; deleting a repository forgets
   `repo:<id>` in its project's alone. Unassigning forgets nothing.
+
+## Email to users
+
+- **`email_user` is offered with email set up and its row on.** The
+  `email_user` tool row starts off; an admin turns it on (`PATCH
+  /api/tools/email_user`, the SMTP page). While `email.enabled()` is
+  false, the row off or the send's `email` key off, no send carries it,
+  never the memory phase or the attention step.
+- **It takes usernames, never an address.** `to` is 1 to `MAX_EMAIL_TO`
+  usernames (an `@` in front is dropped), `subject` one line of at most
+  `MAX_EMAIL_SUBJECT` characters, `body` Markdown of at most
+  `MAX_EMAIL_BODY` bytes. A recipient can open the session (its
+  project, `access.visibleProjectIds()`), is enabled and past the
+  forced password change, has a real address and turned email from
+  agents on.
+- **One refusal refuses the call.** Every user is checked before any
+  row is written; the `ToolError` names each refused user and why, and
+  nothing is queued, so the model calls again with the users it may
+  email. It logs `email refused`.
+- **The caps are constants, counted on the outbox.** `EMAILS_PER_SEND`
+  per send (the session's `agent` rows since `sendStartedAt`, sends
+  being serial per session) and `EMAILS_PER_PROJECT_DAY` per project
+  over the last 24 hours. Over either, the call is an error the model
+  reads, in the transaction that would queue it. The email itself is
+  `docs/email.md`'s.
 
 ## Visuals
 

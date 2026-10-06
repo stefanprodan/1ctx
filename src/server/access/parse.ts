@@ -12,6 +12,7 @@ import type {
 } from "../../shared/api/access.ts";
 import type {
   ChangePasswordRequest,
+  EmailSettingsRequest,
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
 import type {
@@ -140,6 +141,14 @@ export function parseProfile(body: unknown): UpdateProfileRequest {
     about: parseAbout(b.about),
     tz: parseTz(b.tz),
   };
+}
+
+export function parseEmailSettings(body: unknown): EmailSettingsRequest {
+  const b = fields(body, ["fromAgents"]);
+  if (typeof b.fromAgents !== "boolean") {
+    throw new BadRequest("fromAgents must be a boolean");
+  }
+  return { fromAgents: b.fromAgents };
 }
 
 export function parsePasswordChange(body: unknown): ChangePasswordRequest {

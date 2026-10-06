@@ -223,8 +223,8 @@ none; `by` names who marked the latest.
   the automation) closes it and answers the automation; with none open
   it is a no-op 200 with the row as it is.
 - **Opening publishes `automation.attention`**, once per open alert,
-  never for a run that joins: the hint notifications will be sent
-  from. Nothing listens yet.
+  never for a run that joins. It stays a hint: the owner's email is
+  queued in the opening transaction itself (`docs/email.md`).
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

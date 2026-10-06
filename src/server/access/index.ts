@@ -149,6 +149,7 @@ export function accessArea(deps: AccessDeps): Access {
         logins,
         users: deps.users,
         links,
+        email: deps.email,
         clock: deps.clock,
         log: deps.log,
       }),

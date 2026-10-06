@@ -59,6 +59,9 @@ export type ToolContext = {
     agentName: string;
     sessionId: string;
     origin: "chat" | "automation";
+    // when the send began: its sends are serial per session, so rows
+    // of the session from then on are this send's
+    sendStartedAt: number;
   } | null;
   signal: AbortSignal;
   now(): number;

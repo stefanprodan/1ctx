@@ -24,7 +24,7 @@ import {
   DEFAULT_VISUAL_HOSTS,
   type WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
-import { admin } from "../../helpers/client-fixtures.ts";
+import { admin, emailUser } from "../../helpers/client-fixtures.ts";
 
 const visual: WebToolSummary = {
   name: "visualize",
@@ -41,6 +41,7 @@ const response = (changes: Partial<WebToolSummary> = {}): ToolsResponse => ({
   builtin: [],
   access: { mode: "all", domains: [], updatedAt: 0 },
   visualize: { ...visual, ...changes },
+  emailUser: emailUser(),
   search: {
     provider: null,
     keys: { exa: false, firecrawl: false, tavily: false },

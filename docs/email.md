@@ -1,9 +1,10 @@
 # Email
 
-Governs `src/server/email/`: the instance's SMTP server, the outbox and
-the sender, the admin's SMTP page under Config, and what the sign-in,
-link and users pages show of email. The links themselves are in
-`docs/access.md`.
+Governs `src/server/email/`, `render/email.ts`: the instance's SMTP
+server, the outbox and the sender, an agent's email and an alert's, the
+admin's SMTP page under Config, and what the sign-in, link, users and
+profile pages show of email. The links themselves are in
+`docs/access.md`, the `email_user` tool in `docs/tools.md`.
 
 ## The server
 
@@ -72,12 +73,43 @@ link and users pages show of email. The links themselves are in
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
-  may drop it too (`opted-out`, `no-access`, `revoked`).
+  may drop it too (`opted-out`, `no-access`, `revoked`, `deleted`).
 - **An address on `1ctx.dev` is a placeholder.** Seeded and
   bootstrapped users get one, so the project's own domain is never
   emailed. The users' `email_placeholder` follows the address's domain,
   exactly `1ctx.dev`, at every create and every email edit, and the
   migration set it the same way. A placeholder is never emailed.
+
+## Agents and alerts
+
+- **An `agent` row is an agent's `email_user` call, one per user.** It
+  carries the project and the session, and holds the email rendered
+  when it was queued (`packBody()`): the subject, the text, the HTML
+  and the From name, so a rename later changes nothing sent.
+- **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
+  queues it for the automation's owner in the transaction that sets
+  `attention_since` (`automations/alert-email.ts`), only with email on
+  and the owner a recipient as below; a run that joins queues none. A
+  failure to queue is logged `alert email failed` and never fails the
+  run's end.
+- **Both go only to users who took email from agents.**
+  `users.email_from_agents` starts off; the user turns it on on their
+  profile (`PUT /api/profile/email`). Each kind's `prepare` checks
+  again at the send: `deleted` once the session is gone (its id set
+  null), `no-access` when the user can no longer open the project or
+  must change their password, `opted-out` once they turned it off.
+- **The email frames what the agent wrote** (`email/frame.ts`). The
+  subject starts `[1ctx] `; an agent's From name is "<agent> via 1ctx",
+  an alert's the server's. A fixed line says who wrote it where
+  ("your personal project" for the reader's own), the agent's text
+  sits in a blockquote, and the one trusted link, built by `link()` to
+  the chat or run (`sessionPath()`, the client's paths), closes it. An
+  alert carries the run's reason, or says a decider marked it.
+- **The agent's Markdown has its own renderer** (`renderEmailMarkdown()`
+  in `render/email.ts`), HTML and plain text from one parse. A link is
+  written as its full address, never its label, and only an `http(s)`
+  one is an anchor; an image is dropped; a raw HTML block is dropped
+  and a span stays escaped text; nothing carries a class or a style.
 
 ## The pages
 
@@ -94,6 +126,12 @@ link and users pages show of email. The links themselves are in
   invite again while they must change their password, else a reset
   link (`linkCardWords()`). The typed reset shows only when no email
   reaches the user.
+- **What agents email shows only with email on.** The profile's Email
+  from agents switch shows while `emailOn` (in every profile answer);
+  the Config board lists `email_user` only then. The SMTP page holds
+  the tool's switch (Agents email users). The composer's plus menu and
+  the task editor's Access step show an Email switch only while the
+  agents route lists `email` as switchable.
 - **The sign-in page offers its email links only with email on,**
   and says the same after an ask whoever was named. The link page
   (`/link/<token>`) is a `bare` route: drawn outside the shell whoever

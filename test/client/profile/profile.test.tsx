@@ -3,10 +3,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { profile } from "../../../src/client/data/profile.ts";
+import { profile, profileEmailOn } from "../../../src/client/data/profile.ts";
 import { initials, longDate } from "../../../src/client/lib/format.ts";
 import {
   aboutProblem,
+  emailSectionText,
   fullNameProblem,
   passwordProblem,
 } from "../../../src/client/views/profile/Profile.model.ts";
@@ -38,6 +39,15 @@ describe("Profile.model", () => {
     expect(fullNameProblem("a\u2028b")).toBe("One line only");
   });
 
+  test("where email from agents goes", () => {
+    expect(
+      emailSectionText({ email: "c@example.test", emailPlaceholder: false }),
+    ).toBe("Sent to c@example.test.");
+    expect(
+      emailSectionText({ email: "c@1ctx.dev", emailPlaceholder: true }),
+    ).toBe("Your account has no real email. Ask an admin to set one.");
+  });
+
   test("the about rule", () => {
     expect(aboutProblem("")).toBeNull();
     expect(aboutProblem("a".repeat(2001))).toContain("under 2000");
@@ -67,6 +77,7 @@ describe("Profile", () => {
       disabled: false,
       mustChangePassword: false,
       emailPlaceholder: false,
+      emailFromAgents: false,
       about: "Actor.",
       role: "member",
       createdAt: new Date(2026, 8, 12).getTime(),
@@ -87,6 +98,17 @@ describe("Profile", () => {
     expect(html).toContain("Europe/Bucharest");
     expect(html).toContain('autocomplete="new-password"');
     expect(html).toContain("Change password");
+    // email from agents only once email is set up
+    expect(html).not.toContain("Email from agents");
+    profileEmailOn.value = true;
+    try {
+      const on = render(<Profile />);
+      expect(on).toContain("Email from agents");
+      expect(on).toContain('aria-label="Email from agents off"');
+      expect(on).toContain("Sent to casey@example.com.");
+    } finally {
+      profileEmailOn.value = false;
+    }
   });
 
   test("tells a person with a handed password to change it", () => {
@@ -99,6 +121,7 @@ describe("Profile", () => {
       disabled: false,
       mustChangePassword: true,
       emailPlaceholder: false,
+      emailFromAgents: false,
       about: "",
       role: "member",
       createdAt: 0,

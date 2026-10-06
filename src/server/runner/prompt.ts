@@ -4,6 +4,8 @@
 // The system prompt; its order is fixed in docs/sessions.md.
 
 import {
+  EMAIL,
+  EMAIL_OFF_LINE,
   KNOWLEDGE,
   KNOWLEDGE_OFF_LINE,
   MEMORY,
@@ -153,6 +155,12 @@ export function systemPrompt(
     policy.automation === null
   ) {
     parts.push(MEMORY_OFF_LINE);
+  }
+  if (
+    policy.disabledCapabilities.includes(EMAIL) &&
+    policy.offered.tools.length > 0
+  ) {
+    parts.push(EMAIL_OFF_LINE);
   }
   if (policy.mcpOff.length > 0) parts.push(mcpOffLine(policy.mcpOff));
   if (policy.skillsOff.length > 0) {

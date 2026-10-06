@@ -166,3 +166,10 @@ export function resultLine(
 ): string {
   return result === "sent" ? `Sent to ${to ?? "your email"}.` : FAILED[result];
 }
+
+// what the agents' email switch means now
+export function agentEmailLine(on: boolean, emailOn: boolean): string {
+  if (!on) return "Agents cannot email users.";
+  if (!emailOn) return "Agents can email users once the server is set up.";
+  return "Agents may email users who can open the chat or task and turned email from agents on. Each chat and task can turn it off.";
+}

@@ -34,6 +34,7 @@ const context = (): ToolContext => ({
     agentName: "coder",
     sessionId: "session",
     origin: "chat",
+    sendStartedAt: 0,
   },
   signal: new AbortController().signal,
   now: () => 0,
@@ -57,6 +58,7 @@ function mountedContext(s: Setup): ToolContext {
       agentName: s.agent.name,
       sessionId: s.session.id,
       origin: "chat",
+      sendStartedAt: 0,
     },
   };
 }

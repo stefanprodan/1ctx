@@ -21,6 +21,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import {
   credentialKey,
+  EMAIL,
   mcpKey,
   repoKey,
   skillKey,
@@ -55,6 +56,22 @@ export function switchItem(
   }
   return { live: true, on: !input.off, reason: null };
 }
+
+// a switch the instance may not offer at all (Email, until an admin
+// sets email up and turns the tool on): left out rather than locked, so
+// the menu looks as it did before email
+export function offeredItem(
+  key: string,
+  input: Parameters<typeof switchItem>[1],
+): WebItem | null {
+  if (input.switchable === null || !input.switchable.includes(key)) {
+    return null;
+  }
+  return switchItem(key, input);
+}
+
+export const emailItem = (input: Parameters<typeof switchItem>[1]) =>
+  offeredItem(EMAIL, input);
 
 // whether another agent was picked. The list going away for a moment,
 // a project loading or a failed refresh, is no pick: the flips of the

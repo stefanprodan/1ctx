@@ -746,7 +746,9 @@ export const ROUTES: Route[] = [
     view: lazy(() => import("../views/admin/Smtp.tsx").then((m) => m.Smtp)),
     title: () => "SMTP",
     role: "admin",
-    load: loadSmtp,
+    load: async () => {
+      await Promise.all([loadSmtp(), loadTools()]);
+    },
   },
   {
     path: "/admin/config/visuals",

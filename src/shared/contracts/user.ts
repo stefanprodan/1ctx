@@ -27,7 +27,9 @@ export type UserAccount = UserSummary & {
   emailPlaceholder: boolean;
 };
 
-export type Profile = UserAccount & { about: string };
+// the user's own page: emailFromAgents lets agents email them about a
+// chat or run they can open, off until they turn it on
+export type Profile = UserAccount & { about: string; emailFromAgents: boolean };
 
 // another user as their page shows them to any signed-in user: who they
 // are, how to reach them and when it is for them

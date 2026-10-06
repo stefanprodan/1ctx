@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The profile: who the user is on one line, then two sections down one
+// The profile: who the user is on one line, then sections down one
 // column, a heading on the left and the form on the right: the name,
-// the time zone and the about text, and the password. The aside holds
+// the time zone and the about text, email from agents while email is
+// set up, and the password. The aside holds
 // the account: the email, the role and when the user joined. The
 // username is shown, not edited; an admin changes it. A Save wakes when
 // something changed, says Saved for a moment, and a refusal stays beside
@@ -15,14 +16,24 @@ import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
   changePassword,
   profile,
+  profileEmailOn,
   profileError,
+  saveEmailSettings,
   saveProfile,
 } from "../../data/profile.ts";
 import { initials, longDate } from "../../lib/format.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { at, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Page } from "../../ui/Page.tsx";
+import {
+  RowsAvatar,
+  RowsLine,
+  RowsList,
+  RowsSwitch,
+  RowsTitle,
+} from "../../ui/Rows.tsx";
 import { Section, SectionForm } from "../../ui/Section.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
@@ -31,6 +42,7 @@ import { roleWords } from "../directory/Directory.model.ts";
 import {
   aboutProblem,
   detailsFieldOf,
+  emailSectionText,
   fullNameProblem,
   passwordFieldOf,
   passwordFieldProblem,
@@ -110,6 +122,50 @@ function DetailsForm({ user }: { user: ProfileRow }) {
           about.value !== user.about ||
           tz.value !== user.tz
         }
+        label="Save"
+      />
+    </SectionForm>
+  );
+}
+
+const FROM_AGENTS = "Email from agents";
+
+function EmailForm({ user }: { user: ProfileRow }) {
+  const on = useSignal(user.emailFromAgents);
+  const save = useSave(() => saveEmailSettings({ fromAgents: on.value }));
+  return (
+    <SectionForm
+      onSubmit={(event: Event) => {
+        event.preventDefault();
+        void save.run(null);
+      }}
+    >
+      <div class="field">
+        <RowsList>
+          <RowsLine flush>
+            <RowsAvatar>
+              <Icon name="email" size={14} />
+            </RowsAvatar>
+            <RowsTitle name={FROM_AGENTS} />
+            <RowsSwitch
+              on={on.value}
+              label={FROM_AGENTS}
+              disabled={save.busy}
+              onClick={() => {
+                on.value = !on.value;
+                save.touch();
+              }}
+            />
+          </RowsLine>
+        </RowsList>
+        <span class="hint">
+          Agents may email you about chats and tasks you can open, and your
+          tasks when they need attention.
+        </span>
+      </div>
+      <Foot
+        save={save}
+        dirty={on.value !== user.emailFromAgents}
         label="Save"
       />
     </SectionForm>
@@ -226,6 +282,11 @@ export function Profile() {
             >
               <DetailsForm user={user} />
             </Section>
+            {profileEmailOn.value && (
+              <Section title="Email" text={emailSectionText(user)}>
+                <EmailForm user={user} />
+              </Section>
+            )}
             <Section
               title="Password"
               text="Changing it signs out every other device."

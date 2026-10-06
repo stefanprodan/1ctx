@@ -381,6 +381,9 @@ export const MAX_SEARCH = 100;
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;
 export type WebTool = (typeof WEB_TOOLS)[number];
 
+// the tool an agent emails users with, off until an admin turns it on
+export const EMAIL_TOOL = "email_user";
+
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has
 export const BUILTIN_TOOLS = [

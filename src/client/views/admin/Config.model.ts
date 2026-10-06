@@ -5,6 +5,7 @@ import type { ToolsResponse } from "../../../shared/api/tools.ts";
 import type { LimitName } from "../../../shared/contracts/limit.ts";
 import type {
   BuiltinToolSummary,
+  EmailToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import {
@@ -116,10 +117,13 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
   },
 ];
 
-type AnyTool = BuiltinToolSummary | WebToolSummary;
+type AnyTool = BuiltinToolSummary | WebToolSummary | EmailToolSummary;
 
+// email_user only once email is set up, so the board looks as it did
+// before email
 export function builtinsOf(state: ToolsResponse): AnyTool[] {
-  return [...state.builtin, state.visualize].sort((a, b) =>
+  const email = state.emailUser.emailOn ? [state.emailUser] : [];
+  return [...state.builtin, state.visualize, ...email].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
 }
@@ -130,6 +134,10 @@ export function offered(tool: AnyTool, state: ToolsResponse): boolean {
     return state.access.mode !== "off" && state.search.provider !== null;
   }
   if (tool.name === "visualize") return state.visualize.enabled;
+  // the admin's switch, and email set up
+  if (tool.name === "email_user") {
+    return state.emailUser.enabled && state.emailUser.emailOn;
+  }
   return true;
 }
 

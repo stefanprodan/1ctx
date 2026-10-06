@@ -5,6 +5,7 @@ import { type Signal, useSignal } from "@preact/signals";
 import type { SmtpResponse } from "../../../shared/api/smtp.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { saveSmtp, sendTestEmail, smtp, smtpError } from "../../data/smtp.ts";
+import { tools } from "../../data/tools.ts";
 import { says } from "../../lib/format.ts";
 import { at, type Save, useSave } from "../../lib/save.ts";
 import { keyOptions } from "../../lib/secrets.ts";
@@ -18,6 +19,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
+import { AgentEmail } from "./AgentEmail.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import {
@@ -75,6 +77,9 @@ export function SmtpCards({
       {off !== null && <SettingAlert>{off}</SettingAlert>}
       <Server state={state} drafted={drafted} tested={tested} />
       <Test state={state} dirty={dirty} tested={tested} />
+      {tools.value && (
+        <AgentEmail tool={tools.value.emailUser} emailOn={state.enabled} />
+      )}
     </SettingStack>
   );
 }

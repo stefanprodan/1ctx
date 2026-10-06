@@ -8,6 +8,7 @@ import type {
   WebCounts,
 } from "../../shared/api/tools.ts";
 import {
+  EMAIL,
   KNOWLEDGE,
   MEMORY,
   skillKey,
@@ -18,6 +19,7 @@ import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import {
   BUILTIN_TOOLS,
+  EMAIL_TOOL,
   type McpMode,
   type SearchProvider,
   WEB_TOOLS,
@@ -31,10 +33,12 @@ import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ToolCall, wireTokens } from "../providers/index.ts";
+import { type AgentEmailDeps, agentEmails } from "./agent-email.ts";
 import { withCommandHints } from "./bash-hint.ts";
 import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
 import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
+import { makeEmailTool } from "./builtin/email.ts";
 import {
   asMcpCall,
   checkMcpArguments,
@@ -112,6 +116,9 @@ export type ToolsDeps = {
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
   searchDeps?: SearchDependencies;
+  // email_user's: whether email is set up, and what the tool reads and
+  // queues; without it the tool is never offered
+  email?: Omit<AgentEmailDeps, "db" | "clock"> & { enabled(): boolean };
   usage?: {
     visuals(since: number, until: number): VisualCounts;
     web(since: number, until: number): WebCounts;
@@ -156,6 +163,7 @@ const MCP_BACKSTOP_MS = 1000;
 const LOGGED_TOOLS: ReadonlySet<string> = new Set([
   ...BUILTIN_TOOLS,
   ...WEB_TOOLS,
+  EMAIL_TOOL,
 ]);
 
 // the name a log line may carry: a built-in's, or `mcp:` and the server's
@@ -194,6 +202,15 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     fetch: deps.fetcher,
     sleep: abortableSleep,
   };
+  const email = deps.email;
+  const emailPort =
+    email === undefined
+      ? null
+      : agentEmails({ db: deps.db, clock: deps.clock, ...email });
+  // the admin's row and a server set up: a send is offered the tool only
+  // with both
+  const emailOn = () =>
+    email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
 
   const toolsFor = (
     search: SearchProvider | null,
@@ -215,6 +232,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           ),
         ]),
     makeVisualizeTool(hosts),
+    makeEmailTool(emailPort),
     makeBashTool({
       bash: deps.bash,
       web,
@@ -266,6 +284,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const response = (now: number): ToolsResponse => {
     const visual = store.row("visualize");
     const tool = fillYear([makeVisualizeTool(visual.hosts)], now)[0]!;
+    const emailRow = store.row(EMAIL_TOOL);
+    const emailTool = makeEmailTool(null);
     return {
       builtin: builtinCatalog(now, deps.render),
       access: webAccess(),
@@ -278,6 +298,16 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         enabled: visual.enabled,
         hosts: visual.hosts,
         updatedAt: visual.updatedAt,
+      },
+      emailUser: {
+        name: EMAIL_TOOL,
+        description: emailTool.description,
+        parameters: emailTool.parameters,
+        parametersHtml: parametersHtml(emailTool, deps.render),
+        tokens: wireTokens([emailTool]),
+        enabled: emailRow.enabled,
+        emailOn: email?.enabled() ?? false,
+        updatedAt: emailRow.updatedAt,
       },
       search: {
         provider: store.row("websearch").provider,
@@ -305,7 +335,11 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         store.setAccess(mode, domains, now);
       }
       if (change.enabled !== undefined) {
-        store.setEnabled("visualize", change.enabled, now);
+        store.setEnabled(
+          name === EMAIL_TOOL ? EMAIL_TOOL : "visualize",
+          change.enabled,
+          now,
+        );
       }
       if ("provider" in change) store.setProvider(change.provider ?? null, now);
       if (change.hosts !== undefined) store.setHosts(change.hosts, now);
@@ -319,6 +353,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     capabilities: () => [
       ...(webAccess().mode === "off" ? [] : [WEB]),
       ...(store.row("visualize").enabled ? [VISUALIZE] : []),
+      ...(emailOn() ? [EMAIL] : []),
       // no admin row governs these
       KNOWLEDGE,
       MEMORY,
@@ -346,6 +381,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           mcp: mcpService,
           memory: deps.memory,
           credentials: deps.credentials,
+          emailOn,
           toolsFor,
           log: deps.log,
         },

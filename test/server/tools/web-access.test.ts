@@ -182,6 +182,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
     agentId: "a",
     agentName: "agent",
     origin: "chat",
+    sendStartedAt: 0,
   };
   const tool = makeBashTool({
     bash: {
@@ -223,6 +224,7 @@ test("tools routes expose access, None and the independent visual settings", asy
     expect(Object.keys(first).sort()).toEqual([
       "access",
       "builtin",
+      "emailUser",
       "search",
       "visualize",
     ]);
