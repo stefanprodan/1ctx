@@ -160,12 +160,7 @@ export function Revision({
             href={
               steps.newer === null
                 ? undefined
-                : revisionHref(
-                    file.projectId,
-                    file.id,
-                    steps.newer,
-                    file.revision,
-                  )
+                : revisionHref(file.projectId, file.id, steps.newer)
             }
           >
             <Icon name="chevron-right" size={14} />

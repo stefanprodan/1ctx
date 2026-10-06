@@ -109,8 +109,8 @@ test.serial("a past revision: its steps and what it changed", () => {
   );
   expect(html).toContain("Revision 2 of 3");
   expect(html).toContain(`href="${HREF}?revision=1"`);
-  // the newer step would be the file as it is: none
-  expect(html).not.toContain(`href="${HREF}?revision=3"`);
+  // the newer step is the latest's own page, with what it changed
+  expect(html).toContain(`href="${HREF}?revision=3"`);
   expect(html).toContain("What revision 2 changed from revision 1");
   expect(html).toContain('class="diff"');
 });

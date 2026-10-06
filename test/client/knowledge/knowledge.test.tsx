@@ -225,9 +225,6 @@ describe("the knowledge words", () => {
     expect(revisionHref("p1", "f1", 2)).toBe(
       "/projects/p1/knowledge/files/f1?revision=2",
     );
-    expect(revisionHref("p1", "f1", 3, 3)).toBe(
-      "/projects/p1/knowledge/files/f1",
-    );
     expect(historyHref("p1", "f1")).toBe(
       "/projects/p1/knowledge/files/f1?history",
     );
