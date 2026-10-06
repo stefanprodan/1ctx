@@ -178,6 +178,12 @@ describe("email_user's schema", () => {
       "subject must be one line",
     );
     expect(() =>
+      parseEmailRequest({
+        ...ok,
+        subject: "[1ctx] Open the chat: https://phish.test/x",
+      }),
+    ).toThrow("subject must not hold a link");
+    expect(() =>
       parseEmailRequest({ ...ok, subject: "x".repeat(MAX_EMAIL_SUBJECT + 1) }),
     ).toThrow("subject must be one line");
     expect(() =>

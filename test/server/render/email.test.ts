@@ -22,6 +22,16 @@ describe("the email renderer", () => {
     expect(text).not.toContain("your bank");
   });
 
+  test("keeps a bare address as text, its markup whole", () => {
+    const { html, text } = renderEmailMarkdown(
+      "para\n\nsee https://a.test/x*y* ok\n\n# head",
+    );
+    expect(html).toBe(
+      "<p>para</p><p>see https://a.test/x<em>y</em> ok</p><h1>head</h1>",
+    );
+    expect(text).toBe("para\n\nsee https://a.test/xy ok\n\nhead");
+  });
+
   test("links only http and https, and shows any other address as text", () => {
     const { html, text } = renderEmailMarkdown(
       "[a](javascript:alert(1)) [b](mailto:x@example.test)",

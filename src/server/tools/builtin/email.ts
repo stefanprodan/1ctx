@@ -58,6 +58,10 @@ export function parseEmailRequest(args: Record<string, unknown>): EmailRequest {
       `subject must be one line of 1 to ${MAX_EMAIL_SUBJECT} characters`,
     );
   }
+  // the subject shows above 1ctx's lines, in every inbox list
+  if (subject.includes("://")) {
+    throw new Error("subject must not hold a link. Put links in the body");
+  }
   // the outbox refuses the same, too late for the model to read why
   if (badSubject(subject)) {
     throw new Error(
@@ -91,7 +95,7 @@ export function makeEmailTool(port: AgentEmailPort | null): Tool {
         },
         subject: {
           type: "string",
-          description: "One line.",
+          description: "One line, no links.",
           minLength: 1,
           maxLength: MAX_EMAIL_SUBJECT,
         },
