@@ -7,15 +7,15 @@
 
 // tls: TLS from the first byte. starttls: plain, then upgraded, and
 // refused when the server does not offer the upgrade
-export const MAIL_SECURITY = ["tls", "starttls"] as const;
-export type MailSecurity = (typeof MAIL_SECURITY)[number];
-export function isMailSecurity(value: unknown): value is MailSecurity {
-  return MAIL_SECURITY.includes(value as MailSecurity);
+export const SMTP_SECURITY = ["tls", "starttls"] as const;
+export type SmtpSecurity = (typeof SMTP_SECURITY)[number];
+export function isSmtpSecurity(value: unknown): value is SmtpSecurity {
+  return SMTP_SECURITY.includes(value as SmtpSecurity);
 }
 
 // why a send failed: the only words a page, a log or a row holds,
 // never the server's own text
-export const MAIL_FAILURES = [
+export const SMTP_FAILURES = [
   "auth",
   "tls",
   "connect",
@@ -23,20 +23,20 @@ export const MAIL_FAILURES = [
   "timeout",
   "other",
 ] as const;
-export type MailFailure = (typeof MAIL_FAILURES)[number];
+export type SmtpFailure = (typeof SMTP_FAILURES)[number];
 
 export const DEFAULT_FROM_NAME = "1ctx";
 
-export type MailSettings = {
+export type SmtpSettings = {
   host: string;
   port: number;
-  security: MailSecurity;
-  // both null for a server that takes mail without a login
+  security: SmtpSecurity;
+  // both null for a server that takes email without a login
   username: string | null;
   keyName: string | null;
   fromAddress: string;
   fromName: string;
-  // the origin every link a mail carries starts with
+  // the origin every link an email carries starts with
   publicAddress: string;
   updatedAt: number;
 };

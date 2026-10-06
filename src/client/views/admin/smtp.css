@@ -1,7 +1,7 @@
 @layer tokens, base, owners;
 
 @layer owners {
-  .mail-result {
+  .smtp-result {
     margin: 0;
     font-size: var(--text-ui);
   }

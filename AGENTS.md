@@ -10,7 +10,7 @@ them on schedules (automations), with shared knowledge and memory.
   official npm only, `bun install --ignore-scripts`. A new package needs
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
-  only `server/mail/smtp.ts` imports `nodemailer`, and only
+  only `server/email/smtp.ts` imports `nodemailer`, and only
   `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
   patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
   and unknown types are not read as regular files, and cancelling an
@@ -117,7 +117,7 @@ since a relative URL inside the binary resolves against `src/server`.
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`) and fails
-every other, and a fake mailer that keeps every message. `smtp.ts` is
+every other, and a fake email sender that keeps every message. `smtp.ts` is
 a fake SMTP server on loopback. `chat.ts` drives a chat
 with a scripted provider stream. `auth-cases.ts` is the authorization
 matrix.
@@ -143,7 +143,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
-| `docs/mail.md` | `mail/`: the SMTP server, the outbox, the sender, the Mail page |
+| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, the SMTP page |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

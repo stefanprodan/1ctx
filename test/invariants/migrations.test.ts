@@ -60,7 +60,7 @@ const EXPECTED_IDS = [
   "0046-azure",
   "0047-decision-usage-decider",
   "0048-agent-listed-as",
-  "0049-mail",
+  "0049-email",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1513,9 +1513,9 @@ describe("the schema", () => {
           values ('ad', 'root', 'Admin', 'admin@1ctx.dev', 'admin', 'x', 0),
             ('b', 'bea', 'Bea', 'bea@1ctx.dev', 'member', 'x', 0),
             ('c', 'cai', 'Cai', 'someone@1ctx.dev', 'member', 'x', 0),
-            ('d', 'dan', 'Dan', 'dan@mail.1ctx.dev', 'member', 'x', 0);
+            ('d', 'dan', 'Dan', 'dan@team.1ctx.dev', 'member', 'x', 0);
       `);
-      expect(migrate(db)).toEqual(expectedFrom("0049-mail"));
+      expect(migrate(db)).toEqual(expectedFrom("0049-email"));
       expect(
         db.query("select id, email_placeholder from users order by id").all(),
       ).toEqual([
@@ -1525,19 +1525,19 @@ describe("the schema", () => {
         { id: "d", email_placeholder: 0 },
         { id: "u", email_placeholder: 0 },
       ]);
-      expect(db.query("select count(*) as n from mail_outbox").get()).toEqual({
+      expect(db.query("select count(*) as n from email_outbox").get()).toEqual({
         n: 0,
       });
       expect(() =>
         db.exec(`
-          insert into mail_outbox (id, kind, user_id, message_id,
+          insert into email_outbox (id, kind, user_id, message_id,
               next_attempt_at, created_at, updated_at)
             values ('o', 'spam', 'u', '<o@x>', 0, 0, 0)
         `),
       ).toThrow(/CHECK/);
       expect(() =>
         db.exec(`
-          insert into mail_settings (id, host, port, security,
+          insert into smtp_settings (id, host, port, security,
               from_address, public_address, updated_at)
             values (2, 'h', 25, 'tls', 'a@b.c', 'https://x', 0)
         `),
@@ -1545,7 +1545,7 @@ describe("the schema", () => {
       // a chat's delete keeps its sent rows for the project's cap, and
       // finds them by index, never a scan
       db.exec(`
-        insert into mail_outbox (id, kind, user_id, project_id, session_id,
+        insert into email_outbox (id, kind, user_id, project_id, session_id,
             message_id, status, next_attempt_at, created_at, updated_at)
           values ('o', 'agent', 'u', 'p', 'sess', '<o@x>', 'sent', 0, 0, 0)
       `);
@@ -1553,21 +1553,21 @@ describe("the schema", () => {
       const plan = (column: string) =>
         db
           .query<{ detail: string }, [string]>(
-            `explain query plan select 1 from mail_outbox where ${column} = ?`,
+            `explain query plan select 1 from email_outbox where ${column} = ?`,
           )
           .all("x")
           .map((row) => row.detail)
           .join("; ");
       expect(plan("session_id")).toMatch(
-        /^SEARCH mail_outbox USING (COVERING )?INDEX mail_outbox_session/,
+        /^SEARCH email_outbox USING (COVERING )?INDEX email_outbox_session/,
       );
       expect(plan("project_id")).toMatch(
-        /^SEARCH mail_outbox USING (COVERING )?INDEX mail_outbox_project/,
+        /^SEARCH email_outbox USING (COVERING )?INDEX email_outbox_project/,
       );
       db.exec("delete from sessions where id = 'sess'");
       expect(
         db
-          .query("select session_id, project_id, status from mail_outbox")
+          .query("select session_id, project_id, status from email_outbox")
           .all(),
       ).toEqual([{ session_id: null, project_id: "p", status: "sent" }]);
     } finally {

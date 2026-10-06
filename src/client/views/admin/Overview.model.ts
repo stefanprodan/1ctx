@@ -29,7 +29,7 @@ import {
   configMcpHref,
   configProviderHref,
   configSkillHref,
-  MAIL_HREF,
+  SMTP_HREF,
   WEB_HREF,
 } from "../../lib/hrefs.ts";
 
@@ -228,7 +228,7 @@ const ATTENTION: Record<
   {
     what: string;
     line: string;
-    icon: "mcp" | "skill" | "key" | "mail";
+    icon: "mcp" | "skill" | "key" | "email";
     href: (name: string) => string;
   }
 > = {
@@ -262,17 +262,17 @@ const ATTENTION: Record<
     line: "key file missing",
     href: () => WEB_HREF,
   },
-  "mail-key": {
+  "smtp-key": {
     icon: "key",
-    what: "Mail",
+    what: "SMTP",
     line: "key file missing",
-    href: () => MAIL_HREF,
+    href: () => SMTP_HREF,
   },
-  "mail-failed": {
-    icon: "mail",
-    what: "Mail",
+  "email-failed": {
+    icon: "email",
+    what: "Email",
     line: "failed",
-    href: () => MAIL_HREF,
+    href: () => SMTP_HREF,
   },
   "mcp-refresh": {
     icon: "mcp",
@@ -288,22 +288,22 @@ const ATTENTION: Record<
   },
 };
 
-// a failed mail is named by its word, with the outbox's counts
-function mailLine(
+// a failed email is named by its word, with the outbox's counts
+function emailLine(
   at: number,
   now: number,
-  mail: AttentionResponse["mail"],
+  email: AttentionResponse["email"],
 ): string {
-  const failed = mail?.failed ?? 1;
-  const queued = mail?.queued ?? 0;
-  const line = `${plural(failed, "mail")} failed, the last ${ago(at, now)}`;
+  const failed = email?.failed ?? 1;
+  const queued = email?.queued ?? 0;
+  const line = `${plural(failed, "email")} failed, the last ${ago(at, now)}`;
   return queued > 0 ? `${line}, ${count(queued)} queued` : line;
 }
 
 export function attentionRow(
   item: AttentionItem,
   now: number,
-  mail: AttentionResponse["mail"] = null,
+  email: AttentionResponse["email"] = null,
 ) {
   const words = ATTENTION[item.kind];
   return {
@@ -312,8 +312,8 @@ export function attentionRow(
     line:
       item.at === null
         ? words.line
-        : item.kind === "mail-failed"
-          ? mailLine(item.at, now, mail)
+        : item.kind === "email-failed"
+          ? emailLine(item.at, now, email)
           : `${words.line} ${ago(item.at, now)}`,
     what: words.what,
     icon: words.icon,

@@ -33,9 +33,9 @@ import {
   required,
 } from "./client.ts";
 import { decider } from "./decider.ts";
-import { applyMail } from "./mail.ts";
 import { type Document, KINDS, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
+import { applySmtpServer } from "./smtp.ts";
 
 export type Secret = (kind: SecretKind, name: string) => string | null;
 
@@ -415,8 +415,8 @@ export async function apply(
           case "User":
             action = await user(api, doc, secret);
             break;
-          case "Mail":
-            action = await applyMail(api, doc);
+          case "SmtpServer":
+            action = await applySmtpServer(api, doc);
             break;
           case "Project": {
             const made = await project(api, doc);

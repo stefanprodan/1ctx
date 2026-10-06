@@ -1,12 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mail settings' parser and the area's pure rules: the public
+// The SMTP settings' parser and the area's pure rules: the public
 // address, the header values refused, the backoff and the links.
 
 import { describe, expect, test } from "bun:test";
-import { BadRequest } from "../../../src/server/lib/errors.ts";
-import { parseMail } from "../../../src/server/mail/parse.ts";
+import { parseSmtp } from "../../../src/server/email/parse.ts";
 import {
   BACKOFF_MS,
   hasControl,
@@ -14,7 +13,8 @@ import {
   messageIdOf,
   publicOrigin,
   retryAt,
-} from "../../../src/server/mail/rules.ts";
+} from "../../../src/server/email/rules.ts";
+import { BadRequest } from "../../../src/server/lib/errors.ts";
 
 const valid = {
   host: "SMTP.Example.test",
@@ -22,27 +22,27 @@ const valid = {
   security: "tls",
   username: "api_token",
   keyName: "email-relay",
-  fromAddress: "Mail@Example.test",
+  fromAddress: "Noreply@Example.test",
   fromName: "1ctx",
   publicAddress: "https://1ctx.example.test/",
 };
 
 const refused = (body: unknown, words: string) => {
-  expect(() => parseMail(body)).toThrow(BadRequest);
-  expect(() => parseMail(body)).toThrow(words);
+  expect(() => parseSmtp(body)).toThrow(BadRequest);
+  expect(() => parseSmtp(body)).toThrow(words);
 };
 
-describe("the mail settings parser", () => {
+describe("the SMTP settings parser", () => {
   test("keeps the origin and lowercases the host and the sender", () => {
-    expect(parseMail(valid)).toEqual({
+    expect(parseSmtp(valid)).toEqual({
       ...valid,
       host: "smtp.example.test",
       security: "tls",
-      fromAddress: "mail@example.test",
+      fromAddress: "noreply@example.test",
       publicAddress: "https://1ctx.example.test",
     });
     expect(
-      parseMail({ ...valid, username: null, keyName: null }),
+      parseSmtp({ ...valid, username: null, keyName: null }),
     ).toMatchObject({ username: null, keyName: null });
   });
 
@@ -128,7 +128,7 @@ describe("the rules", () => {
   });
 
   test("name a message by its row and the sender's domain", () => {
-    expect(messageIdOf("abc123", "mail@example.test")).toBe(
+    expect(messageIdOf("abc123", "noreply@example.test")).toBe(
       "<abc123@example.test>",
     );
   });

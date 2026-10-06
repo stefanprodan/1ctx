@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PutMailRequest } from "../../shared/api/mail.ts";
+import type { PutSmtpRequest } from "../../shared/api/smtp.ts";
 import {
-  isMailSecurity,
-  type MailSecurity,
-} from "../../shared/contracts/mail.ts";
+  isSmtpSecurity,
+  type SmtpSecurity,
+} from "../../shared/contracts/smtp.ts";
 import {
   EMAIL_KEY_PREFIX,
   isEmail,
@@ -25,7 +25,7 @@ const MAX_ADDRESS = 2048;
 // a host name or an IP address, never a URL
 const HOST = /^[A-Za-z0-9.:-]+$/;
 
-const MAIL_FIELDS = [
+const SMTP_FIELDS = [
   "host",
   "port",
   "security",
@@ -60,14 +60,14 @@ export function parsePort(value: unknown): number {
   return value;
 }
 
-export function parseSecurity(value: unknown): MailSecurity {
-  if (!isMailSecurity(value)) {
+export function parseSecurity(value: unknown): SmtpSecurity {
+  if (!isSmtpSecurity(value)) {
     throw new BadRequest("security must be tls or starttls");
   }
   return value;
 }
 
-export function parseMailUsername(value: unknown): string | null {
+export function parseSmtpUsername(value: unknown): string | null {
   if (value === null) return null;
   if (
     typeof value !== "string" ||
@@ -82,7 +82,7 @@ export function parseMailUsername(value: unknown): string | null {
   return value;
 }
 
-export function parseMailKeyName(value: unknown): string | null {
+export function parseSmtpKeyName(value: unknown): string | null {
   if (value === null) return null;
   if (!isSecretName(EMAIL_KEY_PREFIX, value)) {
     throw new BadRequest(
@@ -138,17 +138,17 @@ export function pairProblem(
   return null;
 }
 
-export function parseMail(body: unknown): PutMailRequest {
-  const b = fields(body, MAIL_FIELDS);
-  for (const name of MAIL_FIELDS) {
+export function parseSmtp(body: unknown): PutSmtpRequest {
+  const b = fields(body, SMTP_FIELDS);
+  for (const name of SMTP_FIELDS) {
     if (!Object.hasOwn(b, name)) throw new BadRequest(`${name} is required`);
   }
-  const parsed: PutMailRequest = {
+  const parsed: PutSmtpRequest = {
     host: parseHost(b.host),
     port: parsePort(b.port),
     security: parseSecurity(b.security),
-    username: parseMailUsername(b.username),
-    keyName: parseMailKeyName(b.keyName),
+    username: parseSmtpUsername(b.username),
+    keyName: parseSmtpKeyName(b.keyName),
     fromAddress: parseFromAddress(b.fromAddress),
     fromName: parseFromName(b.fromName),
     publicAddress: parsePublicAddress(b.publicAddress),

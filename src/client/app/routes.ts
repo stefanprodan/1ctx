@@ -40,7 +40,6 @@ import {
 } from "../data/directory.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
-import { loadMail } from "../data/mail.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -83,6 +82,7 @@ import {
   loadSkillUsage,
   skills,
 } from "../data/skills.ts";
+import { loadSmtp } from "../data/smtp.ts";
 import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
@@ -730,11 +730,11 @@ export const ROUTES: Route[] = [
     },
   },
   {
-    path: "/admin/config/mail",
-    view: lazy(() => import("../views/admin/Mail.tsx").then((m) => m.Mail)),
-    title: () => "Mail",
+    path: "/admin/config/smtp",
+    view: lazy(() => import("../views/admin/Smtp.tsx").then((m) => m.Smtp)),
+    title: () => "SMTP",
     role: "admin",
-    load: loadMail,
+    load: loadSmtp,
   },
   {
     path: "/admin/config/visuals",

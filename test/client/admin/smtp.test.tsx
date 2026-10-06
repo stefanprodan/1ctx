@@ -3,34 +3,34 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { mail, mailError } from "../../../src/client/data/mail.ts";
+import { smtp, smtpError } from "../../../src/client/data/smtp.ts";
 import {
   draftOf,
-  mailBody,
-  mailDirty,
-  mailFieldOf,
   offLine,
   resultLine,
+  smtpBody,
+  smtpDirty,
+  smtpFieldOf,
   testLine,
   withSecurity,
-} from "../../../src/client/views/admin/Mail.model.ts";
-import { Mail } from "../../../src/client/views/admin/Mail.tsx";
-import type { MailResponse } from "../../../src/shared/api/mail.ts";
-import type { MailSettings } from "../../../src/shared/contracts/mail.ts";
+} from "../../../src/client/views/admin/Smtp.model.ts";
+import { Smtp } from "../../../src/client/views/admin/Smtp.tsx";
+import type { SmtpResponse } from "../../../src/shared/api/smtp.ts";
+import type { SmtpSettings } from "../../../src/shared/contracts/smtp.ts";
 
-const settings: MailSettings = {
+const settings: SmtpSettings = {
   host: "smtp.example.test",
   port: 465,
   security: "tls",
   username: "api_token",
   keyName: "email-relay",
-  fromAddress: "mail@example.test",
+  fromAddress: "noreply@example.test",
   fromName: "1ctx",
   publicAddress: "https://1ctx.example.test",
   updatedAt: 5,
 };
 
-const response = (over: Partial<MailResponse> = {}): MailResponse => ({
+const response = (over: Partial<SmtpResponse> = {}): SmtpResponse => ({
   settings,
   enabled: true,
   hasKey: true,
@@ -39,7 +39,7 @@ const response = (over: Partial<MailResponse> = {}): MailResponse => ({
   ...over,
 });
 
-describe("the Mail words", () => {
+describe("the SMTP words", () => {
   test("a new draft starts on TLS at 465 from 1ctx", () => {
     expect(draftOf(null)).toMatchObject({
       port: "465",
@@ -53,59 +53,59 @@ describe("the Mail words", () => {
   });
 
   test("the body holds every field, a login whole or none", () => {
-    expect(mailBody(draftOf(settings))).toEqual({
+    expect(smtpBody(draftOf(settings))).toEqual({
       body: {
         host: "smtp.example.test",
         port: 465,
         security: "tls",
         username: "api_token",
         keyName: "email-relay",
-        fromAddress: "mail@example.test",
+        fromAddress: "noreply@example.test",
         fromName: "1ctx",
         publicAddress: "https://1ctx.example.test",
       },
     });
     const d = draftOf(settings);
-    expect(mailBody({ ...d, keyName: "" })).toMatchObject({
+    expect(smtpBody({ ...d, keyName: "" })).toMatchObject({
       field: "keyName",
     });
-    expect(mailBody({ ...d, username: " " })).toMatchObject({
+    expect(smtpBody({ ...d, username: " " })).toMatchObject({
       field: "username",
     });
-    expect(mailBody({ ...d, username: "", keyName: "" })).toMatchObject({
+    expect(smtpBody({ ...d, username: "", keyName: "" })).toMatchObject({
       body: { username: null, keyName: null },
     });
-    expect(mailBody({ ...d, port: "70000" })).toMatchObject({ field: "port" });
-    expect(mailBody({ ...d, fromAddress: "x" })).toMatchObject({
+    expect(smtpBody({ ...d, port: "70000" })).toMatchObject({ field: "port" });
+    expect(smtpBody({ ...d, fromAddress: "x" })).toMatchObject({
       field: "fromAddress",
     });
-    expect(mailBody({ ...d, host: "" })).toMatchObject({ field: "host" });
+    expect(smtpBody({ ...d, host: "" })).toMatchObject({ field: "host" });
   });
 
   test("dirty only when a field differs from the saved row", () => {
-    expect(mailDirty(draftOf(settings), settings)).toBe(false);
-    expect(mailDirty({ ...draftOf(settings), host: "a" }, settings)).toBe(true);
-    expect(mailDirty(draftOf(null), null)).toBe(false);
+    expect(smtpDirty(draftOf(settings), settings)).toBe(false);
+    expect(smtpDirty({ ...draftOf(settings), host: "a" }, settings)).toBe(true);
+    expect(smtpDirty(draftOf(null), null)).toBe(false);
   });
 
   test("a server refusal lands at its field", () => {
-    expect(mailFieldOf("publicAddress must be an origin, with no path")).toBe(
+    expect(smtpFieldOf("publicAddress must be an origin, with no path")).toBe(
       "publicAddress",
     );
-    expect(mailFieldOf("keyName is required with a username")).toBe("keyName");
-    expect(mailFieldOf("mail is not set up")).toBeUndefined();
+    expect(smtpFieldOf("keyName is required with a username")).toBe("keyName");
+    expect(smtpFieldOf("email is not set up")).toBeUndefined();
   });
 
-  test("says why mail is off and what a test did", () => {
+  test("says why email is off and what a test did", () => {
     expect(offLine(response())).toBeNull();
     expect(offLine(response({ settings: null, enabled: false }))).toBe(
-      "Mail is off until a server is saved.",
+      "Email is off until an SMTP server is saved.",
     );
     expect(offLine(response({ enabled: false, hasKey: false }))).toBe(
-      "Mail is off: email-relay.key is missing.",
+      "Email is off: email-relay.key is missing.",
     );
     expect(testLine(response())).toBe(
-      "Sends a test mail to root@example.test.",
+      "Sends a test email to root@example.test.",
     );
     expect(testLine(response(), true)).toBe("Save the changes to test them.");
     expect(testLine(response({ to: null }))).toBe(
@@ -120,19 +120,19 @@ describe("the Mail words", () => {
   });
 });
 
-describe("the Mail page", () => {
+describe("the SMTP page", () => {
   afterEach(() => {
-    mail.value = null;
-    mailError.value = null;
+    smtp.value = null;
+    smtpError.value = null;
   });
 
-  test.serial("one form, nothing to save at rest, Send test on", () => {
-    mail.value = response();
-    const html = render(<Mail />);
+  test.serial("one form, nothing to save at rest, Send test email on", () => {
+    smtp.value = response();
+    const html = render(<Smtp />);
     expect(html.match(/<form\b/g)).toHaveLength(1);
     expect(
       [...html.matchAll(/setting-title">([^<]+)</g)].map((m) => m[1]),
-    ).toEqual(["Server", "Send test"]);
+    ).toEqual(["Server", "Send test email"]);
     for (const name of [
       "host",
       "port",
@@ -147,14 +147,14 @@ describe("the Mail page", () => {
     expect(html).not.toContain("Unsaved changes");
     expect(html).not.toContain("setting-alert");
     expect(html).toMatch(
-      /<button type="button" class="btn btn-small">Send test/,
+      /<button type="button" class="btn btn-small">Send test email/,
     );
   });
 
-  test.serial("says mail is off and keeps Send test off", () => {
-    mail.value = response({ settings: null, enabled: false, to: null });
-    const html = render(<Mail />);
-    expect(html).toContain("Mail is off until a server is saved.");
-    expect(html).toMatch(/class="btn btn-small" disabled[^>]*>Send test/);
+  test.serial("says email is off and keeps Send test email off", () => {
+    smtp.value = response({ settings: null, enabled: false, to: null });
+    const html = render(<Smtp />);
+    expect(html).toContain("Email is off until an SMTP server is saved.");
+    expect(html).toMatch(/class="btn btn-small" disabled[^>]*>Send test email/);
   });
 });

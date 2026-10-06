@@ -10,7 +10,7 @@ import { join } from "node:path";
 import type { Socket } from "bun";
 
 const fixture = (name: string) =>
-  readFileSync(join(import.meta.dir, "..", "fixtures", "mail", name), "utf8");
+  readFileSync(join(import.meta.dir, "..", "fixtures", "smtp", name), "utf8");
 
 // a self-signed certificate for 127.0.0.1 and localhost; a client that
 // trusts it as its CA verifies the server as the real one would

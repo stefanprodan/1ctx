@@ -523,24 +523,24 @@ describe("needs attention", () => {
       attentionRow({ kind: "credential-key", name: "gh", at: null }, now).href,
     ).toBe("/admin/config/web/credentials/gh");
     expect(
-      attentionRow({ kind: "mail-key", name: "email-relay", at: null }, now),
+      attentionRow({ kind: "smtp-key", name: "email-relay", at: null }, now),
     ).toMatchObject({
       line: "key file missing",
-      what: "Mail",
-      href: "/admin/config/mail",
+      what: "SMTP",
+      href: "/admin/config/smtp",
     });
     expect(
       attentionRow(
-        { kind: "mail-failed", name: "auth", at: now - 2 * 3_600_000 },
+        { kind: "email-failed", name: "auth", at: now - 2 * 3_600_000 },
         now,
         { queued: 3, failed: 2 },
       ),
     ).toMatchObject({
       name: "auth",
-      line: "2 mails failed, the last 2h ago, 3 queued",
-      what: "Mail",
-      icon: "mail",
-      href: "/admin/config/mail",
+      line: "2 emails failed, the last 2h ago, 3 queued",
+      what: "Email",
+      icon: "email",
+      href: "/admin/config/smtp",
     });
   });
 });

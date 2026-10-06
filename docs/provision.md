@@ -4,7 +4,7 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
 `--provision`.
 
 Provisioning applies YAML documents, one object each (a `kind` from
-`KINDS`: users, mail, projects, credentials, repositories, providers,
+`KINDS`: users, the SMTP server, projects, credentials, repositories, providers,
 deciders, skills, MCP servers, agents, tools), to an instance's database, creating or updating
 what they name.
 
@@ -49,7 +49,7 @@ what they name.
 
 ## Rules per kind
 
-- **`Mail` is the instance's one SMTP server.** A second `Mail`
+- **`SmtpServer` is the instance's one SMTP server.** A second `SmtpServer`
   document is refused, and any name updates the server held. A new one
   needs `host`, `port`, `security`, `fromAddress` and
   `publicAddress`; `keyFrom` names an `email-` key file, null takes it

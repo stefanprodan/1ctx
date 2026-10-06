@@ -89,7 +89,7 @@ describe("provision through the composed app", () => {
         .map((line) => line.split(" ")[1]?.split("/")[0]);
       expect(kinds).toEqual([
         "user",
-        "mail",
+        "smtpserver",
         "project",
         "credential",
         "repository",
@@ -109,7 +109,7 @@ describe("provision through the composed app", () => {
         about: "A test teammate.",
       });
       expect(app.projects.personal(zed.id)?.name).toBe("personal");
-      expect(app.mail.settings()).toMatchObject({
+      expect(app.email.settings()).toMatchObject({
         host: "smtp.people.test",
         port: 465,
         security: "tls",

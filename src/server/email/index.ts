@@ -1,15 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Mail: the instance's one SMTP server, the outbox every mail goes
-// through and the sender that empties it. Mail is off until an admin
-// saves a server whose key file is present; every part that mails asks
+// Email: the instance's one SMTP server, the outbox every email goes
+// through and the sender that empties it. Email is off until an admin
+// saves a server whose key file is present; every part that emails asks
 // enabled() first. A caller writes its row with enqueue() inside its
 // own transaction and returns the events, so the sender wakes only
 // after the commit.
 
-import type { MailResponse, MailTestResponse } from "../../shared/api/mail.ts";
-import type { MailFailure, MailSettings } from "../../shared/contracts/mail.ts";
+import type { SmtpResponse, SmtpTestResponse } from "../../shared/api/smtp.ts";
+import type { SmtpFailure, SmtpSettings } from "../../shared/contracts/smtp.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -20,51 +20,51 @@ import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import { routes } from "./routes.ts";
 import {
+  type EmailKind,
   FAILED_KEEP_MS,
   hasControl,
   linkOf,
-  type MailKind,
   messageIdOf,
   SENT_KEEP_MS,
 } from "./rules.ts";
 import { type Prepare, sender } from "./sender.ts";
-import type { Address, Mailer, SmtpServer } from "./smtp.ts";
-import { MailStore } from "./store.ts";
+import type { Address, EmailSender, SmtpServer } from "./smtp.ts";
+import { EmailStore } from "./store.ts";
 
 export {
   pairProblem,
   parseFromAddress,
   parseFromName,
   parseHost,
-  parseMailKeyName,
-  parseMailUsername,
   parsePort,
   parsePublicAddress,
   parseSecurity,
+  parseSmtpKeyName,
+  parseSmtpUsername,
 } from "./parse.ts";
 export {
   type DropWord,
-  MAIL_KINDS,
-  type MailKind,
+  EMAIL_KINDS,
+  type EmailKind,
   publicOrigin,
 } from "./rules.ts";
-export type { MailContent, Prepare } from "./sender.ts";
+export type { EmailContent, Prepare } from "./sender.ts";
 export {
-  type Mailer,
+  type EmailSender,
   type Outgoing,
   type SendResult,
   type SmtpServer,
-  smtpMailer,
+  smtpSender,
 } from "./smtp.ts";
 export type { OutboxRow } from "./store.ts";
-export { MailStore };
+export { EmailStore };
 
-export const mailQueued: BusEvent = { type: "mail.queued", data: {} };
+export const emailQueued: BusEvent = { type: "email.queued", data: {} };
 
-// what an agent's mail and an alert carry; a link mail's row holds no
+// what an agent's email and an alert carry; a link email's row holds no
 // text, its prepare builds it when the row is sent
 export type Enqueue = {
-  kind: MailKind;
+  kind: EmailKind;
   userId: string;
   projectId?: string | null;
   sessionId?: string | null;
@@ -72,17 +72,17 @@ export type Enqueue = {
   body?: string | null;
 };
 
-// what the Monitor shows of mail, null until it is set up
-export type MailAttention = {
+// what the Monitor shows of email, null until it is set up
+export type EmailAttention = {
   keyName: string | null;
   hasKey: boolean;
   queued: number;
   failed: number;
-  lastFailure: MailFailure | null;
+  lastFailure: SmtpFailure | null;
   lastFailedAt: number | null;
 };
 
-export type MailDeps = {
+export type EmailDeps = {
   db: Db;
   clock: Clock;
   log: Log;
@@ -90,20 +90,20 @@ export type MailDeps = {
   secret: (name: string) => string | null;
   keys: () => string[];
   users: { byId(id: string): UserRow | null };
-  mailer: Mailer;
+  emailSender: EmailSender;
 };
 
-export type Mail = {
-  store: MailStore;
+export type Email = {
+  store: EmailStore;
   routes: RouteDescriptor[];
   enabled(): boolean;
-  settings(): MailSettings | null;
-  // a full address under the public address; throws while mail is off
+  settings(): SmtpSettings | null;
+  // a full address under the public address; throws while email is off
   link(path: string): string;
   // writes a row in the caller's transaction; the events to return
   enqueue(fields: Enqueue): BusEvent[];
   // a kind's last word before SMTP; one per kind
-  register(kind: MailKind, prepare: Prepare): void;
+  register(kind: EmailKind, prepare: Prepare): void;
   start(): void;
   stop(): Promise<void>;
   dispose(): void;
@@ -112,13 +112,13 @@ export type Mail = {
   // sent rows past their day, failed ones past their week; the count
   // removed
   sweep(now: number): number;
-  attention(): MailAttention | null;
+  attention(): EmailAttention | null;
 };
 
-export function mailArea(deps: MailDeps): Mail {
-  const store = new MailStore(deps.db);
-  const prepares = new Map<MailKind, Prepare>();
-  // a key file that cannot be read is a missing one: mail is off
+export function emailArea(deps: EmailDeps): Email {
+  const store = new EmailStore(deps.db);
+  const prepares = new Map<EmailKind, Prepare>();
+  // a key file that cannot be read is a missing one: email is off
   const secret = (name: string): string | null => {
     try {
       return deps.secret(name);
@@ -126,7 +126,7 @@ export function mailArea(deps: MailDeps): Mail {
       return null;
     }
   };
-  const hasKey = (settings: MailSettings) =>
+  const hasKey = (settings: SmtpSettings) =>
     settings.keyName === null || secret(settings.keyName) !== null;
   const ready = (): { server: SmtpServer; from: Address } | null => {
     const s = store.settings();
@@ -149,12 +149,12 @@ export function mailArea(deps: MailDeps): Mail {
     clock: deps.clock,
     log: deps.log,
     store,
-    mailer: deps.mailer,
+    emailSender: deps.emailSender,
     ready,
     users: deps.users,
     prepare: (kind) => prepares.get(kind),
   });
-  const response = (userId: string): MailResponse => {
+  const response = (userId: string): SmtpResponse => {
     const settings = store.settings();
     const user = deps.users.byId(userId);
     return {
@@ -166,26 +166,26 @@ export function mailArea(deps: MailDeps): Mail {
     };
   };
   // now, to the admin who asked, never through the outbox
-  const test = async (userId: string): Promise<MailTestResponse> => {
+  const test = async (userId: string): Promise<SmtpTestResponse> => {
     const on = ready();
     const settings = store.settings();
     if (on === null || settings === null) {
-      throw new Conflict("mail is not set up");
+      throw new Conflict("email is not set up");
     }
     const user = deps.users.byId(userId);
     if (user === null || user.emailPlaceholder) {
       throw new Conflict("your email is a placeholder");
     }
-    const result = await deps.mailer(on.server, {
+    const result = await deps.emailSender(on.server, {
       from: on.from,
       to: { name: user.fullName, address: user.email },
-      subject: "Test mail from 1ctx",
-      text: `This is a test mail from 1ctx at ${settings.publicAddress}.\n\nMail is set up.\n`,
+      subject: "Test email from 1ctx",
+      text: `This is a test email from 1ctx at ${settings.publicAddress}.\n\nEmail is set up.\n`,
       messageId: messageIdOf(`test-${newId()}`, settings.fromAddress),
     });
     const fields = { kind: "test", user: user.id };
-    if (result === "sent") deps.log.info("mail sent", fields);
-    else deps.log.warn("mail failed", { ...fields, failure: result });
+    if (result === "sent") deps.log.info("email sent", fields);
+    else deps.log.warn("email failed", { ...fields, failure: result });
     return { result };
   };
   return {
@@ -203,14 +203,14 @@ export function mailArea(deps: MailDeps): Mail {
     settings: () => store.settings(),
     link(path) {
       const settings = store.settings();
-      if (settings === null) throw new Error("mail is not set up");
+      if (settings === null) throw new Error("email is not set up");
       return linkOf(settings.publicAddress, path);
     },
     enqueue(fields) {
       const settings = store.settings();
-      if (settings === null || !enabled()) throw new Error("mail is off");
+      if (settings === null || !enabled()) throw new Error("email is off");
       if (fields.subject != null && hasControl(fields.subject)) {
-        throw new Error("a mail's subject is one line");
+        throw new Error("an email's subject is one line");
       }
       const id = newId();
       const now = deps.clock();
@@ -226,7 +226,7 @@ export function mailArea(deps: MailDeps): Mail {
         createdAt: now,
         now,
       });
-      return [mailQueued];
+      return [emailQueued];
     },
     register(kind, prepare) {
       if (prepares.has(kind)) throw new Error(`${kind} is registered`);

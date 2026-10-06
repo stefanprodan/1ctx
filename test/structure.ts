@@ -21,7 +21,7 @@ export const LAYERS = [
   "secrets",
   "render",
   "users",
-  "mail",
+  "email",
   "usage",
   "audit",
   "providers",

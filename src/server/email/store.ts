@@ -1,18 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PutMailRequest } from "../../shared/api/mail.ts";
+import type { PutSmtpRequest } from "../../shared/api/smtp.ts";
 import type {
-  MailFailure,
-  MailSecurity,
-  MailSettings,
-} from "../../shared/contracts/mail.ts";
+  SmtpFailure,
+  SmtpSecurity,
+  SmtpSettings,
+} from "../../shared/contracts/smtp.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { MailKind } from "./rules.ts";
+import type { EmailKind } from "./rules.ts";
 
 export type OutboxRow = {
   id: string;
-  kind: MailKind;
+  kind: EmailKind;
   userId: string;
   projectId: string | null;
   sessionId: string | null;
@@ -29,14 +29,14 @@ export type OutboxCounts = {
   queued: number;
   failed: number;
   // the newest failed row's word and when it failed
-  lastFailure: MailFailure | null;
+  lastFailure: SmtpFailure | null;
   lastFailedAt: number | null;
 };
 
 type RawSettings = {
   host: string;
   port: number;
-  security: MailSecurity;
+  security: SmtpSecurity;
   username: string | null;
   key_name: string | null;
   from_address: string;
@@ -47,7 +47,7 @@ type RawSettings = {
 
 type RawOutbox = {
   id: string;
-  kind: MailKind;
+  kind: EmailKind;
   user_id: string;
   project_id: string | null;
   session_id: string | null;
@@ -71,12 +71,12 @@ const outbox = (raw: RawOutbox): OutboxRow => ({
   createdAt: raw.created_at,
 });
 
-export class MailStore {
+export class EmailStore {
   constructor(private readonly db: Db) {}
 
-  settings(): MailSettings | null {
+  settings(): SmtpSettings | null {
     const raw = this.db
-      .query<RawSettings, []>("select * from mail_settings where id = 1")
+      .query<RawSettings, []>("select * from smtp_settings where id = 1")
       .get();
     if (raw === null) return null;
     return {
@@ -92,10 +92,10 @@ export class MailStore {
     };
   }
 
-  saveSettings(fields: PutMailRequest, now: number): void {
+  saveSettings(fields: PutSmtpRequest, now: number): void {
     this.db
       .query(
-        `insert into mail_settings (id, host, port, security, username,
+        `insert into smtp_settings (id, host, port, security, username,
            key_name, from_address, from_name, public_address, updated_at)
          values (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict (id) do update set
@@ -125,7 +125,7 @@ export class MailStore {
   insert(fields: OutboxFields): void {
     this.db
       .query(
-        `insert into mail_outbox (id, kind, user_id, project_id, session_id,
+        `insert into email_outbox (id, kind, user_id, project_id, session_id,
            subject, body, message_id, next_attempt_at, created_at, updated_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
@@ -146,7 +146,7 @@ export class MailStore {
 
   byId(id: string): OutboxRow | null {
     const raw = this.db
-      .query<RawOutbox, [string]>("select * from mail_outbox where id = ?")
+      .query<RawOutbox, [string]>("select * from email_outbox where id = ?")
       .get(id);
     return raw === null ? null : outbox(raw);
   }
@@ -157,7 +157,7 @@ export class MailStore {
     return transact(this.db, () => {
       const raw = this.db
         .query<RawOutbox, [number, number]>(
-          `select * from mail_outbox
+          `select * from email_outbox
            where status = 'queued' and next_attempt_at <= ?
              and (claimed_at is null or claimed_at <= ?)
            order by next_attempt_at, created_at limit 1`,
@@ -165,7 +165,7 @@ export class MailStore {
         .get(now, now - stale);
       if (raw === null) return { result: null };
       this.db
-        .query("update mail_outbox set claimed_at = ? where id = ?")
+        .query("update email_outbox set claimed_at = ? where id = ?")
         .run(now, raw.id);
       return { result: outbox(raw) };
     });
@@ -173,14 +173,14 @@ export class MailStore {
 
   // dropped: nothing of it is kept
   remove(id: string): void {
-    this.db.query("delete from mail_outbox where id = ?").run(id);
+    this.db.query("delete from email_outbox where id = ?").run(id);
   }
 
   // the text goes; the row stays a day for the caps counted on rows
   sent(id: string, now: number): void {
     this.db
       .query(
-        `update mail_outbox set status = 'sent', subject = null, body = null,
+        `update email_outbox set status = 'sent', subject = null, body = null,
            claimed_at = null, updated_at = ? where id = ?`,
       )
       .run(now, id);
@@ -189,17 +189,17 @@ export class MailStore {
   retry(id: string, attempts: number, at: number, now: number): void {
     this.db
       .query(
-        `update mail_outbox set attempts = ?, next_attempt_at = ?,
+        `update email_outbox set attempts = ?, next_attempt_at = ?,
            claimed_at = null, updated_at = ? where id = ?`,
       )
       .run(attempts, at, now, id);
   }
 
   // the text goes; the kind, the user, the word and the times stay
-  fail(id: string, attempts: number, failure: MailFailure, now: number): void {
+  fail(id: string, attempts: number, failure: SmtpFailure, now: number): void {
     this.db
       .query(
-        `update mail_outbox set status = 'failed', attempts = ?,
+        `update email_outbox set status = 'failed', attempts = ?,
            failure = ?, subject = null, body = null, claimed_at = null,
            updated_at = ? where id = ?`,
       )
@@ -210,7 +210,7 @@ export class MailStore {
   earliest(): number | null {
     return this.db
       .query<{ at: number | null }, []>(
-        `select min(next_attempt_at) as at from mail_outbox
+        `select min(next_attempt_at) as at from email_outbox
          where status = 'queued' and claimed_at is null`,
       )
       .get()!.at;
@@ -220,7 +220,7 @@ export class MailStore {
   sweep(sentBefore: number, failedBefore: number): number {
     return this.db
       .query(
-        `delete from mail_outbox
+        `delete from email_outbox
          where (status = 'sent' and updated_at < ?)
            or (status = 'failed' and updated_at < ?)`,
       )
@@ -231,12 +231,12 @@ export class MailStore {
     const tally = this.db
       .query<{ queued: number | null; failed: number | null }, []>(
         `select sum(status = 'queued') as queued,
-           sum(status = 'failed') as failed from mail_outbox`,
+           sum(status = 'failed') as failed from email_outbox`,
       )
       .get()!;
     const last = this.db
-      .query<{ failure: MailFailure; updated_at: number }, []>(
-        `select failure, updated_at from mail_outbox where status = 'failed'
+      .query<{ failure: SmtpFailure; updated_at: number }, []>(
+        `select failure, updated_at from email_outbox where status = 'failed'
          order by updated_at desc limit 1`,
       )
       .get();

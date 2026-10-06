@@ -22,6 +22,12 @@ import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
 import {
+  type Email,
+  type EmailSender,
+  emailArea,
+  smtpSender,
+} from "./email/index.ts";
+import {
   acquireProcess,
   type KnowledgeArea,
   knowledgeArea,
@@ -31,7 +37,6 @@ import { userAgent, withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
-import { type Mail, type Mailer, mailArea, smtpMailer } from "./mail/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import {
   type MemoryArea,
@@ -116,7 +121,7 @@ export type ComposeOptions = {
   // the cores the send caps are sized by; a test passes a fixed number
   cores?: number;
   // what reaches the SMTP server; a test passes a fake that records
-  mailer?: Mailer;
+  emailSender?: EmailSender;
 };
 
 export type App = {
@@ -141,7 +146,7 @@ export type App = {
   chat: Providers["chat"];
   // the one way a user is made: with its personal project
   createUser: Users["createUser"];
-  mail: Mail;
+  email: Email;
   runner: Runner;
   socket: Socket;
   routes: RouteDescriptor[];
@@ -205,14 +210,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
     passwordCost: options.passwordCost,
   });
-  const mail = mailArea({
+  const email = emailArea({
     db,
     clock,
-    log: log("mail"),
+    log: log("email"),
     secret: (name) => secret(EMAIL_KEY_PREFIX, name),
     keys: () => options.secretNames?.(EMAIL_KEY_PREFIX) ?? [],
     users,
-    mailer: options.mailer ?? smtpMailer(),
+    emailSender: options.emailSender ?? smtpSender(),
   });
   // the instance's start, as the overview reports it
   const startedAt = clock();
@@ -341,7 +346,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     activity: { personDays: (...args) => sessions.personDays(...args) },
     presence: { onlineUserIds: () => socket.onlineUserIds() },
-    mail,
+    email,
   });
   agents = agentsArea({
     db,
@@ -564,7 +569,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           provider: search,
           hasKey: keyed("search-", search === null ? null : `search-${search}`),
         },
-        mail: mail.attention(),
+        email: email.attention(),
       };
     },
     // built here, at the compile root, so the binary finds its entry
@@ -583,12 +588,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
-    mail.start();
+    email.start();
   }
   const routes: RouteDescriptor[] = [
     ...usage.routes,
     ...limits.routes,
-    ...mail.routes,
+    ...email.routes,
     ...providers.routes,
     ...deciders.routes,
     ...mcp.routes,
@@ -636,7 +641,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         skills: skills.store,
         mcp: mcp.store,
         agents: agents.store,
-        mail,
+        email,
       }),
   });
   const sweepLog = log("sweep");
@@ -660,7 +665,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     catalogs: providers.catalogs,
     chat: providers.chat,
     createUser: users.createUser,
-    mail,
+    email,
     runner,
     socket,
     routes,
@@ -681,7 +686,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         // an idle chat archived may hold messages that now cannot start
         if (chats.chats_archived > 0) runner.queue.wake();
         const notSent = sessions.sweepNotSent(now);
-        const mailRows = mail.sweep(now);
+        const emailRows = email.sweep(now);
         const removed =
           logins +
           visits +
@@ -689,7 +694,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           scratchRows +
           digests +
           notSent +
-          mailRows;
+          emailRows;
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
@@ -698,7 +703,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             bash: scratchRows,
             digests,
             not_sent: notSent,
-            mail: mailRows,
+            emails: emailRows,
             removed,
             ...chats,
           });
@@ -722,7 +727,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       runner.queue.close();
       automations.drain();
       // no row is taken from here; the one in flight ends below
-      const mailing = mail.stop();
+      const emailStopped = email.stop();
       repos.close();
       // no kept files batch starts from here; the wait below is for the
       // one in flight, its compression and its commit
@@ -735,8 +740,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
-      await (cut === undefined ? mailing : Promise.race([mailing, cut]));
-      mail.dispose();
+      await (cut === undefined
+        ? emailStopped
+        : Promise.race([emailStopped, cut]));
+      email.dispose();
       await packing;
       overview.close();
       socket.dispose();

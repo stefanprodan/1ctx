@@ -3,31 +3,31 @@
 //
 // The sender takes outbox rows one at a time, the scheduler's shape:
 // started only when the app is activated, woken after a commit that
-// queued mail and on a timer from the clock, drained on stop. It reads
-// the recipient again just before SMTP, so a mail never reaches a user
+// queued email and on a timer from the clock, drained on stop. It reads
+// the recipient again just before SMTP, so an email never reaches a user
 // disabled or readdressed since the row was written.
 
-import type { MailFailure } from "../../shared/contracts/mail.ts";
+import type { SmtpFailure } from "../../shared/contracts/smtp.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS, sleep } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import {
   type DropWord,
+  type EmailKind,
   hasControl,
-  type MailKind,
   retryAt,
   STALE_CLAIM_MS,
 } from "./rules.ts";
-import type { Address, Mailer, SendResult, SmtpServer } from "./smtp.ts";
-import type { MailStore, OutboxRow } from "./store.ts";
+import type { Address, EmailSender, SendResult, SmtpServer } from "./smtp.ts";
+import type { EmailStore, OutboxRow } from "./store.ts";
 
 // a pass at least this often, so a stale claim is taken again; also
 // the pause after a pass that threw, which no wake cuts short
 const PASS_MS = MINUTE_MS;
 
 // fromName in place of the server's, as an agent's "<agent> via 1ctx"
-export type MailContent = {
+export type EmailContent = {
   subject: string;
   text: string;
   html?: string;
@@ -35,18 +35,21 @@ export type MailContent = {
 };
 
 // a kind's last word before SMTP: the text to send, built now (a link
-// mail mints its token here), or a word that drops the row
-export type Prepare = (row: OutboxRow, user: UserRow) => MailContent | DropWord;
+// email mints its token here), or a word that drops the row
+export type Prepare = (
+  row: OutboxRow,
+  user: UserRow,
+) => EmailContent | DropWord;
 
 export type SenderDeps = {
   clock: Clock;
   log: Log;
-  store: MailStore;
-  mailer: Mailer;
-  // the server and who mail is from, null while mail is off
+  store: EmailStore;
+  emailSender: EmailSender;
+  // the server and who email is from, null while email is off
   ready(): { server: SmtpServer; from: Address } | null;
   users: { byId(id: string): UserRow | null };
-  prepare(kind: MailKind): Prepare | undefined;
+  prepare(kind: EmailKind): Prepare | undefined;
 };
 
 export type Sender = {
@@ -60,7 +63,7 @@ export type Sender = {
 };
 
 // the text a row carries, for a kind with no prepare of its own
-const stored = (row: OutboxRow): MailContent | null =>
+const stored = (row: OutboxRow): EmailContent | null =>
   row.subject === null || row.body === null
     ? null
     : { subject: row.subject, text: row.body };
@@ -82,7 +85,7 @@ export function sender(deps: SenderDeps): Sender {
   const fields = (row: OutboxRow) => ({
     kind: row.kind,
     user: row.userId,
-    mail: row.id,
+    outbox: row.id,
   });
 
   // the recipient as they are now, or why they are no longer one
@@ -94,13 +97,13 @@ export function sender(deps: SenderDeps): Sender {
     return user;
   };
 
-  const failed = (row: OutboxRow, failure: MailFailure) => {
+  const failed = (row: OutboxRow, failure: SmtpFailure) => {
     const now = deps.clock();
     const attempts = row.attempts + 1;
     const at = retryAt(attempts, now);
     if (at === null) deps.store.fail(row.id, attempts, failure, now);
     else deps.store.retry(row.id, attempts, at, now);
-    deps.log.warn("mail failed", {
+    deps.log.warn("email failed", {
       ...fields(row),
       failure,
       attempts,
@@ -111,7 +114,7 @@ export function sender(deps: SenderDeps): Sender {
   // a caller's bug: no later try fixes the text
   const broken = (row: OutboxRow) => {
     deps.store.fail(row.id, row.attempts + 1, "other", deps.clock());
-    deps.log.warn("mail failed", {
+    deps.log.warn("email failed", {
       ...fields(row),
       failure: "other",
       attempts: row.attempts + 1,
@@ -121,7 +124,7 @@ export function sender(deps: SenderDeps): Sender {
 
   const dropped = (row: OutboxRow, reason: DropWord) => {
     deps.store.remove(row.id);
-    deps.log.info("mail dropped", { ...fields(row), reason });
+    deps.log.info("email dropped", { ...fields(row), reason });
   };
 
   const deliver = async (
@@ -131,11 +134,11 @@ export function sender(deps: SenderDeps): Sender {
     const user = recipient(row);
     if (typeof user === "string") return dropped(row, user);
     const prepare = deps.prepare(row.kind);
-    let content: MailContent | DropWord | null;
+    let content: EmailContent | DropWord | null;
     try {
       content = prepare === undefined ? stored(row) : prepare(row, user);
     } catch (err) {
-      deps.log.error("mail prepare failed", {
+      deps.log.error("email prepare failed", {
         ...fields(row),
         ...errorFields(err),
       });
@@ -152,7 +155,7 @@ export function sender(deps: SenderDeps): Sender {
     }
     let result: SendResult;
     try {
-      result = await deps.mailer(ready.server, {
+      result = await deps.emailSender(ready.server, {
         from: {
           name: content.fromName ?? ready.from.name,
           address: ready.from.address,
@@ -164,7 +167,7 @@ export function sender(deps: SenderDeps): Sender {
         messageId: row.messageId,
       });
     } catch (err) {
-      deps.log.error("mail send threw", {
+      deps.log.error("email send threw", {
         ...fields(row),
         ...errorFields(err),
       });
@@ -175,7 +178,7 @@ export function sender(deps: SenderDeps): Sender {
       return;
     }
     deps.store.sent(row.id, deps.clock());
-    deps.log.info("mail sent", fields(row));
+    deps.log.info("email sent", fields(row));
   };
 
   const pass = async (live: () => boolean = () => true): Promise<number> => {
@@ -218,14 +221,14 @@ export function sender(deps: SenderDeps): Sender {
         await pass(live);
         if (live()) await wait();
       } catch (err) {
-        deps.log.error("mail pass failed", errorFields(err));
+        deps.log.error("email pass failed", errorFields(err));
         if (live()) await pause(PASS_MS, false);
       }
     }
   };
 
   const onBus = (event: BusEvent) => {
-    if (event.type === "mail.queued") wake();
+    if (event.type === "email.queued") wake();
   };
 
   return {

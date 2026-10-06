@@ -8,7 +8,7 @@
 // is refused here too, so safety does not rest on the package.
 
 import { createTransport } from "nodemailer";
-import type { MailFailure, MailSecurity } from "../../shared/contracts/mail.ts";
+import type { SmtpFailure, SmtpSecurity } from "../../shared/contracts/smtp.ts";
 import { hasControl } from "./rules.ts";
 
 export type Address = { name: string; address: string };
@@ -16,7 +16,7 @@ export type Address = { name: string; address: string };
 export type SmtpServer = {
   host: string;
   port: number;
-  security: MailSecurity;
+  security: SmtpSecurity;
   username: string | null;
   password: string | null;
 };
@@ -30,12 +30,12 @@ export type Outgoing = {
   messageId: string;
 };
 
-export type SendResult = "sent" | MailFailure;
+export type SendResult = "sent" | SmtpFailure;
 
 // what actually sends; a test passes a fake that records
-export type Mailer = (
+export type EmailSender = (
   server: SmtpServer,
-  mail: Outgoing,
+  message: Outgoing,
 ) => Promise<SendResult>;
 
 export const SMTP_TIMEOUTS = {
@@ -44,14 +44,14 @@ export const SMTP_TIMEOUTS = {
   socketTimeout: 30_000,
 };
 
-export function headersProblem(mail: Outgoing): boolean {
+export function headersProblem(message: Outgoing): boolean {
   return [
-    mail.from.name,
-    mail.from.address,
-    mail.to.name,
-    mail.to.address,
-    mail.subject,
-    mail.messageId,
+    message.from.name,
+    message.from.address,
+    message.to.name,
+    message.to.address,
+    message.subject,
+    message.messageId,
   ].some(hasControl);
 }
 
@@ -59,7 +59,7 @@ export function headersProblem(mail: Outgoing): boolean {
 // keeps the library's fields or its words, a connect keeps its syscall
 const TLS_WORDS = /certificate|self.signed|ssl|tls|altname|handshake/i;
 
-export function failureOf(error: unknown): MailFailure {
+export function failureOf(error: unknown): SmtpFailure {
   const e = (error ?? {}) as {
     code?: unknown;
     responseCode?: unknown;
@@ -95,11 +95,11 @@ export function failureOf(error: unknown): MailFailure {
 // options, for the tests' server on loopback alone: a CA that replaces
 // the default roots, so only that certificate verifies, and shorter
 // timeouts
-export function smtpMailer(
+export function smtpSender(
   options: { ca?: string; timeouts?: Partial<typeof SMTP_TIMEOUTS> } = {},
-): Mailer {
-  return async (server, mail) => {
-    if (headersProblem(mail)) return "other";
+): EmailSender {
+  return async (server, message) => {
+    if (headersProblem(message)) return "other";
     const transport = createTransport({
       host: server.host,
       port: server.port,
@@ -121,12 +121,12 @@ export function smtpMailer(
     });
     try {
       await transport.sendMail({
-        from: mail.from,
-        to: [mail.to],
-        subject: mail.subject,
-        text: mail.text,
-        ...(mail.html === undefined ? {} : { html: mail.html }),
-        messageId: mail.messageId,
+        from: message.from,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+        ...(message.html === undefined ? {} : { html: message.html }),
+        messageId: message.messageId,
       });
       return "sent";
     } catch (error) {

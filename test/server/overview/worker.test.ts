@@ -102,7 +102,7 @@ describe("the scan worker", () => {
         skills: [],
         credentials: [],
         search: { provider: null, hasKey: false },
-        mail: null,
+        email: null,
       }),
       worker: WORKER,
       scanner: {

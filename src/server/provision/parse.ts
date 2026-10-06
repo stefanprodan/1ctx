@@ -24,13 +24,13 @@ import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
-import { MAIL_REQUIRED, mailSpec, newMailPair } from "./mail.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
+import { newSmtpPair, SMTP_REQUIRED, smtpServerSpec } from "./smtp.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
   "User",
-  "Mail",
+  "SmtpServer",
   "Project",
   "Credential",
   "Repository",
@@ -71,8 +71,8 @@ export type Document = {
 }[Kind];
 export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
-export type { MailSpec } from "./mail.ts";
 export type { RepositorySpec } from "./repository.ts";
+export type { SmtpServerSpec } from "./smtp.ts";
 export type {
   AgentSpec,
   CredentialSpec,
@@ -103,7 +103,7 @@ function document(value: unknown, source: string): Document {
     const meta = object(b.metadata, ["name"], "metadata");
     const guard = {
       User: isUsername,
-      Mail: isName,
+      SmtpServer: isName,
       Project: isName,
       Credential: isName,
       Repository: isName,
@@ -125,8 +125,8 @@ function document(value: unknown, source: string): Document {
     switch (kind) {
       case "User":
         return { ...base, kind, spec: spec.user(b.spec) };
-      case "Mail":
-        return { ...base, kind, spec: mailSpec(b.spec) };
+      case "SmtpServer":
+        return { ...base, kind, spec: smtpServerSpec(b.spec) };
       case "Project":
         return { ...base, kind, spec: spec.project(b.spec) };
       case "Credential":
@@ -164,10 +164,10 @@ function duplicate(documents: Document[]): void {
     seen.set(key, doc.source);
   }
   // the instance has one SMTP server
-  const servers = documents.filter((doc) => doc.kind === "Mail");
+  const servers = documents.filter((doc) => doc.kind === "SmtpServer");
   if (servers.length > 1) {
     throw new Error(
-      `${servers[1]!.source}: Mail/${servers[1]!.name}: one Mail object per instance (first Mail/${servers[0]!.name})`,
+      `${servers[1]!.source}: SmtpServer/${servers[1]!.name}: one SmtpServer object per instance (first SmtpServer/${servers[0]!.name})`,
     );
   }
   // one default of a kind, since a second would take the mark from the
@@ -302,13 +302,13 @@ export function preflight(
         }
         break;
       }
-      case "Mail":
+      case "SmtpServer":
         // any name updates the one server held
-        if (inventory.Mail.length === 0) {
-          required([...MAIL_REQUIRED]);
-          const pair = newMailPair(doc.spec);
+        if (inventory.SmtpServer.length === 0) {
+          required([...SMTP_REQUIRED]);
+          const pair = newSmtpPair(doc.spec);
           if (pair !== null) {
-            throw new Error(`${doc.source}: Mail/${doc.name}: ${pair}`);
+            throw new Error(`${doc.source}: SmtpServer/${doc.name}: ${pair}`);
           }
         }
         if (typeof doc.spec.keyFrom === "string") {

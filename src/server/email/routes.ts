@@ -2,25 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
-  MailResponse,
-  MailTestResponse,
-  PutMailRequest,
-} from "../../shared/api/mail.ts";
+  PutSmtpRequest,
+  SmtpResponse,
+  SmtpTestResponse,
+} from "../../shared/api/smtp.ts";
 import { jsonBody } from "../lib/body.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
-import { parseMail } from "./parse.ts";
+import { parseSmtp } from "./parse.ts";
 
 export type RoutesDeps = {
-  response(principal: Principal): MailResponse;
-  save(fields: PutMailRequest): void;
-  test(principal: Principal): Promise<MailTestResponse>;
+  response(principal: Principal): SmtpResponse;
+  save(fields: PutSmtpRequest): void;
+  test(principal: Principal): Promise<SmtpTestResponse>;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
     {
       method: "GET",
-      path: "/api/admin/mail",
+      path: "/api/admin/smtp",
       policy: "admin",
       handle(_req, ctx) {
         return json(deps.response(ctx.principal!));
@@ -28,16 +28,16 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     },
     {
       method: "PUT",
-      path: "/api/admin/mail",
+      path: "/api/admin/smtp",
       policy: "admin",
       async handle(req, ctx) {
-        deps.save(parseMail(await jsonBody(req)));
+        deps.save(parseSmtp(await jsonBody(req)));
         return json(deps.response(ctx.principal!));
       },
     },
     {
       method: "POST",
-      path: "/api/admin/mail/test",
+      path: "/api/admin/smtp/test",
       policy: "admin",
       async handle(_req, ctx) {
         return json(await deps.test(ctx.principal!));

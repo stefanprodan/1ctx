@@ -4,19 +4,19 @@
 import type { Migration } from "../migration.ts";
 
 // The instance's SMTP server, one row whose password is a key file it
-// names, and the outbox every mail goes through: written in the
+// names, and the outbox every email goes through: written in the
 // transaction that causes it and taken by the sender. A sent row keeps
 // its kind, user, project and times for a day, so a daily cap counts
 // it, and a failed one its word for a week; neither keeps the text.
-// The kinds are every mail the instance will send, so a later one
+// The kinds are every email the instance will send, so a later one
 // needs no rebuild. A chat's delete leaves its sent rows to the cap.
 // An address on the project's own domain is a seeded one, never a
-// mailbox, so it is marked and never mailed.
+// inbox, so it is marked and never emailed.
 export const m0049: Migration = {
-  id: "0049-mail",
+  id: "0049-email",
   up(db) {
     db.exec(`
-      create table mail_settings (
+      create table smtp_settings (
         id integer primary key check (id = 1),
         host text not null,
         port integer not null check (port between 1 and 65535),
@@ -29,7 +29,7 @@ export const m0049: Migration = {
         updated_at integer not null
       );
 
-      create table mail_outbox (
+      create table email_outbox (
         id text primary key,
         kind text not null check (kind in ('reset', 'signin', 'invite',
           'notice', 'agent', 'alert')),
@@ -49,10 +49,10 @@ export const m0049: Migration = {
         created_at integer not null,
         updated_at integer not null
       );
-      create index mail_outbox_due on mail_outbox(status, next_attempt_at);
-      create index mail_outbox_project on mail_outbox(project_id, created_at)
+      create index email_outbox_due on email_outbox(status, next_attempt_at);
+      create index email_outbox_project on email_outbox(project_id, created_at)
         where project_id is not null;
-      create index mail_outbox_session on mail_outbox(session_id, created_at)
+      create index email_outbox_session on email_outbox(session_id, created_at)
         where session_id is not null;
 
       alter table users add column email_placeholder integer not null

@@ -252,19 +252,19 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
-    path: "/api/admin/mail",
+    path: "/api/admin/smtp",
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
   {
     method: "PUT",
-    path: "/api/admin/mail",
+    path: "/api/admin/smtp",
     body: {
       host: "smtp.example.test",
       port: 465,
       security: "tls",
       username: null,
       keyName: null,
-      fromAddress: "mail@example.test",
+      fromAddress: "noreply@example.test",
       fromName: "1ctx",
       publicAddress: "https://1ctx.example.test",
     },
@@ -272,7 +272,7 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
-    path: "/api/admin/mail/test",
+    path: "/api/admin/smtp/test",
     // admin: the bootstrap admin's address is a placeholder
     expect: { anonymous: 401, member: 403, admin: 409 },
   },

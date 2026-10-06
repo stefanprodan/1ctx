@@ -33,7 +33,7 @@ export type UserFields = {
 };
 
 // the project's own domain: a seeded or bootstrapped user's address,
-// never a mailbox, so mail never goes to it
+// never an inbox, so email never goes to it
 export const PLACEHOLDER_DOMAIN = "1ctx.dev";
 export const isPlaceholderEmail = (email: string): boolean =>
   email.slice(email.lastIndexOf("@") + 1) === PLACEHOLDER_DOMAIN;

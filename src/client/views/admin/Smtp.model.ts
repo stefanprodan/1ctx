@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
-  MailResponse,
-  MailTestResponse,
-  PutMailRequest,
-} from "../../../shared/api/mail.ts";
+  PutSmtpRequest,
+  SmtpResponse,
+  SmtpTestResponse,
+} from "../../../shared/api/smtp.ts";
 import {
   DEFAULT_FROM_NAME,
-  type MailSecurity,
-  type MailSettings,
-} from "../../../shared/contracts/mail.ts";
+  type SmtpSecurity,
+  type SmtpSettings,
+} from "../../../shared/contracts/smtp.ts";
 import { isEmail } from "../../../shared/words.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
 
 // what the form holds: text as typed, the key as the select's value
-export type MailDraft = {
+export type SmtpDraft = {
   host: string;
   port: string;
-  security: MailSecurity;
+  security: SmtpSecurity;
   username: string;
   keyName: string;
   fromAddress: string;
@@ -26,17 +26,17 @@ export type MailDraft = {
   publicAddress: string;
 };
 
-export type MailField = keyof MailDraft;
+export type SmtpField = keyof SmtpDraft;
 
 // the ports each security word is served on by convention
-const PORTS: Record<MailSecurity, string> = { tls: "465", starttls: "587" };
+const PORTS: Record<SmtpSecurity, string> = { tls: "465", starttls: "587" };
 
-export const SECURITY_OPTIONS: { value: MailSecurity; label: string }[] = [
+export const SECURITY_OPTIONS: { value: SmtpSecurity; label: string }[] = [
   { value: "tls", label: "TLS" },
   { value: "starttls", label: "STARTTLS" },
 ];
 
-export function draftOf(settings: MailSettings | null): MailDraft {
+export function draftOf(settings: SmtpSettings | null): SmtpDraft {
   if (settings === null) {
     return {
       host: "",
@@ -63,18 +63,18 @@ export function draftOf(settings: MailSettings | null): MailDraft {
 
 // a security flip moves the port too, while it is the other's default
 export function withSecurity(
-  draft: MailDraft,
-  security: MailSecurity,
-): MailDraft {
+  draft: SmtpDraft,
+  security: SmtpSecurity,
+): SmtpDraft {
   const port = draft.port === PORTS[draft.security] ? PORTS[security] : null;
   return { ...draft, security, port: port ?? draft.port };
 }
 
 const PORT = /^[0-9]{1,5}$/;
 
-export function mailBody(
-  d: MailDraft,
-): { body: PutMailRequest } | { field: MailField; error: string } {
+export function smtpBody(
+  d: SmtpDraft,
+): { body: PutSmtpRequest } | { field: SmtpField; error: string } {
   const host = d.host.trim();
   if (host === "") return { field: "host", error: "Enter a host" };
   const port = Number(d.port.trim());
@@ -112,17 +112,17 @@ export function mailBody(
   };
 }
 
-export function mailDirty(d: MailDraft, settings: MailSettings | null) {
+export function smtpDirty(d: SmtpDraft, settings: SmtpSettings | null) {
   const saved = draftOf(settings);
-  return (Object.keys(saved) as MailField[]).some(
+  return (Object.keys(saved) as SmtpField[]).some(
     (field) => d[field].trim() !== saved[field],
   );
 }
 
 // the server's words name the field first
-export function mailFieldOf(message: string): MailField | undefined {
+export function smtpFieldOf(message: string): SmtpField | undefined {
   const first = message.split(" ")[0]!.toLowerCase();
-  const fields: Record<string, MailField> = {
+  const fields: Record<string, SmtpField> = {
     host: "host",
     port: "port",
     security: "security",
@@ -135,33 +135,33 @@ export function mailFieldOf(message: string): MailField | undefined {
   return fields[first];
 }
 
-// why mail is off, null while it is on
-export function offLine(state: MailResponse): string | null {
+// why email is off, null while it is on
+export function offLine(state: SmtpResponse): string | null {
   if (state.enabled) return null;
   const settings = state.settings;
   if (settings === null) {
-    return "Mail is off until a server is saved.";
+    return "Email is off until an SMTP server is saved.";
   }
-  return `Mail is off: ${settings.keyName}.key is missing.`;
+  return `Email is off: ${settings.keyName}.key is missing.`;
 }
 
-export function testLine(state: MailResponse, dirty = false): string {
+export function testLine(state: SmtpResponse, dirty = false): string {
   if (state.to === null) return "Your account has no real email.";
   if (dirty) return "Save the changes to test them.";
-  return `Sends a test mail to ${state.to}.`;
+  return `Sends a test email to ${state.to}.`;
 }
 
-const FAILED: Record<Exclude<MailTestResponse["result"], "sent">, string> = {
+const FAILED: Record<Exclude<SmtpTestResponse["result"], "sent">, string> = {
   auth: "Sign in failed. Check the username and the key file.",
   tls: "TLS failed. Check the security and the port.",
   connect: "Could not connect. Check the host and the port.",
-  rejected: "The server refused the mail.",
+  rejected: "The server refused the email.",
   timeout: "The server did not answer in time.",
-  other: "The mail was not sent.",
+  other: "The email was not sent.",
 };
 
 export function resultLine(
-  result: MailTestResponse["result"],
+  result: SmtpTestResponse["result"],
   to: string | null,
 ): string {
   return result === "sent" ? `Sent to ${to ?? "your email"}.` : FAILED[result];

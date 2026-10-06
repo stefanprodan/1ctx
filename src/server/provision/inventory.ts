@@ -25,14 +25,14 @@ export type InventorySources = {
   mcp: Named;
   agents: Named;
   // the one SMTP server, when saved
-  mail: { settings(): unknown | null };
+  email: { settings(): unknown | null };
 };
 
 export function inventoryOf(sources: InventorySources): Inventory {
   const names = sources.users.list().map((row) => row.username);
   return {
     User: names.length ? names : ["admin"],
-    Mail: sources.mail.settings() === null ? [] : ["mail"],
+    SmtpServer: sources.email.settings() === null ? [] : ["smtp"],
     Project: sources.projects
       .teamProjectIds()
       .map((id) => sources.projects.byId(id)!.name),

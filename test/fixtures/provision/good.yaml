@@ -13,7 +13,7 @@ spec:
   mustChangePassword: false
 ---
 apiVersion: config.1ctx.dev/v1
-kind: Mail
+kind: SmtpServer
 metadata:
   name: relay
 spec:

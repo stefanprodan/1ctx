@@ -1,15 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mail area's pure rules: the kinds, when a failed send is tried
+// The email area's pure rules: the kinds, when a failed send is tried
 // again, what a public address may be, and the header values 1ctx
 // refuses to build.
 
 import { DAY_MS, MINUTE_MS } from "../lib/clock.ts";
 
-// every mail the instance sends: the link mails, a security notice, an
-// agent's mail and an automation's alert
-export const MAIL_KINDS = [
+// every email the instance sends: the link emails, a security notice, an
+// agent's email and an automation's alert
+export const EMAIL_KINDS = [
   "reset",
   "signin",
   "invite",
@@ -17,7 +17,7 @@ export const MAIL_KINDS = [
   "agent",
   "alert",
 ] as const;
-export type MailKind = (typeof MAIL_KINDS)[number];
+export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 // why a row was dropped before SMTP: the recipient is gone, disabled
 // or has no real address, or a kind's own check refused it
@@ -86,7 +86,7 @@ export function publicOrigin(
 }
 
 // stable for the row, so a send repeated after a crash reads as one
-// mail
+// email
 export function messageIdOf(id: string, fromAddress: string): string {
   return `<${id}@${fromAddress.slice(fromAddress.lastIndexOf("@") + 1)}>`;
 }

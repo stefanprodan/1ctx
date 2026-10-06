@@ -73,8 +73,8 @@ import {
   optional,
   optionalSpec,
 } from "./fields.ts";
-import type { MailSpec } from "./mail.ts";
 import type { RepositorySpec } from "./repository.ts";
+import type { SmtpServerSpec } from "./smtp.ts";
 
 export type UserSpec = {
   role: Role;
@@ -187,7 +187,7 @@ export type ToolSpec = {
 
 export type Specs = {
   User: UserSpec;
-  Mail: MailSpec;
+  SmtpServer: SmtpServerSpec;
   Project: ProjectSpec;
   Credential: CredentialSpec;
   Repository: RepositorySpec;

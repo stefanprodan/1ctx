@@ -1,17 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mail routes through the composed app: the settings and when mail
+// The email routes through the composed app: the settings and when email
 // is on, the key files offered, and Send test's words, sent now to the
 // signed-in admin once their address is a real one.
 
 import { describe, expect, test } from "bun:test";
 import { transact } from "../../../src/server/db/index.ts";
 import type {
-  MailResponse,
-  MailTestResponse,
-} from "../../../src/shared/api/mail.ts";
-import { MAIL_FAILURES } from "../../../src/shared/contracts/mail.ts";
+  SmtpResponse,
+  SmtpTestResponse,
+} from "../../../src/shared/api/smtp.ts";
+import { SMTP_FAILURES } from "../../../src/shared/contracts/smtp.ts";
 import { collectLogs, testApp } from "../../helpers/app.ts";
 
 const SERVER = {
@@ -20,7 +20,7 @@ const SERVER = {
   security: "starttls" as const,
   username: "api_token",
   keyName: "email-relay",
-  fromAddress: "mail@example.test",
+  fromAddress: "noreply@example.test",
   fromName: "1ctx",
   publicAddress: "https://1ctx.example.test",
 };
@@ -34,14 +34,14 @@ async function signedIn(secrets: Record<string, string> = {}) {
   const admin = app.client();
   expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
   const read = async () => {
-    const res = await admin.call("GET", "/api/admin/mail");
+    const res = await admin.call("GET", "/api/admin/smtp");
     expect(res.status).toBe(200);
-    return (await res.json()) as MailResponse;
+    return (await res.json()) as SmtpResponse;
   };
   return { app, admin, read, logs };
 }
 
-describe("the mail routes", () => {
+describe("the email routes", () => {
   test("start off, list the email- keys and turn on when saved", async () => {
     const { app, admin, read } = await signedIn({ "mcp-other": "x" });
     expect(await read()).toEqual({
@@ -52,13 +52,13 @@ describe("the mail routes", () => {
       // the bootstrap admin's address is made up
       to: null,
     });
-    expect(app.mail.enabled()).toBe(false);
-    const put = await admin.call("PUT", "/api/admin/mail", { body: SERVER });
+    expect(app.email.enabled()).toBe(false);
+    const put = await admin.call("PUT", "/api/admin/smtp", { body: SERVER });
     expect(put.status).toBe(200);
-    const saved = (await put.json()) as MailResponse;
+    const saved = (await put.json()) as SmtpResponse;
     expect(saved.settings).toEqual({ ...SERVER, updatedAt: app.now.value });
     expect(saved.enabled).toBe(true);
-    expect(app.mail.link("/chat/abc")).toBe(
+    expect(app.email.link("/chat/abc")).toBe(
       "https://1ctx.example.test/chat/abc",
     );
     // a value never crosses
@@ -74,7 +74,7 @@ describe("the mail routes", () => {
       { ...SERVER, port: 70000 },
       { ...SERVER, fromName: "a\r\nb" },
     ]) {
-      const res = await admin.call("PUT", "/api/admin/mail", { body });
+      const res = await admin.call("PUT", "/api/admin/smtp", { body });
       expect(res.status).toBe(400);
     }
     expect((await read()).settings).toBeNull();
@@ -83,21 +83,21 @@ describe("the mail routes", () => {
 
   test("stay off while the named key file is missing", async () => {
     const { app, admin, read } = await signedIn();
-    await admin.call("PUT", "/api/admin/mail", {
+    await admin.call("PUT", "/api/admin/smtp", {
       body: { ...SERVER, keyName: "email-gone" },
     });
     expect(await read()).toMatchObject({ enabled: false, hasKey: false });
-    const res = await admin.call("POST", "/api/admin/mail/test");
+    const res = await admin.call("POST", "/api/admin/smtp/test");
     expect(res.status).toBe(409);
     await app.shutdown();
   });
 
   test("send a test only to an admin with a real address", async () => {
     const { app, admin, read, logs } = await signedIn();
-    await admin.call("PUT", "/api/admin/mail", { body: SERVER });
-    const refused = await admin.call("POST", "/api/admin/mail/test");
+    await admin.call("PUT", "/api/admin/smtp", { body: SERVER });
+    const refused = await admin.call("POST", "/api/admin/smtp/test");
     expect(refused.status).toBe(409);
-    expect(app.mailer.sent).toEqual([]);
+    expect(app.emailSender.sent).toEqual([]);
     const me = app.users.byUsername("admin")!;
     expect(me.emailPlaceholder).toBe(true);
     const patched = await admin.call("PATCH", `/api/users/${me.id}`, {
@@ -106,25 +106,25 @@ describe("the mail routes", () => {
     expect(patched.status).toBe(200);
     expect((await patched.json()).user.emailPlaceholder).toBe(false);
     expect((await read()).to).toBe("root@example.test");
-    for (const result of ["sent", ...MAIL_FAILURES] as const) {
-      app.mailer.result = result;
-      const res = await admin.call("POST", "/api/admin/mail/test");
+    for (const result of ["sent", ...SMTP_FAILURES] as const) {
+      app.emailSender.result = result;
+      const res = await admin.call("POST", "/api/admin/smtp/test");
       expect(res.status).toBe(200);
-      expect((await res.json()) as MailTestResponse).toEqual({ result });
+      expect((await res.json()) as SmtpTestResponse).toEqual({ result });
     }
     // straight to the server, never through the outbox
-    expect(app.db.query("select count(*) as n from mail_outbox").get()).toEqual(
-      { n: 0 },
-    );
-    expect(app.mailer.sent[0]!.mail).toMatchObject({
-      from: { name: "1ctx", address: "mail@example.test" },
+    expect(
+      app.db.query("select count(*) as n from email_outbox").get(),
+    ).toEqual({ n: 0 });
+    expect(app.emailSender.sent[0]!.message).toMatchObject({
+      from: { name: "1ctx", address: "noreply@example.test" },
       to: { address: "root@example.test" },
     });
-    expect(app.mailer.sent[0]!.server.password).toBe("secret-pass");
-    const lines = logs.events.filter((e) => e.area === "mail");
+    expect(app.emailSender.sent[0]!.server.password).toBe("secret-pass");
+    const lines = logs.events.filter((e) => e.area === "email");
     expect(lines.map((e) => e.msg)).toEqual([
-      "mail sent",
-      ...MAIL_FAILURES.map(() => "mail failed"),
+      "email sent",
+      ...SMTP_FAILURES.map(() => "email failed"),
     ]);
     expect(JSON.stringify(lines)).not.toContain("example.test");
     await app.shutdown();
@@ -154,18 +154,18 @@ describe("the mail routes", () => {
     };
     expect(await edit("maria@example.test")).toBe(false);
     expect(await edit("maria@1ctx.dev")).toBe(true);
-    // a subdomain is someone's mailbox, the project's own domain is not
-    expect(await edit("maria@mail.1ctx.dev")).toBe(false);
+    // a subdomain is someone's inbox, the project's own domain is not
+    expect(await edit("maria@team.1ctx.dev")).toBe(false);
     await app.shutdown();
   });
 
-  test("say on the users list whether mail is on", async () => {
+  test("say on the users list whether email is on", async () => {
     const { app, admin } = await signedIn();
-    const mailOn = async () =>
-      (await (await admin.call("GET", "/api/users")).json()).mailOn;
-    expect(await mailOn()).toBe(false);
-    await admin.call("PUT", "/api/admin/mail", { body: SERVER });
-    expect(await mailOn()).toBe(true);
+    const emailOn = async () =>
+      (await (await admin.call("GET", "/api/users")).json()).emailOn;
+    expect(await emailOn()).toBe(false);
+    await admin.call("PUT", "/api/admin/smtp", { body: SERVER });
+    expect(await emailOn()).toBe(true);
     await app.shutdown();
   });
 
@@ -174,7 +174,7 @@ describe("the mail routes", () => {
       activate: false,
       secrets: { "email-relay": "secret-pass" },
     });
-    app.mail.store.saveSettings(SERVER, app.now.value);
+    app.email.store.saveSettings(SERVER, app.now.value);
     const admin = app.users.byUsername("admin");
     expect(admin).toBeNull();
     const user = app.createUser({
@@ -188,7 +188,7 @@ describe("the mail routes", () => {
     });
     transact(app.db, () => ({
       result: undefined,
-      events: app.mail.enqueue({
+      events: app.email.enqueue({
         kind: "notice",
         userId: user.id,
         subject: "Hi",
@@ -197,8 +197,8 @@ describe("the mail routes", () => {
     }));
     app.now.value += 60 * 60_000;
     await new Promise((resolve) => setImmediate(resolve));
-    expect(app.mailer.sent).toEqual([]);
-    expect(app.mail.store.counts().queued).toBe(1);
+    expect(app.emailSender.sent).toEqual([]);
+    expect(app.email.store.counts().queued).toBe(1);
     await app.shutdown();
   });
 
@@ -207,15 +207,15 @@ describe("the mail routes", () => {
     const attention = async () =>
       (await (await admin.call("GET", "/api/admin/attention")).json()) as {
         items: unknown[];
-        mail: unknown;
+        email: unknown;
       };
-    expect((await attention()).mail).toBeNull();
-    await admin.call("PUT", "/api/admin/mail", {
+    expect((await attention()).email).toBeNull();
+    await admin.call("PUT", "/api/admin/smtp", {
       body: { ...SERVER, keyName: "email-gone" },
     });
     expect(await attention()).toEqual({
-      items: [{ kind: "mail-key", name: "email-gone", at: null }],
-      mail: { queued: 0, failed: 0 },
+      items: [{ kind: "smtp-key", name: "email-gone", at: null }],
+      email: { queued: 0, failed: 0 },
     });
     await app.shutdown();
   });

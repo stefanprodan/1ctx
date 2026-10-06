@@ -60,8 +60,8 @@ export type UsersRoutesDeps = {
   projects: UsersProjectsPort;
   usage: UsersUsagePort;
   clock: Clock;
-  // a placeholder address is shown only while mail is on
-  mail: { enabled(): boolean };
+  // a placeholder address is shown only while email is on
+  email: { enabled(): boolean };
 };
 
 export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
@@ -105,7 +105,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const visits = deps.visits.latest();
         const teams = teamIds();
         const body: UsersResponse = {
-          mailOn: deps.mail.enabled(),
+          emailOn: deps.email.enabled(),
           users: deps.users
             .list()
             .map((user) =>

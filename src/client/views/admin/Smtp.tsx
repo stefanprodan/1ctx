@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type Signal, useSignal } from "@preact/signals";
-import type { MailResponse } from "../../../shared/api/mail.ts";
+import type { SmtpResponse } from "../../../shared/api/smtp.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { mail, mailError, saveMail, testMail } from "../../data/mail.ts";
+import { saveSmtp, sendTestEmail, smtp, smtpError } from "../../data/smtp.ts";
 import { at, type Save, useAction, useSave } from "../../lib/save.ts";
 import { keyOptions } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -21,33 +21,33 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import {
   draftOf,
-  type MailDraft,
-  type MailField,
-  mailBody,
-  mailDirty,
-  mailFieldOf,
   offLine,
   resultLine,
   SECURITY_OPTIONS,
+  type SmtpDraft,
+  type SmtpField,
+  smtpBody,
+  smtpDirty,
+  smtpFieldOf,
   testLine,
   withSecurity,
-} from "./Mail.model.ts";
-import "./mail.css";
+} from "./Smtp.model.ts";
+import "./smtp.css";
 
-export function Mail() {
-  const state = mail.value;
-  const error = mailError.value;
+export function Smtp() {
+  const state = smtp.value;
+  const error = smtpError.value;
   const off = state === null ? null : offLine(state);
-  // held here, so Send test knows the form has unsaved edits
-  const drafted = useSignal<MailDraft | null>(null);
+  // held here, so Send test email knows the form has unsaved edits
+  const drafted = useSignal<SmtpDraft | null>(null);
   const dirty =
     state !== null &&
     drafted.value !== null &&
-    mailDirty(drafted.value, state.settings);
+    smtpDirty(drafted.value, state.settings);
   return (
     <Page
       steps={[zoneStep("Config")]}
-      title="Mail"
+      title="SMTP"
       loading={state === null && error === null}
       error={error}
     >
@@ -78,8 +78,8 @@ function Text({
   onInput,
 }: {
   label: string;
-  field: MailField;
-  draft: MailDraft;
+  field: SmtpField;
+  draft: SmtpDraft;
   save: Save;
   type?: string;
   required?: boolean;
@@ -114,23 +114,23 @@ function Server({
   state,
   drafted,
 }: {
-  state: MailResponse;
-  drafted: Signal<MailDraft | null>;
+  state: SmtpResponse;
+  drafted: Signal<SmtpDraft | null>;
 }) {
   const latest = useLatest(state);
   const save = useSave(async () => {
-    const got = mailBody(drafted.value ?? draftOf(latest.current.settings));
+    const got = smtpBody(drafted.value ?? draftOf(latest.current.settings));
     if (!("body" in got)) return;
-    await saveMail(got.body);
+    await saveSmtp(got.body);
     drafted.value = null;
-  }, mailFieldOf);
+  }, smtpFieldOf);
   const d = drafted.value ?? draftOf(state.settings);
-  const set = (patch: Partial<MailDraft>) => {
+  const set = (patch: Partial<SmtpDraft>) => {
     drafted.value = { ...d, ...patch };
   };
   const text = (
     label: string,
-    field: MailField,
+    field: SmtpField,
     extra: { type?: string; placeholder?: string } = {},
   ) => (
     <Text
@@ -140,7 +140,7 @@ function Server({
       save={save}
       required={field !== "username"}
       {...extra}
-      onInput={(value) => set({ [field]: value } as Partial<MailDraft>)}
+      onInput={(value) => set({ [field]: value } as Partial<SmtpDraft>)}
     />
   );
   const keyInvalid = save.fieldError("keyName") !== null;
@@ -148,17 +148,17 @@ function Server({
     <SettingForm
       save={save}
       check={() => {
-        const got = mailBody(d);
+        const got = smtpBody(d);
         return "body" in got ? null : at(got.field, got.error);
       }}
     >
       <Setting
         title="Server"
-        line="The SMTP server every mail goes through."
+        line="The SMTP server every email goes through."
         foot={
           <DraftFoot
             save={save}
-            dirty={mailDirty(d, state.settings)}
+            dirty={smtpDirty(d, state.settings)}
             onDiscard={() => {
               drafted.value = null;
             }}
@@ -222,14 +222,14 @@ function Server({
   );
 }
 
-// it mails through the saved server, so it waits while edits are not
-function Test({ state, dirty }: { state: MailResponse; dirty: boolean }) {
+// it sends through the saved server, so it waits while edits are not
+function Test({ state, dirty }: { state: SmtpResponse; dirty: boolean }) {
   const send = useAction();
   const result = useSignal<string | null>(null);
   const failed = useSignal(false);
   return (
     <Setting
-      title="Send test"
+      title="Send test email"
       line={testLine(state, dirty)}
       action={
         <button
@@ -241,19 +241,19 @@ function Test({ state, dirty }: { state: MailResponse; dirty: boolean }) {
           onClick={() =>
             void send.run(async () => {
               result.value = null;
-              const got = await testMail();
+              const got = await sendTestEmail();
               failed.value = got !== "sent";
               result.value = resultLine(got, state.to);
             })
           }
         >
-          {send.busy.value ? "Sending" : "Send test"}
+          {send.busy.value ? "Sending" : "Send test email"}
         </button>
       }
     >
       {(result.value !== null || send.failure.value !== null) && (
         <p
-          class={`mail-result${
+          class={`smtp-result${
             failed.value || send.failure.value !== null ? " error" : ""
           }`}
           role="status"

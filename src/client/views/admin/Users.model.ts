@@ -62,11 +62,11 @@ export function userFieldOf(message: string): UserField | undefined {
   return undefined;
 }
 
-// with mail on a placeholder is never mailed, so it is not shown as
-// an address; with mail off the page reads as it did before mail
-export function metaLine(user: UserAccount, mailOn = false): string {
+// with email on a placeholder is never emailed, so it is not shown as
+// an address; with email off the page reads as it did before email
+export function metaLine(user: UserAccount, emailOn = false): string {
   return `@${user.username} · ${
-    mailOn && user.emailPlaceholder ? "No real email" : user.email
+    emailOn && user.emailPlaceholder ? "No real email" : user.email
   }`;
 }
 

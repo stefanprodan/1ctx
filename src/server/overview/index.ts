@@ -169,10 +169,10 @@ export function overviewArea(deps: OverviewDeps): Overview {
     const input = deps.attention();
     return {
       items: attention(input),
-      mail:
-        input.mail === null
+      email:
+        input.email === null
           ? null
-          : { queued: input.mail.queued, failed: input.mail.failed },
+          : { queued: input.email.queued, failed: input.email.failed },
     };
   };
   const probe = deps.probe ?? processProbe();

@@ -86,7 +86,7 @@ describe("the words", () => {
       expect(metaLine({ ...casey, emailPlaceholder: true }, true)).toBe(
         "@casey · No real email",
       );
-      // with mail off the page reads as it did before mail
+      // with email off the page reads as it did before email
       expect(metaLine({ ...casey, emailPlaceholder: true })).toBe(
         "@casey · casey@example.com",
       );

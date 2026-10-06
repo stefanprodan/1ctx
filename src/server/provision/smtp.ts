@@ -2,32 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The instance's one SMTP server as a document, applied through the
-// mail routes. Its name is a label: there is one server, so a second
+// SMTP routes. Its name is a label: there is one server, so a second
 // document is refused and the first updates whatever is held.
 
-import type { MailResponse, PutMailRequest } from "../../shared/api/mail.ts";
+import type { PutSmtpRequest, SmtpResponse } from "../../shared/api/smtp.ts";
 import {
   DEFAULT_FROM_NAME,
-  type MailSecurity,
-} from "../../shared/contracts/mail.ts";
+  type SmtpSecurity,
+} from "../../shared/contracts/smtp.ts";
 import {
   pairProblem,
   parseFromAddress,
   parseFromName,
   parseHost,
-  parseMailKeyName,
-  parseMailUsername,
   parsePort,
   parsePublicAddress,
   parseSecurity,
-} from "../mail/index.ts";
+  parseSmtpKeyName,
+  parseSmtpUsername,
+} from "../email/index.ts";
 import { type Action, type Client, difference, required } from "./client.ts";
 import { optionalSpec } from "./fields.ts";
 
-export type MailSpec = {
+export type SmtpServerSpec = {
   host?: string;
   port?: number;
-  security?: MailSecurity;
+  security?: SmtpSecurity;
   username?: string | null;
   // an email- key file's name, the password; null takes it off
   keyFrom?: string | null;
@@ -36,7 +36,7 @@ export type MailSpec = {
   publicAddress?: string;
 };
 
-export const MAIL_REQUIRED = [
+export const SMTP_REQUIRED = [
   "host",
   "port",
   "security",
@@ -45,7 +45,7 @@ export const MAIL_REQUIRED = [
 ] as const;
 
 // a new server's login, checked offline: both halves or neither
-export function newMailPair(spec: MailSpec): string | null {
+export function newSmtpPair(spec: SmtpServerSpec): string | null {
   const username = spec.username ?? null;
   const keyFrom = spec.keyFrom ?? null;
   if (username !== null && keyFrom === null) {
@@ -57,29 +57,29 @@ export function newMailPair(spec: MailSpec): string | null {
   return null;
 }
 
-export function mailSpec(value: unknown): MailSpec {
-  return optionalSpec<MailSpec>(value, {
+export function smtpServerSpec(value: unknown): SmtpServerSpec {
+  return optionalSpec<SmtpServerSpec>(value, {
     host: parseHost,
     port: parsePort,
     security: parseSecurity,
-    username: parseMailUsername,
-    keyFrom: parseMailKeyName,
+    username: parseSmtpUsername,
+    keyFrom: parseSmtpKeyName,
     fromAddress: parseFromAddress,
     fromName: parseFromName,
     publicAddress: parsePublicAddress,
   });
 }
 
-export async function applyMail(
+export async function applySmtpServer(
   api: Client,
-  doc: { spec: MailSpec },
+  doc: { spec: SmtpServerSpec },
 ): Promise<Action> {
-  const { settings: held } = await api.call<MailResponse>(
+  const { settings: held } = await api.call<SmtpResponse>(
     "GET",
-    "/api/admin/mail",
+    "/api/admin/smtp",
   );
   const { keyFrom, ...fields } = doc.spec;
-  const desired: PutMailRequest = {
+  const desired: PutSmtpRequest = {
     host: required(fields.host ?? held?.host, "host"),
     port: required(fields.port ?? held?.port, "port"),
     security: required(fields.security ?? held?.security, "security"),
@@ -103,6 +103,6 @@ export async function applyMail(
   if (held !== null && !Object.keys(difference(held, desired)).length) {
     return "unchanged";
   }
-  await api.call("PUT", "/api/admin/mail", desired);
+  await api.call("PUT", "/api/admin/smtp", desired);
   return held === null ? "created" : "updated";
 }

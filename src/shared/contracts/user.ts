@@ -23,7 +23,7 @@ export type UserAccount = UserSummary & {
   createdAt: number;
   disabled: boolean;
   mustChangePassword: boolean;
-  // made up, not the user's: never mailed until an admin saves one
+  // made up, not the user's: never emailed until an admin saves one
   emailPlaceholder: boolean;
 };
 

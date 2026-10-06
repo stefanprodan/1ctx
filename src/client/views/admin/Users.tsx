@@ -5,7 +5,7 @@ import type { AdminUser } from "../../../shared/api/users.ts";
 import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { me } from "../../data/me.ts";
-import { mailOn, users, usersError } from "../../data/users.ts";
+import { emailOn, users, usersError } from "../../data/users.ts";
 import { count, initials } from "../../lib/format.ts";
 import { adminUserHref, USERS_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
@@ -71,7 +71,7 @@ function List() {
                       {u.id === meId && <RowsTag>you</RowsTag>}
                     </>
                   }
-                  sub={metaLine(u, mailOn.value)}
+                  sub={metaLine(u, emailOn.value)}
                 />
                 <RowsMeta bad={u.disabled}>{stateLine(u, now)}</RowsMeta>
               </RowsGo>

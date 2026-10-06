@@ -87,7 +87,7 @@ export type BusEvents = {
   // project made or gone); null means everyone recomputes
   "access.changed": { userIds: string[] | null };
   // an outbox row was written: the sender wakes and reads the rows
-  "mail.queued": Record<string, never>;
+  "email.queued": Record<string, never>;
 };
 
 export type BusEvent = {
