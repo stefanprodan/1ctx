@@ -4,8 +4,9 @@
 // What email_user does once its call is well formed: every recipient is
 // checked before any email is queued, and one refusal refuses the call,
 // naming each user and why, so the model calls again with those it may
-// email. The emails are rendered and queued in one transaction with the
-// caps counted on the outbox, and checked again when each is sent.
+// email. The email is rendered once, then queued for each user in one
+// transaction with the caps counted on the outbox, and checked again
+// when each is sent.
 
 import { type Db, transact } from "../db/index.ts";
 import {
@@ -15,7 +16,7 @@ import {
   type Prepare,
   packBody,
   sessionPath,
-  unpackBody,
+  sessionPrepare,
 } from "../email/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { type Clock, DAY_MS } from "../lib/clock.ts";
@@ -60,7 +61,8 @@ function refusal(
   if (ADDRESS.test(name)) {
     return { why: `${name} is an address; email goes to usernames only` };
   }
-  const username = name.replace(/^@/, "");
+  // usernames are lowercase; a model may write one as a name
+  const username = name.replace(/^@/, "").toLowerCase();
   const user = deps.users.byUsername(username);
   if (user === null) return { why: `@${username} is not a user` };
   if (!deps.canOpen(user.id, actor.projectId)) {
@@ -82,19 +84,7 @@ const named = (users: UserRow[]) =>
   users.map((user) => `@${user.username}`).join(", ");
 
 export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
-  // the sender's last word: what made the user a recipient still holds
-  const prepare: Prepare = (row, user) => {
-    if (row.sessionId === null) return "deleted";
-    if (row.projectId === null || !deps.canOpen(user.id, row.projectId)) {
-      return "no-access";
-    }
-    if (user.mustChangePassword) return "no-access";
-    if (!user.emailFromAgents) return "opted-out";
-    const content = unpackBody(row);
-    if (content === null) throw new Error("an agent email row has no text");
-    return content;
-  };
-  deps.outbox.register("agent", prepare);
+  deps.outbox.register("agent", sessionPrepare(deps.canOpen));
 
   return {
     email(actor, request) {
@@ -116,6 +106,16 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
       const recipients = [...new Map(users.map((u) => [u.id, u])).values()];
       const project = deps.projects.byId(actor.projectId);
       if (project === null) throw new Error("the project is gone");
+      // rendered before the write lock: a long body takes a while
+      const content = agentEmail({
+        agent: actor.agentName,
+        project,
+        origin: actor.origin,
+        subject: request.subject,
+        body: request.body,
+        link: deps.outbox.link(sessionPath(actor.origin, actor.sessionId)),
+      });
+      const body = packBody(content);
       return transact(deps.db, () => {
         const now = deps.clock();
         const sent = deps.outbox.countSession(
@@ -138,14 +138,6 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
             `email limit reached: agents may email ${EMAILS_PER_PROJECT_DAY} users a day in this project. Tell the user in your answer instead`,
           );
         }
-        const content = agentEmail({
-          agent: actor.agentName,
-          project,
-          origin: actor.origin,
-          subject: request.subject,
-          body: request.body,
-          link: deps.outbox.link(sessionPath(actor.origin, actor.sessionId)),
-        });
         const events = recipients.flatMap((user) =>
           deps.outbox.enqueue({
             kind: "agent",
@@ -153,7 +145,7 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
             projectId: actor.projectId,
             sessionId: actor.sessionId,
             subject: content.subject,
-            body: packBody(content),
+            body,
           }),
         );
         return {

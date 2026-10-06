@@ -20,6 +20,11 @@ import {
 import { EMAIL_OFF_LINE } from "../../../src/shared/capabilities.ts";
 import { collectLogs, hashPassword } from "../../helpers/app.ts";
 import {
+  createAutomation,
+  settleRun,
+  startRun,
+} from "../../helpers/automations.ts";
+import {
   type ChatApp,
   chatApp,
   type Script,
@@ -185,6 +190,22 @@ describe("email_user's schema", () => {
       "unknown field cc",
     );
   });
+
+  test("refuses a subject with a control or direction character", () => {
+    const ok = { to: ["maria"], body: "Text" };
+    for (const subject of [
+      "a\tb",
+      "a\u0000b",
+      "a\u001b[31mb",
+      "a\u202eb",
+      "a\u2066b",
+      "a\u200fb",
+    ]) {
+      expect(() => parseEmailRequest({ ...ok, subject })).toThrow(
+        "subject must be plain text, with no tab, control or direction characters",
+      );
+    }
+  });
 });
 
 describe("the offer", () => {
@@ -240,6 +261,30 @@ describe("the offer", () => {
     const system = (script.body.messages as { content: string }[])[0]!;
     expect(system.content).toContain(EMAIL_OFF_LINE);
     await finish(chat, script);
+  });
+});
+
+describe("in a run", () => {
+  test("is offered by default, and the automation's switch takes it off", async () => {
+    const { chat } = await setup();
+    chat.app.automationScheduler.stop();
+    for (const [disabled, offered] of [
+      [[], true],
+      [["email"], false],
+    ] as const) {
+      const automation = await createAutomation(chat, {
+        name: `email-${offered}`,
+        disabledCapabilities: [...disabled],
+      });
+      const run = await startRun(chat, automation.id);
+      expect(offeredNames(chat, run.sessionId).includes("email_user")).toBe(
+        offered,
+      );
+      const system = (run.main.body.messages as { content: string }[])[0]!;
+      expect(system.content.includes(EMAIL_OFF_LINE)).toBe(!offered);
+      run.main.reply("done");
+      expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
+    }
   });
 });
 
@@ -313,6 +358,20 @@ describe("a call", () => {
     ]);
     await finish(chat, next);
     expect(outbox(chat)).toEqual([]);
+  });
+
+  test("matches a username whatever its case", async () => {
+    const { chat, teamId, ids } = await setup();
+    const { script } = await startChat(chat, "tell", chat.member, teamId);
+    const { answers, next } = await round(chat, script, [
+      call("c1", email(["Maria", "@GUS", "maria"])),
+    ]);
+    expect(answers).toEqual(["Email queued for @maria, @gus."]);
+    await finish(chat, next);
+    expect(outbox(chat).map((row) => row.user_id)).toEqual([
+      ids.maria!,
+      ids.gus!,
+    ]);
   });
 
   test("in a personal project reaches its owner alone", async () => {

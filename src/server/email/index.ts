@@ -20,9 +20,9 @@ import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import { routes } from "./routes.ts";
 import {
+  badSubject,
   type EmailKind,
   FAILED_KEEP_MS,
-  hasControl,
   linkOf,
   messageIdOf,
   SENT_KEEP_MS,
@@ -39,6 +39,7 @@ export {
   packBody,
   SUBJECT_TAG,
   sessionPath,
+  sessionPrepare,
   unpackBody,
 } from "./frame.ts";
 export {
@@ -226,7 +227,7 @@ export function emailArea(deps: EmailDeps): Email {
     enqueue(fields) {
       const settings = store.settings();
       if (settings === null || !enabled()) throw new Error("email is off");
-      if (fields.subject != null && hasControl(fields.subject)) {
+      if (fields.subject != null && badSubject(fields.subject)) {
         throw new Error("an email's subject is one line");
       }
       const id = newId();

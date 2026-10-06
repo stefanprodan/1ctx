@@ -73,6 +73,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
       deps.email &&
       alertEmails({
         ...deps.email,
+        clock: deps.clock,
         log: deps.log,
         users: deps.users,
         projects: deps.projects,

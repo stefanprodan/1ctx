@@ -147,8 +147,9 @@ words.
   false, the row off or the send's `email` key off, no send carries it,
   never the memory phase or the attention step.
 - **It takes usernames, never an address.** `to` is 1 to `MAX_EMAIL_TO`
-  usernames (an `@` in front is dropped), `subject` one line of at most
-  `MAX_EMAIL_SUBJECT` characters, `body` Markdown of at most
+  usernames (an `@` in front is dropped, the name lowercased), `subject`
+  one line of at most `MAX_EMAIL_SUBJECT` characters that `badSubject()`
+  passes (no control or bidi character), `body` Markdown of at most
   `MAX_EMAIL_BODY` bytes. A recipient can open the session (its
   project, `access.visibleProjectIds()`), is enabled and past the
   forced password change, has a real address and turned email from
@@ -161,7 +162,8 @@ words.
   per send (the session's `agent` rows since `sendStartedAt`, sends
   being serial per session) and `EMAILS_PER_PROJECT_DAY` per project
   over the last 24 hours. Over either, the call is an error the model
-  reads, in the transaction that would queue it. The email itself is
+  reads, in the transaction that would queue it; the email is rendered
+  before it, outside the write lock. The email itself is
   `docs/email.md`'s.
 
 ## Visuals

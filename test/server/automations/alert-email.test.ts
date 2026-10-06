@@ -8,11 +8,16 @@
 // is off. The sender checks the owner again.
 
 import { describe, expect, test } from "bun:test";
-import { alertEmails } from "../../../src/server/automations/alert-email.ts";
+import {
+  ALERT_EMAILS_PER_DAY,
+  alertEmails,
+} from "../../../src/server/automations/alert-email.ts";
 import { alerts } from "../../../src/server/automations/alerts.ts";
 import type { Enqueue } from "../../../src/server/email/index.ts";
+import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { markAttention } from "../../../src/server/sessions/attention.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import {
   answerRun,
   createAutomation,
@@ -23,9 +28,18 @@ import { type ChatApp, chatApp, type Script } from "../../helpers/chat.ts";
 import { SMTP } from "../../helpers/links.ts";
 
 async function setup(
-  options: { email?: boolean; optIn?: boolean } = {},
+  options: {
+    email?: boolean;
+    optIn?: boolean;
+    logs?: ReturnType<typeof collectLogs>;
+  } = {},
 ): Promise<ChatApp> {
-  const chat = await chatApp({ secrets: { "email-relay": "secret-pass" } });
+  const chat = await chatApp({
+    secrets: { "email-relay": "secret-pass" },
+    ...(options.logs === undefined
+      ? {}
+      : { logFactory: options.logs.logFactory }),
+  });
   chat.app.automationScheduler.stop();
   await chat.app.email.stop();
   if (options.email !== false) {
@@ -138,8 +152,10 @@ describe("an alert's email", () => {
     const queued: { inside: boolean; fields: Enqueue }[] = [];
     // the composed area registered the kind; this one's outbox records
     const emails = alertEmails({
+      clock: () => chat.app.now.value,
       log: silent,
       outbox: {
+        countAlerts: () => 0,
         enabled: () => true,
         link: (path) => `${SMTP.publicAddress}${path}`,
         enqueue: (fields) => {
@@ -174,6 +190,68 @@ describe("an alert's email", () => {
     expect(JSON.parse(fields.body!).text).toContain(
       "A decider marked its run.",
     );
+  });
+
+  test("an automation that flaps emails its owner 3 times a day", async () => {
+    const logs = collectLogs();
+    const chat = await setup({ logs });
+    const automation = await createAutomation(chat, {
+      name: "nightly",
+      attentionMode: "agent",
+    });
+    const other = await createAutomation(chat, {
+      name: "hourly",
+      attentionMode: "agent",
+    });
+    const opened: string[] = [];
+    for (let i = 0; i <= ALERT_EMAILS_PER_DAY; i++) {
+      opened.push(await markedRun(chat, automation.id, `down ${i}`));
+      // the alert opens all the same, capped or not
+      expect(chat.app.automations.byId(automation.id)?.alert?.reason).toBe(
+        `down ${i}`,
+      );
+      await cleanRun(chat, automation.id);
+    }
+    expect(outbox(chat).map((row) => row.session_id)).toEqual(
+      opened.slice(0, ALERT_EMAILS_PER_DAY),
+    );
+    expect(
+      logs.events
+        .filter((e) => e.msg === "alert email capped")
+        .map((e) => e.fields),
+    ).toEqual([{ automation: automation.id }]);
+    // another automation of the same owner has its own count
+    const theirs = await markedRun(chat, other.id, "down");
+    expect(outbox(chat).at(-1)?.session_id).toBe(theirs);
+    // a day on, the first ones no longer count
+    chat.app.now.value += DAY_MS;
+    const later = await markedRun(chat, automation.id, "down again");
+    expect(outbox(chat).at(-1)?.session_id).toBe(later);
+  });
+
+  test("a throw while queueing leaves the run's end and the alert's opening", async () => {
+    const logs = collectLogs();
+    const chat = await setup({ logs });
+    const automation = await createAutomation(chat, {
+      name: "nightly",
+      attentionMode: "agent",
+    });
+    chat.app.db.exec(
+      `create trigger outbox_fails before insert on email_outbox
+       begin select raise(abort, 'disk on fire'); end`,
+    );
+    const run = await markedRun(chat, automation.id, "podinfo is not ready");
+    expect(chat.app.sessions.byId(run)?.status).toBe("done");
+    expect(chat.app.automations.byId(automation.id)?.alert).toMatchObject({
+      runs: 1,
+      reason: "podinfo is not ready",
+    });
+    expect(outbox(chat)).toEqual([]);
+    expect(
+      logs.events
+        .filter((e) => e.msg === "alert email failed")
+        .map((e) => e.fields.automation),
+    ).toEqual([automation.id]);
   });
 
   test("nothing is queued for an owner who did not opt in", async () => {

@@ -178,7 +178,7 @@ export function AccessSection({
             "email",
             "Email",
             "email",
-            "email users",
+            "the email_user tool",
             email,
             emailOn,
             onEmail,

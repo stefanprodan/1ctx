@@ -6,15 +6,31 @@
 // link is written as its full address, never the label the agent gave
 // it; an image is dropped, since loading it would tell its host the
 // email was read; raw HTML never renders: a block is dropped and a span
-// stays escaped text. Nothing carries a class or a script.
+// stays escaped text. Nothing carries a class, a script or an image.
+// A bidi control could show a text or an address reversed: the body
+// loses them, and a link shows the address its parse writes back.
 
+import { stripBidi } from "../../shared/words.ts";
 import { escapeHtml, tableAlign } from "./markdown.ts";
 
 // raw HTML blocks reach the html callback, which drops them; spans stay
 // text, escaped like any other
 const OPTIONS = { noHtmlSpans: true } as const;
 
-const LINKABLE = /^https?:\/\//i;
+// the address a link shows and opens: an http(s) URL with no user
+// info, as the URL parser writes it back, which percent-encodes what
+// could reorder or hide part of it; null shows the href as text
+function linkable(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (url.username !== "" || url.password !== "") return null;
+  return url.href;
+}
 
 // a table cell's end in the plain text, split again by its row
 const CELL = "␟";
@@ -38,8 +54,10 @@ const HTML = {
   // the text callback escaped the code already
   code: (content: string) => `<pre><code>${content}</code></pre>`,
   link: (_content: string, meta: { href: string }) => {
-    const href = escapeHtml(meta.href);
-    return LINKABLE.test(meta.href) ? `<a href="${href}">${href}</a>` : href;
+    const url = linkable(meta.href);
+    if (url === null) return escapeHtml(meta.href);
+    const href = escapeHtml(url);
+    return `<a href="${href}">${href}</a>`;
   },
   image: () => "",
   html: () => "",
@@ -85,7 +103,8 @@ const TEXT = {
   strikethrough: (content: string) => content,
   codespan: (content: string) => content,
   code: (content: string) => `${content.replace(/\n$/, "")}\n\n`,
-  link: (_content: string, meta: { href: string }) => meta.href,
+  link: (_content: string, meta: { href: string }) =>
+    linkable(meta.href) ?? meta.href,
   image: () => "",
   html: () => "",
   // a nested list hangs under its item's line
@@ -109,18 +128,20 @@ const TEXT = {
 
 export type EmailBody = { html: string; text: string };
 
-// a parser failure leaves the text as it was, escaped
+// a parser failure leaves the text as it was, escaped; the bidi
+// controls go from what is rendered, so an entity that wrote one goes
+// too
 export function renderEmailMarkdown(md: string): EmailBody {
   if (md.trim() === "") return { html: "", text: "" };
   try {
     return {
-      html: Bun.markdown.render(md, HTML, OPTIONS),
-      text: Bun.markdown
-        .render(md, TEXT, OPTIONS)
+      html: stripBidi(Bun.markdown.render(md, HTML, OPTIONS)),
+      text: stripBidi(Bun.markdown.render(md, TEXT, OPTIONS))
         .replace(/\n{3,}/g, "\n\n")
         .trim(),
     };
   } catch {
-    return { html: `<p>${escapeHtml(md)}</p>`, text: md.trim() };
+    const text = stripBidi(md);
+    return { html: `<p>${escapeHtml(text)}</p>`, text: text.trim() };
   }
 }

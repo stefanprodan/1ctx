@@ -7,8 +7,9 @@
 // are built when the row is queued and stored with it, so the email
 // says what the agent wrote then, whatever is renamed later.
 
+import { stripBidi } from "../../shared/words.ts";
 import { escapeHtml, renderEmailMarkdown } from "../render/index.ts";
-import type { EmailContent } from "./sender.ts";
+import type { EmailContent, Prepare } from "./sender.ts";
 import type { OutboxRow } from "./store.ts";
 
 export const SUBJECT_TAG = "[1ctx] ";
@@ -30,6 +31,14 @@ const page = (parts: string[]) =>
 
 const linkHtml = (words: string, link: string) =>
   `<p>${escapeHtml(words)} <a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`;
+
+// the agent's text in the plain part, every line quoted as the HTML's
+// blockquote sets it apart, so none can pass for a line of the frame
+const quoted = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => (line === "" ? ">" : `> ${line}`))
+    .join("\n");
 
 // the project as the recipient knows it: a personal project is theirs
 const placeOf = (project: { name: string; kind: "personal" | "team" }) =>
@@ -53,7 +62,7 @@ export function agentEmail(input: AgentEmail): EmailContent {
   return {
     subject: `${SUBJECT_TAG}${input.subject}`,
     fromName: `${input.agent} via 1ctx`,
-    text: `${head}\n\n----\n\n${body.text}\n\n----\n\n${foot} ${input.link}\n`,
+    text: `${head}\n\n----\n\n${quoted(body.text)}\n\n----\n\n${foot} ${input.link}\n`,
     html: page([
       `<p>${escapeHtml(head)}</p>`,
       `<blockquote style="margin:16px 0;padding:0 12px;border-left:3px solid">${body.html}</blockquote>`,
@@ -71,12 +80,18 @@ export type AlertEmail = {
 };
 
 export function alertEmail(input: AlertEmail): EmailContent {
-  const head = `The task ${input.automation} in ${placeOf(input.project)} needs attention.`;
-  const why = input.reason ?? "A decider marked its run.";
+  // a name with a direction character would fail the subject check and
+  // lose the email
+  const name = stripBidi(input.automation);
+  const head = `The task ${name} in ${placeOf(input.project)} needs attention.`;
+  const why =
+    input.reason === null
+      ? "A decider marked its run."
+      : stripBidi(input.reason);
   const foot = "Open the run:";
   return {
-    subject: `${SUBJECT_TAG}${input.automation} needs attention`,
-    text: `${head}\n\n${why}\n\n${foot} ${input.link}\n`,
+    subject: `${SUBJECT_TAG}${name} needs attention`,
+    text: `${head}\n\n${quoted(why)}\n\n${foot} ${input.link}\n`,
     html: page([
       `<p>${escapeHtml(head)}</p>`,
       `<blockquote style="margin:16px 0;padding:0 12px;border-left:3px solid"><p>${escapeHtml(why)}</p></blockquote>`,
@@ -101,5 +116,23 @@ export function unpackBody(row: OutboxRow): EmailContent | null {
     text: stored.text,
     html: stored.html,
     ...(stored.fromName === undefined ? {} : { fromName: stored.fromName }),
+  };
+}
+
+// the sender's last word on an email about a chat or run: what made
+// the user a recipient still holds, and the row holds its email
+export function sessionPrepare(
+  canOpen: (userId: string, projectId: string) => boolean,
+): Prepare {
+  return (row, user) => {
+    if (row.sessionId === null) return "deleted";
+    if (row.projectId === null || !canOpen(user.id, row.projectId)) {
+      return "no-access";
+    }
+    if (user.mustChangePassword) return "no-access";
+    if (!user.emailFromAgents) return "opted-out";
+    const content = unpackBody(row);
+    if (content === null) throw new Error(`an ${row.kind} row has no text`);
+    return content;
   };
 }

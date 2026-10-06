@@ -14,6 +14,7 @@ import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import {
+  badSubject,
   type DropWord,
   type EmailKind,
   hasControl,
@@ -157,7 +158,7 @@ export function sender(deps: SenderDeps): Sender {
     if (typeof content === "string") return dropped(row, content);
     if (
       content === null ||
-      hasControl(content.subject) ||
+      badSubject(content.subject) ||
       (content.fromName !== undefined && hasControl(content.fromName))
     ) {
       return broken(row);

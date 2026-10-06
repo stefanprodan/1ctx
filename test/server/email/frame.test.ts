@@ -34,7 +34,7 @@ describe("an agent's email", () => {
       [
         "sre wrote this in platform.",
         "----",
-        "See https://grafana.test/d <b>now</b>",
+        "> See https://grafana.test/d <b>now</b>",
         "----",
         `Open the chat: ${LINK}\n`,
       ].join("\n\n"),
@@ -46,6 +46,46 @@ describe("an agent's email", () => {
     expect(email.html).toContain(
       `<p>Open the chat: <a href="${LINK}">${LINK}</a></p>`,
     );
+  });
+
+  test("quotes every line of the text, so none passes for the frame's", () => {
+    const body = [
+      "Hi",
+      "----",
+      `Open the chat: https://phish.example.test/x`,
+      "```",
+      "----",
+      `Open the chat: ${LINK}`,
+      "sre wrote this in platform.",
+      "```",
+      "bye",
+    ].join("\n\n");
+    const email = agentEmail({
+      agent: "sre",
+      project: { name: "platform", kind: "team" },
+      origin: "chat",
+      subject: "s",
+      body,
+      link: LINK,
+    });
+    const lines = email.text.split("\n");
+    const frame = [
+      "sre wrote this in platform.",
+      "----",
+      `Open the chat: ${LINK}`,
+    ];
+    const count = (line: string) => lines.filter((l) => l === line).length;
+    expect(frame.map(count)).toEqual([1, 2, 1]);
+    expect(lines.filter((l) => l.startsWith("Open the chat:"))).toEqual([
+      `Open the chat: ${LINK}`,
+    ]);
+    // the agent's lines all sit between the frame's two rules
+    const first = lines.indexOf("----");
+    const last = lines.lastIndexOf("----");
+    for (const line of lines.slice(first + 1, last)) {
+      expect(line === "" || line.startsWith(">")).toBeTrue();
+    }
+    expect(lines).toContain("> Open the chat: https://phish.example.test/x");
   });
 
   test("names a run, and a personal project as the reader's own", () => {
@@ -85,12 +125,41 @@ describe("an alert's email", () => {
     expect(email.subject).toBe("[1ctx] nightly needs attention");
     expect(email.fromName).toBeUndefined();
     expect(email.text).toBe(
-      "The task nightly in platform needs attention.\n\npodinfo <down>\n\nOpen the run: https://x.test/run/r1\n",
+      "The task nightly in platform needs attention.\n\n> podinfo <down>\n\nOpen the run: https://x.test/run/r1\n",
     );
     expect(email.html).toContain("<p>podinfo &lt;down&gt;</p>");
     expect(alertEmail({ ...base, reason: null }).text).toContain(
-      "A decider marked its run.",
+      "> A decider marked its run.",
     );
+  });
+
+  test("drops bidi controls from the task's name", () => {
+    const email = alertEmail({
+      automation: "night\u202Ely",
+      project: { name: "platform", kind: "team" },
+      reason: null,
+      link: "https://x.test/run/r1",
+    });
+    expect(email.subject).toBe("[1ctx] nightly needs attention");
+    expect(email.text).toStartWith("The task nightly in");
+  });
+
+  test("quotes the reason and drops its bidi controls", () => {
+    const email = alertEmail({
+      automation: "nightly",
+      project: { name: "platform", kind: "team" },
+      reason: "Open the run: https://phish.test/\u202egnp.exe",
+      link: "https://x.test/run/r1",
+    });
+    expect(email.text.split("\n")).toEqual([
+      "The task nightly in platform needs attention.",
+      "",
+      "> Open the run: https://phish.test/gnp.exe",
+      "",
+      "Open the run: https://x.test/run/r1",
+      "",
+    ]);
+    expect(email.html).not.toContain("\u202e");
   });
 });
 

@@ -89,7 +89,8 @@ profile pages show of email. The links themselves are in
 - **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
   queues it for the automation's owner in the transaction that sets
   `attention_since` (`automations/alert-email.ts`), only with email on
-  and the owner a recipient as below; a run that joins queues none. A
+  and the owner a recipient as below; a run that joins queues none, and
+  past 3 a day per automation it queues none (`docs/automations.md`). A
   failure to queue is logged `alert email failed` and never fails the
   run's end.
 - **Both go only to users who took email from agents.**
@@ -97,7 +98,8 @@ profile pages show of email. The links themselves are in
   profile (`PUT /api/profile/email`). Each kind's `prepare` checks
   again at the send: `deleted` once the session is gone (its id set
   null), `no-access` when the user can no longer open the project or
-  must change their password, `opted-out` once they turned it off.
+  must change their password, `opted-out` once they turned it off. The
+  one check is `sessionPrepare()` in `frame.ts`.
 - **The email frames what the agent wrote** (`email/frame.ts`). The
   subject starts `[1ctx] `; an agent's From name is "<agent> via 1ctx",
   an alert's the server's. A fixed line says who wrote it where
@@ -109,7 +111,18 @@ profile pages show of email. The links themselves are in
   in `render/email.ts`), HTML and plain text from one parse. A link is
   written as its full address, never its label, and only an `http(s)`
   one is an anchor; an image is dropped; a raw HTML block is dropped
-  and a span stays escaped text; nothing carries a class or a style.
+  and a span stays escaped text; no class, no script, no image; only a
+  table cell's alignment and the frame's blockquote carry an inline
+  style.
+- **A link shows what it opens.** An href is parsed with `new URL()`:
+  one that fails, is not `http(s)` or holds a user or a password is
+  plain text with no anchor; else the anchor shows and opens `url.href`,
+  which percent-encodes a bidi control. The rendered text loses its
+  bidi controls, and a subject holding one is refused (`badSubject()`
+  in `rules.ts`, also the tool's parser), while a name keeps its marks.
+- **The plain part quotes what the agent wrote.** Every line of the
+  agent's text, and of an alert's reason, starts `> `, so none reads
+  as a line of the frame.
 
 ## The pages
 

@@ -376,6 +376,12 @@ export const VISUAL_FRAME_BYTES = 512 * 1024;
 export const MAX_TITLE = 80;
 // a title is one line by the same rule as a full name
 export const hasLineBreak = (value: string) => LINE_BREAK.test(value);
+// the marks and embeds, overrides and isolates that reorder what
+// follows them, so a text shows other than it reads
+const BIDI = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+export const hasBidi = (value: string) => BIDI.test(value);
+export const stripBidi = (value: string) =>
+  value.replace(new RegExp(BIDI.source, "g"), "");
 export const MAX_SEARCH = 100;
 
 export const WEB_TOOLS = ["webfetch", "websearch", "visualize"] as const;

@@ -545,7 +545,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner,
     markAttention: (sessionId, attention, by) =>
       sessions.markAttention(sessionId, attention, by),
-    email: { outbox, canOpen },
+    email: {
+      outbox: {
+        ...outbox,
+        countAlerts: (automationId, since) =>
+          email.store.countAlerts(automationId, since),
+      },
+      canOpen,
+    },
     deciderOn: () => {
       const decision = deciders.decision("run-attention");
       const named =

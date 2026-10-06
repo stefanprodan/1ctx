@@ -7,6 +7,7 @@
 // the port checks the recipients and the caps and queues the emails.
 
 import { EMAIL_TOOL, hasLineBreak } from "../../../shared/words.ts";
+import { badSubject } from "../../email/rules.ts";
 import { fields } from "../../lib/body.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
@@ -55,6 +56,12 @@ export function parseEmailRequest(args: Record<string, unknown>): EmailRequest {
   ) {
     throw new Error(
       `subject must be one line of 1 to ${MAX_EMAIL_SUBJECT} characters`,
+    );
+  }
+  // the outbox refuses the same, too late for the model to read why
+  if (badSubject(subject)) {
+    throw new Error(
+      "subject must be plain text, with no tab, control or direction characters",
     );
   }
   if (typeof body !== "string" || body.trim() === "") {

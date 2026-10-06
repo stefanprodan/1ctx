@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An agent's Markdown in an email: a link shows its address, never its
-// label; an image and a raw HTML block are dropped; everything else is
+// label, and only as the URL parser writes it back; an image, a raw
+// HTML block and a bidi control are dropped; everything else is
 // escaped, and the plain text says the same.
 
 import { describe, expect, test } from "bun:test";
@@ -28,6 +29,45 @@ describe("the email renderer", () => {
     expect(html).toBe("<p>javascript:alert(1) mailto:x@example.test</p>");
     expect(html).not.toContain("<a");
     expect(text).toBe("javascript:alert(1) mailto:x@example.test");
+  });
+
+  test("shows and opens the address as the URL parser writes it", () => {
+    // the override in an address is percent-encoded, so it shows as
+    // written and never reverses what follows
+    const { html, text } = renderEmailMarkdown(
+      "[a](https://x.example/\u202egnp.exe)",
+    );
+    expect(html).toBe(
+      '<p><a href="https://x.example/%E2%80%AEgnp.exe">https://x.example/%E2%80%AEgnp.exe</a></p>',
+    );
+    expect(text).toBe("https://x.example/%E2%80%AEgnp.exe");
+  });
+
+  test("writes an address with a user or a password as text, no anchor", () => {
+    for (const href of [
+      "https://bank.example@evil.example/",
+      "https://u:p@evil.example/",
+    ]) {
+      const { html, text } = renderEmailMarkdown(`[bank](${href})`);
+      expect(html).toBe(`<p>${href}</p>`);
+      expect(text).toBe(href);
+    }
+  });
+
+  test("writes an href no URL parses as text, no anchor", () => {
+    const { html, text } = renderEmailMarkdown("[a](/relative) [b](http://)");
+    expect(html).toBe("<p>/relative http://</p>");
+    expect(text).toBe("/relative http://");
+  });
+
+  test("drops the bidi controls from the text", () => {
+    const controls =
+      "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200e\u200f";
+    const { html, text } = renderEmailMarkdown(
+      `Pay ${controls}here &#x202E;now **${controls}x**`,
+    );
+    expect(html).toBe("<p>Pay here now <strong>x</strong></p>");
+    expect(text).toBe("Pay here now x");
   });
 
   test("drops images and raw HTML blocks, and escapes a span", () => {

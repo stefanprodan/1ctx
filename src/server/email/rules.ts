@@ -5,6 +5,7 @@
 // again, what a public address may be, and the header values 1ctx
 // refuses to build.
 
+import { hasBidi } from "../../shared/words.ts";
 import { DAY_MS, MINUTE_MS } from "../lib/clock.ts";
 
 // every email the instance sends: the link emails, a security notice, an
@@ -53,6 +54,13 @@ export function retryAt(attempts: number, now: number): number | null {
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 export function hasControl(value: string): boolean {
   return CONTROL.test(value);
+}
+
+// a subject is text 1ctx or an agent wrote: no control, and no bidi
+// control either, which could show it reversed. A name keeps its marks,
+// since a right-to-left name may need them
+export function badSubject(value: string): boolean {
+  return hasControl(value) || hasBidi(value);
 }
 
 const LOOPBACK = new Set(["127.0.0.1", "[::1]", "localhost"]);

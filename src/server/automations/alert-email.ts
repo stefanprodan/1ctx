@@ -4,7 +4,9 @@
 // An alert's email: when a run opens its automation's alert, the
 // automation's owner is emailed the reason and a link to the run, in
 // the transaction that opened it, under the same opt-in as an agent's
-// email. A run that joins an open alert emails nobody.
+// email. A run that joins an open alert emails nobody, and an
+// automation that flaps between flagged and clean emails its owner at
+// most ALERT_EMAILS_PER_DAY times a day.
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import {
@@ -14,19 +16,28 @@ import {
   type Prepare,
   packBody,
   sessionPath,
-  unpackBody,
+  sessionPrepare,
 } from "../email/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
+import { type Clock, DAY_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 
+// a constant, not a limits row: an editable cap waits until one is
+// needed
+export const ALERT_EMAILS_PER_DAY = 3;
+
 export type AlertEmailDeps = {
+  clock: Clock;
   log: Log;
   outbox: {
     enabled(): boolean;
     link(path: string): string;
     enqueue(fields: Enqueue): BusEvent[];
     register(kind: EmailKind, prepare: Prepare): void;
+    // the automation's alert rows written at or after since, sent,
+    // failed or queued
+    countAlerts(automationId: string, since: number): number;
   };
   users: { byId(id: string): UserRow | null };
   // the user may open the project: its owner, a member or an admin
@@ -54,17 +65,7 @@ const reaches = (deps: AlertEmailDeps, user: UserRow, projectId: string) =>
   deps.canOpen(user.id, projectId);
 
 export function alertEmails(deps: AlertEmailDeps): AlertEmails {
-  deps.outbox.register("alert", (row, user) => {
-    if (row.sessionId === null) return "deleted";
-    if (row.projectId === null || !deps.canOpen(user.id, row.projectId)) {
-      return "no-access";
-    }
-    if (user.mustChangePassword) return "no-access";
-    if (!user.emailFromAgents) return "opted-out";
-    const content = unpackBody(row);
-    if (content === null) throw new Error("an alert row has no text");
-    return content;
-  });
+  deps.outbox.register("alert", sessionPrepare(deps.canOpen));
   const queue = (
     automation: AutomationSummary,
     sessionId: string,
@@ -72,6 +73,11 @@ export function alertEmails(deps: AlertEmailDeps): AlertEmails {
     if (!deps.outbox.enabled()) return [];
     const owner = deps.users.byId(automation.ownerId);
     if (owner === null || !reaches(deps, owner, automation.projectId)) {
+      return [];
+    }
+    const sent = deps.outbox.countAlerts(automation.id, deps.clock() - DAY_MS);
+    if (sent >= ALERT_EMAILS_PER_DAY) {
+      deps.log.info("alert email capped", { automation: automation.id });
       return [];
     }
     const project = deps.projects.byId(automation.projectId);

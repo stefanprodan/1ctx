@@ -224,7 +224,12 @@ none; `by` names who marked the latest.
   it is a no-op 200 with the row as it is.
 - **Opening publishes `automation.attention`**, once per open alert,
   never for a run that joins. It stays a hint: the owner's email is
-  queued in the opening transaction itself (`docs/email.md`).
+  queued in the opening transaction itself (`docs/email.md`), at most
+  `ALERT_EMAILS_PER_DAY` (3) per automation a day, counted on its
+  `alert` outbox rows through their runs; over the cap the opening
+  emails nobody and logs `alert email capped`. The task's Email switch
+  is the `email_user` tool's alone (its meta says so) and never stops
+  an alert's email; the owner's profile opt-in does.
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

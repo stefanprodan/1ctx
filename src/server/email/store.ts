@@ -239,6 +239,21 @@ export class EmailStore {
       .get(projectId, kind, since)!.n;
   }
 
+  // an automation's alert rows at or after since, through the runs they
+  // link to: the project's rows of the day lead, so the run each names
+  // is read by its key, however many runs the automation kept
+  countAlerts(automationId: string, since: number): number {
+    return this.db
+      .query<{ n: number }, [string, number]>(
+        `select count(*) as n from email_outbox o
+         cross join sessions s on s.id = o.session_id
+         where o.project_id = (select project_id from automations where id = ?1)
+           and o.created_at >= ?2 and o.kind = 'alert'
+           and s.automation_id = ?1`,
+      )
+      .get(automationId, since)!.n;
+  }
+
   // the next time a row is due, a claimed one aside
   earliest(): number | null {
     return this.db
