@@ -64,11 +64,7 @@ export type RunnerDeps = {
   knowledge: Pick<KnowledgeCapability, "snapshot">;
   bash: Pick<
     BashCapability,
-    | "startKept"
-    | "scratchFolder"
-    | "copyScratch"
-    | "returnScratch"
-    | "dropScratch"
+    "startKept" | "copyScratch" | "returnScratch" | "dropScratch"
   >;
   // a send's repositories, looked up at its start
   repos: ReposPort;

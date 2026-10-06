@@ -227,6 +227,40 @@ describe("a delegated task", () => {
       await chat.app.shutdown();
     }
   });
+
+  test("a child whose setup fails ends failed and leaves no scratch", async () => {
+    const chat = await subagentApp();
+    try {
+      const copy = chat.app.bash.copyScratch;
+      chat.app.bash.copyScratch = (from, to) => {
+        copy(from, to);
+        throw new Error("the disk is gone");
+      };
+      const { script, sessionId } = await startChat(chat);
+      script.toolRound([delegateCall("d1", "set up")]);
+      script.end();
+      const next = await waitScript(chat.scripted, 2);
+      expect(isChild(next)).toBe(false);
+      expect(lastResult(next)).toBe("The subagent failed: the disk is gone.");
+      next.reply("I will do it myself");
+      await settled(chat, sessionId);
+      const [childId] = childrenOf(chat, sessionId);
+      expect(chat.app.sessions.byId(childId!)!.status).toBe("failed");
+      expect(chat.app.sessions.lastSend(childId!)).toMatchObject({
+        status: "failed",
+        cause: "failure",
+      });
+      expect(
+        chat.app.sessions
+          .messages(childId!)
+          .filter((row) => row.status === "streaming"),
+      ).toEqual([]);
+      expect(scratchLeft(chat, childId!)).toBe(0);
+      expect(delegateRows(chat, sessionId)[0]!.status).toBe("failed");
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
 });
 
 describe("the parent's end ends its children", () => {
@@ -340,33 +374,38 @@ describe("a run's child", () => {
 });
 
 describe("restart repair", () => {
-  test.serial("ends a running child and fails its delegate row", async () => {
-    const chat = await subagentApp();
-    const { script, sessionId } = await startChat(chat);
-    script.toolRound([delegateCall("d1", "long task")]);
-    script.end();
-    await waitScript(chat.scripted, 2);
-    for (let i = 0; i < 50 && childrenOf(chat, sessionId).length === 0; i++)
-      await tick();
-    const [childId] = childrenOf(chat, sessionId);
-    chat.app.automationScheduler.dispose();
-    const restarted = await testApp({
-      db: chat.app.db,
-      fetcher: chat.scripted.fetcher,
-    });
-    try {
-      expect(restarted.sessions.byId(childId!)!.status).toBe("failed");
-      expect(restarted.sessions.byId(sessionId)!.status).toBe("failed");
-      const [row] = delegateRows(chat, sessionId);
-      expect(row!.status).toBe("failed");
-      expect(row!.childSessionId).toBe(childId);
-      expect(
-        chat.app.db
-          .query("select status, cause from sends where session_id = ?")
-          .get(childId!),
-      ).toEqual({ status: "failed", cause: "restart" });
-    } finally {
-      await restarted.shutdown();
-    }
-  });
+  test.serial(
+    "ends a running child, drops its scratch and fails its delegate row",
+    async () => {
+      const chat = await subagentApp();
+      const { script, sessionId } = await startChat(chat);
+      script.toolRound([delegateCall("d1", "long task")]);
+      script.end();
+      await waitScript(chat.scripted, 2);
+      for (let i = 0; i < 50 && childrenOf(chat, sessionId).length === 0; i++)
+        await tick();
+      const [childId] = childrenOf(chat, sessionId);
+      expect(scratchLeft(chat, childId!)).toBeGreaterThan(0);
+      chat.app.automationScheduler.dispose();
+      const restarted = await testApp({
+        db: chat.app.db,
+        fetcher: chat.scripted.fetcher,
+      });
+      try {
+        expect(restarted.sessions.byId(childId!)!.status).toBe("failed");
+        expect(scratchLeft(chat, childId!)).toBe(0);
+        expect(restarted.sessions.byId(sessionId)!.status).toBe("failed");
+        const [row] = delegateRows(chat, sessionId);
+        expect(row!.status).toBe("failed");
+        expect(row!.childSessionId).toBe(childId);
+        expect(
+          chat.app.db
+            .query("select status, cause from sends where session_id = ?")
+            .get(childId!),
+        ).toEqual({ status: "failed", cause: "restart" });
+      } finally {
+        await restarted.shutdown();
+      }
+    },
+  );
 });

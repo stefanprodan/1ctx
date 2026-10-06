@@ -26,6 +26,12 @@ export type ChildEnd = {
 
 const MORE = (n: number, folder: string) => `and ${n} more in /tmp/${folder}/`;
 
+// the tail, its blank line included, at most this: with an answer at
+// childAnswerChars' ceiling it fits the transcript's display cut
+// (RESULT_DISPLAY_CHARS), which the client reads the files part from
+export const TAIL_CHARS = 4_000;
+const SEPARATOR = "\n\n";
+
 // one path a line while they fit in room, then how many more
 function listed(
   lines: readonly string[],
@@ -49,7 +55,8 @@ function listed(
 }
 
 // the files part, headings counted, at most a quarter of the cut, so the
-// answer always shows; each group gets an even share
+// answer always shows, and at most TAIL_CHARS; each group gets an even
+// share
 function filesTail(end: ChildEnd, resultCut: number): string {
   const groups = [
     {
@@ -64,7 +71,10 @@ function filesTail(end: ChildEnd, resultCut: number): string {
     },
   ].filter((group) => group.lines.length > 0);
   if (groups.length === 0) return "";
-  const room = Math.floor(resultCut / 4);
+  const room = Math.min(
+    Math.floor(resultCut / 4),
+    TAIL_CHARS - SEPARATOR.length,
+  );
   // the newline between the groups
   const share = Math.floor((room - (groups.length - 1)) / groups.length);
   const parts = groups.flatMap((group) => [
@@ -92,7 +102,7 @@ export function childResult(
   caps: { answerChars: number; resultCut: number },
 ): ToolResult {
   const files = filesTail(end, caps.resultCut);
-  const tail = files === "" ? "" : `\n\n${files}`;
+  const tail = files === "" ? "" : `${SEPARATOR}${files}`;
   const room = Math.min(caps.answerChars, caps.resultCut - tail.length);
   const failed = failure(end);
   const body =

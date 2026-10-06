@@ -36,7 +36,7 @@ const budgetLimits = [
     name: "childAnswerChars",
     default: 12_000,
     min: 1000,
-    max: 50_000,
+    max: 16_000,
     unit: "chars",
     scope: "send",
   },

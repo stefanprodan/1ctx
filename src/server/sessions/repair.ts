@@ -3,7 +3,8 @@
 //
 // Each repaired session gets its own revision and envelope rather than
 // a global change nobody hears; a subagent's child is ended the same
-// way but publishes nothing, since no list or watch ever shows it.
+// way but publishes nothing, since no list or watch ever shows it, and
+// its copy of its parent's /tmp goes, since a child is never continued.
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
@@ -17,6 +18,7 @@ export function repairRows(
     touch(id: string): SessionRow;
     message(id: string): Message;
     lastSend(id: string): SendSummary | null;
+    dropScratch(id: string): void;
   },
 ): RepairedSession[] {
   // the feed indexes hold the running rank but lead with the project, so
@@ -75,7 +77,10 @@ export function repairRows(
   db.query(
     "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
   ).run(error, now);
-  for (const id of children) reads.touch(id);
+  for (const id of children) {
+    reads.touch(id);
+    reads.dropScratch(id);
+  }
   return ids
     .filter((id) => !children.has(id))
     .map((id) => {

@@ -269,7 +269,9 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       markAttention(deps.db, store, sessionId, attention, by),
     repair() {
       const touched = transact(deps.db, () => {
-        const rows = store.repair(deps.clock(), RESTART_ERROR);
+        const rows = store.repair(deps.clock(), RESTART_ERROR, (id) =>
+          deps.scratch.drop(id),
+        );
         return {
           result: rows,
           events: rows.map((repaired) =>

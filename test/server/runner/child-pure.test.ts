@@ -4,7 +4,11 @@
 // A subagent's prompt, result and places, on fixtures.
 
 import { describe, expect, test } from "bun:test";
-import { childResult } from "../../../src/server/runner/child-result.ts";
+import { LIMIT_DEFINITIONS } from "../../../src/server/limits/index.ts";
+import {
+  childResult,
+  TAIL_CHARS,
+} from "../../../src/server/runner/child-result.ts";
 import {
   freeSlot,
   noChildren,
@@ -19,12 +23,18 @@ import {
   subagentPrompt,
   systemPrompt,
 } from "../../../src/server/runner/prompt.ts";
-import { CapFull, Registry } from "../../../src/server/runner/registry.ts";
+import {
+  CapFull,
+  Registry,
+  RunCapacity,
+} from "../../../src/server/runner/registry.ts";
 import { cutResult } from "../../../src/server/runner/results.ts";
 import type { ActiveSend } from "../../../src/server/runner/send.ts";
+import { RESULT_DISPLAY_CHARS } from "../../../src/server/sessions/index.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
-import { NOT_COPIED } from "../../../src/shared/subagents.ts";
+import { filesPart, NOT_COPIED } from "../../../src/shared/subagents.ts";
+import { cutAt } from "../../../src/shared/text.ts";
 import { tick } from "../../helpers/chat.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10, 0, 0);
@@ -162,6 +172,23 @@ describe("what a delegate call gives back", () => {
     expect(tail).toMatch(/and \d+ more in \/tmp\/sub-1\/$/);
   });
 
+  test("a long answer and a long list fit the display cut whole", () => {
+    const max = LIMIT_DEFINITIONS.childAnswerChars.max;
+    const copied = Array.from(
+      { length: 5000 },
+      (_, i) => `/tmp/sub-1/file-${i}.txt`,
+    );
+    const result = childResult(
+      { ...end, answer: "a".repeat(100_000), copied },
+      { answerChars: max, resultCut: LIMIT_DEFINITIONS.resultCut.max },
+    );
+    expect(result.tail!).toBeLessThanOrEqual(TAIL_CHARS);
+    expect(result.content.length).toBeLessThanOrEqual(RESULT_DISPLAY_CHARS);
+    const shown = filesPart(cutAt(result.content, RESULT_DISPLAY_CHARS));
+    expect(shown).toStartWith("Files in /tmp/sub-1/:\n/tmp/sub-1/file-0.txt");
+    expect(shown).toMatch(/and \d+ more in \/tmp\/sub-1\/$/);
+  });
+
   test("at a small cut the headings count and no path is cut", () => {
     const copied = Array.from(
       { length: 20 },
@@ -283,12 +310,12 @@ describe("a send's subagent places", () => {
 });
 
 describe("the registry's extra streams", () => {
-  const send = (n: number) =>
+  const send = (n: number, scheduled = false) =>
     ({
       sessionId: `s${n}`,
       projectId: `p${n}`,
-      startedBy: `u${n}`,
-      kind: "chat",
+      startedBy: scheduled ? null : `u${n}`,
+      kind: scheduled ? "run" : "chat",
       terminal: null,
       policy: { fullName: "x" },
     }) as unknown as ActiveSend;
@@ -300,15 +327,34 @@ describe("the registry's extra streams", () => {
     expect(() =>
       registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
     ).not.toThrow();
-    expect(registry.takeExtra(4)).toBe(true);
-    expect(registry.takeExtra(4)).toBe(false);
+    expect(registry.takeExtra(4, false)).toBe(true);
+    expect(registry.takeExtra(4, false)).toBe(false);
     expect(() =>
       registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
     ).toThrow(CapFull);
-    registry.freeExtra();
+    registry.freeExtra(false);
     expect(registry.extraStreams).toBe(0);
     expect(() =>
       registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
     ).not.toThrow();
+  });
+
+  test("a scheduled send's extra stays within the scheduled share", () => {
+    const registry = new Registry();
+    const wide = { ...caps, sendsRunning: 8 };
+    // the share of 8 is 6: five scheduled runs and one extra fill it
+    for (let n = 0; n < 5; n++) registry.set(send(n, true));
+    expect(registry.takeExtra(8, true)).toBe(true);
+    expect(registry.takeExtra(8, true)).toBe(false);
+    expect(() =>
+      registry.admit("s9", { userId: null, projectId: "p9" }, wide),
+    ).toThrow(RunCapacity);
+    // what is left of the process stays a user's
+    expect(registry.takeExtra(8, false)).toBe(true);
+    expect(() =>
+      registry.admit("s9", { userId: "u9", projectId: "p9" }, wide),
+    ).not.toThrow();
+    registry.freeExtra(true);
+    expect(registry.takeExtra(8, true)).toBe(true);
   });
 });

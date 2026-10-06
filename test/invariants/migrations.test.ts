@@ -1734,6 +1734,7 @@ describe("the schema", () => {
         .all()
         .map((row) => row.name);
       expect(partial).toEqual([
+        "sessions_feed",
         "sessions_feed_unowned",
         "sessions_idle",
         "sessions_orphan_runs",

@@ -65,8 +65,10 @@ const projectFull = (n: number): string =>
 export class Registry {
   private readonly sends = new Map<string, ActiveSend>();
   // subagents streaming beside their parents, each a place under
-  // sendsRunning; a parent's first child runs in its place, uncounted
+  // sendsRunning; a parent's first child runs in its place, uncounted.
+  // A scheduled send's extras count in its share too
   private extras = 0;
+  private scheduledExtras = 0;
   private closed = false;
 
   get(sessionId: string): ActiveSend | null {
@@ -122,7 +124,7 @@ export class Registry {
     let running = this.extras;
     let mine = 0;
     let project = 0;
-    let scheduled = 0;
+    let scheduled = this.scheduledExtras;
     let scheduledHere = 0;
     for (const send of this.sends.values()) {
       running++;
@@ -184,15 +186,25 @@ export class Registry {
   }
 
   // a second child of one send streams now only when sendsRunning has
-  // room; else it waits for its sibling
-  takeExtra(sendsRunning: number): boolean {
+  // room, and a scheduled send's only within the scheduled share, so
+  // runs never take the places kept for users; else it waits for its
+  // sibling
+  takeExtra(sendsRunning: number, scheduled: boolean): boolean {
     if (this.sends.size + this.extras >= sendsRunning) return false;
+    if (scheduled) {
+      let going = this.scheduledExtras;
+      for (const send of this.sends.values())
+        if (send.startedBy === null) going++;
+      if (going >= scheduledShare(sendsRunning)) return false;
+      this.scheduledExtras++;
+    }
     this.extras++;
     return true;
   }
 
-  freeExtra(): void {
+  freeExtra(scheduled: boolean): void {
     if (this.extras > 0) this.extras--;
+    if (scheduled && this.scheduledExtras > 0) this.scheduledExtras--;
   }
 
   set(send: ActiveSend): void {

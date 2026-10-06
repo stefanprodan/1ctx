@@ -16,7 +16,6 @@ import {
   copyIn,
   type Returned,
   type ScratchBaseline,
-  scratchFolder,
 } from "./handoff.ts";
 import { startKept } from "./kept.ts";
 import {
@@ -61,15 +60,14 @@ export type BashCapability = {
     maxBytes: number;
     maxFiles: number;
   };
-  // a subagent's /tmp (bash/handoff.ts): the folder its files come back
-  // to, its parent's files copied in at its start, and what it added
-  // or changed copied back at its end
-  scratchFolder(sessionId: string, taken: ReadonlySet<string>): string;
+  // a subagent's /tmp (bash/handoff.ts): its parent's files copied in
+  // at its start, and what it added or changed copied back at its end
+  // to a folder none of taken nor the parent's files hold
   copyScratch(from: string, to: string): ScratchBaseline;
   returnScratch(
     child: string,
     parent: string,
-    folder: string,
+    taken: Set<string>,
     baseline: ScratchBaseline,
   ): Promise<Returned>;
   // a child's scratch, when its files could not come back
@@ -118,15 +116,13 @@ export function bashArea(deps: BashDeps): BashArea {
           events: [],
         };
       }),
-    scratchFolder: (sessionId, taken) =>
-      scratchFolder(scratch, sessionId, taken),
     copyScratch: (from, to) => copyIn(deps.db, scratch, from, to, deps.clock()),
-    returnScratch: (child, parent, folder, baseline) =>
+    returnScratch: (child, parent, taken, baseline) =>
       copyBack(
         { db: deps.db, store: scratch, current: () => deps.limits.current() },
         child,
         parent,
-        folder,
+        taken,
         baseline,
         deps.clock(),
       ),

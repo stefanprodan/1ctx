@@ -172,12 +172,12 @@ export type ActiveSend = {
   letGo: () => void;
   // the subagents this send started, counted before the first await
   children: Children;
-  // set on a subagent's own send: its parent, the delegate row it hangs
-  // off and the folder of the parent's /tmp its files come back to
+  // set on a subagent's own send: its parent and the delegate row it
+  // hangs off
   child: ChildLink | null;
 };
 
-export type ChildLink = { parent: ActiveSend; rowId: string; folder: string };
+export type ChildLink = { parent: ActiveSend; rowId: string };
 
 // the answer as the agent's own words, without the mark another agent's
 // answer carries in its history

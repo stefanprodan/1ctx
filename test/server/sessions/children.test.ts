@@ -212,7 +212,7 @@ describe("the links", () => {
     expect(chat.app.db.query("pragma foreign_key_check").all()).toEqual([]);
   });
 
-  test("both links are set or neither, and each names a real row", async () => {
+  test("both links are set or neither, each names a real row, one child a row", async () => {
     const chat = await chatApp();
     const root = await doneChat(chat);
     const insert = (parent: string | null, message: string | null) =>
@@ -235,6 +235,8 @@ describe("the links", () => {
     expect(() => insert(null, answerOf(chat, root))).toThrow(/CHECK/);
     expect(() => insert("nope", answerOf(chat, root))).toThrow(/FOREIGN/);
     expect(() => insert(root, "nope")).toThrow(/FOREIGN/);
+    addChild(chat, root);
+    expect(() => insert(root, answerOf(chat, root))).toThrow(/UNIQUE/);
     expect(() =>
       chat.app.sessions.create({
         projectId: chat.projectId,

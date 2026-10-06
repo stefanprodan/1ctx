@@ -399,6 +399,33 @@ describe("a child that did not finish", () => {
     const html = drawn(rootRows());
     expect(html).toContain("The subagent failed: the provider refused.");
   });
+
+  test.serial("draws its partial answer once, in the result", () => {
+    onScreen();
+    const rows = childRows().map((r) =>
+      r.id === "c-answer"
+        ? { ...r, status: "failed" as const, html: "<p>Half way.</p>" }
+        : r,
+    );
+    expect(childView(rows).answer).toBeNull();
+    takeChildren("root", [
+      { messageId: "delegate-1", child: work({ status: "failed", rows }) },
+    ]);
+    toolResults.value = new Map([
+      [
+        "delegate-1",
+        {
+          status: "done",
+          content: "The subagent failed: boom. Its last words:\nHalf way.",
+          bytes: 50,
+          cut: false,
+        },
+      ],
+    ]);
+    const html = drawn(rootRows());
+    expect(html).not.toContain("transcript-child-answer");
+    expect(html.split("Half way.").length - 1).toBe(1);
+  });
 });
 
 describe("a watch's answer and the route", () => {

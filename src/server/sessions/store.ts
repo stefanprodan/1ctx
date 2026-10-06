@@ -437,12 +437,17 @@ export class SessionStore {
   }
 
   // the rows are read back through this store so the envelope carries
-  // them
-  repair(now: number, error: string): RepairedSession[] {
+  // them; a child's scratch goes with its rows
+  repair(
+    now: number,
+    error: string,
+    dropScratch: (id: string) => void,
+  ): RepairedSession[] {
     return repairRows(this.db, now, error, {
       touch: (id) => this.touch(id, { status: "failed", now })!,
       message: (id) => this.message(id)!,
       lastSend: (id) => this.lastSend(id),
+      dropScratch,
     });
   }
 }

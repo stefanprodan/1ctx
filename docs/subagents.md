@@ -16,7 +16,8 @@ is its root.
 
 - **A child session is a subagent's.** `parent_session_id` names its
   root and `parent_message_id` the root's tool row; both or neither,
-  and either delete takes the child with every row but its usage. It
+  one child to a row (a unique index), and either delete takes the
+  child with every row but its usage. It
   has the root's project, owner, agent and origin, never an
   automation (`store.create()` refuses one), so a run's picks and a
   task's retention meet roots alone. Its links never change.
@@ -35,11 +36,17 @@ is its root.
   while its root's send does.
 - **Restart repair ends a child's rows and publishes nothing for it.**
   The root's `delegate` row ends `failed`, where other tool rows a
-  restart ends are `stopped`; nothing resumes.
-- **The partial feed and sweep indexes repeat `ROOT`,** and
-  `sessions_feed` carries `parent_session_id`, so the feed's root check
-  never leaves the index. `sends_agent` carries the send mark, so an
-  agent's walk to its newest root send stays in the index.
+  restart ends are `stopped`; nothing resumes, and the child's scratch
+  goes in the same transaction.
+- **A child that never finalized stays running until restart repair.**
+  Its finalization retried three times and failed; it blocks nothing,
+  since no route, watch or cap counts it.
+- **A fork copies a `delegate` call and its result as an ordinary tool
+  row,** without the child or its group: the copy is a `Tool` row.
+- **The feed and sweep indexes are partial on `ROOT`,** so a feed walk
+  or a project's count never steps over a child. `sends_agent` carries
+  the send mark, so an agent's walk to its newest root send stays in
+  the index.
 
 ## The delegate tool
 
@@ -61,7 +68,9 @@ is its root.
   resultCut)`, then the files as its `tail`** (`runner/child-result.ts`):
   the paths copied back and the child's paths left (over the parent's
   limits or name rule), headings counted, at most a quarter of
-  `resultCut`, then how many more. A child that failed, stopped, ran
+  `resultCut` and `TAIL_CHARS` (4,000), then how many more.
+  `childAnswerChars` tops out at 16,000, so answer and tail fit
+  `RESULT_DISPLAY_CHARS`, the cut the work fold reads the files from. A child that failed, stopped, ran
   out of time or gave no answer is a failed result with its last
   words; the parent goes on.
 - **The child's session id is the row's `childSessionId`,** read from
@@ -79,6 +88,9 @@ is its root.
   goes through `WriterDeps.childRows(link, sessionId, rows)`, the one
   hook for frames to the parent's watchers (`childRowsTo()`). Its
   stream frames go nowhere.
+- **Its setup comes after its rows commit.** A throw from its kept-file
+  budget or its copy of `/tmp` ends it as failed like a loop's throw:
+  finalized, its scratch dropped, a failed result to the parent.
 - **It ends at the parent's deadline,** `startedAt + deadlineMs` of the
   parent, never a fresh one. The parent's abort (stop, deadline,
   delete, drain, shutdown) ends it with that cause, and the parent's
@@ -104,7 +116,9 @@ is its root.
 - **The first running child runs in the parent's place,** uncounted,
   since the parent streams nothing while it waits. Each other one at
   the same time takes an extra stream from the registry
-  (`takeExtra()`), which `admit()` counts under `sendsRunning`. With
+  (`takeExtra()`), which `admit()` counts under `sendsRunning`; a
+  scheduled send's extras count in the scheduled share too, so its
+  children never take the room users keep. With
   `childrenAtOnce` running or no extra free, a call waits for a sibling
   to end, first come first served. A freed extra calls `wake`.
 
@@ -116,14 +130,17 @@ is its root.
   `/knowledge`, `/repos` (the parent's trees) and the parent's
   `/uploads` (`subagent.uploadsFrom` on the call's context).
 - **`/knowledge` and `/uploads` are read-only to a child.** Its worker
-  refuses a command that changed either, and the server refuses any
-  doc change itself; nothing is saved, `/tmp` included. Its worker has
+  refuses a command that changed either, with the docs on or off, and
+  the server refuses any doc change itself; nothing is saved, `/tmp`
+  included. Its worker has
   no `open`, and the server refuses an opened record from it.
 - **At its end what it added or changed comes back** under the parent's
   `/tmp/<folder>/`: `sub-N`, the first that no file of the parent's
-  stands at and no sibling took. The copy runs under the parent's
-  command queue, within the parent's scratch caps and name rule; what
-  does not fit is named in the result. The child's scratch goes in the
+  stands at and no sibling took, chosen then, under the parent's
+  command queue, so a folder the parent wrote meanwhile is never
+  written into. The copy runs in the same hold, within the parent's
+  scratch caps and name rule; what does not fit is named in the
+  result. The child's scratch goes in the
   same transaction, or alone when the copy fails, since a child is
   never continued.
 - **Its bash description is the parent's after `mountRepos()`,** less
@@ -157,11 +174,11 @@ is its root.
   status (running while the root's row runs, then the child's own:
   done, failed or stopped) and the child's tokens, never a price, as
   chats show none. Open, it shows the task, the child's rounds drawn
-  by the fold's own `Rounds` and `Tool`, the child's answer once, then only
-  the files part of the parent's result (`filesPart()` in
+  by the fold's own `Rounds` and `Tool`, the child's answer once it is
+  done, then only the files part of the parent's result (`filesPart()` in
   `shared/subagents.ts`, whose headings the server writes too). A failed,
   stopped or answerless child, or a result that failed to load, closes
-  with the whole result. A call refused before its child began is an ordinary `Tool`
+  with the whole result alone, a partial answer drawn only there. A call refused before its child began is an ordinary `Tool`
   row (`isDelegate()`). Two calls are two groups.
 - **The client keeps a child's rows by `delegate` row**
   (`data/session-children.ts`) for the chat on screen: the frames and

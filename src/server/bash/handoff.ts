@@ -16,6 +16,8 @@ import type { ScratchFile, ScratchStore } from "./scratch.ts";
 export type ScratchBaseline = ReadonlyMap<string, string>;
 
 export type Returned = {
+  // the parent's /tmp/<folder>/ they came back to
+  folder: string;
   // the parent's paths, under /tmp
   copied: string[];
   // the child's paths that did not fit or could not be named there
@@ -28,8 +30,9 @@ const digest = (file: ScratchFile) =>
 const sizeOf = (path: string, bytes: number) => bytes + Buffer.byteLength(path);
 
 // the first sub-N no file of the parent's /tmp stands at or under, and
-// none taken by a sibling of the same send
-export function scratchFolder(
+// none taken by a sibling of the same send, read when the files come
+// back, so a folder the parent wrote meanwhile is never written into
+function scratchFolder(
   store: ScratchStore,
   sessionId: string,
   taken: ReadonlySet<string>,
@@ -60,21 +63,27 @@ export function copyIn(
 }
 
 // under the parent's command queue, so none of its commands commits
-// between the read and the write; a file that does not fit the
-// parent's caps or name rule is left and named. The child's scratch
-// goes in the same transaction, since a child is never continued
+// between choosing the folder, the read and the write; a file that
+// does not fit the parent's caps or name rule is left and named. A
+// folder that took files joins taken. The child's scratch goes in the
+// same transaction, since a child is never continued
 export async function copyBack(
   deps: { db: Db; store: ScratchStore; current(): KnowledgeCaps },
   child: string,
   parent: string,
-  folder: string,
+  taken: Set<string>,
   baseline: ScratchBaseline,
   now: number,
 ): Promise<Returned> {
   const release = await acquireSession(parent, new AbortController().signal);
   try {
     return transact(deps.db, () => {
-      const result = backInto(deps, child, parent, folder, baseline, now);
+      const folder = scratchFolder(deps.store, parent, taken);
+      const result = {
+        folder,
+        ...backInto(deps, child, parent, folder, baseline, now),
+      };
+      if (result.copied.length > 0) taken.add(folder);
       deps.store.drop(child);
       return { result, events: [] };
     });
@@ -91,7 +100,7 @@ function backInto(
   folder: string,
   baseline: ScratchBaseline,
   now: number,
-): Returned {
+): Omit<Returned, "folder"> {
   const changed = mountableScratch(deps.store.read(child).entries).kept.filter(
     (file) => baseline.get(file.path) !== digest(file),
   );
@@ -115,7 +124,6 @@ function backInto(
     const nextFiles = files + (before === undefined ? 1 : 0);
     const nextBytes = bytes - (before ?? 0) + size;
     if (
-      held.has(folder) ||
       !isScratchName(path) ||
       nextFiles > caps.scratchFiles ||
       nextBytes > caps.scratchBytes

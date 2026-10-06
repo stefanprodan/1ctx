@@ -1,12 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A subagent's command on the server side, past a worker that ignores
-// its flag: a doc change and an opened record are refused all the same.
+// A subagent's command: a write to /knowledge refused with the docs off,
+// and on the server side, past a worker that ignores its flag, a doc
+// change and an opened record refused all the same.
 
 import { describe, expect, test } from "bun:test";
 import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/tree.ts";
-import { callCaps, run, setup } from "./helpers.ts";
+import { callCaps, run, scratchState, setup } from "./helpers.ts";
 
 const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
 
@@ -25,6 +26,39 @@ describe("a subagent's command", () => {
       const saved = await run(s, "docs");
       expect(saved.error).toBe(false);
       expect(s.knowledge.list(s.projectId).files).toHaveLength(1);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a write to /knowledge with the docs off saves nothing, /tmp included", async () => {
+    const s = setup();
+    try {
+      const caps = {
+        ...callCaps,
+        knowledge: false,
+        subagent: { uploadsFrom: s.session.id },
+      };
+      const result = await run(
+        s,
+        "mkdir -p /knowledge/d; printf x > /knowledge/d/a.md; printf y > /tmp/y.txt",
+        caps,
+      );
+      expect(result.error).toBe(true);
+      expect(result.content).toContain(
+        `nothing saved: ${READ_ONLY_TO_SUBAGENT}`,
+      );
+      expect(scratchState(s).entries).toEqual([]);
+      // a folder alone is no write
+      const folder = await run(
+        s,
+        "mkdir -p /knowledge/e; printf y > /tmp/y.txt",
+        caps,
+      );
+      expect(folder.error).toBe(false);
+      expect(scratchState(s).entries.map((file) => file.path)).toEqual([
+        "y.txt",
+      ]);
     } finally {
       s.db.close();
     }

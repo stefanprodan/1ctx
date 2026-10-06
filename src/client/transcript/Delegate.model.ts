@@ -56,7 +56,8 @@ export function childHead(status: ChildStatus, work: ChildWork | null): string {
 export type ChildView = { rounds: WorkRound[]; answer: Message | null };
 
 // the child's rows as the fold draws a send's: its work rounds, then
-// its answer
+// its answer once done; a failed or stopped one's words are in the
+// parent's result
 export function childView(rows: Message[]): ChildView {
   const ordered = [...rows].sort((a, b) => a.seq - b.seq);
   return {
@@ -67,7 +68,11 @@ export function childView(rows: Message[]): ChildView {
       ),
     ),
     answer:
-      ordered.find((row) => row.kind === "reply" && row.slot === "answer") ??
-      null,
+      ordered.find(
+        (row) =>
+          row.kind === "reply" &&
+          row.slot === "answer" &&
+          row.status === "done",
+      ) ?? null,
   };
 }

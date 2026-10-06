@@ -225,11 +225,12 @@ describe("copying back", () => {
         },
         child.id,
         parent.id,
-        "sub-1",
+        new Set(),
         baseline,
         3,
       );
       expect(returned).toEqual({
+        folder: "sub-1",
         copied: ["/tmp/sub-1/a.txt"],
         left: ["b.txt"],
       });
@@ -237,6 +238,64 @@ describe("copying back", () => {
       expect(scratchOf(chat, parent.id)).toEqual({
         "old.txt": "old",
         "sub-1/a.txt": "a",
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("picks its folder at the end, past what the parent and siblings wrote meanwhile", async () => {
+    const chat = await subagentApp();
+    try {
+      const session = (title: string) =>
+        chat.app.sessions.create({
+          projectId: chat.projectId,
+          ownerId: chat.memberId,
+          agentId: chat.agentId,
+          title,
+          now: chat.app.now.value,
+        }).id;
+      const parent = session("p");
+      const child = session("c");
+      const store = new ScratchStore(chat.app.db);
+      const bytes = (text: string) => new TextEncoder().encode(text);
+      const write = (id: string, path: string, text: string) =>
+        transact(chat.app.db, () => {
+          const at = store.read(id).revision;
+          store.write(
+            id,
+            at,
+            {
+              written: [{ path, data: bytes(text), mode: 0o644 }],
+              removed: [],
+              cwd: "/tmp",
+            },
+            0,
+          );
+          return { result: undefined };
+        });
+      const baseline = copyIn(chat.app.db, store, parent, child, 1);
+      // the parent's own command, while its child ran
+      write(parent, "sub-1/report.md", "the parent's");
+      write(child, "report.md", "the child's");
+      const taken = new Set(["sub-2"]);
+      const returned = await copyBack(
+        { db: chat.app.db, store, current: () => DEFAULT_LIMITS },
+        child,
+        parent,
+        taken,
+        baseline,
+        3,
+      );
+      expect(returned).toEqual({
+        folder: "sub-3",
+        copied: ["/tmp/sub-3/report.md"],
+        left: [],
+      });
+      expect([...taken]).toEqual(["sub-2", "sub-3"]);
+      expect(scratchOf(chat, parent)).toEqual({
+        "sub-1/report.md": "the parent's",
+        "sub-3/report.md": "the child's",
       });
     } finally {
       await chat.app.shutdown();

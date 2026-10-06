@@ -53,12 +53,14 @@ export function Delegate({ node }: { node: CallNode }) {
   const status = childStatus(row, work);
   const view = childView(work?.rows ?? []);
   const task = taskOf(node);
-  // a finished child's answer is drawn once; only its files follow it
-  const answered =
-    status === "done" &&
-    !shown.err &&
-    view.answer !== null &&
-    view.answer.html !== "";
+  // a finished child's answer is drawn once, as soon as it is done; only
+  // its files follow it. Any other closes with the whole result alone,
+  // its last words in it
+  const answer =
+    work?.status === "done" && view.answer !== null && view.answer.html !== ""
+      ? view.answer.html
+      : null;
+  const answered = status === "done" && answer !== null && !shown.err;
   const files = answered ? filesPart(shown.text) : "";
   return (
     <details
@@ -102,11 +104,11 @@ export function Delegate({ node }: { node: CallNode }) {
             {entry.error}
           </div>
         )}
-        {view.answer !== null && view.answer.html !== "" && (
+        {answer !== null && (
           <div
             class="transcript-md transcript-child-answer"
             // the server renders a reply's markdown, as the answer's
-            dangerouslySetInnerHTML={{ __html: view.answer.html }}
+            dangerouslySetInnerHTML={{ __html: answer }}
           />
         )}
         {row.status !== "streaming" && answered && files !== "" && (

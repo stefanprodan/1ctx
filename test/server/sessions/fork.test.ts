@@ -1016,7 +1016,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(send.status).toBe("done");
       expect(send.cause).toBe("finish");
       expect(send.finished_at).not.toBeNull();
-      chat.app.sessions.repair(Date.now(), "the server restarted");
+      chat.app.sessions.repair(Date.now(), "the server restarted", () => {});
       expect(chat.app.sessions.byId(copied.session.id)?.status).toBe("done");
     } finally {
       await chat.app.shutdown();

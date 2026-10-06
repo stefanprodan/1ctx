@@ -44,11 +44,7 @@ export type ChildDeps = {
   ending: Pick<EndingDeps, "writer" | "pause" | "log">;
   bash: Pick<
     BashCapability,
-    | "startKept"
-    | "scratchFolder"
-    | "copyScratch"
-    | "returnScratch"
-    | "dropScratch"
+    "startKept" | "copyScratch" | "returnScratch" | "dropScratch"
   >;
   registry: Registry;
   // the process cap now, which an extra stream counts under
@@ -136,18 +132,16 @@ export function childSendRow(
 
 const turnOf = (send: ActiveSend) => (send.kind === "run" ? "run" : "turn");
 
-// the child's session, send, task and first reply in one transaction,
-// then its kept-file budget and its copy of the parent's /tmp
+type Baseline = ReturnType<ChildDeps["bash"]["copyScratch"]>;
+
+// the child's session, send, task and first reply in one transaction
 function startChild(
   deps: ChildDeps,
   link: ChildLink,
   policy: SendPolicy,
   input: DelegateInput,
   now: number,
-): {
-  send: ActiveSend;
-  baseline: ReturnType<ChildDeps["bash"]["copyScratch"]> | null;
-} {
+): ActiveSend {
   const parent = link.parent;
   const root = deps.sessions.byId(parent.sessionId);
   if (root === null) throw new Error("the chat is gone");
@@ -223,20 +217,36 @@ function startChild(
           tool: { ...parent.repos.tool, notice: () => "" },
           release() {},
         };
-  if (!offers(policy.offered, "bash")) return { send, baseline: null };
-  const kept = deps.bash.startKept(sessionId, null);
-  let next = kept.next;
-  send.keep = {
-    take: () => next++,
-    maxBytes: kept.maxBytes,
-    used: kept.used,
-    maxFiles: kept.maxFiles,
-    files: kept.files,
-  };
-  return {
-    send,
-    baseline: deps.bash.copyScratch(parent.sessionId, sessionId),
-  };
+  return send;
+}
+
+// its kept-file budget and its copy of the parent's /tmp, after its rows
+// committed, so a throw here ends the child as failed
+function setUp(
+  deps: ChildDeps,
+  send: ActiveSend,
+  parentId: string,
+): Baseline | null {
+  if (!offers(send.policy.offered, "bash")) return null;
+  try {
+    const kept = deps.bash.startKept(send.sessionId, null);
+    let next = kept.next;
+    send.keep = {
+      take: () => next++,
+      maxBytes: kept.maxBytes,
+      used: kept.used,
+      maxFiles: kept.maxFiles,
+      files: kept.files,
+    };
+    return deps.bash.copyScratch(parentId, send.sessionId);
+  } catch (error) {
+    deps.log.warn("child setup failed", {
+      chat: parentId,
+      child: send.sessionId,
+      ...errorFields(error),
+    });
+    throw error;
+  }
 }
 
 // a delegate call of the parent's: refused past childrenPerSend, else
@@ -262,13 +272,12 @@ export async function delegate(
     };
   }
   children.started++;
-  const folder = deps.bash.scratchFolder(parent.sessionId, children.folders);
-  children.folders.add(folder);
   const port: SlotPort = {
     atOnce: limits.childrenAtOnce,
-    takeExtra: () => deps.registry.takeExtra(deps.sendsRunning()),
+    takeExtra: () =>
+      deps.registry.takeExtra(deps.sendsRunning(), parent.startedBy === null),
     freeExtra: () => {
-      deps.registry.freeExtra();
+      deps.registry.freeExtra(parent.startedBy === null);
       deps.wake();
     },
   };
@@ -280,7 +289,7 @@ export async function delegate(
     };
   }
   try {
-    return await runChild(deps, { parent, rowId, folder }, input, ctx.signal);
+    return await runChild(deps, { parent, rowId }, input, ctx.signal);
   } finally {
     freeSlot(children, slot, port);
   }
@@ -303,7 +312,8 @@ async function runChild(
     return { content: "The subagent ran out of time.", error: true };
   }
   const policy = childPolicy(parent.policy, left);
-  const { send, baseline } = startChild(deps, link, policy, input, now);
+  const send = startChild(deps, link, policy, input, now);
+  let baseline: Baseline | null = null;
   const stop = () => {
     const cause =
       parent.cause === "deadline" || parent.cause === "shutdown"
@@ -320,6 +330,7 @@ async function runChild(
       : after(deps.clock, left, () => void claim(send, "deadline"));
   try {
     try {
+      baseline = setUp(deps, send, parent.sessionId);
       const end = await toolLoop(deps.loop, send);
       claim(send, end.cause, end.error);
     } catch (error) {
@@ -351,7 +362,6 @@ async function runChild(
       cause: send.cause!,
       error: send.error,
       ...answerOf(deps.messages(send.sessionId)),
-      folder: link.folder,
       ...(await returned(deps, send, link, baseline)),
     },
     {
@@ -377,14 +387,19 @@ async function returned(
   deps: ChildDeps,
   send: ActiveSend,
   link: ChildLink,
-  baseline: ReturnType<ChildDeps["bash"]["copyScratch"]> | null,
-): Promise<{ copied: string[]; left: string[] }> {
-  if (baseline === null) return { copied: [], left: [] };
+  baseline: Baseline | null,
+): Promise<Awaited<ReturnType<ChildDeps["bash"]["returnScratch"]>>> {
+  const none = { folder: "", copied: [], left: [] };
+  if (baseline === null) {
+    // a setup that failed may have left part of its copy
+    if (offers(send.policy.offered, "bash")) drop(deps, send, link);
+    return none;
+  }
   try {
     return await deps.bash.returnScratch(
       send.sessionId,
       link.parent.sessionId,
-      link.folder,
+      link.parent.children.folders,
       baseline,
     );
   } catch (error) {
@@ -393,8 +408,20 @@ async function returned(
       child: send.sessionId,
       ...errorFields(error),
     });
-    // a child is never continued, so its copy of the parent's /tmp goes
+    drop(deps, send, link);
+    return none;
+  }
+}
+
+// a child is never continued, so its copy of the parent's /tmp goes
+function drop(deps: ChildDeps, send: ActiveSend, link: ChildLink): void {
+  try {
     deps.bash.dropScratch(send.sessionId);
-    return { copied: [], left: [] };
+  } catch (error) {
+    deps.log.warn("child scratch not dropped", {
+      chat: link.parent.sessionId,
+      child: send.sessionId,
+      ...errorFields(error),
+    });
   }
 }

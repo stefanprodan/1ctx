@@ -1126,7 +1126,7 @@ describe("the tool-loop store", () => {
     ]);
     store.touch(session.id, { status: "running", now: 0 });
 
-    const repaired = store.repair(1, "restart");
+    const repaired = store.repair(1, "restart", () => {});
     expect(repaired).toHaveLength(1);
     expect(repaired[0]!.session.status).toBe("failed");
     expect(repaired[0]!.send).toMatchObject({ cause: "restart" });
@@ -1174,7 +1174,7 @@ describe("the tool-loop store", () => {
     });
     store.touch(session.id, { status: "done", now: 0 });
 
-    const repaired = store.repair(1, "restart");
+    const repaired = store.repair(1, "restart", () => {});
 
     expect(repaired).toHaveLength(1);
     expect(repaired[0]!.messages).toEqual([
@@ -1224,7 +1224,7 @@ describe("the tool-loop store", () => {
     });
     store.touch(session.id, { status: "running", now: 0 });
 
-    const repaired = store.repair(1, "restart");
+    const repaired = store.repair(1, "restart", () => {});
     expect(repaired[0]!.messages).toEqual([
       expect.objectContaining({
         id: summary.id,
@@ -1299,7 +1299,7 @@ describe("the tool-loop store", () => {
     db.query("update sends set memory_round = 2 where id = ?").run(send.id);
     store.touch(session.id, { status: "running", now: 2 });
 
-    const repaired = store.repair(3, "restart");
+    const repaired = store.repair(3, "restart", () => {});
 
     expect(repaired[0]!.messages).toEqual([
       expect.objectContaining({

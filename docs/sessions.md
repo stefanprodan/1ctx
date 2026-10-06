@@ -327,8 +327,10 @@ leave it out are in `docs/subagents.md`.
   parameter. The feed indexes lead with project, origin and running
   rank and carry title, so a search filters inside the index.
 - **A lookup by status alone reads the table,** since the running rank
-  sits behind the project. Lookups by project use the feed index's
-  prefix.
+  sits behind the project. Lookups of roots by project use the feed
+  index's prefix; one of every session by project (a project's delete,
+  a capability forgotten in one) reads the table, as the feed indexes
+  leave children out.
 - **`sessions_automation` is partial** (`automation_id is not null`).
   An `is null` lookup uses `sessions_feed_unowned` or
   `sessions_orphan_runs`. All's per-automation pick is the one walk

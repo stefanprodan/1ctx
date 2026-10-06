@@ -147,7 +147,9 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   memoryPhaseRounds: limit(4, 1, 20, "count", "send"),
   childrenAtOnce: limit(2, 1, 4, "count", "send"),
   childrenPerSend: limit(4, 1, 16, "count", "send"),
-  childAnswerChars: limit(12_000, 1000, 50_000, "chars", "send"),
+  // its ceiling and the files tail (runner/child-result.ts) fit the
+  // transcript's display cut of a result, so the files always show
+  childAnswerChars: limit(12_000, 1000, 16_000, "chars", "send"),
   callTimeoutMs: limit(20_000, 1000, 600_000, "ms", "call"),
   resultCut: limit(50_000, 1000, 500_000, "chars", "call"),
   maxBashCalls: limit(100, 1, 1000, "count", "call"),
