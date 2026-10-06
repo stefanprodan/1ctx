@@ -3,6 +3,8 @@
 [![test](https://github.com/stefanprodan/1ctx/actions/workflows/test.yml/badge.svg)](https://github.com/stefanprodan/1ctx/actions/workflows/test.yml)
 [![release](https://img.shields.io/github/v/release/stefanprodan/1ctx?include_prereleases&sort=semver)](https://github.com/stefanprodan/1ctx/releases)
 [![built with Bun](https://img.shields.io/badge/built%20with-Bun-000?logo=bun)](https://bun.com)
+[![license](https://img.shields.io/github/license/stefanprodan/1ctx)](LICENSE)
+[![SLSA 2](https://slsa.dev/images/gh-badge-level2.svg)](https://github.com/stefanprodan/1ctx/attestations)
 
 A self-hosted AI factory with continuous context.
 
