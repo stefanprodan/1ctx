@@ -79,6 +79,7 @@ const LATER_COLUMNS = [
   "subagents",
   "parent_session_id",
   "parent_message_id",
+  "child",
 ];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
@@ -1694,6 +1695,13 @@ describe("the schema", () => {
         { subagents: 0, parent_session_id: null, parent_message_id: null },
       ]);
       expect(() => db.exec("update agents set subagents = 2")).toThrow(/CHECK/);
+      expect(db.query("select id, child from sends order by id").all()).toEqual(
+        [
+          { id: "send1", child: 0 },
+          { id: "send2", child: 0 },
+        ],
+      );
+      expect(() => db.exec("update sends set child = 2")).toThrow(/CHECK/);
       db.exec(`
         insert into sessions (id, project_id, owner_id, agent_id, origin,
             title, status, created_at, last_activity_at, parent_session_id,
@@ -1854,6 +1862,7 @@ describe("the schema", () => {
               subagents: ________,
               parent_session_id: _________,
               parent_message_id: __________,
+              child: ___________,
               ...rest
             }) => rest,
           ),

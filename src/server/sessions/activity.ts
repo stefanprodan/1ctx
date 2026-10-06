@@ -12,7 +12,7 @@ import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
 import { splitWireName } from "../../shared/mcp.ts";
 import { SKILL_TOOLS } from "../../shared/words.ts";
-import { CHILD_SESSIONS, type Db } from "../db/index.ts";
+import type { Db } from "../db/index.ts";
 import { countByDay } from "../usage/index.ts";
 import { ROOT } from "./children.ts";
 
@@ -239,20 +239,18 @@ function callArgs(text: string | null): { name: string; path: string } | null {
   return { name, path: typeof path === "string" ? path : "" };
 }
 
-// a walk back into sends_agent per agent, to its newest root send, and
-// a seek into sends_running; a subagent's child is its root's work
-const ROOT_SEND = `s.session_id not in (${CHILD_SESSIONS})`;
-
+// a walk back into sends_agent per agent, which carries the child mark,
+// to its newest root send, and a seek into sends_running; a child runs
+// only while its root's send does, so running needs no mark
 export function agentActivity(db: Db): AgentActivity[] {
   return db
     .query<{ agentId: string; lastAt: number | null; running: number }, []>(
       `select a.id as agentId,
               (select s.started_at from sends s
-                where s.agent_id = a.id and ${ROOT_SEND}
+                where s.agent_id = a.id and s.child = 0
                 order by s.started_at desc limit 1) as lastAt,
               exists (select 1 from sends s
-                where s.agent_id = a.id and s.status = 'running'
-                  and ${ROOT_SEND}) as running
+                where s.agent_id = a.id and s.status = 'running') as running
          from agents a
         where a.deleted_at is null`,
     )

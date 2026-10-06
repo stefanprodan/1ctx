@@ -8,7 +8,7 @@ import type {
   WeekUsageResponse,
 } from "../../shared/api/usage.ts";
 import type { RoundUsage } from "../../shared/contracts/session.ts";
-import { CHILD_SESSIONS, type Db } from "../db/index.ts";
+import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
 export type UsageFields = {
@@ -123,8 +123,7 @@ const CHAT_ROUND = `exists (select 1 from sends
 // its root's project, user and agent
 const countLive = (alias: string, column: "send_id" | "session_id") =>
   `count(distinct case when exists (select 1 from sends
-     where sends.id = ${alias}.send_id)
-       and ${alias}.session_id not in (${CHILD_SESSIONS})
+     where sends.id = ${alias}.send_id and sends.child = 0)
      then ${alias}.${column} end)`;
 
 // the days of a window, each from its start to the next's, the last to

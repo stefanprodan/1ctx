@@ -19,7 +19,11 @@ import { PACK_FROM } from "../../../src/server/sessions/pack.ts";
 import { KEPT_STILL } from "../../../src/server/sessions/pack-kept.ts";
 import type { SessionsResponse } from "../../../src/shared/api/sessions.ts";
 import { testApp } from "../../helpers/app.ts";
-import { settleRun } from "../../helpers/automations.ts";
+import {
+  createAutomation,
+  settleRun,
+  startRun,
+} from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
 
@@ -32,6 +36,28 @@ async function doneChat(chat: ChatApp, message = "hello") {
   return started.sessionId;
 }
 
+// a finished manual run of a new task, the scheduler stopped
+async function doneRun(chat: ChatApp, retentionDays = 30) {
+  chat.app.automationScheduler.stop();
+  const automation = await createAutomation(chat, { retentionDays });
+  const run = await startRun(chat, automation.id);
+  run.main.reply("healthy");
+  await settleRun(chat, run.sessionId);
+  return { automationId: automation.id, runId: run.sessionId };
+}
+
+const packed = (chat: ChatApp, sessionId: string): number =>
+  chat.app.db
+    .query<{ n: number }, [string]>(
+      "select count(*) as n from messages where session_id = ? and packed is not null",
+    )
+    .get(sessionId)!.n;
+
+const ago = (chat: ChatApp, id: string, days: number) =>
+  chat.app.db
+    .query("update sessions set last_activity_at = ? where id = ?")
+    .run(chat.app.now.value - days * DAY_MS, id);
+
 // the root's answer, which stands for the tool row that started a child
 const answerOf = (chat: ChatApp, sessionId: string): string =>
   chat.app.db
@@ -41,11 +67,10 @@ const answerOf = (chat: ChatApp, sessionId: string): string =>
     )
     .get(sessionId)!.id;
 
-let made = 0;
-
 // a child under the root, as the runner would leave one: its task, a
 // large tool result, its answer, its send and one priced round; its
-// send starts a minute after now
+// send starts a minute after now. Its rows are named after it: the
+// send `<child>-send`, the tool row `<child>-tool`
 function addChild(
   chat: ChatApp,
   rootId: string,
@@ -65,12 +90,12 @@ function addChild(
     status,
     now: at,
   });
-  const send = `child-send-${++made}`;
+  const send = `${child.id}-send`;
   db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id,
        provider_id, provider_name, model, status, first_message_id,
-       started_at, finished_at)
-     values (?, ?, ?, ?, ?, ?, 'local', 'm', ?, ?, ?, ?)`,
+       child, started_at, finished_at)
+     values (?, ?, ?, ?, ?, ?, 'local', 'm', ?, ?, 1, ?, ?)`,
   ).run(
     send,
     child.id,
@@ -79,7 +104,7 @@ function addChild(
     root.agentId,
     chat.providerId,
     status,
-    `${send}-task`,
+    `${child.id}-task`,
     at,
     status === "running" ? null : at + 1000,
   );
@@ -87,13 +112,13 @@ function addChild(
     `insert into messages (id, session_id, seq, kind, send_id, round,
        user_id, content, status, created_at, finished_at)
      values (?, ?, 1, 'user', ?, 1, ?, 'look around', 'done', ?, ?)`,
-  ).run(`${send}-task`, child.id, send, root.ownerId, at, at);
+  ).run(`${child.id}-task`, child.id, send, root.ownerId, at, at);
   db.query(
     `insert into messages (id, session_id, seq, kind, send_id, round,
        tool_call_id, tool_name, content, status, created_at, finished_at)
      values (?, ?, 2, 'tool', ?, 1, 'c1', 'bash', ?, ?, ?, ?)`,
   ).run(
-    `${send}-tool`,
+    `${child.id}-tool`,
     child.id,
     send,
     BIG,
@@ -107,7 +132,7 @@ function addChild(
          slot, agent_id, model, content, status, created_at, finished_at)
        values (?, ?, 3, 'reply', ?, 2, 'answer', ?, 'm', 'found it',
          'done', ?, ?)`,
-    ).run(`${send}-answer`, child.id, send, root.agentId, at, at);
+    ).run(`${child.id}-answer`, child.id, send, root.agentId, at, at);
   }
   db.query(
     `insert into usage (id, send_id, session_id, project_id, user_id,
@@ -115,7 +140,7 @@ function addChild(
        completion_tokens, cost, created_at)
      values (?, ?, ?, ?, ?, ?, ?, 'm', 1, 1, 1000, 100, 0.5, ?)`,
   ).run(
-    `${send}-usage`,
+    `${child.id}-usage`,
     send,
     child.id,
     root.projectId,
@@ -225,12 +250,41 @@ describe("the links", () => {
   });
 });
 
+describe("the child mark on sends", () => {
+  test("is set exactly on a child's sends, and refused otherwise", async () => {
+    const chat = await chatApp();
+    const root = await doneChat(chat);
+    const child = addChild(chat, root);
+    const send = (sessionId: string, child?: boolean) =>
+      chat.app.sessions.createSend({
+        sessionId,
+        userId: chat.memberId,
+        agentId: chat.agentId,
+        providerId: chat.providerId,
+        model: "m",
+        firstMessageId: "x",
+        now: chat.app.now.value,
+        ...(child === undefined ? {} : { child }),
+      });
+    const mark = (id: string) =>
+      chat.app.db.query("select child from sends where id = ?").get(id);
+    expect(() => send(child)).toThrow(
+      "a send is a child's exactly when its session is",
+    );
+    expect(() => send(root, true)).toThrow(
+      "a send is a child's exactly when its session is",
+    );
+    expect(mark(send(child, true).id)).toEqual({ child: 1 });
+    expect(mark(send(root).id)).toEqual({ child: 0 });
+  });
+});
+
 describe("access", () => {
   test("every session route answers a child as a missing chat", async () => {
     const chat = await chatApp();
     const root = await doneChat(chat);
     const child = addChild(chat, root);
-    const tool = `child-send-${made}-tool`;
+    const tool = `${child}-tool`;
     const calls: [string, string, unknown?][] = [
       ["GET", `/api/sessions/${child}`],
       ["GET", `/api/sessions/${child}/markdown?tz=UTC`],
@@ -384,7 +438,9 @@ describe("lists and counts", () => {
     const until = chat.app.now.value + DAY_MS;
     const days = personDays(chat.app.db, chat.memberId, [since], until);
     const last = agentActivity(chat.app.db);
-    addChild(chat, root, { status: "running" });
+    // a child starts after its root's send; a running one runs only
+    // under its root's, which says running itself
+    addChild(chat, root);
     expect(personDays(chat.app.db, chat.memberId, [since], until)).toEqual(
       days,
     );
@@ -517,6 +573,50 @@ describe("archive, packing and deletion", () => {
   });
 });
 
+describe("a run as the root", () => {
+  test("its child is packed with it, folded into its storage and goes with its retention", async () => {
+    const chat = await chatApp();
+    const { runId } = await doneRun(chat, 1);
+    const own = scan(chat.app.db, { now: chat.app.now.value, since: 0 })
+      .sessions[0]!;
+    const child = addChild(chat, runId);
+    expect(chat.app.sessions.byId(child)).toMatchObject({
+      origin: "automation",
+      automationId: null,
+    });
+    chat.app.sweep();
+    expect(packed(chat, child)).toBe(1);
+    const sums = scan(chat.app.db, { now: chat.app.now.value, since: 0 });
+    expect(sums.sessions.map((row) => row.id)).toEqual([runId]);
+    expect(sums.sessions[0]!.messageBytes).toBeGreaterThan(own.messageBytes);
+    // a run past its task's retention takes its child
+    ago(chat, runId, 2);
+    expect(chat.app.automationScheduler.sweep()).toBe(1);
+    expect(chat.app.sessions.byId(runId)).toBeNull();
+    expect(left(chat, child).sessions).toBe(0);
+  });
+
+  test("the orphan runs step never takes a run's child alone", async () => {
+    const chat = await chatApp();
+    const { automationId, runId } = await doneRun(chat);
+    const child = addChild(chat, runId);
+    const res = await chat.member.call(
+      "DELETE",
+      `/api/automations/${automationId}`,
+    );
+    expect(res.status).toBe(204);
+    // the child past the cut, its orphaned run fresh
+    ago(chat, child, 400);
+    chat.app.sweep();
+    expect(left(chat, child).sessions).toBe(1);
+    // the run past the cut takes it
+    ago(chat, runId, 400);
+    chat.app.sweep();
+    expect(chat.app.sessions.byId(runId)).toBeNull();
+    expect(left(chat, child).sessions).toBe(0);
+  });
+});
+
 describe("restart repair", () => {
   test.serial("ends a running child and publishes nothing for it", async () => {
     const chat = await chatApp();
@@ -540,7 +640,7 @@ describe("restart repair", () => {
       expect(
         chat.app.db
           .query("select status from messages where id = ?")
-          .get(`child-send-${made}-tool`),
+          .get(`${child}-tool`),
       ).toEqual({ status: "stopped" });
       expect(
         events.filter(

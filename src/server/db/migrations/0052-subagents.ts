@@ -10,11 +10,13 @@ import type { Migration } from "../migration.ts";
 // either. Both links are set together or not at all, and a column with a
 // reference added in place must default to null, so no rebuild.
 //
-// The children indexes serve the cascades, which look a child up by
-// each link on every delete of a session or a message, and the first
-// carries the ids that readers of turns leave out. The feed and
-// sweep indexes are remade so a child never enters a partial one and
-// the feed's root check stays inside the index it walks.
+// A child's sends are marked on their own row, which every reader of
+// turns already reads, and the agent's walk to its newest send carries
+// the mark in its index. The children indexes serve the cascades, which
+// look a child up by each link on every delete of a session or a
+// message. The feed and sweep indexes are remade so a child never
+// enters a partial one and the feed's root check stays inside the
+// index it walks.
 export const m0052: Migration = {
   id: "0052-subagents",
   up(db) {
@@ -26,10 +28,14 @@ export const m0052: Migration = {
       alter table sessions add column parent_message_id text
         references messages(id) on delete cascade
         check ((parent_message_id is null) = (parent_session_id is null));
-      create index sessions_children on sessions(parent_session_id, id)
+      create index sessions_children on sessions(parent_session_id)
         where parent_session_id is not null;
       create index sessions_parent_message on sessions(parent_message_id)
         where parent_message_id is not null;
+      alter table sends add column child integer not null default 0
+        check (child in (0, 1));
+      drop index sends_agent;
+      create index sends_agent on sends(agent_id, started_at, child);
 
       drop index sessions_feed;
       create index sessions_feed

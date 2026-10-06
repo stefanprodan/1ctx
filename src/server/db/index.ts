@@ -25,12 +25,6 @@ export function parseStored<T>(text: string | null, fallback: T): T {
   }
 }
 
-// a subagent's child sessions, as a subquery a reader of turns tests a
-// row's session against: built once a statement from the covering
-// partial index, where a lookup per row would read the sessions table
-export const CHILD_SESSIONS =
-  "select id from sessions where parent_session_id is not null";
-
 export type OpenedDb = { db: Db; migrations: string[] };
 
 export function open(path: string): OpenedDb {

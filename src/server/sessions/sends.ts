@@ -40,19 +40,31 @@ export type SendFields = {
   firstMessageId: string;
   mcpDigest?: McpDigest | null;
   summoned?: boolean;
+  // a send of a subagent's child session; true exactly when the session
+  // is a child, so readers of turns leave it out by its own row
+  child?: boolean;
   now: number;
 };
 
 export function insertSend(db: Db, fields: SendFields): string {
   const id = fields.id ?? newId();
+  const child = fields.child === true;
+  const parent = db
+    .query<{ child: number }, [string]>(
+      "select parent_session_id is not null as child from sessions where id = ?",
+    )
+    .get(fields.sessionId);
+  if (parent !== null && (parent.child === 1) !== child) {
+    throw new Error("a send is a child's exactly when its session is");
+  }
   const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
   db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
        provider_name, model, status, first_message_id, mcp, summoned,
-       started_at)
+       child, started_at)
      values (?, ?, ?, ?, ?, ?,
        coalesce((select name from providers where id = ?), ?), ?,
-       'running', ?, ?, ?, ?)`,
+       'running', ?, ?, ?, ?, ?)`,
   ).run(
     id,
     fields.sessionId,
@@ -67,6 +79,7 @@ export function insertSend(db: Db, fields: SendFields): string {
     fields.firstMessageId,
     mcp,
     fields.summoned === true ? 1 : 0,
+    child ? 1 : 0,
     fields.now,
   );
   return id;

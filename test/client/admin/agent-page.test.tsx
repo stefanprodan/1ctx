@@ -21,6 +21,7 @@ import {
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import { tabOf } from "../../../src/client/views/admin/AgentPage.tsx";
 import { AgentSkills } from "../../../src/client/views/admin/AgentSkills.tsx";
+import { AgentSubagents } from "../../../src/client/views/admin/AgentSubagents.tsx";
 import { windowText } from "../../../src/client/views/admin/Agents.model.ts";
 import { NewAgent } from "../../../src/client/views/admin/NewAgent.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
@@ -539,6 +540,24 @@ describe("the cards", () => {
     expect(tools).toContain("Add skill");
     expect(tools).not.toContain("takes no tools");
     skills.value = null;
+  });
+
+  test("Subagents says in sight when the model takes no tools, and locks only turning on", () => {
+    const bare = { ...agent, model: { ...described, tools: false } };
+    const html = render(
+      <AgentSubagents agent={bare} drafts={AgentDrafts.of(bare)} />,
+    );
+    expect(html).toContain("This model takes no tools.");
+    expect(html).toMatch(/name="subagents"[^>]*disabled/);
+    const on = { ...bare, subagents: true };
+    expect(
+      render(<AgentSubagents agent={on} drafts={AgentDrafts.of(on)} />),
+    ).not.toMatch(/name="subagents"[^>]*disabled/);
+    const tools = render(
+      <AgentSubagents agent={agent} drafts={AgentDrafts.of(agent)} />,
+    );
+    expect(tools).not.toContain("takes no tools");
+    expect(tools).not.toMatch(/name="subagents"[^>]*disabled/);
   });
 
   test.serial("New agent is one form whose one submit is Create", () => {

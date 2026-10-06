@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The agent's Subagents switch, drawn as the Visuals switch is: a flip
-// saves only on Save. A model without tools cannot turn it on; one
-// already on may still be turned off.
+// saves only on Save. A model without tools cannot turn it on, and the
+// card says so; one already on may still be turned off.
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import { updateAgent } from "../../data/agents.ts";
 import { useSave } from "../../lib/save.ts";
-import { RowsSwitch } from "../../ui/Rows.tsx";
+import { RowsNote, RowsSwitch } from "../../ui/Rows.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
 import { cardBody } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
@@ -20,7 +20,8 @@ const TITLE = "Subagents";
 const SUBAGENTS_LINE =
   "Turns and runs may hand a task to a fresh copy of this agent.";
 
-const NO_TOOLS = "The model does not take tools";
+// the note the Skills and MCP tabs show, in sight on a phone too
+const NO_TOOLS = "This model takes no tools.";
 
 export function AgentSubagents({
   agent,
@@ -44,12 +45,14 @@ export function AgentSubagents({
     }),
   );
   const on = d.subagents.value;
-  const locked = !on && !agent.model.tools;
+  const noTools = !agent.model.tools;
+  const locked = !on && noTools;
   return (
     <SettingForm save={save}>
       <Setting
         title={TITLE}
         line={SUBAGENTS_LINE}
+        list={noTools}
         action={
           <RowsSwitch
             on={on}
@@ -71,7 +74,9 @@ export function AgentSubagents({
             onDiscard={() => d.resetSubagents(latest.current)}
           />
         }
-      />
+      >
+        {noTools && <RowsNote>{NO_TOOLS}</RowsNote>}
+      </Setting>
     </SettingForm>
   );
 }
