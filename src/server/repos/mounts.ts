@@ -1,37 +1,29 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// From a project's repositories to the trees a turn mounts: one lookup
-// per repository a minute, a fetch per commit and ignore rules at a
-// time, a turn's wait for a cold tree capped, and a hold on every folder
-// mounted. The row's state follows: pending, fetching, ready or failed.
+// The trees a turn mounts from its project's repositories, and row state.
 
 import type { RepoError } from "../../shared/contracts/repo.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
-import { type Adapter, adapter, isCommit } from "./adapters.ts";
+import { adapter } from "./adapters.ts";
 import type { CacheEntry, RepoCache } from "./cache.ts";
-import type { RepoAuth, RepoHeader } from "./check.ts";
+import type { RepoAuth } from "./check.ts";
 import {
   type Failure,
-  type Fetched,
   Fetches,
   fail,
-  hash,
-  kindOf,
   type RepoLimits,
   sourceOf,
-  type Tree,
 } from "./fetches.ts";
 import type { JobRunner } from "./jobs.ts";
-import { REPO_LOOKUP_MS, REPO_WAIT_MS } from "./limits.ts";
+import { REPO_WAIT_MS } from "./limits.ts";
 import { logFetchFailed } from "./log.ts";
-import { apiLookup } from "./lookup.ts";
+import { type Lookup, Lookups, scopedEtag } from "./lookup.ts";
 import { ignoreKey } from "./rules.ts";
 import type { RepoRow, ReposStore } from "./store.ts";
-import type { JobEvent } from "./unpack.ts";
 
-export { type RepoLimits, sourceOf } from "./fetches.ts";
+export type { RepoLimits } from "./fetches.ts";
 
 export type RepoMount = {
   repoId: string;
@@ -88,9 +80,6 @@ export type MountsDeps = {
   userAgent: string;
 };
 
-type Lookup =
-  | { ok: true; commit: string; etag: string | null; header: RepoHeader | null }
-  | Failure;
 type Ensured =
   | {
       ok: true;
@@ -103,27 +92,17 @@ type Ensured =
 const EMPTY: Prepared = { mounts: [], notices: [], release() {} };
 
 export class Mounts {
-  // by kind, URL, ref and key: an admin who names one key in two
-  // projects grants both the same access, a signed and an unsigned
-  // lookup never share, and neither do two kinds' endpoints
-  private readonly lookups = new Map<
-    string,
-    { at: number; answer: Promise<Lookup> }
-  >();
   private readonly closing = new AbortController();
 
   // null without a cache directory
-  private readonly fetches: Fetches | null;
+  private readonly fetches: Fetches | null = null;
+  private readonly lookups: Lookups | null = null;
 
   constructor(private readonly deps: MountsDeps) {
-    this.fetches =
-      deps.cache === null
-        ? null
-        : new Fetches({
-            ...deps,
-            cache: deps.cache,
-            signal: this.closing.signal,
-          });
+    if (deps.cache === null) return;
+    const live = { ...deps, cache: deps.cache };
+    this.fetches = new Fetches({ ...live, signal: this.closing.signal });
+    this.lookups = new Lookups(live, this.fetches);
   }
 
   // at startup: a fetch the process was running goes back to pending,
@@ -221,17 +200,14 @@ export class Mounts {
     if (this.deps.cache === null || this.closing.signal.aborted) return;
     const row = this.deps.store.byId(repoId);
     if (row === null) return;
-    this.lookups.delete(this.lookupKey(row));
+    this.lookups!.forget(row);
     this.fetches!.forget(row);
     void this.ensure(row).then((done) => done.ok && done.release());
   }
 
   // hourly: the cap kept and what a job left behind cleared
   sweep(): void {
-    const now = this.deps.clock();
-    for (const [key, entry] of this.lookups) {
-      if (now - entry.at >= REPO_LOOKUP_MS) this.lookups.delete(key);
-    }
+    this.lookups?.prune(this.deps.clock());
     this.fetches?.sweep();
   }
 
@@ -240,24 +216,10 @@ export class Mounts {
     this.closing.abort();
   }
 
-  private lookupKey(row: RepoRow): string {
-    return `${kindOf(row)}\n${row.url}\n${row.ref}\n${row.keyName ?? ""}`;
-  }
-
-  // the row's ETag when it was stored for this same lookup
-  private storedEtag(row: RepoRow): string | null {
-    const scope = `${hash(this.lookupKey(row), 12)} `;
-    return row.etag?.startsWith(scope) ? row.etag.slice(scope.length) : null;
-  }
-
-  private scoped(row: RepoRow, etag: string | null): string | null {
-    return etag === null ? null : `${hash(this.lookupKey(row), 12)} ${etag}`;
-  }
-
   private async ensure(row: RepoRow, pinned?: string): Promise<Ensured> {
     try {
       const cache = this.deps.cache!;
-      const looked = await this.lookup(row);
+      const looked = await this.lookups!.get(row);
       if (!looked.ok) return this.failed(row, looked);
       const source = sourceOf(row);
       const ignore = ignoreKey(row.ignore);
@@ -276,7 +238,7 @@ export class Mounts {
             return { ok: true, entry, release, missedPin };
           }
         }
-        this.state(row, "fetching");
+        this.markFetching(row);
         const tree = await this.fetches!.byCommit(row, commit, looked.header);
         if (!tree.ok) return this.failed(row, tree);
       }
@@ -286,141 +248,10 @@ export class Mounts {
     }
   }
 
-  private lookup(row: RepoRow): Promise<Lookup> {
-    const key = this.lookupKey(row);
-    const now = this.deps.clock();
-    // an expired answer may hold a key's header: never kept
-    for (const [old, entry] of this.lookups) {
-      if (now - entry.at >= REPO_LOOKUP_MS) this.lookups.delete(old);
-    }
-    const hit = this.lookups.get(key);
-    if (hit !== undefined) return hit.answer;
-    const answer = this.lookUp(row).catch(() => fail("host unreachable"));
-    this.lookups.set(key, { at: now, answer });
-    return answer;
-  }
-
-  private async lookUp(row: RepoRow): Promise<Lookup> {
-    const auth = this.deps.auth(row);
-    if (!auth.ok) return fail("no access");
-    const header = auth.header;
-    // a commit is looked up too: the host's answer is the proof of
-    // access, never a tree another project fetched
-    const host = adapter(row.url, row.kind);
-    if (header === null) return this.archiveLookup(row, host);
-    const etag = row.commit === null ? null : this.storedEtag(row);
-    const looked = await apiLookup(
-      this.deps.fetch,
-      host,
-      row.ref,
-      header,
-      etag,
-      this.deps.userAgent,
-    );
-    if (!looked.ok) return looked;
-    return {
-      ok: true,
-      commit: looked.commit ?? row.commit!,
-      etag: looked.etag,
-      header,
-    };
-  }
-
-  // public: a GET of the archive by ref is the lookup, its 304 or the
-  // commit its first member names, and the tarball when that is new
-  private archiveLookup(row: RepoRow, host: Adapter): Promise<Lookup> {
-    const cache = this.deps.cache!;
-    const source = sourceOf(row);
-    const ignore = ignoreKey(row.ignore);
-    const stored = this.storedEtag(row);
-    const etag =
-      stored !== null &&
-      row.commit !== null &&
-      cache.get(source, row.commit, ignore) !== null
-        ? stored
-        : null;
-    return new Promise<Lookup>((resolve) => {
-      let settled = false;
-      // the job's answer, whenever its event comes
-      let answered: (done: Fetched) => void = () => {};
-      const finished = new Promise<Fetched>((then) => {
-        answered = then;
-      });
-      const onEvent = (event: JobEvent): boolean => {
-        if (settled) return false;
-        settled = true;
-        const commit = event.commit ?? row.commit!;
-        let go = true;
-        if (event.commit !== null && !event.published) {
-          const folder = cache.folder(source, commit, ignore);
-          // a tree refused a while ago or being fetched is not unpacked
-          // twice: the job stops at the commit and the turn asks for it
-          if (
-            this.fetches!.refusal(folder, row) !== null ||
-            this.fetches!.busy(folder)
-          ) {
-            go = false;
-          } else {
-            // the job unpacks on: it is this commit's fetch now
-            const tree = finished.then((done) =>
-              done.ok || done.error !== "no commit"
-                ? (done as Tree)
-                : fail("host unreachable"),
-            );
-            this.fetches!.track(folder, tree, row);
-          }
-        }
-        resolve({ ok: true, commit, etag: event.etag, header: null });
-        return go;
-      };
-      const job = this.fetches!.run(
-        row,
-        host,
-        {
-          url: host.archiveUrl(row.ref),
-          etag,
-          expect: isCommit(row.ref) ? row.ref : null,
-          header: null,
-        },
-        onEvent,
-      );
-      void job.then(answered);
-      void job.then(async (done) => {
-        if (settled) return;
-        settled = true;
-        if (done.ok) {
-          resolve({
-            ok: true,
-            commit: done.entry.meta.commit,
-            etag: null,
-            header: null,
-          });
-        } else if (done.error === "no commit") {
-          // an archive without the commit's comment: the API answers it
-          const looked = await apiLookup(
-            this.deps.fetch,
-            host,
-            row.ref,
-            null,
-            null,
-            this.deps.userAgent,
-          );
-          resolve(
-            looked.ok
-              ? { ok: true, commit: looked.commit!, etag: null, header: null }
-              : looked,
-          );
-        } else {
-          resolve(done);
-        }
-      });
-    });
-  }
-
-  private state(row: RepoRow, state: "fetching"): void {
-    if (row.state === state || this.closing.signal.aborted) return;
-    row.state = state;
-    this.deps.store.setFetched(row.id, { state, error: null }, row);
+  private markFetching(row: RepoRow): void {
+    if (row.state === "fetching" || this.closing.signal.aborted) return;
+    row.state = "fetching";
+    this.deps.store.setFetched(row.id, { state: "fetching", error: null }, row);
   }
 
   private ready(
@@ -429,7 +260,7 @@ export class Mounts {
     looked: Lookup & { ok: true },
   ) {
     const meta = entry.meta;
-    const etag = this.scoped(row, looked.etag);
+    const etag = scopedEtag(row, looked.etag);
     if (
       this.closing.signal.aborted ||
       (row.state === "ready" &&

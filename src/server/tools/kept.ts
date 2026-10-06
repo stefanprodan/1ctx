@@ -1,12 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An MCP result as the context and /mcp get it. What the context cannot
-// hold is kept whole under /mcp and the context gets its start and the
-// path; an embedded resource is inlined when it is small text and kept
-// as a file otherwise, never both.
 // The path lines are the result's tail, so every later cut keeps them.
 
+import { cutAt } from "../../shared/text.ts";
 import { type KeptFile, keptPath } from "../bash/index.ts";
 import type { McpCallOutput, McpContent } from "../mcp/index.ts";
 import type { KeepPort, ToolResult } from "./types.ts";
@@ -100,10 +97,7 @@ function start(text: string, room: number): string {
   if (text.length <= room) return text;
   const cut = text.slice(0, room);
   const line = cut.lastIndexOf("\n");
-  if (line >= room / 2) return cut.slice(0, line);
-  // never half of a surrogate pair, which a strict JSON reader refuses
-  const last = cut.charCodeAt(cut.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return line >= room / 2 ? cut.slice(0, line) : cutAt(text, room);
 }
 
 function isJson(text: string): boolean {
@@ -176,7 +170,7 @@ export function shapeMcpResult(
       text !== null ? Buffer.byteLength(text) : (data?.byteLength ?? 0);
     const at = folder();
     files.push({ folder: number, dir: at, name, text, data, bytes });
-    return keptPath(folder(), name);
+    return keptPath(at, name);
   };
 
   // the text as resultText gives it, a large resource left to its file

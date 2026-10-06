@@ -16,7 +16,6 @@ export type CredentialRow = {
   header: string;
   template: string;
   methods: HttpMethod[];
-  // the team projects it is bound to, by id
   projectIds: string[];
   createdAt: number;
   updatedAt: number;
@@ -43,7 +42,7 @@ type Raw = {
 };
 
 // one order, whatever order a request named them in
-export const orderedMethods = (methods: Iterable<HttpMethod>): HttpMethod[] => {
+const orderedMethods = (methods: Iterable<HttpMethod>): HttpMethod[] => {
   const set = new Set(methods);
   return HTTP_METHODS.filter((method) => set.has(method));
 };

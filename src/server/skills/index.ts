@@ -14,7 +14,6 @@ import { switchable } from "./switchable.ts";
 export { parseSkillMd } from "./frontmatter.ts";
 export * from "./limits.ts";
 export { type LoadedSkill, loadSkill } from "./load.ts";
-export { validPath } from "./source.ts";
 export { SkillStore } from "./store.ts";
 
 export type SkillsDeps = {
@@ -72,14 +71,7 @@ export function skillsArea(deps: SkillsDeps): Skills {
     bodyText: (id) => store.bodyText(id),
     body(id, name) {
       const row = store.bodyOf(id);
-      if (row === null || row.name !== name) return null;
-      return {
-        id: row.id,
-        name: row.name,
-        compatibility: row.compatibility,
-        body: row.body,
-        files: row.files,
-      };
+      return row?.name === name ? row : null;
     },
     file(id, name, path) {
       if (store.nameOf(id) !== name) return null;

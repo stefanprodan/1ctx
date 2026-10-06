@@ -6,7 +6,7 @@
 
 import { parseArguments } from "../../shared/contracts/tool.ts";
 import { sanitize } from "../../shared/memory.ts";
-import { ToolError } from "../lib/errors.ts";
+import { messageOf, ToolError } from "../lib/errors.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
 
@@ -18,7 +18,42 @@ function describe(error: unknown, timeoutMs: number): string {
   if (error instanceof DOMException && error.name === "TimeoutError") {
     return `tool timed out after ${Math.round(timeoutMs / 1000)} seconds`;
   }
-  return error instanceof Error ? error.message : String(error);
+  return messageOf(error);
+}
+
+// a call's arguments as an object, or the words the model reads
+export function parsedArgs(
+  call: ToolCall,
+  notObject = `arguments for tool "${call.name}" must be an object`,
+): Record<string, unknown> {
+  const parsed = parseArguments(call.arguments);
+  if (parsed.ok) return parsed.args;
+  throw new Error(
+    parsed.reason === "json"
+      ? `invalid JSON arguments for tool "${call.name}"`
+      : notObject,
+  );
+}
+
+function failed(
+  failure: unknown,
+  timedOut: boolean,
+  timeoutMs: number,
+  cut: number,
+): ToolResult {
+  const result: ToolResult = {
+    content: clean(`Error: ${describe(failure, timeoutMs)}`, cut),
+    error: true,
+  };
+  Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
+    value: timedOut ? true : failure,
+  });
+  return result;
+}
+
+// a call that failed before any tool ran, shaped as the registry would
+export function failedCall(error: unknown, ctx: ToolContext): ToolResult {
+  return failed(error, false, ctx.caps.callTimeoutMs, ctx.caps.resultCut);
 }
 
 export class Registry {
@@ -46,18 +81,11 @@ export class Registry {
       if (!tool) throw new ToolError(this.unknown(call.name), "tool not found");
       timeoutMs =
         (tool.timeoutMs ?? ctx.caps.callTimeoutMs) + (tool.graceMs ?? 0);
-      const parsed = parseArguments(call.arguments);
-      if (!parsed.ok) {
-        throw new Error(
-          parsed.reason === "json"
-            ? `invalid JSON arguments for tool "${call.name}"`
-            : `arguments for tool "${call.name}" must be an object`,
-        );
-      }
+      const args = parsedArgs(call);
       started = performance.now();
       timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
-      const result = await tool.run(parsed.args, {
+      const result = await tool.run(args, {
         ...ctx,
         signal,
       });
@@ -88,9 +116,8 @@ export class Registry {
         error: typeof result === "string" ? false : result.error,
       };
     } catch (error) {
-      // a tool with its own timer of the same length (an MCP call) can
-      // throw its own words a moment before this one fires; past the
-      // limit, the failure is this timeout either way
+      // a tool whose own deadline equals the call timeout may fail first;
+      // past the limit it is this timeout
       const late =
         timeoutSignal !== null &&
         (timeoutSignal.aborted || performance.now() - started >= timeoutMs);
@@ -98,15 +125,7 @@ export class Registry {
       const failure = timedOut
         ? new DOMException("the tool call timed out", "TimeoutError")
         : error;
-      const message = describe(failure, timeoutMs);
-      const result: ToolResult = {
-        content: clean(`Error: ${message}`, ctx.caps.resultCut),
-        error: true,
-      };
-      Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
-        value: timedOut ? true : failure,
-      });
-      return result;
+      return failed(failure, timedOut, timeoutMs, ctx.caps.resultCut);
     }
   }
 }

@@ -1,3 +1,6 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
 import idiomorph from "idiomorph/dist/idiomorph.min.js" with { type: "text" };
 import { measureVisual } from "./visual-height.ts";
 import {
@@ -18,15 +21,6 @@ import {
   VISUAL_THEME_CSS,
   visualThemeValues,
 } from "./visual-theme.ts";
-
-export {
-  cleanVisual,
-  inertVisual,
-  visualAttributeRule,
-  visualElementRule,
-  visualScript,
-} from "./visual-inert.ts";
-export { visualConnect, visualMessage } from "./visual-painter.ts";
 
 export function visualCsp(hosts: string[]): string {
   const sources = hosts.length ? ` ${hosts.join(" ")}` : "";

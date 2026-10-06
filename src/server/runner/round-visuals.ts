@@ -66,9 +66,7 @@ export class RoundVisuals {
       this.round.drafts.delete(index);
       return;
     }
-    draft.pendingBytes += new TextEncoder().encode(
-      draft.reader.html.slice(before),
-    ).byteLength;
+    draft.pendingBytes += Buffer.byteLength(draft.reader.html.slice(before));
     // A whole argument value never creates a preview, even after an empty delta.
     if (
       !draft.reader.complete &&

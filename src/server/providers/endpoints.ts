@@ -1,19 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Who serves a model behind OpenRouter: the endpoints list an admin
-// picks a preferred upstream from. Read on demand, never cached, since
-// it is asked once per model picked in the form.
 
 import type { Endpoint } from "../../shared/contracts/provider.ts";
-import {
-  CATALOG_TIMEOUT_MS,
-  MAX_CATALOG_BYTES,
-  perMillion,
-  readCapped,
-} from "./catalog.ts";
+import { fetchJson, perMillion } from "./catalog.ts";
 import type { ProviderRow } from "./store.ts";
-import { CatalogError, type Fetcher } from "./types.ts";
+import type { Fetcher } from "./types.ts";
+import { authHeaders, endpoint } from "./wires.ts";
 
 const sum = (e: Endpoint): number =>
   (e.promptPrice ?? Number.POSITIVE_INFINITY) +
@@ -72,25 +64,8 @@ export async function fetchEndpoints(
   model: string,
 ): Promise<Endpoint[]> {
   const path = model.split("/").map(encodeURIComponent).join("/");
-  let res: Response;
-  try {
-    res = await fetcher(
-      `${provider.baseUrl.replace(/\/+$/, "")}/models/${path}/endpoints`,
-      {
-        headers: key === null ? {} : { authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
-      },
-    );
-  } catch (err) {
-    throw new CatalogError(
-      `the provider did not answer: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-  if (!res.ok) throw new CatalogError(`the provider answered ${res.status}`);
-  try {
-    return parseEndpoints(JSON.parse(await readCapped(res, MAX_CATALOG_BYTES)));
-  } catch (err) {
-    if (err instanceof CatalogError) throw err;
-    throw new CatalogError("the provider did not answer with JSON");
-  }
+  const url = endpoint(provider.baseUrl, `/models/${path}/endpoints`);
+  return parseEndpoints(
+    await fetchJson(fetcher, url, authHeaders("openrouter", key)),
+  );
 }

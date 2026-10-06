@@ -18,7 +18,6 @@ import {
   type DocsPort,
   run,
 } from "./mount.ts";
-import { heldSessions } from "./queue.ts";
 import { ScratchStore } from "./scratch.ts";
 import { commandWorkers } from "./worker.ts";
 
@@ -99,8 +98,7 @@ export function bashArea(deps: BashDeps): BashArea {
           events: [],
         };
       }),
-    sweep: (now) =>
-      scratch.sweep(now, deps.limits.current().scratchIdleDays, heldSessions()),
+    sweep: (now) => scratch.sweep(now, deps.limits.current().scratchIdleDays),
     close: () => workers.close(),
   };
 }
@@ -119,7 +117,6 @@ export {
   KEPT_UNPACK_ERROR,
   type KeptFile,
   type KeptPending,
-  type KeptWrite,
   keptPath,
   pendingKept,
   readKeptRaw,
@@ -127,6 +124,6 @@ export {
   writeKeptFiles,
   writeKeptFrame,
 } from "./kept.ts";
-export type { CommandRepos } from "./mount.ts";
+export type { CommandResult } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";
 export type { CommandEnd, JobRepo } from "./protocol.ts";

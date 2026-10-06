@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The request boundary for knowledge names, text and revisions. Files
-// use row ids in URLs because their names contain slashes; replacements
-// require a revision so a restore cannot silently overwrite a newer edit.
 
 import {
   type CreateKnowledgeFileRequest,
@@ -12,10 +8,14 @@ import {
   SEARCH_MAX,
   SEARCH_MIN,
 } from "../../shared/api/knowledge.ts";
-import { isKnowledgeName } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { textFromString } from "../../shared/knowledge.ts";
+import {
+  isKnowledgeName,
+  MAX_KNOWLEDGE_NAME,
+  MAX_KNOWLEDGE_SEGMENTS,
+} from "../../shared/words.ts";
+import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { textFromString } from "./text.ts";
 
 export function parseId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
@@ -27,7 +27,7 @@ export function parseId(value: unknown, name: string): string {
 export function parseName(value: unknown): string {
   if (!isKnowledgeName(value)) {
     throw new BadRequest(
-      "name must be 1 to 8 path segments of letters, digits, dots, dashes or underscores, at most 80 characters each and 200 total, never . or ..",
+      `name must be 1 to ${MAX_KNOWLEDGE_SEGMENTS} path segments of letters, digits, dots, dashes or underscores, at most 80 characters each and ${MAX_KNOWLEDGE_NAME} total, never . or ..`,
     );
   }
   return value;
@@ -73,14 +73,10 @@ export function parseRename(body: unknown): RenameKnowledgeFileRequest {
 export type SearchQuery = { q: string; after: string | null };
 
 export function parseSearch(url: URL): SearchQuery {
-  for (const key of url.searchParams.keys()) {
-    if (key !== "q" && key !== "after") {
-      throw new BadRequest(`unknown parameter ${key}`);
-    }
-  }
-  const qs = url.searchParams.getAll("q");
-  if (qs.length !== 1) throw new BadRequest("q must appear once");
-  const q = qs[0]!.trim();
+  const get = queryParams(url, ["q", "after"]);
+  const raw = get("q");
+  if (raw === null) throw new BadRequest("q must appear once");
+  const q = raw.trim();
   if (q.length < SEARCH_MIN || q.length > SEARCH_MAX) {
     throw new BadRequest(`q must be ${SEARCH_MIN} to ${SEARCH_MAX} characters`);
   }
@@ -88,11 +84,10 @@ export function parseSearch(url: URL): SearchQuery {
   if (/[\r\n]/.test(q)) {
     throw new BadRequest("q must be one line of text");
   }
-  const afters = url.searchParams.getAll("after");
-  if (afters.length > 1) throw new BadRequest("after must appear once");
-  if (afters.length === 0) return { q, after: null };
-  if (!isKnowledgeName(afters[0])) {
+  const after = get("after");
+  if (after === null) return { q, after: null };
+  if (!isKnowledgeName(after)) {
     throw new BadRequest("after must be a file name");
   }
-  return { q, after: afters[0] };
+  return { q, after };
 }

@@ -10,12 +10,12 @@
 // the round numbers, the tool rows, the counters and the terminal cause.
 
 import { describe, expect, test } from "bun:test";
-import { LOOP_LIMITS } from "../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { LOOP_LINE } from "../../src/server/runner/context.ts";
 import {
   NOT_RUN_LOOP,
   NOT_RUN_REPEAT,
-} from "../../src/server/runner/writer.ts";
+} from "../../src/server/runner/reply-rows.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, setLimits, startChat, waitScript } from "../helpers/chat.ts";
 import {
@@ -288,8 +288,9 @@ describe("the tool loop", () => {
     const { detail, sessionId } = await startChat(chat, "cap then answer");
     // over the per-round cap: the calls are recorded not run and the
     // loop enters the answer round, which asks for the answer in words
-    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
-      time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    const many = Array.from(
+      { length: DEFAULT_LIMITS.callsPerRound + 1 },
+      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
@@ -329,8 +330,9 @@ describe("the tool loop", () => {
   test("a hosted wire goes from the answer round straight to no schemas", async () => {
     const chat = await chatApp({ wire: "gemini" });
     const { sessionId } = await startChat(chat, "cap on gemini");
-    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
-      time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    const many = Array.from(
+      { length: DEFAULT_LIMITS.callsPerRound + 1 },
+      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
@@ -362,7 +364,7 @@ describe("the tool loop", () => {
       const chat = await chatApp({ wire });
       const { sessionId } = await startChat(chat, `text call on ${wire}`);
       const many = Array.from(
-        { length: LOOP_LIMITS.callsPerRound + 1 },
+        { length: DEFAULT_LIMITS.callsPerRound + 1 },
         (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
       );
       chat.scripted.scripts[0].toolRound(many);
@@ -527,8 +529,9 @@ describe("the tool loop", () => {
   test("the call cap cuts a round over the per-round limit", async () => {
     const chat = await chatApp();
     const { detail, sessionId } = await startChat(chat, "too many at once");
-    const many = Array.from({ length: LOOP_LIMITS.callsPerRound + 1 }, (_, i) =>
-      time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    const many = Array.from(
+      { length: DEFAULT_LIMITS.callsPerRound + 1 },
+      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();

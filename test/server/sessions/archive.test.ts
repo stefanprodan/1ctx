@@ -161,7 +161,6 @@ describe("an archived chat is read-only", () => {
           sessions: chat.app.sessions,
           usage: { record() {} },
           render: (text) => text,
-          stream() {},
         },
         {
           sendId: "send1",

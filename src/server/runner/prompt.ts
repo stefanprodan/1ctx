@@ -1,17 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The system prompt: the agent's name and project, the agent's prompt,
-// the user with what was written about them, the skills catalog and the
-// date. The model learns who it is and where before its instructions, as
-// a harness's prompt opens. A run belongs to its project, not to a
-// person, so the run's line takes the user's place.
-// The user comes after what is fixed per agent and project, since the
-// user changes with the author of a team chat, and a day, not a time, so
-// the prefix holds until midnight and a provider's cache with it. The
-// skills catalog arrives on the policy's offered snapshot; memory and
-// knowledge are captured once per send so a tool's writes cannot move
-// the prefix between rounds.
+// The system prompt; its order is fixed in docs/sessions.md.
 
 import {
   KNOWLEDGE,
@@ -28,9 +18,10 @@ import {
 } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
-import type { SendPolicy } from "./policy.ts";
+import { localMinute } from "../lib/clock.ts";
+import { offers, type SendPolicy } from "./policy.ts";
 
-// the calendar day in UTC; the user's zone comes with the profile later
+// the UTC day, so the prefix holds until midnight for every author
 export function dateLine(now: number): string {
   return `Today is ${new Date(now).toISOString().slice(0, 10)}.`;
 }
@@ -59,20 +50,7 @@ function projectLine(
 function automationLine(
   automation: NonNullable<SendPolicy["automation"]>,
 ): string {
-  // numbers only, "2026-09-14 20:10", since runtimes word a medium date
-  // differently and the prompt should not move with them
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: automation.tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(automation.dueAt);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  const at = `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+  const at = localMinute(automation.tz)(automation.dueAt);
   const kind = automation.source === "manual" ? "manual" : "scheduled";
   return `This is a ${kind} run of the ${automation.name} automation, started at ${at} ${automation.tz}. You run autonomously. Do not ask questions. Do the task and stop.`;
 }
@@ -98,28 +76,30 @@ export type RepoLines = {
 
 export const NO_REPO_LINES: RepoLines = { off: [], moved: [] };
 
+export type PromptPolicy = Pick<
+  SendPolicy,
+  | "prompt"
+  | "agentName"
+  | "summoned"
+  | "projectName"
+  | "projectKind"
+  | "projectDescription"
+  | "fullName"
+  | "username"
+  | "about"
+  | "tz"
+  | "automation"
+  | "offered"
+  | "projectMemory"
+  | "automationMemory"
+  | "knowledge"
+  | "disabledCapabilities"
+  | "mcpOff"
+  | "skillsOff"
+>;
+
 export function systemPrompt(
-  policy: Pick<
-    SendPolicy,
-    | "prompt"
-    | "agentName"
-    | "summoned"
-    | "projectName"
-    | "projectKind"
-    | "projectDescription"
-    | "fullName"
-    | "username"
-    | "about"
-    | "tz"
-    | "automation"
-    | "offered"
-    | "projectMemory"
-    | "automationMemory"
-    | "knowledge"
-    | "disabledCapabilities"
-    | "mcpOff"
-    | "skillsOff"
-  >,
+  policy: PromptPolicy,
   now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
@@ -147,7 +127,7 @@ export function systemPrompt(
     parts.push(memoryBlock("automation-memory", policy.automationMemory));
   }
   // a model that cannot call the tool is not told of the files behind it
-  const bash = policy.offered.tools.some((tool) => tool.name === "bash");
+  const bash = offers(policy.offered, "bash");
   const docsOff = policy.disabledCapabilities.includes(KNOWLEDGE);
   if (bash && !docsOff) {
     parts.push(knowledgeBlock(policy.knowledge.empty));

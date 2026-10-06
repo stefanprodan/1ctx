@@ -10,7 +10,6 @@ import {
   monthWindow,
   nextDay,
   usageWindow,
-  weekWindow,
 } from "../../../src/server/usage/window.ts";
 
 const HOUR = 3_600_000;
@@ -148,9 +147,10 @@ describe("usageWindow", () => {
   });
 
   test("the week is the last seven local days, today included", () => {
-    const week = weekWindow(
+    const week = daysWindow(
       Date.parse("2026-03-29T12:00:00Z"),
       "Europe/Bucharest",
+      7,
     );
     expect(week.days).toEqual([
       "2026-03-23",

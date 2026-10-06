@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { isRecord } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export function object(
@@ -8,7 +9,7 @@ export function object(
   allowed: readonly string[],
   path: string,
 ): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(`${path || "document"} must be an object`);
   }
   for (const key of Object.keys(value)) {
@@ -41,6 +42,17 @@ export function optional<T>(
     }
   }
   return out;
+}
+
+// a spec of optional fields only: the validators name every allowed field
+export function optionalSpec<T>(
+  value: unknown,
+  validators: { [K in keyof Required<T>]: (value: unknown) => T[K] },
+): Partial<T> {
+  return optional<T>(
+    object(value, Object.keys(validators), "spec"),
+    validators,
+  );
 }
 
 export function boolean(value: unknown): boolean {

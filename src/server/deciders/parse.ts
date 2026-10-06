@@ -1,26 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The decider and decision request parsers. That the provider serves
-// decisions, its catalog lists the model and a named decider exists
-// are the routes' checks, not the parsers'.
 
 import {
   DECISION_OPTIONS,
   type DecisionId,
   MAX_OPTION_TEXT,
 } from "../../shared/contracts/decision.ts";
-import {
-  isName,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { isRecord } from "../../shared/words.ts";
+import { fields, parseModel, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { DecisionFields } from "./decisions.ts";
-
-export const MAX_MODEL = 200;
 
 export type ParsedDecider = {
   name: string;
@@ -32,40 +21,20 @@ export type ParsedDecider = {
 
 export function parseDecider(body: unknown): ParsedDecider {
   const b = fields(body, ["name", "providerId", "model", "default"]);
-  if (!isName(b.name)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
+  const name = parseName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
-  if (
-    typeof b.model !== "string" ||
-    b.model === "" ||
-    b.model.length > MAX_MODEL
-  ) {
-    throw new BadRequest("model must be a model id");
-  }
+  const model = parseModel(b.model);
   if (b.default !== undefined && typeof b.default !== "boolean") {
     throw new BadRequest("default must be true or false");
   }
   return {
-    name: b.name,
+    name,
     providerId: b.providerId,
-    model: b.model,
+    model,
     mark: b.default ?? null,
   };
-}
-
-// a decider's name as a path names it, by the same rule a save keeps
-export function parseDeciderName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
 }
 
 // a decision's whole settings: every option key of it exactly once
@@ -84,7 +53,7 @@ export function parseDecision(id: DecisionId, body: unknown): DecisionFields {
     throw new BadRequest("deciderId must be an id or null");
   }
   const raw = b.options;
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!isRecord(raw)) {
     throw new BadRequest("options must be an object");
   }
   const keys = DECISION_OPTIONS[id].map((o) => o.key);

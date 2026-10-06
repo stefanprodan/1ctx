@@ -12,12 +12,14 @@ import {
   QUEUED_PREVIEW,
   type QueuedMessage,
 } from "../../shared/contracts/session.ts";
+import { cutAt } from "../../shared/text.ts";
 import type { NotSentReason, QueuedState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import { notSentOf } from "./not-sent.ts";
+import { listJson } from "./rows.ts";
 
 // a chat's queue starts as one turn, so it holds at most what one turn
 // opens with
@@ -74,11 +76,10 @@ const row = (raw: RawQueued): QueuedRow => ({
 // the text cut at QUEUED_PREVIEW characters, never inside a surrogate
 // pair
 function preview(text: string): { text: string; cut: boolean } {
-  if (text.length <= QUEUED_PREVIEW) return { text, cut: false };
-  let end = QUEUED_PREVIEW;
-  const last = text.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end--;
-  return { text: text.slice(0, end), cut: true };
+  return {
+    text: cutAt(text, QUEUED_PREVIEW),
+    cut: text.length > QUEUED_PREVIEW,
+  };
 }
 
 // a row on the wire: whole for the detail and an answer, a preview on
@@ -218,7 +219,7 @@ export class QueueStore {
         fields.sessionId,
         fields.authorId,
         fields.text,
-        fields.uploads?.length ? JSON.stringify(fields.uploads) : null,
+        listJson(fields.uploads),
         fields.capabilities === undefined
           ? null
           : JSON.stringify(fields.capabilities),
@@ -252,14 +253,6 @@ export class QueueStore {
   // what the detail shows: every queued row, and the viewer's not sent
   ofChat(sessionId: string, viewerId: string | null): QueuedMessage[] {
     return chatQueue(this.db, sessionId, viewerId);
-  }
-
-  chatCount(sessionId: string): number {
-    return this.db
-      .query<{ n: number }, [string]>(
-        "select count(*) as n from queued_messages where session_id = ? and state = 'queued'",
-      )
-      .get(sessionId)!.n;
   }
 
   // queued and not sent together, the rows queuedPerUser bounds

@@ -1,19 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The agents list and an agent's page, for every signed-in user: the
-// list is the live agents with the model's id alone; the page is how
-// an agent is configured. The composer's route already sends the whole
-// row, so the page adds only
-// what a user cannot see elsewhere: the provider's name, the skills
-// with when they were fetched and how many files they hold, the
-// built-in tools a send would offer it now with their descriptions'
-// first sentences and websearch's provider, and token counts.
-// The tools are the tools area's answer at this moment, none when the
-// model does not accept tools. The list is built-ins alone, memory_edit
-// as a chat is offered it; skill and MCP schemas still count because the
-// provider request carries them. Its days are the agent's turns in
-// every project as one series, whoever asks.
+// The agents list and an agent's page for every signed-in user: what a
+// send would offer it now, and its token counts.
 
 import type {
   DirectoryAgentDaysResponse,
@@ -23,7 +12,7 @@ import type {
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { firstSentence } from "../../shared/mcp-catalog.ts";
 import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
-import { parseNoQuery } from "../lib/body.ts";
+import { parseName, parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -31,9 +20,8 @@ import { tokens } from "../lib/tokens.ts";
 import type { OfferedServer } from "../mcp/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { parseAgentName } from "./parse.ts";
 import type { AgentTotalPort, ProvidersPort } from "./routes.ts";
-import { type AgentRow, type AgentStore, summary } from "./store.ts";
+import type { AgentRow, AgentStore } from "./store.ts";
 
 // the tools the page lists; the skill and MCP tools are shown as what
 // they carry
@@ -108,7 +96,7 @@ export type DirectoryDeps = {
 // a body is up to 40,000 characters and an agent carries up to twenty,
 // so a count is kept per skill until its digest moves; the cap bounds
 // the map when skills come and go
-export const MAX_COUNTED_SKILLS = 500;
+const MAX_COUNTED_SKILLS = 500;
 
 export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
   const counted = new Map<string, { digest: string; tokens: number }>();
@@ -151,7 +139,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       path: "/api/directory/agents/:name",
       policy: "authenticated",
       handle(_req, ctx) {
-        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        const agent = deps.store.byName(parseName(ctx.params.name));
         if (agent === null) throw new NotFound("no such agent");
         const offered = agent.model.tools
           ? deps.tools.offered(
@@ -175,7 +163,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
         const provider = deps.providers.byId(agent.providerId);
         const wire = provider?.wire ?? null;
         const body: DirectoryAgentResponse = {
-          agent: summary(agent),
+          agent,
           provider: provider?.name ?? "",
           wire,
           skills: deps.skills
@@ -225,7 +213,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       path: "/api/directory/agents/:name/days",
       policy: "authenticated",
       handle(_req, ctx) {
-        const agent = deps.store.byName(parseAgentName(ctx.params.name));
+        const agent = deps.store.byName(parseName(ctx.params.name));
         if (agent === null) throw new NotFound("no such agent");
         const timeZone = parseZoneQuery(ctx.url);
         return json(deps.usage.agentDays(agent.id, timeZone));

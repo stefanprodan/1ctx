@@ -6,7 +6,7 @@
 
 import { describe, expect, spyOn, test } from "bun:test";
 import * as tokenCount from "../../../src/server/lib/tokens.ts";
-import { LOOP_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   type ChatMessageIn,
   type ChatRequest,
@@ -125,8 +125,8 @@ const policy: SendPolicy = {
   knowledge: { empty: true },
   automation: null,
   deadlineMs: null,
-  limits: LOOP_LIMITS,
-  toolCaps: TOOL_CAPS,
+  limits: DEFAULT_LIMITS,
+  toolCaps: DEFAULT_LIMITS,
   sendCaps: { sendsPerUser: 4, sendsPerProject: 16, sendsRunning: 64 },
 };
 
@@ -1515,7 +1515,7 @@ describe("the tail after a summary", () => {
     rows.filter((one) => one.kind !== "summary");
 
   test("the budget is the least of 20K, a tenth of the window and half the room left", () => {
-    const reserve = LOOP_LIMITS.contextReserve;
+    const reserve = DEFAULT_LIMITS.contextReserve;
     expect(tailBudget(null, reserve, 0)).toBe(0);
     expect(tailBudget(32_000, reserve, 0)).toBe(3200);
     expect(tailBudget(128_000, reserve, 0)).toBe(12_800);

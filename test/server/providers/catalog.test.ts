@@ -379,7 +379,8 @@ describe("the decisions catalog", () => {
       `${PROVIDER_URL}/models`,
       `${PROVIDER_URL}/models?output_modalities=decisions`,
     ]);
-    expect(logs.events.map((event) => event.fields.kind)).toEqual([
+    // the two refreshes run at once, so their order is not the test's
+    expect(logs.events.map((event) => event.fields.kind).sort()).toEqual([
       "chat",
       "decisions",
     ]);

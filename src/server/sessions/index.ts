@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Sessions: the session, message and send rows, their reads, the
-// rename, the deletion, and the boot repair of rows a crash left running. The
-// runner below writes them through the store this area builds.
 
 import type { AgentActivity } from "../../shared/api/agents.ts";
 import type { McpServersUsage, McpUsage } from "../../shared/api/mcp.ts";
@@ -30,8 +26,10 @@ import {
   visualCounts,
   webCounts,
 } from "./activity.ts";
-import { agentChats, agentRunning, archivedEvent } from "./archive.ts";
+import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
+import { detail, sessionInfo } from "./detail.ts";
+import { envelope } from "./envelope.ts";
 import { envelopeRow } from "./feed.ts";
 import { listAlerts } from "./list.ts";
 import { type KeptPacker, keptPacker } from "./pack-kept.ts";
@@ -39,12 +37,11 @@ import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
 import {
   type AccessPort,
-  detail,
   type LivePort,
   routes,
   type UploadsPort,
 } from "./routes.ts";
-import { offWire, type SessionRow, type UsagePort } from "./rows.ts";
+import type { SessionRow, UsagePort } from "./rows.ts";
 import { SessionStore } from "./store.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
@@ -53,14 +50,17 @@ export {
   alertOf,
   endedAfter,
   MARKED,
+  openAlertRuns,
   type RawAlert,
 } from "./alerts.ts";
 export { refuseArchived } from "./archive.ts";
+export { forgetCapabilityIn } from "./capabilities.ts";
 export {
   parseFeedCursor,
   parseRunsCursor,
   type RunsCursor,
 } from "./cursor.ts";
+export { envelope } from "./envelope.ts";
 export {
   chatMarkdown,
   type ExportRow,
@@ -98,6 +98,7 @@ export {
 } from "./rows.ts";
 export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
+export { type SummonAgents, summonOf } from "./summon.ts";
 
 export const RESTART_ERROR = "the server restarted";
 
@@ -120,7 +121,7 @@ export type SessionsDeps = {
   wakeQueue(): void;
   // a marked run's delete, with when it ended: its automation's open
   // alert, built later in the automations area
-  pruned?: (automationId: string, endedAt: number) => BusEvent[];
+  pruned: (automationId: string, endedAt: number) => BusEvent[];
 };
 
 export type Sessions = {
@@ -177,7 +178,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.db,
     deps.usage,
     deps.scratch,
-    (automationId, endedAt) => deps.pruned?.(automationId, endedAt) ?? [],
+    deps.pruned,
   );
   const visible = (principal: Principal, id: string): SessionRow => {
     const session = store.byId(id);
@@ -210,7 +211,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     archiveAgent: (agentId, now) =>
       agentChats(deps.db, agentId).flatMap((id) => {
         const row = store.archive(id, "agent", null, now);
-        return row === null ? [] : [archivedEvent(row, store.lastSend(row.id))];
+        return row === null ? [] : [envelope(row, [], store.lastSend(row.id))];
       }),
     personDays: (userId, starts, until) =>
       personDays(deps.db, userId, starts, until),
@@ -219,20 +220,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     skillLoads: (since, until) => skillLoads(deps.db, since, until),
     visualCounts: (since, until) => visualCounts(deps.db, since, until),
     webCounts: (since, until) => webCounts(deps.db, since, until),
-    sessionInfo(sessionId) {
-      const row = deps.db
-        .query<NonNullable<Memory["session"]>, [string]>(
-          `select sessions.id as id, sessions.title as title,
-             sessions.origin as origin,
-             automations.id as automationId,
-             automations.name as automationName
-           from sessions
-           left join automations on automations.id = sessions.automation_id
-           where sessions.id = ?`,
-        )
-        .get(sessionId);
-      return row ?? null;
-    },
+    sessionInfo: (sessionId) => sessionInfo(deps.db, sessionId),
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
     dropQueued: (projectId, userId) =>
       [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
@@ -266,15 +254,9 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         const rows = store.repair(deps.clock(), RESTART_ERROR);
         return {
           result: rows,
-          events: rows.map((repaired) => ({
-            type: "session.changed" as const,
-            data: {
-              projectId: repaired.session.projectId,
-              session: repaired.session,
-              messages: repaired.messages.map(offWire),
-              send: repaired.send,
-            },
-          })),
+          events: rows.map((repaired) =>
+            envelope(repaired.session, repaired.messages, repaired.send),
+          ),
         };
       });
       if (touched.length > 0) {
@@ -306,7 +288,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         keptDays: () => deps.limits.current().archivedDeleteDays,
         visible,
         wakeQueue: () => deps.wakeQueue(),
-        alerts: (...args) => listAlerts(deps.db, deps.usage, ...args),
+        alerts: (query) => listAlerts(deps.db, deps.usage, query),
       }),
       ...queuedRoutes({
         db: deps.db,

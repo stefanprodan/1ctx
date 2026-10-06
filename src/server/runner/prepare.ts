@@ -14,9 +14,9 @@ import {
   type SessionStore,
   sessionDetail,
 } from "../sessions/index.ts";
-import type { SendPolicy } from "./policy.ts";
+import { offers, type SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
-import { live, newSend, type SendOp } from "./send.ts";
+import { type ActiveSend, live, newSend, type SendOp } from "./send.ts";
 import { firstMessageId, type QueuedClaim, type StartFields } from "./start.ts";
 import type { Writer } from "./writer.ts";
 
@@ -25,6 +25,52 @@ export type PreparedRun = {
   launch(): void;
   abandon(): void;
 };
+
+// admitted unless a probe, then registered; the release frees the place
+// and wakes a waiter when it freed one
+export function reserve(
+  registry: Registry,
+  wake: () => void,
+  send: ActiveSend,
+  admit = true,
+): () => void {
+  if (admit) {
+    registry.admit(
+      send.sessionId,
+      { userId: send.startedBy, projectId: send.projectId },
+      send.policy.sendCaps,
+    );
+  }
+  registry.set(send);
+  return () => {
+    if (registry.free(send)) wake();
+  };
+}
+
+export function logStart(
+  log: Log,
+  sessionId: string,
+  policy: SendPolicy,
+  op: SendOp,
+): void {
+  log.info("send start", {
+    chat: sessionId,
+    user: policy.username,
+    agent: policy.agentName,
+    provider: policy.providerName,
+    model: policy.model,
+    op,
+  });
+}
+
+// a send starts only on a chat that is not archived, so no archive is
+// read and its kept days go unused
+export const startedDetail = (
+  sessions: SessionStore,
+  session: Parameters<typeof sessionDetail>[1],
+  send: ActiveSend,
+  userId: string | null,
+): SessionDetail => sessionDetail(sessions, session, live(send), 0, userId);
 
 export function prepareSend(fields: {
   db: Db;
@@ -67,6 +113,7 @@ export function prepareSend(fields: {
 }): PreparedRun {
   const now = fields.now;
   const { turn } = fields;
+  const bash = offers(fields.policy.offered, "bash");
   // a regenerate reuses its rows, and their files are in the tree already
   for (const user of "users" in turn ? turn.users : []) {
     if (!user.uploads?.length) continue;
@@ -74,16 +121,9 @@ export function prepareSend(fields: {
       throw new BadRequest("uploads require a new chat message");
     }
     fields.checkUploads(user.userId, fields.policy.projectId, user.uploads);
-    if (!fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
+    if (!bash) {
       throw new BadRequest("this agent cannot read files");
     }
-  }
-  if (fields.probe !== true) {
-    fields.registry.admit(
-      fields.sessionId,
-      { userId: fields.startedBy, projectId: fields.policy.projectId },
-      fields.policy.sendCaps,
-    );
   }
   const sendId = newId();
   const replyId = newId();
@@ -99,14 +139,19 @@ export function prepareSend(fields: {
     replyId,
     now,
   });
-  fields.registry.set(send);
+  const release = reserve(
+    fields.registry,
+    fields.wake,
+    send,
+    fields.probe !== true,
+  );
   let started: ReturnType<Writer["startSend"]>;
   try {
     // a refused start rolls the trim back with it
     started = transact(fields.db, () => {
       // under the lock, before the send is written and any command mounts:
       // the kept files trimmed to the budget stay put for the whole send
-      if (fields.policy.offered.tools.some((tool) => tool.name === "bash")) {
+      if (bash) {
         // a regenerate's kept files go with the rows it replaces
         const kept = fields.startKept(
           fields.sessionId,
@@ -145,21 +190,18 @@ export function prepareSend(fields: {
       fields.policy.offered.mcpPrompt.digest,
     );
   } catch (err) {
-    if (fields.registry.free(send)) fields.wake();
+    release();
     throw err;
   }
   let settled = false;
   let detail: SessionDetail | null = null;
   return {
-    // read once, when asked: a queue's start needs none. A send starts
-    // only on a chat that is not archived, so no archive is read and its
-    // kept days go unused
+    // read once, when asked: a queue's start needs none
     get detail() {
-      detail ??= sessionDetail(
+      detail ??= startedDetail(
         fields.sessions,
         started.session,
-        live(send),
-        0,
+        send,
         fields.startedBy,
       );
       return detail;
@@ -167,20 +209,13 @@ export function prepareSend(fields: {
     launch() {
       if (settled) return;
       settled = true;
-      fields.log.info("send start", {
-        chat: fields.sessionId,
-        user: fields.policy.username,
-        agent: fields.policy.agentName,
-        provider: fields.policy.providerName,
-        model: fields.policy.model,
-        op: fields.op,
-      });
+      logStart(fields.log, fields.sessionId, fields.policy, fields.op);
       fields.run(send);
     },
     abandon() {
       if (settled) return;
       settled = true;
-      if (fields.registry.free(send)) fields.wake();
+      release();
     },
   };
 }

@@ -1,25 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The webfetch tool: a plain fetch that follows redirects, cuts the body
-// at the cap and reaches under the deadline. Listed access checks every
-// origin before a request, including redirects. The fetch comes from the dependency, so the
-// suite passes a fake and never leaves the process. The body cap, the
-// deadline and the result cut come from the tool caps on the context.
+// Listed access checks every origin, redirects included.
 
 import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
+import { raceSignal } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
-import { ToolError } from "../../lib/errors.ts";
+import { messageOf, ToolError } from "../../lib/errors.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
   return `<error>Content truncated at ${bytesWords(maxBytes)}.</error>`;
 }
-
-// what reaches the network; a test passes a fake
-export type FetchDependencies = {
-  fetch: typeof fetch;
-};
 
 type MediaType = {
   type: string;
@@ -151,33 +143,29 @@ async function readBody(
   const chunks: Uint8Array[] = [];
   let size = 0;
   let cut = false;
-  while (true) {
-    signal.throwIfAborted();
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (size === maxBytes) {
-      cut = true;
-      await reader.cancel();
-      break;
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const { done, value } = await raceSignal(reader.read(), signal);
+      if (done) break;
+      const remaining = maxBytes - size;
+      if (value.byteLength > remaining) {
+        chunks.push(value.subarray(0, remaining));
+        size = maxBytes;
+        cut = true;
+        reader.cancel().catch(() => {});
+        break;
+      }
+      chunks.push(value);
+      size += value.byteLength;
     }
-    const remaining = maxBytes - size;
-    const chunk =
-      value.byteLength > remaining ? value.subarray(0, remaining) : value;
-    chunks.push(chunk);
-    size += chunk.byteLength;
-    if (value.byteLength > remaining) {
-      cut = true;
-      await reader.cancel();
-      break;
-    }
+  } catch (error) {
+    reader.cancel(error).catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { bytes, cut };
+  return { bytes: Buffer.concat(chunks, size), cut };
 }
 
 function decode(bytes: Uint8Array, charset: string): string {
@@ -337,8 +325,7 @@ function integerArgument(
 export async function fetchText(
   args: Record<string, unknown>,
   ctx: ToolContext,
-  version: string,
-  dependencies: FetchDependencies = { fetch },
+  fetcher: typeof fetch = fetch,
 ): Promise<string> {
   if (typeof args.url !== "string" || args.url === "") {
     throw new Error("url must be a non-empty string");
@@ -366,10 +353,9 @@ export async function fetchText(
 
     while (true) {
       deadline.throwIfAborted();
-      const response = await dependencies.fetch(url.href, {
+      const response = await fetcher(url.href, {
         method: "GET",
         headers: {
-          "User-Agent": `1ctx/${version}`,
           Accept:
             "text/html, text/plain, application/json, application/xml, text/*;q=0.9",
         },
@@ -381,14 +367,14 @@ export async function fetchText(
         [301, 302, 303, 307, 308].includes(response.status) &&
         location !== null
       ) {
-        await response.body?.cancel();
+        response.body?.cancel().catch(() => {});
         if (redirects >= 3) {
           throw new Error("redirect limit exceeded after 3 hops");
         }
         try {
           url = parseFetchUrl(new URL(location, url).href, ctx.web);
         } catch (error) {
-          const reason = error instanceof Error ? error.message : String(error);
+          const reason = messageOf(error);
           throw new ToolError(
             `redirect refused: ${reason}`,
             "redirect refused",
@@ -398,7 +384,7 @@ export async function fetchText(
         continue;
       }
       if (response.status < 200 || response.status >= 300) {
-        await response.body?.cancel();
+        response.body?.cancel().catch(() => {});
         throw new Error(`HTTP status ${response.status}`);
       }
 
@@ -425,10 +411,8 @@ export async function fetchText(
   }
 }
 
-// the tool the area builds per send, with the version bound
 export function makeWebfetchTool(
-  version: string,
-  dependencies: FetchDependencies = { fetch },
+  fetcher: typeof fetch = fetch,
   web: WebSnapshot | null = null,
 ): Tool {
   return {
@@ -462,6 +446,6 @@ export function makeWebfetchTool(
       required: ["url"],
       additionalProperties: false,
     },
-    run: (args, ctx) => fetchText(args, ctx, version, dependencies),
+    run: (args, ctx) => fetchText(args, ctx, fetcher),
   };
 }

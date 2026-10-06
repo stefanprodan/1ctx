@@ -341,7 +341,7 @@ describe("automation scheduler", () => {
     expect(instructions).toContain("instructions changed after the snapshot");
     expect(
       chat.app.sessions
-        .list([chat.projectId], "")
+        .list({ projectIds: [chat.projectId], q: "" })
         .rows.some((row) => row.session.automationId === deleted.id),
     ).toBe(false);
     expect(rows).toHaveLength(3);

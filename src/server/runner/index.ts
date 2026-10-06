@@ -1,33 +1,23 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The runner: a send from admission to its end. start() opens a chat
-// with its first send, send() adds one to a chat, stop() ends the one
-// holding the lock, and every one of them goes through the same
-// registry, the same writer, the same tool loop and the same terminal
-// transition. The areas it needs come as ports from compose.ts; the
-// stream frames go out through the socket port. run() drives the loop;
-// the lock is let go after both the provider iteration and the round's
-// tools have settled.
+// The runner area: admission to finalize for every send.
 
 import type { SendMessageRequest } from "../../shared/api/sessions.ts";
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import { after } from "../lib/clock.ts";
-import { BadRequest, Conflict } from "../lib/errors.ts";
+import { after, sleep } from "../lib/clock.ts";
+import { BadRequest, messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import {
-  refuseArchived,
-  type SessionRow,
-  titleFrom,
-} from "../sessions/index.ts";
+import { type SessionRow, titleFrom } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
 import { liveAuthor, principalOf } from "./authors.ts";
+import { chatFor } from "./chat-guard.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
@@ -90,9 +80,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     clock: deps.clock,
     log: deps.log,
   };
-  const pause =
-    deps.clock.sleep ??
-    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const pause = (ms: number) => sleep(deps.clock, ms).promise;
   const historyOf = (send: ActiveSend) =>
     deps.sessions
       .messages(send.sessionId)
@@ -160,11 +148,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         if (send.cause === null && error instanceof ProviderRefusal) {
           send.refusal = { status: error.status };
         }
-        void terminate(
-          send,
-          "failure",
-          error instanceof Error ? error.message : String(error),
-        );
+        void terminate(send, "failure", messageOf(error));
       }
       finalized = await endSend(
         { writer, phase: phaseDeps, pause, log: deps.log, attention: asks },
@@ -286,11 +270,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     let project: ProjectRow | null = null;
     const authors: UserRow[] = [];
     for (const { principal, user } of messages) {
-      const seen = deps.visible(principal, sessionId);
-      if (seen.origin === "automation") {
-        throw new Conflict("a run cannot continue");
-      }
-      refuseArchived(seen);
+      const seen = chatFor(deps, principal, sessionId, "continue");
       const own = deps.access.project(principal, seen.projectId);
       session ??= seen;
       project ??= own;
@@ -376,15 +356,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
         : { status: 202, body: queued };
     },
     regenerate(principal, sessionId, fields = {}) {
-      const session = deps.visible(principal, sessionId);
-      if (session.origin === "automation") {
-        throw new Conflict("a run cannot regenerate");
-      }
-      refuseArchived(session);
-      registry.locked(session.id);
-      if (session.status === "running") {
-        throw new Conflict("the chat is running");
-      }
+      const session = chatFor(
+        deps,
+        principal,
+        sessionId,
+        "regenerate",
+        registry,
+      );
       const existing = regenerateUsers(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
@@ -413,15 +391,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       });
     },
     compact(principal, sessionId) {
-      const session = deps.visible(principal, sessionId);
-      if (session.origin === "automation") {
-        throw new Conflict("a run cannot compact");
-      }
-      refuseArchived(session);
-      registry.locked(session.id);
-      if (session.status === "running") {
-        throw new Conflict("the chat is running");
-      }
+      const session = chatFor(deps, principal, sessionId, "compact", registry);
       const project = deps.access.project(principal, session.projectId);
       const user = author(principal);
       const policy = sendPolicy(deps, {

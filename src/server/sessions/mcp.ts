@@ -1,13 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Content-addressed MCP send snapshots. Sessions own these rows, but
-// keeping their canonical storage here leaves the main store focused.
 
 import type { McpDigest } from "../../shared/mcp.ts";
-import type { SendKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
-import { newId, sha256 } from "../lib/ids.ts";
+import { sha256 } from "../lib/ids.ts";
 
 function canonical(digest: McpDigest): string {
   const out: McpDigest = {};
@@ -34,49 +30,6 @@ export function storeMcpDigest(
     body,
   );
   return key;
-}
-
-export type McpSendFields = {
-  id?: string;
-  kind?: SendKind;
-  sessionId: string;
-  userId: string;
-  agentId: string;
-  providerId: string;
-  model: string;
-  firstMessageId: string;
-  mcpDigest?: McpDigest | null;
-  summoned?: boolean;
-  now: number;
-};
-
-export function insertMcpSend(db: Db, fields: McpSendFields): string {
-  const id = fields.id ?? newId();
-  const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
-  db.query(
-    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
-       provider_name, model, status, first_message_id, mcp, summoned,
-       started_at)
-     values (?, ?, ?, ?, ?, ?,
-       coalesce((select name from providers where id = ?), ?), ?,
-       'running', ?, ?, ?, ?)`,
-  ).run(
-    id,
-    fields.sessionId,
-    fields.kind ?? "chat",
-    fields.userId,
-    fields.agentId,
-    fields.providerId,
-    // the name outlives the provider, which may be deleted later
-    fields.providerId,
-    fields.providerId,
-    fields.model,
-    fields.firstMessageId,
-    mcp,
-    fields.summoned === true ? 1 : 0,
-    fields.now,
-  );
-  return id;
 }
 
 export type DigestArgs = [

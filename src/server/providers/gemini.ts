@@ -1,18 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The Gemini wire, Google AI Studio: the native model list for the
-// catalog, and the OpenAI-compatible chat endpoint with Gemini's rules
-// over the plain wire. Google refuses any body field it does not know,
-// takes thinking as thinking_config or reasoning_effort none, never
-// both, streams thoughts as content frames marked thought, and puts a
-// thought signature on every tool call that Gemini 3 wants back on the
-// next request. Verified live on 2026-09-16; the recorded frames are
-// under test/fixtures/providers/gemini/.
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { canStopThinking } from "../../shared/thinking.ts";
-import { buildChatBody as buildOpenAiChatBody, chatEvents } from "./openai.ts";
+import { isRecord } from "../../shared/words.ts";
+import { frameEvents, num, parseFrame } from "./frames.ts";
+import { baseChatBody } from "./openai.ts";
 import { CatalogError, type ChatEvent, type ChatRequest } from "./types.ts";
 
 // These models generate something other than a chat answer, even when
@@ -35,11 +28,7 @@ const EXCLUDED_WORDS = [
 ];
 
 const record = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-const num = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) ? value : 0;
+  isRecord(value) ? value : {};
 
 export function parseCatalog(body: unknown): CatalogMatch[] {
   const catalog = record(body);
@@ -91,14 +80,10 @@ const THINKING_BUDGETS = { low: 1024, medium: 8192, high: 24576 } as const;
 export const FOREIGN_SIGNATURE = "skip_thought_signature_validator";
 
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = buildOpenAiChatBody(req, { includeThinkingFlag: false });
-  delete body.prompt_cache_key;
-  delete body.reasoning_effort;
+  const body = baseChatBody(req, { usageOption: true });
   const messages = body.messages as Record<string, unknown>[];
   messages.forEach((message, index) => {
     if (message.role !== "assistant") return;
-    delete message.reasoning_content;
-    delete message.reasoning_details;
     const source = req.messages[index]!;
     if (source.role !== "assistant" || !Array.isArray(message.tool_calls)) {
       return;
@@ -147,11 +132,13 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
 export function geminiEvents(): (json: string) => ChatEvent[] {
   let inThought = false;
   return (json) => {
-    const events = chatEvents(json);
+    const frame = parseFrame(json);
+    if (!frame.ok) return frame.events;
+    const events = frameEvents(frame.value);
     if (events.length === 0 || events.some((event) => event.kind === "error")) {
       return events;
     }
-    const body = record(JSON.parse(json));
+    const body = record(frame.value);
     const choice = record(Array.isArray(body.choices) ? body.choices[0] : null);
     const delta = record(choice.delta);
     const google = record(record(delta.extra_content).google);
@@ -206,18 +193,22 @@ export function geminiEvents(): (json: string) => ChatEvent[] {
   };
 }
 
-export function geminiError(message: string): string {
-  const match = /^HTTP (\d+): (.*)$/s.exec(message);
-  if (!match) return message;
+// Google's own words from a refused request's body, or null without them
+export function geminiError(
+  status: number,
+  body: string,
+): { message: string } | null {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(match[2]!);
+    parsed = JSON.parse(body);
   } catch {
-    return message;
+    return null;
   }
-  if (!Array.isArray(parsed)) return message;
+  if (!Array.isArray(parsed)) return null;
   const words = parsed
     .map((item) => record(record(item).error).message)
     .filter((text): text is string => typeof text === "string" && text !== "");
-  return words.length > 0 ? `Gemini ${match[1]}: ${words.join("\n")}` : message;
+  return words.length > 0
+    ? { message: `Gemini ${status}: ${words.join("\n")}` }
+    : null;
 }

@@ -73,8 +73,9 @@ describe("cookieValue", () => {
 describe("access", () => {
   test("marks the cookie Secure when asked", () => {
     const { user, access } = build(true);
-    expect(access.open(user).setCookie).toMatch(/; Secure$/);
-    expect(access.clearCookie()).toMatch(/; Secure$/);
+    const { login, setCookie } = access.open(user);
+    expect(setCookie).toMatch(/; Secure$/);
+    expect(access.close(login.id)).toMatch(/; Secure$/);
   });
 
   test("a login of a deleted user is nobody", () => {

@@ -17,11 +17,12 @@ import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import {
+  envelope,
   queueFrameEvent,
   refuseArchived,
   type SessionRow,
 } from "../sessions/index.ts";
-import { envelope, lastLine } from "./envelope.ts";
+import { lastLine } from "./envelope.ts";
 import type { SendPolicy } from "./policy.ts";
 import { applyChanges } from "./turn.ts";
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";

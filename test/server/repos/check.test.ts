@@ -4,8 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
-  checkRepo,
-  desired,
+  checkFields,
   type KeysPort,
   refetches,
   repoAuth,
@@ -87,88 +86,6 @@ describe("the repository parsers", () => {
   });
 });
 
-describe("the row a change asks for", () => {
-  test("a github URL names exactly an owner and a repository", () => {
-    expect(
-      words(() =>
-        desired(null, {
-          url: "https://ghe.example.test/org/team/widgets",
-          kind: "github",
-        }),
-      ),
-    ).toBe("url must be https://host/owner/name for github");
-    expect(
-      desired(null, {
-        url: "https://git.example.test/org/team/widgets",
-        kind: "gitlab",
-      }).url,
-    ).toBe("https://git.example.test/org/team/widgets");
-  });
-
-  test("a public host fixes the kind and the name defaults to the repo's", () => {
-    expect(desired(null, { url: "https://github.com/acme/widgets" })).toEqual({
-      name: "widgets",
-      url: "https://github.com/acme/widgets",
-      kind: "github",
-      ref: "",
-      keyName: null,
-      ignore: "",
-    });
-    expect(
-      words(() =>
-        desired(null, {
-          url: "https://gitlab.com/acme/widgets",
-          kind: "github",
-        }),
-      ),
-    ).toBe("kind must be gitlab for gitlab.com");
-  });
-
-  test("another host needs its kind, once", () => {
-    expect(
-      words(() =>
-        desired(null, { url: "https://git.example.test/acme/widgets" }),
-      ),
-    ).toBe("kind is required for git.example.test");
-    // a personal project's form never asks the kind: the host rule speaks
-    expect(
-      words(() =>
-        desired(null, { url: "https://git.example.test/acme/widgets" }, true),
-      ),
-    ).toBe(
-      "a personal project's repository must be on github.com or gitlab.com",
-    );
-    const held = desired(null, {
-      url: "https://git.example.test/acme/widgets",
-      kind: "gitlab",
-    });
-    expect(held.kind).toBe("gitlab");
-    expect(desired(held, { ref: "main" })).toEqual({ ...held, ref: "main" });
-  });
-
-  test("a name the URL cannot give is asked for", () => {
-    expect(
-      words(() => desired(null, { url: "https://github.com/acme/_x" })),
-    ).toContain("name is required");
-    expect(
-      desired(null, { url: "https://github.com/acme/_x", name: "x-repo" }).name,
-    ).toBe("x-repo");
-  });
-
-  test("only what is fetched sets the row pending", () => {
-    const held = desired(null, { url: "https://github.com/acme/widgets" });
-    expect(refetches(held, { ...held, name: "other" })).toBe(false);
-    for (const change of [
-      { url: "https://github.com/acme/other" },
-      { ref: "main" },
-      { keyName: "http-github" },
-      { ignore: "*.md" },
-    ]) {
-      expect(refetches(held, { ...held, ...change })).toBe(true);
-    }
-  });
-});
-
 // key files by name: a value, or why it cannot be read
 const port = (
   files: Record<string, string | "missing" | "unusable"> = {},
@@ -185,37 +102,124 @@ const KEY = "k".repeat(20);
 const team = { id: "team1", kind: "team" as const };
 const personal = { id: "mine", kind: "personal" as const };
 
+// a team project's row, with no key file to read
+const asks = (
+  current: Parameters<typeof checkFields>[1],
+  change: Parameters<typeof checkFields>[2],
+) => checkFields(team, current, change, port());
+
+describe("the row a change asks for", () => {
+  test("a github URL names exactly an owner and a repository", () => {
+    expect(
+      words(() =>
+        asks(null, {
+          url: "https://ghe.example.test/org/team/widgets",
+          kind: "github",
+        }),
+      ),
+    ).toBe("url must be https://host/owner/name for github");
+    expect(
+      asks(null, {
+        url: "https://git.example.test/org/team/widgets",
+        kind: "gitlab",
+      }).url,
+    ).toBe("https://git.example.test/org/team/widgets");
+  });
+
+  test("a public host fixes the kind and the name defaults to the repo's", () => {
+    expect(asks(null, { url: "https://github.com/acme/widgets" })).toEqual({
+      name: "widgets",
+      url: "https://github.com/acme/widgets",
+      kind: "github",
+      ref: "",
+      keyName: null,
+      ignore: "",
+    });
+    expect(
+      words(() =>
+        asks(null, {
+          url: "https://gitlab.com/acme/widgets",
+          kind: "github",
+        }),
+      ),
+    ).toBe("kind must be gitlab for gitlab.com");
+  });
+
+  test("another host needs its kind, once", () => {
+    expect(
+      words(() => asks(null, { url: "https://git.example.test/acme/widgets" })),
+    ).toBe("kind is required for git.example.test");
+    // a personal project's form never asks the kind: the host rule speaks
+    expect(
+      words(() =>
+        checkFields(
+          personal,
+          null,
+          { url: "https://git.example.test/acme/widgets" },
+          port(),
+        ),
+      ),
+    ).toBe(
+      "a personal project's repository must be on github.com or gitlab.com",
+    );
+    const held = asks(null, {
+      url: "https://git.example.test/acme/widgets",
+      kind: "gitlab",
+    });
+    expect(held.kind).toBe("gitlab");
+    expect(asks(held, { ref: "main" })).toEqual({ ...held, ref: "main" });
+  });
+
+  test("a name the URL cannot give is asked for", () => {
+    expect(
+      words(() => asks(null, { url: "https://github.com/acme/_x" })),
+    ).toContain("name is required");
+    expect(
+      asks(null, { url: "https://github.com/acme/_x", name: "x-repo" }).name,
+    ).toBe("x-repo");
+  });
+
+  test("only what is fetched sets the row pending", () => {
+    const held = asks(null, { url: "https://github.com/acme/widgets" });
+    expect(refetches(held, { ...held, name: "other" })).toBe(false);
+    for (const change of [
+      { url: "https://github.com/acme/other" },
+      { ref: "main" },
+      { keyName: "http-github" },
+      { ignore: "*.md" },
+    ]) {
+      expect(refetches(held, { ...held, ...change })).toBe(true);
+    }
+  });
+});
+
 describe("who may add what", () => {
-  const repo = (fields: Record<string, unknown> = {}) =>
-    desired(null, { url: "https://github.com/acme/widgets", ...fields });
+  const widgets = "https://github.com/acme/widgets";
 
   test("a personal project takes public hosts only, without a key", () => {
-    checkRepo(personal, repo(), null, port());
-    checkRepo(
+    checkFields(personal, null, { url: widgets }, port());
+    checkFields(
       personal,
-      desired(null, { url: "https://gitlab.com/acme/widgets" }),
       null,
+      { url: "https://gitlab.com/acme/widgets" },
       port(),
     );
     expect(
       words(() =>
-        checkRepo(
+        checkFields(
           personal,
-          desired(null, {
-            url: "https://git.example.test/acme/widgets",
-            kind: "github",
-          }),
           null,
+          { url: "https://git.example.test/acme/widgets", kind: "github" },
           port(),
         ),
       ),
     ).toContain("github.com or gitlab.com");
     expect(
       words(() =>
-        checkRepo(
+        checkFields(
           personal,
-          repo({ keyName: "http-github" }),
           null,
+          { url: widgets, keyName: "http-github" },
           port({ "http-github": KEY }),
         ),
       ),
@@ -223,27 +227,22 @@ describe("who may add what", () => {
   });
 
   test("a team project's key names a usable file when it is saved", () => {
-    checkRepo(
-      team,
-      desired(null, {
-        url: "https://git.example.test/acme/widgets",
-        kind: "gitlab",
-      }),
-      null,
-      port(),
-    );
-    const named = repo({ keyName: "http-github" });
-    checkRepo(team, named, null, port({ "http-github": KEY }));
-    expect(words(() => checkRepo(team, named, null, port()))).toBe(
+    asks(null, {
+      url: "https://git.example.test/acme/widgets",
+      kind: "gitlab",
+    });
+    const change = { url: widgets, keyName: "http-github" };
+    const named = checkFields(team, null, change, port({ "http-github": KEY }));
+    expect(words(() => checkFields(team, null, change, port()))).toBe(
       "keyName http-github is missing",
     );
     expect(
       words(() =>
-        checkRepo(team, named, null, port({ "http-github": "unusable" })),
+        checkFields(team, null, change, port({ "http-github": "unusable" })),
       ),
     ).toBe("keyName http-github is unusable");
     // a key gone since it was saved fails the lookup, never a rename
-    checkRepo(team, { ...named, name: "other" }, named, port());
+    checkFields(team, named, { name: "other" }, port());
   });
 });
 

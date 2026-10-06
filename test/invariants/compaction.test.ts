@@ -150,6 +150,21 @@ describe("compaction", () => {
     chat.app.socket.dispose();
   });
 
+  test("an answer that compacts drops its own leading mark", async () => {
+    const chat = await chatApp();
+    const started = await startChat(chat, "the old question");
+    finish(started.script, "[coder] the answer", HIGH_PROMPT, 10);
+    const summaryScript = await waitScript(chat.scripted, 2);
+    finish(summaryScript, "## Goal\n\n- Continue", 41_000, 200);
+    await settle(chat, started.sessionId);
+    expect(rows(chat, started.sessionId)[1]).toMatchObject({
+      kind: "reply",
+      slot: "answer",
+      content: "the answer",
+    });
+    chat.app.socket.dispose();
+  });
+
   // the preview's 32K agent, whose schemas and long reasoning took the
   // answer round past the window; a 1M window at its threshold; and a
   // tokenizer counting more than ours near a 32K window, where only the

@@ -40,9 +40,8 @@ export function readKey(port: KeyPort, name: string): KeyRead {
 export const keyState = (read: KeyRead): KeyState =>
   read.ok ? "ok" : read.reason;
 
-// the http- files over the secrets port, and the port again for a scrub
-// list, where an http- key that fails its rule is never sent, so never
-// scrubbed
+// the http- port, and a scrub reader that skips an http- key failing its
+// rule, since it is never sent
 export function httpKeys<Kind extends string>(secrets: {
   secret(kind: Kind | "http-", name: string): string | null;
   secretNames?: (kind: "http-") => string[];

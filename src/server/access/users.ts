@@ -14,6 +14,7 @@ import type {
 import type { Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import { accessChanged, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
@@ -129,20 +130,10 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             tz: parsed.tz,
             passwordHash,
             mustChangePassword: parsed.mustChangePassword ?? true,
+            about: parsed.about,
+            disabled: parsed.disabled,
             now: deps.clock(),
           });
-          if (parsed.about !== undefined && parsed.about !== created.about) {
-            deps.users.setDetails(created.id, {
-              fullName: created.fullName,
-              about: parsed.about,
-            });
-          }
-          if (
-            parsed.disabled !== undefined &&
-            parsed.disabled !== created.disabled
-          ) {
-            deps.users.setDisabled(created.id, parsed.disabled);
-          }
           return { result: find(created.id) };
         });
         const body: UserResponse = { user: oneUser(user) };
@@ -208,21 +199,9 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           return {
             result: find(user.id),
             events: [
-              ...(roleChanged
-                ? [
-                    {
-                      type: "access.changed" as const,
-                      data: { userIds: [user.id] },
-                    },
-                  ]
-                : []),
+              ...(roleChanged ? [accessChanged([user.id])] : []),
               ...(disabledChanged && patch.disabled === true
-                ? [
-                    {
-                      type: "login.revoked" as const,
-                      data: { userId: user.id, loginId: null },
-                    },
-                  ]
+                ? [loginRevoked(user.id, null)]
                 : []),
             ],
           };
@@ -264,12 +243,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           deps.logins.deleteForUser(user.id);
           return {
             result: undefined,
-            events: [
-              {
-                type: "login.revoked" as const,
-                data: { userId: user.id, loginId: null },
-              },
-            ],
+            events: [loginRevoked(user.id, null)],
           };
         });
         return new Response(null, { status: 204 });

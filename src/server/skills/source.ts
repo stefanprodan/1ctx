@@ -3,9 +3,10 @@
 
 import type { IndexEntry } from "../../shared/contracts/skill.ts";
 import { sourceForm } from "../../shared/skills.ts";
-import { isSkillName, type SkillSource } from "../../shared/words.ts";
+import { isRecord, isSkillName, type SkillSource } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { normalizePath, validPath } from "../lib/paths.ts";
+import { httpUrl } from "./fetch.ts";
 import { MAX_INDEX_BYTES, MAX_INDEX_ENTRIES } from "./limits.ts";
 
 export type ResolvedSource = {
@@ -20,8 +21,6 @@ export type Picked = {
   skillMd: Uint8Array;
   files: Map<string, Uint8Array>;
 };
-
-export { normalizePath, validPath } from "../lib/paths.ts";
 
 export function resolve(url: string, select = ""): ResolvedSource {
   const form = sourceForm(url);
@@ -57,26 +56,8 @@ export function resolve(url: string, select = ""): ResolvedSource {
   };
 }
 
-function absoluteUrl(value: unknown, base: string): string {
-  if (typeof value !== "string") throw new BadRequest("index URL is missing");
-  let url: URL;
-  try {
-    url = new URL(value, base);
-  } catch {
-    throw new BadRequest("index URL is invalid");
-  }
-  if (
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.username !== "" ||
-    url.password !== ""
-  ) {
-    throw new BadRequest("index URL must be http or https");
-  }
-  return url.href;
-}
-
 export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
-  if (new TextEncoder().encode(text).byteLength > MAX_INDEX_BYTES) {
+  if (Buffer.byteLength(text) > MAX_INDEX_BYTES) {
     throw new BadRequest("the index is too large");
   }
   let parsed: unknown;
@@ -85,19 +66,19 @@ export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
   } catch {
     throw new BadRequest("the index is not JSON");
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     throw new BadRequest("the index must be an object");
   }
-  const skills = (parsed as Record<string, unknown>).skills;
+  const skills = parsed.skills;
   if (!Array.isArray(skills)) throw new BadRequest("the index has no skills");
   if (skills.length > MAX_INDEX_ENTRIES) {
     throw new BadRequest("the index has too many skills");
   }
   return skills.map((value, index) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    if (!isRecord(value)) {
       throw new BadRequest(`index entry ${index + 1} must be an object`);
     }
-    const entry = value as Record<string, unknown>;
+    const entry = value;
     if (!isSkillName(entry.name)) {
       throw new BadRequest(`index entry ${index + 1} has an invalid name`);
     }
@@ -113,19 +94,20 @@ export function parseIndex(text: string, indexUrl: string): IndexEntry[] {
     ) {
       throw new BadRequest(`index entry ${entry.name} has an invalid digest`);
     }
+    if (typeof entry.url !== "string") {
+      throw new BadRequest("index URL is missing");
+    }
     return {
       name: entry.name,
       type: entry.type,
       description: entry.description,
-      url: absoluteUrl(entry.url, indexUrl),
+      url: httpUrl(entry.url, "index URL", indexUrl).href,
       digest: entry.digest,
     };
   });
 }
 
 export function pick(files: Map<string, Uint8Array>, path: string): Picked {
-  // the archive member count is bounded in fetch.ts before pick runs;
-  // here the keys are normalized and their paths validated
   const normalized = new Map<string, Uint8Array>();
   for (const [name, bytes] of files) {
     const clean = normalizePath(name);

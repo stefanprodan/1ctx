@@ -1,53 +1,36 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Both usage routes and the chat export take the caller's zone; the
-// days route may also take how many weeks, up to the year. Anything
-// else is a 400, as every parser answers the unexpected.
+// the query parsers of the zone-taking routes
 
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
+import { isTimeZone, MAX_TZ } from "../../shared/words.ts";
+import { queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-function only(url: URL, allowed: string[]): void {
-  for (const name of url.searchParams.keys()) {
-    if (!allowed.includes(name)) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
+// ?tz=, as given: one IANA zone the runtime knows
+export function zoneParam(get: (name: string) => string | null): string {
+  const timeZone = get("tz");
+  if (timeZone === null || timeZone === "") {
+    throw new BadRequest("tz is required");
   }
-}
-
-function zoneOf(url: URL): string {
-  const values = url.searchParams.getAll("tz");
-  if (values.length === 0) throw new BadRequest("tz is required");
-  if (values.length !== 1) throw new BadRequest("tz must appear once");
-  const timeZone = values[0]!;
-  if (timeZone === "") throw new BadRequest("tz is required");
-  if (new TextEncoder().encode(timeZone).byteLength > 64) {
-    throw new BadRequest("tz is too long");
-  }
-  try {
-    new Intl.DateTimeFormat("en", { timeZone });
-  } catch {
-    throw new BadRequest("unknown tz");
-  }
+  if (timeZone.length > MAX_TZ) throw new BadRequest("tz is too long");
+  if (!isTimeZone(timeZone)) throw new BadRequest("unknown tz");
   return timeZone;
 }
 
 export function parseZoneQuery(url: URL): string {
-  only(url, ["tz"]);
-  return zoneOf(url);
+  return zoneParam(queryParams(url, ["tz"]));
 }
 
 export function parseDaysUsageQuery(url: URL): {
   timeZone: string;
   weeks: number;
 } {
-  only(url, ["tz", "weeks"]);
-  const timeZone = zoneOf(url);
-  const values = url.searchParams.getAll("weeks");
-  if (values.length === 0) return { timeZone, weeks: MAX_WEEKS };
-  if (values.length !== 1) throw new BadRequest("weeks must appear once");
-  const raw = values[0]!;
+  const get = queryParams(url, ["tz", "weeks"]);
+  const timeZone = zoneParam(get);
+  const raw = get("weeks");
+  if (raw === null) return { timeZone, weeks: MAX_WEEKS };
   // digits only, so "1e1", " 5" and "05" are not numbers here
   if (!/^[1-9][0-9]?$/.test(raw) || Number(raw) > MAX_WEEKS) {
     throw new BadRequest(`weeks must be 1 to ${MAX_WEEKS}`);

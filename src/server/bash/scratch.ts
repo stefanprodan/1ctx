@@ -8,13 +8,10 @@
 import type { Db } from "../db/index.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
+import type { ScratchEntry } from "./protocol.ts";
 import { heldSessions } from "./queue.ts";
 
-export type ScratchFile = {
-  path: string;
-  data: Uint8Array;
-  mode: number;
-};
+export type ScratchFile = ScratchEntry;
 
 export type Scratch = {
   cwd: string;
@@ -142,7 +139,8 @@ export class ScratchStore {
     return heldSessions();
   }
 
-  sweep(now: number, idleDays: number, held: ReadonlySet<string>): number {
+  sweep(now: number, idleDays: number): number {
+    const held = this.held();
     const expired = this.db
       .query<{ session_id: string }, [number]>(
         "select session_id from session_scratch where used_at < ?",

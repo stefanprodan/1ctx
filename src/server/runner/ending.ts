@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { Attention } from "./attention.ts";
 import { attentionStep, hasAttentionStep } from "./attention-step.ts";
 import {
+  hasMemoryPhase,
   type MemoryPhaseDeps,
   memoryPhase,
   stopMainTools,
@@ -24,10 +26,6 @@ export type EndingDeps = {
   log: Log;
   attention: Pick<Attention, "ask">;
 };
-
-function words(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
   let lastError: unknown = null;
@@ -49,17 +47,6 @@ async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
     ...errorFields(lastError),
   });
   return false;
-}
-
-function hasMemoryPhase(send: ActiveSend): boolean {
-  return (
-    send.policy.automation?.ownMemory === true &&
-    send.policy.memoryOffered !== null &&
-    send.policy.memoryOffered.memory !== null &&
-    (send.cause === "finish" ||
-      send.cause === "deadline" ||
-      send.cause === "failure")
-  );
 }
 
 export async function endSend(
@@ -93,7 +80,7 @@ export async function endSend(
         await memoryPhase(deps.phase, send);
       }
     } catch (error) {
-      send.memoryError = words(error);
+      send.memoryError = messageOf(error);
     }
   }
   const finalized = await finalize(deps, send);

@@ -19,9 +19,7 @@ import { errorFields, type Log } from "./log.ts";
 
 // the event map: one entry per event, payload by name
 export type BusEvents = {
-  // a user's logins were revoked (logout, a password change, the
-  // expiry sweep); the socket layer closes that login's connections,
-  // or every connection of the user when the login id is null
+  // every way a login ends; loginId null is all of the user's
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
@@ -93,6 +91,16 @@ export type BusEvents = {
 export type BusEvent = {
   [K in keyof BusEvents]: { type: K; data: BusEvents[K] };
 }[keyof BusEvents];
+
+export const loginRevoked = (
+  userId: string,
+  loginId: string | null,
+): BusEvent => ({ type: "login.revoked", data: { userId, loginId } });
+
+export const accessChanged = (userIds: string[] | null): BusEvent => ({
+  type: "access.changed",
+  data: { userIds },
+});
 
 type Listener = (event: BusEvent) => void;
 type Subscription = { listener: Listener; log: Log };

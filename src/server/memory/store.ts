@@ -1,21 +1,20 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The durable note, the pure replay used when its revision moved while a
-// run held a working copy, and each chat's view of the project's note:
-// the snapshot its prompt carries and what it has seen of the note since.
+// The durable note, its replay over a moved revision, and each chat's view.
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import {
   applyEdit,
-  checkEntries,
   entriesEqual,
   entryEqual,
+  findTopic,
   type MemoryEdit,
-  normalize,
+  resultThere,
+  topicKey,
 } from "../../shared/memory.ts";
 import type { Db } from "../db/index.ts";
-import { BadRequest, Conflict } from "../lib/errors.ts";
+import { Conflict } from "../lib/errors.ts";
 
 export type MemoryTarget = {
   projectId: string;
@@ -115,13 +114,11 @@ export function replay(
 ): { entries: MemoryEntry[]; skipped: number; skippedOperations: number[] } {
   let entries = [...current];
   const skippedOperations: number[] = [];
-  const initialTopics = new Set(
-    current.map((entry) => entry.topic.toLowerCase()),
-  );
+  const initialTopics = new Set(current.map((entry) => topicKey(entry.topic)));
   const firstExpected = new Map<string, string | null>();
   for (const [index, operation] of operations.entries()) {
     if (operation.action === "none") continue;
-    const topic = operation.topic.toLowerCase();
+    const topic = topicKey(operation.topic);
     if (!firstExpected.has(topic)) firstExpected.set(topic, operation.expected);
     // A no-op remove must not let a later set resurrect a hand-deleted topic.
     if (
@@ -132,14 +129,8 @@ export function replay(
       skippedOperations.push(index);
       continue;
     }
-    const current = entries.find(
-      (entry) => entry.topic.toLowerCase() === topic,
-    );
-    const resultThere =
-      operation.action === "remove"
-        ? current === undefined
-        : current !== undefined && entryEqual(current, operation);
-    if (resultThere) continue;
+    const current = findTopic(entries, operation.topic);
+    if (resultThere(current, operation)) continue;
     const expected = operation.expected;
     const matches =
       expected === null
@@ -203,6 +194,7 @@ export class MemoryStore {
     );
   }
 
+  // next is parseSaveMemory's: normalized and checked
   save(
     target: MemoryTarget,
     next: readonly MemoryEntry[],
@@ -213,10 +205,7 @@ export class MemoryStore {
     const current = this.read(target);
     if (current.revision !== revision) throw new Conflict("memory changed");
     this.assertTarget(target);
-    const normalized = normalize(next);
-    const problem = checkEntries(normalized);
-    if (problem !== null) throw new BadRequest(`entries: ${problem}`);
-    this.write(target, current, normalized, userId, null, now);
+    this.write(target, current, next, userId, null, now);
     return this.read(target);
   }
 

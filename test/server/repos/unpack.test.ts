@@ -16,12 +16,12 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { ignoreKey } from "../../../src/server/repos/rules.ts";
+import { treeFolder } from "../../../src/server/repos/tree.ts";
 import {
   type FetchJob,
   type JobEvent,
   type JobResult,
   runJob,
-  treeFolder,
 } from "../../../src/server/repos/unpack.ts";
 import {
   COMMIT,

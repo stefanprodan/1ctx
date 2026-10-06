@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The schemas and context captured for one send. Keeping this selection
-// apart from dispatch lets the agent page and the runner share the same
-// offered set without needing a live call context.
+// The set offered to one send, shared by the agent page and the runner.
 
 import {
   credentialKey,
@@ -65,7 +63,7 @@ export type SendCredentials = {
 const NO_CREDENTIALS: SendCredentials = { offered: [], off: [] };
 
 type OfferDeps = {
-  store: Pick<ToolStore, "rows">;
+  store: Pick<ToolStore, "row">;
   skills: SkillsPort;
   mcp: Pick<Mcp, "offered">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
@@ -217,11 +215,10 @@ export function offered(
       memory,
     };
   }
-  const rows = new Map(deps.store.rows().map((row) => [row.name, row]));
-  const searchRow = rows.get("websearch")!;
-  const visuals = rows.get("visualize")!.enabled;
+  const visualRow = deps.store.row("visualize");
+  const visuals = visualRow.enabled;
   const knowledge = !disabledCapabilities.includes(KNOWLEDGE);
-  const access = rows.get("web")!;
+  const access = deps.store.row("web");
   const web: WebSnapshot | null =
     access.mode === "off" || disabledCapabilities.includes(WEB)
       ? null
@@ -229,7 +226,7 @@ export function offered(
           mode: access.mode as WebSnapshot["mode"],
           domains: [...access.hosts],
         };
-  const search = web === null ? null : searchRow.provider;
+  const search = web === null ? null : deps.store.row("websearch").provider;
   const credentials = credentialsFor(
     deps.credentials,
     scope?.projectId,
@@ -265,14 +262,7 @@ export function offered(
   const baseTools = fillYear(
     [
       ...deps
-        .toolsFor(
-          search,
-          rows.get("visualize")!.hosts,
-          web,
-          visuals,
-          knowledge,
-          credentials,
-        )
+        .toolsFor(search, visualRow.hosts, web, visuals, knowledge, credentials)
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory)),

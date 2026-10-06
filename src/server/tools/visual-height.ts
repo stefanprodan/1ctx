@@ -1,3 +1,6 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
 export function measureVisual(root: HTMLElement): number {
   const properties = [
     "height",

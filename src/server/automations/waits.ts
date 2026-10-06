@@ -1,19 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A scheduled fire refused for a full cap stays due, with nothing
-// written. What the scheduler keeps in memory about those waits lives
-// here: the projects and the process whose cap was full, cleared by a
-// wake, the wake's generation, and the wait last logged per automation.
-// An occurrence missed while waiting is replaced by the newest past one.
+// What the scheduler keeps in memory about cap waits.
 
-import { type Db, transact } from "../db/index.ts";
 import { MINUTE_MS } from "../lib/clock.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import type { Log } from "../lib/log.ts";
+import { type RecordDeps, recordOn } from "./events.ts";
 import { nextFire } from "./schedule.ts";
-import type { AutomationStore } from "./store.ts";
 
-export const STILL_WAITING = "still waiting";
+const STILL_WAITING = "still waiting";
 
 export type Waiting = {
   wait: "project" | "process";
@@ -88,9 +83,9 @@ export class Waits {
 }
 
 // the newest occurrence at or before now once the one after dueAt has
-// passed too; null while dueAt is the latest. A binary search over the time since
-// dueAt, since a row missed through a long downtime would otherwise walk
-// every occurrence in between
+// passed too; null while dueAt is the latest. A binary search over the
+// time since dueAt, since a row missed through a long downtime would
+// otherwise walk every occurrence in between
 export function newestPast(
   schedule: string,
   tz: string,
@@ -122,90 +117,19 @@ export function newestPast(
 
 // a missed occurrence is one skipped event, and next_at moves to the
 // newest past one, which the same pass then tries
-export function replaceMissed(
-  deps: { db: Db; store: AutomationStore; log: Log },
-  id: string,
-  now: number,
-): void {
-  let skipped = false;
-  try {
-    transact(deps.db, () => {
-      const row = deps.store.byId(id);
-      if (row === null || row.suspendedAt !== null || row.nextAt === null) {
-        return { result: undefined };
-      }
-      const newest = newestPast(row.schedule, row.tz, row.nextAt, now);
-      if (newest === null) return { result: undefined };
-      skipped = true;
-      const updated = deps.store.recordEvent(row.id, {
-        at: now,
-        dueAt: row.nextAt,
-        source: "schedule",
-        outcome: "skipped",
-        reason: STILL_WAITING,
-        nextAt: newest,
-      })!;
-      return {
-        result: undefined,
-        events: [
-          {
-            type: "automation.changed" as const,
-            data: { projectId: updated.projectId, automation: updated },
-          },
-        ],
-      };
-    });
-  } catch (err) {
-    deps.log.error("replace failed", { automation: id, ...errorFields(err) });
-    return;
-  }
+export function replaceMissed(deps: RecordDeps, id: string, now: number): void {
+  const skipped = recordOn(deps, id, "replace failed", (row, dueAt) => {
+    const newest = newestPast(row.schedule, row.tz, dueAt, now);
+    return newest === null
+      ? null
+      : {
+          at: now,
+          dueAt,
+          source: "schedule",
+          outcome: "skipped",
+          reason: STILL_WAITING,
+          nextAt: newest,
+        };
+  });
   if (skipped) deps.log.info("skip", { automation: id, reason: STILL_WAITING });
-}
-
-export const RESTARTING = "restarting";
-
-// during a drain a due row records a deferred event, once per due time,
-// and keeps its next_at, so the next start fires it
-export function deferDue(
-  deps: { db: Db; store: AutomationStore; log: Log },
-  id: string,
-  now: number,
-): void {
-  let deferred = false;
-  try {
-    transact(deps.db, () => {
-      const row = deps.store.byId(id);
-      if (
-        row === null ||
-        row.suspendedAt !== null ||
-        row.nextAt === null ||
-        row.nextAt > now ||
-        (row.lastEventOutcome === "deferred" &&
-          row.lastEventDueAt === row.nextAt)
-      ) {
-        return { result: undefined };
-      }
-      deferred = true;
-      const updated = deps.store.recordEvent(row.id, {
-        at: now,
-        dueAt: row.nextAt,
-        source: "schedule",
-        outcome: "deferred",
-        reason: RESTARTING,
-      })!;
-      return {
-        result: undefined,
-        events: [
-          {
-            type: "automation.changed" as const,
-            data: { projectId: updated.projectId, automation: updated },
-          },
-        ],
-      };
-    });
-  } catch (err) {
-    deps.log.error("defer failed", { automation: id, ...errorFields(err) });
-    return;
-  }
-  if (deferred) deps.log.info("defer", { automation: id });
 }

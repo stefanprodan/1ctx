@@ -6,7 +6,7 @@
 // the runner's marks are written with the run's end (marks.ts).
 
 import { type Db, transact } from "../db/index.ts";
-import { archivedEvent } from "./archive.ts";
+import { envelope } from "./envelope.ts";
 import type { SessionStore } from "./store.ts";
 
 // the send's last done answer before its memory phase, whose rounds are
@@ -50,7 +50,7 @@ export function markAttention(
       ? { result: false, events: [] }
       : {
           result: true,
-          events: [archivedEvent(row, store.lastSend(sessionId))],
+          events: [envelope(row, [], store.lastSend(sessionId))],
         };
   });
 }

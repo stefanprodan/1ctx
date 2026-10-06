@@ -1,3 +1,7 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
+import { isRecord } from "../../shared/words.ts";
 import type { measureVisual } from "./visual-height.ts";
 import type {
   cleanVisual,
@@ -39,16 +43,17 @@ export function visualConnect(
 }
 
 export function visualMessage(value: unknown): value is VisualMessage {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!isRecord(value)) return false;
   if (!("type" in value)) return false;
   const keys = Object.keys(value);
   if (value.type === "paint" || value.type === "final") {
+    // VISUAL_FRAME_BYTES, inline: this runs from its source
     return (
       keys.length === 2 &&
       "html" in value &&
       typeof value.html === "string" &&
       value.html.length <= 512 * 1024 &&
-      new TextEncoder().encode(value.html).byteLength <= 512 * 1024
+      Buffer.byteLength(value.html) <= 512 * 1024
     );
   }
   if (

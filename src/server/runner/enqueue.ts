@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One message written to the queue of a chat whose lock is held, or of
-// any chat during a drain, in one transaction with its bounds: the
-// author's rows, queued and not sent, under queuedPerUser, the chat's
-// under MAX_QUEUED_PER_CHAT, and a staged file in one queued message of
-// the chat only. A summon of no
-// agent is refused here, not when it would start.
+// One message to a busy chat's queue (docs/sessions.md, The queue).
 
 import type {
   QueuedResponse,
@@ -23,9 +18,10 @@ import {
   queuedOnWire,
   type SessionRow,
   type SessionStore,
+  type SummonAgents,
+  summonOf,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
-import { type SummonAgents, summonOf } from "./summon.ts";
 
 export type EnqueueDeps = {
   db: Db;

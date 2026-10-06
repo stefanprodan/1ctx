@@ -1,15 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The websearch tool. The provider is chosen once per send (the area's
-// offered()); the key is read by the area from the secrets port at each
-// call and passed here, never held by the runner. This file reaches the
-// network only through the fetch dependency, so the suite passes a fake
-// and never leaves the process. The body cap and the deadline come from
-// the tool caps on the context.
+// The websearch tool; the network only through the fetch dependency.
 
+import { isRecord } from "../../../shared/words.ts";
+import { raceSignal, readStream } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
-import { ToolError } from "../../lib/errors.ts";
+import { sleepUnless, wallClock } from "../../lib/clock.ts";
+import { messageOf, ToolError } from "../../lib/errors.ts";
+import { scrubValues } from "../../lib/log.ts";
 import type { Tool, ToolContext } from "../types.ts";
 import * as exa from "./search/exa.ts";
 import * as firecrawl from "./search/firecrawl.ts";
@@ -28,16 +27,13 @@ const WIRES = { exa, firecrawl, tavily } satisfies Record<
     buildRequest(
       args: SearchArgs,
       key: string | null,
-      version: string,
       deadlineMs: number,
     ): ProviderRequest;
     parseAnswer(body: string, contentType: string | null, key: boolean): string;
   }
 >;
 
-// the provider chosen for the send and the key read for this call; the
-// key is null when there is no file, and the call runs keyless on the
-// same provider, never a switch to another (decision 3)
+// the key read for this call, null for keyless on the same provider
 export type Search = { provider: SearchProvider; key: string | null };
 
 export type SearchDependencies = {
@@ -45,25 +41,15 @@ export type SearchDependencies = {
   sleep(ms: number, signal: AbortSignal): Promise<void>;
 };
 
-const defaults: SearchDependencies = {
-  fetch,
-  sleep: (ms, signal) =>
-    new Promise<void>((resolveSleep, reject) => {
-      if (signal.aborted) {
-        reject(signal.reason);
-        return;
-      }
-      const timer = setTimeout(resolveSleep, ms);
-      signal.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(timer);
-          reject(signal.reason);
-        },
-        { once: true },
-      );
-    }),
-};
+// rejects with the signal's reason once it aborts
+export async function abortableSleep(
+  ms: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!(await sleepUnless(wallClock, ms, signal))) throw signal.reason;
+}
+
+const defaults: SearchDependencies = { fetch, sleep: abortableSleep };
 
 function domainError(): never {
   throw new Error(
@@ -97,7 +83,7 @@ export function parseArgs(args: Record<string, unknown>): SearchArgs {
   return { query, domain };
 }
 
-export function retryAfterMs(header: string | null): number | null {
+export function searchRetryDelay(header: string | null): number | null {
   if (header === null) return 1000;
   const value = header.trim();
   if (value === "" || /^-\d+$/u.test(value)) return 1000;
@@ -109,24 +95,6 @@ export function retryAfterMs(header: string | null): number | null {
     return null;
   }
   return 1000;
-}
-
-function raceSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise<T>((resolveRace, reject) => {
-    const aborted = () => reject(signal.reason);
-    signal.addEventListener("abort", aborted, { once: true });
-    promise.then(
-      (value) => {
-        signal.removeEventListener("abort", aborted);
-        resolveRace(value);
-      },
-      (error) => {
-        signal.removeEventListener("abort", aborted);
-        reject(error);
-      },
-    );
-  });
 }
 
 // discarding a body is best effort: the cancel is not awaited, so a
@@ -141,33 +109,9 @@ async function readBody(
   signal: AbortSignal,
   maxBytes: number,
 ): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      signal.throwIfAborted();
-      const { done, value } = await raceSignal(reader.read(), signal);
-      if (done) break;
-      size += value.byteLength;
-      if (size > maxBytes) {
-        reader.cancel().catch(() => {});
-        throw new Error(`websearch answer over ${bytesWords(maxBytes)}`);
-      }
-      chunks.push(value);
-    }
-  } catch (error) {
-    if (signal.aborted) reader.cancel(signal.reason).catch(() => {});
-    throw error;
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
+  const bytes = await readStream(response.body, maxBytes, signal);
+  if (bytes === null) {
+    throw new Error(`websearch answer over ${bytesWords(maxBytes)}`);
   }
   return new TextDecoder().decode(bytes);
 }
@@ -187,16 +131,9 @@ function serverText(text: string): string {
 function errorFromBody(body: string): string | null {
   try {
     const value = JSON.parse(body);
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return null;
-    }
-    const record = value as Record<string, unknown>;
+    if (!isRecord(value)) return null;
     // Tavily nests its words under detail
-    const detail = record.detail;
-    const error =
-      typeof detail === "object" && detail !== null && !Array.isArray(detail)
-        ? (detail as Record<string, unknown>).error
-        : record.error;
+    const error = isRecord(value.detail) ? value.detail.error : value.error;
     return typeof error === "string" ? serverText(error) : null;
   } catch {
     return null;
@@ -235,7 +172,7 @@ async function post(
       signal,
     );
     if (response.status === 429) {
-      const delay = retryAfterMs(response.headers.get("retry-after"));
+      const delay = searchRetryDelay(response.headers.get("retry-after"));
       discard(response.body);
       if (attempt === 1 || delay === null || delay >= deadlineAt - Date.now()) {
         throw new Error("websearch rate limited, try again in a moment");
@@ -272,7 +209,6 @@ export async function searchWeb(
   args: Record<string, unknown>,
   ctx: ToolContext,
   search: Search,
-  version: string,
   dependencies: SearchDependencies = defaults,
 ): Promise<string> {
   const parsed = parseArgs(args);
@@ -286,7 +222,7 @@ export async function searchWeb(
   // the provider's timeout and the retry wait follow whichever ends first
   const effectiveMs = Math.min(deadlineMs, ctx.caps.callTimeoutMs);
   const wire = WIRES[provider];
-  const request = wire.buildRequest(parsed, key, version, effectiveMs);
+  const request = wire.buildRequest(parsed, key, effectiveMs);
   const parse = wire.parseAnswer;
   const timeout = AbortSignal.timeout(deadlineMs);
   const signal = AbortSignal.any([ctx.signal, timeout]);
@@ -313,12 +249,10 @@ export async function searchWeb(
 const DESCRIPTION =
   "Search the web. Describe the page you want in a sentence, not keywords. Set domain to limit the results to one site. Returns titles, URLs and excerpts. Call webfetch on a result's URL to read the whole page. Searches have a per-send budget, so make each one count and do not repeat a query in other words. The current year is {{year}}. You MUST use this year when searching for recent information.";
 
-// the tool the area builds per send, with the provider chosen and the
-// version bound; the key is passed in per call by the area
+// the provider is chosen per send; the key is read at each call
 export function makeWebsearchTool(
   key: () => string | null,
   provider: SearchProvider,
-  version: string,
   dependencies: SearchDependencies = defaults,
 ): Tool {
   return {
@@ -347,20 +281,13 @@ export function makeWebsearchTool(
       const value = key();
       // a provider may echo the key in an answer as well as an error, and
       // either would reach the model, the stored row and the UI
-      const scrub = (text: string) =>
-        value === null ? text : text.replaceAll(value, "[key]");
+      const scrub = (text: string) => scrubValues(text, [value], "[key]");
       try {
         return scrub(
-          await searchWeb(
-            args,
-            ctx,
-            { provider, key: value },
-            version,
-            dependencies,
-          ),
+          await searchWeb(args, ctx, { provider, key: value }, dependencies),
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = messageOf(error);
         throw error instanceof ToolError
           ? new ToolError(scrub(message), error.logged)
           : new Error(scrub(message));

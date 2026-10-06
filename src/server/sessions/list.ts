@@ -13,18 +13,25 @@ import { feedRows } from "./feed.ts";
 import type { RawSession, UsagePort } from "./rows.ts";
 import { FEED_LIMIT } from "./rows.ts";
 
-export type ListArgs = [
-  projectIds: string[],
-  q: string,
-  origin?: "chat" | "automation" | null,
-  before?: FeedCursor | null,
-  limit?: number,
-];
+export type ListQuery = {
+  projectIds: string[];
+  q: string;
+  origin?: "chat" | "automation" | null;
+  before?: FeedCursor | null;
+  limit?: number;
+};
 
 type Part = { sql: string; args: (string | number)[] };
 
 const ORDER = "order by status = 'running' desc, last_activity_at desc, id";
-const SEARCH = "and (? = '' or title like ? escape '\\')";
+
+const searchArgs = (q: string): [string, string] => [
+  q,
+  `%${q.replace(/[%_\\]/g, "\\$&")}%`,
+];
+
+const titleLike = (column: string) =>
+  `(? = '' or ${column} like ? escape '\\')`;
 
 function arm(
   projects: string,
@@ -46,7 +53,7 @@ function arm(
   return {
     sql: `select * from sessions indexed by ${index}
       where project_id in (select value from json_each(?)) and ${kind}
-        ${SEARCH} ${rank === null ? "" : `and (status = 'running') = ${rank}`}
+        and ${titleLike("title")} ${rank === null ? "" : `and (status = 'running') = ${rank}`}
         ${at} ${order} limit ?`,
     args: [projects, ...search, ...args, limit],
   };
@@ -68,7 +75,7 @@ function newestRuns(
         join sessions on sessions.id = (
           select newest.id from sessions newest indexed by sessions_automation
           where newest.automation_id = automations.id
-            and (? = '' or newest.title like ? escape '\\')
+            and ${titleLike("newest.title")}
           order by newest.last_activity_at desc, newest.id limit 1)
         where automations.project_id in (select value from json_each(?)))
       where true ${after.sql} ${ORDER} limit ?`,
@@ -88,11 +95,17 @@ function feedOrder(a: RawSession, b: RawSession): number {
 /** The feed's first limit+1 rows after the cursor, in the feed order. */
 export function feedRead(
   db: Db,
-  ...[projectIds, q, origin = null, before = null, limit = FEED_LIMIT]: ListArgs
+  {
+    projectIds,
+    q,
+    origin = null,
+    before = null,
+    limit = FEED_LIMIT,
+  }: ListQuery,
 ): RawSession[] {
   if (projectIds.length === 0) return [];
   const projects = JSON.stringify(projectIds);
-  const search: [string, string] = [q, `%${q.replace(/[%_\\]/g, "\\$&")}%`];
+  const search = searchArgs(q);
   const read: RawSession[] = [];
   const run = (part: Part) => {
     read.push(
@@ -129,10 +142,10 @@ function runCounts(db: Db, raws: RawSession[]): Map<string, number> {
 export function listSessions(
   db: Db,
   usagePort: UsagePort,
-  ...args: ListArgs
+  query: ListQuery,
 ): SessionsResponse {
-  const [, , origin = null, , limit = FEED_LIMIT] = args;
-  const read = feedRead(db, ...args);
+  const { origin = null, limit = FEED_LIMIT } = query;
+  const read = feedRead(db, query);
   const rows = read.slice(0, limit);
   const last = rows.at(-1);
   const usage = usagePort.latestFor(rows.map((row) => row.id));
@@ -147,12 +160,12 @@ export function listSessions(
   };
 }
 
-export type AlertArgs = [
-  projectIds: string[],
-  q: string,
-  before?: RunsCursor | null,
-  limit?: number,
-];
+export type AlertQuery = {
+  projectIds: string[];
+  q: string;
+  before?: RunsCursor | null;
+  limit?: number;
+};
 
 // The Flagged pick: the automations with an open alert, newest
 // alert first, through the partial index on attention_since, each as
@@ -161,10 +174,10 @@ export type AlertArgs = [
 export function listAlerts(
   db: Db,
   usagePort: UsagePort,
-  ...[projectIds, q, before = null, limit = FEED_LIMIT]: AlertArgs
+  { projectIds, q, before = null, limit = FEED_LIMIT }: AlertQuery,
 ): SessionsResponse {
   if (projectIds.length === 0) return { rows: [], next: null };
-  const search: [string, string] = [q, `%${q.replace(/[%_\\]/g, "\\$&")}%`];
+  const search = searchArgs(q);
   const after =
     before === null
       ? { sql: "", args: [] }
@@ -184,7 +197,7 @@ export function listAlerts(
        join sessions on sessions.id = (
          select newest.id from sessions newest indexed by sessions_automation
          where newest.automation_id = automations.id
-           and (? = '' or newest.title like ? escape '\\')
+           and ${titleLike("newest.title")}
          order by newest.last_activity_at desc, newest.id limit 1)
        where automations.attention_since is not null
          and automations.project_id in (select value from json_each(?))

@@ -159,7 +159,9 @@ export type App = {
 
 const SCRUB_KINDS: SecretKind[] = ["provider-", "search-", "mcp-", "http-"];
 
-function scrubbedLogs(options: ComposeOptions): LogFactory {
+export function scrubbedLogs(
+  options: Pick<ComposeOptions, "secret" | "secretNames" | "log">,
+): LogFactory {
   const { scrubbed } = httpKeys(options);
   return (area) =>
     scrubErrors(options.log(area), () =>
@@ -175,13 +177,8 @@ function scrubbedLogs(options: ComposeOptions): LogFactory {
 export async function compose(options: ComposeOptions): Promise<App> {
   const { db, clock, secret } = options;
   const log = scrubbedLogs(options);
-  // Ports that point down the list, at an area built after the one that
-  // holds them, are closures called once the list is complete: a user
-  // is made with its personal project, project routes ask sessions
-  // and access, an agent's delete reaches what runs on it, the
-  // session detail asks the runner for the reply in flight, and a freed
-  // place or a moved send cap wakes the queue's dispatcher, then the
-  // scheduler, so a user's waiting message takes a place before a run.
+  // ports to areas built later are closures, called once the list is
+  // complete
   let sessions!: Sessions;
   let automations!: Automations;
   let agents!: Agents;
@@ -197,6 +194,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // the instance's start, as the overview reports it
   const startedAt = clock();
   const fetcher = withUserAgent(options.fetcher ?? fetch, options.version);
+  // the queue first, so a waiting message takes a place before a run
   const wake = () => {
     runner.queue.wake();
     automations.scheduler.wake();
@@ -239,12 +237,17 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     usage,
   });
-  // a deleted server or skill leaves no key behind in a chat or a task
+  // a deleted object leaves no key behind in a chat or a task; a
+  // repository was its project's, so only that project's rows are read
   const capabilities = {
-    forget(key: string) {
-      sessions.store.forgetCapability(key);
-      automations.store.forgetCapability(key);
+    forget(key: string, projectId?: string) {
+      sessions.store.forgetCapability(key, projectId);
+      automations.store.forgetCapability(key, projectId);
     },
+  };
+  const agentNames = {
+    byId: (id: string) => agents.byId(id),
+    byName: (name: string) => agents.store.byName(name),
   };
   const mcp: Mcp = mcpArea({
     db,
@@ -354,13 +357,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     projects: projects.store,
     keys: { readKey: (keyName) => credentials.readKey(keyName) },
-    // a deleted repository was its project's, so only its rows are read
-    capabilities: {
-      forget(key, projectId) {
-        sessions.store.forgetCapability(key, projectId);
-        automations.store.forgetCapability(key, projectId);
-      },
-    },
+    capabilities,
     cacheDir: options.cacheDir ?? null,
     // built here, at the compile root, so the binary finds its entry
     jobs:
@@ -393,10 +390,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("sessions"),
     access,
-    agents: {
-      byId: (id) => agents.byId(id),
-      byName: (name) => agents.store.byName(name),
-    },
+    agents: agentNames,
     live: (sessionId) => runner.live(sessionId),
     usage,
     limits,
@@ -412,7 +406,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret("search-", name),
     clock,
     log: log("tools"),
-    version: options.version,
     render: renderMarkdown,
     skills,
     mcp,
@@ -442,10 +435,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: sessions.store,
     access,
     visible: (principal, id) => sessions.visible(principal, id),
-    agents: {
-      byId: (id) => agents.byId(id),
-      byName: (name) => agents.store.byName(name),
-    },
+    agents: agentNames,
     users,
     providers,
     tools,
@@ -525,9 +515,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     attention: () => {
       const keyed = (kind: SecretKind, name: string | null) =>
         name !== null && secret(kind, name) !== null;
-      const search =
-        configuredTools.store.rows().find((row) => row.name === "websearch")
-          ?.provider ?? null;
+      const search = configuredTools.store.row("websearch").provider;
       return {
         providers: providers.store.list().map((p) => ({
           name: p.name,
@@ -572,7 +560,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     overview.start();
   }
   const routes: RouteDescriptor[] = [
-    ...users.routes,
     ...usage.routes,
     ...limits.routes,
     ...providers.routes,

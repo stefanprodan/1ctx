@@ -639,7 +639,9 @@ describe("Gemini stream", () => {
 describe("Gemini errors", () => {
   test("uses Google's refusal and scrubs the key", async () => {
     const message = JSON.parse(refused)[0].error.message;
-    expect(geminiError(`HTTP 400: ${refused}`)).toBe(`Gemini 400: ${message}`);
+    expect(geminiError(400, refused)).toEqual({
+      message: `Gemini 400: ${message}`,
+    });
     const { events } = await stream(
       refused.replace("default_api:datetime", KEY),
       400,
@@ -677,11 +679,29 @@ describe("Gemini errors", () => {
   });
 
   test.each([
-    "HTTP 502",
-    "HTTP 502: not JSON",
-    "HTTP 400: []",
-    "connection failed",
-  ])("keeps a failure without Google's message: %s", (message) => {
-    expect(geminiError(message)).toBe(message);
+    [502, "not JSON"],
+    [400, "[]"],
+  ])("keeps a failure without Google's message: %s %s", (status, body) => {
+    expect(geminiError(status, body)).toBeNull();
+  });
+});
+
+describe("Gemini body failures", () => {
+  test("a body the wire cannot build is an error event, never a throw", async () => {
+    const events: ChatEvent[] = [];
+    const fetcher = (async () => new Response("")) as unknown as typeof fetch;
+    const unknown = { ...request, reasoningEffort: "max" } as ChatRequest;
+    for await (const event of providerFor(row, {
+      fetcher,
+      secret: () => KEY,
+    }).chat(unknown, new AbortController().signal)) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      {
+        kind: "error",
+        message: "gemini failed: unknown Gemini thinking effort",
+      },
+    ]);
   });
 });

@@ -95,6 +95,18 @@ export function isAbout(value: unknown): value is string {
 
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD_BYTES = 1024;
+// a password under the floor or over the byte cap, else null; a login
+// passes a floor of 1 so an old password stays usable
+export function passwordProblem(
+  value: string,
+  min = MIN_PASSWORD,
+): "short" | "long" | null {
+  if (value.length < min) return "short";
+  if (new TextEncoder().encode(value).length > MAX_PASSWORD_BYTES) {
+    return "long";
+  }
+  return null;
+}
 
 // how an opened file is drawn: HTML and SVG in the visual frame while
 // the admin's Visuals row is on, Markdown rendered, anything else as code
@@ -115,6 +127,9 @@ export function isName(value: unknown): value is string {
     NAME_RE.test(value)
   );
 }
+
+// a provider's model id, as an agent or a decider names it
+export const MAX_MODEL = 200;
 
 export const MAX_KNOWLEDGE_NAME = 200;
 export const MAX_KNOWLEDGE_SEGMENTS = 8;
@@ -183,6 +198,10 @@ export function isSecretName(kind: string, value: unknown): value is string {
     /^[a-z0-9][a-z0-9-]{0,47}$/.test(value.slice(kind.length))
   );
 }
+// isSecretName's rule in words, for a 400 that refuses a key name
+export const secretNameRule = (kind: SecretKind) =>
+  `${kind} followed by 1 to 48 lowercase letters, digits and dashes, ` +
+  "starting with a letter or digit";
 
 // an MCP server's own call timeout, null for the limits' callTimeoutMs
 export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
@@ -376,84 +395,6 @@ export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 export function isSearchProvider(value: unknown): value is SearchProvider {
   return SEARCH_PROVIDERS.includes(value as SearchProvider);
 }
-
-// the limits an admin may override: the loop caps of a send, then the
-// caps a single tool call runs under. The names are the keys the
-// runner and the tools read, so a row maps to a cap without a table.
-export const LIMIT_NAMES = [
-  "rounds",
-  "callsPerRound",
-  "callsPerSend",
-  "toolMs",
-  "resultBytes",
-  "toolWorkTokens",
-  "contextReserve",
-  "summaryMaxTokens",
-  "callTimeoutMs",
-  "resultCut",
-  "maxBashCalls",
-  "maxFetches",
-  "maxSearches",
-  "fetchBodyBytes",
-  "searchBodyBytes",
-  "fetchDeadlineMs",
-  "searchDeadlineMs",
-  "runDeadlineMs",
-  "sendDeadlineMs",
-  "memoryPhaseMs",
-  "memoryPhaseRounds",
-  "visualBytes",
-  "visualSendBytes",
-  "maxVisuals",
-  "knowledgeFileBytes",
-  "knowledgeFiles",
-  "knowledgeProjectBytes",
-  "knowledgeVersions",
-  "knowledgeHistoryBytes",
-  "knowledgeHistoryDays",
-  "scratchBytes",
-  "scratchFiles",
-  "scratchIdleDays",
-  "uploadBytes",
-  "uploadFiles",
-  "mcpKeptBytes",
-  "mcpKeptFiles",
-  "sendsPerUser",
-  "sendsPerProject",
-  "sendsRunning",
-  "queuedPerUser",
-  "queuedMinutes",
-  "archiveIdleDays",
-  "archivedDeleteDays",
-  "repoBytes",
-  "repoFiles",
-  "repoFileBytes",
-  "repoCacheBytes",
-] as const;
-export type LimitName = (typeof LIMIT_NAMES)[number];
-
-export const LIMIT_UNITS = [
-  "count",
-  "ms",
-  "bytes",
-  "chars",
-  "tokens",
-  "days",
-  "minutes",
-] as const;
-export type LimitUnit = (typeof LIMIT_UNITS)[number];
-
-// knowledge caps are read at each write, sends caps at each admission
-export const LIMIT_SCOPES = [
-  "send",
-  "call",
-  "knowledge",
-  "sends",
-  "visuals",
-  "chats",
-  "repos",
-] as const;
-export type LimitScope = (typeof LIMIT_SCOPES)[number];
 
 // the Agent Skills rule, stricter than isName, since a skill written for
 // any client obeys it

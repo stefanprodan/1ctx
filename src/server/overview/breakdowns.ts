@@ -6,6 +6,7 @@
 
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
+import { projectRows } from "./read.ts";
 
 export type Bounds = [number, number];
 
@@ -120,27 +121,12 @@ export function byAgents(db: Db, bounds: Bounds): GroupRow[] {
   );
 }
 
-type ProjectRow = {
-  id: string;
-  kind: "personal" | "team";
-  name: string;
-  owner: string;
-};
-
-const projectNames = (db: Db): ProjectRow[] =>
-  db
-    .query<ProjectRow, []>(
-      `select p.id, p.kind, p.name, u.username as owner
-         from projects p join users u on u.id = p.owner_id`,
-    )
-    .all();
-
 // safe as a sentinel: no project id is empty
 const DELETED_PROJECTS = "";
 
 export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
   // a personal project is never named
-  const names = projectNames(db).map((project) =>
+  const names = projectRows(db).map((project) =>
     project.kind === "personal"
       ? {
           key: project.id,

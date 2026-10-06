@@ -1,20 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The decisions wire: typed questions about a state, answered with
-// probabilities and no text, at <baseUrl>/systemone. Each answer is
-// normalized to the pick and its probability, since the vendors' own
-// confidences do not compare. An error is in our words, the status and
-// a question id at most, never the server's body, which may echo the
-// state.
 
-import { readCapped } from "./catalog.ts";
-import { OPENROUTER_HEADERS, type ProviderDeps } from "./provider.ts";
+import { readStream } from "../lib/body.ts";
+import { messageOf } from "../lib/errors.ts";
+import { OPENROUTER_HEADERS } from "./openrouter.ts";
+import { keyOf, noKeyFile, type ProviderDeps, scrubKey } from "./provider.ts";
 import type { ProviderRow } from "./store.ts";
-import { CatalogError } from "./types.ts";
+import { authHeaders, endpoint } from "./wires.ts";
 
 // far past any answer: what is dropped unread past it
-export const MAX_DECISION_BYTES = 1024 * 1024;
+const MAX_DECISION_BYTES = 1024 * 1024;
 // enough of an error body to find the question it names
 const MAX_ERROR_BYTES = 64 * 1024;
 
@@ -239,7 +234,7 @@ export function refusedQuestion(
   return null;
 }
 
-export function decisionError(
+function decisionError(
   name: string,
   status: number,
   text: string,
@@ -253,15 +248,14 @@ export function decisionError(
   );
 }
 
-async function capped(res: Response, max: number): Promise<string> {
-  try {
-    return await readCapped(res, max);
-  } catch (err) {
-    if (err instanceof CatalogError) {
-      throw new DecisionError("the answer is too large");
-    }
-    throw err;
-  }
+async function capped(
+  res: Response,
+  max: number,
+  signal: AbortSignal,
+): Promise<string> {
+  const bytes = await readStream(res.body, max, signal);
+  if (bytes === null) throw new DecisionError("the answer is too large");
+  return new TextDecoder().decode(bytes);
 }
 
 async function send(
@@ -274,27 +268,24 @@ async function send(
   const headers: Record<string, string> = {
     "content-type": "application/json",
     ...(row.wire === "openrouter" ? OPENROUTER_HEADERS : {}),
-    ...(key === null ? {} : { authorization: `Bearer ${key}` }),
+    ...authHeaders(row.wire, key),
   };
-  const res = await deps.fetcher(
-    `${row.baseUrl.replace(/\/+$/, "")}/systemone`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: req.model,
-        state: req.state,
-        questions: req.questions,
-      }),
-      signal,
-    },
-  );
+  const res = await deps.fetcher(endpoint(row.baseUrl, "/systemone"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: req.model,
+      state: req.state,
+      questions: req.questions,
+    }),
+    signal,
+  });
   if (!res.ok) {
-    const text = await capped(res, MAX_ERROR_BYTES).catch(() => "");
+    const text = await capped(res, MAX_ERROR_BYTES, signal).catch(() => "");
     throw decisionError(row.name, res.status, text, req);
   }
   let body: unknown;
-  const text = await capped(res, MAX_DECISION_BYTES);
+  const text = await capped(res, MAX_DECISION_BYTES, signal);
   try {
     body = JSON.parse(text);
   } catch {
@@ -310,12 +301,11 @@ export async function requestDecisions(
   req: DecisionRequest,
   signal: AbortSignal,
 ): Promise<Decisions> {
-  const key = row.keyName === null ? null : deps.secret(row.keyName);
+  const key = keyOf(row, deps.secret);
   if (row.keyName !== null && key === null) {
-    throw new DecisionError(`${row.name} has no key file ${row.keyName}.key`);
+    throw new DecisionError(noKeyFile(row));
   }
-  const scrub = (message: string) =>
-    key === null ? message : message.replaceAll(key, "[key]");
+  const scrub = (message: string) => scrubKey(message, key);
   try {
     return await send(row, deps, key, req, signal);
   } catch (err) {
@@ -333,9 +323,7 @@ export async function requestDecisions(
       );
     }
     throw new DecisionError(
-      scrub(
-        `${row.name} did not answer: ${err instanceof Error ? err.message : String(err)}`,
-      ),
+      scrub(`${row.name} did not answer: ${messageOf(err)}`),
     );
   }
 }

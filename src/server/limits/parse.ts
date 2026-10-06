@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { PutLimitsRequest } from "../../shared/api/limits.ts";
-import { LIMIT_NAMES } from "../../shared/words.ts";
+import { LIMIT_NAMES } from "../../shared/contracts/limit.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { LIMIT_DEFINITIONS } from "./defaults.ts";

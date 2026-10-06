@@ -1,15 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one table of the limits: the loop caps of a send, the caps a
-// single tool call runs under and the caps on the chats and runs going
-// at once, each with its default, the floor and the ceiling the parser
-// holds an admin to, its unit and its scope.
-// The code owns the defaults; a row in the limits table is an override
-// alone, so a default that changes in code changes for every server
-// that never overrode it.
+// the code owns every default; a limits row is an admin's override alone
 
-import type { LimitName, LimitScope, LimitUnit } from "../../shared/words.ts";
+import type {
+  LimitName,
+  LimitScope,
+  LimitUnit,
+} from "../../shared/contracts/limit.ts";
 
 export type LoopLimits = {
   rounds: number;
@@ -67,7 +65,7 @@ export type SendCaps = {
 
 // the messages sent to a busy chat one user may have waiting, not sent
 // ones included, and the minutes one may wait from when it was sent
-export type QueueCaps = {
+type QueueCaps = {
   queuedPerUser: number;
   queuedMinutes: number;
 };
@@ -118,332 +116,68 @@ export type LimitDefinition = {
   scope: LimitScope;
 };
 
+const KiB = 1024;
+const MiB = 1024 * KiB;
+const GiB = 1024 * MiB;
+
+const limit = (
+  value: number,
+  min: number,
+  max: number,
+  unit: LimitUnit,
+  scope: LimitScope,
+): LimitDefinition => ({ default: value, min, max, unit, scope });
+
 // the table on one core: limitDefinitions() moves the process cap
 export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
-  rounds: { default: 100, min: 1, max: 500, unit: "count", scope: "send" },
-  callsPerRound: {
-    default: 10,
-    min: 1,
-    max: 50,
-    unit: "count",
-    scope: "send",
-  },
-  callsPerSend: {
-    default: 100,
-    min: 1,
-    max: 1000,
-    unit: "count",
-    scope: "send",
-  },
-  toolMs: {
-    default: 600_000,
-    min: 10_000,
-    max: 3_600_000,
-    unit: "ms",
-    scope: "send",
-  },
-  resultBytes: {
-    default: 2 * 1024 * 1024,
-    min: 64 * 1024,
-    max: 32 * 1024 * 1024,
-    unit: "bytes",
-    scope: "send",
-  },
-  toolWorkTokens: {
-    default: 1_000_000,
-    min: 10_000,
-    max: 10_000_000,
-    unit: "tokens",
-    scope: "send",
-  },
-  contextReserve: {
-    default: 20_000,
-    min: 1000,
-    max: 200_000,
-    unit: "tokens",
-    scope: "send",
-  },
-  summaryMaxTokens: {
-    default: 4096,
-    min: 1000,
-    max: 32_000,
-    unit: "tokens",
-    scope: "send",
-  },
-  memoryPhaseMs: {
-    default: 120_000,
-    min: 10_000,
-    max: 600_000,
-    unit: "ms",
-    scope: "send",
-  },
-  memoryPhaseRounds: {
-    default: 4,
-    min: 1,
-    max: 20,
-    unit: "count",
-    scope: "send",
-  },
-  callTimeoutMs: {
-    default: 20_000,
-    min: 1000,
-    max: 600_000,
-    unit: "ms",
-    scope: "call",
-  },
-  resultCut: {
-    default: 50_000,
-    min: 1000,
-    max: 500_000,
-    unit: "chars",
-    scope: "call",
-  },
-  maxBashCalls: {
-    default: 100,
-    min: 1,
-    max: 1000,
-    unit: "count",
-    scope: "call",
-  },
-  maxFetches: {
-    default: 6,
-    min: 0,
-    max: 100,
-    unit: "count",
-    scope: "call",
-  },
-  maxSearches: {
-    default: 3,
-    min: 0,
-    max: 100,
-    unit: "count",
-    scope: "call",
-  },
-  fetchBodyBytes: {
-    default: 2 * 1024 * 1024,
-    min: 64 * 1024,
-    max: 32 * 1024 * 1024,
-    unit: "bytes",
-    scope: "call",
-  },
-  searchBodyBytes: {
-    default: 1024 * 1024,
-    min: 64 * 1024,
-    max: 32 * 1024 * 1024,
-    unit: "bytes",
-    scope: "call",
-  },
-  fetchDeadlineMs: {
-    default: 15_000,
-    min: 1000,
-    max: 600_000,
-    unit: "ms",
-    scope: "call",
-  },
-  searchDeadlineMs: {
-    default: 10_000,
-    min: 1000,
-    max: 600_000,
-    unit: "ms",
-    scope: "call",
-  },
-  runDeadlineMs: {
-    default: 600_000,
-    min: 60_000,
-    max: 3_600_000,
-    unit: "ms",
-    scope: "send",
-  },
-  sendDeadlineMs: {
-    default: 1_800_000,
-    min: 60_000,
-    max: 14_400_000,
-    unit: "ms",
-    scope: "send",
-  },
-  visualBytes: {
-    default: 256 * 1024,
-    min: 16 * 1024,
-    max: 512 * 1024,
-    unit: "bytes",
-    scope: "visuals",
-  },
-  visualSendBytes: {
-    default: 1024 * 1024,
-    min: 64 * 1024,
-    max: 4 * 1024 * 1024,
-    unit: "bytes",
-    scope: "visuals",
-  },
-  maxVisuals: {
-    default: 2,
-    min: 1,
-    max: 10,
-    unit: "count",
-    scope: "visuals",
-  },
-  knowledgeFileBytes: {
-    default: 256 * 1024,
-    min: 4 * 1024,
-    max: 4 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  knowledgeFiles: {
-    default: 500,
-    min: 1,
-    max: 10_000,
-    unit: "count",
-    scope: "knowledge",
-  },
-  knowledgeProjectBytes: {
-    default: 16 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 64 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  knowledgeVersions: {
-    default: 20,
-    min: 1,
-    max: 200,
-    unit: "count",
-    scope: "knowledge",
-  },
-  knowledgeHistoryBytes: {
-    default: 64 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 1024 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  knowledgeHistoryDays: {
-    default: 90,
-    min: 1,
-    max: 3650,
-    unit: "days",
-    scope: "knowledge",
-  },
-  scratchBytes: {
-    default: 16 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 64 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  scratchFiles: {
-    default: 1000,
-    min: 10,
-    max: 10_000,
-    unit: "count",
-    scope: "knowledge",
-  },
-  scratchIdleDays: {
-    default: 7,
-    min: 1,
-    max: 90,
-    unit: "days",
-    scope: "knowledge",
-  },
-  uploadBytes: {
-    default: 16 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 64 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  uploadFiles: {
-    default: 1000,
-    min: 10,
-    max: 10_000,
-    unit: "count",
-    scope: "knowledge",
-  },
-  mcpKeptBytes: {
-    default: 32 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 256 * 1024 * 1024,
-    unit: "bytes",
-    scope: "knowledge",
-  },
-  mcpKeptFiles: {
-    default: 2000,
-    min: 10,
-    max: 20_000,
-    unit: "count",
-    scope: "knowledge",
-  },
-  sendsPerUser: { default: 4, min: 1, max: 16, unit: "count", scope: "sends" },
-  sendsPerProject: {
-    default: 16,
-    min: 4,
-    max: 64,
-    unit: "count",
-    scope: "sends",
-  },
-  sendsRunning: {
-    default: sendsRunningDefault(1),
-    min: 4,
-    max: 256,
-    unit: "count",
-    scope: "sends",
-  },
-  queuedPerUser: {
-    default: 8,
-    min: 1,
-    max: 32,
-    unit: "count",
-    scope: "sends",
-  },
-  queuedMinutes: {
-    default: 60,
-    min: 10,
-    max: 240,
-    unit: "minutes",
-    scope: "sends",
-  },
-  archiveIdleDays: {
-    default: 30,
-    min: 1,
-    max: 180,
-    unit: "days",
-    scope: "chats",
-  },
-  archivedDeleteDays: {
-    default: 365,
-    min: 30,
-    max: 1825,
-    unit: "days",
-    scope: "chats",
-  },
-  repoBytes: {
-    default: 256 * 1024 * 1024,
-    min: 1024 * 1024,
-    max: 2 * 1024 * 1024 * 1024,
-    unit: "bytes",
-    scope: "repos",
-  },
-  repoFiles: {
-    default: 50_000,
-    min: 100,
-    max: 500_000,
-    unit: "count",
-    scope: "repos",
-  },
-  repoFileBytes: {
-    default: 4 * 1024 * 1024,
-    min: 64 * 1024,
-    max: 64 * 1024 * 1024,
-    unit: "bytes",
-    scope: "repos",
-  },
-  repoCacheBytes: {
-    default: 10 * 1024 * 1024 * 1024,
-    min: 1024 * 1024 * 1024,
-    max: 1024 * 1024 * 1024 * 1024,
-    unit: "bytes",
-    scope: "repos",
-  },
+  rounds: limit(100, 1, 500, "count", "send"),
+  callsPerRound: limit(10, 1, 50, "count", "send"),
+  callsPerSend: limit(100, 1, 1000, "count", "send"),
+  toolMs: limit(600_000, 10_000, 3_600_000, "ms", "send"),
+  resultBytes: limit(2 * MiB, 64 * KiB, 32 * MiB, "bytes", "send"),
+  toolWorkTokens: limit(1_000_000, 10_000, 10_000_000, "tokens", "send"),
+  contextReserve: limit(20_000, 1000, 200_000, "tokens", "send"),
+  summaryMaxTokens: limit(4096, 1000, 32_000, "tokens", "send"),
+  memoryPhaseMs: limit(120_000, 10_000, 600_000, "ms", "send"),
+  memoryPhaseRounds: limit(4, 1, 20, "count", "send"),
+  callTimeoutMs: limit(20_000, 1000, 600_000, "ms", "call"),
+  resultCut: limit(50_000, 1000, 500_000, "chars", "call"),
+  maxBashCalls: limit(100, 1, 1000, "count", "call"),
+  maxFetches: limit(6, 0, 100, "count", "call"),
+  maxSearches: limit(3, 0, 100, "count", "call"),
+  fetchBodyBytes: limit(2 * MiB, 64 * KiB, 32 * MiB, "bytes", "call"),
+  searchBodyBytes: limit(MiB, 64 * KiB, 32 * MiB, "bytes", "call"),
+  fetchDeadlineMs: limit(15_000, 1000, 600_000, "ms", "call"),
+  searchDeadlineMs: limit(10_000, 1000, 600_000, "ms", "call"),
+  runDeadlineMs: limit(600_000, 60_000, 3_600_000, "ms", "send"),
+  sendDeadlineMs: limit(1_800_000, 60_000, 14_400_000, "ms", "send"),
+  visualBytes: limit(256 * KiB, 16 * KiB, 512 * KiB, "bytes", "visuals"),
+  visualSendBytes: limit(MiB, 64 * KiB, 4 * MiB, "bytes", "visuals"),
+  maxVisuals: limit(2, 1, 10, "count", "visuals"),
+  knowledgeFileBytes: limit(256 * KiB, 4 * KiB, 4 * MiB, "bytes", "knowledge"),
+  knowledgeFiles: limit(500, 1, 10_000, "count", "knowledge"),
+  knowledgeProjectBytes: limit(16 * MiB, MiB, 64 * MiB, "bytes", "knowledge"),
+  knowledgeVersions: limit(20, 1, 200, "count", "knowledge"),
+  knowledgeHistoryBytes: limit(64 * MiB, MiB, GiB, "bytes", "knowledge"),
+  knowledgeHistoryDays: limit(90, 1, 3650, "days", "knowledge"),
+  scratchBytes: limit(16 * MiB, MiB, 64 * MiB, "bytes", "knowledge"),
+  scratchFiles: limit(1000, 10, 10_000, "count", "knowledge"),
+  scratchIdleDays: limit(7, 1, 90, "days", "knowledge"),
+  uploadBytes: limit(16 * MiB, MiB, 64 * MiB, "bytes", "knowledge"),
+  uploadFiles: limit(1000, 10, 10_000, "count", "knowledge"),
+  mcpKeptBytes: limit(32 * MiB, MiB, 256 * MiB, "bytes", "knowledge"),
+  mcpKeptFiles: limit(2000, 10, 20_000, "count", "knowledge"),
+  sendsPerUser: limit(4, 1, 16, "count", "sends"),
+  sendsPerProject: limit(16, 4, 64, "count", "sends"),
+  sendsRunning: limit(sendsRunningDefault(1), 4, 256, "count", "sends"),
+  queuedPerUser: limit(8, 1, 32, "count", "sends"),
+  queuedMinutes: limit(60, 10, 240, "minutes", "sends"),
+  archiveIdleDays: limit(30, 1, 180, "days", "chats"),
+  archivedDeleteDays: limit(365, 30, 1825, "days", "chats"),
+  repoBytes: limit(256 * MiB, MiB, 2 * GiB, "bytes", "repos"),
+  repoFiles: limit(50_000, 100, 500_000, "count", "repos"),
+  repoFileBytes: limit(4 * MiB, 64 * KiB, 64 * MiB, "bytes", "repos"),
+  repoCacheBytes: limit(10 * GiB, GiB, 1024 * GiB, "bytes", "repos"),
 };
 
 // the table on the given cores; only the process cap's default moves
@@ -468,31 +202,3 @@ export const defaultLimits = (cores: number): Limits =>
 // the defaults on one core; a running server's are the limits area's,
 // on its cores
 export const DEFAULT_LIMITS = defaultLimits(1);
-
-export const LOOP_LIMITS: LoopLimits = {
-  rounds: DEFAULT_LIMITS.rounds,
-  callsPerRound: DEFAULT_LIMITS.callsPerRound,
-  callsPerSend: DEFAULT_LIMITS.callsPerSend,
-  toolMs: DEFAULT_LIMITS.toolMs,
-  resultBytes: DEFAULT_LIMITS.resultBytes,
-  toolWorkTokens: DEFAULT_LIMITS.toolWorkTokens,
-  contextReserve: DEFAULT_LIMITS.contextReserve,
-  summaryMaxTokens: DEFAULT_LIMITS.summaryMaxTokens,
-  memoryPhaseMs: DEFAULT_LIMITS.memoryPhaseMs,
-  memoryPhaseRounds: DEFAULT_LIMITS.memoryPhaseRounds,
-};
-
-export const TOOL_CAPS: ToolCaps = {
-  callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
-  resultCut: DEFAULT_LIMITS.resultCut,
-  maxBashCalls: DEFAULT_LIMITS.maxBashCalls,
-  maxFetches: DEFAULT_LIMITS.maxFetches,
-  maxSearches: DEFAULT_LIMITS.maxSearches,
-  fetchBodyBytes: DEFAULT_LIMITS.fetchBodyBytes,
-  searchBodyBytes: DEFAULT_LIMITS.searchBodyBytes,
-  fetchDeadlineMs: DEFAULT_LIMITS.fetchDeadlineMs,
-  searchDeadlineMs: DEFAULT_LIMITS.searchDeadlineMs,
-  visualBytes: DEFAULT_LIMITS.visualBytes,
-  visualSendBytes: DEFAULT_LIMITS.visualSendBytes,
-  maxVisuals: DEFAULT_LIMITS.maxVisuals,
-};

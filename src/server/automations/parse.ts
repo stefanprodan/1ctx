@@ -13,7 +13,6 @@ import {
 import { sanitize } from "../../shared/memory.ts";
 import {
   isAttentionMode,
-  isName,
   isRunFilter,
   MAX_ATTENTION_GUIDANCE,
   MAX_MEMORY_GUIDANCE,
@@ -23,7 +22,7 @@ import {
   RETENTION_DAYS,
   type RunFilter,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 
@@ -51,23 +50,33 @@ function text(value: unknown, name: string): string {
   return value;
 }
 
+// text the agent reads, cleaned, at most max bytes
+function guidance(value: unknown, field: string, label: string, max: number) {
+  if (typeof value !== "string") throw new BadRequest(`${field} must be text`);
+  const cleaned = sanitize(value);
+  if (Buffer.byteLength(cleaned) > max) {
+    throw new BadRequest(`${label} must be at most ${max} bytes`);
+  }
+  return cleaned;
+}
+
 function parseValues(
   body: Record<string, unknown>,
   required: boolean,
 ): PatchAutomationRequest {
   const out: PatchAutomationRequest = {};
   const take = (name: string) => required || Object.hasOwn(body, name);
-  if (take("name")) {
-    if (!isName(body.name)) throw new BadRequest("invalid name");
-    out.name = body.name;
-  }
+  // a field a create leaves out takes its default
+  const given = (name: string, fallback: unknown) =>
+    Object.hasOwn(body, name) ? body[name] : fallback;
+  if (take("name")) out.name = parseName(body.name);
   if (take("agentId")) out.agentId = text(body.agentId, "agentId");
   if (take("instructions")) {
     const instructions = text(body.instructions, "instructions");
     if (instructions.trim() === "") {
       throw new BadRequest("instructions must not be blank");
     }
-    if (new TextEncoder().encode(instructions).length > MAX_MESSAGE_BYTES) {
+    if (Buffer.byteLength(instructions) > MAX_MESSAGE_BYTES) {
       throw new BadRequest(
         `instructions must be at most ${MAX_MESSAGE_BYTES} bytes`,
       );
@@ -103,58 +112,38 @@ function parseValues(
     out.ownMemory = body.ownMemory;
   }
   if (take("rerunOnRestart")) {
-    const value = Object.hasOwn(body, "rerunOnRestart")
-      ? body.rerunOnRestart
-      : false;
+    const value = given("rerunOnRestart", false);
     if (typeof value !== "boolean") {
       throw new BadRequest("rerunOnRestart must be boolean");
     }
     out.rerunOnRestart = value;
   }
   if (take("memoryGuidance")) {
-    const value = Object.hasOwn(body, "memoryGuidance")
-      ? body.memoryGuidance
-      : "";
-    if (typeof value !== "string") {
-      throw new BadRequest("memoryGuidance must be text");
-    }
-    const guidance = sanitize(value);
-    if (new TextEncoder().encode(guidance).length > MAX_MEMORY_GUIDANCE) {
-      throw new BadRequest(
-        `memory guidance must be at most ${MAX_MEMORY_GUIDANCE} bytes`,
-      );
-    }
-    out.memoryGuidance = guidance;
+    out.memoryGuidance = guidance(
+      given("memoryGuidance", ""),
+      "memoryGuidance",
+      "memory guidance",
+      MAX_MEMORY_GUIDANCE,
+    );
   }
   if (take("attentionMode")) {
-    const value = Object.hasOwn(body, "attentionMode")
-      ? body.attentionMode
-      : "agent";
+    const value = given("attentionMode", "agent");
     if (!isAttentionMode(value)) {
       throw new BadRequest("attentionMode must be off, agent or decider");
     }
     out.attentionMode = value;
   }
   if (take("attentionGuidance")) {
-    const value = Object.hasOwn(body, "attentionGuidance")
-      ? body.attentionGuidance
-      : "";
-    if (typeof value !== "string") {
-      throw new BadRequest("attentionGuidance must be text");
-    }
-    const guidance = sanitize(value);
-    if (new TextEncoder().encode(guidance).length > MAX_ATTENTION_GUIDANCE) {
-      throw new BadRequest(
-        `attention guidance must be at most ${MAX_ATTENTION_GUIDANCE} bytes`,
-      );
-    }
-    out.attentionGuidance = guidance;
+    out.attentionGuidance = guidance(
+      given("attentionGuidance", ""),
+      "attentionGuidance",
+      "attention guidance",
+      MAX_ATTENTION_GUIDANCE,
+    );
   }
   if (take("disabledCapabilities")) {
     const parsed = parseSet(
-      Object.hasOwn(body, "disabledCapabilities")
-        ? body.disabledCapabilities
-        : [],
+      given("disabledCapabilities", []),
       "disabledCapabilities",
     );
     if (!parsed.ok) throw new BadRequest(parsed.error);
@@ -189,27 +178,16 @@ export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
   return parseValues(parsed, false);
 }
 
-function queryKeys(url: URL, allowed: string[]): void {
-  const seen = new Set<string>();
-  for (const name of url.searchParams.keys()) {
-    if (!allowed.includes(name)) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
-    if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
-    seen.add(name);
-  }
-}
-
 export function parseRunsQuery(url: URL): {
   filter: RunFilter | null;
   before: RunsCursor | null;
 } {
-  queryKeys(url, ["filter", "before"]);
-  const filter = url.searchParams.get("filter");
+  const get = queryParams(url, ["filter", "before"]);
+  const filter = get("filter");
   if (filter !== null && !isRunFilter(filter)) {
     throw new BadRequest("filter must be manual or attention");
   }
-  const before = url.searchParams.get("before");
+  const before = get("before");
   return {
     filter,
     before: before === null ? null : parseRunsCursor(before),
@@ -219,8 +197,7 @@ export function parseRunsQuery(url: URL): {
 // ?runs=delete deletes the automation's runs with it; without it they
 // stay, their automation gone
 export function parseDeleteAutomation(url: URL): { runs: boolean } {
-  queryKeys(url, ["runs"]);
-  const runs = url.searchParams.get("runs");
+  const runs = queryParams(url, ["runs"])("runs");
   if (runs !== null && runs !== "delete") {
     throw new BadRequest("runs must be delete");
   }
@@ -231,9 +208,9 @@ export function parseSchedulePreview(url: URL): {
   schedule: string;
   tz: string;
 } {
-  queryKeys(url, ["schedule", "tz"]);
-  const schedule = url.searchParams.get("schedule")?.trim();
-  const tz = url.searchParams.get("tz")?.trim();
+  const get = queryParams(url, ["schedule", "tz"]);
+  const schedule = get("schedule")?.trim();
+  const tz = get("tz")?.trim();
   if (schedule === undefined || schedule.length > MAX_SCHEDULE) {
     throw new BadRequest("invalid schedule");
   }

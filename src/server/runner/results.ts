@@ -1,16 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { cutAt } from "../../shared/text.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { ToolResult } from "./policy.ts";
 
 export const CONTEXT_CUT = "result cut to fit the context";
-
-function prefix(text: string, length: number): string {
-  const last = text.charCodeAt(length - 1);
-  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? length - 1 : length);
-}
 
 // a tool's end as its row stores it: fields by name, so one the log
 // keeps, like ended, never reaches the row
@@ -32,7 +28,7 @@ export function cutResult(result: ToolResult, chars: number): ToolResult {
   return {
     ...result,
     content:
-      prefix(result.content, chars - tail) +
+      cutAt(result.content, chars - tail) +
       result.content.slice(result.content.length - tail),
   };
 }
@@ -48,9 +44,9 @@ export function resultsFit(
     (sum, call) =>
       sum +
       chars * 6 +
-      new TextEncoder().encode(
+      Buffer.byteLength(
         JSON.stringify({ role: "tool", tool_call_id: call.id, content: "" }),
-      ).byteLength,
+      ),
     0,
   );
   return bound <= room;
@@ -93,7 +89,7 @@ export function fitResults(
     let high = body.length;
     while (low < high) {
       const mid = Math.ceil((low + high) / 2);
-      const candidate = prefix(body, mid);
+      const candidate = cutAt(body, mid);
       const candidateSize = count(index, candidate + ending);
       if (candidateSize <= target) {
         kept = candidate;

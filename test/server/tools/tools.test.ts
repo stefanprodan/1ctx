@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
 import { formatDatetime } from "../../../src/server/tools/builtin/datetime.ts";
@@ -73,7 +73,7 @@ function context(shared: ToolBudget = budget()): ToolContext {
     signal: new AbortController().signal,
     now: () => now,
     budget: shared,
-    caps: TOOL_CAPS,
+    caps: DEFAULT_LIMITS,
   };
 }
 
@@ -90,7 +90,6 @@ function area(
     secret: (name) => secrets[name] ?? null,
     clock: () => now,
     log: silent,
-    version: "vtest",
     render: (md) => md,
     skills,
   });

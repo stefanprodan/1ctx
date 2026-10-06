@@ -4,7 +4,6 @@ import type { AutomationRunsResponse } from "../../shared/api/automations.ts";
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
-import type { MessageUpload } from "../../shared/uploads.ts";
 import type { ArchiveReason, SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -14,43 +13,48 @@ import {
   automationRunning,
   automationRuns,
   expiredAutomationRuns,
-  type RunsArgs,
+  type RunsQuery,
 } from "./automation.ts";
-import { forgetCapability as forget, setDisabled } from "./capabilities.ts";
+import { forgetCapabilityIn, setDisabled } from "./capabilities.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
-  exportRows,
   agents as readAgents,
   archive as readArchive,
   authors as readAuthors,
-} from "./export.ts";
+} from "./detail.ts";
+import { exportRows } from "./export.ts";
 import {
   copyRows,
   type ForkFields,
   forkedFrom as readForkedFrom,
   readForkPoint,
 } from "./fork.ts";
-import { type ListArgs, listSessions } from "./list.ts";
+import { type ListQuery, listSessions } from "./list.ts";
 import type { ExportRow } from "./markdown.ts";
 import { markRun, type RunMark } from "./marks.ts";
 import {
   type DigestArgs,
-  insertMcpSend,
-  type McpSendFields,
   lastMcpDigest as readLastMcpDigest,
   sweepMcpDigests,
 } from "./mcp.ts";
 import {
+  type AgentMessageFields,
   addAgentMessage,
   addToolRows,
+  addUserMessage,
+  capWork,
   finishReply,
   finishToolRow,
   type MountedRepos,
+  markRoundWork,
+  markSlot,
   mountedBefore,
-  nextSeq,
+  readMessage,
+  readMessages,
   readMountedRepos,
   setMountedRepos,
   type ToolFinish,
+  writeReply,
 } from "./messages.ts";
 import { readOpenedFile } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
@@ -60,9 +64,6 @@ import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
 import {
   type CreateSession,
-  MESSAGE_COLUMNS,
-  message,
-  type RawMessage,
   type RawSession,
   type RepairedSession,
   type ReplyFinish,
@@ -73,11 +74,13 @@ import {
 import {
   bumpSendCounters,
   endSendRow,
+  insertSend,
   readLastSend,
   readReasoningDetails,
   readSend,
   type SendCounters,
   type SendEnd,
+  type SendFields,
 } from "./sends.ts";
 
 // the bash area's scratch of a chat, dropped when it is archived,
@@ -106,12 +109,12 @@ export class SessionStore {
     return raw ? session(raw, this.usage.latest(raw.id)) : null;
   }
 
-  list(...args: ListArgs): SessionsResponse {
-    return listSessions(this.db, this.usage, ...args);
+  list(query: ListQuery): SessionsResponse {
+    return listSessions(this.db, this.usage, query);
   }
 
-  runs(...args: RunsArgs): AutomationRunsResponse {
-    return automationRuns(this.db, this.usage, ...args);
+  runs(query: RunsQuery): AutomationRunsResponse {
+    return automationRuns(this.db, this.usage, query);
   }
 
   create(fields: CreateSession): SessionRow {
@@ -223,7 +226,7 @@ export class SessionStore {
   }
 
   forgetCapability(key: string, projectId?: string): void {
-    forget(this.db, key, projectId);
+    forgetCapabilityIn(this.db, "sessions", key, projectId);
   }
 
   // the commits a turn mounted, on its first message
@@ -302,12 +305,7 @@ export class SessionStore {
   }
 
   messages(sessionId: string): Message[] {
-    return this.db
-      .query<RawMessage, [string]>(
-        `select ${MESSAGE_COLUMNS} from messages where session_id = ? order by seq`,
-      )
-      .all(sessionId)
-      .map(message);
+    return readMessages(this.db, sessionId);
   }
 
   exportRows(sessionId: string): ExportRow[] {
@@ -315,12 +313,7 @@ export class SessionStore {
   }
 
   message(id: string): Message | null {
-    const raw = this.db
-      .query<RawMessage, [string]>(
-        `select ${MESSAGE_COLUMNS} from messages where id = ?`,
-      )
-      .get(id);
-    return raw ? message(raw) : null;
+    return readMessage(this.db, id);
   }
 
   openedFile(messageId: string, index: number) {
@@ -335,85 +328,24 @@ export class SessionStore {
     return readReasoningDetails(this.db, id, providerId, model);
   }
 
-  addUserMessage(fields: {
-    id?: string;
-    sessionId: string;
-    sendId: string;
-    userId: string;
-    content: string;
-    uploads?: MessageUpload[] | null;
-    now: number;
-  }): Message {
-    const id = fields.id ?? newId();
-    this.db
-      .query(
-        `insert into messages (id, session_id, seq, kind, send_id, round,
-           user_id, content, uploads, status, created_at, finished_at)
-         values (?, ?, ?, 'user', ?, 1, ?, ?, ?, 'done', ?, ?)`,
-      )
-      .run(
-        id,
-        fields.sessionId,
-        nextSeq(this.db, fields.sessionId),
-        fields.sendId,
-        fields.userId,
-        fields.content,
-        fields.uploads?.length ? JSON.stringify(fields.uploads) : null,
-        fields.now,
-        fields.now,
-      );
-    return this.message(id)!;
+  addUserMessage(fields: Parameters<typeof addUserMessage>[1]): Message {
+    return addUserMessage(this.db, fields);
   }
 
   replaceSend(users: readonly Message[], newSendId: string) {
     return replaceSendRows(this.db, users, newSendId);
   }
-  addReply(fields: {
-    id?: string;
-    sessionId: string;
-    sendId: string;
-    round: number;
-    agentId: string;
-    model: string;
-    now: number;
-  }): Message {
+
+  addReply(fields: AgentMessageFields): Message {
     return addAgentMessage(this.db, "reply", fields);
   }
 
-  addSummary(fields: {
-    id?: string;
-    sessionId: string;
-    sendId: string;
-    round: number;
-    agentId: string;
-    model: string;
-    now: number;
-  }): Message {
+  addSummary(fields: AgentMessageFields): Message {
     return addAgentMessage(this.db, "summary", fields);
   }
 
-  writeReply(
-    id: string,
-    fields: {
-      content: string;
-      reasoning: string;
-      reasoningDetails: ReasoningDetail[];
-    },
-  ): boolean {
-    return (
-      this.db
-        .query(
-          "update messages set content = ?, reasoning = ?, reasoning_details = ? where id = ? and status = 'streaming'",
-        )
-        .run(
-          fields.content,
-          fields.reasoning,
-          fields.reasoningDetails.length > 0
-            ? JSON.stringify(fields.reasoningDetails)
-            : null,
-          id,
-        ).changes > 0
-    );
+  writeReply(id: string, fields: Parameters<typeof writeReply>[2]): boolean {
+    return writeReply(this.db, id, fields);
   }
 
   finishReply(id: string, fields: ReplyFinish): Message | null {
@@ -421,32 +353,17 @@ export class SessionStore {
   }
 
   capWork(id: string, finishReason: string): Message | null {
-    const changed =
-      this.db
-        .query(
-          "update messages set finish_reason = ? where id = ? and kind = 'reply' and slot = 'work' and status = 'done'",
-        )
-        .run(finishReason, id).changes > 0;
-    return changed ? this.message(id) : null;
+    return capWork(this.db, id, finishReason) ? this.message(id) : null;
   }
 
   // guarded by the null slot, so a second call delta writes nothing
   markRoundWork(id: string): Message | null {
-    const sql =
-      "update messages set slot = 'work' where id = ? and kind = 'reply' and status = 'streaming' and slot is null";
-    const changed = this.db.query(sql).run(id).changes > 0;
-    return changed ? this.message(id) : null;
+    return markRoundWork(this.db, id) ? this.message(id) : null;
   }
 
   // the repair places a reply before it ends it
   markSlot(id: string, slot: "work" | "answer"): Message | null {
-    const changed =
-      this.db
-        .query(
-          "update messages set slot = ? where id = ? and kind = 'reply' and slot is null",
-        )
-        .run(slot, id).changes > 0;
-    return changed ? this.message(id) : null;
+    return markSlot(this.db, id, slot) ? this.message(id) : null;
   }
 
   addToolRows(calls: Parameters<typeof addToolRows>[1]): Message[] {
@@ -457,8 +374,8 @@ export class SessionStore {
     return finishToolRow(this.db, id, fields) ? this.message(id) : null;
   }
 
-  createSend(fields: McpSendFields): SendSummary {
-    return this.send(insertMcpSend(this.db, fields))!;
+  createSend(fields: SendFields): SendSummary {
+    return this.send(insertSend(this.db, fields))!;
   }
 
   lastMcpDigest(...args: DigestArgs): McpDigest | null {

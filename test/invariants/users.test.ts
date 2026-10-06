@@ -191,13 +191,13 @@ describe("admin users", () => {
     expect((await member.call("GET", "/api/profile")).status).toBe(401);
   });
 
-  test("create rolls back details and the personal project if disabling fails", async () => {
+  test("create rolls back the user if its personal project fails", async () => {
     const logs = collectLogs();
     const app = await testApp({ logFactory: logs.logFactory });
     const client = await admin(app);
-    const original = app.users.setDisabled.bind(app.users);
-    app.users.setDisabled = () => {
-      throw new Error("disabled write failed");
+    const original = app.projects.createPersonal.bind(app.projects);
+    app.projects.createPersonal = () => {
+      throw new Error("personal project failed");
     };
     try {
       const response = await client.call("POST", "/api/users", {
@@ -217,11 +217,11 @@ describe("admin users", () => {
         fields: {
           route: "/api/users",
           status: 500,
-          error: "disabled write failed",
+          error: "personal project failed",
         },
       });
     } finally {
-      app.users.setDisabled = original;
+      app.projects.createPersonal = original;
     }
     expect(app.users.byUsername("robin")).toBeNull();
     expect(app.db.query("select count(*) as n from projects").get()).toEqual({

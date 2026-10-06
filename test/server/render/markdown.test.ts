@@ -94,9 +94,6 @@ describe("renderMarkdown", () => {
     expect(html).toContain("graph LR\nA --&gt; B");
     expect(html).not.toContain("<img");
     expect(html).not.toContain("hljs-");
-    expect(renderMarkdown("```mermaid\ngraph LR\n```", true)).toContain(
-      'data-lang="mermaid"',
-    );
   });
 
   test("wraps and aligns tables", () => {

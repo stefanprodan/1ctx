@@ -1,12 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The session's rows as the wire takes them: the system prompt, then
-// the rows (render.ts). After a done summary the history is the summary,
-// then the tail (tail.ts), the newest whole turns before it as they
-// were, then the rows after it; what came before the tail reaches the
-// model only through the summary. The answer round ends the request
-// with the ask as a user message, never a stored row.
+// The session's rows as the wire takes them (docs/compaction.md).
 
 import { contextReserve } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
@@ -22,7 +17,12 @@ import {
   type ToolCall,
 } from "../providers/index.ts";
 import { leastThinking, type SendPolicy } from "./policy.ts";
-import { NO_REPO_LINES, type RepoLines, systemPrompt } from "./prompt.ts";
+import {
+  NO_REPO_LINES,
+  type PromptPolicy,
+  type RepoLines,
+  systemPrompt,
+} from "./prompt.ts";
 import {
   type ContextLookups,
   ownTurn,
@@ -30,9 +30,9 @@ import {
   renderRows,
   roundComplete,
   type Turn,
-  toolRowsByRound,
 } from "./render.ts";
 import { lastSummary, tailBudget, tailOf } from "./tail.ts";
+import { roundKey, toolRowsByRound } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far. The chat continues from your summary, followed by its newest turns as they were when they fit, so cover all of it, the newest turns included. Write Markdown with these sections, terse bullets, no prose:
 
@@ -75,7 +75,7 @@ function loadedSkills(
   for (let i = from; i < cut; i++) {
     const row = rows[i]!;
     if (!own(row.sendId)) continue;
-    const key = `${row.sendId}:${row.round}`;
+    const key = roundKey(row);
     if (row.kind === "reply" && row.slot === "work") {
       calls.set(key, row.toolCalls ?? []);
       continue;
@@ -110,34 +110,9 @@ export type TailRoom = {
 
 export function history(
   rows: Message[],
-  policy: Pick<
-    SendPolicy,
-    | "prompt"
-    | "agentName"
-    | "agentId"
-    | "summoned"
-    | "projectName"
-    | "projectKind"
-    | "projectDescription"
-    | "fullName"
-    | "about"
-    | "tz"
-    | "username"
-    | "userId"
-    | "providerId"
-    | "model"
-    | "automation"
-    | "offered"
-    | "projectMemory"
-    | "automationMemory"
-    | "knowledge"
-    | "disabledCapabilities"
-    | "mcpOff"
-    | "skillsOff"
-    | "contextLength"
-    | "limits"
-    | "wire"
-  >,
+  policy: PromptPolicy &
+    RenderPolicy &
+    Pick<SendPolicy, "contextLength" | "limits" | "wire">,
   lookups: ContextLookups,
   now: number,
   mcpNote = "",
@@ -230,54 +205,52 @@ export const cacheKeyOf = (
 ): string =>
   policy.summoned === null ? sessionId : `${sessionId}:${policy.agentId}`;
 
+// what every request of a send carries
+export function requestBase(
+  policy: Pick<
+    SendPolicy,
+    "model" | "agentId" | "summoned" | "upstream" | "skip4Bit"
+  >,
+  sessionId: string,
+  messages: ChatMessageIn[],
+): Pick<
+  ChatRequest,
+  "model" | "messages" | "cacheKey" | "upstream" | "skip4Bit"
+> {
+  return {
+    model: policy.model,
+    messages,
+    cacheKey: cacheKeyOf(policy, sessionId),
+    upstream: policy.upstream,
+    skip4Bit: policy.skip4Bit,
+  };
+}
+
 export function request(
   policy: SendPolicy,
   sessionId: string,
   messages: ChatMessageIn[],
+  tools: ChatTool[] = policy.offered.tools,
 ): ChatRequest {
   return {
-    model: policy.model,
-    messages,
+    ...requestBase(policy, sessionId, messages),
     thinking: policy.thinking,
     thinkingOff: policy.thinkingOff,
     reasoningEffort: policy.effort,
-    cacheKey: cacheKeyOf(policy, sessionId),
-    upstream: policy.upstream,
-    skip4Bit: policy.skip4Bit,
-    ...(policy.offered.tools.length > 0 ? { tools: policy.offered.tools } : {}),
+    ...(tools.length > 0 ? { tools } : {}),
   };
 }
 
-// the summary request's size is the last counted round's measured
-// prompt plus completion: exact for the provider's tokenizer, replayed
-// reasoning included, and it only overstates the summary (schemas, the
-// completion), so it errs safe. Rows written after that round (a
-// stopped turn's tool results, a later message) are not in it, so the
-// size is then its measured prompt plus the local estimate of the rest,
-// its reply included: a reply's calls render only with their results,
-// so the reply is never counted apart from them. The estimate, with a
-// tenth on top for another tokenizer, takes the whole size only when
-// nothing was measured or the measure passed the window the agent
-// states, a provider that took more than it. That tenth stops where a
-// history at the threshold still gets the whole summary, or at half the
-// reserve when the summary wants more: at a large window's threshold it
-// would otherwise eat the reserve and the summary with it, and any less
-// sends a history past the threshold to a tokenizer counting more than
-// ours with a summary cap that passes the window. The floor is the
-// least a summary is asked for: a short summary beats none, and a
-// provider that cannot fit even that refuses the round, which ends
-// failed and is tried again next time
+// sizing rules: docs/compaction.md, The summary and its tail
+// left free under the window
 export const SUMMARY_MARGIN = 256;
+// a tenth on top for another tokenizer
 export const ESTIMATE_SLACK = 0.1;
+// the least a summary is asked for
 export const SUMMARY_MIN_TOKENS = 128;
 
-// the summary round: the history plus the instruction, no tools and the
-// least thinking, since a model's thoughts come out of the same cap. Its
-// answer is capped by the limit and the reserve, then by the room its
-// size leaves: a strict provider refuses a request whose prompt and
-// max_tokens together pass the window. `counted` is the counted round's
-// measured prompt and the history before its reply, given only when
-// rows came after it
+// no tools and the least thinking, since thoughts come out of the same
+// cap; `counted` is given only when rows came after the counted round
 export function summaryRequest(
   policy: SendPolicy,
   sessionId: string,
@@ -291,12 +264,11 @@ export function summaryRequest(
       ? policy.limits.summaryMaxTokens
       : contextReserve(window, policy.limits.contextReserve);
   const req: ChatRequest = {
-    model: policy.model,
-    messages: [...messages, { role: "user", content: SUMMARIZE }],
+    ...requestBase(policy, sessionId, [
+      ...messages,
+      { role: "user", content: SUMMARIZE },
+    ]),
     ...leastThinking(policy),
-    cacheKey: cacheKeyOf(policy, sessionId),
-    upstream: policy.upstream,
-    skip4Bit: policy.skip4Bit,
   };
   let maxTokens = Math.min(policy.limits.summaryMaxTokens, reserve);
   if (window !== null) {

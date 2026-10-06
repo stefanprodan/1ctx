@@ -1,7 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, sleep } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { AUTOMATIC_HOLD_MS, REFRESH_INTERVAL_MS } from "./limits.ts";
@@ -63,6 +64,16 @@ export class RefreshCoordinator {
     return { status: "taken", promise, signal: controller.signal };
   }
 
+  // a failed refresh keeps the last good list and says why
+  recordFailure(row: Pick<McpServerRow, "id" | "name">, error: unknown): void {
+    const words = messageOf(error);
+    this.deps.store.recordFailure(row.id, words, this.deps.clock());
+    this.deps.log.warn("server refresh failed", {
+      server: row.name,
+      ...errorFields(error, false),
+    });
+  }
+
   abort(id: string): void {
     this.active.get(id)?.controller.abort(new Error("server deleted"));
   }
@@ -90,12 +101,7 @@ export class RefreshCoordinator {
         }
       } catch (error) {
         if (signal.aborted) return;
-        const words = error instanceof Error ? error.message : String(error);
-        this.deps.store.recordFailure(row.id, words, this.deps.clock());
-        this.deps.log.warn("server refresh failed", {
-          server: row.name,
-          ...errorFields(error, false),
-        });
+        this.recordFailure(row, error);
       }
     });
     if (taken.status !== "taken") return null;
@@ -122,16 +128,9 @@ export class RefreshCoordinator {
   }
 
   private wait(ms: number): Promise<void> {
-    if (this.deps.clock.sleep) {
-      return Promise.race([this.deps.clock.sleep(ms), this.closedWait]);
-    }
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      void this.closedWait.then(() => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+    const timer = sleep(this.deps.clock, ms);
+    void this.closedWait.then(timer.cancel);
+    return Promise.race([timer.promise, this.closedWait]);
   }
 
   start(): void {

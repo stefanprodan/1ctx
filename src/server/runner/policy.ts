@@ -1,14 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a send runs under, decided once before startSend and never
-// changed: the author, the project, the agent with its provider and
-// model, the offered tools and the caps. The tool set is decided here
-// and nowhere else: an agent whose model accepts tools is offered what
-// the tools area answered when the send began; a model without the
-// flag is offered none. The caps are the limits area's word at the
-// same moment, copied onto the policy so a send runs under the caps it
-// started on whatever an admin changes later.
+// What a send runs under, decided once before startSend.
 
 import { mcpKey } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
@@ -143,6 +136,9 @@ export type SendPolicy = {
   sendCaps: SendCaps;
 };
 
+export const offers = (offered: Pick<Offered, "tools">, name: string) =>
+  offered.tools.some((tool) => tool.name === name);
+
 // no thinking, or the least effort the wire names for a model that
 // always thinks: for a round that only needs a short answer or a call
 export const leastThinking = (
@@ -205,6 +201,8 @@ export function buildPolicy(input: {
   summoned?: string | null;
 }): SendPolicy {
   const { user, agent } = input;
+  // a model that does not accept tools is offered none
+  const tools = agent.model.tools ? input.tools : null;
   const disabledCapabilities = [...(input.disabledCapabilities ?? [])];
   const automationScope =
     input.automation === undefined || input.automation === null
@@ -218,8 +216,8 @@ export function buildPolicy(input: {
               : { guidance: input.automation.attentionGuidance },
         };
   const offered =
-    input.tools !== null && agent.model.tools
-      ? input.tools.offered(
+    tools !== null
+      ? tools.offered(
           input.now,
           agent.id,
           agent.servers,
@@ -237,16 +235,16 @@ export function buildPolicy(input: {
         )
       : NONE;
   const memoryOffered =
-    input.tools !== null && agent.model.tools && automationScope?.ownMemory
-      ? input.tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+    tools !== null && automationScope?.ownMemory
+      ? tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
           projectId: input.project.id,
           automation: automationScope,
           phase: "memory",
         })
       : null;
   const attentionOffered =
-    input.tools !== null && agent.model.tools && automationScope?.attention
-      ? input.tools.offered(input.now, agent.id, [], "auto", {
+    tools !== null && automationScope?.attention
+      ? tools.offered(input.now, agent.id, [], "auto", {
           projectId: input.project.id,
           automation: automationScope,
           phase: "attention",
@@ -286,8 +284,8 @@ export function buildPolicy(input: {
     offered,
     disabledCapabilities,
     mcpOff:
-      input.tools !== null && agent.model.tools
-        ? input.tools
+      tools !== null
+        ? tools
             .serverNames(
               agent.servers.filter((link) =>
                 disabledCapabilities.includes(mcpKey(link.serverId)),
@@ -296,8 +294,8 @@ export function buildPolicy(input: {
             .sort()
         : [],
     skillsOff:
-      input.tools !== null && agent.model.tools
-        ? input.tools.skillsOff(agent.id, disabledCapabilities).sort()
+      tools !== null
+        ? tools.skillsOff(agent.id, disabledCapabilities).sort()
         : [],
     web: offered.web,
     memoryOffered,

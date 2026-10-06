@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-// Persistence and the socket frames of a send. Each durable change is
-// one transaction with one revision and one envelope after commit.
-// startSend opens the send; delta streams without a revision, and the reply
-// moves into the fold at the first tool call; finishRound ends a work
-// round and launches tools; finishTool ends one; cut calls are recorded not run.
-// startRound begins the next round; finalizeSend ends the send once.
+//
+// Durable writes of a send: one transaction, one revision, one envelope each.
 
 import type {
   LiveRetry,
@@ -19,18 +15,24 @@ import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import type { ChatEvent, Usage } from "../providers/index.ts";
+import type { ChatEvent } from "../providers/index.ts";
+import { envelope } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
-import { envelope, lastLine } from "./envelope.ts";
+import { answerLine } from "./envelope.ts";
 import { type AlertsPort, alertEvents, runMark } from "./marks.ts";
 import type { ToolResult } from "./policy.ts";
-import { toolFinish } from "./results.ts";
 import {
-  type ActiveSend,
-  afterRun,
-  type RoundState,
-  unmarkAnswer,
-} from "./send.ts";
+  cutCalls,
+  finalizeRound,
+  finishReplyRow,
+  NOT_RUN,
+  newToolRows,
+  notRun,
+  recordUsage,
+  stopOpenTools,
+} from "./reply-rows.ts";
+import { toolFinish } from "./results.ts";
+import type { ActiveSend } from "./send.ts";
 import {
   type StartDeps,
   type Started,
@@ -39,28 +41,16 @@ import {
 } from "./start.ts";
 import { streamDelta, streamRetry, streamVisual } from "./stream.ts";
 import {
+  type AfterAnswer,
   type CompactFields,
   type StartedCompact,
+  startAfterAnswer,
   startCompact as startCompactRows,
-  startSummary as startSummaryRows,
 } from "./summary.ts";
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type { Started } from "./start.ts";
 export type { SessionsPort } from "./writer-port.ts";
-
-// the text a call cut before it ran gets, as its content
-export const NOT_RUN = "not run: the tool budget was spent";
-export const NOT_RUN_LOOP = "not run: the same calls came three times in a row";
-// the loop check's first trip: the calls are refused and the loop goes on
-export const NOT_RUN_REPEAT =
-  "not run: the same calls as your previous two rounds, and their results are above. Use them, call something else, or answer.";
-
-export function notRun(reason: string): string {
-  return reason === "tool_loop" ? NOT_RUN_LOOP : NOT_RUN;
-}
-// the text a call still running when the send ended gets
-export const CUT_SHORT = "stopped before it finished";
 
 export type WriterDeps = {
   db: Db;
@@ -72,7 +62,7 @@ export type WriterDeps = {
   // a chat's snapshot of the project's note, started with its first send
   // and dropped by a summary, inside the caller's transaction
   views: StartDeps["views"] & { end(sessionId: string): void };
-  render: (markdown: string, streaming: boolean) => string;
+  render: (markdown: string) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;
@@ -96,7 +86,16 @@ export class Writer {
   constructor(private readonly deps: WriterDeps) {}
 
   startSummary(send: ActiveSend): Message {
-    return startSummaryRows(this.deps, send);
+    return startAfterAnswer(this.deps, send, {
+      row: "summary",
+      status: "done",
+      error: null,
+      counters: {},
+    });
+  }
+
+  startAfterAnswer(send: ActiveSend, next: AfterAnswer): Message {
+    return startAfterAnswer(this.deps, send, next);
   }
 
   startCompact(fields: CompactFields): StartedCompact {
@@ -131,7 +130,7 @@ export class Writer {
   }
 
   // the first tool call delta of a round: the streaming reply moves into
-  // the fold, guarded by its null slot, one revision, one envelope
+  // the fold, guarded by its null slot
   markRoundWork(send: ActiveSend): void {
     const round = send.round;
     if (round === null) return;
@@ -147,86 +146,6 @@ export class Writer {
     });
   }
 
-  private finishReplyRow(
-    round: RoundState,
-    status: Exclude<SessionStatus, "running">,
-    error: string | null,
-    slot: "work" | "answer" | null,
-    toolCalls: ToolCall[] | null,
-    now: number,
-    finishReason = round.finishReason,
-  ): Message | null {
-    const thinkingMs =
-      round.thinkingMs ??
-      (round.reasoningStartedAt === null
-        ? null
-        : now - round.reasoningStartedAt);
-    return this.deps.sessions.finishReply(round.messageId, {
-      content: round.content,
-      reasoning: round.reasoning,
-      reasoningDetails: round.reasoningDetails,
-      html: this.deps.render(round.content, false),
-      status,
-      error,
-      finishReason,
-      slot,
-      toolCalls,
-      ttftMs: round.ttftMs,
-      thinkingMs,
-      upstream: round.upstream,
-      servedModel: round.servedModel,
-      nativeFinish: round.nativeFinish,
-      finishedAt: now,
-    });
-  }
-
-  private recordUsage(send: ActiveSend, round: RoundState, now: number): void {
-    const usage: Usage | null = round.usage;
-    if (usage === null) return;
-    this.deps.usage.record({
-      sendId: send.id,
-      sessionId: send.sessionId,
-      projectId: send.projectId,
-      userId: send.policy.userId,
-      agentId: send.policy.agentId,
-      providerId: send.policy.providerId,
-      model: send.policy.model,
-      round: send.roundNo,
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-      cachedTokens: usage.cachedTokens,
-      reasoningTokens: usage.reasoningTokens,
-      cost: usage.cost,
-      contextLength: send.policy.contextLength,
-      upstream: round.upstream,
-      servedModel: round.servedModel,
-      now,
-    });
-  }
-
-  private newToolRows(
-    send: ActiveSend,
-    calls: ToolCall[],
-    now: number,
-    toolNames: string[] = calls.map((call) => call.name),
-  ) {
-    return this.deps.sessions.addToolRows(
-      calls.map((call, index) => ({
-        sessionId: send.sessionId,
-        sendId: send.id,
-        round: send.roundNo,
-        toolCallId: call.id,
-        toolName: toolNames[index] ?? call.name,
-        now,
-      })),
-    );
-  }
-
-  // a work round that ends with calls to run: the reply done as work
-  // with its calls, its usage, one streaming tool row per call, the
-  // send's counters bumped. One revision, one envelope with every row.
-  // The launched tool rows are tracked on the send, by call id, so the
-  // loop's finishTool and a terminal cleanup find them
   finishRound(
     send: ActiveSend,
     toolNames: string[] = send.round?.calls.map((call) => call.name) ?? [],
@@ -236,7 +155,8 @@ export class Writer {
     const now = this.deps.clock();
     const launched = send.budget.calls + round.calls.length;
     const result = transact(this.deps.db, () => {
-      const reply = this.finishReplyRow(
+      const reply = finishReplyRow(
+        this.deps,
         round,
         "done",
         null,
@@ -244,8 +164,14 @@ export class Writer {
         round.calls,
         now,
       );
-      this.recordUsage(send, round, now);
-      const rows = this.newToolRows(send, round.calls, now, toolNames);
+      recordUsage(this.deps, send, round, now);
+      const rows = newToolRows(
+        this.deps.sessions,
+        send,
+        round.calls,
+        now,
+        toolNames,
+      );
       const sendRow = this.deps.sessions.bumpCounters(send.id, {
         rounds: send.roundNo,
         toolCalls: launched,
@@ -256,6 +182,7 @@ export class Writer {
         events: [envelope(session, reply ? [reply, ...rows] : rows, sendRow)],
       };
     });
+    // openTools is keyed by the call object, so duplicate call ids stay apart
     send.openTools = new Map();
     round.calls.forEach((call, i) => {
       send.openTools.set(call, result.rows[i]!.id);
@@ -264,9 +191,7 @@ export class Writer {
     return result;
   }
 
-  // one tool's end: an update guarded by status streaming, so a late
-  // tool after a terminal cleanup writes nothing. One revision, one
-  // envelope with the row it changed
+  // guarded by status streaming, so a late tool after cleanup writes nothing
   finishTool(send: ActiveSend, call: ToolCall, result: ToolResult): boolean {
     const rowId = send.openTools.get(call);
     if (rowId === undefined) return false;
@@ -282,9 +207,6 @@ export class Writer {
     return changed;
   }
 
-  // a round the loop cut before its calls ran: the reply done as work
-  // with the given finish reason, the calls written stopped with the
-  // not-run text. One revision, one envelope with every row
   recordUnrun(
     send: ActiveSend,
     finishReason: string,
@@ -295,40 +217,23 @@ export class Writer {
     if (round === null) return;
     const now = this.deps.clock();
     transact(this.deps.db, () => {
-      const reply = this.finishReplyRow(
+      const rows = cutCalls(
+        this.deps,
+        send,
         round,
-        "done",
-        null,
-        "work",
         calls,
-        now,
         finishReason,
+        content,
+        now,
       );
-      const created = this.newToolRows(send, calls, now);
-      const stopped = created.map(
-        (row) =>
-          this.deps.sessions.finishTool(row.id, {
-            content,
-            status: "stopped",
-            error: null,
-            finishedAt: now,
-          })!,
-      );
-      this.recordUsage(send, round, now);
       const session = this.session(send.sessionId, now);
-      return {
-        result: undefined,
-        events: [
-          envelope(session, reply ? [reply, ...stopped] : stopped, null),
-        ],
-      };
+      return { result: undefined, events: [envelope(session, rows, null)] };
     });
     round.drafts.clear();
   }
 
   // the next streaming reply and, on a cap transition, the work reply
-  // and not-run calls that led to it. The round number and counters bump
-  // with the new row in one revision and one envelope.
+  // and not-run calls that led to it
   startRound(
     send: ActiveSend,
     transition?: { finishReason: string } & (
@@ -351,28 +256,17 @@ export class Writer {
         "calls" in transition &&
         send.round !== null
       ) {
-        const previous = this.finishReplyRow(
-          send.round,
-          "done",
-          null,
-          "work",
-          transition.calls,
-          now,
-          transition.finishReason,
+        changed.push(
+          ...cutCalls(
+            this.deps,
+            send,
+            send.round,
+            transition.calls,
+            transition.finishReason,
+            notRun(transition.finishReason),
+            now,
+          ),
         );
-        if (previous !== null) changed.push(previous);
-        const created = this.newToolRows(send, transition.calls, now);
-        for (const row of created) {
-          changed.push(
-            this.deps.sessions.finishTool(row.id, {
-              content: notRun(transition.finishReason),
-              status: "stopped",
-              error: null,
-              finishedAt: now,
-            })!,
-          );
-        }
-        this.recordUsage(send, send.round, now);
       }
       const created = this.deps.sessions.addReply({
         sessionId: send.sessionId,
@@ -401,38 +295,7 @@ export class Writer {
     return reply;
   }
 
-  // the round's reply as it ends and its usage, inside the caller's
-  // transaction; a null slot becomes answer. The finished row, or null
-  // when it was not streaming
-  finalizeRound(
-    send: ActiveSend,
-    status: Exclude<SessionStatus, "running">,
-    error: string | null,
-    now: number,
-  ): Message | null {
-    const round = send.round;
-    if (round === null) return null;
-    // work once a call delta came, else the answer, even empty and
-    // stopped; a round after the run is work, ended by its own step
-    const after = afterRun(send);
-    const slot = after
-      ? "work"
-      : send.summarizing
-        ? null
-        : round.slotMarked
-          ? "work"
-          : "answer";
-    const finalStatus = after?.status ?? status;
-    const finalError = after ? after.error : error;
-    if (slot === "answer") unmarkAnswer(round, send.policy.agentName);
-    this.recordUsage(send, round, now);
-    return this.finishReplyRow(round, finalStatus, finalError, slot, null, now);
-  }
-
-  // called exactly once per send, by the winner of the terminal
-  // transition: the last round finalized when one is streaming, any
-  // open tool rows stopped, the send's end and the session's state.
-  // One transaction, one envelope
+  // only the winner of the terminal transition calls it, exactly once
   finalizeSend(
     send: ActiveSend,
     cause: SendCause,
@@ -442,24 +305,8 @@ export class Writer {
     const status = statusOf(cause);
     const result = transact(this.deps.db, () => {
       const memorySkipped = this.deps.commitMemory(send);
-      // a work reply is never finalized twice: finalizeRound runs only
-      // when a round is streaming
-      const reply =
-        send.round !== null
-          ? this.finalizeRound(send, status, error, now)
-          : null;
-      // the round's tool rows still streaming are stopped; a guard means
-      // a late tool that already wrote returns null
-      const stopped: Message[] = [];
-      for (const rowId of send.openTools.values()) {
-        const row = this.deps.sessions.finishTool(rowId, {
-          content: CUT_SHORT,
-          status: "stopped",
-          error: null,
-          finishedAt: now,
-        });
-        if (row !== null) stopped.push(row);
-      }
+      const reply = finalizeRound(this.deps, send, status, error, now);
+      const stopped = stopOpenTools(this.deps.sessions, send, now);
       const row = this.deps.sessions.finishSend(send.id, {
         status,
         cause,
@@ -481,10 +328,7 @@ export class Writer {
         this.deps.views.end(send.sessionId);
       }
       const changed = [...(reply ? [reply] : []), ...stopped];
-      const last =
-        reply?.status === "done" && reply.slot === "answer"
-          ? lastLine(reply, send.policy.agentName)
-          : undefined;
+      const last = answerLine(reply, send.policy.agentName);
       return {
         result: { session, reply, send: row, memorySkipped },
         events: [envelope(session, changed, row, [], last), ...alerted],

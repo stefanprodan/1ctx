@@ -1,14 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The process's load, kept in memory and never stored: its CPU and its
-// resident memory sampled into a ring, which a restart starts over. CPU
-// is the time the process ran between two samples over the wall time,
-// shared by the cores it may use; availableParallelism() follows a
-// container's CPU cap, so a capped process reads against its own share.
-// Memory is set against constrainedMemory(), a container's limit when
-// one is set and the host's memory otherwise. Neither is machine-wide:
-// inside a container the load average and used memory read the host.
+// The process's CPU and memory, sampled into an in-memory ring.
 
 import { availableParallelism, totalmem } from "node:os";
 import { LOAD_SAMPLES } from "../../shared/api/admin.ts";

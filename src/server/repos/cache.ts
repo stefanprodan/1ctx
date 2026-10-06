@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The cache directory: trees/<source>/<commit>-<ignore>/ per tree,
-// tmp/ for the jobs unpacking. An index in memory holds each tree's
-// size on disk and when it was last mounted; a folder mounted by a
-// running turn is held and never evicted. The trees can always be
-// fetched again, so backups leave the directory out.
+// The cache directory's trees, indexed in memory by size and last mount.
 
 import {
   mkdirSync,

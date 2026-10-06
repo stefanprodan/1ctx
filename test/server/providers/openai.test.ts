@@ -6,9 +6,9 @@
 // body, the events, the tool call tracker and the stream's ends.
 
 import { describe, expect, test } from "bun:test";
+import { chatEvents } from "../../../src/server/providers/frames.ts";
 import {
   buildChatBody,
-  chatEvents,
   parseSse,
   streamChat,
   ToolCallTracker,

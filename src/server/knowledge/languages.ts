@@ -4,7 +4,7 @@
 // A file's highlight.js language by its extension, shared by `open` and
 // the file page so both name a file's language alike.
 
-import { kindOf } from "./text.ts";
+import { kindOf } from "../../shared/knowledge.ts";
 
 const LANGUAGES: Record<string, string> = {
   bash: "bash",

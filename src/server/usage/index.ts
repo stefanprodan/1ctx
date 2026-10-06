@@ -22,7 +22,7 @@ import {
 } from "./decisions.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
-import { usageWindow } from "./window.ts";
+import { type UsageWindow, usageWindow } from "./window.ts";
 
 export {
   type DecisionSlot,
@@ -30,7 +30,7 @@ export {
   type DecisionUsageFields,
   decisionSlots,
 } from "./decisions.ts";
-export { parseZoneQuery } from "./parse.ts";
+export { parseZoneQuery, zoneParam } from "./parse.ts";
 export { type UsageFields, UsageStore } from "./store.ts";
 export {
   countByDay,
@@ -40,13 +40,13 @@ export {
   nextDay,
   type UsageWindow,
   usageWindow,
+  zoneOrUtc,
 } from "./window.ts";
 
 export type UsageDeps = { db: Db; clock: Clock; access: AccessPort };
 
 export type Usage = {
   store: UsageStore;
-  decisions: DecisionUsageStore;
   record(fields: UsageFields): UsageRow;
   recordDecision(fields: DecisionUsageFields): DecisionUsageRow;
   // the last round of a chat agent counted for a session, never a
@@ -71,9 +71,16 @@ export type Usage = {
 export function usageArea(deps: UsageDeps): Usage {
   const store = new UsageStore(deps.db);
   const decisions = new DecisionUsageStore(deps.db);
+  // the year of days in the zone, with what read sums over them
+  const inWindow = <T extends object>(
+    timeZone: string,
+    read: (starts: number[], until: number) => T,
+  ): Omit<UsageWindow, "starts"> & T => {
+    const { days, starts, since, until } = usageWindow(deps.clock(), timeZone);
+    return { since, until, days, ...read(starts, until) };
+  };
   return {
     store,
-    decisions,
     record: (fields) => store.record(fields),
     recordDecision: (fields) => decisions.record(fields),
     latest: (sessionId) => store.latest(sessionId),
@@ -83,30 +90,14 @@ export function usageArea(deps: UsageDeps): Usage {
     activeProjects: (ids, since, until) =>
       store.activeProjects(ids, since, until),
     decisionTotal: (by, since, until) => decisions.total(by, since, until),
-    agentDays(agentId, timeZone) {
-      const { days, starts, since, until } = usageWindow(
-        deps.clock(),
-        timeZone,
-      );
-      return {
-        since,
-        until,
-        days,
-        ...store.agentDays(agentId, starts, until),
-      };
-    },
-    deciderDays(deciderId, timeZone) {
-      const { days, starts, since, until } = usageWindow(
-        deps.clock(),
-        timeZone,
-      );
-      return {
-        since,
-        until,
-        days,
-        ...decisions.deciderDays(deciderId, starts, until),
-      };
-    },
+    agentDays: (agentId, timeZone) =>
+      inWindow(timeZone, (starts, until) =>
+        store.agentDays(agentId, starts, until),
+      ),
+    deciderDays: (deciderId, timeZone) =>
+      inWindow(timeZone, (starts, until) =>
+        decisions.deciderDays(deciderId, starts, until),
+      ),
     routes: routes({ clock: deps.clock, store, access: deps.access }),
   };
 }

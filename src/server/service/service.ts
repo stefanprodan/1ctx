@@ -6,19 +6,19 @@
 
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { optionsToArgs, parseCli, type RunOptions } from "../lib/cli.ts";
+import {
+  dataDir,
+  defaultDb,
+  optionsToArgs,
+  parseCli,
+  type RunOptions,
+  VALUED_FLAGS,
+} from "../lib/cli.ts";
+import { messageOf } from "../lib/errors.ts";
 import type { ServiceBackend } from "./backend.ts";
 import { launchdBackend } from "./launchd.ts";
 
 const HEALTH_ATTEMPTS = 60;
-const VALUED = [
-  "--listen",
-  "--db",
-  "--secrets",
-  "--cache",
-  "--provision",
-  "--drain",
-];
 // the manager's kill timeout over the drain: the runner's five-second
 // wait and room to close; the sum stays under the stop's own wait
 // (WAIT_MS in launchd.ts)
@@ -87,7 +87,7 @@ function resolveDeps(deps: ServiceDeps) {
 type Resolved = ReturnType<typeof resolveDeps>;
 
 function logPath(home: string): string {
-  return join(home, ".1ctx", "1ctx.log");
+  return join(dataDir(home), "1ctx.log");
 }
 
 function optionsOf(args: string[], home: string): RunOptions | null {
@@ -116,10 +116,18 @@ async function waitForHealth(url: string, r: Resolved): Promise<void> {
   throw new ServiceError(`1ctx did not answer at ${url}`);
 }
 
-async function stored(r: Resolved): Promise<RunOptions> {
+async function installedOptions(r: Resolved): Promise<{
+  args: string[] | null;
+  options: RunOptions | null;
+}> {
   const args = await r.backend.installed();
+  const options = args === null ? null : optionsOf(args.slice(1), r.home);
+  return { args, options };
+}
+
+async function stored(r: Resolved): Promise<RunOptions> {
+  const { args, options } = await installedOptions(r);
   if (args === null) throw new ServiceError("service is not installed");
-  const options = optionsOf(args.slice(1), r.home);
   if (options === null) throw new ServiceError("service definition is invalid");
   return options;
 }
@@ -133,7 +141,7 @@ async function install(argv: string[], r: Resolved): Promise<void> {
   const flags: string[] = [];
   let restart = false;
   for (const [i, argument] of argv.entries()) {
-    const value = i > 0 && VALUED.includes(argv[i - 1]);
+    const value = i > 0 && VALUED_FLAGS.includes(argv[i - 1]);
     if (argument === "--restart" && !value) restart = true;
     else flags.push(argument);
   }
@@ -164,7 +172,7 @@ async function install(argv: string[], r: Resolved): Promise<void> {
   await r.backend.install({
     programArguments: [r.execPath, ...optionsToArgs(options)],
     home: r.home,
-    workingDirectory: join(r.home, ".1ctx"),
+    workingDirectory: dataDir(r.home),
     logPath: logPath(r.home),
     exitTimeout: options.drain + EXIT_MARGIN,
   });
@@ -188,8 +196,7 @@ async function restart(r: Resolved): Promise<void> {
 }
 
 async function status(r: Resolved): Promise<void> {
-  const args = await r.backend.installed();
-  const options = args === null ? null : optionsOf(args.slice(1), r.home);
+  const { args, options } = await installedOptions(r);
   const state = await r.backend.state();
   const url = options === null ? null : urlOf(options);
   const version =
@@ -209,8 +216,7 @@ async function status(r: Resolved): Promise<void> {
 }
 
 async function uninstall(purge: boolean, r: Resolved): Promise<void> {
-  const args = await r.backend.installed();
-  const options = args === null ? null : optionsOf(args.slice(1), r.home);
+  const { args, options } = await installedOptions(r);
   // a definition that names no readable database is never guessed at:
   // purge would remove the wrong file
   if (purge && args !== null && options === null) {
@@ -220,7 +226,7 @@ async function uninstall(purge: boolean, r: Resolved): Promise<void> {
   }
   await r.backend.remove();
   if (purge) {
-    const db = options?.dbPath ?? join(r.home, ".1ctx", "1ctx.sqlite");
+    const db = options?.dbPath ?? defaultDb(r.home);
     const log = logPath(r.home);
     const paths = db === ":memory:" ? [] : [db, `${db}-shm`, `${db}-wal`];
     for (const path of [...paths, log, `${log}.1`]) await r.remove(path);
@@ -256,8 +262,6 @@ export async function runService(
   } catch (error) {
     if (error instanceof ServiceError) throw error;
     // the manager's own words: a launchctl failure, a file it could not write
-    throw new ServiceError(
-      error instanceof Error ? error.message : String(error),
-    );
+    throw new ServiceError(messageOf(error));
   }
 }

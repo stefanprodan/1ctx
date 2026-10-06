@@ -1,18 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The dispatcher: a message sent to a chat whose turn is running waits
-// as a queued row, and every wake starts each free chat's queue as one
-// turn through sendTurn, a summon as a turn of its own, before the
-// scheduler hears the wake, so a due run never takes the place a user's
-// message waits for. A wake is level-triggered: a pass reads the chats
-// with queued rows, one indexed read when there are none, and a wake
-// during a pass runs another. A queued row holds no place in any cap. A
-// full cap, the lock or a lost claim leaves the rows queued; any other
-// refusal turns the rows that cause it not sent, each found by a start
-// tried in a transaction that is rolled back, and the rest start. One
-// whose author lost the chat goes. One timer, set to the oldest row's
-// expiry, expires rows in an idle process.
+// The queue dispatcher (docs/sessions.md, The queue dispatcher).
 
 import type {
   QueuedResponse,
@@ -21,7 +10,7 @@ import type {
 import type { NotSentReason } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
-import { Conflict, HttpError } from "../lib/errors.ts";
+import { HttpError } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
@@ -29,13 +18,14 @@ import type { ProjectRow } from "../projects/index.ts";
 import {
   type QueuedRow,
   queueChanged,
-  refuseArchived,
   type SessionRow,
   type SessionStore,
+  type SummonAgents,
   type WaitingCursor,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
+import { chatFor } from "./chat-guard.ts";
 import { queueMessage } from "./enqueue.ts";
 import type { PreparedRun } from "./prepare.ts";
 import {
@@ -46,7 +36,7 @@ import {
   RunCapacity,
 } from "./registry.ts";
 import { ClaimLost, type QueuedClaim } from "./start.ts";
-import { type SummonAgents, summonGone, summons, turnBatch } from "./summon.ts";
+import { summonGone, summons, turnBatch } from "./summon.ts";
 import { claimsOf, messagesOf, type TurnMessage } from "./turn.ts";
 
 // passes one wake may run before it hands the rest to a later turn
@@ -462,11 +452,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     sessionId: string,
     fields: SendMessageRequest,
   ): QueuedResponse | null => {
-    const session = deps.visible(principal, sessionId);
-    if (session.origin === "automation") {
-      throw new Conflict("a run cannot continue");
-    }
-    refuseArchived(session);
+    const session = chatFor(deps, principal, sessionId, "continue");
     // a queue a full cap left behind goes before the new message
     if (started && !closed && registry.get(session.id) === null) {
       startChat(session.id);

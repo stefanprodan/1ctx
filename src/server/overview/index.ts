@@ -34,6 +34,7 @@ import {
   type RangeResult,
   range,
 } from "./range.ts";
+import { inMemory } from "./read.ts";
 import { routes } from "./routes.ts";
 import { type ScanInput, type ScanResult, scan } from "./scan.ts";
 import {
@@ -46,12 +47,7 @@ import { type Scanner, workerScanner } from "./worker.ts";
 export { type AttentionInput, attention } from "./attention.ts";
 export { BOARD_KEEP_MS, KEEP_MS } from "./cache.ts";
 export { type Probe, type Reading, sampler } from "./load.ts";
-export {
-  parseNoQuery,
-  parseOverviewQuery,
-  parseUsageQuery,
-  parseZoneQuery,
-} from "./parse.ts";
+export { canonicalZone, parseOverviewQuery, parseUsageQuery } from "./parse.ts";
 
 export type OverviewDeps = {
   db: Db;
@@ -102,7 +98,7 @@ function inlineScanner(db: Db): Scanner {
 }
 
 export function overviewArea(deps: OverviewDeps): Overview {
-  const memory = deps.db.filename === "" || deps.db.filename === ":memory:";
+  const memory = inMemory(deps.db);
   const scanner =
     deps.scanner ??
     (memory

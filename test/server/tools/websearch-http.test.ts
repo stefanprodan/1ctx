@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  retryAfterMs,
+  searchRetryDelay,
   searchWeb,
 } from "../../../src/server/tools/builtin/websearch.ts";
 import {
@@ -26,7 +26,6 @@ describe("websearch HTTP policy", () => {
       { query: "find" },
       context(new AbortController().signal, budget(), 5000),
       search(),
-      "vtest",
       dependencies(
         async (_input, init) => {
           signals.push(init?.signal);
@@ -54,13 +53,13 @@ describe("websearch HTTP policy", () => {
   });
 
   test("parses retry-after", () => {
-    expect(retryAfterMs(null)).toBe(1000);
-    expect(retryAfterMs("")).toBe(1000);
-    expect(retryAfterMs("-1")).toBe(1000);
-    expect(retryAfterMs("0")).toBe(0);
-    expect(retryAfterMs("2")).toBe(2000);
-    expect(retryAfterMs("30")).toBeNull();
-    expect(retryAfterMs("1.5")).toBeNull();
+    expect(searchRetryDelay(null)).toBe(1000);
+    expect(searchRetryDelay("")).toBe(1000);
+    expect(searchRetryDelay("-1")).toBe(1000);
+    expect(searchRetryDelay("0")).toBe(0);
+    expect(searchRetryDelay("2")).toBe(2000);
+    expect(searchRetryDelay("30")).toBeNull();
+    expect(searchRetryDelay("1.5")).toBeNull();
   });
 
   test("maps HTTP errors for both providers", async () => {
@@ -70,7 +69,6 @@ describe("websearch HTTP policy", () => {
           { query: "find" },
           context(),
           search(provider),
-          "vtest",
           dependencies(async () =>
             streamResponse([JSON.stringify({ error: "server broke" })], {
               status: 500,
@@ -86,7 +84,6 @@ describe("websearch HTTP policy", () => {
           { query: "find" },
           context(),
           search(provider),
-          "vtest",
           dependencies(async () =>
             streamResponse(["<html>bad gateway</html>"], { status: 502 }),
           ),
@@ -104,7 +101,6 @@ describe("websearch HTTP policy", () => {
         { query: "find" },
         context(),
         search("firecrawl"),
-        "vtest",
         dependencies(async () => streamResponse([refusal], { status: 403 })),
       ),
     );
@@ -116,7 +112,6 @@ describe("websearch HTTP policy", () => {
         { query: "find" },
         context(),
         search("firecrawl", "bad"),
-        "vtest",
         dependencies(async () =>
           streamResponse(
             [JSON.stringify({ success: false, error: "Invalid API key" })],
@@ -134,7 +129,6 @@ describe("websearch HTTP policy", () => {
         { query: "find" },
         context(),
         search("tavily", "bad"),
-        "vtest",
         dependencies(async () =>
           streamResponse(
             [
@@ -155,7 +149,6 @@ describe("websearch HTTP policy", () => {
         { query: "find" },
         context(),
         search("tavily"),
-        "vtest",
         dependencies(async () =>
           streamResponse([JSON.stringify({ detail: { error: "Too many" } })], {
             status: 403,
@@ -173,7 +166,6 @@ describe("websearch HTTP policy", () => {
         { query: "find" },
         context(),
         search(),
-        "vtest",
         dependencies(async () =>
           streamResponse([JSON.stringify({ error: dirty })], { status: 500 }),
         ),
@@ -195,7 +187,6 @@ describe("websearch limits and cancellation", () => {
         { query: "find" },
         context(),
         search(),
-        "vtest",
         dependencies(async () =>
           streamResponse(
             [new Uint8Array(1024 * 1024), new Uint8Array([1])],
@@ -218,7 +209,6 @@ describe("websearch limits and cancellation", () => {
         { query: "find" },
         ctx,
         search("tavily"),
-        "vtest",
         dependencies(async () =>
           streamResponse([new Uint8Array(64 * 1024 + 1)], {
             headers: { "content-type": "application/json" },
@@ -237,7 +227,6 @@ describe("websearch limits and cancellation", () => {
         { query: "find" },
         context(new AbortController().signal, shared),
         search(),
-        "vtest",
         dependencies(async () => {
           fetches++;
           return exaResponse();
@@ -259,7 +248,6 @@ describe("websearch limits and cancellation", () => {
         { query: "find" },
         context(new AbortController().signal, budget(), 30),
         search(),
-        "vtest",
         dependencies(async () => new Promise<Response>(() => {})),
       ),
     );
@@ -277,7 +265,6 @@ describe("websearch limits and cancellation", () => {
           { query: "find" },
           context(controller.signal),
           search("exa"),
-          "vtest",
           dependencies(async () => {
             called = true;
             return exaResponse();

@@ -1,15 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The OpenAI chat completions wire, as every provider speaks it: the
-// request body from a ChatRequest, the SSE frames split and read into
-// ChatEvents (frames.ts), the tool call fragments joined into calls,
-// and the stream with its
-// timeouts and caps. What reaches the provider goes through the fetcher
-// the caller passes, so a test hands it recorded frames and the suite
-// never reaches a network.
 
 import { MINUTE_MS } from "../lib/clock.ts";
+import { messageOf } from "../lib/errors.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
 import type {
@@ -21,14 +14,12 @@ import type {
 } from "./types.ts";
 
 // Gemini holds the headers while it thinks on a long prompt
-export const CHAT_HEADERS_TIMEOUT_MS = 120_000;
+const CHAT_HEADERS_TIMEOUT_MS = 120_000;
 const CHAT_SILENCE_TIMEOUT_MS = 5 * MINUTE_MS;
-export const MAX_SSE_FRAME_BYTES = 1024 * 1024;
+const MAX_SSE_FRAME_BYTES = 1024 * 1024;
 const CHAT_ERROR_BODY_MAX_BYTES = 4 * 1024;
 const CHAT_ERROR_BODY_TIMEOUT_MS = 10_000;
 const OVERSIZED_SSE_FRAME = "the provider sent an oversized stream frame";
-
-export { chatEvents, frameEvents, parseFrame } from "./frames.ts";
 
 // the name field on a user message, as OpenAI-compatible servers accept
 // it: letters, digits, underscore and dash, at most 64; a username's
@@ -38,17 +29,36 @@ export function wireName(name: string): string | null {
   return safe === "" ? null : safe;
 }
 
+// the fields a wire takes beyond the spec's, each off unless asked for
 export type ChatBodyOptions = {
   // OpenRouter's structured reasoning items go back on its assistant
   // messages; a message's plain reasoning goes back only where a wire's
   // own builder adds it (opencode.ts)
   reasoningDetails?: boolean;
-  includeThinkingFlag?: boolean;
+  // enable_thinking, sent on every request, off included
+  thinkingFlag?: boolean;
+  usageOption?: boolean;
+  effort?: boolean;
+  cacheKey?: boolean;
+  // reasoning_effort none on the agent's own Off: a model that never
+  // thinks refuses the field, so a default that resolved to off sends
+  // nothing
+  offAsNone?: boolean;
 };
 
-export function buildChatBody(
+// the openai-compatible body (mlx-serve, llama-server)
+export function buildChatBody(req: ChatRequest): Record<string, unknown> {
+  return baseChatBody(req, {
+    thinkingFlag: true,
+    usageOption: true,
+    effort: true,
+    cacheKey: true,
+  });
+}
+
+export function baseChatBody(
   req: ChatRequest,
-  options: ChatBodyOptions = {},
+  options: ChatBodyOptions,
 ): Record<string, unknown> {
   const messages = req.messages.map((message) => {
     if (message.role === "tool") {
@@ -97,14 +107,10 @@ export function buildChatBody(
     model: req.model,
     messages,
     stream: true,
-    stream_options: { include_usage: true },
   };
-  // mlx-serve and llama-server read the flag on every request, off
-  // included; OpenRouter takes the reasoning object instead
-  if (options.includeThinkingFlag ?? true) {
-    body.enable_thinking = req.thinking;
-  }
-  if (req.thinking && req.reasoningEffort) {
+  if (options.usageOption) body.stream_options = { include_usage: true };
+  if (options.thinkingFlag) body.enable_thinking = req.thinking;
+  if (options.effort && req.thinking && req.reasoningEffort) {
     body.reasoning_effort = req.reasoningEffort;
   }
   if (req.tools && req.tools.length > 0) {
@@ -112,8 +118,11 @@ export function buildChatBody(
   }
   if (req.temperature != null) body.temperature = req.temperature;
   if (req.topP != null) body.top_p = req.topP;
-  if (req.cacheKey) body.prompt_cache_key = req.cacheKey;
+  if (options.cacheKey && req.cacheKey) body.prompt_cache_key = req.cacheKey;
   if (req.maxTokens != null) body.max_tokens = req.maxTokens;
+  if (options.offAsNone && !req.thinking && req.thinkingOff) {
+    body.reasoning_effort = "none";
+  }
   return body;
 }
 
@@ -142,7 +151,7 @@ export function parseSse(
     const split = /\r?\n\r?\n/.exec(rest);
     if (!split || split.index === undefined) break;
     const raw = rest.slice(0, split.index);
-    if (new TextEncoder().encode(raw).byteLength > MAX_SSE_FRAME_BYTES) {
+    if (Buffer.byteLength(raw) > MAX_SSE_FRAME_BYTES) {
       throw new Error(OVERSIZED_SSE_FRAME);
     }
     rest = rest.slice(split.index + split[0].length);
@@ -153,7 +162,7 @@ export function parseSse(
       .map((line) => line.slice(5).replace(/^ /, ""));
     if (data.length > 0) frames.push(data.join("\n"));
   }
-  if (new TextEncoder().encode(rest).byteLength > MAX_SSE_FRAME_BYTES) {
+  if (Buffer.byteLength(rest) > MAX_SSE_FRAME_BYTES) {
     throw new Error(OVERSIZED_SSE_FRAME);
   }
   return { frames, rest };
@@ -273,13 +282,7 @@ async function readErrorBody(
       chunks.push(chunk);
       size += chunk.byteLength;
     }
-    const body = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      body.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(body);
+    return new TextDecoder().decode(Buffer.concat(chunks, size));
   } catch {
     return "";
   } finally {
@@ -317,10 +320,16 @@ export function retryAfterMs(header: string | null, now: number) {
 
 export type StreamOptions = {
   mapEvents?: (json: string) => ChatEvent[];
+  // a refused request's body in the wire's own words; null, or no hook,
+  // keeps HTTP <status>: <body>
+  refusal?: (
+    status: number,
+    body: string,
+  ) => { message: string; code?: string; param?: string } | null;
   headers?: Record<string, string>;
-  // shorter in a test, so a timed out wait is seen without two minutes
+  // shorter in a test
   headersTimeoutMs?: number;
-  // shorter in a test, so a silent stream is seen without five minutes
+  // shorter in a test
   silenceMs?: number;
   // asked after each frame: the wire's terminal event came, so the read
   // ends there, for a wire that sends no [DONE]
@@ -357,21 +366,20 @@ export async function* streamChat(
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new Unanswered(
-      err instanceof Error ? err.message : String(err),
-      timedOut,
-    );
+    throw new Unanswered(messageOf(err), timedOut);
   } finally {
     clearTimeout(headersTimer);
   }
   if (!response.ok) {
     const wait = retryAfterMs(response.headers.get("retry-after"), Date.now());
     const text = await readErrorBody(response, controller);
+    const own = text ? options.refusal?.(response.status, text) : null;
     yield {
       kind: "error",
       message: `HTTP ${response.status}${text ? `: ${text}` : ""}`,
       status: response.status,
       remote: true,
+      ...own,
       ...(wait === null ? {} : { retryAfterMs: wait }),
     };
     return;

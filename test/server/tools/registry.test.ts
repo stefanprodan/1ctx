@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { ToolError } from "../../../src/server/lib/errors.ts";
 import { errorFields } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type {
   Tool,
@@ -39,7 +39,7 @@ function context(): ToolContext {
       visualBytes: 0,
       visuals: 0,
     },
-    caps: TOOL_CAPS,
+    caps: DEFAULT_LIMITS,
   };
 }
 

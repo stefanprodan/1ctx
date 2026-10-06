@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { PatchToolRequest } from "../../../shared/api/tools.ts";
+import type { LimitName } from "../../../shared/contracts/limit.ts";
 import type { SearchState } from "../../../shared/contracts/tool.ts";
 import {
   MAX_WEB_DOMAINS,
@@ -9,7 +10,7 @@ import {
   type WebAccess,
   type WebAccessMode,
 } from "../../../shared/web.ts";
-import type { LimitName, SearchProvider } from "../../../shared/words.ts";
+import type { SearchProvider } from "../../../shared/words.ts";
 import { CREDENTIALS_HREF, WEB_HREF } from "../../lib/hrefs.ts";
 import { hostsCount, lineError } from "./Tools.model.ts";
 

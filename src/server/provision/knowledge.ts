@@ -87,7 +87,7 @@ async function walk(
       docs.push({
         name: path,
         text,
-        bytes: new TextEncoder().encode(text).byteLength,
+        bytes: Buffer.byteLength(text),
       });
     }
   };

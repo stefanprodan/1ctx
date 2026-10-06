@@ -50,13 +50,21 @@ export function normalize(entries: readonly MemoryEntry[]): MemoryEntry[] {
   }));
 }
 
-// the one equality the diff, Undo, the commit and the page use: a topic
-// in another case is the same topic
+// the one topic equality the diff, Undo, the commit and the page use: a
+// topic in another case is the same topic
+export const topicKey = (topic: string): string => topic.toLowerCase();
+
+export const sameTopic = (left: string, right: string): boolean =>
+  topicKey(left) === topicKey(right);
+
+export const findTopic = (
+  entries: readonly MemoryEntry[],
+  topic: string,
+): MemoryEntry | undefined =>
+  entries.find((entry) => sameTopic(entry.topic, topic));
+
 export function entryEqual(left: MemoryEntry, right: MemoryEntry): boolean {
-  return (
-    left.topic.toLowerCase() === right.topic.toLowerCase() &&
-    left.text === right.text
-  );
+  return sameTopic(left.topic, right.topic) && left.text === right.text;
 }
 
 export function entriesEqual(
@@ -91,29 +99,68 @@ export function memorySize(entries: readonly MemoryEntry[]): string {
   return `${memoryChars(entries).toLocaleString("en-US")} of ${MEMORY_CHARS.toLocaleString("en-US")}`;
 }
 
-// the refusal a save or an edit gets, naming the entry and the numbers
-// of the fix; null when the entries fit
-export function checkEntries(entries: readonly MemoryEntry[]): string | null {
+type Refusal = {
+  kind: "topic" | "text" | "long" | "budget";
+  words: string;
+  // the page's fix, which a tool's own advice replaces
+  fix: string | null;
+};
+
+function refusalOf(entries: readonly MemoryEntry[]): Refusal | null {
   const topics = new Set<string>();
+  const refuse = (
+    kind: Refusal["kind"],
+    words: string,
+    fix: string | null = null,
+  ) => ({
+    kind,
+    words,
+    fix,
+  });
   for (const [index, entry] of entries.entries()) {
     const name = entry.topic || `entry ${index + 1}`;
-    if (entry.topic.length === 0) return `The topic of ${name} is empty.`;
-    if (entry.topic.length > MEMORY_TOPIC_CHARS) {
-      return `The topic of ${name} is ${entry.topic.length} characters, the limit is ${MEMORY_TOPIC_CHARS}, cut ${entry.topic.length - MEMORY_TOPIC_CHARS}.`;
+    if (entry.topic.length === 0) {
+      return refuse("topic", `The topic of ${name} is empty.`);
     }
-    const key = entry.topic.toLowerCase();
-    if (topics.has(key)) return `The topic ${name} is repeated.`;
+    if (entry.topic.length > MEMORY_TOPIC_CHARS) {
+      return refuse(
+        "topic",
+        `The topic of ${name} is ${entry.topic.length} characters, the limit is ${MEMORY_TOPIC_CHARS}, cut ${entry.topic.length - MEMORY_TOPIC_CHARS}.`,
+      );
+    }
+    const key = topicKey(entry.topic);
+    if (topics.has(key))
+      return refuse("topic", `The topic ${name} is repeated.`);
     topics.add(key);
-    if (entry.text.length === 0) return `The text of ${name} is empty.`;
+    if (entry.text.length === 0) {
+      return refuse("text", `The text of ${name} is empty.`);
+    }
     if (entry.text.length > MEMORY_ENTRY_CHARS) {
-      return `The text of ${name} is ${entry.text.length} characters, the limit is ${MEMORY_ENTRY_CHARS}, cut ${entry.text.length - MEMORY_ENTRY_CHARS}.`;
+      return refuse(
+        "long",
+        `The text of ${name} is ${entry.text.length} characters, the limit is ${MEMORY_ENTRY_CHARS}, cut ${entry.text.length - MEMORY_ENTRY_CHARS}.`,
+      );
     }
     const chars = memoryChars(entries.slice(0, index + 1));
     if (chars > MEMORY_CHARS) {
-      return `The note would be ${memorySize(entries)}, free ${(memoryChars(entries) - MEMORY_CHARS).toLocaleString("en-US")}. Cut or remove ${name}.`;
+      return refuse(
+        "budget",
+        `The note would be ${memorySize(entries)}, free ${(memoryChars(entries) - MEMORY_CHARS).toLocaleString("en-US")}.`,
+        `Cut or remove ${name}.`,
+      );
     }
   }
   return null;
+}
+
+const wordsOf = (refusal: Refusal) =>
+  refusal.fix === null ? refusal.words : `${refusal.words} ${refusal.fix}`;
+
+// the refusal a save or an edit gets, naming the entry and the numbers
+// of the fix; null when the entries fit
+export function checkEntries(entries: readonly MemoryEntry[]): string | null {
+  const refusal = refusalOf(entries);
+  return refusal === null ? null : wordsOf(refusal);
 }
 
 export type MemoryEdit =
@@ -121,10 +168,14 @@ export type MemoryEdit =
   | { action: "remove"; topic: string }
   | { action: "none" };
 
-export type EditRefusal = "match" | "text" | "budget";
+// match: no such topic; topic: the topic is not one; text: the text is
+// empty; long: the text is past its cap; budget: the note would not fit
+export type EditRefusal = "match" | "topic" | "text" | "long" | "budget";
 export type EditResult =
   | { ok: true; entries: MemoryEntry[] }
-  | { ok: false; reason: string; kind: EditRefusal };
+  | { ok: false; reason: string; kind: Exclude<EditRefusal, "budget"> }
+  // bare: the reason without the page's fix
+  | { ok: false; reason: string; kind: "budget"; bare: string };
 
 export function applyEdit(
   entries: readonly MemoryEntry[],
@@ -132,13 +183,11 @@ export function applyEdit(
 ): EditResult {
   if (edit.action === "none") return { ok: true, entries: [...entries] };
   const topic = normalizeTopic(edit.topic);
-  const invalidTopic = checkEntries([{ topic, text: "x" }]);
+  const invalidTopic = refusalOf([{ topic, text: "x" }]);
   if (invalidTopic !== null) {
-    return { ok: false, reason: invalidTopic, kind: "text" };
+    return { ok: false, reason: wordsOf(invalidTopic), kind: "topic" };
   }
-  const index = entries.findIndex(
-    (entry) => entry.topic.toLowerCase() === topic.toLowerCase(),
-  );
+  const index = entries.findIndex((entry) => sameTopic(entry.topic, topic));
   let next: MemoryEntry[];
   if (edit.action === "remove") {
     if (index === -1) {
@@ -151,17 +200,37 @@ export function applyEdit(
     next = entries.filter((_, at) => at !== index);
   } else {
     const entry = { topic, text: sanitize(edit.text) };
-    const problem = checkEntries([entry]);
-    if (problem !== null) return { ok: false, reason: problem, kind: "text" };
+    const problem = refusalOf([entry]);
+    if (problem !== null) {
+      // one entry is never past the budget
+      const kind = problem.kind === "long" ? "long" : "text";
+      return { ok: false, reason: wordsOf(problem), kind };
+    }
     next =
       index === -1
         ? [...entries, entry]
         : entries.map((current, at) => (at === index ? entry : current));
   }
-  const refusal = checkEntries(next);
+  const refusal = refusalOf(next);
   return refusal === null
     ? { ok: true, entries: next }
-    : { ok: false, reason: refusal, kind: "budget" };
+    : {
+        ok: false,
+        reason: wordsOf(refusal),
+        kind: "budget",
+        bare: refusal.words,
+      };
+}
+
+// whether the note holds the edit's result already: the topic gone for a
+// remove, the same entry for a set
+export function resultThere(
+  current: MemoryEntry | undefined,
+  edit: Exclude<MemoryEdit, { action: "none" }>,
+): boolean {
+  return edit.action === "remove"
+    ? current === undefined
+    : current !== undefined && entryEqual(current, edit);
 }
 
 export type DiffEntry = MemoryEntry &
@@ -176,25 +245,23 @@ export function diffEntries(
   previous: readonly MemoryEntry[],
   current: readonly MemoryEntry[],
 ): DiffEntry[] {
-  const now = new Set(current.map((entry) => entry.topic.toLowerCase()));
+  const now = new Set(current.map((entry) => topicKey(entry.topic)));
   const out: DiffEntry[] = [];
   let cursor = 0;
   const flushRemoved = (upTo: number) => {
     for (; cursor < upTo; cursor++) {
       const entry = previous[cursor]!;
-      if (!now.has(entry.topic.toLowerCase())) {
+      if (!now.has(topicKey(entry.topic))) {
         out.push({ ...entry, kind: "removed" });
       }
     }
   };
   for (const entry of current) {
-    const at = previous.findIndex(
-      (old) => old.topic.toLowerCase() === entry.topic.toLowerCase(),
-    );
+    const at = previous.findIndex((old) => sameTopic(old.topic, entry.topic));
     if (at === -1) {
       while (
         cursor < previous.length &&
-        !now.has(previous[cursor]!.topic.toLowerCase())
+        !now.has(topicKey(previous[cursor]!.topic))
       ) {
         flushRemoved(cursor + 1);
       }

@@ -9,19 +9,20 @@
 // cache per zone, and the load read at each request.
 
 import { describe, expect, test } from "bun:test";
+import { parseNoQuery } from "../../../src/server/lib/body.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   BOARD_KEEP_MS,
+  canonicalZone,
   KEEP_MS,
   overviewArea,
   type Probe,
-  parseNoQuery,
   parseOverviewQuery,
   parseUsageQuery,
-  parseZoneQuery,
   type Reading,
   sampler,
 } from "../../../src/server/overview/index.ts";
+import { parseZoneQuery } from "../../../src/server/usage/index.ts";
 import type {
   LoadResponse,
   OverviewResponse,
@@ -206,7 +207,9 @@ function addSend(
 
 describe("the overview queries", () => {
   const zone = (query: string) =>
-    parseZoneQuery(new URL(`http://x/api/admin/overview${query}`));
+    canonicalZone(
+      parseZoneQuery(new URL(`http://x/api/admin/overview${query}`)),
+    );
   const loadQuery = (query: string) =>
     parseNoQuery(new URL(`http://x/api/admin/load${query}`));
 

@@ -1,16 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Whether a finished run needs a person: the run-attention decision,
-// asked of its decider once the run is done and its frames are out, so
-// the ask never holds the run. It is the backup of the run's own mark:
-// asked only for an automation in the decider mode, of a run that
-// finished with no mark of its agent's or the runner's. A failure
-// stores nothing and is not asked again; the answer and the decision's
-// settings are read when the ask starts. Its word opens or closes the
-// automation's open alert, which the run's end left to it: an ask that
-// marks nothing (off, no answer, a failure, dropped) closes it, as a
-// clean run's end would; a shutdown leaves it.
+// The decider backup for a run's mark (docs/automations.md).
 
 import {
   DECISION_OPTIONS,

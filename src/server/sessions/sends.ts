@@ -1,14 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The send row's reads and its two writes. Sessions own these rows, but
-// keeping them here leaves the main store focused.
 
 import type { SendSummary } from "../../shared/contracts/session.ts";
-import type { SendCause, SessionStatus } from "../../shared/words.ts";
+import type { McpDigest } from "../../shared/mcp.ts";
+import type { SendCause, SendKind, SessionStatus } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
+import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
-import { type RawSend, send, sendTokens } from "./rows.ts";
+import { storeMcpDigest } from "./mcp.ts";
+import { type RawSend, safeListOrNull, send, sendTokens } from "./rows.ts";
 
 export type SendEnd = {
   status: Exclude<SessionStatus, "running">;
@@ -28,6 +28,49 @@ export type SendCounters = {
   attentionRound?: number;
   memoryFrom?: number;
 };
+
+export type SendFields = {
+  id?: string;
+  kind?: SendKind;
+  sessionId: string;
+  userId: string;
+  agentId: string;
+  providerId: string;
+  model: string;
+  firstMessageId: string;
+  mcpDigest?: McpDigest | null;
+  summoned?: boolean;
+  now: number;
+};
+
+export function insertSend(db: Db, fields: SendFields): string {
+  const id = fields.id ?? newId();
+  const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
+  db.query(
+    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
+       provider_name, model, status, first_message_id, mcp, summoned,
+       started_at)
+     values (?, ?, ?, ?, ?, ?,
+       coalesce((select name from providers where id = ?), ?), ?,
+       'running', ?, ?, ?, ?)`,
+  ).run(
+    id,
+    fields.sessionId,
+    fields.kind ?? "chat",
+    fields.userId,
+    fields.agentId,
+    fields.providerId,
+    // the name outlives the provider, which may be deleted later
+    fields.providerId,
+    fields.providerId,
+    fields.model,
+    fields.firstMessageId,
+    mcp,
+    fields.summoned === true ? 1 : 0,
+    fields.now,
+  );
+  return id;
+}
 
 export function readSend(db: Db, id: string): SendSummary | null {
   const raw = db
@@ -61,13 +104,7 @@ export function readReasoningDetails(
        where messages.id = ? and sends.provider_id = ? and sends.model = ?`,
     )
     .get(id, providerId, model);
-  if (!raw?.reasoning_details) return null;
-  try {
-    const parsed = JSON.parse(raw.reasoning_details);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-  } catch {
-    return null;
-  }
+  return safeListOrNull<ReasoningDetail>(raw?.reasoning_details ?? null);
 }
 
 // A provider refused a reasoning record sent back: the session's

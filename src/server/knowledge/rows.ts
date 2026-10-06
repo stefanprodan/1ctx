@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The database shapes and their wire summaries, kept separate from text.
-// Author names are stored at the write rather than joined from live users
-// or agents, so history remains attributable after its author is gone.
+// Author names are stored at write, so history outlives its author.
 
 import type {
   KnowledgeAuthor,
@@ -64,6 +62,10 @@ export function fileOf(raw: FileRaw): KnowledgeFile {
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
+}
+
+export function rowOf(raw: FullRaw): KnowledgeRow {
+  return { ...fileOf(raw), text: raw.text, digest: raw.digest };
 }
 
 export function summary({ text: _, digest: __, ...file }: KnowledgeRow) {

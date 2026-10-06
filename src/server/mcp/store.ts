@@ -12,7 +12,7 @@ import type {
   McpToolSummary,
 } from "../../shared/contracts/mcp.ts";
 import { wireName } from "../../shared/mcp.ts";
-import { type Db, transact } from "../db/index.ts";
+import { type Db, parseStored, transact } from "../db/index.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { DiscoveredTool, DiscoveryResult } from "./discover.ts";
@@ -88,15 +88,6 @@ type RawAgentServer = {
   write: number;
 };
 
-function parsed<T>(text: string | null, fallback: T): T {
-  if (text === null) return fallback;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 function toolRow(raw: RawTool): McpToolRow {
   return {
     serverId: raw.server_id,
@@ -117,16 +108,16 @@ function row(raw: RawServer, tools: McpToolRow[]): McpServerRow {
     write: raw.write === 1,
     instructionsOn: raw.instructions_on === 1,
     timeoutMs: raw.timeout_ms,
-    readPatterns: parsed(raw.read_patterns, []),
-    writePatterns: parsed(raw.write_patterns, []),
-    excludedPatterns: parsed(raw.excluded_patterns, []),
+    readPatterns: parseStored(raw.read_patterns, []),
+    writePatterns: parseStored(raw.write_patterns, []),
+    excludedPatterns: parseStored(raw.excluded_patterns, []),
     serverName: raw.server_name,
     serverVersion: raw.server_version,
     protocolVersion: raw.protocol_version,
     instructions: raw.instructions,
     fingerprint: raw.fingerprint,
     checkedAt: raw.checked_at,
-    lastChange: parsed(raw.last_change, null),
+    lastChange: parseStored(raw.last_change, null),
     refreshError: raw.refresh_error,
     refreshFailedAt: raw.refresh_failed_at,
     createdAt: raw.created_at,
@@ -146,7 +137,7 @@ function codeFence(json: string): string {
 export function summary(
   server: McpServerRow,
   hasSecret: (name: string) => boolean,
-  render: (markdown: string, streaming?: boolean) => string,
+  render: (markdown: string) => string,
 ): McpServerSummary {
   const tools: McpToolSummary[] = server.tools.map((tool) => {
     const name = wireName(server.name, tool.name);
@@ -164,7 +155,7 @@ export function summary(
       description: tool.description,
       parameters: value as object,
       schemaJson: tool.inputSchema,
-      parametersHtml: render(codeFence(json), false),
+      parametersHtml: render(codeFence(json)),
     };
   });
   return {
@@ -205,11 +196,32 @@ export class McpServerStore {
       .map(toolRow);
   }
 
+  // every server's tools in one query, each list by name
+  private allTools(): Map<string, McpToolRow[]> {
+    const out = new Map<string, McpToolRow[]>();
+    const raws = this.db
+      .query<RawTool, []>("select * from mcp_tools order by server_id, name")
+      .all();
+    for (const raw of raws) {
+      const list = out.get(raw.server_id) ?? [];
+      list.push(toolRow(raw));
+      out.set(raw.server_id, list);
+    }
+    return out;
+  }
+
   list(): McpServerRow[] {
+    const tools = this.allTools();
     return this.db
       .query<RawServer, []>("select * from mcp_servers order by name")
       .all()
-      .map((raw) => row(raw, this.tools(raw.id)));
+      .map((raw) => row(raw, tools.get(raw.id) ?? []));
+  }
+
+  exists(id: string): boolean {
+    return (
+      this.db.query("select 1 from mcp_servers where id = ?").get(id) !== null
+    );
   }
 
   byId(id: string): McpServerRow | null {
@@ -453,7 +465,7 @@ export class McpServerStore {
       if (!link.read) {
         throw new BadRequest("a server needs read");
       }
-      if (this.byId(link.serverId) === null) {
+      if (!this.exists(link.serverId)) {
         throw new BadRequest("serverId is unknown");
       }
       seen.add(link.serverId);

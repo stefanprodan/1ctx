@@ -2,9 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { WebAccess } from "../../shared/web.ts";
-import { MAX_PASSWORD_BYTES, MIN_PASSWORD } from "../../shared/words.ts";
-import { type Action, apply, type Counts, type Secret } from "./apply.ts";
-import { client, type Handle } from "./client.ts";
+import {
+  MAX_PASSWORD_BYTES,
+  MIN_PASSWORD,
+  passwordProblem,
+} from "../../shared/words.ts";
+import { messageOf } from "../lib/errors.ts";
+import { scrubValues } from "../lib/log.ts";
+import { ADMIN_SECRET } from "../users/index.ts";
+import { apply, type Secret } from "./apply.ts";
+import { type Action, type Counts, client, type Handle } from "./client.ts";
 import {
   type CredentialsView,
   type Document,
@@ -41,12 +48,8 @@ export function provisionArea(deps: ProvisionDeps) {
       deps.projectDocs,
       deps.credentials,
     );
-    const password = secret("user-", "user-admin");
-    if (
-      password === null ||
-      password.length < MIN_PASSWORD ||
-      new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES
-    ) {
+    const password = secret("user-", ADMIN_SECRET);
+    if (password === null || passwordProblem(password) !== null) {
       throw new Error(
         `user/admin: user-admin.key must hold ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
       );
@@ -65,13 +68,8 @@ export function provisionArea(deps: ProvisionDeps) {
         if (value !== null) values.add(value);
         return value;
       };
-      const scrub = (line: string) => {
-        let result = line;
-        for (const value of [...values].sort((a, b) => b.length - a.length)) {
-          result = result.replaceAll(value, "[redacted]");
-        }
-        return result.replace(/[\r\n]/g, " ");
-      };
+      const scrub = (line: string) =>
+        scrubValues(line, values, "[redacted]").replace(/[\r\n]/g, " ");
       const counts: Counts = { created: 0, updated: 0, unchanged: 0 };
       const report = (action: Action, kind: string, name: string) => {
         counts[action]++;
@@ -89,9 +87,7 @@ export function provisionArea(deps: ProvisionDeps) {
         try {
           await api.call("POST", "/api/login", { username: "admin", password });
         } catch (error) {
-          throw new Error(
-            `user/admin: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          throw new Error(`user/admin: ${messageOf(error)}`);
         }
         try {
           await apply(api, documents, secret, report);
@@ -103,9 +99,7 @@ export function provisionArea(deps: ProvisionDeps) {
         );
         return counts;
       } catch (error) {
-        throw new Error(
-          scrub(error instanceof Error ? error.message : String(error)),
-        );
+        throw new Error(scrub(messageOf(error)));
       }
     },
   };

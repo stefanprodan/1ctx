@@ -15,11 +15,12 @@ import {
   type Tool,
   UnauthorizedError,
 } from "@modelcontextprotocol/client";
-import { ToolError } from "../lib/errors.ts";
+import { cutCodePoints } from "../../shared/text.ts";
+import { messageOf, ToolError } from "../lib/errors.ts";
+import { scrubValues } from "../lib/log.ts";
+import type { Fetcher } from "../providers/index.ts";
 import { CLIENT_CLEANUP_MS, MAX_ERROR } from "./limits.ts";
 import type { McpResult } from "./result.ts";
-
-export type Fetcher = typeof fetch;
 
 export type ListedTool = {
   name: string;
@@ -53,13 +54,8 @@ export type ClientOptions = {
   bodyBytes: number;
 };
 
-export function cut(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return [...text].slice(0, max).join("");
-}
-
 function scrubText(text: string, key: string | null): string {
-  return key === null || key === "" ? text : text.replaceAll(key, "[redacted]");
+  return scrubValues(text, [key], "[redacted]");
 }
 
 export function scrub<T>(value: T, key: string | null): T {
@@ -279,10 +275,10 @@ function errorText(
     text = error.message;
     logged = "MCP protocol error";
   } else {
-    text = error instanceof Error ? error.message : String(error);
+    text = messageOf(error);
     logged = "MCP call failed";
   }
-  return new ToolError(cut(scrubText(text, key), MAX_ERROR), logged);
+  return new ToolError(cutCodePoints(scrubText(text, key), MAX_ERROR), logged);
 }
 
 async function cleanup(
@@ -323,13 +319,14 @@ export async function withClient<T>(
   options: ClientOptions,
   fn: (client: ClientView) => Promise<T>,
 ): Promise<T> {
+  const close = () => {
+    void transport.close().catch(() => undefined);
+  };
   const budget: Budget = {
     limit: options.bodyBytes,
     remaining: options.bodyBytes,
     over: false,
-    close: () => {
-      void transport.close().catch(() => undefined);
-    },
+    close,
   };
   const transport = new StreamableHTTPClientTransport(new URL(server.url), {
     fetch: budgetedFetch(deps.fetcher, budget, key),
@@ -351,9 +348,6 @@ export async function withClient<T>(
     options.timeoutMs,
   );
   const signal = AbortSignal.any([options.signal, timeout.signal]);
-  const close = () => {
-    void transport.close().catch(() => undefined);
-  };
   signal.addEventListener("abort", close);
   if (signal.aborted) close();
   let value: T | undefined;

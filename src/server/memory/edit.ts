@@ -1,19 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A chat's edit of the project's note, pure. Its prompt may carry an
-// older note than the one saved, and set replaces a topic's whole text,
-// so an edit applies only over the text the chat has seen of its topic,
-// or when the note already holds its result. Every refusal lists the
-// note as it stands, so the chat has then seen all of it.
+// A chat's edit, pure: it applies only over the text the chat has seen.
 
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import {
   applyEdit,
-  entryEqual,
+  findTopic,
   MEMORY_ENTRY_CHARS,
   type MemoryEdit,
   memorySize,
+  resultThere,
+  sameTopic,
 } from "../../shared/memory.ts";
 
 export type ChatMemoryEdit = Exclude<MemoryEdit, { action: "none" }>;
@@ -33,17 +31,12 @@ export type ChatEditOutcome =
       conflict: "wrote" | "removed" | null;
     };
 
-const find = (entries: readonly MemoryEntry[], topic: string) =>
-  entries.find((entry) => entry.topic.toLowerCase() === topic.toLowerCase());
-
 function seenWith(
   seen: readonly MemoryEntry[],
   topic: string,
   entry: MemoryEntry | undefined,
 ): MemoryEntry[] {
-  const rest = seen.filter(
-    (held) => held.topic.toLowerCase() !== topic.toLowerCase(),
-  );
+  const rest = seen.filter((held) => !sameTopic(held.topic, topic));
   return entry === undefined ? rest : [...rest, { ...entry }];
 }
 
@@ -52,14 +45,12 @@ export function chatEdit(
   seen: readonly MemoryEntry[],
   edit: ChatMemoryEdit,
 ): ChatEditOutcome {
-  const current = find(note, edit.topic);
-  const saw = find(seen, edit.topic);
+  const current = findTopic(note, edit.topic);
+  const saw = findTopic(seen, edit.topic);
   const all = note.map((entry) => ({ ...entry }));
   // a remove of a topic nobody wrote falls through to the unknown topic
   const there =
-    edit.action === "remove"
-      ? current === undefined && saw !== undefined
-      : current !== undefined && entryEqual(current, edit);
+    resultThere(current, edit) && (edit.action === "set" || saw !== undefined);
   if (there) {
     return {
       ok: true,
@@ -93,13 +84,10 @@ export function chatEdit(
         ? " Use one of the topics in the note."
         : result.kind === "budget"
           ? " Shorten, merge or remove entries, or leave out what later chats do not need."
-          : /^The text of .+ the limit is/.test(result.reason)
+          : result.kind === "long"
             ? " Split it into several topics, one set call each, or cut it."
             : "";
-    const reason =
-      result.kind === "budget"
-        ? result.reason.replace(/ Cut or remove .+\.$/, "")
-        : result.reason;
+    const reason = result.kind === "budget" ? result.bare : result.reason;
     return {
       ok: false,
       reason: `${reason}${advice}`,
@@ -110,7 +98,7 @@ export function chatEdit(
   return {
     ok: true,
     entries: result.entries,
-    seen: seenWith(seen, edit.topic, find(result.entries, edit.topic)),
+    seen: seenWith(seen, edit.topic, findTopic(result.entries, edit.topic)),
     changed: true,
   };
 }

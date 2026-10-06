@@ -4,8 +4,7 @@
 // Request and response bodies of the limits routes, all for admins. A
 // change applies to the next send.
 
-import type { LimitRow } from "../contracts/limit.ts";
-import type { LimitName } from "../words.ts";
+import type { LimitName, LimitRow } from "../contracts/limit.ts";
 
 // GET /api/limits, and what PUT /api/limits answers
 export type LimitsResponse = { limits: LimitRow[] };

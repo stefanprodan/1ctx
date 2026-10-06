@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A disposable mount keeps shared text and session scratch atomic without
-// holding a database transaction while the shell runs. The server's
-// thread admits the command, reads the rows and commits; the shell runs
-// in a worker, so a command that never yields holds no stream.
+// A disposable mount: no transaction is held while the shell runs.
 
 import type {
   KnowledgeAuthor,
@@ -23,7 +20,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { BACKSTOP_MS, COMMAND_ITERATIONS } from "./commands.ts";
 import { type CommitDocs, commit } from "./commit.ts";
 import { type CommandCredential, commandFetch } from "./credentials.ts";
-import { listKept, readKept } from "./kept.ts";
+import { type KeptEntry, listKept, readKept } from "./kept.ts";
 import { mountableScratch } from "./names.ts";
 import {
   checkOpened,
@@ -38,6 +35,7 @@ import type {
   CommandCause,
   CommandEnd,
   CommandPhase,
+  Job,
   JobRepo,
 } from "./protocol.ts";
 import { acquireSession } from "./queue.ts";
@@ -145,6 +143,128 @@ function checked(
   return changes;
 }
 
+type Mount = {
+  job: Job;
+  rows: MountedDoc[];
+  scratch: Scratch;
+  // scratch rows whose name the rule no longer allows, dropped on commit
+  skipped: string[];
+  kept: KeptEntry[];
+  storage: KnowledgeCaps;
+  // the repository notice and the scratch left out
+  left: string;
+};
+
+function mountJob(
+  deps: MountDeps,
+  caps: CommandCaps,
+  command: string,
+  started: number,
+  projectId: string,
+  sessionId: string,
+): Mount {
+  const repos = caps.repos;
+  const storage = deps.current();
+  const docs = caps.knowledge;
+  const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
+  const stored = deps.scratch.read(sessionId);
+  // the worker writes each row at /tmp/<path>, so a row outside the
+  // rule never mounts; the commit drops it
+  const mountable = mountableScratch(stored.entries);
+  const scratch = { ...stored, entries: mountable.kept };
+  const skipped = mountable.skipped;
+  const left =
+    (repos?.notice ?? "") +
+    (skipped.length === 0
+      ? ""
+      : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
+  const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
+  const uploads = deps.knowledge.mountedUploads(sessionId);
+  const kept = listKept(deps.db, sessionId);
+  const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
+  // A lowered cap still permits deleting or shrinking the mounted base.
+  const projectBytes = Math.max(
+    storage.knowledgeProjectBytes,
+    rows.reduce((bytes, row) => bytes + row.bytes, 0),
+  );
+  const mountBytes =
+    projectBytes +
+    Math.max(storage.scratchBytes, scratch.bytes) +
+    Math.max(storage.uploadBytes, uploads.bytes) +
+    // lazy files count when a command reads them
+    keptBytes +
+    2 * 1024 * 1024;
+  const ioBytes = Math.max(
+    4 * caps.resultCut,
+    storage.scratchBytes,
+    storage.knowledgeFileBytes,
+    ...uploads.entries.map((file) => file.bytes),
+    // the reads the path line teaches (yq, then rg, then sed) add up
+    ...kept.map((entry) => 4 * entry.bytes),
+  );
+  const job: Job = {
+    command,
+    endsAt: started + caps.callTimeoutMs,
+    docs,
+    visuals: caps.visuals,
+    network: Boolean(caps.web),
+    cwd: scratch.cwd,
+    knowledgeFileBytes: storage.knowledgeFileBytes,
+    mountBytes,
+    ioBytes,
+    iterations: COMMAND_ITERATIONS,
+    knowledge: rows.map((row) => ({
+      name: row.name,
+      data: row.data,
+      mtime: row.updatedAt,
+    })),
+    // the scratch commit reads only the revision and totals, so its
+    // bytes can go
+    scratch: scratch.entries.map((file) => ({
+      name: file.path,
+      data: file.data,
+      mode: file.mode,
+      mtime: scratchTime,
+    })),
+    uploads: uploads.entries.map((file) => ({
+      name: file.name,
+      data: file.data,
+      mtime: file.createdAt,
+    })),
+    kept: kept.map((entry) => entry.path),
+    repos: (repos?.mounts ?? []).map((repo) => ({ ...repo })),
+    repoFileBytes: repos?.fileBytes ?? 0,
+  };
+  return { job, rows, scratch, skipped, kept, storage, left };
+}
+
+// 124 is the interpreter's own deadline, 126 another of its limits: the
+// exit decides, whatever changes came with it
+function stopped(
+  answer: Answer,
+  late: string,
+  notice: string,
+  resultCut: number,
+): CommandResult {
+  const head = answer.exitCode === 124 ? late + notice : notice;
+  const printed = refused(
+    answer.stdout,
+    answer.stderr,
+    answer.exitCode,
+    "command stopped at a deadline or limit",
+    resultCut - head.length,
+  );
+  return {
+    ...printed,
+    content: head + printed.content,
+    error: true,
+    ended: {
+      phase: "run",
+      cause: answer.exitCode === 124 ? "deadline" : "limit",
+    },
+  };
+}
+
 export async function run(
   deps: MountDeps,
   projectId: string,
@@ -163,19 +283,16 @@ export async function run(
   const combined = AbortSignal.any([signal, deadline.signal]);
   let release: (() => void) | undefined;
   let releaseSession: (() => void) | undefined;
-  const repos = caps.repos;
   // a repository's notice stands even when the command never mounts
-  let notice = repos?.notice ?? "";
+  let notice = caps.repos?.notice ?? "";
   // set once the command ran, so a refused save still shows its output
   let answer: Answer | undefined;
   let phase: CommandPhase = "queue";
   // the worker's word when neither signal fired: a shutdown is an abort
   let ended: CommandCause = "error";
-  // a command that waited for its slots and then ran out of time says
-  // so first, so the model does not read its command as too slow
+  // a late start leads the result, so the command never reads as too slow
   let late = "";
-  // when the chat's turn came; the longer of its wait and the process
-  // slot's names who held the command up
+  // when the chat's turn came, to name the longer wait
   let turnAt: number | undefined;
   const ownChat = (now: number) =>
     (turnAt ?? now) - started >= now - (turnAt ?? now);
@@ -215,79 +332,18 @@ export async function run(
       late = `waited ${seconds(waitedMs)} s ${behind}, so the command had ${Math.max(0, seconds(caps.callTimeoutMs) - seconds(waitedMs))} s to run\n`;
     }
     phase = "mount";
-    const storage = deps.current();
+    const { job, rows, scratch, skipped, kept, storage, left } = mountJob(
+      deps,
+      caps,
+      command,
+      started,
+      projectId,
+      sessionId,
+    );
     const docs = caps.knowledge;
-    const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
-    const stored = deps.scratch.read(sessionId);
-    // the worker writes each row at /tmp/<path>, so a row outside the
-    // rule never mounts; the commit drops it
-    const mountable = mountableScratch(stored.entries);
-    const scratch = { ...stored, entries: mountable.kept };
-    const skipped = mountable.skipped;
-    const left =
-      (repos?.notice ?? "") +
-      (skipped.length === 0
-        ? ""
-        : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
     notice = left;
-    const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
-    const uploads = deps.knowledge.mountedUploads(sessionId);
-    const kept = listKept(deps.db, sessionId);
-    const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
-    // A lowered cap still permits deleting or shrinking the mounted base.
-    const projectBytes = Math.max(
-      storage.knowledgeProjectBytes,
-      rows.reduce((bytes, row) => bytes + row.bytes, 0),
-    );
-    const mountBytes =
-      projectBytes +
-      Math.max(storage.scratchBytes, scratch.bytes) +
-      Math.max(storage.uploadBytes, uploads.bytes) +
-      // lazy files count when a command reads them
-      keptBytes +
-      2 * 1024 * 1024;
-    const ioBytes = Math.max(
-      4 * caps.resultCut,
-      storage.scratchBytes,
-      storage.knowledgeFileBytes,
-      ...uploads.entries.map((file) => file.bytes),
-      // the reads the path line teaches (yq, then rg, then sed) add up
-      ...kept.map((entry) => 4 * entry.bytes),
-    );
     const settled = await deps.workers.run(
-      {
-        command,
-        endsAt: started + caps.callTimeoutMs,
-        docs,
-        visuals: caps.visuals,
-        network: Boolean(caps.web),
-        cwd: scratch.cwd,
-        knowledgeFileBytes: storage.knowledgeFileBytes,
-        mountBytes,
-        ioBytes,
-        iterations: COMMAND_ITERATIONS,
-        knowledge: rows.map((row) => ({
-          name: row.name,
-          data: row.data,
-          mtime: row.updatedAt,
-        })),
-        // the scratch commit reads only the revision and totals, so its
-        // bytes can go
-        scratch: scratch.entries.map((file) => ({
-          name: file.path,
-          data: file.data,
-          mode: file.mode,
-          mtime: scratchTime,
-        })),
-        uploads: uploads.entries.map((file) => ({
-          name: file.name,
-          data: file.data,
-          mtime: file.createdAt,
-        })),
-        kept: kept.map((entry) => entry.path),
-        repos: (repos?.mounts ?? []).map((repo) => ({ ...repo })),
-        repoFileBytes: repos?.fileBytes ?? 0,
-      },
+      job,
       {
         // MCP results past the cut, read from the database on first read
         kept: (index) =>
@@ -316,26 +372,8 @@ export async function run(
     phase = "diff";
     notice = left + answer.notice;
     combined.throwIfAborted();
-    // the exit decides, whatever changes came with it
     if (answer.exitCode === 124 || answer.exitCode === 126) {
-      if (answer.exitCode === 124) notice = late + notice;
-      const printed = refused(
-        answer.stdout,
-        answer.stderr,
-        answer.exitCode,
-        "command stopped at a deadline or limit",
-        caps.resultCut - notice.length,
-      );
-      return {
-        ...printed,
-        content: notice + printed.content,
-        error: true,
-        // 124 is the interpreter's own deadline, 126 another of its limits
-        ended: {
-          phase: "run",
-          cause: answer.exitCode === 124 ? "deadline" : "limit",
-        },
-      };
+      return stopped(answer, late, notice, caps.resultCut);
     }
     if (answer.refused !== null) throw new Error(answer.refused);
     const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));

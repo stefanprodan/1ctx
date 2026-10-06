@@ -10,9 +10,10 @@ import { BadRequest } from "../../src/server/lib/errors.ts";
 import { modelPrice } from "../../src/server/providers/index.ts";
 import {
   parseBaseUrl,
+  parseCatalogQuery,
   parseKeyName,
+  parseModelQuery,
   parseProvider,
-  parseQuery,
 } from "../../src/server/providers/parse.ts";
 import secretNames from "../fixtures/secrets/names.json";
 import {
@@ -101,12 +102,33 @@ describe("parseProvider", () => {
   );
 
   test("the query is trimmed and capped", () => {
-    expect(parseQuery(new URL("http://x/?q=%20deep%20"))).toBe("deep");
-    expect(parseQuery(new URL("http://x/"))).toBe("");
-    expect(() => parseQuery(new URL(`http://x/?q=${"a".repeat(101)}`))).toThrow(
-      BadRequest,
-    );
+    const q = (query: string) =>
+      parseCatalogQuery(new URL(`http://x/${query}`)).q;
+    expect(q("?q=%20deep%20")).toBe("deep");
+    expect(q("")).toBe("");
+    expect(() => q(`?q=${"a".repeat(101)}`)).toThrow(BadRequest);
     expect(parseBaseUrl("https://models.test")).toBe("https://models.test");
+  });
+
+  test("the query names are known and given once", () => {
+    const catalog = (query: string) =>
+      parseCatalogQuery(new URL(`http://x/${query}`));
+    const model = (query: string) =>
+      parseModelQuery(new URL(`http://x/${query}`));
+    expect(catalog("?q=deep&kind=decisions")).toEqual({
+      q: "deep",
+      kind: "decisions",
+    });
+    expect(model("?model=a/b")).toBe("a/b");
+    for (const [parse, query, message] of [
+      [catalog, "?q=deep&page=2", "unknown parameter page"],
+      [catalog, "?q=a&q=b", "q must appear once"],
+      [catalog, "?kind=chat&kind=chat", "kind must appear once"],
+      [model, "?model=a/b&q=x", "unknown parameter q"],
+      [model, "?model=a/b&model=c/d", "model must appear once"],
+    ] as const) {
+      expect(() => parse(query), query).toThrow(message);
+    }
   });
 });
 

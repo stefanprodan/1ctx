@@ -1,19 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Access: the cookie, the login row behind it, and the principal the
-// router hands to every handler. The cookie carries a random token; the
-// row holds its hash. Thirty days sliding: a request past an hour since
-// the last touch pushes the row's expiry out and re-sends the cookie
-// with a full Max-Age, so the browser's copy slides with it.
 
 import { type Db, transact } from "../db/index.ts";
+import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
-import { daysWindow } from "../usage/index.ts";
+import { daysWindow, zoneOrUtc } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
@@ -60,7 +55,6 @@ export type Auth = {
   open(user: UserRow): { login: Login; setCookie: string };
   // revoke one login; the cleared cookie header value
   close(loginId: string): string;
-  clearCookie(): string;
   // drop the rows whose expiry passed, telling the socket layer about
   // each; how many went
   sweep(): number;
@@ -113,13 +107,7 @@ export function auth(deps: AuthDeps): Auth {
   const visit = (user: UserRow, now: number) => {
     const held = visited.get(user.id);
     if (held !== undefined && held.tz === user.tz && now < held.until) return;
-    let day: { days: string[]; until: number };
-    try {
-      day = daysWindow(now, user.tz, 1);
-    } catch {
-      // a zone the runtime does not know counts the day in UTC
-      day = daysWindow(now, "UTC", 1);
-    }
+    const day = daysWindow(now, zoneOrUtc(user.tz), 1);
     deps.visits.record(user.id, day.days[0]!, now);
     visited.set(user.id, { tz: user.tz, until: day.until });
   };
@@ -135,12 +123,7 @@ export function auth(deps: AuthDeps): Auth {
           deps.logins.delete(login.id);
           return {
             result: undefined,
-            events: [
-              {
-                type: "login.revoked" as const,
-                data: { userId: login.userId, loginId: login.id },
-              },
-            ],
+            events: [loginRevoked(login.userId, login.id)],
           };
         });
         return nobody;
@@ -174,16 +157,12 @@ export function auth(deps: AuthDeps): Auth {
       deps.logins.delete(loginId);
       return clearCookie();
     },
-    clearCookie,
     sweep() {
       return transact(deps.db, () => {
         const gone = deps.logins.deleteExpired(deps.clock());
         return {
           result: gone.length,
-          events: gone.map((login) => ({
-            type: "login.revoked" as const,
-            data: { userId: login.userId, loginId: login.id },
-          })),
+          events: gone.map((login) => loginRevoked(login.userId, login.id)),
         };
       });
     },

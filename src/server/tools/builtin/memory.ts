@@ -97,7 +97,7 @@ export function runMemory(
     const result = handle.stopped
       ? stoppedResult()
       : await new Registry(makeMemoryTools(handle)).run(call, ctx);
-    if (call.name === "memory_edit") handle.recordEdit(!result.error);
+    handle.recordEdit(!result.error);
     return result.error
       ? {
           error: true,
@@ -200,14 +200,11 @@ function editTool(work: MemoryWork): Tool {
             ? " Use one of the topics in the note."
             : result.kind === "budget"
               ? " Shorten or remove entries, or leave out what the next run does not need."
-              : /^The text of .+ the limit is/.test(result.reason)
+              : result.kind === "long"
                 ? " Split it into several topics, one set call each, or cut it."
                 : "";
         // the page names the entry to cut; a run is told what to leave out
-        const reason =
-          result.kind === "budget"
-            ? result.reason.replace(/ Cut or remove .+\.$/, "")
-            : result.reason;
+        const reason = result.kind === "budget" ? result.bare : result.reason;
         throw new Error(`${reason}${advice}`);
       }
       const operation =

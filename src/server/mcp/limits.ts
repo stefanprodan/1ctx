@@ -12,7 +12,7 @@ export const MAX_TOOL_DESCRIPTION = 4_000;
 export const MAX_TOOL_SCHEMA_BYTES = 64 * 1024;
 export const MAX_TOOLS_BYTES = 512 * 1024;
 export const MAX_INSTRUCTIONS = 16_000;
-export const MAX_SERVER_NAME = 200;
+export const MAX_REPORTED_SERVER_NAME = 200;
 export const MAX_SERVER_VERSION = 100;
 export const MAX_ERROR = 2_000;
 

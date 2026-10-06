@@ -1,16 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The limits area: the defaults with an admin's overrides on top.
-// current() is read once when a send starts and copied onto its policy,
-// so a change on an admin page reaches the next send and never one in
-// flight; the send caps are read at each admission. A value saved equal
-// to its default drops the override rather than store it, so the rows
-// are exactly what an admin changed.
 
 import type { LimitsResponse } from "../../shared/api/limits.ts";
-import type { LimitRow } from "../../shared/contracts/limit.ts";
-import { LIMIT_NAMES } from "../../shared/words.ts";
+import { LIMIT_NAMES, type LimitRow } from "../../shared/contracts/limit.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -28,18 +20,13 @@ import { LimitStore } from "./store.ts";
 export {
   type ChatCaps,
   DEFAULT_LIMITS,
-  defaultLimits,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
   type Limits,
-  LOOP_LIMITS,
   type LoopLimits,
-  limitDefinitions,
-  type RepoCaps,
   type SendCaps,
   scheduledShare,
   sendsRunningDefault,
-  TOOL_CAPS,
   type ToolCaps,
 } from "./defaults.ts";
 
@@ -80,6 +67,7 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
   const store = new LimitStore(deps.db);
   const definitions = limitDefinitions(deps.cores);
   const defaults = defaultLimits(deps.cores);
+  // read once per send, the send caps at each admission
   const current = (): Limits => {
     const values = { ...defaults };
     for (const override of store.rows()) {
@@ -119,6 +107,7 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
     write();
     if (sendCaps() !== before) deps.wake?.();
   };
+  // a value saved equal to its default drops the override
   const set = (values: Partial<Limits>, now: number): void =>
     noticing(() => {
       transact(deps.db, () => {

@@ -5,11 +5,8 @@
 // A model must see what was saved even when stdout is cut, so receipts
 // that cannot fit refuse the write rather than hiding its outcome.
 
-export function cutText(text: string, length: number): string {
-  const cut = text.slice(0, Math.max(0, length));
-  const last = cut.charCodeAt(cut.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
-}
+import { cutAt } from "../../shared/text.ts";
+import { messageOf } from "../lib/errors.ts";
 
 const mark = (resultCut: number) =>
   `... output cut at ${resultCut} characters, narrow with grep or sed -n`;
@@ -30,7 +27,7 @@ function bounded(
   const room = resultCut - mark(resultCut).length - tail.length - 2;
   if (room < 0) return null;
   return {
-    content: `${cutText(printed, room)}\n${mark(resultCut)}\n${tail}`,
+    content: `${cutAt(printed, room)}\n${mark(resultCut)}\n${tail}`,
     tail: tail.length,
   };
 }
@@ -62,12 +59,12 @@ export function refused(
   error: unknown,
   resultCut: number,
 ): { content: string; error: true; tail: number } {
-  const words = error instanceof Error ? error.message : String(error);
+  const words = messageOf(error);
   const exit = `exit ${exitCode}`;
   const whole = `nothing saved: ${words}`;
   // at most half the room past the mark, so some output always shows,
   // and never less than the refusal itself
-  const line = cutText(
+  const line = cutAt(
     whole,
     Math.max(
       "nothing saved".length,
@@ -76,7 +73,7 @@ export function refused(
   );
   const tail = `${line}\n${exit}`;
   // with no room for output and exit, the refusal alone, as failed() says it
-  const short = cutText(whole, resultCut);
+  const short = cutAt(whole, resultCut);
   const content = bounded(stdout, stderr, tail, resultCut) ?? {
     content: short,
     tail: short.length,
@@ -85,9 +82,9 @@ export function refused(
 }
 
 export function failed(error: unknown, resultCut: number) {
-  const words = error instanceof Error ? error.message : String(error);
+  const words = messageOf(error);
   return {
-    content: cutText(`nothing saved: ${words}`, resultCut),
+    content: cutAt(`nothing saved: ${words}`, resultCut),
     error: true,
   };
 }

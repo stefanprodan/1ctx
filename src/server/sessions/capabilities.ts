@@ -10,19 +10,20 @@ export function setDisabled(db: Db, id: string, set: readonly string[]): void {
   );
 }
 
-// every session's set, or one project's when the key's object was the
+// every row's set, or one project's when the key's object was the
 // project's, so a repository's delete reads only its project's rows
-export function forgetCapability(
+export function forgetCapabilityIn(
   db: Db,
+  table: "sessions" | "automations",
   key: string,
   projectId?: string,
 ): void {
   db.query(
-    `update sessions set disabled_capabilities = (
+    `update ${table} set disabled_capabilities = (
        select json_group_array(value order by value)
-       from json_each(sessions.disabled_capabilities) where value != ?
+       from json_each(${table}.disabled_capabilities) where value != ?
      ) where ${projectId === undefined ? "" : "project_id = ? and "}exists (
-       select 1 from json_each(sessions.disabled_capabilities) where value = ?
+       select 1 from json_each(${table}.disabled_capabilities) where value = ?
      )`,
   ).run(key, ...(projectId === undefined ? [] : [projectId]), key);
 }

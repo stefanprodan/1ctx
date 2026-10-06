@@ -11,24 +11,23 @@
 // fails the run, and a failure or an abort of it marks nothing.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import { type Db, transact } from "../db/index.ts";
 import { after, type Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { ChatRequest, ToolCall } from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
 import { asksAgain, attentionMessages } from "./attention-packet.ts";
-import { cacheKeyOf, historyMessages } from "./context.ts";
-import { envelope, lastLine } from "./envelope.ts";
+import { runOne, toolContext } from "./call.ts";
+import { historyMessages, requestBase } from "./context.ts";
 import { runMark } from "./marks.ts";
 import { leastThinking } from "./policy.ts";
 import type { ContextLookups } from "./render.ts";
+import { OVER_ROUND } from "./reply-rows.ts";
 import type { RoundDeps } from "./round.ts";
 import { failureFields, runRound } from "./round.ts";
-import { type ActiveSend, newRound } from "./send.ts";
+import { type ActiveSend, nextRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { statusOf } from "./writer.ts";
-import type { SessionsPort } from "./writer-port.ts";
 
 // One small request, twice at most: 2.5 s on average on a local model in
 // the eval. A minute covers a local server reading the record cold and a
@@ -37,12 +36,8 @@ export const ATTENTION_STEP_MS = 60_000;
 // what the eval measured, enough for a model that must think
 export const ATTENTION_MAX_TOKENS = 4000;
 
-const OVER_ROUND = "not run: too many calls in one round";
-
 export type AttentionStepDeps = {
-  db: Db;
   clock: Clock;
-  sessions: SessionsPort;
   round: RoundDeps;
   writer: Writer;
   tools: {
@@ -51,6 +46,7 @@ export type AttentionStepDeps = {
       call: ToolCall,
       ctx: ToolContext,
     ): Promise<ToolResult>;
+    logName?(offered: Offered, call: ToolCall): string;
   };
   log: Log;
   historyOf(send: ActiveSend): Message[];
@@ -70,60 +66,17 @@ export function hasAttentionStep(send: ActiveSend): boolean {
   );
 }
 
-// the answer finished and the step's first row, as the memory phase
-// opens: one transaction, one envelope
 function startStep(deps: AttentionStepDeps, send: ActiveSend): void {
-  const now = deps.clock();
   const first = send.roundNo + 1;
-  const started = transact(deps.db, () => {
-    const answer = deps.writer.finalizeRound(
-      send,
-      statusOf(send.cause!),
-      send.error,
-      now,
-    );
-    const created = deps.sessions.addReply({
-      sessionId: send.sessionId,
-      sendId: send.id,
-      round: first,
-      agentId: send.policy.agentId,
-      model: send.policy.model,
-      now,
-    });
-    const reply = deps.sessions.markSlot(created.id, "work") ?? created;
-    const sendRow = deps.sessions.bumpCounters(send.id, {
-      memoryRound: first,
-      attentionRound: first,
-      rounds: first,
-      toolCalls: send.budget.calls,
-    })!;
-    const session = deps.sessions.touch(send.sessionId, {
-      status: "running",
-      now,
-    })!;
-    const last =
-      answer?.status === "done" && answer.slot === "answer"
-        ? lastLine(answer, send.policy.agentName)
-        : undefined;
-    return {
-      result: reply,
-      events: [
-        envelope(
-          session,
-          answer ? [answer, reply] : [reply],
-          sendRow,
-          [],
-          last,
-        ),
-      ],
-    };
+  const reply = deps.writer.startAfterAnswer(send, {
+    row: "work",
+    status: statusOf(send.cause!),
+    error: send.error,
+    counters: { memoryRound: first, attentionRound: first },
   });
   send.memoryRound = first;
   send.attentionRound = first;
-  send.roundNo = first;
-  send.phase = "attention";
-  send.round = newRound(started.id, started.createdAt);
-  send.round.slotMarked = true;
+  nextRound(send, reply, "attention");
 }
 
 // asked with thinking off, the step called the tool every time; with
@@ -166,13 +119,9 @@ function stepRequest(
   );
   if (messages === null) return null;
   return {
-    model: send.policy.model,
-    messages,
+    ...requestBase(send.policy, send.sessionId, messages),
     ...leastThinking(send.policy),
     maxTokens: ATTENTION_MAX_TOKENS,
-    cacheKey: cacheKeyOf(send.policy, send.sessionId),
-    upstream: send.policy.upstream,
-    skip4Bit: send.policy.skip4Bit,
     tools: offered.tools,
   };
 }
@@ -186,32 +135,10 @@ async function runCalls(
   calls: ToolCall[],
   signal: AbortSignal,
 ): Promise<void> {
-  const ctx: ToolContext = {
-    actor: {
-      projectId: send.projectId,
-      userId: send.policy.userId,
-      agentId: send.policy.agentId,
-      agentName: send.policy.agentName,
-      sessionId: send.sessionId,
-      origin: "automation",
-    },
-    signal,
-    now: deps.clock,
-    budget: send.toolBudget,
-    caps: send.policy.toolCaps,
-    web: null,
-  };
+  const ctx = toolContext(send, signal, deps.clock, { web: null });
   for (const call of calls) {
     if (signal.aborted) return;
-    let result: ToolResult;
-    try {
-      result = await deps.tools.run(offered, call, ctx);
-    } catch (error) {
-      result = {
-        content: error instanceof Error ? error.message : String(error),
-        error: true,
-      };
-    }
+    const result = await runOne(deps, send, offered, call, ctx);
     if (signal.aborted) return;
     deps.writer.finishTool(send, call, result);
   }
@@ -289,10 +216,7 @@ export async function attentionStep(
         if (!(await callRound(deps, send, offered, controller.signal))) break;
         if (!asksAgain(rounds, round, handle.reason !== null)) break;
       }
-      const reply = deps.writer.startRound(send);
-      send.roundNo += 1;
-      send.round = newRound(reply.id, reply.createdAt);
-      send.round.slotMarked = true;
+      nextRound(send, deps.writer.startRound(send), "attention");
     }
   } catch (error) {
     if (!controller.signal.aborted) {

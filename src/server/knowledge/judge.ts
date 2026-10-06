@@ -13,12 +13,14 @@ import {
   textFromBytes,
 } from "../../shared/knowledge.ts";
 import { uploadFolder } from "../../shared/uploads.ts";
+import { MAX_KNOWLEDGE_NAME } from "../../shared/words.ts";
 import type { ArchiveMember } from "../lib/archive.ts";
+import { MAX_ANSWER_NAMES, MAX_NAME_JSON_BYTES } from "./limits.ts";
 
 type Skip = KnowledgeUploadResult["skipped"][number];
 type Candidate = { index: number; name: string; renamed: boolean };
 export type Selection = { candidates: Candidate[]; skipped: Skip[] };
-export type JudgedFile = { name: string; text: string; replaces: boolean };
+export type JudgedFile = { name: string; text: string };
 
 function skip(
   member: ArchiveMember,
@@ -34,14 +36,14 @@ function skip(
 }
 
 export function skippedName(raw: string): string {
-  const cut = raw.slice(0, 200);
-  if (Buffer.byteLength(JSON.stringify(cut)) <= 300) return cut;
+  const cut = raw.slice(0, MAX_KNOWLEDGE_NAME);
+  if (Buffer.byteLength(JSON.stringify(cut)) <= MAX_NAME_JSON_BYTES) return cut;
   // A character cap alone cannot bound UTF-8 or JSON-escaped controls.
   let name = "";
   let bytes = 2;
   for (const character of cut) {
     bytes += Buffer.byteLength(JSON.stringify(character)) - 2;
-    if (bytes > 300) break;
+    if (bytes > MAX_NAME_JSON_BYTES) break;
     name += character;
   }
   return name;
@@ -180,17 +182,15 @@ export function judgeMembers(
       result.unchanged++;
       continue;
     }
-    files.push({
-      name: file.name,
-      text: file.text,
-      replaces: before !== undefined,
-    });
+    files.push({ name: file.name, text: file.text });
     if (before === undefined) result.added++;
     else result.replaced++;
     if (file.renamed) result.renamed++;
-    if (result.saved.length < 200) result.saved.push(file.name);
+    if (result.saved.length < MAX_ANSWER_NAMES) result.saved.push(file.name);
   }
   result.skippedTotal = skipped.length;
-  result.skipped = skipped.sort((a, b) => a.index - b.index).slice(0, 200);
+  result.skipped = skipped
+    .sort((a, b) => a.index - b.index)
+    .slice(0, MAX_ANSWER_NAMES);
   return { files, result };
 }

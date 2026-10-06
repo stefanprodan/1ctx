@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The credentials, all for admins: the list with the http- key names,
-// a new one, a change and a deletion. The links to projects are written
-// in the transaction that checks them.
 
 import type {
   CredentialResponse,
@@ -22,17 +18,8 @@ import { json, type RouteDescriptor } from "../lib/http.ts";
 import { prefixesOverlap } from "./check.ts";
 import { type KeyRead, keyState } from "./key.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
+import { type ProjectsPort, teamName } from "./projects.ts";
 import type { CredentialRow, CredentialStore } from "./store.ts";
-
-export type ProjectsPort = {
-  byId(id: string): { kind: string; name: string } | null;
-};
-
-// a team project's name, null for a personal or a missing one
-export function teamName(projects: ProjectsPort, id: string): string | null {
-  const project = projects.byId(id);
-  return project?.kind === "team" ? project.name : null;
-}
 
 export type RoutesDeps = {
   db: Db;
@@ -52,7 +39,7 @@ export type ReposPort = {
   usingKeys(): { keyName: string; projectId: string; name: string }[];
 };
 
-export function summary(
+function summary(
   row: CredentialRow,
   key: CredentialSummary["key"],
   teamName: (id: string) => string | null,

@@ -4,6 +4,11 @@
 // An error with a status is what the router turns into a JSON body; any
 // other throw is a bug and propagates.
 
+// a throw's words, whatever was thrown
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -66,6 +71,16 @@ export class ServiceUnavailable extends HttpError {
   constructor(message = "service unavailable") {
     super(503, message);
   }
+}
+
+// a pure rule's answer: the value, or the 400's words
+export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export const refused = (error: string) => ({ ok: false, error }) as const;
+
+export function checked<T>(result: Checked<T>): T {
+  if (!result.ok) throw new BadRequest(result.error);
+  return result.value;
 }
 
 // A failure whose message names what the caller sent or a server

@@ -7,11 +7,13 @@
 
 import { isIP } from "node:net";
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
+import type { Me } from "../../shared/contracts/user.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
-import { json, type RouteDescriptor } from "../lib/http.ts";
+import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { meOf, type UserRow, verifyPassword } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
@@ -21,8 +23,13 @@ import { RateLimit } from "./ratelimit.ts";
 export const LOGIN_LIMIT = 10;
 export const LOGIN_WINDOW_MS = MINUTE_MS;
 
-// a hash to verify against when the name is unknown, so the work and the
-// time are the same as for a known name
+const meOfPrincipal = (p: Principal): Me => ({
+  id: p.userId,
+  username: p.username,
+  fullName: p.fullName,
+  role: p.role,
+  mustChangePassword: p.mustChangePassword,
+});
 
 export type UsersPort = {
   byUsername(username: string): UserRow | null;
@@ -45,11 +52,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/login",
       policy: "public",
       async handle(req, ctx) {
+        const addr = isIP(ctx.address) === 0 ? "invalid" : ctx.address;
         if (!limit.hit(ctx.address, deps.clock())) {
           if (limit.closed(ctx.address)) {
-            deps.log.warn("login limited", {
-              addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
-            });
+            deps.log.warn("login limited", { addr });
           }
           throw new TooManyRequests("too many sign-in attempts. Wait a minute");
         }
@@ -60,10 +66,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           user?.passwordHash ?? (await deps.users.nobodyHash()),
         );
         const wrong = new Unauthorized("wrong username or password");
-        const logFailure = () =>
-          deps.log.warn("login failed", {
-            addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
-          });
+        const logFailure = () => deps.log.warn("login failed", { addr });
         if (!ok || user === null || user.disabled) {
           logFailure();
           throw wrong;
@@ -98,12 +101,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const principal = ctx.principal!;
         const cleared = transact(deps.db, () => ({
           result: deps.auth.close(principal.loginId),
-          events: [
-            {
-              type: "login.revoked",
-              data: { userId: principal.userId, loginId: principal.loginId },
-            },
-          ],
+          events: [loginRevoked(principal.userId, principal.loginId)],
         }));
         deps.log.info("login closed", { user: principal.username });
         return json({ ok: true }, 200, { "set-cookie": cleared });
@@ -117,17 +115,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "public",
       handle(_req, ctx) {
         const p = ctx.principal;
-        const body: MeResponse = {
-          user: p
-            ? {
-                id: p.userId,
-                username: p.username,
-                fullName: p.fullName,
-                role: p.role,
-                mustChangePassword: p.mustChangePassword,
-              }
-            : null,
-        };
+        const body: MeResponse = { user: p ? meOfPrincipal(p) : null };
         return json(body);
       },
     },

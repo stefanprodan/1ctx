@@ -209,7 +209,7 @@ function compare(
         .query<RawSession, [string]>("select * from sessions where id = ?")
         .get(id)!,
   );
-  const got = feedRead(db, projectIds, q, origin, before, limit);
+  const got = feedRead(db, { projectIds, q, origin, before, limit });
   // toEqual only for the diff: it is most of the suite's time otherwise
   if (!Bun.deepEquals(got, want)) {
     expect({ projectIds, q, origin, before, limit, got }).toEqual({
@@ -224,11 +224,7 @@ function compare(
   const response = listSessions(
     db,
     { latest: () => null, latestFor: () => new Map() },
-    projectIds,
-    q,
-    origin,
-    before,
-    limit,
+    { projectIds, q, origin, before, limit },
   );
   const next = want.length > limit ? feedCursor(want[limit - 1]!) : null;
   const counts = new Map(
@@ -489,7 +485,7 @@ function capture(
   const query = spyOn(db, "query");
   let sqls: string[];
   try {
-    feedRead(db, ids, q, origin, before, 50);
+    feedRead(db, { projectIds: ids, q, origin, before, limit: 50 });
     sqls = query.mock.calls.map(([sql]) => sql);
   } finally {
     query.mockRestore();

@@ -14,9 +14,7 @@ import {
 } from "../../shared/contracts/repo.ts";
 import { isName } from "../../shared/words.ts";
 
-export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
-
-const refused = (error: string) => ({ ok: false, error }) as const;
+import { type Checked, refused } from "../lib/errors.ts";
 
 // never a lone or leading dash, which GitLab keeps for its own pages
 const SEGMENT = /^[A-Za-z0-9_.][A-Za-z0-9._-]*$/;

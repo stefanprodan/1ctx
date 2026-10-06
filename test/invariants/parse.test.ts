@@ -626,6 +626,8 @@ describe("titleFrom", () => {
     ["", ""],
     ["a".repeat(MAX_TITLE), "a".repeat(MAX_TITLE)],
     ["a".repeat(MAX_TITLE + 1), `${"a".repeat(MAX_TITLE - 1)}…`],
+    // an emoji astride the cut goes whole, never half a surrogate pair
+    [`${"a".repeat(MAX_TITLE - 2)}\u{1F600}b`, `${"a".repeat(MAX_TITLE - 2)}…`],
   ])("turns %p into %p", (input, expected) => {
     expect(titleFrom(input)).toBe(expected);
   });

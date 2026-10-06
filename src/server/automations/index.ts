@@ -16,7 +16,7 @@ import type { UserRow } from "../users/index.ts";
 import { type Alerts, alerts } from "./alerts.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
-import { AutomationStore } from "./store.ts";
+import { AutomationStore, automationChanged } from "./store.ts";
 
 export { checkSchedule, nextFire, nextFires } from "./schedule.ts";
 
@@ -35,9 +35,8 @@ export type AutomationsDeps = {
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
   sessions: SessionStore;
   runner: { startRun(event: Event): PreparedRun };
-  // the run-attention decision is on with a decider to ask; off when
-  // absent
-  deciderOn?: () => boolean;
+  // the run-attention decision is on with a decider to ask
+  deciderOn(): boolean;
   // the decider's chance on a run, in the caller's transaction
   markAttention(sessionId: string, attention: number, by: string): boolean;
 };
@@ -73,10 +72,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     alerts: alerted,
     scheduler: scheduled,
     suspendAgent: (agentId, by, now) =>
-      store.retireAgent(agentId, by, now).map((row) => ({
-        type: "automation.changed" as const,
-        data: { projectId: row.projectId, automation: row },
-      })),
+      store.retireAgent(agentId, by, now).map(automationChanged),
     start: scheduled.start,
     drain: scheduled.drain,
     stop: scheduled.stop,
@@ -85,7 +81,6 @@ export function automationsArea(deps: AutomationsDeps): Automations {
       ...deps,
       store,
       scheduler: scheduled,
-      deciderOn: deps.deciderOn ?? (() => false),
       alerts: alerted,
     }),
   };

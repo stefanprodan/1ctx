@@ -113,7 +113,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 
 - **A secrets reader is bound to one kind.** One bare value per
   `<kind>-<name>.key`, the kind from `SECRET_KINDS`, the name by
-  `isSecretName`; `read()`, `has()` and `list()` refuse a name of
+  `isSecretName`; `read()` and `list()` refuse a name of
   another kind. `compose.ts` binds each area's reader; only provision,
   the Monitor's key checks (`overview/`) and the log scrubber read by
   kind.
@@ -122,9 +122,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   one past `maxBytes`; `main.ts` caps `http-` files.
 - **A value is never logged, returned by a route or stored.** Routes
   list names alone. Provider, search, MCP and `http-` values are
-  scrubbed from logs. The kinds are listed twice, `SCRUB_KINDS` in
-  `compose.ts` and the startup logger in `main.ts`; a new kind joins
-  both.
+  scrubbed from logs, the kinds in `SCRUB_KINDS` in `compose.ts`.
 
 ## The socket
 

@@ -3,8 +3,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import type { LimitRow } from "../../../shared/contracts/limit.ts";
-import type { LimitName } from "../../../shared/words.ts";
+import type { LimitName, LimitRow } from "../../../shared/contracts/limit.ts";
 import { ApiError } from "../../data/api.ts";
 import { saveLimits } from "../../data/tools.ts";
 import { useFocusField, useSave } from "../../lib/save.ts";

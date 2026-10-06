@@ -7,25 +7,9 @@ import type {
   UpdatePersonalProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
-import {
-  isDescription,
-  isName,
-  MAX_DESCRIPTION,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
-} from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { isDescription, MAX_DESCRIPTION } from "../../shared/words.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-
-function parseName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
-}
 
 function parseDescription(value: unknown): string {
   if (!isDescription(value)) {

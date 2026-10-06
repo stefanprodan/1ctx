@@ -1,16 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The kept MCP files of archived chats and ended runs, packed by a job
-// of their own: a chat may keep up to mcpKeptBytes, too much for a click
-// or for the synchronous sweep. A pass walks the sessions holding files
-// to try by id, over the covering candidate index, a chunk at a time,
-// and packs them in small batches. A batch copies its files' bytes,
-// compresses them one at a time on Bun's thread pool, then writes in one
-// short transaction that rechecks each session by key, so what it
-// writes ended and is not due for deletion at that moment. The main
-// thread only reads, copies and writes; the event loop runs between
-// every step.
 
 import {
   compressKept,
@@ -108,12 +97,8 @@ function step(deps: Deps, walk: Walk): void {
   walk.queue = ids.filter(still);
 }
 
-/**
- * A batch's files, copied in order until the next would take the raw
- * input past maxBytes; the first is taken whatever its size. At most
- * one step of the walk, so a stretch of live sessions never holds the
- * thread; a session whose files are all taken leaves the queue.
- */
+// the first file is taken whatever its size; at most one step of the
+// walk, so a stretch of live sessions never holds the thread
 export function readBatch(deps: Deps, walk: Walk, maxBytes: number): Read[] {
   const files: Read[] = [];
   let bytes = 0;

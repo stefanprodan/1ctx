@@ -1,18 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The server's side of the command worker: a worker per command, ended
-// when the job settles, so a busy loop never holds the thread that
-// serves the streams. A job settles exactly once. A message of another
-// id, of an unknown shape or after the job settled is dropped, and so is
-// a second request under one number, since the commands inside can post
-// too; an answer of this job that does not check out fails it. A
-// cancel lets the command stop on its own within a grace; past it, or
-// at the deadline, the worker is ended. The worker file is an entry
-// point of the compiled binary, where a URL resolves against the
-// compile root, so compose.ts builds it and passes it in.
+// One worker per command, ended when the job settles; compose.ts builds
+// its URL.
 
 import type { SecureFetch } from "just-bash";
+import { messageOf } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
 import {
   type Answer,
@@ -46,12 +39,14 @@ export type CommandStops = {
   phase?: (phase: "run" | "diff") => void;
 };
 
+type WorkerCause = Exclude<CommandCause, "limit" | "busy">;
+
 export type Settled =
   | { ok: true; answer: Answer }
   | {
       ok: false;
       phase: CommandPhase;
-      cause: Exclude<CommandCause, "limit" | "busy">;
+      cause: WorkerCause;
       // the start notice, when the worker got that far
       notice: string;
       error?: Error;
@@ -127,10 +122,7 @@ export function commandWorkers(
         worker.terminate();
         resolve(result);
       };
-      const fail = (
-        cause: Exclude<CommandCause, "limit" | "busy">,
-        error?: Error,
-      ) =>
+      const fail = (cause: WorkerCause, error?: Error) =>
         finish({
           ok: false,
           phase,
@@ -213,7 +205,7 @@ export function commandWorkers(
               request,
               error: {
                 name: error instanceof Error ? error.name : "Error",
-                message: error instanceof Error ? error.message : String(error),
+                message: messageOf(error),
               },
             });
           },

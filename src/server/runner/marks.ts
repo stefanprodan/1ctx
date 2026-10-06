@@ -1,15 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mark a run ends with: its agent's needs_attention reason from the
-// attention step, else, from no model, the runner's fixed words for a
-// run that failed (with the failure's first line), hit its deadline or
-// ran out of budget. Nothing for a
-// chat, an automation whose mode is off, or a run a user, a shutdown or
-// a restart stopped. And what that end does to the automation's open
-// alert (docs/automations.md, The open alert).
+// The mark a run ends with (docs/automations.md, Attention).
 
-import { cutText } from "../../shared/mcp.ts";
+import { cutText } from "../../shared/text.ts";
 import { MAX_ATTENTION_REASON, type SendCause } from "../../shared/words.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { RunMark } from "../sessions/index.ts";

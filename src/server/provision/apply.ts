@@ -23,26 +23,20 @@ import type {
 import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
 import type { SecretKind } from "../../shared/words.ts";
-import { type Client, difference } from "./client.ts";
+import { messageOf } from "../lib/errors.ts";
+import { isToolName } from "../tools/index.ts";
+import {
+  type Action,
+  type Client,
+  difference,
+  idOf,
+  required,
+} from "./client.ts";
 import { decider } from "./decider.ts";
-import { type Document, KINDS } from "./parse.ts";
+import { type Document, KINDS, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 
-export type Action = "created" | "updated" | "unchanged";
-export type Counts = Record<Action, number>;
 export type Secret = (kind: SecretKind, name: string) => string | null;
-type Of<K extends Document["kind"]> = Extract<Document, { kind: K }>;
-
-function idOf(rows: { id: string; name: string }[], name: string): string {
-  const row = rows.find((row) => row.name === name);
-  if (!row) throw new Error(`no such reference ${name}`);
-  return row.id;
-}
-
-function required<T>(value: T | undefined, field: string): T {
-  if (value === undefined) throw new Error(`spec.${field} is required`);
-  return value;
-}
 
 async function user(
   api: Client,
@@ -163,9 +157,7 @@ async function docs(
       });
       report("updated", "Knowledge", `${doc.name}/${file.name}`);
     } catch (error) {
-      throw new Error(
-        `knowledge ${file.name}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      throw new Error(`knowledge ${file.name}: ${messageOf(error)}`);
     }
   }
 }
@@ -394,14 +386,13 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
 
 async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
   const found = await api.call<ToolsResponse>("GET", "/api/tools");
-  const before =
-    doc.name === "web"
-      ? found.access
-      : doc.name === "websearch"
-        ? found.search
-        : doc.name === "visualize"
-          ? found.visualize
-          : null;
+  const before = isToolName(doc.name)
+    ? {
+        web: found.access,
+        websearch: found.search,
+        visualize: found.visualize,
+      }[doc.name]
+    : null;
   if (!before) throw new Error("no such tool");
   const patch = difference(before, doc.spec);
   if (!Object.keys(patch).length) return "unchanged";
@@ -457,7 +448,7 @@ export async function apply(
         report(action, doc.kind, doc.name);
       } catch (error) {
         throw new Error(
-          `${doc.source}: ${doc.kind}/${doc.name}: ${error instanceof Error ? error.message : String(error)}`,
+          `${doc.source}: ${doc.kind}/${doc.name}: ${messageOf(error)}`,
         );
       }
     }

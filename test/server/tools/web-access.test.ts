@@ -3,7 +3,7 @@
 
 import { expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
@@ -19,7 +19,6 @@ function setup() {
     db,
     clock: () => 1,
     log: silent,
-    version: "test",
     render: (text) => text,
     secret: () => null,
     skills: {
@@ -43,7 +42,7 @@ const context = (): ToolContext => ({
   now: () => 0,
   signal: new AbortController().signal,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-  caps: TOOL_CAPS,
+  caps: DEFAULT_LIMITS,
 });
 
 for (const mode of ["off", "all", "listed"] as const) {
@@ -184,16 +183,16 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
     agentName: "agent",
     origin: "chat",
   };
-  const tool = makeBashTool(
-    {
+  const tool = makeBashTool({
+    bash: {
       async run(_project, _session, _author, _command, caps, signal) {
         expect(caps).toEqual({
-          callTimeoutMs: TOOL_CAPS.callTimeoutMs,
-          resultCut: TOOL_CAPS.resultCut,
+          callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
+          resultCut: DEFAULT_LIMITS.resultCut,
           visuals: true,
           knowledge: true,
-          fetchDeadlineMs: TOOL_CAPS.fetchDeadlineMs,
-          fetchBodyBytes: TOOL_CAPS.fetchBodyBytes,
+          fetchDeadlineMs: DEFAULT_LIMITS.fetchDeadlineMs,
+          fetchBodyBytes: DEFAULT_LIMITS.fetchBodyBytes,
           web,
         });
         expect(signal).toBe(ctx.signal);
@@ -201,7 +200,7 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
       },
     },
     web,
-  );
+  });
   expect(tool.description).toContain("host9.test and 2 more");
   expect(tool.description).not.toContain("host10.test");
   expect(tool.description).toContain("Save downloads in /tmp");

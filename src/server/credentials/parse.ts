@@ -15,47 +15,21 @@ import {
 } from "../../shared/contracts/credential.ts";
 import {
   HTTP_KEY_PREFIX,
-  isName,
   isSecretName,
-  MAX_NAME,
-  MIN_NAME,
-  NAME_CHARACTERS,
+  secretNameRule,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
-import { BadRequest } from "../lib/errors.ts";
-import {
-  type Checked,
-  checkHeaderName,
-  checkTemplate,
-  normalizePrefix,
-} from "./check.ts";
-import { orderedMethods } from "./store.ts";
+import { fields, parseName } from "../lib/body.ts";
+import { BadRequest, checked } from "../lib/errors.ts";
+import { checkHeaderName, checkTemplate, normalizePrefix } from "./check.ts";
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
 // more than any project may hold, so a list past it is a typo
 const MAX_PROJECTS = 256;
 
-function checked<T>(result: Checked<T>): T {
-  if (!result.ok) throw new BadRequest(result.error);
-  return result.value;
-}
-
-export function parseName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
-  }
-  return value;
-}
-
 export function parseKeyName(value: unknown): string {
   if (!isSecretName(HTTP_KEY_PREFIX, value)) {
-    throw new BadRequest(
-      "keyName must be http- followed by 1 to 48 lowercase letters, " +
-        "digits and dashes, starting with a letter or digit",
-    );
+    throw new BadRequest(`keyName must be ${secretNameRule(HTTP_KEY_PREFIX)}`);
   }
   return value;
 }
@@ -76,7 +50,7 @@ export function parseMethods(value: unknown): HttpMethod[] {
       `methods must be distinct names from ${HTTP_METHODS.join(", ")}`,
     );
   }
-  return orderedMethods(value);
+  return value;
 }
 
 function parseProjectIds(value: unknown): string[] {

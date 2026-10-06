@@ -117,7 +117,9 @@ describe("startSend", () => {
         });
       }
       expect(seen).toEqual([]);
-      expect(store.list([chat.projectId], "").rows).toEqual([]);
+      expect(store.list({ projectIds: [chat.projectId], q: "" }).rows).toEqual(
+        [],
+      );
       expect(chat.app.runner.registry.size).toBe(0);
       // and the next send is admitted
       const again = await startChat(chat);

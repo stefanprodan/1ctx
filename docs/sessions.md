@@ -236,10 +236,11 @@ that agent answers the one turn (see Summons).
 ## Summons
 
 - **A first word `@name` runs one turn on that agent**
-  (`shared/summon.ts`, `runner/summon.ts`). The chat's own name is an
-  ordinary turn. A name past the first word is plain text, trailing
-  punctuation dropped. A first word naming no live agent is the 400
-  "no agent named <word>", at send, at queueing and on a queued edit.
+  (`shared/summon.ts`, `sessions/summon.ts`, `runner/summon.ts`). The
+  chat's own name is an ordinary turn. A name past the first word is
+  plain text, trailing punctuation dropped. A first word naming no live
+  agent is the 400 "no agent named <word>", at send, at queueing and on
+  a queued edit.
 - **Where a summon is refused.** A new chat's first message cannot
   summon. A multi-message turn holds a summon alone. A run never
   summons. The send is refused, "the chat is too long for <name>", when
@@ -305,7 +306,7 @@ that agent answers the one turn (see Summons).
 - **Rename and delete are the owner's or an admin's;** anyone else
   gets 403. A rename is allowed while the chat runs, since a send never
   writes the title. A delete waits for the end.
-- **Every delete goes through `deleteSession()`**
+- **Every delete goes through `removeSession()`**
   (`sessions/delete.ts`): the route, a task's retention and the sweep.
   The foreign keys take the dependents.
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`

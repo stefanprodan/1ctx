@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { envelope } from "../../../src/server/runner/envelope.ts";
+import { envelope } from "../../../src/server/sessions/envelope.ts";
 import { parseVisualParams } from "../../../src/server/sessions/parse.ts";
 import { offWire } from "../../../src/server/sessions/rows.ts";
 import type { SessionResponse } from "../../../src/shared/api/sessions.ts";

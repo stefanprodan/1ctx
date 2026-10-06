@@ -14,12 +14,7 @@ describe("knowledge store and area", () => {
   test("writes post-images with byte, line, digest, token and author counts", () => {
     const { db, area, projectId, author, agent, now } = setup();
     try {
-      const first = area.create(
-        projectId,
-        author,
-        "docs/x.md",
-        "\ufeffone\r\n",
-      );
+      const first = area.create(projectId, author, "docs/x.md", "one\r\n");
       expect(first).toMatchObject({
         name: "docs/x.md",
         kind: "md",

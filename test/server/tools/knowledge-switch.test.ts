@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
 import { KNOWLEDGE } from "../../../src/shared/capabilities.ts";
@@ -17,7 +17,6 @@ function setup() {
     db,
     clock: () => 1,
     log: silent,
-    version: "test",
     render: (text) => text,
     secret: () => null,
     skills: { forAgent: () => [], body: () => null, file: () => null },
@@ -45,7 +44,7 @@ const context = (): ToolContext => ({
   now: () => 0,
   signal: new AbortController().signal,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-  caps: TOOL_CAPS,
+  caps: DEFAULT_LIMITS,
 });
 
 const bash = { id: "c1", name: "bash", arguments: '{"command":"ls"}' };

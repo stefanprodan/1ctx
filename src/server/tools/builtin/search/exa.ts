@@ -1,10 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Exa wire: an MCP tools/call over its endpoint, answered as JSON or
-// as a single SSE message. Nothing here reads a key file or reaches the
-// network; the area passes the key and the version, the caller does the
-// request.
+// The Exa wire: an MCP tools/call, answered as JSON or one SSE message.
 
 import { isRecord } from "../../../../shared/words.ts";
 import { jsonObject, unexpected } from "./answer.ts";
@@ -51,13 +48,11 @@ export const EXA_URL = "https://mcp.exa.ai/mcp";
 export function buildRequest(
   args: SearchArgs,
   key: string | null,
-  version: string,
 ): ProviderRequest {
   const query = args.domain ? `${args.query} site:${args.domain}` : args.query;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
-    "User-Agent": `1ctx/${version}`,
   };
   if (key !== null) headers["x-api-key"] = key;
   return {

@@ -4,30 +4,20 @@
 // An upload commits every eligible knowledge change together, retaining
 // the mounted identities so a concurrent write refuses the whole commit.
 
-import { sniffArchive } from "../../shared/archive.ts";
 import type {
   KnowledgeAuthor,
   KnowledgeUploadResult,
 } from "../../shared/contracts/knowledge.ts";
 import { FOLDER_ONCE, knowledgeFolder } from "../../shared/knowledge.ts";
 import { type Db, transact } from "../db/index.ts";
-import { type ArchiveMember, readArchive } from "../lib/archive.ts";
-import { readBytes } from "../lib/body.ts";
+import type { ArchiveMember } from "../lib/archive.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { type Change, commitKnowledge } from "./commit.ts";
-import {
-  judgeMembers as judge,
-  type Selection,
-  selectMembers,
-} from "./judge.ts";
-import {
-  MAX_ARCHIVE_EXPANDED,
-  MAX_ARCHIVE_MEMBERS,
-  MAX_ARCHIVE_UPLOAD,
-} from "./limits.ts";
+import { judgeMembers, type Selection, selectMembers } from "./judge.ts";
 import { withUpload } from "./queue.ts";
+import { readUpload } from "./read.ts";
 import type { KnowledgeRow, KnowledgeStore } from "./store.ts";
 
 type UploadDeps = {
@@ -36,8 +26,6 @@ type UploadDeps = {
   clock: Clock;
   current(): KnowledgeCaps;
 };
-
-export { selectMembers } from "./judge.ts";
 
 export function parseFolder(params: URLSearchParams): string {
   const folders = params.getAll("folder");
@@ -49,14 +37,14 @@ export function parseFolder(params: URLSearchParams): string {
   return folder.name;
 }
 
-export function judgeMembers(
+export function judgeUpload(
   manifest: readonly ArchiveMember[],
   selection: Selection,
   rows: readonly KnowledgeRow[],
   caps: KnowledgeCaps,
 ): { changes: Change[]; result: KnowledgeUploadResult } {
   const live = new Map(rows.map((row) => [row.name, row]));
-  const { files, result } = judge(
+  const { files, result } = judgeMembers(
     manifest,
     selection,
     live,
@@ -85,45 +73,20 @@ export async function upload(
     req,
     () => parseFolder(params),
     async (folder, signal, running) => {
-      const bytes = await readBytes(req, MAX_ARCHIVE_UPLOAD, signal);
-      running();
-      let selection: Selection | undefined;
-      let manifest: ArchiveMember[];
-      if (sniffArchive(bytes) !== null) {
-        manifest = await readArchive(
-          bytes,
-          {
-            maxExpandedBytes: MAX_ARCHIVE_EXPANDED,
-            maxMembers: MAX_ARCHIVE_MEMBERS,
-          },
-          signal,
-          (members) => {
-            running();
-            selection = selectMembers(members, folder);
-            running();
-            return selection.candidates.map((member) => member.index);
-          },
-        );
-      } else {
-        const names = params.getAll("name");
-        if (names.length !== 1 || !names[0]) {
-          throw new BadRequest("name is required once for a text file");
-        }
-        manifest = [
-          {
-            index: 0,
-            name: names[0],
-            type: "file",
-            size: bytes.length,
-            data: bytes,
-          },
-        ];
-        selection = selectMembers(manifest, folder);
-      }
-      running();
-      if (selection === undefined)
-        throw new Error("the upload manifest was not selected");
-      const { changes, result } = judgeMembers(
+      const { manifest, selection } = await readUpload(
+        req,
+        signal,
+        running,
+        (members) => selectMembers(members, folder),
+        () => {
+          const names = params.getAll("name");
+          if (names.length !== 1 || !names[0]) {
+            throw new BadRequest("name is required once for a text file");
+          }
+          return names[0];
+        },
+      );
+      const { changes, result } = judgeUpload(
         manifest,
         selection,
         deps.store.read(projectId),

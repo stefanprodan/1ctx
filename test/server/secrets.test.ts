@@ -74,7 +74,6 @@ test("secrets refuse invalid and wrong-kind access at the port", () => {
       expect(store.list(kind)).toEqual(own);
       for (const name of own) {
         expect(store.read(kind, name)).toBe("value");
-        expect(store.has(kind, name)).toBe(true);
       }
       for (const name of [
         ...invalid,
@@ -82,13 +81,11 @@ test("secrets refuse invalid and wrong-kind access at the port", () => {
         `${kind}../outside`,
       ]) {
         expect(() => store.read(kind, name)).toThrow("bad secret name");
-        expect(() => store.has(kind, name)).toThrow("bad secret name");
         expect(store.list(kind)).not.toContain(name);
       }
     }
     for (const kind of ["", "webhook-", "unknown-", "provider-a"]) {
       expect(() => store.read(kind, `${kind}token`)).toThrow("bad secret name");
-      expect(() => store.has(kind, `${kind}token`)).toThrow("bad secret name");
       expect(() => store.list(kind)).toThrow("bad secret kind");
     }
   } finally {
@@ -96,15 +93,13 @@ test("secrets refuse invalid and wrong-kind access at the port", () => {
   }
 });
 
-test("has checks existence, read treats an empty file as absent", () => {
+test("read treats an empty file as absent", () => {
   const dir = mkdtempSync(join(tmpdir(), "1ctx-secrets-"));
   try {
     writeFileSync(join(dir, "provider-empty.key"), " \n\t");
     const store = secrets(dir);
-    expect(store.has("provider-", "provider-empty")).toBe(true);
     expect(store.read("provider-", "provider-empty")).toBeNull();
     expect(store.list("provider-")).toEqual(["provider-empty"]);
-    expect(store.has("provider-", "provider-missing")).toBe(false);
     writeFileSync(join(dir, "http-large.key"), "k".repeat(20));
     expect(store.read("http-", "http-large", 20)).toBe("k".repeat(20));
     expect(store.read("http-", "http-large", 19)).toBeNull();

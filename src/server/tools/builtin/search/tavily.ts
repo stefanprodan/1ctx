@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The Tavily wire: a basic search, answered as JSON. Without a key the
-// request asks for keyless access by header. Nothing here reads a key
-// file or reaches the network; the area passes the key and the version,
-// the caller does the request.
+// request asks for keyless access by header.
 
 import { formatHits, jsonObject } from "./answer.ts";
 import type { ProviderRequest, SearchArgs } from "./types.ts";
@@ -14,11 +12,9 @@ export const TAVILY_URL = "https://api.tavily.com/search";
 export function buildRequest(
   args: SearchArgs,
   key: string | null,
-  version: string,
 ): ProviderRequest {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "User-Agent": `1ctx/${version}`,
   };
   if (key === null) headers["X-Tavily-Access-Mode"] = "keyless";
   else headers.Authorization = `Bearer ${key}`;

@@ -1,16 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The azure wire, for Microsoft Foundry and Azure OpenAI: the Responses
-// API, since Azure refuses function tools with thinking on chat
-// completions. The body is OpenCode's Responses body, stateless with
-// store off, plus the phase Copilot sends back. Stored records are
-// projected, never sent as stored: a reasoning item goes back with its
-// summary and encrypted blob and no index, one with no blob is left
-// out, and a phase record only sets its message's phase. They reach
-// only the provider and model that wrote them (the history's lookup).
-// The API has no author field, so a named user message opens with the
-// author's mark. Two refusals are adapted once each, inside the wire.
 
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Log } from "../lib/log.ts";
@@ -29,7 +18,7 @@ const BASE_PATH = "/openai/v1";
 // moved deployments to the management API, which needs an Entra token
 const DEPLOYMENTS_VERSION = "2022-12-01";
 
-export const AZURE_BASE_URL_PROBLEM =
+const AZURE_BASE_URL_PROBLEM =
   "must be https://<resource>.services.ai.azure.com/openai/v1 or the same path on <resource>.openai.azure.com";
 
 // null when the base URL is a resource's v1 address, on either host
@@ -195,25 +184,19 @@ export function countedText(req: ChatRequest): string {
   });
 }
 
-// a non-2xx answer in the wire's words, with its code and field
+// a refused request's body in the wire's words, with its code and field
 export function azureError(
-  event: Extract<ChatEvent, { kind: "error" }>,
-): Extract<ChatEvent, { kind: "error" }> {
-  const match = /^HTTP (\d+): (.*)$/s.exec(event.message);
-  if (!match || event.code !== undefined) return event;
+  status: number,
+  body: string,
+): Extract<ChatEvent, { kind: "error" }> | null {
   let parsed: { error?: unknown } | null = null;
   try {
-    parsed = JSON.parse(match[2]!);
+    parsed = JSON.parse(body);
   } catch {
-    return event;
+    return null;
   }
-  if (parsed === null || typeof parsed?.error !== "object") return event;
-  return {
-    ...errorEvent(parsed.error, event.status),
-    ...(event.retryAfterMs === undefined
-      ? {}
-      : { retryAfterMs: event.retryAfterMs }),
-  };
+  if (parsed === null || typeof parsed?.error !== "object") return null;
+  return errorEvent(parsed.error, status);
 }
 
 export type AzureChatDeps = {
@@ -231,11 +214,7 @@ const sendsReasoning = (body: Record<string, unknown>) =>
     (item) => item.type === "reasoning",
   );
 
-// Before any event reaches the caller, a 400 that refuses none on a
-// model that always thinks is sent again at low, remembered per model,
-// and one that refuses a blob is sent again without reasoning, after a
-// reasoningRefused event. Each at most once, so a round makes at most
-// three requests and a second refusal is the round's error.
+// two 400s are adapted once each, before any event
 export async function* azureChat(
   req: ChatRequest,
   deps: AzureChatDeps,
@@ -249,8 +228,7 @@ export async function* azureChat(
     const body = buildChatBody(req, { noneAsLow, dropReasoning });
     let again = false;
     let yielded = false;
-    for await (const raw of deps.open(body)) {
-      const event = raw.kind === "error" ? azureError(raw) : raw;
+    for await (const event of deps.open(body)) {
       if (!yielded && event.kind === "error" && event.status === 400) {
         if (
           !raised &&

@@ -608,14 +608,11 @@ describe("the open alert's lists", () => {
 
       // a page of one, then the next by the alert's place
       const usage = { latestFor: () => new Map(), latest: () => null };
-      const page = listAlerts(
-        chat.app.db,
-        usage,
-        [chat.projectId],
-        "",
-        null,
-        1,
-      );
+      const page = listAlerts(chat.app.db, usage, {
+        projectIds: [chat.projectId],
+        q: "",
+        limit: 1,
+      });
       expect(page.rows.map((row) => row.session.id)).toEqual([cLatest]);
       expect(page.next).toBe(`${endOf(chat, cFailed)}.${c.id}`);
       const rest = await pick(`&before=${page.next}`);

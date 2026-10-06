@@ -1,13 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fetch queue: one job per tree folder at a time, each in a fetch
-// slot and a process slot, the cache made room for before it writes,
-// and a tree that failed not fetched again for a while.
+// The fetch queue and the refused-tree memory.
 
 import type { RepoError } from "../../shared/contracts/repo.ts";
 import type { Clock } from "../lib/clock.ts";
-import { newId } from "../lib/ids.ts";
+import { newId, sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { Queue } from "../lib/queue.ts";
 import type { Limits } from "../limits/index.ts";
@@ -53,19 +51,20 @@ export const fail = (error: RepoError): Failure => ({
   status: null,
 });
 
-export const hash = (text: string, length: number) =>
-  new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, length);
+// a job that found no commit, where the commit was known: a failure
+export const asTree = (done: Fetched): Tree =>
+  done.ok || done.error !== "no commit" ? done : fail("host unreachable");
 
 // the kind whose endpoints a row reaches: github.com and gitlab.com fix
 // it, any other host takes the row's
-export const kindOf = (row: Pick<RepoRow, "url" | "kind">) =>
+export const endpointKind = (row: Pick<RepoRow, "url" | "kind">) =>
   adapter(row.url, row.kind).kind;
 
 // the cache's folder name for a repository: no disk path part comes
 // from a host, a repository or a tarball. One URL as two kinds is two
 // repositories, each tree proved by its own endpoints
 export const sourceOf = (row: Pick<RepoRow, "url" | "kind">) =>
-  hash(`${kindOf(row)} ${row.url}`, 16);
+  sha256(`${endpointKind(row)} ${row.url}`).slice(0, 16);
 
 // who fetches: a failure with one key, or with none, is never another's
 const signerOf = (row: RepoRow) => row.keyName ?? "";
@@ -180,10 +179,7 @@ export class Fetches {
       host,
       { url, etag: null, expect: commit, header },
       () => true,
-    ).then((done) => {
-      if (done.ok || done.error !== "no commit") return done as Tree;
-      return fail("host unreachable");
-    });
+    ).then(asTree);
     return this.track(folder, tree, row);
   }
 

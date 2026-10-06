@@ -8,6 +8,7 @@
 // nothing is sent.
 
 import { sanitize } from "../../../shared/memory.ts";
+import { cutCodePoints } from "../../../shared/text.ts";
 import { hasLineBreak, MAX_ATTENTION_REASON } from "../../../shared/words.ts";
 import type { AttentionHandle, Tool } from "../types.ts";
 
@@ -54,19 +55,17 @@ function oneLine(value: unknown): string | null {
   if (typeof value !== "string" || hasLineBreak(value.trim())) return null;
   const reason = sanitize(value);
   if (reason === "") return null;
-  const chars = [...reason];
-  return chars.length <= MAX_ATTENTION_REASON
+  return [...reason].length <= MAX_ATTENTION_REASON
     ? reason
-    : `${chars
-        .slice(0, MAX_ATTENTION_REASON - 1)
-        .join("")
-        .trimEnd()}…`;
+    : `${cutCodePoints(reason, MAX_ATTENTION_REASON - 1).trimEnd()}…`;
 }
 
-// the reason as stored, or null for one the model has to write again
-export function parseReason(value: unknown): string | null {
+// the reason as stored; a throw is the model's to write again
+export function checkReason(value: unknown): string {
   const reason = oneLine(value);
-  return reason === null || placeholder(reason) ? null : reason;
+  if (reason === null) throw new Error(REFUSED);
+  if (placeholder(reason)) throw new Error(FILLER_REFUSED);
+  return reason;
 }
 
 export function makeAttentionTool(handle: AttentionHandle): Tool {
@@ -80,10 +79,7 @@ export function makeAttentionTool(handle: AttentionHandle): Tool {
       additionalProperties: false,
     },
     async run(args) {
-      const reason = oneLine(args.reason);
-      if (reason === null) throw new Error(REFUSED);
-      if (placeholder(reason)) throw new Error(FILLER_REFUSED);
-      handle.reason = reason;
+      handle.reason = checkReason(args.reason);
       return "Marked.";
     },
   };

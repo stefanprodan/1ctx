@@ -5,7 +5,9 @@
 // asks: every object by kind and name, and a team project's docs.
 
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { TOOL_NAMES } from "../tools/index.ts";
 import type { Inventory, ProjectDocs } from "./parse.ts";
+import { repoKey } from "./repository.ts";
 
 type Named = { list(): { name: string }[] };
 
@@ -19,7 +21,7 @@ export type InventorySources = {
   repos: { forProject(projectId: string): { name: string }[] };
   providers: Named;
   deciders: Named;
-  skills: { summaries(agentNames: () => string[]): { name: string }[] };
+  skills: { names(): string[] };
   mcp: Named;
   agents: Named;
 };
@@ -37,14 +39,14 @@ export function inventoryOf(sources: InventorySources): Inventory {
       const project = sources.projects.byId(id)!.name;
       return sources.repos
         .forProject(id)
-        .map((row) => `${project}/${row.name}`);
+        .map((row) => repoKey(project, row.name));
     }),
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
-    Skill: sources.skills.summaries(() => []).map((row) => row.name),
+    Skill: sources.skills.names(),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),
-    Tool: ["web", "websearch", "visualize"],
+    Tool: [...TOOL_NAMES],
   };
 }
 

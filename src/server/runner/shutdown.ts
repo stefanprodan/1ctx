@@ -7,29 +7,13 @@
 // waits, within its own deadline, for the streams, the asks and what
 // the caller closes after them.
 
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, sleep } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import type { Registry } from "./registry.ts";
 import type { ActiveSend } from "./send.ts";
 
 export type ShutdownResult = { ended: number; timedOut: boolean };
 export type DrainResult = { drained: number };
-
-// resolves after ms on the clock, and a cancel for a real timer
-function deadline(clock: Clock, ms: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const done = clock.sleep
-    ? clock.sleep(ms)
-    : new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms);
-      });
-  return {
-    done,
-    cancel: () => {
-      if (timer !== undefined) clearTimeout(timer);
-    },
-  };
-}
 
 export async function drainRunner(
   registry: Registry,
@@ -58,10 +42,10 @@ export async function drainRunner(
   )
     .then(() => asks.settled())
     .then(() => true);
-  const bound = deadline(clock, boundMs);
+  const bound = sleep(clock, boundMs);
   const finished = await Promise.race([
     own,
-    bound.done.then(() => false),
+    bound.promise.then(() => false),
     cut.then(() => false),
   ]);
   bound.cancel();
@@ -102,10 +86,10 @@ export async function shutdownRunner(
     ...sends.map((send) => send.drained),
     closeAsks(),
   ]).then(closeOnce);
-  const bound = deadline(clock, timeoutMs);
+  const bound = sleep(clock, timeoutMs);
   const timedOut = await Promise.race([
     waits.then(() => false),
-    bound.done.then(() => true),
+    bound.promise.then(() => true),
   ]);
   bound.cancel();
   if (timedOut) {

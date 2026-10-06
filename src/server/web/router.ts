@@ -1,14 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one place access is enforced. A request is matched to a
-// descriptor, checked for same origin when it is not a GET (an upgrade
-// counts as a write: a browser sends Origin on the handshake), given a
-// principal, checked against the descriptor's policy, and only then
-// handed to the handler. An HttpError and an unexpected throw become
-// JSON bodies. A cookie the resolver renewed rides back on every
-// response unless the handler set its own, and on an upgrade it rides
-// in the handshake headers.
+// The one place access is enforced; an upgrade counts as a write, since
+// a browser sends Origin on the handshake.
 
 import { isIP } from "node:net";
 import { BadRequest, HttpError } from "../lib/errors.ts";
@@ -159,67 +153,8 @@ async function dispatch(
   }
 }
 
-function requestFields(
-  method: string,
-  route: string,
-  status: number,
-  started: number,
-  address: string,
-  principal: Principal | null | undefined,
-  error?: unknown,
-): LogFields {
-  const details = error === undefined ? {} : errorFields(error);
-  const { status: _errorStatus, ...withoutErrorStatus } = details;
-  return {
-    method,
-    route,
-    status,
-    duration: performance.now() - started,
-    user:
-      principal === undefined
-        ? undefined
-        : principal === null
-          ? "nobody"
-          : principal.username,
-    addr: isIP(address) === 0 ? "invalid" : address,
-    ...withoutErrorStatus,
-  };
-}
-
 // a probe asks every few seconds and never says anything in the log
 const PROBES = new Set(["/api/health", "/api/ready"]);
-
-function recordRequest(
-  log: Log,
-  method: string,
-  route: string,
-  probe: boolean,
-  status: number,
-  started: number,
-  address: string,
-  principal: Principal | null | undefined,
-  error?: unknown,
-): void {
-  if (probe) return;
-  // a 5xx is our bug whoever asked; below that only a signed-in user's
-  // requests say anything, since our client never calls a missing route
-  // or writes cross-origin, and a scanner's 4xx would fill the disk
-  if (status < 500) {
-    if (principal === null || principal === undefined) return;
-    if (method === "GET" && status < 400) return;
-  }
-  const fields = requestFields(
-    method,
-    route,
-    status,
-    started,
-    address,
-    principal,
-    error,
-  );
-  if (error === undefined) log.info("request", fields);
-  else log.error("request", fields);
-}
 
 export function router(deps: RouterDeps): Router {
   const clashes = conflicts(deps.routes);
@@ -229,6 +164,40 @@ export function router(deps: RouterDeps): Router {
     const started = performance.now();
     const url = new URL(req.url);
     const method = req.method as Method;
+    const probe = PROBES.has(url.pathname);
+    const record = (
+      route: string,
+      status: number,
+      principal: Principal | null | undefined,
+      error?: unknown,
+    ): void => {
+      if (probe) return;
+      // a 5xx is our bug whoever asked; below that only a signed-in user's
+      // requests say anything, since our client never calls a missing route
+      // or writes cross-origin, and a scanner's 4xx would fill the disk
+      if (status < 500) {
+        if (principal === null || principal === undefined) return;
+        if (method === "GET" && status < 400) return;
+      }
+      const details = error === undefined ? {} : errorFields(error);
+      const { status: _errorStatus, ...withoutErrorStatus } = details;
+      const fields: LogFields = {
+        method,
+        route,
+        status,
+        duration: performance.now() - started,
+        user:
+          principal === undefined
+            ? undefined
+            : principal === null
+              ? "nobody"
+              : principal.username,
+        addr: isIP(address) === 0 ? "invalid" : address,
+        ...withoutErrorStatus,
+      };
+      if (error === undefined) deps.log.info("request", fields);
+      else deps.log.error("request", fields);
+    };
     let pathMatched = false;
     for (const route of compiled) {
       const match = route.pattern.exec(url.pathname);
@@ -240,37 +209,18 @@ export function router(deps: RouterDeps): Router {
         !sameOrigin(req, url, deps.trustProxy)
       ) {
         const res = json({ error: "cross-origin request" }, 403);
-        recordRequest(
-          deps.log,
-          method,
-          route.path,
-          PROBES.has(url.pathname),
-          res.status,
-          started,
-          address,
-          undefined,
-        );
+        record(route.path, res.status, undefined);
         return res;
       }
-      const resolved = route.policy !== "webhook";
+      const resolves = route.policy !== "webhook";
       let resolution: ReturnType<Resolver>;
       try {
-        resolution = resolved
+        resolution = resolves
           ? deps.resolve(req)
           : { principal: null, setCookie: null };
       } catch (error) {
         const res = json({ error: "internal error" }, 500);
-        recordRequest(
-          deps.log,
-          method,
-          route.path,
-          PROBES.has(url.pathname),
-          res.status,
-          started,
-          address,
-          undefined,
-          error,
-        );
+        record(route.path, res.status, undefined, error);
         return res;
       }
       const upgrade =
@@ -302,15 +252,10 @@ export function router(deps: RouterDeps): Router {
       if (resolution.setCookie !== null && !res.headers.has("set-cookie")) {
         res.headers.set("set-cookie", resolution.setCookie);
       }
-      recordRequest(
-        deps.log,
-        method,
+      record(
         route.path,
-        PROBES.has(url.pathname),
         res.status,
-        started,
-        address,
-        resolved ? resolution.principal : undefined,
+        resolves ? resolution.principal : undefined,
         unexpected,
       );
       return res;
@@ -319,16 +264,7 @@ export function router(deps: RouterDeps): Router {
       { error: pathMatched ? "method not allowed" : "not found" },
       pathMatched ? 405 : 404,
     );
-    recordRequest(
-      deps.log,
-      method,
-      "unmatched",
-      PROBES.has(url.pathname),
-      res.status,
-      started,
-      address,
-      undefined,
-    );
+    record("unmatched", res.status, undefined);
     return res;
   };
 }

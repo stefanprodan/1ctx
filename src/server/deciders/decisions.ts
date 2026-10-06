@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The decisions' settings: rows only for what an admin changed, merged
-// with the code, so a later change to a default reaches every decision
-// that kept it.
 
 import {
   DECISION_OPTIONS,
@@ -19,6 +15,15 @@ export type DecisionFields = {
   // every option key of the decision, each description trimmed
   options: Record<string, string>;
 };
+
+// the decider a decision asks: the one it names, else the default; none
+// when it is off
+export function deciderIdFor(
+  decision: Pick<DecisionSummary, "enabled" | "deciderId">,
+  defaultId: string | null,
+): string | null {
+  return decision.enabled ? (decision.deciderId ?? defaultId) : null;
+}
 
 export class DecisionStore {
   constructor(private readonly db: Db) {}

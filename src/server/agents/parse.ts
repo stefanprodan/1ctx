@@ -10,21 +10,16 @@ import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   isAvatar,
   isMcpMode,
-  isName,
   MAX_CONTEXT_LENGTH,
-  MAX_NAME,
   MAX_SKILLS_PER_AGENT,
   MIN_CONTEXT_LENGTH,
-  MIN_NAME,
-  NAME_CHARACTERS,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseModel, parseName, refusal } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
-export const MAX_MODEL = 200;
 export const MAX_PROMPT = 16_000;
 export const MAX_SERVERS_PER_AGENT = 50;
-export const MAX_UPSTREAM = 100;
+const MAX_UPSTREAM = 100;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,
@@ -48,14 +43,37 @@ export type ParsedAgent = Omit<
   mark: boolean | null;
 };
 
-// an agent's name as a path names it, by the same rule a save keeps
-export function parseAgentName(value: unknown): string {
-  if (!isName(value)) {
-    throw new BadRequest(
-      `name must be ${MIN_NAME} to ${MAX_NAME} ${NAME_CHARACTERS}`,
-    );
+// the field parsers provision shares; null leaves the name to its path
+export function parseThinking(
+  value: unknown,
+  field: string | null = "thinking",
+): ParsedAgent["thinking"] {
+  if (value !== null && value !== "on" && value !== "off") {
+    throw refusal(field, "must be on, off or null");
   }
   return value;
+}
+
+export function parseEffort(
+  value: unknown,
+  field: string | null = "effort",
+): string | null {
+  if (value !== null && typeof value !== "string") {
+    throw refusal(field, "must be text or null");
+  }
+  return value;
+}
+
+// trimmed, and empty when left out
+export function parsePrompt(
+  value: unknown,
+  field: string | null = "prompt",
+): string {
+  const prompt = value ?? "";
+  if (typeof prompt !== "string" || prompt.length > MAX_PROMPT) {
+    throw refusal(field, `must be text of at most ${MAX_PROMPT} characters`);
+  }
+  return prompt.trim();
 }
 
 function parseServers(value: unknown): AgentServer[] {
@@ -111,31 +129,16 @@ export function parseAgent(body: unknown): ParsedAgent {
     "skip4Bit",
     "default",
   ]);
-  const name = parseAgentName(b.name);
+  const name = parseName(b.name);
   if (typeof b.providerId !== "string" || b.providerId === "") {
     throw new BadRequest("providerId must be an id");
   }
-  if (
-    typeof b.model !== "string" ||
-    b.model === "" ||
-    b.model.length > MAX_MODEL
-  ) {
-    throw new BadRequest("model must be a model id");
-  }
-  if (b.thinking !== null && b.thinking !== "on" && b.thinking !== "off") {
-    throw new BadRequest("thinking must be on, off or null");
-  }
-  if (b.effort !== null && typeof b.effort !== "string") {
-    throw new BadRequest("effort must be text or null");
-  }
+  const model = parseModel(b.model);
+  const thinking = parseThinking(b.thinking);
+  const effort = parseEffort(b.effort);
   const avatar = b.avatar ?? "bot";
   if (!isAvatar(avatar)) throw new BadRequest("avatar must be a known one");
-  const prompt = b.prompt ?? "";
-  if (typeof prompt !== "string" || prompt.length > MAX_PROMPT) {
-    throw new BadRequest(
-      `prompt must be text of at most ${MAX_PROMPT} characters`,
-    );
-  }
+  const prompt = parsePrompt(b.prompt);
   const skills = b.skills ?? [];
   if (
     !Array.isArray(skills) ||
@@ -195,10 +198,10 @@ export function parseAgent(body: unknown): ParsedAgent {
     name,
     avatar,
     providerId: b.providerId,
-    model: b.model,
-    thinking: b.thinking,
-    effort: b.effort,
-    prompt: prompt.trim(),
+    model,
+    thinking,
+    effort,
+    prompt,
     skills,
     servers,
     mcpMode,

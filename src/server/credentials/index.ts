@@ -1,32 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// HTTP credentials: a key file in the secrets directory, the https
-// prefix bash's curl signs with it and the header it goes in, bound to
-// team projects by an admin. The key is read when it is needed and
-// never leaves this area but to the caller that signs with it.
+// HTTP credentials: an http- key file curl signs with under a prefix.
 
 import type { KeyState } from "../../shared/contracts/credential.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { type KeyPort, type KeyRead, keyState, readKey } from "./key.ts";
-import {
-  type ProjectsPort,
-  type ReposPort,
-  routes,
-  teamName,
-} from "./routes.ts";
+import { type ProjectsPort, teamName } from "./projects.ts";
+import { type ReposPort, routes } from "./routes.ts";
 import { type CredentialRow, CredentialStore } from "./store.ts";
 
-export {
-  checkHeaderName,
-  checkTemplate,
-  headerValue,
-  isUsableKey,
-  normalizePrefix,
-  prefixesOverlap,
-} from "./check.ts";
+export { headerValue, prefixesOverlap } from "./check.ts";
 export { httpKeys, type KeyRead, MAX_KEY_FILE_BYTES, readKey } from "./key.ts";
 export {
   parseHeader,
@@ -41,7 +27,6 @@ export type CredentialsDeps = {
   db: Db;
   clock: Clock;
   projects: ProjectsPort;
-  // the http- key files: their names, sizes and values
   key: KeyPort;
   capabilities: { forget(key: string): void };
   repos: ReposPort;
@@ -51,7 +36,7 @@ export type Credentials = {
   store: CredentialStore;
   routes: RouteDescriptor[];
   byId(id: string): CredentialRow | null;
-  // the credentials bound to a project, in name order
+  // in name order
   forProject(projectId: string): CredentialRow[];
   // a key as it is now: its file sized, read and held to the key's rule
   readKey(keyName: string): KeyRead;

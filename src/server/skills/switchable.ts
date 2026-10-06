@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The skills a chat or a task can turn off, for the composer's menu and
-// the task editor: by agent id, the skills each agent carries, in name
-// order, over one read. An agent without a skill has no entry.
 
 import type { SwitchableSkill } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";

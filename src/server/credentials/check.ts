@@ -13,9 +13,7 @@ import {
   MAX_TEMPLATE,
 } from "../../shared/contracts/credential.ts";
 
-export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
-
-const refused = (error: string) => ({ ok: false, error }) as const;
+import { type Checked, refused } from "../lib/errors.ts";
 
 // https alone, never userinfo, a query or a fragment; stored as the
 // parsed origin and path, the host without a trailing dot

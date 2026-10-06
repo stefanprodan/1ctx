@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { REPO_FREE_BYTES, RepoCache } from "../../../src/server/repos/cache.ts";
-import type { TreeMeta } from "../../../src/server/repos/unpack.ts";
+import type { TreeMeta } from "../../../src/server/repos/tree.ts";
 import { COMMIT, cacheDir, NEXT_COMMIT } from "../../helpers/repos.ts";
 
 const dirs: string[] = [];

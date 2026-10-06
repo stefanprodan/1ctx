@@ -85,7 +85,7 @@ describe("runs grouped in All", () => {
     const audit = Array.from({ length: 3 }, (_, i) => run("audit", 5 + i));
     const early = chat(1);
     const late = chat(100);
-    const all = store.list(["p", "t"], "");
+    const all = store.list({ projectIds: ["p", "t"], q: "" });
     expect(ids(all.rows)).toEqual([
       late,
       spend.at(-1)!,
@@ -102,7 +102,7 @@ describe("runs grouped in All", () => {
     run("digest", 10);
     const running = run("digest", 20, "running");
     const newer = chat(100);
-    const rows = store.list(["p"], "").rows;
+    const rows = store.list({ projectIds: ["p"], q: "" }).rows;
     expect(ids(rows)).toEqual([running, newer]);
     expect(rows[0]!.runs).toBe(2);
   });
@@ -112,7 +112,7 @@ describe("runs grouped in All", () => {
     const kept = run("spend", 50);
     const orphans = [run("digest", 10), run("digest", 20)];
     db.query("delete from automations where id = 'digest'").run();
-    const rows = store.list(["p"], "").rows;
+    const rows = store.list({ projectIds: ["p"], q: "" }).rows;
     expect(ids(rows)).toEqual([kept, orphans[1]!, orphans[0]!]);
     expect(counts(rows)).toEqual([1, null, null]);
   });
@@ -121,12 +121,16 @@ describe("runs grouped in All", () => {
     const { store, chat, run } = seeded();
     const runs = [run("digest", 10), run("digest", 20), run("spend", 30)];
     const chats = [chat(5), chat(6)];
-    const tasks = store.list(["p"], "", "automation").rows;
+    const tasks = store.list({
+      projectIds: ["p"],
+      q: "",
+      origin: "automation",
+    }).rows;
     expect(ids(tasks)).toEqual([...runs].reverse());
     expect(counts(tasks)).toEqual([null, null, null]);
-    expect(ids(store.list(["p"], "", "chat").rows)).toEqual(
-      [...chats].reverse(),
-    );
+    expect(
+      ids(store.list({ projectIds: ["p"], q: "", origin: "chat" }).rows),
+    ).toEqual([...chats].reverse());
   });
 
   test("group a search by the newest run that holds it", () => {
@@ -136,18 +140,22 @@ describe("runs grouped in All", () => {
     const renamed = run("digest", 30);
     db.query("update sessions set title = 'daily' where id = ?").run(renamed);
     const found = chat(15, "digest notes");
-    const rows = store.list(["p"], "DIGEST").rows;
+    const rows = store.list({ projectIds: ["p"], q: "DIGEST" }).rows;
     expect(ids(rows)).toEqual([newer, found]);
     expect(counts(rows)).toEqual([3, null]);
-    expect(ids(store.list(["p"], "daily").rows)).toEqual([renamed]);
-    expect(ids(store.list(["p"], "nothing").rows)).toEqual([]);
+    expect(ids(store.list({ projectIds: ["p"], q: "daily" }).rows)).toEqual([
+      renamed,
+    ]);
+    expect(ids(store.list({ projectIds: ["p"], q: "nothing" }).rows)).toEqual(
+      [],
+    );
   });
 
   test("keep an automation out of a project the caller does not see", () => {
     const { store, run } = seeded();
     run("audit", 10);
     const mine = run("digest", 5);
-    expect(ids(store.list(["p"], "").rows)).toEqual([mine]);
+    expect(ids(store.list({ projectIds: ["p"], q: "" }).rows)).toEqual([mine]);
   });
 
   test("page over the lines with no repeat and no gap", () => {
@@ -156,20 +164,19 @@ describe("runs grouped in All", () => {
     const digest = Array.from({ length: 9 }, (_, i) => run("digest", i));
     const spend = run("spend", 3);
     run("audit", 2);
-    const all = ids(store.list(["p"], "", null, null, 1000).rows);
+    const all = ids(store.list({ projectIds: ["p"], q: "", limit: 1000 }).rows);
     expect(all).toHaveLength(9);
     expect(all).toContain(digest.at(-1)!);
     expect(all).toContain(spend);
     const got: string[] = [];
     let before: string | null = null;
     for (let i = 0; i < 10; i++) {
-      const page = store.list(
-        ["p"],
-        "",
-        null,
-        before === null ? null : parseFeedCursor(before),
-        2,
-      );
+      const page = store.list({
+        projectIds: ["p"],
+        q: "",
+        before: before === null ? null : parseFeedCursor(before),
+        limit: 2,
+      });
       got.push(...ids(page.rows));
       if (page.next === null) break;
       before = page.next;
@@ -177,9 +184,14 @@ describe("runs grouped in All", () => {
     expect(got).toEqual(all);
     expect(chats.every((id) => got.includes(id))).toBe(true);
     // a new run moves the line above the cursor: no later page repeats it
-    const first = store.list(["p"], "", null, null, 2);
+    const first = store.list({ projectIds: ["p"], q: "", limit: 2 });
     const moved = run("digest", 500, "running");
-    const rest = store.list(["p"], "", null, parseFeedCursor(first.next!), 50);
+    const rest = store.list({
+      projectIds: ["p"],
+      q: "",
+      before: parseFeedCursor(first.next!),
+      limit: 50,
+    });
     expect(ids(rest.rows)).not.toContain(moved);
     expect(ids(rest.rows)).not.toContain(digest.at(-1)!);
   });

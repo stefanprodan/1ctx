@@ -95,18 +95,16 @@ describe("websearch arguments", () => {
 });
 
 describe("provider requests", () => {
-  test("builds the exact Exa envelope with the 1ctx User-Agent", async () => {
+  test("builds the exact Exa envelope", async () => {
     const request = buildExaRequest(
       { query: "latest kubernetes version", domain: null },
       null,
-      "vtest",
     );
     expect(request).toEqual({
       url: EXA_URL,
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/event-stream",
-        "User-Agent": "1ctx/vtest",
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -120,16 +118,13 @@ describe("provider requests", () => {
     });
     expect(
       JSON.parse(
-        buildExaRequest(
-          { query: "ssh", domain: "fluxcd.io" },
-          "secret",
-          "vtest",
-        ).body,
+        buildExaRequest({ query: "ssh", domain: "fluxcd.io" }, "secret").body,
       ).params.arguments,
     ).toEqual({ query: "ssh site:fluxcd.io", numResults: 5 });
     expect(
-      buildExaRequest({ query: "ssh", domain: "fluxcd.io" }, "secret", "vtest")
-        .headers["x-api-key"],
+      buildExaRequest({ query: "ssh", domain: "fluxcd.io" }, "secret").headers[
+        "x-api-key"
+      ],
     ).toBe("secret");
 
     const seen: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
@@ -137,7 +132,6 @@ describe("provider requests", () => {
       { query: "find" },
       context(),
       search(),
-      "vtest",
       dependencies(async (input, init) => {
         seen.push({ input, init });
         return exaResponse();
@@ -148,19 +142,17 @@ describe("provider requests", () => {
     expect(seen[0].init?.redirect).toBe("error");
   });
 
-  test("builds the exact Firecrawl body with the 1ctx User-Agent", () => {
+  test("builds the exact Firecrawl body", () => {
     expect(
       buildFirecrawlRequest(
         { query: "latest kubernetes version", domain: null },
         null,
-        "vtest",
         10_000,
       ),
     ).toEqual({
       url: FIRECRAWL_URL,
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "1ctx/vtest",
       },
       body: JSON.stringify({
         query: "latest kubernetes version",
@@ -171,7 +163,6 @@ describe("provider requests", () => {
     const restricted = buildFirecrawlRequest(
       { query: "ssh", domain: "fluxcd.io" },
       "secret",
-      "vtest",
       30_000,
     );
     expect(restricted.headers.Authorization).toBe("Bearer secret");
@@ -186,12 +177,8 @@ describe("provider requests", () => {
   test("gives Firecrawl the deadline less its margin, a second at least", async () => {
     const timeout = (deadlineMs: number) =>
       JSON.parse(
-        buildFirecrawlRequest(
-          { query: "find", domain: null },
-          null,
-          "vtest",
-          deadlineMs,
-        ).body,
+        buildFirecrawlRequest({ query: "find", domain: null }, null, deadlineMs)
+          .body,
       ).timeout;
     expect(timeout(1000)).toBe(1000);
     expect(timeout(2500)).toBe(1000);
@@ -203,7 +190,6 @@ describe("provider requests", () => {
       { query: "find" },
       long,
       search("firecrawl"),
-      "vtest",
       dependencies(async (_input, init) => {
         sent = JSON.parse(String(init?.body)).timeout;
         return firecrawlResponse();
@@ -217,13 +203,11 @@ describe("provider requests", () => {
       buildTavilyRequest(
         { query: "latest kubernetes version", domain: null },
         null,
-        "vtest",
       ),
     ).toEqual({
       url: TAVILY_URL,
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "1ctx/vtest",
         "X-Tavily-Access-Mode": "keyless",
       },
       body: JSON.stringify({
@@ -234,7 +218,6 @@ describe("provider requests", () => {
     const restricted = buildTavilyRequest(
       { query: "ssh", domain: "fluxcd.io" },
       "secret",
-      "vtest",
     );
     expect(restricted.headers.Authorization).toBe("Bearer secret");
     expect(restricted.headers["X-Tavily-Access-Mode"]).toBeUndefined();
@@ -256,7 +239,6 @@ describe("provider requests", () => {
         { query: "find" },
         context(),
         search(provider, key),
-        "vtest",
         dependencies(async (input, init) => {
           calls.push({
             url: String(input),
@@ -290,7 +272,6 @@ describe("the area reads the key at each call", () => {
       secret: (name) => secrets[name] ?? null,
       clock: Date.now,
       log: silent,
-      version: "vtest",
       render: (md) => md,
       searchDeps: dependencies(fetcher as never),
       skills: { forAgent: () => [], body: () => null, file: () => null },
@@ -416,7 +397,6 @@ describe("websearch review fixes", () => {
     const tool = makeWebsearchTool(
       () => "tvly-secret",
       "tavily",
-      "vtest",
       dependencies(async () =>
         streamResponse(
           [
@@ -448,7 +428,6 @@ describe("websearch review fixes", () => {
           { query: "find" },
           context(),
           search("tavily", "bad"),
-          "vtest",
           dependencies(async () => streamResponse([body], { status: 401 })),
         ),
       );
@@ -458,7 +437,6 @@ describe("websearch review fixes", () => {
           { query: "find" },
           context(),
           search("firecrawl"),
-          "vtest",
           dependencies(async () => streamResponse([body], { status: 403 })),
         ),
       );
@@ -470,7 +448,6 @@ describe("websearch review fixes", () => {
         { query: "find" },
         context(),
         search("tavily"),
-        "vtest",
         dependencies(async () => streamResponse([""], { status: 401 })),
       ),
     );
@@ -485,7 +462,6 @@ describe("websearch review fixes", () => {
       { query: "find" },
       ctx,
       search("firecrawl"),
-      "vtest",
       dependencies(async (_input, init) => {
         timeout = JSON.parse(String(init?.body)).timeout;
         return firecrawlResponse();
@@ -500,7 +476,6 @@ describe("websearch review fixes", () => {
         { query: "find" },
         ctx,
         search("tavily"),
-        "vtest",
         dependencies(
           async () =>
             streamResponse([""], {

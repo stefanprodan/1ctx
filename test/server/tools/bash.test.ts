@@ -12,7 +12,7 @@ import {
 } from "../../../src/server/bash/queue.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
-import { DEFAULT_LIMITS, TOOL_CAPS } from "../../../src/server/limits/index.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import {
   commandCredentials,
@@ -38,7 +38,7 @@ const context = (): ToolContext => ({
   signal: new AbortController().signal,
   now: () => 0,
   budget: { bashCalls: 0, fetches: 0, searches: 0, visualBytes: 0, visuals: 0 },
-  caps: TOOL_CAPS,
+  caps: DEFAULT_LIMITS,
 });
 
 const call = (args: unknown) => ({
@@ -63,7 +63,7 @@ function mountedContext(s: Setup): ToolContext {
 
 describe("bash", () => {
   test("the catalog uses the command-only schema and its unfilled description", () => {
-    const tool = makeBashTool(undefined, { mode: "all", domains: [] });
+    const tool = makeBashTool({ web: { mode: "all", domains: [] } });
     expect(tool.parameters).toEqual({
       type: "object",
       properties: {
@@ -105,26 +105,28 @@ describe("bash", () => {
       };
       let calls = 0;
       const tool = makeBashTool({
-        async run(projectId, sessionId, author, command, caps, signal) {
-          calls++;
-          expect(projectId).toBe("project");
-          expect(sessionId).toBe("session");
-          expect(author).toEqual({
-            kind: "agent",
-            id: "agent",
-            name: "coder",
-            sessionId: "session",
-            origin: "chat",
-          });
-          expect(command).toBe("sed -i 's/hello/world/' docs/x.md");
-          expect(caps).toEqual({
-            callTimeoutMs: ctx.caps.callTimeoutMs,
-            resultCut: ctx.caps.resultCut,
-            visuals: true,
-            knowledge: true,
-          });
-          expect(signal.aborted).toBe(false);
-          return result;
+        bash: {
+          async run(projectId, sessionId, author, command, caps, signal) {
+            calls++;
+            expect(projectId).toBe("project");
+            expect(sessionId).toBe("session");
+            expect(author).toEqual({
+              kind: "agent",
+              id: "agent",
+              name: "coder",
+              sessionId: "session",
+              origin: "chat",
+            });
+            expect(command).toBe("sed -i 's/hello/world/' docs/x.md");
+            expect(caps).toEqual({
+              callTimeoutMs: ctx.caps.callTimeoutMs,
+              resultCut: ctx.caps.resultCut,
+              visuals: true,
+              knowledge: true,
+            });
+            expect(signal.aborted).toBe(false);
+            return result;
+          },
         },
       });
       expect(
@@ -145,7 +147,7 @@ describe("bash", () => {
       const ctx = mountedContext(s);
       ctx.caps = { ...ctx.caps, maxBashCalls: 1, callTimeoutMs: 100 };
       ctx.budget.bashCalls = 1;
-      const registry = new Registry([makeBashTool(s.bash)]);
+      const registry = new Registry([makeBashTool({ bash: s.bash })]);
       const slots = await Promise.all(
         Array.from({ length: PROCESS_SLOTS }, () =>
           acquireProcess(freshSignal()),
@@ -185,7 +187,7 @@ describe("bash", () => {
       const s = setup();
       const ctx = mountedContext(s);
       ctx.caps = { ...ctx.caps, maxBashCalls: 2 };
-      const registry = new Registry([makeBashTool(s.bash)]);
+      const registry = new Registry([makeBashTool({ bash: s.bash })]);
       const release = await acquireSession(s.session.id, freshSignal());
       const pending = ["first", "second", "third", "fourth"].map((name) =>
         registry.run(call({ command: `echo ${name} > ${name}` }), ctx),
@@ -277,7 +279,7 @@ describe("bash", () => {
     s.knowledge.create(s.projectId, s.author, "old", "old");
     s.knowledge.create(s.projectId, s.author, "source", "x".repeat(2000));
     try {
-      const result = await new Registry([makeBashTool(s.bash)]).run(
+      const result = await new Registry([makeBashTool({ bash: s.bash })]).run(
         call({
           command:
             "cat source; printf one > first; printf two > second; rm old; false",
@@ -312,9 +314,11 @@ describe("bash", () => {
   ])("refuses invalid arguments %j before calling knowledge", async (args) => {
     let calls = 0;
     const tool = makeBashTool({
-      async run() {
-        calls++;
-        return { content: "exit 0", error: false };
+      bash: {
+        async run() {
+          calls++;
+          return { content: "exit 0", error: false };
+        },
       },
     });
     const result = await new Registry([tool]).run(call(args), context());
@@ -337,11 +341,13 @@ describe("bash", () => {
     const controller = new AbortController();
     ctx.signal = controller.signal;
     const tool = makeBashTool({
-      async run(_projectId, _sessionId, _author, _command, _caps, signal) {
-        controller.abort(new Error("stopped"));
-        expect(signal.aborted).toBe(true);
-        signal.throwIfAborted();
-        return { content: "exit 0", error: false };
+      bash: {
+        async run(_projectId, _sessionId, _author, _command, _caps, signal) {
+          controller.abort(new Error("stopped"));
+          expect(signal.aborted).toBe(true);
+          signal.throwIfAborted();
+          return { content: "exit 0", error: false };
+        },
       },
     });
     expect(
@@ -370,17 +376,19 @@ describe("bash with credentials", () => {
       name: "long",
       prefix: `https://long.example.test/${"a".repeat(80)}/`,
     };
-    const words = makeBashTool(undefined, all, true, {
-      offered: [long, quotes],
-      off: [{ name: "prices", prefix: "https://prices.example.test/" }],
+    const words = makeBashTool({
+      web: all,
+      credentials: {
+        offered: [long, quotes],
+        off: [{ name: "prices", prefix: "https://prices.example.test/" }],
+      },
     }).description;
     expect(words).toEndWith(
       `Save downloads in /tmp. curl to ${long.prefix.slice(0, 77)}... (long) is signed in; send no key. curl to https://quotes.example.test/api/v1/ (quotes) is signed in; send no key.`,
     );
     expect(words).not.toContain("prices");
     expect(
-      makeBashTool(undefined, null, true, { offered: [quotes], off: [] })
-        .description,
+      makeBashTool({ credentials: { offered: [quotes], off: [] } }).description,
     ).toEndWith("No network.");
   });
 
@@ -395,8 +403,8 @@ describe("bash with credentials", () => {
       ["http-gone", { ok: false as const, reason: "missing" as const }],
     ]);
     let seen: unknown;
-    const tool = makeBashTool(
-      {
+    const tool = makeBashTool({
+      bash: {
         async run(_projectId, _sessionId, _author, _command, caps) {
           seen = caps;
           return {
@@ -406,9 +414,8 @@ describe("bash with credentials", () => {
           };
         },
       },
-      all,
-      true,
-      {
+      web: all,
+      credentials: {
         offered: [
           quotes,
           { ...quotes, id: "gone1", name: "gone", keyName: "http-gone" },
@@ -417,11 +424,11 @@ describe("bash with credentials", () => {
         ],
         off: [{ name: "prices", prefix: "https://prices.example.test/" }],
       },
-      {
+      keys: {
         byId: (id) => rows.get(id) ?? null,
         readKey: (name) => reads.get(name)!,
       },
-    );
+    });
     const result = await tool.run(
       { command: "curl" },
       { ...context(), web: all },
@@ -493,17 +500,15 @@ describe("bash with credentials", () => {
 
   test("a command without network reads no key", async () => {
     let caps: unknown;
-    const tool = makeBashTool(
-      {
+    const tool = makeBashTool({
+      bash: {
         async run(_projectId, _sessionId, _author, _command, given) {
           caps = given;
           return { content: "exit 0", error: false };
         },
       },
-      null,
-      true,
-      { offered: [quotes], off: [] },
-      {
+      credentials: { offered: [quotes], off: [] },
+      keys: {
         byId: () => {
           throw new Error("no row is read");
         },
@@ -511,7 +516,7 @@ describe("bash with credentials", () => {
           throw new Error("no key is read");
         },
       },
-    );
+    });
     await tool.run({ command: "ls" }, context());
     expect(caps).not.toHaveProperty("credentials");
   });

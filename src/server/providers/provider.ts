@@ -1,45 +1,27 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A provider row, ready to talk to: the wire picks the body and the
-// error text, the base URL and the key file name pick where and as
-// whom. The key is read at each request, so a file added or rotated
-// later is seen, and it never rides in an event: whatever a provider
-// echoes back, and whatever the fetch throws, is scrubbed before the
-// runner sees it. A failure is always an error event, never a throw,
-// so the runner has one channel to finish a round on; a stop by the
-// caller's signal ends the stream with no event, since the caller knows.
 
 import type { Wire } from "../../shared/words.ts";
-import type { Log } from "../lib/log.ts";
+import { messageOf } from "../lib/errors.ts";
+import { type Log, scrubValues } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
-import { azureChat, azureUrls, countedText, responsesTools } from "./azure.ts";
+import {
+  azureChat,
+  azureError,
+  azureUrls,
+  countedText,
+  responsesTools,
+} from "./azure.ts";
 import { azureEvents } from "./azure-stream.ts";
 import {
-  buildChatBody as buildGeminiChatBody,
-  geminiError,
-  geminiEvents,
-} from "./gemini.ts";
-import {
-  buildChatBody as buildOpenAiChatBody,
-  chatEvents,
   wireTokens as chatToolTokens,
+  type StreamOptions,
   streamChat,
   Unanswered,
   wireTools,
 } from "./openai.ts";
-import {
-  buildChatBody as buildOpenCodeChatBody,
-  openCodeHeaders,
-  sendsReasoning,
-} from "./opencode.ts";
-import {
-  buildChatBody as buildOpenRouterChatBody,
-  openRouterError,
-  openRouterEvents,
-} from "./openrouter.ts";
+import { sendsReasoning } from "./opencode.ts";
 import type { ProviderRow } from "./store.ts";
-import { buildChatBody as buildStrictChatBody } from "./strict.ts";
 import type {
   ChatEvent,
   ChatMessageIn,
@@ -48,6 +30,7 @@ import type {
   Fetcher,
   Provider,
 } from "./types.ts";
+import { authHeaders, CHAT_WIRES, endpoint } from "./wires.ts";
 
 export type ProviderDeps = {
   fetcher: Fetcher;
@@ -61,14 +44,25 @@ export type ProviderDeps = {
   log?: Log;
 };
 
-export const OPENROUTER_HEADERS = {
-  "http-referer": "https://1ctx.dev",
-  "x-title": "1ctx",
-};
+// the key file's value, null for a provider that needs none or whose
+// file is missing (noKeyFile)
+export function keyOf(
+  row: Pick<ProviderRow, "keyName">,
+  secret: (name: string) => string | null,
+): string | null {
+  return row.keyName === null ? null : secret(row.keyName);
+}
+
+export const noKeyFile = (row: Pick<ProviderRow, "name" | "keyName">) =>
+  `${row.name} has no key file ${row.keyName}.key`;
+
+export function scrubKey(text: string, key: string | null): string {
+  return scrubValues(text, [key], "[key]");
+}
 
 // the messages as a fit counts them: a message's plain reasoning only
 // where the wire sends it back
-export function sentMessages(
+function sentMessages(
   wire: Wire | null,
   model: string,
   messages: ChatMessageIn[],
@@ -91,7 +85,6 @@ export function requestText(wire: Wire | null, req: ChatRequest): string {
   });
 }
 
-// the tokens a request costs on the wire
 export function requestTokens(wire: Wire | null, req: ChatRequest): number {
   return tokens(requestText(wire, req));
 }
@@ -107,14 +100,6 @@ export function wireTokens(
 }
 
 export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
-  const openRouter = row.wire === "openrouter";
-  const gemini = row.wire === "gemini";
-  const openCode = row.wire === "opencode";
-  const azure = row.wire === "azure";
-  const path = gemini ? "/openai/chat/completions" : "/chat/completions";
-  const url = azure
-    ? azureUrls(row.baseUrl).chat
-    : `${row.baseUrl.replace(/\/+$/, "")}${path}`;
   const noneRefused = deps.noneRefused ?? new Set<string>();
   return {
     id: row.id,
@@ -123,89 +108,56 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
       req: ChatRequest,
       signal: AbortSignal,
     ): AsyncIterable<ChatEvent> {
-      const key = row.keyName === null ? null : deps.secret(row.keyName);
+      const key = keyOf(row, deps.secret);
       if (row.keyName !== null && key === null) {
-        yield {
-          kind: "error",
-          message: `${row.name} has no key file ${row.keyName}.key`,
-        };
+        yield { kind: "error", message: noKeyFile(row) };
         return;
       }
-      const headers: Record<string, string> = {
-        ...(openRouter ? OPENROUTER_HEADERS : {}),
-        ...(openCode ? openCodeHeaders(req.cacheKey) : {}),
-        ...(key === null
-          ? {}
-          : azure
-            ? { "api-key": key }
-            : { authorization: `Bearer ${key}` }),
-      };
-      const timeout =
+      const options: StreamOptions =
         deps.headersTimeoutMs === undefined
           ? {}
           : { headersTimeoutMs: deps.headersTimeoutMs };
-      const chatBody = () =>
-        openRouter
-          ? buildOpenRouterChatBody(req)
-          : gemini
-            ? buildGeminiChatBody(req)
-            : row.wire === "openai-strict"
-              ? buildStrictChatBody(req)
-              : openCode
-                ? buildOpenCodeChatBody(req)
-                : buildOpenAiChatBody(req);
-      const scrub = (message: string) =>
-        key === null ? message : message.replaceAll(key, "[key]");
-      const events = azure
-        ? azureChat(req, {
+      const open = (): AsyncIterable<ChatEvent> => {
+        if (row.wire === "azure") {
+          const url = azureUrls(row.baseUrl).chat;
+          return azureChat(req, {
             open: (body) => {
               const stream = azureEvents();
               return streamChat(deps.fetcher, url, body, signal, {
+                ...options,
                 mapEvents: stream.map,
                 ended: stream.ended,
                 thinking: stream.thinking,
-                headers,
-                ...timeout,
+                refusal: azureError,
+                headers: authHeaders(row.wire, key),
               });
             },
             noneRefused,
             providerId: row.id,
             providerName: row.name,
             ...(deps.log === undefined ? {} : { log: deps.log }),
-          })
-        : streamChat(deps.fetcher, url, chatBody(), signal, {
-            mapEvents: openRouter
-              ? openRouterEvents
-              : gemini
-                ? geminiEvents()
-                : chatEvents,
-            headers,
-            ...timeout,
           });
+        }
+        const wire = CHAT_WIRES[row.wire];
+        const url = endpoint(row.baseUrl, wire.path);
+        return streamChat(deps.fetcher, url, wire.body(req), signal, {
+          ...options,
+          mapEvents: wire.events(),
+          ...(wire.refusal === undefined ? {} : { refusal: wire.refusal }),
+          headers: { ...wire.headers(req), ...authHeaders(row.wire, key) },
+        });
+      };
       try {
-        for await (const event of events) {
-          if (event.kind !== "error") {
-            yield event;
-            continue;
-          }
-          yield {
-            ...event,
-            message: scrub(
-              openRouter
-                ? openRouterError(event.message)
-                : gemini
-                  ? geminiError(event.message)
-                  : event.message,
-            ),
-          };
+        for await (const event of open()) {
+          yield event.kind === "error"
+            ? { ...event, message: scrubKey(event.message, key) }
+            : event;
         }
       } catch (err) {
         if (signal.aborted) return;
         yield {
           kind: "error",
-          message: scrub(
-            `${row.name} failed: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+          message: scrubKey(`${row.name} failed: ${messageOf(err)}`, key),
           ...(err instanceof Unanswered
             ? { unanswered: true, ...(err.timedOut ? { timedOut: true } : {}) }
             : {}),

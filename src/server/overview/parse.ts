@@ -6,59 +6,33 @@ import {
   MONTH_PATTERN,
   type OverviewRange,
 } from "../../shared/api/admin.ts";
-import { isTimeZone } from "../../shared/words.ts";
+import { queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-
-function only(url: URL, names: readonly string[]): void {
-  for (const name of url.searchParams.keys()) {
-    if (!names.includes(name)) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
-  }
-}
-
-function one(url: URL, name: string): string {
-  const values = url.searchParams.getAll(name);
-  if (values.length === 0) throw new BadRequest(`${name} is required`);
-  if (values.length !== 1) throw new BadRequest(`${name} must appear once`);
-  return values[0]!;
-}
+import { zoneParam } from "../usage/index.ts";
 
 // the canonical name, since Intl takes any case and the cache keys on it
-function zone(url: URL): string {
-  const timeZone = one(url, "tz");
-  if (!isTimeZone(timeZone)) throw new BadRequest("unknown tz");
+export function canonicalZone(timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions()
     .timeZone;
-}
-
-export function parseZoneQuery(url: URL): string {
-  only(url, ["tz"]);
-  return zone(url);
 }
 
 export function parseOverviewQuery(url: URL): {
   timeZone: string;
   range: OverviewRange;
 } {
-  only(url, ["tz", "range"]);
-  const values = url.searchParams.getAll("range");
-  if (values.length > 1) throw new BadRequest("range must appear once");
-  const range = values[0] ?? "30d";
+  const get = queryParams(url, ["tz", "range"]);
+  const range = get("range") ?? "30d";
   if (!isOverviewRange(range)) throw new BadRequest("unknown range");
-  return { timeZone: zone(url), range };
+  return { timeZone: canonicalZone(zoneParam(get)), range };
 }
 
 export function parseUsageQuery(url: URL): {
   timeZone: string;
   month: string;
 } {
-  only(url, ["tz", "month"]);
-  const month = one(url, "month");
+  const get = queryParams(url, ["tz", "month"]);
+  const month = get("month");
+  if (month === null) throw new BadRequest("month is required");
   if (!MONTH_PATTERN.test(month)) throw new BadRequest("month is YYYY-MM");
-  return { timeZone: zone(url), month };
-}
-
-export function parseNoQuery(url: URL): void {
-  only(url, []);
+  return { timeZone: canonicalZone(zoneParam(get)), month };
 }

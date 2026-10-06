@@ -19,17 +19,20 @@ function named(args: Record<string, unknown>): string {
   return args.name;
 }
 
+function gone(name: string): ToolError {
+  return new ToolError(
+    `skill ${name} is no longer available`,
+    "skill not available",
+  );
+}
+
 function offeredSkill(
   offered: OfferedSkill[],
   args: Record<string, unknown>,
 ): OfferedSkill {
   const name = named(args);
   const skill = offered.find((item) => item.name === name);
-  if (skill === undefined)
-    throw new ToolError(
-      `skill ${name} is no longer available`,
-      "skill not available",
-    );
+  if (skill === undefined) throw gone(name);
   return skill;
 }
 
@@ -60,12 +63,7 @@ export function makeSkillTools(
       async run(args) {
         const snapshot = offeredSkill(offered, args);
         const row = skills.body(snapshot.id, snapshot.name);
-        if (row === null) {
-          throw new ToolError(
-            `skill ${snapshot.name} is no longer available`,
-            "skill not available",
-          );
-        }
+        if (row === null) throw gone(snapshot.name);
         return skillContent({
           name: row.name,
           compatibility: row.compatibility,
@@ -97,12 +95,7 @@ export function makeSkillTools(
           throw new Error("path must be a skill file path");
         }
         const row = skills.body(snapshot.id, snapshot.name);
-        if (row === null) {
-          throw new ToolError(
-            `skill ${snapshot.name} is no longer available`,
-            "skill not available",
-          );
-        }
+        if (row === null) throw gone(snapshot.name);
         const content = skills.file(snapshot.id, snapshot.name, args.path);
         if (content === null) {
           const available =

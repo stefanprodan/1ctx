@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { cutCodePoints } from "../../shared/text.ts";
+import { bytesWords } from "../lib/bytes.ts";
 import { sha256 } from "../lib/ids.ts";
+import type { Fetcher } from "../providers/index.ts";
 import {
-  cut,
-  type Fetcher,
+  type ClientInfo,
   type ListedTool,
   scrub,
   withClient,
@@ -13,7 +15,7 @@ import {
   DISCOVERY_BODY_BYTES,
   DISCOVERY_TIMEOUT_MS,
   MAX_INSTRUCTIONS,
-  MAX_SERVER_NAME,
+  MAX_REPORTED_SERVER_NAME,
   MAX_SERVER_VERSION,
   MAX_TOOL_DESCRIPTION,
   MAX_TOOL_SCHEMA_BYTES,
@@ -40,8 +42,6 @@ export type DiscoveryResult = {
   tools: DiscoveredTool[];
 };
 
-const bytes = (text: string) => new TextEncoder().encode(text).byteLength;
-
 export function fingerprint(fields: {
   serverName: string;
   serverVersion: string;
@@ -65,7 +65,7 @@ function schemaOf(tool: ListedTool): {
   const inputSchema = { ...tool.inputSchema };
   if (inputSchema.properties === undefined) inputSchema.properties = {};
   const schemaJson = JSON.stringify(inputSchema);
-  const size = bytes(schemaJson);
+  const size = Buffer.byteLength(schemaJson);
   if (size <= MAX_TOOL_SCHEMA_BYTES) {
     return { inputSchema, schemaJson, size, unusable: null };
   }
@@ -74,7 +74,24 @@ function schemaOf(tool: ListedTool): {
     inputSchema: replacement,
     schemaJson: JSON.stringify(replacement),
     size,
-    unusable: "input schema is over 64 KB",
+    unusable: `input schema is over ${bytesWords(MAX_TOOL_SCHEMA_BYTES)}`,
+  };
+}
+
+// the server's identity as stored, scrubbed and cut, with its
+// fingerprint, so a call compares what discovery kept
+export function identityOf(info: ClientInfo, key: string | null) {
+  const raw = scrub(info, key);
+  const identity = {
+    serverName: cutCodePoints(raw.serverName, MAX_REPORTED_SERVER_NAME),
+    serverVersion: cutCodePoints(raw.serverVersion, MAX_SERVER_VERSION),
+    instructions: cutCodePoints(raw.instructions.trim(), MAX_INSTRUCTIONS),
+  };
+  return {
+    ...identity,
+    protocolEra: raw.protocolEra,
+    protocolVersion: raw.protocolVersion,
+    fingerprint: fingerprint(identity),
   };
 }
 
@@ -105,20 +122,24 @@ export async function discover(
       const tools: DiscoveredTool[] = [];
       const seen = new Set<string>();
       let total = 0;
-      for (const listedTool of listed.tools) {
-        if (seen.has(listedTool.name)) {
-          throw new Error(`the server listed ${listedTool.name} twice`);
+      for (const tool of listed.tools) {
+        if (seen.has(tool.name)) {
+          throw new Error(`the server listed ${tool.name} twice`);
         }
-        seen.add(listedTool.name);
-        const tool = scrub(listedTool, key);
+        seen.add(tool.name);
         const schema = schemaOf(tool);
-        const description = cut(
+        const description = cutCodePoints(
           typeof tool.description === "string" ? tool.description : "",
           MAX_TOOL_DESCRIPTION,
         );
-        total += bytes(tool.name) + bytes(description) + schema.size;
+        total +=
+          Buffer.byteLength(tool.name) +
+          Buffer.byteLength(description) +
+          schema.size;
         if (total > MAX_TOOLS_BYTES) {
-          throw new Error("the server's tools are over 512 KB");
+          throw new Error(
+            `the server's tools are over ${bytesWords(MAX_TOOLS_BYTES)}`,
+          );
         }
         tools.push({
           name: tool.name,
@@ -128,16 +149,8 @@ export async function discover(
           unusable: schema.unusable,
         });
       }
-      const raw = scrub(client.info(), key);
-      const serverName = cut(raw.serverName, MAX_SERVER_NAME);
-      const serverVersion = cut(raw.serverVersion, MAX_SERVER_VERSION);
-      const instructions = cut(raw.instructions.trim(), MAX_INSTRUCTIONS);
-      const identity = { serverName, serverVersion, instructions };
       return {
-        ...identity,
-        protocolEra: raw.protocolEra,
-        protocolVersion: raw.protocolVersion,
-        fingerprint: fingerprint(identity),
+        ...identityOf(client.info(), key),
         checkedAt: deps.clock(),
         tools,
       };

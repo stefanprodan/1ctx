@@ -10,6 +10,7 @@
 
 import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
+import { cutAt, oneLine } from "../../shared/text.ts";
 import type { Offered } from "../tools/index.ts";
 
 export const TRACE_HEADING = "Calls in this turn, results not included:";
@@ -47,19 +48,32 @@ export function yoursOf(offered: Pick<Offered, "mcp" | "skills">): Yours {
 // a display or a catalog lookup, not work: no line and no count
 const UNTRACED = new Set(["visualize", "mcp_describe"]);
 
+export const roundKey = (row: Pick<Message, "sendId" | "round">): string =>
+  `${row.sendId}:${row.round}`;
+
+// the tool result rows of one (sendId, round), in call order
+export function toolRowsByRound(
+  rows: readonly Message[],
+): Map<string, Message[]> {
+  const byRound = new Map<string, Message[]>();
+  for (const row of rows) {
+    if (row.kind !== "tool") continue;
+    const key = roundKey(row);
+    const calls = byRound.get(key) ?? [];
+    calls.push(row);
+    byRound.set(key, calls);
+  }
+  return byRound;
+}
+
 // the send's calls in order, each paired with its tool row by position
 // in its round, as the writer pairs them; a call with no row failed
 export function traceCalls(rows: readonly Message[]): TraceCall[] {
-  const results = new Map<string, Message[]>();
-  for (const row of rows) {
-    if (row.kind !== "tool") continue;
-    const key = `${row.sendId}:${row.round}`;
-    results.set(key, [...(results.get(key) ?? []), row]);
-  }
+  const results = toolRowsByRound(rows);
   const out: TraceCall[] = [];
   for (const row of rows) {
     if (row.kind !== "reply" || row.slot !== "work") continue;
-    const tools = results.get(`${row.sendId}:${row.round}`) ?? [];
+    const tools = results.get(roundKey(row)) ?? [];
     (row.toolCalls ?? []).forEach((call, index) => {
       if (UNTRACED.has(call.name)) return;
       const result = tools[index];
@@ -76,8 +90,6 @@ export function traceCalls(rows: readonly Message[]): TraceCall[] {
   }
   return out;
 }
-
-const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
 // a catalog call names the MCP tool and carries its arguments inside
 function unwrapped(text: string): Pick<TraceCall, "name" | "arguments"> {
@@ -110,26 +122,26 @@ const text = (args: Record<string, unknown>, key: string) =>
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = toolArguments(call.arguments);
   if (args === null) {
-    return call.name === "memory_edit" ? "" : flat(call.arguments);
+    return call.name === "memory_edit" ? "" : oneLine(call.arguments);
   }
   switch (call.name) {
     case "bash":
       // a line ending in an odd run of backslashes continues; an even run
       // is escaped backslashes and ends the command
-      return flat(
+      return oneLine(
         text(args, "command")
           .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
           .split("\n", 1)[0] ?? "",
       );
     case "websearch":
-      return flat(text(args, "query"));
+      return oneLine(text(args, "query"));
     case "webfetch":
-      return flat(text(args, "url"));
+      return oneLine(text(args, "url"));
     case "skill":
     case "skill_file":
-      return flat(text(args, "name"));
+      return oneLine(text(args, "name"));
     case "memory_edit":
-      return flat(
+      return oneLine(
         [
           `action=${text(args, "action")}`,
           ...(text(args, "topic") === ""
@@ -138,19 +150,15 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
         ].join(" "),
       );
   }
-  if (call.name.startsWith("mcp__")) return flat(pairs(args));
-  if (typeof args.path === "string") return flat(args.path);
-  return flat(pairs(args));
+  if (call.name.startsWith("mcp__")) return oneLine(pairs(args));
+  if (typeof args.path === "string") return oneLine(args.path);
+  return oneLine(pairs(args));
 }
 
-// cut at a code point, never inside a surrogate pair
+// cutText without its trimEnd: the trace's bytes stay as they were
 function cut(value: string, chars: number): string {
   if (value.length <= chars) return value;
-  if (chars <= 1) return "";
-  let end = chars - 1;
-  const last = value.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end--;
-  return `${value.slice(0, end)}…`;
+  return chars <= 1 ? "" : `${cutAt(value, chars - 1)}…`;
 }
 
 // the reading agent lacks the tool: another agent's MCP tool or skill
@@ -170,7 +178,7 @@ const SAVED_ANY = " saved …";
 // the saved docs, the fullest form first: one doc by its path, several
 // in one directory by it, else the first and a count; then shorter forms
 // down to a bare count. Never cut
-export function savedForms(saved: SavedDocs | null): string[] {
+function savedForms(saved: SavedDocs | null): string[] {
   if (saved === null || saved.count === 0) return [];
   const files = saved.count === 1 ? "1 file" : `${saved.count} files`;
   const inDir = saved.dir === null ? [] : [` saved ${files} in ${saved.dir}/`];
@@ -192,7 +200,7 @@ export function traceLine(call: TraceCall, yours: Yours): string {
   const forms = savedForms(call.saved);
   const least = forms.length === 0 ? 0 : SAVED_ANY.length;
   const name = cut(
-    flat(call.name),
+    oneLine(call.name),
     TRACE_LINE_CHARS - status.length - 1 - mark.length - least,
   );
   const fixed = name.length + 1 + status.length + mark.length;

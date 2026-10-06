@@ -9,12 +9,14 @@ import type {
   SkillsResponse,
 } from "../../shared/api/skills.ts";
 import { skillKey } from "../../shared/capabilities.ts";
+import { cutCodePoints } from "../../shared/text.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import {
   Conflict,
   HttpError,
+  messageOf,
   NotFound,
   ServiceUnavailable,
 } from "../lib/errors.ts";
@@ -57,7 +59,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
   });
   const detail = (id: string): SkillResponse => {
     const body = deps.store.bodyOf(id);
-    const skill = deps.store.summaryById(id, deps.agents.agentNames);
+    const skill = deps.store.summaryById(id);
     if (body === null || skill === null) throw new NotFound("no such skill");
     return { skill, body: body.body };
   };
@@ -68,7 +70,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const body: SkillsResponse = {
-          skills: deps.store.summaries(deps.agents.agentNames),
+          skills: deps.store.summaries(),
         };
         return json(body);
       },
@@ -203,10 +205,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return json(response(row));
         } catch (error) {
           if (error instanceof ServiceUnavailable) throw error;
-          const words = error instanceof Error ? error.message : String(error);
+          const words = messageOf(error);
           deps.store.refreshFailed(
             before.id,
-            [...words].slice(0, MAX_REFRESH_ERROR).join(""),
+            cutCodePoints(words, MAX_REFRESH_ERROR),
             deps.clock(),
           );
           deps.log.warn("skill refresh failed", {

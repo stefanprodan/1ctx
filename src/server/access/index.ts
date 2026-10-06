@@ -3,7 +3,6 @@
 //
 // Access: logins, the principal, the login, logout and me routes, the
 // signed-in profile routes, and admin user management.
-// What other areas and compose.ts may import.
 
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -46,7 +45,6 @@ export {
   parseEmail,
   parseFullName,
   parseTz,
-  parseUserPassword,
 } from "./parse.ts";
 
 export type AccessDeps = {
@@ -70,7 +68,6 @@ export type AccessDeps = {
 };
 
 export type Access = Auth & {
-  store: LoginStore;
   // drop the visits past every window; how many went
   sweepVisits(): number;
   routes: RouteDescriptor[];
@@ -89,7 +86,6 @@ export function accessArea(deps: AccessDeps): Access {
     secureCookie: deps.secureCookie,
   });
   return {
-    store: logins,
     ...built,
     sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
     routes: [

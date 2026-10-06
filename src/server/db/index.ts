@@ -1,8 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// A transaction body returns its events instead of publishing them, so
-// they go out only after the outermost commit and never on a throw.
 
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
@@ -16,6 +13,17 @@ export { release };
 export type Db = Database;
 
 export type Transaction<T> = { result: T; events?: BusEvent[] };
+
+// a JSON column read leniently: null or text that does not parse gives
+// the fallback
+export function parseStored<T>(text: string | null, fallback: T): T {
+  if (text === null) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 export type OpenedDb = { db: Db; migrations: string[] };
 
@@ -115,7 +123,8 @@ const rowCount = (db: Db, table: string): number =>
     .query<{ n: number }, []>(`select count(*) as n from ${quoted(table)}`)
     .get()!.n;
 
-// A body that throws truncates back to where it started, so a savepoint
+// A body returns its events, published only after the outermost commit;
+// a body that throws truncates back to where it started, so a savepoint
 // that rolled back leaves no event behind, even when a body above it
 // catches the throw and commits.
 const pending = new WeakMap<Db, BusEvent[]>();

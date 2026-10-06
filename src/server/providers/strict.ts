@@ -1,21 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The openai-strict wire: the plain wire's body with nothing outside
-// the OpenAI chat spec, for a server that refuses any field it does
-// not know (NVIDIA NIM, Groq). Thinking rides in reasoning_effort
-// alone. No past reasoning goes back: Groq refuses
-// `reasoning_content`, and OpenRouter's structured items are not
-// asked for. The stream is the plain wire's.
 
-import { buildChatBody as buildOpenAiChatBody } from "./openai.ts";
+import { baseChatBody } from "./openai.ts";
 import type { ChatRequest } from "./types.ts";
 
 export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = buildOpenAiChatBody(req, { includeThinkingFlag: false });
-  delete body.prompt_cache_key;
-  // a model that never thinks refuses the field outright, so Off is
-  // sent only when the agent chose it
-  if (!req.thinking && req.thinkingOff) body.reasoning_effort = "none";
-  return body;
+  return baseChatBody(req, {
+    usageOption: true,
+    effort: true,
+    offAsNone: true,
+  });
 }

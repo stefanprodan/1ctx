@@ -15,6 +15,7 @@ import {
   MAX_PATTERNS,
   MCP_KEY_PREFIX,
   MCP_TIMEOUT_MS,
+  secretNameRule,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -53,8 +54,7 @@ export function parseMcpKeyName(value: unknown): string | null {
   if (value === null) return null;
   if (!isSecretName(MCP_KEY_PREFIX, value)) {
     throw new BadRequest(
-      `keyName must be ${MCP_KEY_PREFIX} followed by 1 to 48 lowercase ` +
-        "letters, digits and dashes, starting with a letter or digit, or null",
+      `keyName must be ${secretNameRule(MCP_KEY_PREFIX)}, or null`,
     );
   }
   return value;
@@ -115,7 +115,15 @@ export function parseTimeout(value: unknown): number | null {
   return value;
 }
 
-function patterns(b: Record<string, unknown>) {
+const PATTERN_FIELDS = [
+  "readPatterns",
+  "writePatterns",
+  "excludedPatterns",
+] as const;
+
+function patterns(
+  b: Record<string, unknown>,
+): Record<(typeof PATTERN_FIELDS)[number], string[]> {
   return {
     readPatterns: parsePatterns(b.readPatterns, "readPatterns"),
     writePatterns: parsePatterns(b.writePatterns, "writePatterns"),
@@ -160,17 +168,8 @@ export function parsePatch(body: unknown): PatchMcpRequest {
     out.instructionsOn = boolean(b.instructionsOn, "instructionsOn");
   }
   if ("timeoutMs" in b) out.timeoutMs = parseTimeout(b.timeoutMs);
-  if ("readPatterns" in b) {
-    out.readPatterns = parsePatterns(b.readPatterns, "readPatterns");
-  }
-  if ("writePatterns" in b) {
-    out.writePatterns = parsePatterns(b.writePatterns, "writePatterns");
-  }
-  if ("excludedPatterns" in b) {
-    out.excludedPatterns = parsePatterns(
-      b.excludedPatterns,
-      "excludedPatterns",
-    );
+  for (const field of PATTERN_FIELDS) {
+    if (field in b) out[field] = parsePatterns(b[field], field);
   }
   return out;
 }

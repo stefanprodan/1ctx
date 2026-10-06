@@ -70,8 +70,6 @@ const row = (
   createdAt: raw.created_at,
 });
 
-export const summary = (agent: AgentRow): AgentSummary => agent;
-
 export type AgentFields = {
   name: string;
   avatar: Avatar;

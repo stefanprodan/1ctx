@@ -92,14 +92,13 @@ describe("the feed's pages", () => {
   test("page 120 rows with tied activity into 50, 50 and 20", () => {
     const { store, add } = seeded();
     for (let i = 0; i < 120; i++) add({ now: Math.floor(i / 4) });
-    const all = ids(store.list(["p"], "", null, null, 1000).rows);
+    const all = ids(store.list({ projectIds: ["p"], q: "", limit: 1000 }).rows);
     const got = pages((before) =>
-      store.list(
-        ["p"],
-        "",
-        null,
-        before === null ? null : parseFeedCursor(before),
-      ),
+      store.list({
+        projectIds: ["p"],
+        q: "",
+        before: before === null ? null : parseFeedCursor(before),
+      }),
     );
     expect(FEED_LIMIT).toBe(50);
     expect(got.map((page) => page.length)).toEqual([50, 50, 20]);
@@ -111,21 +110,20 @@ describe("the feed's pages", () => {
     const { store, add } = seeded();
     for (let i = 0; i < 32; i++) add({ status: "running", now: i % 3 });
     for (let i = 0; i < 60; i++) add({ now: 100 + (i % 7) });
-    const all = ids(store.list(["p"], "", null, null, 1000).rows);
-    const first = store.list(["p"], "");
+    const all = ids(store.list({ projectIds: ["p"], q: "", limit: 1000 }).rows);
+    const first = store.list({ projectIds: ["p"], q: "" });
     expect(first.rows.map((row) => row.session.status)).toEqual([
       ...Array(32).fill("running"),
       ...Array(18).fill("done"),
     ]);
     expect(first.next?.startsWith("0.")).toBe(true);
     const small = pages((before) =>
-      store.list(
-        ["p"],
-        "",
-        null,
-        before === null ? null : parseFeedCursor(before),
-        20,
-      ),
+      store.list({
+        projectIds: ["p"],
+        q: "",
+        before: before === null ? null : parseFeedCursor(before),
+        limit: 20,
+      }),
     );
     expect(small.map((page) => page.length)).toEqual([20, 20, 20, 20, 12]);
     expect(small.flat()).toEqual(all);
@@ -137,44 +135,57 @@ describe("the feed's pages", () => {
       add({ status: "running", now: 50 - i }),
     );
     const finished = Array.from({ length: 10 }, (_, i) => add({ now: 30 - i }));
-    const first = store.list(["p"], "", null, null, 3);
+    const first = store.list({ projectIds: ["p"], q: "", limit: 3 });
     expect(ids(first.rows)).toEqual(running.slice(0, 3));
     expect(first.next?.startsWith("1.")).toBe(true);
     touch(db, running[3]!, "done", 1000);
-    const second = store.list(["p"], "", null, parseFeedCursor(first.next!), 3);
+    const second = store.list({
+      projectIds: ["p"],
+      q: "",
+      before: parseFeedCursor(first.next!),
+      limit: 3,
+    });
     expect(ids(second.rows)).toEqual([running[4]!, running[3]!, finished[0]!]);
   });
 
   test("leave a row that jumps above the cursor to the first page", () => {
     const { db, store, add } = seeded();
     const made = Array.from({ length: 60 }, (_, i) => add({ now: 100 - i }));
-    const first = store.list(["p"], "");
+    const first = store.list({ projectIds: ["p"], q: "" });
     const moved = made[55]!;
     touch(db, moved, "running", 1000);
-    const second = store.list(["p"], "", null, parseFeedCursor(first.next!));
+    const second = store.list({
+      projectIds: ["p"],
+      q: "",
+      before: parseFeedCursor(first.next!),
+    });
     expect(ids(second.rows)).not.toContain(moved);
     expect(ids(second.rows)).toEqual(
       made.slice(50).filter((id) => id !== moved),
     );
-    expect(ids(store.list(["p"], "").rows)[0]).toBe(moved);
+    expect(ids(store.list({ projectIds: ["p"], q: "" }).rows)[0]).toBe(moved);
   });
 
   test("answer next null for exactly a page", () => {
     const { store, add } = seeded();
     for (let i = 0; i < 50; i++) add({ now: i });
-    const page = store.list(["p"], "");
+    const page = store.list({ projectIds: ["p"], q: "" });
     expect(page.rows).toHaveLength(50);
     expect(page.next).toBeNull();
     add({ now: 99 });
-    expect(store.list(["p"], "").next).not.toBeNull();
+    expect(store.list({ projectIds: ["p"], q: "" }).next).not.toBeNull();
   });
 
   test("page from a cursor whose row is gone", () => {
     const { db, store, add } = seeded();
     const made = Array.from({ length: 60 }, (_, i) => add({ now: 100 - i }));
-    const first = store.list(["p"], "");
+    const first = store.list({ projectIds: ["p"], q: "" });
     db.query("delete from sessions where id = ?").run(made[49]!);
-    const second = store.list(["p"], "", null, parseFeedCursor(first.next!));
+    const second = store.list({
+      projectIds: ["p"],
+      q: "",
+      before: parseFeedCursor(first.next!),
+    });
     expect(ids(second.rows)).toEqual(made.slice(50));
   });
 
@@ -190,24 +201,39 @@ describe("the feed's pages", () => {
     const cursor = (before: string | null) =>
       before === null ? null : parseFeedCursor(before);
     const searched = pages((before) =>
-      store.list(["p"], "depl", null, cursor(before)),
+      store.list({ projectIds: ["p"], q: "depl", before: cursor(before) }),
     );
     expect(searched.map((page) => page.length)).toEqual([40]);
     expect(searched.flat()).toEqual(found);
     const tasks = pages((before) =>
-      store.list(["p"], "", "automation", cursor(before)),
+      store.list({
+        projectIds: ["p"],
+        q: "",
+        origin: "automation",
+        before: cursor(before),
+      }),
     );
     expect(tasks.map((page) => page.length)).toEqual([50, 5]);
     expect(tasks.flat()).toEqual(runs);
     const chats = pages((before) =>
-      store.list(["p"], "", "chat", cursor(before)),
+      store.list({
+        projectIds: ["p"],
+        q: "",
+        origin: "chat",
+        before: cursor(before),
+      }),
     );
     expect(chats.map((page) => page.length)).toEqual([50, 30]);
     const many = Array.from({ length: 30 }, (_, i) =>
       add({ now: 400 - i, title: "Deploy again" }),
     );
     const again = pages((before) =>
-      store.list(["p"], "deploy", "chat", cursor(before)),
+      store.list({
+        projectIds: ["p"],
+        q: "deploy",
+        origin: "chat",
+        before: cursor(before),
+      }),
     );
     expect(again.map((page) => page.length)).toEqual([50, 20]);
     expect(again.flat()).toEqual([...many, ...found]);
@@ -225,11 +251,13 @@ describe("the feed's pages", () => {
     const cursor = (before: string | null) =>
       before === null ? null : parseFeedCursor(before);
     const home = pages((before) =>
-      store.list(["p", "t"], "", null, cursor(before)),
+      store.list({ projectIds: ["p", "t"], q: "", before: cursor(before) }),
     );
     expect(home.map((page) => page.length)).toEqual([50, 20]);
     expect(new Set(home.flat())).toEqual(new Set([...personal, ...team]));
-    const one = pages((before) => store.list(["t"], "", null, cursor(before)));
+    const one = pages((before) =>
+      store.list({ projectIds: ["t"], q: "", before: cursor(before) }),
+    );
     expect(one.flat()).toEqual(team);
   });
 });
@@ -242,15 +270,14 @@ describe("an automation's pages of runs", () => {
     );
     for (const id of made.slice(0, 10)) touch(db, id, "failed", 0);
     const running = add({ run: true, status: "running", now: 1000 });
-    const all = ids(store.runs("au", null, null, 1000).rows);
+    const all = ids(store.runs({ automationId: "au", limit: 1000 }).rows);
     expect(all[0]).toBe(running);
     const tallies: unknown[] = [];
     const got = pages((before) => {
-      const page = store.runs(
-        "au",
-        null,
-        before === null ? null : parseRunsCursor(before),
-      );
+      const page = store.runs({
+        automationId: "au",
+        before: before === null ? null : parseRunsCursor(before),
+      });
       tallies.push(page.tally);
       return page;
     });
@@ -262,9 +289,17 @@ describe("an automation's pages of runs", () => {
     for (const id of made.slice(0, 10)) {
       db.query("update sessions set attention = 1 where id = ?").run(id);
     }
-    const flagged = store.runs("au", "attention", null, 4);
+    const flagged = store.runs({
+      automationId: "au",
+      filter: "attention",
+      limit: 4,
+    });
     expect(flagged.rows).toHaveLength(4);
-    const rest = store.runs("au", "attention", parseRunsCursor(flagged.next!));
+    const rest = store.runs({
+      automationId: "au",
+      filter: "attention",
+      before: parseRunsCursor(flagged.next!),
+    });
     expect(rest.next).toBeNull();
     expect(new Set([...ids(flagged.rows), ...ids(rest.rows)])).toEqual(
       new Set(made.slice(0, 10)),

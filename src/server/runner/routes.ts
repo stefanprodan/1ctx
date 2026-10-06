@@ -7,7 +7,6 @@
 
 import type {
   CreateSessionRequest,
-  QueuedResponse,
   RegenerateRequest,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
@@ -22,6 +21,7 @@ import {
   parseRegenerate,
   parseSendMessage,
 } from "../sessions/index.ts";
+import type { MessageAnswer } from "./types.ts";
 
 export type RoutesDeps = {
   start(principal: Principal, fields: CreateSessionRequest): SessionDetail;
@@ -31,9 +31,7 @@ export type RoutesDeps = {
     principal: Principal,
     sessionId: string,
     fields: SendMessageRequest,
-  ):
-    | { status: 201; body: SessionDetail }
-    | { status: 202; body: QueuedResponse };
+  ): MessageAnswer;
   regenerate(
     principal: Principal,
     sessionId: string,

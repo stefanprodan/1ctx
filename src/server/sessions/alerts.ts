@@ -1,12 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// An automation's open alert as its runs say it: the marked runs that
-// ended at or after attention_since, counted, the latest reason any of
-// them gave (a decider's mark has none) and who marked the latest, read
-// through the partial index on marked runs, so the reads walk only the
-// alert's own runs. The automations area writes the
-// column; every reader of an automation's alert takes these columns.
 
 import type { AutomationAlert } from "../../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
@@ -16,10 +9,14 @@ import type { Db } from "../db/index.ts";
 // cannot use it
 export const MARKED = `attention >= ${ATTENTION_AT}`;
 
-const alertRuns = (automations: string, pick: string, where = "") =>
-  `(select ${pick} from sessions marked indexed by sessions_marked
+// the marked runs of the automations row's open alert, as marked
+export const openAlertRuns = (automations: string) =>
+  `from sessions marked indexed by sessions_marked
      where marked.automation_id = ${automations}.id and marked.${MARKED}
-       and marked.last_activity_at >= ${automations}.attention_since${where}
+       and marked.last_activity_at >= ${automations}.attention_since`;
+
+const alertRuns = (automations: string, pick: string, where = "") =>
+  `(select ${pick} ${openAlertRuns(automations)}${where}
      order by marked.last_activity_at desc, marked.id limit 1)`;
 
 // the alert's columns of the automations row named, nothing read while
@@ -27,9 +24,7 @@ const alertRuns = (automations: string, pick: string, where = "") =>
 export const alertColumns = (automations: string) =>
   `${automations}.attention_since as alert_since,
    case when ${automations}.attention_since is null then 0 else
-     (select count(*) from sessions marked indexed by sessions_marked
-      where marked.automation_id = ${automations}.id and marked.${MARKED}
-        and marked.last_activity_at >= ${automations}.attention_since)
+     (select count(*) ${openAlertRuns(automations)})
    end as alert_runs,
    case when ${automations}.attention_since is null then null else
      ${alertRuns(
@@ -59,12 +54,8 @@ export const alertOf = (raw: RawAlert): AutomationAlert | null =>
         by: raw.alert_by,
       };
 
-// whether another run of the automation said something since this one
-// ended: a late decider's word on an older run then leaves the alert to
-// the newer. A run that a stop, a shutdown or a restart ended said
-// nothing about the alert, so it is passed over. In a tie of one
-// millisecond a mark wins: a word that would close yields to a run that
-// ended at the same time, one that would open does not
+// a run a stop, shutdown or restart ended said nothing; in a 1 ms tie a
+// mark wins
 export function endedAfter(
   db: Db,
   automationId: string,

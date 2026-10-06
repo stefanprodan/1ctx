@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Providers: where the models come from. A row names a wire, a base
-// URL and a key file; its catalog is read from the wire and cached, and
-// a chat request goes out over the wire as one event stream, a
-// decisions request as one answer.
 
 import type { CatalogKind } from "../../shared/contracts/decider.ts";
 import type {
@@ -13,17 +8,12 @@ import type {
 } from "../../shared/contracts/provider.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadGateway, NotFound } from "../lib/errors.ts";
+import { NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  CatalogError,
-  Catalogs,
-  type Fetcher,
-  servesDecisions,
-} from "./catalog.ts";
+import { Catalogs, type Fetcher, gateway, servesDecisions } from "./catalog.ts";
 import { fetchEndpoints } from "./endpoints.ts";
-import { providerFor } from "./provider.ts";
+import { keyOf, providerFor } from "./provider.ts";
 import {
   type AgentsPort,
   type DecidersPort,
@@ -41,7 +31,6 @@ import type { ChatEvent, ChatRequest } from "./types.ts";
 
 export { markOf } from "./author.ts";
 export {
-  AZURE_BASE_URL_PROBLEM,
   azureBaseUrlProblem,
   buildChatBody as buildAzureChatBody,
   parseDeployments,
@@ -75,12 +64,7 @@ export { wireTools } from "./openai.ts";
 export { buildChatBody as buildOpenCodeChatBody } from "./opencode.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseBaseUrl, parseKeyName } from "./parse.ts";
-export {
-  requestText,
-  requestTokens,
-  sentMessages,
-  wireTokens,
-} from "./provider.ts";
+export { requestText, requestTokens, wireTokens } from "./provider.ts";
 export { type ProviderRow, ProviderStore } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
 export {
@@ -154,16 +138,15 @@ export type Providers = {
 export function providersArea(deps: ProvidersDeps): Providers {
   const store = new ProviderStore(deps.db);
   const noneRefused = new Set<string>();
-  const endpoints = async (provider: ProviderRow, model: string) => {
-    const key =
-      provider.keyName === null ? null : deps.secret(provider.keyName);
-    try {
-      return await fetchEndpoints(deps.fetcher, provider, key, model);
-    } catch (err) {
-      if (err instanceof CatalogError) throw new BadGateway(err.message);
-      throw err;
-    }
-  };
+  const endpoints = (provider: ProviderRow, model: string) =>
+    gateway(
+      fetchEndpoints(
+        deps.fetcher,
+        provider,
+        keyOf(provider, deps.secret),
+        model,
+      ),
+    );
   const catalogs = new Catalogs({
     fetcher: deps.fetcher,
     clock: deps.clock,
@@ -174,14 +157,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
     store,
     catalogs,
     byId: (id) => store.byId(id),
-    model: async (provider, id, kind) => {
-      try {
-        return await catalogs.model(provider, id, kind);
-      } catch (err) {
-        if (err instanceof CatalogError) throw new BadGateway(err.message);
-        throw err;
-      }
-    },
+    model: (provider, id, kind) => gateway(catalogs.model(provider, id, kind)),
     endpoints,
     chat: (providerId, req, signal) => {
       const row = store.byId(providerId);

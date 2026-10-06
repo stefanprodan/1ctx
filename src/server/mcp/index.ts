@@ -15,31 +15,24 @@ import { ToolError } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  cut,
-  type Fetcher,
-  type ListedTool,
-  scrub,
-  withClient,
-} from "./client.ts";
-import { discover, fingerprint } from "./discover.ts";
-import {
-  MAX_INSTRUCTIONS,
-  MAX_SERVER_NAME,
-  MAX_SERVER_VERSION,
-} from "./limits.ts";
+import type { Fetcher } from "../providers/index.ts";
+import { type ListedTool, scrub, withClient } from "./client.ts";
+import { discover, identityOf } from "./discover.ts";
 import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
 import { routes, type UsagePort } from "./routes.ts";
 import { type McpServerRow, McpServerStore } from "./store.ts";
 import { validateArguments } from "./validate.ts";
 
+export { changeNote } from "./note.ts";
 export {
   parseMcpKeyName,
   parsePatterns,
   parseTimeout,
   parseUrl,
 } from "./parse.ts";
+export type { McpCallOutput, McpContent } from "./result.ts";
+export { McpServerStore } from "./store.ts";
 
 export type OfferedMcpTool = {
   name: string;
@@ -87,7 +80,7 @@ export type McpDeps = {
   keys: () => string[];
   // the limits' call timeout of the moment, for the form's hint
   callTimeoutMs: () => number;
-  render: (markdown: string, streaming?: boolean) => string;
+  render: (markdown: string) => string;
   capabilities: { forget(key: string): void };
   // a closure, sessions is built later
   usage: UsagePort;
@@ -279,13 +272,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     async call(server, tool, args, options) {
       const key = server.keyName === null ? null : deps.secret(server.keyName);
       return withClient(deps, server, key, options, async (client) => {
-        const raw = scrub(client.info(), key);
-        const identity = {
-          serverName: cut(raw.serverName, MAX_SERVER_NAME),
-          serverVersion: cut(raw.serverVersion, MAX_SERVER_VERSION),
-          instructions: cut(raw.instructions.trim(), MAX_INSTRUCTIONS),
-        };
-        const observed = fingerprint(identity);
+        const observed = identityOf(client.info(), key).fingerprint;
         if (observed !== server.fingerprint) {
           coordinator.refreshSoon(server.id, observed);
         }
@@ -320,7 +307,6 @@ export function mcpArea(deps: McpDeps): Mcp {
     capabilities: deps.capabilities,
     coordinator,
     clock: deps.clock,
-    log: deps.log,
     hasSecret: (name) => deps.secret(name) !== null,
     keys: deps.keys,
     callTimeoutMs: deps.callTimeoutMs,
@@ -330,7 +316,3 @@ export function mcpArea(deps: McpDeps): Mcp {
   });
   return area;
 }
-
-export { changeNote } from "./note.ts";
-export type { McpCallOutput, McpContent } from "./result.ts";
-export { McpServerStore } from "./store.ts";

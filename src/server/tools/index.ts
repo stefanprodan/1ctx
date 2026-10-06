@@ -1,8 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// Built-ins, skills and MCP tools are resolved once for a send. The
-// runner keeps this snapshot and the area dispatches only through it.
 
 import type {
   PatchToolRequest,
@@ -48,11 +45,9 @@ import {
 import { runMemory } from "./builtin/memory.ts";
 import { makeSkillTools } from "./builtin/skill.ts";
 import { makeVisualizeTool } from "./builtin/visualize.ts";
+import { makeWebfetchTool } from "./builtin/webfetch.ts";
 import {
-  type FetchDependencies,
-  makeWebfetchTool,
-} from "./builtin/webfetch.ts";
-import {
+  abortableSleep,
   makeWebsearchTool,
   type SearchDependencies,
 } from "./builtin/websearch.ts";
@@ -65,7 +60,7 @@ import {
   type SkillsPort,
 } from "./offer.ts";
 import type { ToolName } from "./parse.ts";
-import { Registry } from "./registry.ts";
+import { failedCall, Registry } from "./registry.ts";
 import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
 import type {
@@ -83,7 +78,14 @@ export {
   MEMORY_WRITE_RULES,
 } from "./builtin/memory.ts";
 export type { SkillsPort } from "./offer.ts";
-export { parseHosts, parseWebDomains } from "./parse.ts";
+export {
+  isToolName,
+  parseHosts,
+  parseWebDomains,
+  TOOL_FIELDS,
+  TOOL_NAMES,
+  type ToolName,
+} from "./parse.ts";
 export type {
   KeepPort,
   MemoryScope,
@@ -101,8 +103,7 @@ export type ToolsDeps = {
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
-  version: string;
-  render: (markdown: string, streaming: boolean) => string;
+  render: (markdown: string) => string;
   skills: SkillsPort;
   mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
@@ -110,7 +111,6 @@ export type ToolsDeps = {
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
-  fetchDeps?: FetchDependencies;
   searchDeps?: SearchDependencies;
   usage?: {
     visuals(since: number, until: number): VisualCounts;
@@ -149,7 +149,8 @@ export type ToolsArea = Tools & {
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
 // the attention step likewise offers needs_attention alone
 const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
-// how long an MCP call's own timer runs past the registry's limit
+// an MCP call's own timer runs this far past the registry's, so two
+// timers never race and the timeout words are the registry's
 const MCP_BACKSTOP_MS = 1000;
 
 const LOGGED_TOOLS: ReadonlySet<string> = new Set([
@@ -189,27 +190,9 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     },
     validateArguments: () => null,
   };
-  const fetchDeps: FetchDependencies = deps.fetchDeps ?? {
-    fetch: deps.fetcher,
-  };
   const searchDeps: SearchDependencies = deps.searchDeps ?? {
     fetch: deps.fetcher,
-    sleep: (ms, signal) =>
-      new Promise<void>((resolve, reject) => {
-        if (signal.aborted) {
-          reject(signal.reason);
-          return;
-        }
-        const timer = setTimeout(resolve, ms);
-        signal.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            reject(signal.reason);
-          },
-          { once: true },
-        );
-      }),
+    sleep: abortableSleep,
   };
 
   const toolsFor = (
@@ -221,26 +204,25 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     credentials: SendCredentials,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
-    ...(web === null ? [] : [makeWebfetchTool(deps.version, fetchDeps, web)]),
+    ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
     ...(search === null
       ? []
       : [
           makeWebsearchTool(
             () => deps.secret(`search-${search}`),
             search,
-            deps.version,
             searchDeps,
           ),
         ]),
     makeVisualizeTool(hosts),
-    makeBashTool(
-      deps.bash,
+    makeBashTool({
+      bash: deps.bash,
       web,
       visuals,
       credentials,
-      deps.credentials,
-      knowledge,
-    ),
+      keys: deps.credentials,
+      docs: knowledge,
+    }),
   ];
 
   const mcpTools = (
@@ -255,10 +237,6 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           description: tool.description,
           parameters: tool.wireInputSchema,
           timeoutMs,
-          // the registry times the call and aborts its signal; the
-          // client's own timer is a backstop set past it, since two
-          // timers of one length race and the client's words would win
-          // now and then
           run: async (args: Record<string, unknown>, runCtx: ToolContext) => {
             checkMcpArguments(tool, args, mcpService.validateArguments);
             return shapeMcpResult(
@@ -277,7 +255,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     );
 
   const webAccess = (): WebAccess => {
-    const row = store.rows().find((row) => row.name === "web")!;
+    const row = store.row("web");
     return {
       mode: row.mode!,
       domains: row.hosts,
@@ -286,8 +264,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   };
 
   const response = (now: number): ToolsResponse => {
-    const rows = new Map(store.rows().map((row) => [row.name, row]));
-    const visual = rows.get("visualize")!;
+    const visual = store.row("visualize");
     const tool = fillYear([makeVisualizeTool(visual.hosts)], now)[0]!;
     return {
       builtin: builtinCatalog(now, deps.render),
@@ -303,7 +280,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         updatedAt: visual.updatedAt,
       },
       search: {
-        provider: rows.get("websearch")!.provider,
+        provider: store.row("websearch").provider,
         keys: {
           exa: deps.secret("search-exa") !== null,
           firecrawl: deps.secret("search-firecrawl") !== null,
@@ -320,7 +297,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   ): void => {
     transact(deps.db, () => {
       if (name === "web") {
-        const row = store.rows().find((row) => row.name === "web")!;
+        const row = store.row("web");
         const mode = change.mode ?? row.mode!;
         const domains = change.domains ?? row.hosts;
         if (mode === "listed" && domains.length === 0)
@@ -341,9 +318,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     webAccess,
     capabilities: () => [
       ...(webAccess().mode === "off" ? [] : [WEB]),
-      ...(store.rows().find((row) => row.name === "visualize")!.enabled
-        ? [VISUALIZE]
-        : []),
+      ...(store.row("visualize").enabled ? [VISUALIZE] : []),
       // no admin row governs these
       KNOWLEDGE,
       MEMORY,
@@ -409,6 +384,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           () => ATTENTION_ONLY,
         ).run(call, ctx);
       }
+      // the memory phase offers nothing but memory_edit, handled above
+      if (memory?.work) {
+        return new Registry([], () => PHASE_ONLY).run(call, ctx);
+      }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
       const catalog =
         offered.mcpCatalog === ""
@@ -448,19 +427,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           );
           return new Registry([...base, ...direct]).run(target, ctx);
         } catch (error) {
-          const failed: Tool = {
-            name: "mcp_call",
-            description: "",
-            parameters: {},
-            async run() {
-              throw error;
-            },
-          };
-          return new Registry([failed]).run({ ...call, arguments: "{}" }, ctx);
+          return failedCall(error, ctx);
         }
-      }
-      if (offered.memory?.work) {
-        return new Registry(base, () => PHASE_ONLY).run(call, ctx);
       }
       const runtime =
         offered.mcpCatalog === ""
@@ -477,8 +445,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       deps.usage?.web(since, until) ?? { fetches: 0, searches: 0, failed: 0 },
     response,
     patch,
-    visualHosts: () =>
-      store.rows().find((row) => row.name === "visualize")!.hosts,
+    visualHosts: () => store.row("visualize").hosts,
   });
   return area;
 }

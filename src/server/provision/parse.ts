@@ -9,18 +9,20 @@ import {
 import type { WebAccess } from "../../shared/web.ts";
 import {
   isName,
+  isRecord,
   isServerName,
   isSkillName,
   isUsername,
   MAX_PASSWORD_BYTES,
   MIN_PASSWORD,
   PERSONAL_PROJECT_NAME,
+  passwordProblem,
   type SecretKind,
 } from "../../shared/words.ts";
-import { parseUserPassword } from "../access/index.ts";
 import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
+import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import * as spec from "./spec.ts";
@@ -65,6 +67,7 @@ export type Document = {
     spec: spec.Specs[K];
   } & (K extends "Project" ? { docs?: KnowledgeDoc[] } : unknown);
 }[Kind];
+export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
 export type { RepositorySpec } from "./repository.ts";
 export type {
@@ -80,10 +83,7 @@ export type {
 } from "./spec.ts";
 
 function document(value: unknown, source: string): Document {
-  const raw =
-    typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
+  const raw = isRecord(value) ? value : {};
   const metadata = raw.metadata as Record<string, unknown> | undefined;
   const label = `${typeof raw.kind === "string" ? raw.kind : "?"}/${
     typeof metadata?.name === "string" ? metadata.name : "?"
@@ -108,8 +108,7 @@ function document(value: unknown, source: string): Document {
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
-      Tool: (name: unknown): name is string =>
-        name === "web" || name === "websearch" || name === "visualize",
+      Tool: isToolName,
     }[kind];
     if (!guard(meta.name)) throw new Error("metadata.name is invalid");
     const name = meta.name;
@@ -139,7 +138,7 @@ function document(value: unknown, source: string): Document {
       case "Agent":
         return { ...base, kind, spec: spec.agent(b.spec) };
       case "Tool":
-        return { ...base, kind, spec: spec.tool(b.spec, name) };
+        return { ...base, kind, spec: spec.tool(b.spec, name as ToolName) };
     }
   } catch (error) {
     throw new Error(`${source}: ${label}: ${(error as Error).message}`);
@@ -255,8 +254,9 @@ export function preflight(
       } catch {
         return fail(field, `could not read secret ${name}.key`);
       }
-      if (value === null || value === "")
-        fail(field, `secret ${name}.key is missing or empty`);
+      if (value === null || value === "") {
+        return fail(field, `secret ${name}.key is missing or empty`);
+      }
       return value;
     };
     // an http- key a credential or a repository reads at its request
@@ -280,15 +280,11 @@ export function preflight(
             "user-",
             doc.spec.passwordFrom,
           );
-          if (!exists) {
-            try {
-              parseUserPassword({ password });
-            } catch {
-              fail(
-                "passwordFrom",
-                `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
-              );
-            }
+          if (!exists && passwordProblem(password) !== null) {
+            fail(
+              "passwordFrom",
+              `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
+            );
           }
         }
         break;

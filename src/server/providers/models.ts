@@ -139,11 +139,8 @@ export function modelPrice(
   };
 }
 
-// a round's cost in USD: the reply's own when it gave one, 0 on a flat
-// plan (OpenCode Go), else the sum at the model's rates, the highest
-// tier the prompt passes; null when nothing prices it. The prompt
-// counts cache reads and writes, so the rest of it is uncached input;
-// the completion counts reasoning on every wire
+// the reply's cost, else 0 on opencode, else priced at the highest tier
+// passed
 export function costOf(
   usage: Pick<
     Usage,

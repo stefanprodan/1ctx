@@ -39,9 +39,8 @@ export type MemoryDeps = {
   sessions: SessionInfoPort;
 };
 
-// what a chat's edit answers the model: the saved words or the refusal
-// conflict: refused because another chat wrote or removed the topic since
-// this one saw it
+// a chat edit's tool answer; conflict says another chat wrote or removed
+// the topic
 export type ChatEditAnswer = {
   error: boolean;
   content: string;
@@ -102,6 +101,10 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
     projectId: string,
     automationId: string | null,
   ): MemoryTarget => ({ projectId, automationId });
+  const userSummary = (id: string | null) => {
+    const user = id === null ? null : deps.users.byId(id);
+    return user === null ? null : summary(user);
+  };
   const present = (row: MemoryRow): Memory => ({
     projectId: row.projectId,
     automationId: row.automationId,
@@ -111,13 +114,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
     limit: MEMORY_CHARS,
     revision: row.revision,
     updatedAt: row.updatedAt,
-    updatedBy:
-      row.updatedBy === null
-        ? null
-        : (() => {
-            const user = deps.users.byId(row.updatedBy);
-            return user === null ? null : summary(user);
-          })(),
+    updatedBy: userSummary(row.updatedBy),
     agentName: row.agentName,
     agentRetired: row.agentName !== null && !store.agentLive(row.agentName),
     session:

@@ -55,7 +55,9 @@ describe("admission", () => {
     });
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: PROCESS });
-    expect(chat.app.sessions.list([team.id], "").rows).toHaveLength(3);
+    expect(
+      chat.app.sessions.list({ projectIds: [team.id], q: "" }).rows,
+    ).toHaveLength(3);
     held[0]!.script.reply("done");
     await settleRun(chat, held[0]!.sessionId);
     const next = await startChat(chat, "d", chat.member, team.id);

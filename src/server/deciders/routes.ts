@@ -1,10 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The deciders and the decisions, all for admins. A decider's save names
-// a provider that serves decisions and a model its decisions catalog
-// lists; what the catalog says about it is kept on the row. Check asks
-// the fixed yes/no. A decision's save is its whole settings.
 
 import type {
   CheckDeciderResponse,
@@ -36,12 +31,7 @@ import {
 } from "./decide.ts";
 import type { DecisionStore } from "./decisions.ts";
 import { type ParsedDecider, parseDecider, parseDecision } from "./parse.ts";
-import {
-  type DeciderFields,
-  type DeciderRow,
-  type DeciderStore,
-  summary,
-} from "./store.ts";
+import type { DeciderFields, DeciderRow, DeciderStore } from "./store.ts";
 
 export type TotalsPort = {
   decisionTotal(
@@ -67,12 +57,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       deps.usage.decisionTotal(by, since, until),
     );
   const providerName = (id: string) => deps.providers.byId(id)?.name ?? id;
+  const fields = (decider: DeciderRow) => ({
+    name: decider.name,
+    provider: providerName(decider.providerId),
+    model: decider.model,
+  });
   const logged = (msg: string, decider: DeciderRow) =>
-    deps.log.info(msg, {
-      name: decider.name,
-      provider: providerName(decider.providerId),
-      model: decider.model,
-    });
+    deps.log.info(msg, fields(decider));
   // the rows the body names are checked before the catalog fetch and
   // again in the transaction, since the world may move while it waits
   const check = (body: ParsedDecider, except: string | null) => {
@@ -132,7 +123,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const body: DecidersResponse = {
-          deciders: deps.store.list().map(summary),
+          deciders: deps.store.list(),
         };
         return json(body);
       },
@@ -197,7 +188,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return { result: deps.store.byId(created.id)! };
         });
         logged("decider created", decider);
-        const body: DeciderResponse = { decider: summary(decider) };
+        const body: DeciderResponse = { decider };
         return json(body, 201);
       },
     },
@@ -219,7 +210,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return { result: deps.store.byId(decider.id)! };
         });
         logged("decider updated", updated);
-        const body: DeciderResponse = { decider: summary(updated) };
+        const body: DeciderResponse = { decider: updated };
         return json(body);
       },
     },
@@ -265,9 +256,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         } catch (err) {
           if (!(err instanceof DecisionError)) throw err;
           deps.log.warn("decider check failed", {
-            name: decider.name,
-            provider: providerName(decider.providerId),
-            model: decider.model,
+            ...fields(decider),
             ...errorFields(err, false),
           });
           throw new BadGateway(err.message);

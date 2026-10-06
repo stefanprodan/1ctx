@@ -1,14 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  parseArguments,
-  toolArguments,
-} from "../../../shared/contracts/tool.ts";
+import { toolArguments } from "../../../shared/contracts/tool.ts";
 import { isRecord } from "../../../shared/words.ts";
 import { ToolError } from "../../lib/errors.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../../mcp/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
+import { parsedArgs } from "../registry.ts";
 import type { Tool } from "../types.ts";
 
 function flat(servers: OfferedServer[]): OfferedMcpTool[] {
@@ -34,14 +32,9 @@ function object(value: unknown): Record<string, unknown> {
   return value;
 }
 
+// only an mcp_call reaches here
 function outer(call: ToolCall): Record<string, unknown> {
-  const parsed = parseArguments(call.arguments);
-  if (parsed.ok) return parsed.args;
-  throw new Error(
-    parsed.reason === "json"
-      ? 'invalid JSON arguments for tool "mcp_call"'
-      : "arguments must be an object",
-  );
+  return parsedArgs(call, "arguments must be an object");
 }
 
 export function mcpCallName(

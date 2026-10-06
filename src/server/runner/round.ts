@@ -1,18 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One provider round: the request from the context, the stream, every
-// delta to the writer, the finish and the usage kept on the round. The
-// first tool call delta of a round marks the reply work at once, in its
-// own transaction, so the row moves into the fold with its reasoning;
-// the assembled calls land on round.calls when the stream ends. A
-// provider failure is an error event, asked again when retry.ts says so
-// before the stream started, else a throw here, so the send ends
-// through its one terminal transition. Once terminated the
-// rest of the stream is dropped: the rows are already final.
+// One provider round: request, stream, deltas to the writer, usage.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import type { Clock } from "../lib/clock.ts";
+import { bytesWords } from "../lib/bytes.ts";
+import { type Clock, sleep, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log, type LogFields } from "../lib/log.ts";
 import {
   type ChatEvent,
@@ -23,6 +16,7 @@ import {
   type Usage,
 } from "../providers/index.ts";
 import { history, request, summaryRequest, withExhausted } from "./context.ts";
+import { offers } from "./policy.ts";
 import type { ContextLookups } from "./render.ts";
 import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { RoundVisuals } from "./round-visuals.ts";
@@ -56,46 +50,6 @@ export const MAX_REPLY_BYTES = 1024 * 1024;
 type TimedNext =
   | { kind: "next"; result: IteratorResult<ChatEvent> }
   | { kind: "idle" };
-
-const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
-
-function sleep(clock: Clock, ms: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return {
-    promise:
-      clock.sleep?.(ms) ??
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms);
-      }),
-    cancel: () => {
-      if (timer !== undefined) clearTimeout(timer);
-    },
-  };
-}
-
-// false when the signal ended the wait
-async function pause(
-  clock: Clock,
-  ms: number,
-  signal: AbortSignal,
-): Promise<boolean> {
-  if (signal.aborted) return false;
-  if (ms <= 0) return true;
-  let stop = () => {};
-  const aborted = new Promise<void>((resolve) => {
-    stop = resolve;
-    signal.addEventListener("abort", stop, { once: true });
-  });
-  // listening first, so an abort however early ends the wait
-  const timer = sleep(clock, ms);
-  try {
-    await Promise.race([timer.promise, aborted]);
-  } finally {
-    timer.cancel();
-    signal.removeEventListener("abort", stop);
-  }
-  return !signal.aborted;
-}
 
 // idleMs is null before the first event: a local server says nothing
 // while it reads a long prompt, minutes for a cold 64k tokens, so only
@@ -194,7 +148,7 @@ export function buildRequest(
   return req;
 }
 
-export type RoundOptions = {
+type RoundOptions = {
   request?: ChatRequest;
   signal?: AbortSignal;
   // when a retry's wait must be over: the turn's deadline unless a
@@ -243,10 +197,17 @@ async function streamRound(
     send.kind !== "compact" &&
     !send.summarizing &&
     !send.answering &&
-    send.policy.offered.tools.some((tool) => tool.name === "visualize")
+    offers(send.policy.offered, "visualize")
       ? new RoundVisuals(send, round, deps.writer, signal)
       : null;
-  let replyBytes = bytes(round.content) + bytes(round.reasoning);
+  let replyBytes =
+    Buffer.byteLength(round.content) + Buffer.byteLength(round.reasoning);
+  const grow = (text: string) => {
+    replyBytes += Buffer.byteLength(text);
+    if (replyBytes > MAX_REPLY_BYTES) {
+      throw new Error(`the reply exceeded ${bytesWords(MAX_REPLY_BYTES)}`);
+    }
+  };
   // heard: any event came, so the quiet timer runs; started: one reached
   // the writer or the page, so asking again is no longer safe
   let heard = false;
@@ -300,7 +261,7 @@ async function streamRound(
           attempt: retry.retries,
           max: MAX_RETRIES,
         });
-        if (!(await pause(deps.clock, wait, signal))) return;
+        if (!(await sleepUnless(deps.clock, wait, signal))) return;
         heard = false;
         thinking = false;
         iterator = open();
@@ -330,17 +291,11 @@ async function streamRound(
     switch (event.kind) {
       case "reasoning":
         if (send.summarizing) break;
-        replyBytes += bytes(event.text);
-        if (replyBytes > MAX_REPLY_BYTES) {
-          throw new Error("the reply exceeded 1 MB");
-        }
+        grow(event.text);
         deps.writer.delta(send, event);
         break;
       case "content": {
-        replyBytes += bytes(event.text);
-        if (replyBytes > MAX_REPLY_BYTES) {
-          throw new Error("the reply exceeded 1 MB");
-        }
+        grow(event.text);
         deps.writer.delta(send, event);
         break;
       }
@@ -352,10 +307,7 @@ async function streamRound(
         );
         break;
       case "toolCallDelta":
-        replyBytes += bytes(event.arguments ?? "");
-        if (replyBytes > MAX_REPLY_BYTES) {
-          throw new Error("the reply exceeded 1 MB");
-        }
+        grow(event.arguments ?? "");
         if (send.summarizing) break;
         // the server's earliest certain knowledge that this is a work
         // round: move the row into the fold once, guarded by the round

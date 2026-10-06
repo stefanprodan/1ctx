@@ -45,6 +45,18 @@ export class ToolStore {
       .map(row);
   }
 
+  // every name has a row from the migrations on
+  row(name: ToolRow["name"]): ToolRow {
+    const raw = this.db
+      .query<Raw, [string]>(
+        `select name, enabled, provider, hosts, mode, updated_at from tools
+         where name = ?`,
+      )
+      .get(name);
+    if (raw === null) throw new Error(`no tools row for ${name}`);
+    return row(raw);
+  }
+
   setAccess(
     mode: WebAccessMode,
     domains: readonly string[],

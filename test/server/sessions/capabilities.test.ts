@@ -137,8 +137,8 @@ test("the capability setter shares the caller's transaction and revision", async
       disabledCapabilities: ["web"],
     });
     expect(
-      chat.app.sessions.list([chat.projectId], "").rows[0]?.session
-        .disabledCapabilities,
+      chat.app.sessions.list({ projectIds: [chat.projectId], q: "" }).rows[0]
+        ?.session.disabledCapabilities,
     ).toEqual(["web"]);
   } finally {
     await chat.app.shutdown();

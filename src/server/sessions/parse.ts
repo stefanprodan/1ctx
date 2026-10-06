@@ -1,9 +1,5 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
-//
-// The session request parsers: a new chat, a message, a rename, and the
-// feed's filters. A message is any text up to the byte cap, not
-// blank; a title is one line up to the title cap.
 
 import type {
   CreateSessionRequest,
@@ -22,6 +18,7 @@ import {
   parseChange,
 } from "../../shared/capabilities.ts";
 import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
+import { cutText } from "../../shared/text.ts";
 import { MAX_UPLOADS_PER_MESSAGE } from "../../shared/uploads.ts";
 import {
   hasLineBreak,
@@ -29,7 +26,7 @@ import {
   MAX_SEARCH,
   MAX_TITLE,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   type FeedCursor,
@@ -38,9 +35,10 @@ import {
   type RunsCursor,
 } from "./cursor.ts";
 
-// the body cap: the message plus the JSON around it
+// a capabilities change at its largest
 export const MAX_REGENERATE_BODY =
   MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) + 128;
+// the body cap: the message plus the JSON around it
 export const MAX_SESSION_BODY = MAX_MESSAGE_BYTES + 1024 + MAX_REGENERATE_BODY;
 export const MAX_SMALL_BODY = 1024;
 
@@ -48,7 +46,7 @@ export function parseMessage(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") {
     throw new BadRequest("message must be text");
   }
-  if (new TextEncoder().encode(value).length > MAX_MESSAGE_BYTES) {
+  if (Buffer.byteLength(value) > MAX_MESSAGE_BYTES) {
     throw new BadRequest(`message must be at most ${MAX_MESSAGE_BYTES} bytes`);
   }
   return value;
@@ -222,25 +220,18 @@ export function parseStreamQuery(url: URL): {
   // the pick's own cursor
   alertBefore: RunsCursor | null;
 } {
-  const seen = new Set<string>();
-  for (const name of url.searchParams.keys()) {
-    if (
-      name !== "project" &&
-      name !== "q" &&
-      name !== "origin" &&
-      name !== "attention" &&
-      name !== "before"
-    ) {
-      throw new BadRequest(`unknown parameter ${name}`);
-    }
-    if (seen.has(name)) throw new BadRequest(`duplicate parameter ${name}`);
-    seen.add(name);
-  }
-  const project = url.searchParams.get("project");
-  const q = url.searchParams.get("q") ?? "";
-  const origin = url.searchParams.get("origin");
-  const attention = url.searchParams.get("attention");
-  const before = url.searchParams.get("before");
+  const get = queryParams(url, [
+    "project",
+    "q",
+    "origin",
+    "attention",
+    "before",
+  ]);
+  const project = get("project");
+  const q = get("q") ?? "";
+  const origin = get("origin");
+  const attention = get("attention");
+  const before = get("before");
   if (q.length > MAX_SEARCH) throw new BadRequest("q is too long");
   if (origin !== null && origin !== "chat" && origin !== "automation") {
     throw new BadRequest("origin must be chat or automation");
@@ -266,9 +257,7 @@ export function parseStreamQuery(url: URL): {
 // the first line of the first message, cut to the cap
 export function titleFrom(text: string): string {
   const line = text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
-  return line.length > MAX_TITLE
-    ? `${line.slice(0, MAX_TITLE - 1).trimEnd()}…`
-    : line;
+  return cutText(line, MAX_TITLE);
 }
 
 // the feed's last line: the first non-empty line, its Markdown
@@ -283,7 +272,5 @@ export function lineFrom(text: string): string {
     .replace(/^(?:(?:#+|[-*+]|\d+\.)\s+|>\s*)+/, "")
     .replace(/\*\*|__|`+/g, "")
     .trim();
-  return stripped.length > MAX_LAST_LINE
-    ? `${stripped.slice(0, MAX_LAST_LINE - 1).trimEnd()}…`
-    : stripped;
+  return cutText(stripped, MAX_LAST_LINE);
 }

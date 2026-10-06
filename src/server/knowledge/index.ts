@@ -1,11 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The knowledge capability shared by routes, send policies and the bash
-// area: the project docs and a chat's uploads. Page writes bind the file,
-// its history and its event in one transaction; a command's docs commit
-// runs in the command's, on the same store, so both paths share
-// revisions and caps.
+// The project docs, their history and search, and a chat's uploads.
 
 import type {
   KnowledgeAuthor,
@@ -26,7 +22,6 @@ import { upload } from "./archive.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type Change, commitKnowledge } from "./commit.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
-import { parseName, parseText } from "./parse.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { oneAtATime, search } from "./search.ts";
@@ -95,6 +90,13 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     const row = store.byId(projectId, fileId);
     if (row === null) throw new NotFound();
     return row;
+  };
+  const atRevision = (projectId: string, fileId: string, revision: number) => {
+    const current = required(projectId, fileId);
+    if (current.revision !== revision) {
+      throw new Conflict(`${current.name} is at revision ${current.revision}`);
+    }
+    return current;
   };
   const write = (
     projectId: string,
@@ -215,8 +217,6 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       };
     },
     create(projectId, author, name, text) {
-      name = parseName(name);
-      text = parseText(text);
       return write(projectId, (caps) => {
         if (store.byName(projectId, name) !== null) {
           throw new Conflict(`a file named ${name} exists`);
@@ -240,14 +240,8 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       });
     },
     replace(projectId, author, fileId, text, revision) {
-      text = parseText(text);
       return write(projectId, (caps) => {
-        const current = required(projectId, fileId);
-        if (current.revision !== revision) {
-          throw new Conflict(
-            `${current.name} is at revision ${current.revision}`,
-          );
-        }
+        const current = atRevision(projectId, fileId, revision);
         const bytes = Buffer.byteLength(text);
         checkFile(current.name, bytes, current.bytes, caps);
         const before = store.totals(projectId);
@@ -266,14 +260,8 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       });
     },
     rename(projectId, author, fileId, name, revision) {
-      name = parseName(name);
       return write(projectId, () => {
-        const current = required(projectId, fileId);
-        if (current.revision !== revision) {
-          throw new Conflict(
-            `${current.name} is at revision ${current.revision}`,
-          );
-        }
+        const current = atRevision(projectId, fileId, revision);
         if (name === current.name) {
           throw new BadRequest(`the file is named ${name} already`);
         }

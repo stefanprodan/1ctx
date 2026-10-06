@@ -3,11 +3,11 @@
 
 import { expect, test } from "bun:test";
 import {
-  judgeMembers,
+  judgeUpload,
   parseFolder,
-  selectMembers,
 } from "../../../src/server/knowledge/archive.ts";
 import { commitKnowledge } from "../../../src/server/knowledge/commit.ts";
+import { selectMembers } from "../../../src/server/knowledge/judge.ts";
 import type { ArchiveMember } from "../../../src/server/lib/archive.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
@@ -29,7 +29,7 @@ const manifest = (entries: Entry[]) =>
 
 function judge(entries: Entry[], s?: Setup, folder = "") {
   const members = manifest(entries);
-  return judgeMembers(
+  return judgeUpload(
     members,
     selectMembers(members, folder),
     s?.area.store.read(s.projectId) ?? [],

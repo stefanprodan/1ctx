@@ -4,12 +4,13 @@
 // The pure rules of MCP, shared by the server and the page so the
 // admin's preview is the bytes a send carries: the wire name, the
 // split of a server's tools by patterns, the lean schema the wire
-// gets and how a text is cut, the instructions block and the digest of
-// what a send offered. The catalog is in mcp-catalog.ts.
+// gets, the instructions block and the digest of what a send offered.
+// The catalog is in mcp-catalog.ts.
 // Environment neutral: no Bun, no DOM, no packages. The hash is an
 // argument, so the server passes Bun's and the page a stub.
 
 import type { AgentServer } from "./contracts/mcp.ts";
+import { cutText } from "./text.ts";
 import { isRecord } from "./words.ts";
 
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -163,16 +164,6 @@ function resolveRef(root: unknown, ref: string): unknown {
     node = node[key];
   }
   return node;
-}
-
-// a cut text ends in an ellipsis inside the cap, so the model never
-// reads a cut as the whole text; a cut never splits a surrogate pair
-export function cutText(text: string, cap: number): string {
-  if (text.length <= cap) return text;
-  let end = cap - 1;
-  const last = text.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
-  return `${text.slice(0, end).trimEnd()}…`;
 }
 
 export function wireDescription(text: string): string {

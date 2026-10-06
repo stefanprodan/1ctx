@@ -5,15 +5,13 @@
 // when it answers, when the deadline passes, or by close() at shutdown,
 // so a stuck job never holds every later request on its promise. A
 // storage scan and a range read may be in flight together, each on its
-// own worker. The worker file is an entry point of the compiled
-// binary, where a URL resolves against the compile root, so compose.ts
-// builds it and passes it in.
+// own worker.
 
 import type { MonthResult, RangeInput, RangeResult } from "./range.ts";
 import type { ScanInput, ScanResult } from "./scan.ts";
 import type { Job, WorkerReply, WorkerRequest } from "./scan.worker.ts";
 
-export const SCAN_DEADLINE_MS = 30_000;
+const SCAN_DEADLINE_MS = 30_000;
 
 export type Scanner = {
   scan(input: ScanInput): Promise<ScanResult>;

@@ -404,7 +404,6 @@ describe("MCP refresh coordinator", () => {
       usage: NO_USAGE,
       coordinator,
       clock: time.clock,
-      log: silent,
       hasSecret: () => false,
       keys: () => [],
       callTimeoutMs: () => 20_000,
@@ -695,7 +694,7 @@ describe("MCP refresh routes", () => {
     db.close();
   });
 
-  test("delete aborts discovery before removing the server", async () => {
+  test("delete aborts a running discovery", async () => {
     const db = memoryDb();
     const time = fakeClock();
     let ended = false;
@@ -737,6 +736,62 @@ describe("MCP refresh routes", () => {
     await settle();
     expect(ended).toBeTrue();
     expect(area.store.byId(row.id)).toBeNull();
+    await area.close();
+    db.close();
+  });
+
+  test("a refused delete leaves a running discovery alone", async () => {
+    const db = memoryDb();
+    const time = fakeClock();
+    let ended = false;
+    const fetcher = (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) =>
+      await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          ended = true;
+          reject(new Error("stop"));
+        });
+      })) as typeof fetch;
+    const area = mcpArea({
+      capabilities: { forget: () => {} },
+      usage: NO_USAGE,
+      db,
+      fetcher,
+      secret: () => null,
+      keys: () => [],
+      callTimeoutMs: () => 20_000,
+      clock: time.clock,
+      log: silent,
+      version: "test",
+      render: (text) => text,
+    });
+    const row = area.store.create(fields(), found(time.clock()));
+    db.exec("pragma foreign_keys = off");
+    db.query(
+      `insert into agent_servers (agent_id, server_id, read, write)
+       values (?, ?, 1, 0)`,
+    ).run("agent-test", row.id);
+    db.exec("pragma foreign_keys = on");
+    area.refreshSoon(row.id, "new");
+    await settle();
+    const route = area.routes.find(
+      (item) => item.method === "DELETE" && item.path === "/api/mcp/:id",
+    )!;
+    await expect(
+      Promise.resolve().then(() =>
+        route.handle(
+          new Request(`https://app.test/api/mcp/${row.id}`, {
+            method: "DELETE",
+          }),
+          routeContext(row.id),
+        ),
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await settle();
+    expect(ended).toBeFalse();
+    expect(area.store.byId(row.id)).not.toBeNull();
     await area.close();
     db.close();
   });
