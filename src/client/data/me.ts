@@ -18,6 +18,8 @@ import { api, onUnauthorized } from "./api.ts";
 
 export const me = signal<Me | null | undefined>(undefined);
 export const meError = signal<Failure | null>(null);
+// email is set up, so the sign-in page offers its links
+export const emailOn = signal(false);
 
 // every change of who is signed in bumps this, so a load that started
 // before the change is dropped when it answers: the first load of the
@@ -41,8 +43,9 @@ export async function loadMe(): Promise<void> {
   const mine = ++turn;
   meError.value = null;
   try {
-    const { user } = await api<MeResponse>("/api/me");
-    if (turn === mine) me.value = user;
+    const body = await api<MeResponse>("/api/me");
+    emailOn.value = body.emailOn;
+    if (turn === mine) me.value = body.user;
   } catch (err) {
     if (turn === mine) {
       meError.value = failure(err);

@@ -37,6 +37,14 @@ function table() {
     },
     {
       ...base,
+      path: "/open/:id",
+      role: "public",
+      load: async (params) => {
+        calls.push(`open ${params.id}`);
+      },
+    },
+    {
+      ...base,
       path: "/admin/config/x",
       role: "admin",
       load: async () => {
@@ -69,6 +77,18 @@ afterEach(async () => {
 });
 
 describe("startLoading", () => {
+  test("loads a public page for nobody, once per address", () => {
+    const { routes, calls } = table();
+    path.value = "/open/a";
+    stop = startLoading(routes);
+    expect(calls).toEqual(["open a"]);
+    // a sign in on the page does not read it again
+    me.value = casey;
+    expect(calls).toEqual(["open a"]);
+    path.value = "/open/b";
+    expect(calls).toEqual(["open a", "open b"]);
+  });
+
   test("runs the matched route's load for a signed-in user", () => {
     const { routes, calls } = table();
     me.value = casey;

@@ -32,7 +32,11 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   does, with the same 401. The user is re-read in the write
   transaction after the hash, so a disable or reset that won meanwhile
   opens no login.
+- **The sign-in field takes a username or an email.** One with an `@`
+  is an email, lowercased and looked up by address; the parser caps
+  either at 254 characters. The same 401, cost and limit.
 - **Login is rate limited per address, a password change per user.**
+  A login, a link ask and a link used share one window per address.
   A wrong current password is a 403, since a 401 signs the tab out.
   The limit is a fixed window per key with a cap on keys, so memory
   stays constant. `login limited` is logged once when an address's
@@ -47,6 +51,39 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **Passwords are argon2id through `Bun.password`.** The cost is a
   compose option a test lowers.
 
+## Links by email
+
+Only while email is on (`docs/email.md`); the sign-in page learns it
+from `emailOn` in `GET /api/me`.
+
+- **An ask never tells.** `POST /api/login/forgot` and
+  `/api/login/link` answer 202 with no body before any lookup. The
+  lookup and the outbox write run after the answer (`links.ask()`),
+  which the shutdown awaits. A missing, disabled or placeholder
+  account, or one with a live link of that purpose, gets nothing. Only
+  the login limit answers 429.
+- **A token is minted when its email is sent.** A `user_links` row is
+  written unminted with its outbox row, which holds no text; the kind's
+  `prepare` stores the token's hash and starts the expiry at each try:
+  reset 30 minutes, sign in 15, invite 7 days. One unused link per user
+  and purpose: a new one replaces the old and its queued email.
+  Expired links go with the logins' sweep.
+- **A link never acts on a GET,** since email scanners open links.
+  `GET /api/links/:token` names the purpose and the username with no
+  side effect, `no-store` and `no-referrer`; unknown, used, expired and
+  a disabled user's are one 404. Only `POST` acts, and a link issued
+  keeps working if email goes off.
+- **Using a link is one conditional update** (unused, unexpired, user
+  enabled) in the transaction that sets the password or opens the
+  login. A reset or an invite sets the password, clears must-change,
+  ends every login and live link and opens one login; a sign-in link
+  opens one and keeps must-change. The tab's old login ends too.
+- **A password change, a reset, a disable and an email change end
+  every live link** of the user, with its queued email.
+- **A security notice follows** a password change, a reset (by link or
+  an admin) and a sign-in link used: the time in the user's zone and
+  the client address, no link.
+
 ## Users
 
 - **`createUser()` in `users/` is the one way to make a user.** It
@@ -55,9 +92,17 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **A must-change user reaches only routes marked `passwordChange`.**
   Elsewhere the router answers 403, and the socket sends no durable
   frame and refuses `watch`. A create sets the flag by default, a reset
-  always; only the profile's password change clears it.
-- **An admin cannot demote, disable or reset their own row.** Demoting
-  or disabling the last enabled admin is a 409 too.
+  always; the profile's password change and a reset or invite link
+  clear it.
+- **An admin cannot demote, disable, reset or invite their own row.**
+  Demoting or disabling the last enabled admin is a 409 too.
+- **With email on an admin never holds a password.** `POST
+  /api/users` with `invite: true` makes a must-change user whose
+  password is random and unknown, and sends a 7-day invite; `POST
+  /api/users/:id/invite` sends it again and `/reset-link` sends a
+  reset. Each is a 409 while email is off and for a disabled user or a
+  placeholder. The typed reset stays for a user no email reaches. An
+  invite used clears `email_placeholder`.
 - **A user PATCH never takes a password.** A reset is its own route.
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An

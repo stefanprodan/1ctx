@@ -32,4 +32,8 @@
     width: 28px;
     height: 28px;
   }
+  .users-result {
+    margin: 0;
+    font-size: var(--text-ui);
+  }
 }

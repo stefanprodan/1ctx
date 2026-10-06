@@ -116,6 +116,15 @@ export async function resetPassword(
   await reread();
 }
 
+// an email with a link to choose a password; nothing changes on the row
+// until it is used
+export async function sendUserLink(
+  id: string,
+  kind: "reset-link" | "invite",
+): Promise<void> {
+  await api(`/api/users/${encodeURIComponent(id)}/${kind}`, "POST");
+}
+
 // a failure is the saving card's, since the page keeps the list it has
 async function reread(): Promise<void> {
   await loadUsers();

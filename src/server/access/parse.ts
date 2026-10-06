@@ -5,7 +5,11 @@
 // checks the source; these check the JSON a stale tab or a hostile
 // client sends, and refuse anything unexpected with a 400.
 
-import type { LoginRequest } from "../../shared/api/access.ts";
+import type {
+  LinkAskRequest,
+  LoginRequest,
+  UseLinkRequest,
+} from "../../shared/api/access.ts";
 import type {
   ChangePasswordRequest,
   UpdateProfileRequest,
@@ -47,19 +51,43 @@ function password(value: unknown, what: string, min = 1): string {
   return value;
 }
 
-export function parseLogin(body: unknown): LoginRequest {
-  const b = fields(body, ["username", "password"]);
-  // the login form takes what was typed; the rule is checked, not
-  // enforced, so the answer is the same 401 as for an unknown user
-  if (typeof b.username !== "string" || b.username === "") {
+// a username or an email as typed at sign in: the rule is checked, not
+// enforced, so the answer is the same as for an unknown user. Capped at
+// an email's length; only an email is lowercased, as it is stored
+function loginName(value: unknown): string {
+  if (typeof value !== "string" || value === "") {
     throw new BadRequest("username must be a string");
   }
-  if (b.username.length > MAX_USERNAME) {
-    throw new BadRequest(
-      `username must be ${MIN_USERNAME} to ${MAX_USERNAME} characters`,
-    );
+  if (value.length > MAX_EMAIL) {
+    throw new BadRequest(`username must be at most ${MAX_EMAIL} characters`);
   }
-  return { username: b.username, password: password(b.password, "password") };
+  return value.includes("@") ? value.toLowerCase() : value;
+}
+
+export function parseLogin(body: unknown): LoginRequest {
+  const b = fields(body, ["username", "password"]);
+  return {
+    username: loginName(b.username),
+    password: password(b.password, "password"),
+  };
+}
+
+export function parseLinkAsk(body: unknown): LinkAskRequest {
+  const b = fields(body, ["username"]);
+  return { username: loginName(b.username) };
+}
+
+export function parseLinkUse(body: unknown): UseLinkRequest {
+  const b = fields(body, ["password"]);
+  return b.password === undefined
+    ? {}
+    : { password: password(b.password, "password", MIN_PASSWORD) };
+}
+
+// newToken()'s shape: 32 bytes as base64url
+const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+export function isLinkToken(value: string): boolean {
+  return TOKEN.test(value);
 }
 
 export function parseUsername(value: unknown): string {
@@ -130,6 +158,7 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     "role",
     "tz",
     "password",
+    "invite",
     "about",
     "disabled",
     "mustChangePassword",
@@ -141,8 +170,22 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     email: parseEmail(b.email),
     role: b.role,
     tz: parseTz(b.tz),
-    password: password(b.password, "password", MIN_PASSWORD),
   };
+  if (b.invite !== undefined) {
+    if (b.invite !== true) throw new BadRequest("invite must be true");
+    if (b.password !== undefined) {
+      throw new BadRequest("password must be left out with an invite");
+    }
+    // the invite sets the password, so the flag is the invite's own
+    if (b.mustChangePassword !== undefined) {
+      throw new BadRequest(
+        "mustChangePassword must be left out with an invite",
+      );
+    }
+    parsed.invite = true;
+  } else {
+    parsed.password = password(b.password, "password", MIN_PASSWORD);
+  }
   if (b.about !== undefined) parsed.about = parseAbout(b.about);
   if (b.disabled !== undefined) {
     if (typeof b.disabled !== "boolean") {

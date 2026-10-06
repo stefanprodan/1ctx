@@ -132,7 +132,7 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
 | `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed), the admin pages |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket |
+| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
@@ -143,7 +143,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
-| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, the SMTP page |
+| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, the SMTP page, the pages of email links |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

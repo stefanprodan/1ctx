@@ -12,6 +12,7 @@ import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { profile, type UserRow, verifyPassword } from "../users/index.ts";
+import type { Links } from "./links.ts";
 import { parsePasswordChange, parseProfile } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 import type { LoginStore } from "./store.ts";
@@ -32,6 +33,7 @@ export type ProfileDeps = {
   db: Db;
   logins: LoginStore;
   users: UsersPort;
+  links: Pick<Links, "revoke" | "notice">;
   clock: Clock;
   log: Log;
 };
@@ -100,9 +102,15 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           deps.users.setPasswordHash(user.id, hash);
           deps.users.setMustChangePassword(user.id, false);
           const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
+          // a link asked for before the change would undo it
+          deps.links.revoke(user.id);
+          const changed = self(user.id);
           return {
-            result: self(user.id),
-            events: revoked > 0 ? [loginRevoked(user.id, null)] : [],
+            result: changed,
+            events: [
+              ...(revoked > 0 ? [loginRevoked(user.id, null)] : []),
+              ...deps.links.notice(changed, "changed", ctx.address),
+            ],
           };
         });
         deps.log.info("password changed", { user: user.username });

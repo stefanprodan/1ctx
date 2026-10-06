@@ -15,7 +15,7 @@ import { effect } from "@preact/signals";
 import { me } from "../data/me.ts";
 import { loadProjects } from "../data/projects.ts";
 import { path, query } from "./router.ts";
-import { match, ROUTES, type Route } from "./routes.ts";
+import { type Match, match, ROUTES, type Route } from "./routes.ts";
 
 // module state rather than a return value, so reload() can be imported
 // by whoever learns of a change without holding the loader; the token
@@ -26,6 +26,24 @@ let current: { run: () => Promise<void>; owner: object } | null = null;
 export function startLoading(routes: Route[] = ROUTES): () => void {
   const owner = {};
   let last = { user: "", pathname: "", search: "" };
+  const start = (
+    m: Match,
+    load: NonNullable<Route["load"]>,
+    search: string,
+  ) => {
+    const run = async () => {
+      // a load reports its failure through its entity; one that throws
+      // instead, before or after its promise, is a bug in it, reported
+      // and not left as an unhandled rejection
+      try {
+        await load(m.params, new URLSearchParams(search));
+      } catch (err) {
+        console.error(`load for ${m.route.path} failed: ${String(err)}`);
+      }
+    };
+    current = { run, owner };
+    void run();
+  };
   const dispose = effect(() => {
     // the user's id, role and password state, not the row: a profile
     // save replaces the row and must not reload the page's entities,
@@ -45,28 +63,24 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
       return;
     }
     const newUser = user !== last.user;
+    const moved = pathname !== last.pathname || search !== last.search;
     last = { user, pathname, search };
+    const m = match(pathname, routes);
+    // a public page reads the same for anyone, signed in or not, so it
+    // loads once per address and a sign in on it does not read it again
+    if (m?.route.role === "public") {
+      if (moved) current = null;
+      if (moved && m.route.load !== undefined) start(m, m.route.load, search);
+      return;
+    }
     current = null;
     if (row === null || row === undefined) return;
-    const m = match(pathname, routes);
     // the server refuses every other route until the password changes
     if (row.mustChangePassword && m?.route.path !== "/profile") return;
     if (newUser && !row.mustChangePassword) void loadProjects();
     if (m === null || m.route.load === undefined) return;
     if (m.route.role === "admin" && row.role !== "admin") return;
-    const load = m.route.load;
-    const run = async () => {
-      // a load reports its failure through its entity; one that throws
-      // instead, before or after its promise, is a bug in it, reported
-      // and not left as an unhandled rejection
-      try {
-        await load(m.params, new URLSearchParams(search));
-      } catch (err) {
-        console.error(`load for ${m.route.path} failed: ${String(err)}`);
-      }
-    };
-    current = { run, owner };
-    void run();
+    start(m, m.route.load, search);
   });
   return () => {
     if (current?.owner === owner) current = null;

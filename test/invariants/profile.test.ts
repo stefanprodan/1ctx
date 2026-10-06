@@ -111,6 +111,7 @@ describe("POST /api/profile/password", () => {
       expect((await here.call("GET", "/api/me")).status).toBe(200);
       expect(await (await elsewhere.call("GET", "/api/me")).json()).toEqual({
         user: null,
+        emailOn: false,
       });
       expect((await app.client().login("admin", "hunter2-test")).status).toBe(
         401,
@@ -151,6 +152,7 @@ describe("POST /api/profile/password", () => {
     expect((await winner.call("GET", "/api/me")).status).toBe(200);
     expect(await (await loser.call("GET", "/api/me")).json()).toEqual({
       user: null,
+      emailOn: false,
     });
     expect((await app.client().login("admin", password)).status).toBe(200);
     expect((await app.client().login("admin", other)).status).toBe(401);

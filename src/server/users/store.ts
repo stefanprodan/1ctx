@@ -186,6 +186,13 @@ export class UserStore {
       .run(email, isPlaceholderEmail(email) ? 1 : 0, id);
   }
 
+  // an invite used proves the address reaches its user
+  confirmEmail(id: string): void {
+    this.db
+      .query("update users set email_placeholder = 0 where id = ?")
+      .run(id);
+  }
+
   setTz(id: string, tz: string): void {
     this.db.query("update users set tz = ? where id = ?").run(tz, id);
   }

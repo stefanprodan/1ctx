@@ -3,8 +3,10 @@
 //
 // Admin user management. Identity conflicts are checked in the same
 // transaction as each write so the response names the field instead of
-// exposing a unique-index error.
+// exposing a unique-index error. With email on, an admin invites a new
+// user and resets a password by link, so they never hold the password.
 
+import type { LinkPurpose } from "../../shared/api/access.ts";
 import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   AdminUser,
@@ -18,8 +20,15 @@ import { accessChanged, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
+import { newToken } from "../lib/ids.ts";
 import { lastDays } from "../usage/index.ts";
-import { account, type UserFields, type UserRow } from "../users/index.ts";
+import {
+  account,
+  isPlaceholderEmail,
+  type UserFields,
+  type UserRow,
+} from "../users/index.ts";
+import type { Links } from "./links.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
@@ -62,7 +71,11 @@ export type UsersRoutesDeps = {
   clock: Clock;
   // a placeholder address is shown only while email is on
   email: { enabled(): boolean };
+  links: Pick<Links, "issue" | "revoke" | "notice">;
 };
+
+const NO_EMAIL = "email is not set up";
+const PLACEHOLDER = "email is a placeholder, so no email reaches it";
 
 export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
   const find = (id: string): UserRow => {
@@ -96,6 +109,30 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       throw new Conflict("email is taken");
     }
   };
+  // a link emailed to another user who can take one
+  const sendLink = (
+    purpose: LinkPurpose,
+    id: string,
+    adminId: string,
+  ): void => {
+    if (!deps.email.enabled()) throw new Conflict(NO_EMAIL);
+    if (id === adminId) {
+      throw new Conflict(
+        purpose === "invite"
+          ? "cannot invite yourself"
+          : "cannot reset your own password",
+      );
+    }
+    transact(deps.db, () => {
+      const user = find(id);
+      if (user.disabled) throw new Conflict("the user is disabled");
+      if (user.emailPlaceholder) throw new Conflict(PLACEHOLDER);
+      return {
+        result: undefined,
+        events: deps.links.issue(purpose, user.id, adminId),
+      };
+    });
+  };
   return [
     {
       method: "GET",
@@ -119,9 +156,18 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       method: "POST",
       path: "/api/users",
       policy: "admin",
-      async handle(req) {
+      async handle(req, ctx) {
         const parsed = parseNewUser(await jsonBody(req));
-        const passwordHash = await deps.users.hashPassword(parsed.password);
+        const invite = parsed.invite === true;
+        if (invite && !deps.email.enabled()) throw new Conflict(NO_EMAIL);
+        if (invite && isPlaceholderEmail(parsed.email)) {
+          throw new Conflict(PLACEHOLDER);
+        }
+        // an invited user's first password is one nobody knows, hashed
+        // like any other, until the invite sets theirs
+        const passwordHash = await deps.users.hashPassword(
+          invite ? newToken() : parsed.password!,
+        );
         const user = transact(deps.db, () => {
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
@@ -137,7 +183,13 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             disabled: parsed.disabled,
             now: deps.clock(),
           });
-          return { result: find(created.id) };
+          return {
+            result: find(created.id),
+            events:
+              invite && !created.disabled
+                ? deps.links.issue("invite", created.id, ctx.principal!.userId)
+                : [],
+          };
         });
         const body: UserResponse = { user: oneUser(user) };
         return json(body, 201);
@@ -162,6 +214,8 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);
             deps.users.setEmail(user.id, patch.email);
+            // a link sent to the old address must not outlive it
+            deps.links.revoke(user.id);
           }
           const fullName = patch.fullName ?? user.fullName;
           const about = patch.about ?? user.about;
@@ -197,6 +251,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             deps.users.setDisabled(user.id, patch.disabled!);
             if (patch.disabled === true) {
               deps.logins.deleteForUser(user.id);
+              deps.links.revoke(user.id);
             }
           }
           return {
@@ -244,11 +299,34 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           deps.users.setPasswordHash(user.id, passwordHash);
           deps.users.setMustChangePassword(user.id, true);
           deps.logins.deleteForUser(user.id);
+          deps.links.revoke(user.id);
           return {
             result: undefined,
-            events: [loginRevoked(user.id, null)],
+            events: [
+              loginRevoked(user.id, null),
+              ...deps.links.notice(user, "admin-reset", ctx.address),
+            ],
           };
         });
+        return new Response(null, { status: 204 });
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/users/:id/reset-link",
+      policy: "admin",
+      handle(_req, ctx) {
+        sendLink("reset", ctx.params.id, ctx.principal!.userId);
+        return new Response(null, { status: 204 });
+      },
+    },
+    {
+      // sent again: the last invite stops working
+      method: "POST",
+      path: "/api/users/:id/invite",
+      policy: "admin",
+      handle(_req, ctx) {
+        sendLink("invite", ctx.params.id, ctx.principal!.userId);
         return new Response(null, { status: 204 });
       },
     },

@@ -44,6 +44,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   config: [
     "users",
     "logins",
+    "user_links",
     "visits",
     "projects",
     "memberships",

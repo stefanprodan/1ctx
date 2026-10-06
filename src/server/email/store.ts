@@ -176,6 +176,18 @@ export class EmailStore {
     this.db.query("delete from email_outbox where id = ?").run(id);
   }
 
+  // a user's queued rows of these kinds, as when the links they would
+  // carry are revoked; the count removed
+  dropQueued(userId: string, kinds: readonly EmailKind[]): number {
+    if (kinds.length === 0) return 0;
+    return this.db
+      .query(
+        `delete from email_outbox where user_id = ? and status = 'queued'
+         and kind in (${kinds.map(() => "?").join(", ")})`,
+      )
+      .run(userId, ...kinds).changes;
+  }
+
   // the text goes; the row stays a day for the caps counted on rows
   sent(id: string, now: number): void {
     this.db

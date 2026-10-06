@@ -34,7 +34,12 @@ import { teamsOf } from "./Credentials.model.ts";
 import { useDraftCard } from "./DraftCard.tsx";
 import { useShownRow } from "./drafts.ts";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
-import { type CardProps, PasswordCard, SwitchCard } from "./UserCards.tsx";
+import {
+  type CardProps,
+  LinkCard,
+  PasswordCard,
+  SwitchCard,
+} from "./UserCards.tsx";
 import { UserFields, type Who } from "./UserFields.tsx";
 import {
   adminCount,
@@ -100,6 +105,9 @@ export function UserPage({ params }: { params: Params }) {
 function Body({ user }: { user: AdminUser }) {
   // the profile page is where the admin changes their own
   const self = me.value?.id === user.id;
+  // with email on a link replaces the typed password, unless no email
+  // can reach them
+  const byLink = emailOn.value && !user.emailPlaceholder;
   // one card saves at a time, so a slower answer never puts back what a
   // later save changed
   const saving = useSignal(false);
@@ -108,7 +116,12 @@ function Body({ user }: { user: AdminUser }) {
       <ProfileCard user={user} saving={saving} />
       <RoleCard user={user} saving={saving} />
       <ProjectsCard user={user} saving={saving} />
-      {!self && <PasswordCard user={user} saving={saving} />}
+      {!self &&
+        (byLink ? (
+          <LinkCard user={user} saving={saving} />
+        ) : (
+          <PasswordCard user={user} saving={saving} />
+        ))}
       {!self && <SwitchCard user={user} saving={saving} />}
     </SettingStack>
   );

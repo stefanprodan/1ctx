@@ -1,7 +1,9 @@
 # Email
 
 Governs `src/server/email/`: the instance's SMTP server, the outbox and
-the sender, and the admin's SMTP page under Config.
+the sender, the admin's SMTP page under Config, and what the sign-in,
+link and users pages show of email. The links themselves are in
+`docs/access.md`.
 
 ## The server
 
@@ -36,7 +38,16 @@ the sender, and the admin's SMTP page under Config.
   answers `sent` or a failure word.
 - **A link email's row holds no text.** Its kind's `prepare` (from
   `register()`) builds the email when the row is sent, so a retry never
-  carries an expired or stored link.
+  carries an expired or stored link. The `reset`, `signin` and `invite`
+  kinds are access's links (`docs/access.md`); their `prepare` mints a
+  fresh token at every try and drops the row as `revoked` when the link
+  went since. `dropQueued()` removes a user's queued rows of a kind, as
+  when their links end.
+- **A `notice` row holds its text,** written when it is queued, since
+  it carries no link; its `prepare` adds the HTML.
+- **An account email is short plain text with the same paragraphs as
+  simple HTML.** Its subject is fixed words, never what a user typed,
+  and the names in it are escaped in HTML.
 - **The sender is the scheduler's shape.** It starts only when the app
   is activated, wakes on `email.queued` and on a timer from the clock,
   and on shutdown takes no new row and waits for the one in flight. A
@@ -59,14 +70,14 @@ the sender, and the admin's SMTP page under Config.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
-  may drop it too (`opted-out`, `no-access`).
+  may drop it too (`opted-out`, `no-access`, `revoked`).
 - **An address on `1ctx.dev` is a placeholder.** Seeded and
   bootstrapped users get one, so the project's own domain is never
   emailed. The users' `email_placeholder` follows the address's domain,
   exactly `1ctx.dev`, at every create and every email edit, and the
   migration set it the same way. A placeholder is never emailed.
 
-## The page
+## The pages
 
 - **The SMTP page saves the server as one card,** since `PUT` takes
   every field and nothing is held before the first save.
@@ -76,6 +87,16 @@ the sender, and the admin's SMTP page under Config.
   placeholder; a save clears its last result. The Users pages say "No
   real email" for a placeholder only while email is on (`emailOn` in
   `GET /api/users`).
+- **With email on an admin sends links, not passwords.** New user
+  offers Send an invite or Set a password; a user's page sends the
+  invite again while they must change their password, else a reset
+  link (`linkCardWords()`). The typed reset shows only when no email
+  reaches the user.
+- **The sign-in page offers its email links only with email on,**
+  and says the same after an ask whoever was named. The link page
+  (`/link/<token>`) is a `bare` route: drawn outside the shell whoever
+  is signed in, it names an account already signed in before its one
+  button replaces it.
 
 ## Words and logs
 

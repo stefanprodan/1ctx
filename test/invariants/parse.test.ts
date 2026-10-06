@@ -6,6 +6,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   parseEmail,
+  parseLinkAsk,
+  parseLinkUse,
   parseLogin,
   parseNewUser,
   parsePasswordChange,
@@ -43,6 +45,17 @@ describe("parseLogin", () => {
     });
   });
 
+  test("lowercases an email and only an email", () => {
+    expect(
+      parseLogin({ username: "Casey@Example.COM", password: "pw" }),
+    ).toEqual({ username: "casey@example.com", password: "pw" });
+    expect(parseLogin({ username: "Casey", password: "pw" }).username).toBe(
+      "Casey",
+    );
+    const long = `${"a".repeat(242)}@example.com`;
+    expect(parseLogin({ username: long, password: "pw" }).username).toBe(long);
+  });
+
   refuses(
     [
       null,
@@ -56,7 +69,7 @@ describe("parseLogin", () => {
       { username: 1, password: "pw" },
       { username: "casey", password: { $ne: "" } },
       { username: "casey", password: "pw", role: "admin" },
-      { username: "a".repeat(33), password: "pw" },
+      { username: "a".repeat(255), password: "pw" },
       { username: "casey", password: "p".repeat(1025) },
     ],
     parseLogin,
@@ -289,8 +302,57 @@ describe("parseNewUser", () => {
         mustChangePassword,
       })),
       { ...body, extra: true },
+      { ...body, password: undefined },
+      { ...body, invite: true },
+      { ...body, password: undefined, invite: false },
+      { ...body, password: undefined, invite: true, mustChangePassword: true },
     ],
     parseNewUser,
+  );
+
+  test("takes an invite in place of the password", () => {
+    expect(
+      parseNewUser({ ...body, password: undefined, invite: true }),
+    ).toEqual({
+      ...body,
+      password: undefined,
+      email: "casey@example.com",
+      invite: true,
+    });
+  });
+});
+
+describe("parseLinkAsk", () => {
+  test("takes a username or an email", () => {
+    expect(parseLinkAsk({ username: "Casey@Example.com" })).toEqual({
+      username: "casey@example.com",
+    });
+  });
+
+  refuses(
+    [
+      null,
+      {},
+      { username: "" },
+      { username: 1 },
+      { username: "a".repeat(255) },
+      { username: "casey", password: "x" },
+    ],
+    parseLinkAsk,
+  );
+});
+
+describe("parseLinkUse", () => {
+  test("takes a new password or none", () => {
+    expect(parseLinkUse({})).toEqual({});
+    expect(parseLinkUse({ password: "longenough" })).toEqual({
+      password: "longenough",
+    });
+  });
+
+  refuses(
+    [null, [], { password: "short" }, { password: 1 }, { token: "x" }],
+    parseLinkUse,
   );
 });
 

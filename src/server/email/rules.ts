@@ -20,13 +20,15 @@ export const EMAIL_KINDS = [
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 // why a row was dropped before SMTP: the recipient is gone, disabled
-// or has no real address, or a kind's own check refused it
+// or has no real address, or a kind's own check refused it (a link
+// email's link was revoked since)
 export type DropWord =
   | "gone"
   | "disabled"
   | "placeholder"
   | "opted-out"
-  | "no-access";
+  | "no-access"
+  | "revoked";
 
 // the waits after the first, second and third failed try; the fourth
 // failure is final

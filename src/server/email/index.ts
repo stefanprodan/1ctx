@@ -104,6 +104,9 @@ export type Email = {
   enqueue(fields: Enqueue): BusEvent[];
   // a kind's last word before SMTP; one per kind
   register(kind: EmailKind, prepare: Prepare): void;
+  // the user's queued rows of these kinds, in the caller's transaction;
+  // the count removed
+  dropQueued(userId: string, kinds: readonly EmailKind[]): number;
   start(): void;
   stop(): Promise<void>;
   // after a cut shutdown, so the send in flight writes nothing
@@ -236,6 +239,7 @@ export function emailArea(deps: EmailDeps): Email {
       if (prepares.has(kind)) throw new Error(`${kind} is registered`);
       prepares.set(kind, prepare);
     },
+    dropQueued: (userId, kinds) => store.dropQueued(userId, kinds),
     start: () => loop.start(),
     stop: () => loop.stop(),
     halt: () => loop.halt(),

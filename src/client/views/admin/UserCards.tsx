@@ -5,13 +5,23 @@ import { type Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { AdminUser } from "../../../shared/api/users.ts";
 import { me } from "../../data/me.ts";
-import { resetPassword, updateUser, users } from "../../data/users.ts";
-import { at, useSave } from "../../lib/save.ts";
+import {
+  resetPassword,
+  sendUserLink,
+  updateUser,
+  users,
+} from "../../data/users.ts";
+import { at, useAction, useSave } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
 import { holding } from "./drafts.ts";
 import { PasswordField } from "./PasswordField.tsx";
-import { adminCount, disableLock, passwordProblem } from "./Users.model.ts";
+import {
+  adminCount,
+  disableLock,
+  linkCardWords,
+  passwordProblem,
+} from "./Users.model.ts";
 
 export type CardProps = { user: AdminUser; saving: Signal<boolean> };
 
@@ -65,6 +75,46 @@ export function PasswordCard({ user, saving }: CardProps) {
         </div>
       </Setting>
     </SettingForm>
+  );
+}
+
+// with email on the admin sends a link and never holds the password;
+// nothing changes on the row until the link is used
+export function LinkCard({ user, saving }: CardProps) {
+  const send = useAction();
+  const sent = useSignal<string | null>(null);
+  const words = linkCardWords(user);
+  const failed = send.failure.value;
+  return (
+    <Setting
+      title={words.title}
+      line={words.line}
+      action={
+        <button
+          type="button"
+          class="btn btn-small"
+          disabled={send.busy.value || saving.value || user.disabled}
+          onClick={() =>
+            void send.run(async () => {
+              sent.value = null;
+              await sendUserLink(user.id, words.kind);
+              sent.value = words.sent;
+            })
+          }
+        >
+          {send.busy.value ? "Sending" : words.button}
+        </button>
+      }
+    >
+      {(sent.value !== null || failed !== null) && (
+        <p
+          class={`users-result${failed !== null ? " error" : ""}`}
+          role="status"
+        >
+          {failed ?? sent.value}
+        </p>
+      )}
+    </Setting>
   );
 }
 

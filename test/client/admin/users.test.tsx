@@ -11,9 +11,11 @@ import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import {
   createUser,
+  emailOn,
   loadUsers,
   loadUserUsage,
   resetPassword,
+  sendUserLink,
   setUserProjects,
   updateUser,
   users,
@@ -26,7 +28,9 @@ import {
   adminCount,
   disableLock,
   emailProblem,
+  firstPasswordOf,
   generatePassword,
+  linkCardWords,
   metaLine,
   passwordProblem,
   patchOf,
@@ -156,6 +160,46 @@ describe("the words", () => {
       ).toBe(1);
     });
   }
+});
+
+describe("the email links", () => {
+  test("a new user is invited only with email on and the invite picked", () => {
+    expect(firstPasswordOf(true, "invite", "typed")).toEqual({ invite: true });
+    expect(firstPasswordOf(true, "password", "typed")).toEqual({
+      password: "typed",
+    });
+    expect(firstPasswordOf(false, "invite", "typed")).toEqual({
+      password: "typed",
+    });
+  });
+
+  test("the card invites again until a password is chosen, then resets", () => {
+    expect(linkCardWords(casey)).toMatchObject({
+      kind: "invite",
+      button: "Send invite",
+      sent: "Sent to casey@example.com.",
+    });
+    expect(
+      linkCardWords({ ...casey, mustChangePassword: false }),
+    ).toMatchObject({ kind: "reset-link", button: "Send reset link" });
+    expect(linkCardWords({ ...casey, disabled: true }).line).toBe(
+      "Enable them first.",
+    );
+  });
+
+  test.serial("sends the link the card names", async () => {
+    const calls: string[] = [];
+    answer = (url, init) => {
+      calls.push(`${init?.method} ${url}`);
+      return new Response(null, { status: 204 });
+    };
+    await sendUserLink("u2", "invite");
+    await sendUserLink("u2", "reset-link");
+    expect(calls).toEqual([
+      "POST /api/users/u2/invite",
+      "POST /api/users/u2/reset-link",
+    ]);
+  });
 });
 
 describe("the checks", () => {
@@ -446,6 +490,51 @@ describe("the pages", () => {
     expect(html).toContain("Enable @casey");
     expect(html).toContain("They cannot sign in.");
   });
+
+  test.serial(
+    "with email on, New user sends an invite in place of the password",
+    () => {
+      users.value = [root];
+      emailOn.value = true;
+      try {
+        const html = render(<NewUser />);
+        expect(html).toContain("Send an invite");
+        expect(html).toContain("It works for 7 days.");
+        expect(html).not.toContain('aria-label="Generate"');
+      } finally {
+        emailOn.value = false;
+      }
+    },
+  );
+
+  test.serial(
+    "with email on, a user's page emails a link in place of the typed reset",
+    () => {
+      users.value = [
+        root,
+        casey,
+        { ...casey, id: "u3", username: "dana", mustChangePassword: false },
+      ];
+      projects.value = [];
+      emailOn.value = true;
+      try {
+        const invited = render(<UserPage params={{ username: "casey" }} />);
+        expect(invited).toContain("Send invite");
+        expect(invited).not.toContain('aria-label="Generate"');
+        const active = render(<UserPage params={{ username: "dana" }} />);
+        expect(active).toContain("Send reset link");
+        // no email reaches a placeholder, so the typed reset stays
+        users.value = [root, { ...casey, emailPlaceholder: true }];
+        const seeded = render(<UserPage params={{ username: "casey" }} />);
+        expect(seeded).not.toContain("Send invite");
+        expect(seeded).toContain('aria-label="Generate"');
+        const own = render(<UserPage params={{ username: "admin" }} />);
+        expect(own).not.toContain("Send reset link");
+      } finally {
+        emailOn.value = false;
+      }
+    },
+  );
 
   test.serial("an unknown handle says so", () => {
     users.value = [root];

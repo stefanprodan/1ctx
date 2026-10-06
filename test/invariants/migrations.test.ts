@@ -61,6 +61,7 @@ const EXPECTED_IDS = [
   "0047-decision-usage-decider",
   "0048-agent-listed-as",
   "0049-email",
+  "0050-user-links",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns

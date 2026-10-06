@@ -154,9 +154,11 @@ export type App = {
   provision: Provision;
   repaired: number;
   reconciled: number;
-  // drop expired logins and sweep the chats; called at start and every
-  // hour; the rows removed, not the chats swept
+  // drop expired logins and links and sweep the chats; called at start
+  // and every hour; the rows removed, not the chats swept
   sweep(): number;
+  // the work a link ask left after its 202
+  linkAsks(): Promise<void>;
   // the hourly MCP refresh loop; main.ts starts it after the first
   // sweep, a test only when it tests the pass
   mcpStart(): void;
@@ -680,6 +682,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sweep: () => {
       try {
         const logins = access.sweep();
+        const links = access.sweepLinks();
         const visits = access.sweepVisits();
         const now = clock();
         const knowledgeRows = knowledge.sweep(now);
@@ -693,6 +696,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const emailRows = email.sweep(now);
         const removed =
           logins +
+          links +
           visits +
           knowledgeRows +
           scratchRows +
@@ -702,6 +706,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
           sweepLog.info("sweep", {
             logins,
+            links,
             visits,
             knowledge: knowledgeRows,
             bash: scratchRows,
@@ -718,6 +723,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         throw error;
       }
     },
+    linkAsks: () => access.settled(),
     mcpStart: () => mcp.start(),
     keptStart: () => sessions.kept.start(),
     packKept: () => sessions.kept.pass(),
@@ -744,6 +750,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
+      // a link ask answered before the drain writes its row
+      await access.settled();
       if (cut === undefined) await emailStopped;
       else {
         await Promise.race([emailStopped, cut]);
