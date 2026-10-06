@@ -135,7 +135,7 @@ export function unpackBody(row: OutboxRow): Framed | null {
 
 // the sender's last word on an email about a chat or run: what made
 // the user a recipient still holds, and the row holds its email; the
-// link is built now, and the row dropped when email went off since
+// link is built now, from the public address of the send
 export function sessionPrepare(
   canOpen: (userId: string, projectId: string) => boolean,
   link: (path: string) => string,
@@ -149,12 +149,6 @@ export function sessionPrepare(
     if (!user.emailFromAgents) return "opted-out";
     const framed = unpackBody(row);
     if (framed === null) throw new Error(`an ${row.kind} row has no text`);
-    let full: string;
-    try {
-      full = link(framed.path);
-    } catch {
-      return "off";
-    }
-    return withLink(framed, full);
+    return withLink(framed, link(framed.path));
   };
 }

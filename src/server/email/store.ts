@@ -180,21 +180,54 @@ export class EmailStore {
     });
   }
 
-  // dropped: nothing of it is kept
-  remove(id: string): void {
-    this.db.query("delete from email_outbox where id = ?").run(id);
+  // dropped: nothing of it is kept, but an asked row stays a day as
+  // dropped, with no text, so the caps on asks keep counting it
+  drop(id: string, now: number): void {
+    transact(this.db, () => {
+      this.db
+        .query(
+          `update email_outbox set status = 'dropped', subject = null,
+             body = null, claimed_at = null, updated_at = ?
+           where id = ? and asked = 1`,
+        )
+        .run(now, id);
+      this.db
+        .query("delete from email_outbox where id = ? and asked = 0")
+        .run(id);
+      return { result: undefined };
+    });
   }
 
   // a user's queued rows of these kinds, as when the links they would
-  // carry are revoked; the count removed
-  dropQueued(userId: string, kinds: readonly EmailKind[]): number {
+  // carry are revoked, dropped as drop() does; the count dropped
+  dropQueued(userId: string, kinds: readonly EmailKind[], now: number): number {
     if (kinds.length === 0) return 0;
-    return this.db
+    const where = `user_id = ? and status = 'queued'
+      and kind in (${kinds.map(() => "?").join(", ")})`;
+    const kept = this.db
       .query(
-        `delete from email_outbox where user_id = ? and status = 'queued'
-         and kind in (${kinds.map(() => "?").join(", ")})`,
+        `update email_outbox set status = 'dropped', subject = null,
+           body = null, claimed_at = null, updated_at = ?
+         where ${where} and asked = 1`,
       )
+      .run(now, userId, ...kinds).changes;
+    const removed = this.db
+      .query(`delete from email_outbox where ${where} and asked = 0`)
       .run(userId, ...kinds).changes;
+    return kept + removed;
+  }
+
+  // whether the user has a queued row of the kind, as a link email
+  // still being tried
+  hasQueued(userId: string, kind: EmailKind): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string, string]>(
+          `select count(*) as n from email_outbox
+           where user_id = ? and kind = ? and status = 'queued'`,
+        )
+        .get(userId, kind)!.n > 0
+    );
   }
 
   // the text goes; the row stays a day for the caps counted on rows
@@ -287,12 +320,12 @@ export class EmailStore {
       .get()!.at;
   }
 
-  // sent rows past sentBefore, failed ones past failedBefore
+  // sent and dropped rows past sentBefore, failed ones past failedBefore
   sweep(sentBefore: number, failedBefore: number): number {
     return this.db
       .query(
         `delete from email_outbox
-         where (status = 'sent' and updated_at < ?)
+         where (status in ('sent', 'dropped') and updated_at < ?)
            or (status = 'failed' and updated_at < ?)`,
       )
       .run(sentBefore, failedBefore).changes;

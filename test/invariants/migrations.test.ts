@@ -1595,12 +1595,21 @@ describe("the schema", () => {
       ).toEqual([
         "SEARCH email_outbox USING INDEX email_outbox_due (status=? AND next_attempt_at<?)",
       ]);
+      for (const sql of [
+        `delete from email_outbox where user_id = ? and status = 'queued'
+         and kind in (?, ?) and asked = 0`,
+        `update email_outbox set status = 'dropped' where user_id = ?
+         and status = 'queued' and kind in (?, ?) and asked = 1`,
+      ]) {
+        expect(plans(sql, "u", "reset", "signin")).toEqual([
+          "SEARCH email_outbox USING INDEX email_outbox_queued (user_id=? AND kind=?)",
+        ]);
+      }
       expect(
         plans(
-          `delete from email_outbox where user_id = ? and status = 'queued'
-           and kind in (?, ?)`,
+          `select count(*) as n from email_outbox
+           where user_id = ? and kind = ? and status = 'queued'`,
           "u",
-          "reset",
           "signin",
         ),
       ).toEqual([

@@ -303,6 +303,16 @@ describe("the caps on asks", () => {
     await ask(ASKED_LINKS_PER_HOUR);
     expect(await e.send()).toBe(ASKED_LINKS_PER_HOUR);
     expect(capped(e)).toEqual([{ cap: "instance" }]);
+    // an admin's link still goes
+    const reset = await admin.call(
+      "POST",
+      `/api/users/${e.maria.id}/reset-link`,
+    );
+    expect(reset.status).toBe(204);
+    expect(await e.send()).toBe(1);
+    expect(app.emailSender.sent.at(-1)!.message.to.address).toBe(
+      "maria@example.test",
+    );
     // shown only while email is on
     await admin.call("PUT", "/api/admin/smtp", {
       body: { ...SMTP, keyName: "email-gone" },
@@ -316,6 +326,120 @@ describe("the caps on asks", () => {
     await ask(ASKED_LINKS_PER_HOUR + 1);
     expect(await e.send()).toBe(1);
     expect(capped(e)).toHaveLength(1);
+    await app.shutdown();
+  });
+
+  test("a link still being tried counts while SMTP keeps failing", async () => {
+    const e = await emailApp();
+    const { app, maria } = e;
+    app.emailSender.result = "timeout";
+    const issued = () =>
+      e.logs.events.filter((ev) => ev.msg === "link issued").length;
+    const outcomes: string[] = [];
+    let asks = 0;
+    for (let minute = 0; minute < 24 * 60; minute++) {
+      if (minute % 22 === 0) {
+        const before = [issued(), capped(e).length];
+        const res = await app
+          .client(`10.3.${asks++}.1`)
+          .call("POST", "/api/login/link", { body: { username: "maria" } });
+        expect(res.status).toBe(202);
+        await app.linkAsks();
+        outcomes.push(
+          issued() > before[0]!
+            ? "issued"
+            : capped(e).length > before[1]!
+              ? "capped"
+              : "live",
+        );
+      }
+      await e.send();
+      app.now.value += MINUTE;
+    }
+    expect(outcomes.filter((o) => o === "issued")).toHaveLength(
+      ASKED_LINKS_PER_USER_DAY,
+    );
+    const first = outcomes.indexOf("capped");
+    expect(first).toBeGreaterThan(0);
+    expect(outcomes.slice(first).every((o) => o === "capped")).toBe(true);
+    expect(e.outbox(maria.id)).toHaveLength(ASKED_LINKS_PER_USER_DAY);
+    // four tries each, then failed
+    expect(app.emailSender.sent).toHaveLength(4 * ASKED_LINKS_PER_USER_DAY);
+    await app.shutdown();
+  });
+
+  test("a revoked link's email still counts", async () => {
+    const e = await emailApp();
+    const { app, maria } = e;
+    const tab = app.client("203.0.113.9");
+    await tab.login("maria", MARIA_PASSWORD);
+    const passwords = [
+      MARIA_PASSWORD,
+      "maria-pw-1",
+      "maria-pw-2",
+      "maria-pw-3",
+    ];
+    for (let i = 0; i <= ASKED_LINKS_PER_USER_DAY; i++) {
+      await app.client(`10.4.${i}.1`).call("POST", "/api/login/link", {
+        body: { username: "maria" },
+      });
+      await app.linkAsks();
+      if (i === ASKED_LINKS_PER_USER_DAY) break;
+      // the change revokes the queued link and its email
+      const res = await tab.call("POST", "/api/profile/password", {
+        body: { current: passwords[i], next: passwords[i + 1] },
+      });
+      expect(res.status).toBe(200);
+    }
+    expect(e.outbox(maria.id).filter((row) => row.kind === "signin")).toEqual(
+      Array(ASKED_LINKS_PER_USER_DAY).fill({
+        kind: "signin",
+        status: "dropped",
+      }),
+    );
+    expect(capped(e)).toEqual([{ cap: "user", user: "maria" }]);
+    await app.shutdown();
+  });
+
+  test("sign in and reset asks share the user's cap", async () => {
+    const e = await emailApp();
+    const { app } = e;
+    let n = 0;
+    const ask = async (path: string) => {
+      await app.client(`10.5.${n++}.1`).call("POST", path, {
+        body: { username: "maria" },
+      });
+      await app.linkAsks();
+      return e.send();
+    };
+    expect(await ask("/api/login/link")).toBe(1);
+    expect(await ask("/api/login/forgot")).toBe(1);
+    // the reset link is live and waits out
+    expect(await ask("/api/login/forgot")).toBe(0);
+    app.now.value += 31 * MINUTE;
+    expect(await ask("/api/login/forgot")).toBe(1);
+    expect(app.emailSender.sent).toHaveLength(3);
+    expect(capped(e)).toEqual([]);
+    expect(await ask("/api/login/link")).toBe(0);
+    expect(capped(e)).toEqual([{ cap: "user", user: "maria" }]);
+    await app.shutdown();
+  });
+
+  test("the sweep at the day's edge keeps the count", async () => {
+    const e = await emailApp();
+    const { app, maria } = e;
+    const start = app.now.value;
+    await app.client().call("POST", "/api/login/link", {
+      body: { username: "maria" },
+    });
+    await app.linkAsks();
+    expect(await e.send()).toBe(1);
+    app.now.value = start + DAY_MS;
+    app.sweep();
+    expect(app.email.countAsked(maria.id, app.now.value - DAY_MS)).toBe(1);
+    app.now.value += 1;
+    app.sweep();
+    expect(app.email.countAsked(maria.id, 0)).toBe(0);
     await app.shutdown();
   });
 });

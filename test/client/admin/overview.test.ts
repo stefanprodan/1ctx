@@ -527,6 +527,7 @@ describe("needs attention", () => {
     ).toMatchObject({
       line: "key file missing",
       what: "SMTP",
+      mono: true,
       href: "/admin/config/smtp",
     });
     expect(
@@ -536,9 +537,10 @@ describe("needs attention", () => {
       ),
     ).toMatchObject({
       name: "Link emails",
-      line: "paused",
+      line: "capped for this hour",
       what: "Email",
       icon: "email",
+      mono: false,
       href: "/admin/config/smtp",
     });
     expect(

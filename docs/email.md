@@ -10,8 +10,8 @@ profile pages show of email. The links themselves are in
 
 - **Email is off until an admin sets it up.** `enabled()` is true once
   the settings row is saved and the `email-` key file it names, if any,
-  is present. Every feature that sends email asks it first; off, nothing it
-  adds shows.
+  is present. Every feature that sends email asks it first; off, nothing
+  it adds shows.
 - **One SMTP server per instance.** `GET` and `PUT /api/admin/smtp`
   hold host, port, security, username, the password's key file
   (`keyName`), the From address and name and the public address. The
@@ -42,7 +42,7 @@ profile pages show of email. The links themselves are in
   carries an expired or stored link. The `reset`, `signin` and `invite`
   kinds are access's links (`docs/access.md`); their `prepare` mints a
   fresh token at every try and drops the row as `revoked` when the link
-  went since. `dropQueued()` removes a user's queued rows of a kind, as
+  went since. `dropQueued()` drops a user's queued rows of a kind, as
   when their links end.
 - **A `notice` row holds its text,** written when it is queued, since
   it carries no link; its `prepare` adds the HTML.
@@ -63,22 +63,24 @@ profile pages show of email. The links themselves are in
   is at least once: a second signal's cut leaves the send in flight
   unwritten (`halt()`), and the row goes again after the restart.
 - **Backoff is 1, 5 and 30 minutes, then failed.** A sent row becomes
-  `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it;
-  a failed row keeps its word for 7 days. Neither keeps the text, and
-  the hourly sweep removes them. A dropped row is deleted. A chat's
-  delete leaves its rows with no session, so the project's cap keeps
-  counting them.
+  `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it; a
+  failed row keeps its word for 7 days. Neither keeps the text, and the
+  hourly sweep removes them. A dropped row is deleted, but an `asked`
+  one becomes `dropped`, with no text, and is kept a day like a sent
+  one, so the caps on asks count it. A chat's delete leaves its rows
+  with no session, so the project's cap keeps counting them.
 - **A kind's email may carry its own From name** (`fromName`, as
   "<agent> via 1ctx"); the address is always the server's.
-- **Link emails asked for at the sign-in page are capped,** 3 per user
-  a day and 50 per instance an hour, on rows marked `asked`; an
-  admin's links are not. The Monitor shows "Link emails paused" while
-  the instance's cap holds and email is on.
+- **Link emails asked for at the sign-in page are capped,** 3 per user a
+  day and 50 per instance an hour, on rows marked `asked`; an admin's
+  links are not. A link whose email is still queued is live, though it
+  expired between tries, so an ask waits it out. The Monitor's Attention
+  shows "Link emails", "capped for this hour", while the instance's cap
+  holds and email is on.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
-  may drop it too (`opted-out`, `no-access`, `revoked`, `deleted`,
-  `off`).
+  may drop it too (`opted-out`, `no-access`, `revoked`, `deleted`).
 - **An address on `1ctx.dev` is a placeholder.** Seeded and
   bootstrapped users get one, so the project's own domain is never
   emailed. The users' `email_placeholder` follows the address's domain,
@@ -92,8 +94,9 @@ profile pages show of email. The links themselves are in
   when it was queued (`packBody()`): the subject, the text, the HTML
   and the From name, so a rename later changes nothing sent. The link
   is stored as a path; `prepare` builds it with `link()` at the send,
-  so a changed public address is the one sent, and drops the row as
-  `off` when email went off.
+  so a changed public address is the one sent. While email is off the
+  sender claims no row, so rows wait for it; a `link()` that throws
+  anyway fails the try as `other`, which is retried.
 - **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
   queues it for the automation's owner in the transaction that sets
   `attention_since` (`automations/alert-email.ts`), only with email on
@@ -166,8 +169,8 @@ profile pages show of email. The links themselves are in
   `rejected`, `timeout` or `other` (`failureOf()` in `smtp.ts`). Rows,
   the page and the Monitor show the word, never the server's text.
 - **The sender logs `email sent`, `email failed` and `email dropped`**
-  with the kind, the user id, the row id (`outbox`) and the word. Never an
-  address, subject, body or the server's text.
+  with the kind, the user id, the row id (`outbox`) and the word. Never
+  an address, subject, body or the server's text.
 - **The Monitor shows email as key checks:** a missing key file, and the
   newest failure's word with the queued and failed counts.
 

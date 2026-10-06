@@ -38,6 +38,7 @@ export type EmailPort = {
   enqueue(fields: Enqueue): BusEvent[];
   register(kind: EmailKind, prepare: Prepare): void;
   dropQueued(userId: string, kinds: readonly EmailKind[]): number;
+  hasQueued(userId: string, kind: EmailKind): boolean;
   countAsked(userId: string | null, since: number): number;
 };
 
@@ -158,8 +159,13 @@ export function links(deps: LinksDeps): Links {
     const outcome = transact<"live" | "user" | "instance" | "issued">(
       deps.db,
       () => {
-        // one live link per user and purpose: a second ask waits it out
-        if (deps.store.live(user.id, purpose, deps.clock())) {
+        // one live link per user and purpose: a second ask waits it out,
+        // and a link whose email is still being tried is live, though it
+        // expired between tries
+        if (
+          deps.store.live(user.id, purpose, deps.clock()) ||
+          deps.email.hasQueued(user.id, purpose)
+        ) {
           return { result: "live" };
         }
         const cap = capped(user.id);

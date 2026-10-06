@@ -88,24 +88,23 @@ describe("attention", () => {
 
 describe("email's attention", () => {
   test("puts paused link emails after the key files", () => {
+    // paused only while email is on, so its key file is there
     const email = {
       keyName: "email-relay",
-      hasKey: false,
+      hasKey: true,
       queued: 0,
       failed: 0,
       lastFailure: null,
       lastFailedAt: null,
       linksPaused: true,
     };
-    expect(attention({ ...none, email })).toEqual([
-      { kind: "smtp-key", name: "email-relay", at: null },
+    const search = { provider: "exa" as const, hasKey: false };
+    expect(attention({ ...none, search, email })).toEqual([
+      { kind: "search-key", name: "exa", at: null },
       { kind: "links-paused", name: "Link emails", at: null },
     ]);
     expect(
-      attention({
-        ...none,
-        email: { ...email, hasKey: true, linksPaused: false },
-      }),
+      attention({ ...none, email: { ...email, linksPaused: false } }),
     ).toEqual([]);
   });
 });

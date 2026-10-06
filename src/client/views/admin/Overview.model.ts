@@ -230,6 +230,8 @@ const ATTENTION: Record<
     line: string;
     icon: "mcp" | "skill" | "key" | "email";
     href: (name: string) => string;
+    // the name is a phrase, not an object's name, so it is not mono
+    phrase?: boolean;
   }
 > = {
   "provider-key": {
@@ -271,8 +273,9 @@ const ATTENTION: Record<
   "links-paused": {
     icon: "email",
     what: "Email",
-    line: "paused",
+    line: "capped for this hour",
     href: () => SMTP_HREF,
+    phrase: true,
   },
   "email-failed": {
     icon: "email",
@@ -323,6 +326,7 @@ export function attentionRow(
           : `${words.line} ${ago(item.at, now)}`,
     what: words.what,
     icon: words.icon,
+    mono: words.phrase !== true,
     href: words.href(item.name),
   };
 }

@@ -211,7 +211,7 @@ describe("a row's body", () => {
     ).toBe("/run/r1");
   });
 
-  test("is dropped when email went off before its link was built", () => {
+  test("builds its link at the send, and a link that fails throws", () => {
     const framed = alertFrame({
       automation: "nightly",
       project: { name: "platform", kind: "team" },
@@ -228,11 +228,12 @@ describe("a row's body", () => {
     const user = { id: "u1", mustChangePassword: false, emailFromAgents: true };
     const prepare = (link: (path: string) => string) =>
       sessionPrepare(() => true, link)(row, user as UserRow);
-    expect(
+    // the sender tries the row again as other
+    expect(() =>
       prepare(() => {
         throw new Error("email is off");
       }),
-    ).toBe("off");
+    ).toThrow("email is off");
     expect(prepare((path) => `https://x.test${path}`)).toMatchObject({
       text: expect.stringContaining("Open the run: https://x.test/run/r1"),
     });

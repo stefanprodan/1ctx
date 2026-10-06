@@ -102,7 +102,7 @@ function Attention() {
             <RowsAvatar>
               <Icon name={row.icon} size={14} />
             </RowsAvatar>
-            <RowsTitle name={row.name} sub={row.line} mono bad />
+            <RowsTitle name={row.name} sub={row.line} mono={row.mono} bad />
             <RowsMeta>{row.what}</RowsMeta>
           </RowsGo>
         ))

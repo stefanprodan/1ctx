@@ -13,7 +13,8 @@ import type { Migration } from "../migration.ts";
 // An alert row names its automation, so deleting runs keeps the
 // automation's cap; the automation's own delete takes them, as no cap
 // is left to count. A link email asked for at the sign-in page is
-// marked, for the caps on asks.
+// marked, for the caps on asks, and a dropped one stays a day with no
+// text, so dropping it never lowers the count.
 // An address on the project's own domain is a seeded one, never a
 // inbox, so it is marked and never emailed.
 export const m0049: Migration = {
@@ -46,7 +47,7 @@ export const m0049: Migration = {
         message_id text not null unique,
         asked integer not null default 0 check (asked in (0, 1)),
         status text not null default 'queued'
-          check (status in ('queued', 'sent', 'failed')),
+          check (status in ('queued', 'sent', 'failed', 'dropped')),
         attempts integer not null default 0,
         next_attempt_at integer not null,
         claimed_at integer,

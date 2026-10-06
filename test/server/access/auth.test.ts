@@ -40,6 +40,7 @@ function build(secureCookie: boolean) {
       enqueue: () => [],
       register: () => {},
       dropQueued: () => 0,
+      hasQueued: () => false,
       countAsked: () => 0,
     },
     clock: () => 0,

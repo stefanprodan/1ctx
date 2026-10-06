@@ -128,8 +128,10 @@ export type Email = {
   // a kind's last word before SMTP; one per kind
   register(kind: EmailKind, prepare: Prepare): void;
   // the user's queued rows of these kinds, in the caller's transaction;
-  // the count removed
+  // an asked row stays as dropped for the caps; the count dropped
   dropQueued(userId: string, kinds: readonly EmailKind[]): number;
+  // whether the user has a queued row of the kind
+  hasQueued(userId: string, kind: EmailKind): boolean;
   // the link emails asked for at the sign-in page at or after since, a
   // user's or, with null, the instance's
   countAsked(userId: string | null, since: number): number;
@@ -140,8 +142,8 @@ export type Email = {
   dispose(): void;
   wake(): void;
   pass(): Promise<number>;
-  // sent rows past their day, failed ones past their week; the count
-  // removed
+  // sent and dropped rows past their day, failed ones past their week;
+  // the count removed
   sweep(now: number): number;
   attention(): EmailAttention | null;
 };
@@ -267,7 +269,9 @@ export function emailArea(deps: EmailDeps): Email {
       if (prepares.has(kind)) throw new Error(`${kind} is registered`);
       prepares.set(kind, prepare);
     },
-    dropQueued: (userId, kinds) => store.dropQueued(userId, kinds),
+    dropQueued: (userId, kinds) =>
+      store.dropQueued(userId, kinds, deps.clock()),
+    hasQueued: (userId, kind) => store.hasQueued(userId, kind),
     countAsked: (userId, since) => store.countAsked(userId, since),
     start: () => loop.start(),
     stop: () => loop.stop(),

@@ -22,8 +22,7 @@ export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 // why a row was dropped before SMTP: the recipient is gone, disabled
 // or has no real address, or a kind's own check refused it (a link
-// email's link was revoked since, the chat or run it links to deleted,
-// email turned off before its link was built)
+// email's link was revoked since, the chat or run it links to deleted)
 export type DropWord =
   | "gone"
   | "disabled"
@@ -31,8 +30,7 @@ export type DropWord =
   | "opted-out"
   | "no-access"
   | "revoked"
-  | "deleted"
-  | "off";
+  | "deleted";
 
 // the waits after the first, second and third failed try; the fourth
 // failure is final
