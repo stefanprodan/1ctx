@@ -1,10 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A past revision in the file's card: the ‹ › steps to its neighbours,
-// who wrote it and when, then what it changed from the revision before
-// it, or its text, Markdown rendered or as its source. A change too
-// large to compare offers the text only.
+// A revision in the file's card, the latest too: the ‹ › steps to its
+// neighbours, who wrote it and when, then what it changed from the
+// revision before it, or its text, Markdown rendered or as its source.
+// A change too large to compare offers the text only.
 
 import { useSignal } from "@preact/signals";
 import { useMemo } from "preact/hooks";
@@ -14,24 +14,25 @@ import type {
 } from "../../../../shared/contracts/knowledge.ts";
 import { type DocHistory, versionOf } from "../../../data/knowledge-history.ts";
 import { revisionPair } from "../../../data/knowledge-rows.ts";
-import { diffLines, type LineDiff } from "../../../lib/diff.ts";
+import { diffLines } from "../../../lib/diff.ts";
 import { ago, sentence } from "../../../lib/format.ts";
-import { Icon } from "../../../lib/icons.tsx";
-import { Diff, DiffStat } from "../../../ui/Diff.tsx";
+import { Icon, type IconName } from "../../../lib/icons.tsx";
 import { Seg } from "../../../ui/Seg.tsx";
 import { Source } from "../../../ui/Source.tsx";
 import { Author } from "../Author.tsx";
 import { authorOf, historyHref, revisionHref } from "../Knowledge.model.ts";
+import { Changes } from "./Changes.tsx";
 import { revisionSteps } from "./DocPage.model.ts";
 import { MarkdownBody } from "./Reader.tsx";
 
 type Showing = "changes" | "preview" | "source" | "text";
 
-const SHOWING: Record<Showing, string> = {
-  changes: "Changes",
-  preview: "Preview",
-  source: "Source",
-  text: "Text",
+// each an icon in the band, named by its tooltip
+const SHOWING: Record<Showing, { icon: IconName; title: string }> = {
+  changes: { icon: "diff", title: "Changes" },
+  preview: { icon: "eye", title: "Preview" },
+  source: { icon: "code", title: "Source" },
+  text: { icon: "file-text", title: "Text" },
 };
 
 // the version on the page, once its text is read, for the head's Restore
@@ -46,38 +47,18 @@ export function revisionView(
   return view.state === "done" ? view.version : null;
 }
 
-// what the revision changed, once its diff is known and comparable
-function Changes({
-  before,
-  after,
-  diff,
-}: {
-  before: number;
-  after: number;
-  diff: Extract<LineDiff, { tooLarge: false }>;
-}) {
-  return (
-    <>
-      <div class="docpage-band">
-        <span class="docpage-band-words">
-          What revision {after} changed from revision {before}
-        </span>
-        <DiffStat added={diff.added} removed={diff.removed} />
-      </div>
-      <Diff diff={diff} />
-    </>
-  );
-}
-
 export function Revision({
   file,
   history,
   revision,
+  latest,
   now,
 }: {
   file: KnowledgeFileView;
   history: DocHistory;
   revision: number;
+  // the newest revision the page knows of, past the file it holds
+  latest: number;
   now: number;
 }) {
   const mode = useSignal<Showing | null>(null);
@@ -127,13 +108,15 @@ export function Revision({
   const comparable = pair.before !== null && !tooLarge;
   const markdown = view.state === "done" && view.version.html !== null;
   const options: Showing[] = [
-    ...(comparable ? (["changes"] as const) : []),
     ...(markdown ? (["preview", "source"] as const) : (["text"] as const)),
+    ...(comparable ? (["changes"] as const) : []),
   ];
   const showing =
     mode.value !== null && options.includes(mode.value)
       ? mode.value
-      : options[0];
+      : comparable
+        ? "changes"
+        : options[0];
   return (
     <>
       <div class="docpage-band docpage-band-rev">
@@ -151,7 +134,7 @@ export function Revision({
             <Icon name="chevron-left" size={14} />
           </a>
           <span class="docpage-strong">
-            Revision {revision} of {file.revision}
+            Revision {revision} of {latest}
           </span>
           <a
             class={`btn-icon${steps.newer === null ? " docpage-off" : ""}`}
@@ -177,7 +160,8 @@ export function Revision({
             small
             options={options.map((value) => ({
               value,
-              label: SHOWING[value],
+              label: <Icon name={SHOWING[value].icon} size={12} />,
+              title: SHOWING[value].title,
             }))}
             value={showing}
             onPick={(value) => {

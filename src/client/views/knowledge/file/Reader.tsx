@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A file as it is read: the band (the revision, a link to History, who
-// and when, and at its right the Outline and Preview or Source) over the whole
-// text, Markdown rendered, an HTML file drawn as a visual, anything
-// else by its numbered lines. And the aside's facts.
+// and when, and at its right the icons for the Outline and Changes,
+// Preview or Source, each named by its tooltip) over the whole text,
+// Markdown rendered, an HTML file drawn as a visual, anything else by
+// its numbered lines, or what the latest revision changed. And the
+// aside's facts.
 
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
@@ -20,14 +22,25 @@ import {
   plural,
   sizeWords,
 } from "../../../lib/format.ts";
+import { Icon, type IconName } from "../../../lib/icons.tsx";
 import { Seg } from "../../../ui/Seg.tsx";
 import { Source } from "../../../ui/Source.tsx";
 import { AsideLine, AsideSection } from "../../../ui/Split.tsx";
 import { Author } from "../Author.tsx";
 import { authorOf, historyHref } from "../Knowledge.model.ts";
+import { LatestChanges } from "./Changes.tsx";
 import { OutlineMenu } from "./DocMenus.tsx";
 import { OUTLINE_FROM, outlineOf, utf8Bytes } from "./DocPage.model.ts";
 import { DocVisual } from "./DocVisual.tsx";
+
+type Showing = "changes" | "preview" | "source";
+
+// each an icon in the band, named by its tooltip
+const SHOWING: Record<Showing, { icon: IconName; title: string }> = {
+  changes: { icon: "diff", title: "Changes" },
+  preview: { icon: "eye", title: "Preview" },
+  source: { icon: "code", title: "Source" },
+};
 
 // the facts the aside holds; the foot says them where the aside is
 // hidden
@@ -85,12 +98,28 @@ export function Reader({
   line: number | null;
   now: number;
 }) {
-  const shown = useSignal<"preview" | "source">("preview");
+  const shown = useSignal<Showing | null>(null);
   const mdBody = useRef<HTMLDivElement>(null);
   const markdown = file.html !== null;
   const visual = drawsVisual(file);
   const previewable = markdown || visual;
-  const view = line !== null || !previewable ? "source" : shown.value;
+  const options: Showing[] = [
+    ...(previewable ? (["preview"] as const) : []),
+    "source",
+    "changes",
+  ];
+  // the first revision changed nothing to show
+  const changed = file.revision > 1;
+  const view: Showing =
+    line !== null
+      ? "source"
+      : shown.value !== null &&
+          options.includes(shown.value) &&
+          (shown.value !== "changes" || changed)
+        ? shown.value
+        : previewable
+          ? "preview"
+          : "source";
   const outline = markdown && view === "preview" ? outlineOf(file.html) : [];
   return (
     <>
@@ -110,23 +139,25 @@ export function Reader({
         {outline.length >= OUTLINE_FROM && (
           <OutlineMenu entries={outline} body={() => mdBody.current} />
         )}
-        {previewable && (
-          <Seg
-            label="Show"
-            small
-            options={[
-              { value: "preview", label: "Preview" },
-              { value: "source", label: "Source" },
-            ]}
-            value={view}
-            onPick={(value) => {
-              shown.value = value;
-              if (line !== null) navigate(href, true);
-            }}
-          />
-        )}
+        <Seg
+          label="Show"
+          small
+          options={options.map((value) => ({
+            value,
+            label: <Icon name={SHOWING[value].icon} size={12} />,
+            title: SHOWING[value].title,
+            disabled: value === "changes" && !changed,
+          }))}
+          value={view}
+          onPick={(value) => {
+            shown.value = value;
+            if (line !== null) navigate(href, true);
+          }}
+        />
       </div>
-      {view === "preview" && markdown ? (
+      {view === "changes" ? (
+        <LatestChanges file={file} />
+      ) : view === "preview" && markdown ? (
         <MarkdownBody html={file.html ?? ""} body={mdBody} />
       ) : view === "preview" && visual ? (
         <DocVisual

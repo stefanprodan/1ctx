@@ -49,6 +49,11 @@ export function Seg<T extends string>({
             aria-pressed={on}
             disabled={option.disabled}
             title={option.title}
+            // an icon has no words, so its tooltip names it; a worded
+            // option's title only describes it
+            aria-label={
+              typeof option.label === "string" ? undefined : option.title
+            }
             onClick={() => onPick(option.value)}
           >
             {option.label}
