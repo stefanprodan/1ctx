@@ -225,10 +225,11 @@ of that shell that shows a file on the chat page.
 - **A subagent's command carries `subagent` in its caps.** It mounts
   `/uploads` of `uploadsFrom`, its parent's session, and its job's
   `subagent` flag leaves `open` out of the worker. A change under
-  `/knowledge` (the docs on or off) or `/uploads` is refused at commit with
-  `READ_ONLY_TO_SUBAGENT`, nothing saved, by the worker and, for docs,
-  by the server; `checkOpened()` refuses any opened record. Its `/tmp`
-  comes and goes by copy (`bash/handoff.ts`, `docs/subagents.md`).
+  `/knowledge` (the docs on or off) or `/uploads` is refused at commit
+  with `READ_ONLY_TO_SUBAGENT`, nothing saved, by the worker and, for
+  docs, by the server; `checkOpened()` refuses any opened record. Its
+  `/tmp` comes and goes by copy (`bash/handoff.ts`,
+  `docs/subagents.md`).
 
 ## The open command
 

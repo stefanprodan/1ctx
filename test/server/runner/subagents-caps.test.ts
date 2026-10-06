@@ -7,6 +7,7 @@
 // a child.
 
 import { describe, expect, test } from "bun:test";
+import { createAutomation } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   setLimits,
@@ -31,6 +32,17 @@ const children = (chat: ChatApp) => chat.scripted.scripts.filter(isChild);
 async function quiet(chat: ChatApp, count: number) {
   for (let i = 0; i < 40; i++) await tick();
   expect(chat.scripted.scripts.length).toBe(count);
+}
+
+// a scheduled run of a new task, its session id
+async function fired(chat: ChatApp, name: string): Promise<string> {
+  const automation = await createAutomation(chat, { name });
+  chat.app.db
+    .query("update automations set next_at = ? where id = ?")
+    .run(chat.app.now.value, automation.id);
+  const detail = await chat.app.automationScheduler.fire(automation.id);
+  if (detail === null) throw new Error("the run did not start");
+  return detail.session.id;
 }
 
 describe("subagents at once", () => {
@@ -109,6 +121,40 @@ describe("subagents at once", () => {
         other.script.reply("done");
         await settled(chat, other.sessionId);
       }
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a scheduled run's second waits once runs fill their share", async () => {
+    const chat = await subagentApp();
+    try {
+      // the share of 4 is 3: two runs and the parent fill it, one place
+      // stays a user's
+      await setLimits(chat, {
+        sendsPerUser: 4,
+        sendsPerProject: 4,
+        sendsRunning: 4,
+      });
+      await fired(chat, "first-run");
+      await fired(chat, "second-run");
+      await fired(chat, "the-parent");
+      const parent = (await scriptsFrom(chat, 3))[2]!;
+      parent.toolRound([
+        delegateCall("d1", "task alpha"),
+        delegateCall("d2", "task beta"),
+      ]);
+      parent.end();
+      const first = await scriptsFrom(chat, 4);
+      expect(isChild(first[3]!)).toBe(true);
+      await quiet(chat, 4);
+      expect(chat.app.runner.registry.extraStreams).toBe(0);
+      // a user's chat still gets the last place
+      await startChat(chat, "a user's turn");
+      expect(isChild((await scriptsFrom(chat, 5))[4]!)).toBe(false);
+      first[3]!.reply("first done");
+      const second = await scriptsFrom(chat, 6);
+      expect(isChild(second[5]!)).toBe(true);
     } finally {
       await chat.app.shutdown();
     }

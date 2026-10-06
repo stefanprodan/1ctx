@@ -3,8 +3,8 @@
 Governs the `delegate` tool, child sessions, the child loop and the
 child rows: `src/server/sessions/children.ts`, `child-work.ts`, the
 client's `data/session-children.ts` and `transcript/Delegate*`, and
-what reads or writes a child elsewhere. A send, the writer and the caps are in
-`docs/sessions.md`; archive, packing and the sweep in
+what reads or writes a child elsewhere. A send, the writer and the
+caps are in `docs/sessions.md`; archive, packing and the sweep in
 `docs/archive.md`; what the Monitor counts in `docs/monitor.md`.
 
 A turn may hand a task to a fresh copy of its agent when an admin
@@ -65,13 +65,14 @@ is its root.
   and its result against `resultBytes`. `runCalls` adds to `toolMs`
   only the ordinary calls' time, up to the last of them to end.
 - **The result is the answer cut to `min(childAnswerChars,
-  resultCut)`, then the files as its `tail`** (`runner/child-result.ts`):
-  the paths copied back and the child's paths left (over the parent's
-  limits or name rule), headings counted, at most a quarter of
-  `resultCut` and `TAIL_CHARS` (4,000), then how many more.
-  `childAnswerChars` tops out at 16,000, so answer and tail fit
-  `RESULT_DISPLAY_CHARS`, the cut the work fold reads the files from. A child that failed, stopped, ran
-  out of time or gave no answer is a failed result with its last
+  resultCut)`, then the files as its `tail`**
+  (`runner/child-result.ts`): the paths copied back and the child's
+  paths left (over the parent's limits or name rule), headings
+  counted, at most a quarter of `resultCut` and `TAIL_CHARS` (4,000),
+  then how many more. `childAnswerChars` tops out at 16,000, so answer
+  and tail fit `RESULT_DISPLAY_CHARS`, the cut the work fold reads the
+  files from. A child that failed, stopped, ran out of time or gave
+  no answer is a failed result with its last
   words; the parent goes on.
 - **The child's session id is the row's `childSessionId`,** read from
   the child's `parent_message_id` with the row, never from the text.
@@ -116,11 +117,12 @@ is its root.
 - **The first running child runs in the parent's place,** uncounted,
   since the parent streams nothing while it waits. Each other one at
   the same time takes an extra stream from the registry
-  (`takeExtra()`), which `admit()` counts under `sendsRunning`; a
-  scheduled send's extras count in the scheduled share too, so its
-  children never take the room users keep. With
-  `childrenAtOnce` running or no extra free, a call waits for a sibling
-  to end, first come first served. A freed extra calls `wake`.
+  (`takeExtra()`), which `admit()` counts under `sendsRunning`.
+- **A scheduled send's extra child stream counts in the process-wide
+  scheduled share and in `sendsRunning`,** never in the per-project
+  counts, so its children never take the room users keep.
+- **With `childrenAtOnce` running or no extra free, a call waits** for
+  a sibling to end, first come first served. A freed extra calls `wake`.
 
 ## The workspace
 
@@ -175,11 +177,12 @@ is its root.
   done, failed or stopped) and the child's tokens, never a price, as
   chats show none. Open, it shows the task, the child's rounds drawn
   by the fold's own `Rounds` and `Tool`, the child's answer once it is
-  done, then only the files part of the parent's result (`filesPart()` in
-  `shared/subagents.ts`, whose headings the server writes too). A failed,
-  stopped or answerless child, or a result that failed to load, closes
-  with the whole result alone, a partial answer drawn only there. A call refused before its child began is an ordinary `Tool`
-  row (`isDelegate()`). Two calls are two groups.
+  done, then only the files part of the parent's result
+  (`filesPart()` in `shared/subagents.ts`, whose headings the server
+  writes too). A failed, stopped or answerless child, or a result that
+  failed to load, closes with the whole result alone, a partial answer
+  drawn only there. A call refused before its child began is an
+  ordinary `Tool` row (`isDelegate()`). Two calls are two groups.
 - **The client keeps a child's rows by `delegate` row**
   (`data/session-children.ts`) for the chat on screen: the frames and
   the watch's answer land on what is held, and an ended row never goes
