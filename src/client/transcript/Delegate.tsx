@@ -8,6 +8,7 @@
 
 import { useEffect } from "preact/hooks";
 import { childWork, loadChild } from "../data/session-children.ts";
+import { loadToolResult, toolResults } from "../data/session-values.ts";
 import { Icon } from "../lib/icons.tsx";
 import {
   childHead,
@@ -19,6 +20,7 @@ import {
 import { folds } from "./fold.ts";
 import { Rounds } from "./Rounds.tsx";
 import type { CallNode } from "./rows.ts";
+import { displayResult, wantsResult } from "./Tool.model.ts";
 import { Tool, Value } from "./Tool.tsx";
 
 const { useFoldOpen } = folds();
@@ -29,11 +31,24 @@ export function Delegate({ node }: { node: CallNode }) {
   const { open, onToggle } = useFoldOpen(node.key);
   const entry = childWork.value.get(row.id);
   const work = entry?.work ?? null;
-  const wanted =
-    open && entry === undefined && row.childSessionId !== undefined;
+  // read on opening, and again when a watch dropped what was held; a
+  // failed read is asked again only by opening the group again
+  const missing = entry === undefined;
   useEffect(() => {
-    if (wanted) void loadChild(row.id);
-  }, [wanted, row.id]);
+    if (!open || row.childSessionId === undefined) return;
+    const held = childWork.value.get(row.id);
+    if (held === undefined || (held.error !== null && !held.loading)) {
+      void loadChild(row.id, true);
+    }
+  }, [open, missing, row.id, row.childSessionId]);
+  // the parent's result: the answer as it got it, a failure's words or
+  // the files copied back, off the wire like any call's
+  const result = toolResults.value.get(row.id);
+  const wantsOwn = wantsResult(open, row, result);
+  useEffect(() => {
+    if (wantsOwn) void loadToolResult(row.id);
+  }, [wantsOwn, row.id]);
+  const shown = displayResult(row, result);
   const status = childStatus(row, work);
   const view = childView(work?.rows ?? []);
   const task = taskOf(node);
@@ -85,6 +100,12 @@ export function Delegate({ node }: { node: CallNode }) {
             // the server renders a reply's markdown, as the answer's
             dangerouslySetInnerHTML={{ __html: view.answer.html }}
           />
+        )}
+        {row.status !== "streaming" && (
+          <div class="transcript-tool-detail">
+            <div class="transcript-tool-label">{shown.label}</div>
+            <Value text={shown.text} failed={shown.err} />
+          </div>
         )}
       </div>
     </details>

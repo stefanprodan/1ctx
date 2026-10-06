@@ -2,7 +2,7 @@
 
 Governs `src/server/overview/` and the usage windows in
 `src/server/usage/window.ts` (`lastDays()`, `monthWindow()`). The
-Monitor's pages are in `docs/views.md`.
+Monitor's pages are in `docs/admin-pages.md`.
 
 The Monitor is the admin's view of the whole instance, under
 `/admin/monitor`: the overview (usage over a range, what needs an

@@ -2,7 +2,7 @@
 
 Governs `src/client/`: the data layer, the `ui/` primitives, forms,
 the shell, the stylesheets and the `lib/` helpers. What each page
-draws is in `docs/views.md`.
+draws is in `docs/views.md`, the admin pages in `docs/admin-pages.md`.
 
 ## Data
 

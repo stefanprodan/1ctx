@@ -84,6 +84,22 @@ export function runningChildren(
     .all(rootId);
 }
 
+// the child a row of the root started, read by its links alone
+export function childAt(
+  db: Db,
+  rootId: string,
+  messageId: string,
+): string | null {
+  return (
+    db
+      .query<{ id: string }, [string, string]>(
+        `select id from sessions
+         where parent_session_id = ? and parent_message_id = ?`,
+      )
+      .get(rootId, messageId)?.id ?? null
+  );
+}
+
 // whether the session is a child of the root, as a child's tool row is
 // read under its root
 export function childOf(db: Db, sessionId: string, rootId: string): boolean {

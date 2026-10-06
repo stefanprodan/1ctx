@@ -14,9 +14,15 @@ import { ranCall } from "./Tool.model.ts";
 
 export type ChildStatus = "running" | "done" | "failed" | "stopped";
 
-// a call that ran as delegate; one never run is an ordinary row
-export const isDelegate = (node: CallNode): boolean =>
-  node.result !== null && ranCall(node.call, node.result).name === "delegate";
+// a delegate call that made a child, or may still: one refused before
+// its child began (spent, stopped, out of time) or never run is an
+// ordinary row, its result saying why. held: rows of its child are held
+export const isDelegate = (node: CallNode, held = false): boolean =>
+  node.result !== null &&
+  ranCall(node.call, node.result).name === "delegate" &&
+  (node.result.childSessionId !== undefined ||
+    node.result.status === "streaming" ||
+    held);
 
 function argument(node: CallNode, name: string): string {
   const value = toolArguments(node.call.arguments)?.[name];

@@ -248,4 +248,34 @@ describe("the child route", () => {
       await chat.app.shutdown();
     }
   });
+
+  test("answers only for a delegate row, whatever else a child hangs off", async () => {
+    const chat = await subagentApp();
+    try {
+      const { script, sessionId } = await delegated(chat);
+      script.toolRound([
+        delegateCall("d1", "Read the clock."),
+        clockCall("t1"),
+      ]);
+      script.end();
+      (await waitScript(chat.scripted, 2)).reply("noon");
+      (await waitScript(chat.scripted, 3)).reply("noon");
+      await settled(chat, sessionId);
+      const [childId] = childrenOf(chat, sessionId);
+      const clock = chat.app.sessions
+        .messages(sessionId)
+        .find((m) => m.kind === "tool" && m.toolName === "datetime")!;
+      // a link no runner writes: the child under the clock's row
+      chat.app.db
+        .query("update sessions set parent_message_id = ? where id = ?")
+        .run(clock.id, childId!);
+      const res = await chat.member.call(
+        "GET",
+        `/api/sessions/${sessionId}/messages/${clock.id}/child`,
+      );
+      expect(res.status).toBe(404);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
 });

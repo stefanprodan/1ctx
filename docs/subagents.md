@@ -148,7 +148,8 @@ is its root.
   flight.
 - **`GET /api/sessions/:id/messages/:messageId/child` reads a child.**
   It answers when the chat is `visible()`, the message is that chat's
-  `delegate` row and the row has a child; 404 otherwise. The result
+  `delegate` row and a child links to both (`childAt()`); 404
+  otherwise. The result
   route reads a child's tool row under its root (`childOf()`); no other
   route takes a child's row.
 - **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
@@ -156,12 +157,16 @@ is its root.
   status (running while the root's row runs, then the child's own:
   done, failed or stopped), the child's tokens and its cost when a
   round stated one. Open, it shows the task, the child's rounds drawn
-  by the fold's own `Rounds` and `Tool`, and closes with the child's
-  answer. Two calls are two groups.
+  by the fold's own `Rounds` and `Tool`, the child's answer, and closes
+  with the parent's own result (a failure's words, the files copied
+  back). A call refused before its child began is an ordinary `Tool`
+  row (`isDelegate()`). Two calls are two groups.
 - **The client keeps a child's rows by `delegate` row**
   (`data/session-children.ts`) for the chat on screen: the frames and
-  the watch's answer land on what is held, an ended row never goes
-  back to running, and a group opened with nothing held reads the route
-  once.
+  the watch's answer land on what is held, and an ended row never goes
+  back to running. A watch's answer drops every held child it does not
+  name, since one that ended while the connection was down missed its
+  last frames. A group opened with nothing held reads the route; after
+  a failed read, opening it again asks again.
 - **The fold counts the root's calls.** A `delegate` call is one of
   them; the child's calls are its own and never in the fold's count.

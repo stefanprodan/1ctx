@@ -20,7 +20,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
 import { refuseArchived } from "./archive.ts";
-import { childOf, childWork } from "./child-work.ts";
+import { childAt, childOf, childWork } from "./child-work.ts";
 import { detail } from "./detail.ts";
 import { envelope } from "./envelope.ts";
 import type { AlertQuery } from "./list.ts";
@@ -191,7 +191,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           message?.sessionId === session.id &&
           message.kind === "tool" &&
           message.toolName === "delegate"
-            ? (message.childSessionId ?? null)
+            ? childAt(deps.db, session.id, message.id)
             : null;
         const body: ChildWorkResponse | null =
           childId === null

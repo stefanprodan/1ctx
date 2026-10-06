@@ -33,7 +33,7 @@ import { carry, changeOf } from "./capabilities.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
-import { takeChildren } from "./session-children.ts";
+import { takeChildren, takeWatched } from "./session-children.ts";
 import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
@@ -462,7 +462,7 @@ export function onSocket(ev: SocketEvent): void {
     case "watched":
       onQueueSocket(ev);
       onWatched(ev);
-      takeChildren(ev.sessionId, ev.children ?? []);
+      takeWatched(ev.sessionId, ev.children ?? []);
       break;
     case "child":
       takeChildren(ev.sessionId, [ev]);

@@ -11,6 +11,7 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
+import { childWork } from "../data/session-children.ts";
 import { Icon } from "../lib/icons.tsx";
 import { isDelegate } from "./Delegate.model.ts";
 import { Delegate } from "./Delegate.tsx";
@@ -94,7 +95,7 @@ export function Work({
           live={live}
           running={running}
           call={(call) =>
-            isDelegate(call) ? (
+            isDelegate(call, childWork.value.has(call.result?.id ?? "")) ? (
               <Delegate key={call.key} node={call} />
             ) : (
               <Tool key={call.key} node={call} />

@@ -77,13 +77,39 @@ export function takeChildren(sessionId: string, list: ChildOf[]): void {
   }
 }
 
-// a group opened with nothing held reads the child's rows once
-export async function loadChild(messageId: string): Promise<void> {
+// a watch's answer: the running children's rows, and nothing kept of a
+// child that is not among them, since one that ended while the
+// connection was down missed its last frames; its group reads the
+// route when opened
+export function takeWatched(sessionId: string, list: ChildOf[]): void {
+  if (!onScreen(sessionId)) return;
+  const running = new Set(list.map((of) => of.messageId));
+  const kept = new Map(
+    [...childWork.value].filter(([messageId]) => running.has(messageId)),
+  );
+  for (const [messageId, request] of requests) {
+    if (running.has(messageId)) continue;
+    request.abort();
+    requests.delete(messageId);
+  }
+  if (kept.size !== childWork.value.size) childWork.value = kept;
+  takeChildren(sessionId, list);
+}
+
+// a group opened with nothing held reads the child's rows once; retry
+// asks again after a failed read
+export async function loadChild(
+  messageId: string,
+  retry = false,
+): Promise<void> {
   const chat = session.value?.session.id;
-  if (chat === undefined || childWork.value.has(messageId)) return;
+  const held = childWork.value.get(messageId);
+  if (chat === undefined) return;
+  if (held !== undefined && !(retry && held.error !== null && !held.loading))
+    return;
   const request = new AbortController();
   requests.set(messageId, request);
-  set(messageId, { work: null, loading: true, error: null });
+  set(messageId, { work: held?.work ?? null, loading: true, error: null });
   try {
     const body = await api<ChildWorkResponse>(
       `/api/sessions/${encodeURIComponent(chat)}/messages/${encodeURIComponent(messageId)}/child`,

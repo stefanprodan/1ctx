@@ -130,7 +130,8 @@ change it in the same commit as the code that changes a rule.
 | Doc | Governs |
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
-| `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed), the admin pages |
+| `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed) |
+| `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |

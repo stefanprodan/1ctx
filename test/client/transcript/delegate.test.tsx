@@ -5,11 +5,17 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   childWork,
+  loadChild,
   mergeWork,
   resetChildren,
   takeChildren,
+  takeWatched,
 } from "../../../src/client/data/session-children.ts";
 import { session } from "../../../src/client/data/session-held.ts";
+import {
+  resetValues,
+  toolResults,
+} from "../../../src/client/data/session-values.ts";
 import {
   childHead,
   childStatus,
@@ -149,10 +155,34 @@ const work = (changes: Partial<ChildWork> = {}): ChildWork => ({
 const replyOf = (rows: Message[]) =>
   groupRows(rows).find((node) => node.kind === "reply") as ReplyNode;
 
+const realFetch = globalThis.fetch;
+
 afterEach(() => {
+  globalThis.fetch = realFetch;
+  resetValues();
   resetChildren();
   session.value = null;
 });
+
+const onScreen = () => {
+  session.value = { session: { id: "root" } } as SessionDetail;
+};
+
+const drawn = (rows: Message[]) => {
+  const reply = replyOf(rows);
+  return render(
+    <Work
+      node={reply.work!}
+      reply={reply.message}
+      live={new Map()}
+      running={false}
+    />,
+  );
+};
+
+// the root's turn with its delegate row changed
+const withDelegate = (changes: Partial<Message>) =>
+  rootRows().map((r) => (r.id === "delegate-1" ? { ...r, ...changes } : r));
 
 describe("a delegate group", () => {
   test("is a delegate call that ran, headed by the child's status and tally", () => {
@@ -161,6 +191,23 @@ describe("a delegate group", () => {
     expect(isDelegate(call)).toBe(true);
     expect(isDelegate({ ...call, result: null })).toBe(false);
     const delegate = call.result!;
+    // refused before a child began: an ordinary row, unless one is held
+    const refused = {
+      ...call,
+      result: {
+        ...delegate,
+        status: "failed" as const,
+        childSessionId: undefined,
+      },
+    };
+    expect(isDelegate(refused)).toBe(false);
+    expect(isDelegate(refused, true)).toBe(true);
+    expect(
+      isDelegate({
+        ...call,
+        result: { ...delegate, status: "streaming", childSessionId: undefined },
+      }),
+    ).toBe(true);
     expect(childStatus(delegate, null)).toBe("done");
     expect(childStatus({ ...delegate, status: "streaming" }, work())).toBe(
       "running",
@@ -254,4 +301,90 @@ describe("a child's rows on the client", () => {
       expect(held.status).toBe("done");
     },
   );
+});
+
+describe("a delegate call's own result", () => {
+  test.serial(
+    "a call refused before its child began is an ordinary row",
+    () => {
+      toolResults.value = new Map([
+        [
+          "delegate-1",
+          {
+            status: "done",
+            content: "Not run: this turn has used its 4 subagents.",
+            bytes: 44,
+            cut: false,
+          },
+        ],
+      ]);
+      const html = drawn(
+        withDelegate({ status: "failed", childSessionId: undefined }),
+      );
+      expect(html).not.toContain("transcript-child-title");
+      expect(html).toContain(">delegate<");
+      expect(html).toContain("Not run: this turn has used its 4 subagents.");
+    },
+  );
+
+  test.serial("closes the group with what the parent got back", () => {
+    onScreen();
+    takeChildren("root", [{ messageId: "delegate-1", child: work() }]);
+    toolResults.value = new Map([
+      [
+        "delegate-1",
+        {
+          status: "done",
+          content: "It is noon.\nFiles copied to /tmp/sub-1/: notes.md",
+          bytes: 50,
+          cut: false,
+        },
+      ],
+    ]);
+    const html = drawn(rootRows());
+    expect(html).toContain("transcript-child-title");
+    expect(html).toContain("Files copied to /tmp/sub-1/: notes.md");
+    // the answer comes before the parent's result
+    expect(html.indexOf("<p>It is noon.</p>")).toBeLessThan(
+      html.indexOf("Files copied"),
+    );
+  });
+});
+
+describe("a watch's answer and the route", () => {
+  test.serial("a watch drops a held child that is no longer running", () => {
+    onScreen();
+    takeChildren("root", [
+      { messageId: "delegate-1", child: work({ status: "running" }) },
+      { messageId: "delegate-2", child: work({ sessionId: "child-2" }) },
+    ]);
+    takeWatched("root", [
+      { messageId: "delegate-1", child: work({ status: "running", rows: [] }) },
+    ]);
+    expect([...childWork.value.keys()]).toEqual(["delegate-1"]);
+    expect(childWork.value.get("delegate-1")!.work!.rows).toHaveLength(4);
+  });
+
+  test.serial("a failed read is asked again only on a retry", async () => {
+    onScreen();
+    const asked: string[] = [];
+    let answer = new Response("{}", { status: 500 });
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url);
+      return answer;
+    }) as unknown as typeof fetch;
+    await loadChild("delegate-1");
+    expect(childWork.value.get("delegate-1")!.error).not.toBeNull();
+    await loadChild("delegate-1");
+    expect(asked).toHaveLength(1);
+    answer = new Response(JSON.stringify(work()), { status: 200 });
+    await loadChild("delegate-1", true);
+    expect(asked).toEqual([
+      "/api/sessions/root/messages/delegate-1/child",
+      "/api/sessions/root/messages/delegate-1/child",
+    ]);
+    const entry = childWork.value.get("delegate-1")!;
+    expect(entry.error).toBeNull();
+    expect(entry.work!.rows).toHaveLength(4);
+  });
 });
