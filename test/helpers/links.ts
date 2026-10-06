@@ -7,6 +7,7 @@
 
 import { expect } from "bun:test";
 import type { UserRow } from "../../src/server/users/index.ts";
+import type { LinkResponse } from "../../src/shared/api/access.ts";
 import type { PutSmtpRequest } from "../../src/shared/api/smtp.ts";
 import {
   collectLogs,
@@ -38,6 +39,8 @@ export type EmailApp = {
   send(): Promise<number>;
   // the token in the newest email that carried one
   token(): string;
+  // what GET /api/links/:token says of a token, always a 200
+  read(token: string): Promise<LinkResponse["link"]>;
   // the outbox rows of a user, queued or not
   outbox(userId: string): { kind: string; status: string }[];
   // the user's links: whether a token was minted, and used
@@ -81,6 +84,11 @@ export async function emailApp(
         if (found !== null) return found[1]!;
       }
       throw new Error("no email carried a link");
+    },
+    async read(token) {
+      const res = await app.client().call("GET", `/api/links/${token}`);
+      expect(res.status).toBe(200);
+      return ((await res.json()) as LinkResponse).link;
     },
     outbox: (userId) =>
       app.db

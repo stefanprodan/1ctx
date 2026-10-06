@@ -3,7 +3,7 @@
 //
 // The links an email carries: asking for one from the sign-in page, and
 // the link page's read and its one action. The read changes nothing on
-// the server, so a email scanner that opens the page does no harm.
+// the server, so an email scanner that opens the page does no harm.
 
 import { signal } from "@preact/signals";
 import type {
@@ -15,8 +15,12 @@ import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { setMe } from "./me.ts";
 
-// the link on screen: its token and what the server said of it
-export const link = signal<{ token: string; value: LinkResponse } | null>(null);
+// the link on screen: its token and what the server said of it, null
+// for a link no longer valid
+export const link = signal<{
+  token: string;
+  value: LinkResponse["link"];
+} | null>(null);
 export const linkError = signal<Failure | null>(null);
 
 let turn = 0;
@@ -26,7 +30,7 @@ export async function loadLink(token: string): Promise<void> {
   linkError.value = null;
   if (link.value?.token !== token) link.value = null;
   try {
-    const value = await api<LinkResponse>(
+    const { link: value } = await api<LinkResponse>(
       `/api/links/${encodeURIComponent(token)}`,
     );
     if (turn === mine) link.value = { token, value };

@@ -15,7 +15,7 @@ import { says, sentence } from "../../lib/format.ts";
 import { Logo } from "../../lib/icons.tsx";
 import "./login.css";
 import {
-  goneLine,
+  GONE_LINE,
   linkWords,
   newPasswordProblem,
   otherAccount,
@@ -31,23 +31,31 @@ export function Link({ params }: { params: Params }) {
         <Logo height={80} />
       </div>
       {failed !== null ? (
-        <div class="login-form card">
-          <p class="login-note" role="alert">
-            {goneLine(failed.status) ?? sentence(failed.words)}
-          </p>
-          <a class="btn" href="/login">
-            Go to sign in
-          </a>
-        </div>
-      ) : held !== null && held.token === token ? (
+        <Gone line={sentence(failed.words)} />
+      ) : held === null || held.token !== token ? null : held.value === null ? (
+        <Gone line={GONE_LINE} />
+      ) : (
         <Act
           key={token}
           token={token}
           purpose={held.value.purpose}
           username={held.value.username}
         />
-      ) : null}
+      )}
     </main>
+  );
+}
+
+function Gone({ line }: { line: string }) {
+  return (
+    <div class="login-form card">
+      <p class="login-note" role="alert">
+        {line}
+      </p>
+      <a class="btn" href="/login">
+        Go to sign in
+      </a>
+    </div>
   );
 }
 

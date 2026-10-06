@@ -68,10 +68,6 @@ export function newPasswordProblem(value: string): string | null {
   return null;
 }
 
-// a link the server no longer knows is said plainly; any other failure
-// is the server's words
-export function goneLine(status: number | null): string | null {
-  return status === 404
-    ? "This link is no longer valid. Ask for a new one from the sign in page."
-    : null;
-}
+// a link the server no longer knows, said plainly
+export const GONE_LINE =
+  "This link is no longer valid. Ask for a new one from the sign in page.";

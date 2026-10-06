@@ -124,11 +124,16 @@ export function noticeEmail(
   address: string,
 ): Content {
   const { subject, what } = NOTICE[event];
+  const when = noticeTime(at, user.tz);
+  // the address is the admin's own, and the admin did it
+  if (event === "admin-reset") {
+    return content(subject, [`Hi ${user.fullName},`, `${what} on ${when}.`]);
+  }
   // a proxy's header is not ours to repeat unless it is an address
   const from = isIP(address) === 0 ? "an unknown address" : address;
   return content(subject, [
     `Hi ${user.fullName},`,
-    `${what} on ${noticeTime(at, user.tz)} from ${from}.`,
+    `${what} on ${when} from ${from}.`,
     "If this was not you, tell your admin.",
   ]);
 }

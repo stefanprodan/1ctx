@@ -89,6 +89,20 @@ describe("startLoading", () => {
     expect(calls).toEqual(["open a", "open b"]);
   });
 
+  test.serial("a sign in on a public page loads the rail's projects", () => {
+    const { routes } = table();
+    let projects = 0;
+    globalThis.fetch = (async () => {
+      projects++;
+      return Response.json({ projects: [] });
+    }) as unknown as typeof fetch;
+    path.value = "/open/a";
+    stop = startLoading(routes);
+    expect(projects).toBe(0);
+    me.value = casey;
+    expect(projects).toBe(1);
+  });
+
   test("runs the matched route's load for a signed-in user", () => {
     const { routes, calls } = table();
     me.value = casey;

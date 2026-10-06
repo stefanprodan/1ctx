@@ -16,7 +16,7 @@ import {
 } from "../../../src/client/data/links.ts";
 import { emailOn, me } from "../../../src/client/data/me.ts";
 import {
-  goneLine,
+  GONE_LINE,
   linkWords,
   newPasswordProblem,
   otherAccount,
@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("the words", () => {
-  test("say what each link does and for whom", () => {
+  test.serial("say what each link does and for whom", () => {
     expect(linkWords("reset", "maria")).toMatchObject({
       title: "Choose a new password",
       button: "Set password",
@@ -69,7 +69,7 @@ describe("the words", () => {
     }
   });
 
-  test("name the account signed in only when it is another", () => {
+  test.serial("name the account signed in only when it is another", () => {
     expect(otherAccount(null, "maria")).toBeNull();
     expect(otherAccount("maria", "maria")).toBeNull();
     expect(otherAccount("admin", "maria")).toBe(
@@ -77,16 +77,14 @@ describe("the words", () => {
     );
   });
 
-  test("check the new password and say a dead link plainly", () => {
+  test.serial("check the new password", () => {
     expect(newPasswordProblem("short")).toBe(
       "The password needs at least 8 characters",
     );
     expect(newPasswordProblem("longenough")).toBeNull();
-    expect(goneLine(404)).toStartWith("This link is no longer valid.");
-    expect(goneLine(500)).toBeNull();
   });
 
-  test("an ask needs a name and answers the same for any", () => {
+  test.serial("an ask needs a name and answers the same for any", () => {
     expect(askProblem("  ")).toBe("Enter your username or email first.");
     expect(askProblem("maria")).toBeNull();
     expect(askedLine("forgot")).toContain("reset link");
@@ -95,7 +93,7 @@ describe("the words", () => {
 });
 
 describe("the sign-in page", () => {
-  test("offers the email links only with email on", () => {
+  test.serial("offers the email links only with email on", () => {
     const off = render(<Login />);
     expect(off).toContain(">Username<");
     expect(off).not.toContain("Forgot password?");
@@ -109,7 +107,7 @@ describe("the sign-in page", () => {
 });
 
 describe("the link page", () => {
-  test("names the account and asks a password for a reset", () => {
+  test.serial("names the account and asks a password for a reset", () => {
     link.value = {
       token: TOKEN,
       value: { purpose: "reset", username: "maria" },
@@ -121,22 +119,33 @@ describe("the link page", () => {
     expect(html).not.toContain("You are signed in");
   });
 
-  test("says who is signed in before a sign in link replaces them", () => {
-    me.value = { ...maria, id: "u1", username: "admin" };
-    link.value = {
-      token: TOKEN,
-      value: { purpose: "signin", username: "maria" },
-    };
+  test.serial(
+    "says who is signed in before a sign in link replaces them",
+    () => {
+      me.value = { ...maria, id: "u1", username: "admin" };
+      link.value = {
+        token: TOKEN,
+        value: { purpose: "signin", username: "maria" },
+      };
+      const html = render(<Link params={{ token: TOKEN }} />);
+      expect(html).toContain("Sign in as @maria");
+      expect(html).toContain("You are signed in as @admin.");
+      expect(html).not.toContain('type="password"');
+    },
+  );
+
+  test.serial("a dead link says so and leads to sign in", () => {
+    link.value = { token: TOKEN, value: null };
     const html = render(<Link params={{ token: TOKEN }} />);
-    expect(html).toContain("Sign in as @maria");
-    expect(html).toContain("You are signed in as @admin.");
-    expect(html).not.toContain('type="password"');
+    expect(html).toContain(GONE_LINE);
+    expect(html).toContain('href="/login"');
+    expect(html).not.toContain("<form");
   });
 
-  test("a dead link says so and leads to sign in", () => {
-    linkError.value = { words: "this link is no longer valid", status: 404 };
+  test.serial("a failed read shows the server's words", () => {
+    linkError.value = { words: "the server is busy", status: 503 };
     const html = render(<Link params={{ token: TOKEN }} />);
-    expect(html).toContain("This link is no longer valid.");
+    expect(html).toContain("The server is busy.");
     expect(html).toContain('href="/login"');
   });
 });
@@ -148,7 +157,9 @@ describe("the data", () => {
       answer = (_url, init) =>
         init?.method === "POST"
           ? Response.json({ user: maria })
-          : Response.json({ purpose: "signin", username: "maria" });
+          : Response.json({
+              link: { purpose: "signin", username: "maria" },
+            });
       await loadLink(TOKEN);
       expect(link.value).toEqual({
         token: TOKEN,
@@ -162,14 +173,21 @@ describe("the data", () => {
     },
   );
 
+  test.serial("a dead link reads as null, not an error", async () => {
+    answer = () => Response.json({ link: null });
+    await loadLink(TOKEN);
+    expect(link.value).toEqual({ token: TOKEN, value: null });
+    expect(linkError.value).toBeNull();
+  });
+
   test.serial("a failed read is the link's error", async () => {
     answer = () =>
-      Response.json({ error: "this link is no longer valid" }, { status: 404 });
+      Response.json({ error: "the server is busy" }, { status: 503 });
     await loadLink(TOKEN);
     expect(link.value).toBeNull();
     expect(linkError.value).toEqual({
-      words: "this link is no longer valid",
-      status: 404,
+      words: "the server is busy",
+      status: 503,
     });
   });
 

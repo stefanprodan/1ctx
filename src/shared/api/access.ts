@@ -18,8 +18,11 @@ export type LinkAskRequest = { username: string };
 export const LINK_PURPOSES = ["reset", "signin", "invite"] as const;
 export type LinkPurpose = (typeof LINK_PURPOSES)[number];
 
-// GET /api/links/:token
-export type LinkResponse = { purpose: LinkPurpose; username: string };
+// GET /api/links/:token: null for a link unknown, used, expired or whose
+// user is disabled
+export type LinkResponse = {
+  link: { purpose: LinkPurpose; username: string } | null;
+};
 
 // POST /api/links/:token answers LoginResponse: reset and invite take
 // the new password, signin none

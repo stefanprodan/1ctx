@@ -66,6 +66,9 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     const moved = pathname !== last.pathname || search !== last.search;
     last = { user, pathname, search };
     const m = match(pathname, routes);
+    // the rail's projects, whichever page the sign in happened on; the
+    // server refuses them until the password changes
+    if (newUser && row && !row.mustChangePassword) void loadProjects();
     // a public page reads the same for anyone, signed in or not, so it
     // loads once per address and a sign in on it does not read it again
     if (m?.route.role === "public") {
@@ -77,7 +80,6 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     if (row === null || row === undefined) return;
     // the server refuses every other route until the password changes
     if (row.mustChangePassword && m?.route.path !== "/profile") return;
-    if (newUser && !row.mustChangePassword) void loadProjects();
     if (m === null || m.route.load === undefined) return;
     if (m.route.role === "admin" && row.role !== "admin") return;
     start(m, m.route.load, search);

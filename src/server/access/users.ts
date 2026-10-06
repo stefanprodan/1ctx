@@ -3,8 +3,8 @@
 //
 // Admin user management. Identity conflicts are checked in the same
 // transaction as each write so the response names the field instead of
-// exposing a unique-index error. With email on, an admin invites a new
-// user and resets a password by link, so they never hold the password.
+// exposing a unique-index error. With email on, an admin is offered an
+// invite and a reset by link in place of typing a password.
 
 import type { LinkPurpose } from "../../shared/api/access.ts";
 import type { SendTotals } from "../../shared/api/admin.ts";
@@ -127,6 +127,11 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       const user = find(id);
       if (user.disabled) throw new Conflict("the user is disabled");
       if (user.emailPlaceholder) throw new Conflict(PLACEHOLDER);
+      // a user with a password of their own gets a reset, never a
+      // 7-day link that sets one
+      if (purpose === "invite" && !user.mustChangePassword) {
+        throw new Conflict("the user has a password. Send a reset link");
+      }
       return {
         result: undefined,
         events: deps.links.issue(purpose, user.id, adminId),
@@ -185,10 +190,9 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           });
           return {
             result: find(created.id),
-            events:
-              invite && !created.disabled
-                ? deps.links.issue("invite", created.id, ctx.principal!.userId)
-                : [],
+            events: invite
+              ? deps.links.issue("invite", created.id, ctx.principal!.userId)
+              : [],
           };
         });
         const body: UserResponse = { user: oneUser(user) };

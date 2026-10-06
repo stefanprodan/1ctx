@@ -10,12 +10,14 @@
 import type { SmtpFailure } from "../../shared/contracts/smtp.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS, sleep } from "../lib/clock.ts";
+import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import {
   type DropWord,
   type EmailKind,
   hasControl,
+  messageIdOfTry,
   retryAt,
   STALE_CLAIM_MS,
 } from "./rules.ts";
@@ -26,12 +28,15 @@ import type { EmailStore, OutboxRow } from "./store.ts";
 // the pause after a pass that threw, which no wake cuts short
 const PASS_MS = MINUTE_MS;
 
-// fromName in place of the server's, as an agent's "<agent> via 1ctx"
+// fromName in place of the server's, as an agent's "<agent> via 1ctx";
+// perTry for a text that differs per try (a link email's token), which
+// then gets a Message-ID of its own each try
 export type EmailContent = {
   subject: string;
   text: string;
   html?: string;
   fromName?: string;
+  perTry?: boolean;
 };
 
 // a kind's last word before SMTP: the text to send, built now (a link
@@ -168,7 +173,10 @@ export function sender(deps: SenderDeps): Sender {
         subject: content.subject,
         text: content.text,
         ...(content.html === undefined ? {} : { html: content.html }),
-        messageId: row.messageId,
+        messageId:
+          content.perTry === true
+            ? messageIdOfTry(row.messageId, newId())
+            : row.messageId,
       });
     } catch (err) {
       if (halted) return;

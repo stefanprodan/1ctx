@@ -7,7 +7,6 @@
 // when the email is sent, and a link is used once.
 
 import { describe, expect, test } from "bun:test";
-import type { LinkResponse } from "../../../src/shared/api/access.ts";
 import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
 
 const MINUTE = 60_000;
@@ -204,16 +203,13 @@ describe("a link email", () => {
     );
     expect(message.text).not.toMatch(/[—;]/);
     app.now.value += 29 * MINUTE;
-    const res = await app.client().call("GET", `/api/links/${token}`);
-    expect(res.status).toBe(200);
+    expect(await e.read(token)).not.toBeNull();
     app.now.value += MINUTE;
-    expect((await app.client().call("GET", `/api/links/${token}`)).status).toBe(
-      404,
-    );
+    expect(await e.read(token)).toBeNull();
     await app.shutdown();
   });
 
-  test("a retry carries a fresh token and the old one is dead", async () => {
+  test("a retry carries a fresh token, a new Message-ID, and the old is dead", async () => {
     const e = await emailApp();
     const { app } = e;
     await app.client().call("POST", "/api/login/link", {
@@ -228,12 +224,13 @@ describe("a link email", () => {
     await e.send();
     const sent = e.token();
     expect(sent).not.toBe(failed);
-    expect(
-      (await app.client().call("GET", `/api/links/${failed}`)).status,
-    ).toBe(404);
-    expect((await app.client().call("GET", `/api/links/${sent}`)).status).toBe(
-      200,
+    // a client that kept the first copy must not drop this one
+    const [first, second] = app.emailSender.sent.map(
+      (s) => s.message.messageId,
     );
+    expect(second).not.toBe(first);
+    expect(await e.read(failed)).toBeNull();
+    expect(await e.read(sent)).not.toBeNull();
     await app.shutdown();
   });
 });
@@ -252,26 +249,25 @@ describe("using a link", () => {
     return { ...e, link: `/api/links/${e.token()}` };
   }
 
-  test("GET has no side effect, is never stored and sends no referrer", async () => {
+  test("GET has no side effect and is never stored; a dead link is null", async () => {
     const e = await sentLink("forgot");
     for (let i = 0; i < 2; i++) {
       const res = await e.app.client().call("GET", e.link);
       expect(res.status).toBe(200);
       expect(res.headers.get("cache-control")).toBe("no-store");
-      expect(res.headers.get("referrer-policy")).toBe("no-referrer");
       expect(res.headers.get("set-cookie")).toBeNull();
-      expect((await res.json()) as LinkResponse).toEqual({
-        purpose: "reset",
-        username: "maria",
+      expect(await res.json()).toEqual({
+        link: { purpose: "reset", username: "maria" },
       });
     }
     expect(e.links(e.maria.id)).toEqual([
       { purpose: "reset", minted: true, used: false },
     ]);
+    // a malformed token and an unknown one read the same
     for (const path of ["/api/links/nope", `/api/links/${"A".repeat(43)}`]) {
       const res = await e.app.client().call("GET", path);
-      expect(res.status).toBe(404);
-      expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ link: null });
     }
     await e.app.shutdown();
   });
@@ -291,7 +287,6 @@ describe("using a link", () => {
       body: { password: "maria-new-pw" },
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect((await res.json()).user).toMatchObject({
       username: "maria",
       mustChangePassword: false,
@@ -315,13 +310,13 @@ describe("using a link", () => {
       body: { password: "maria-other-pw" },
     });
     expect(again.status).toBe(404);
-    expect((await app.client().call("GET", e.link)).status).toBe(404);
+    expect(await e.read(e.token())).toBeNull();
     expect(e.logs.events.some((ev) => ev.msg === "link used")).toBe(true);
     await app.shutdown();
   });
 
-  test("a sign in link opens a login and leaves must-change as it is", async () => {
-    const e = await sentLink("link", { mustChange: true });
+  test("a sign in link opens a login and sets no password", async () => {
+    const e = await sentLink("link");
     const { app } = e;
     const tab = app.client();
     expect(
@@ -330,10 +325,7 @@ describe("using a link", () => {
     ).toBe(400);
     const res = await tab.call("POST", e.link, { body: {} });
     expect(res.status).toBe(200);
-    expect((await res.json()).user).toMatchObject({
-      username: "maria",
-      mustChangePassword: true,
-    });
+    expect((await res.json()).user).toMatchObject({ username: "maria" });
     // the old password still works: nothing was reset
     expect((await app.client().login("maria", MARIA_PASSWORD)).status).toBe(
       200,
@@ -342,9 +334,30 @@ describe("using a link", () => {
     await app.shutdown();
   });
 
+  test("a must-change user who asks to sign in gets a reset link", async () => {
+    const e = await sentLink("link", { mustChange: true });
+    const { app, maria } = e;
+    expect(e.links(maria.id)).toEqual([
+      { purpose: "reset", minted: true, used: false },
+    ]);
+    expect(app.emailSender.sent.at(-1)!.message.subject).toBe(
+      "Reset your 1ctx password",
+    );
+    expect(await e.read(e.token())).toEqual({
+      purpose: "reset",
+      username: "maria",
+    });
+    const res = await app.client().call("POST", e.link, {
+      body: { password: "maria-new-pw" },
+    });
+    expect((await res.json()).user.mustChangePassword).toBe(false);
+    await app.shutdown();
+  });
+
   test("an expired link and a disabled user's link do nothing", async () => {
     const expired = await sentLink("link");
     expired.app.now.value += 15 * MINUTE;
+    expect(await expired.read(expired.token())).toBeNull();
     const res = await expired.app.client().call("POST", expired.link, {
       body: {},
     });
@@ -360,6 +373,7 @@ describe("using a link", () => {
         })
       ).status,
     ).toBe(200);
+    expect(await disabled.read(disabled.token())).toBeNull();
     const tab = disabled.app.client();
     expect((await tab.call("POST", disabled.link, { body: {} })).status).toBe(
       404,

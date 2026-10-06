@@ -57,8 +57,8 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "GET",
     path: "/api/links/:token",
-    // public: no such link, the same answer for everyone
-    expect: { anonymous: 404, member: 404, admin: 404 },
+    // public: no such link, a null link for everyone
+    expect: { anonymous: 200, member: 200, admin: 200 },
   },
   {
     method: "POST",

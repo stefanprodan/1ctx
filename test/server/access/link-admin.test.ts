@@ -39,8 +39,10 @@ describe("invites", () => {
       const login = await app.client().login("nina", password || "x");
       expect(login.status).toBe(401);
     }
-    const link = await app.client().call("GET", `/api/links/${token}`);
-    expect(await link.json()).toEqual({ purpose: "invite", username: "nina" });
+    expect(await e.read(token)).toEqual({
+      purpose: "invite",
+      username: "nina",
+    });
     // seven days later it still works
     app.now.value += 7 * 24 * 60 * 60_000 - 1;
     const tab = app.client();
@@ -72,32 +74,29 @@ describe("invites", () => {
       { kind: "invite", status: "queued" },
     ]);
     await e.send();
-    expect((await app.client().call("GET", `/api/links/${first}`)).status).toBe(
-      404,
-    );
-    expect(
-      (await app.client().call("GET", `/api/links/${e.token()}`)).status,
-    ).toBe(200);
+    expect(await e.read(first)).toBeNull();
+    expect(await e.read(e.token())).not.toBeNull();
     await app.shutdown();
   });
 
-  test("an invite to a placeholder clears the mark once used", async () => {
+  test("are refused to a user with a password of their own", async () => {
     const e = await emailApp();
     const { app, admin, maria } = e;
-    expect(
-      (await admin.call("POST", `/api/users/${maria.id}/invite`)).status,
-    ).toBe(204);
-    await e.send();
-    // marked while the email was out, as a test can only do by hand
-    app.db
-      .query("update users set email_placeholder = 1 where id = ?")
-      .run(maria.id);
-    const used = await app.client().call("POST", `/api/links/${e.token()}`, {
-      body: { password: "maria-chosen-pw" },
-    });
-    expect(used.status).toBe(200);
-    expect(app.users.byId(maria.id)!.emailPlaceholder).toBe(false);
+    const res = await admin.call("POST", `/api/users/${maria.id}/invite`);
+    expect(res.status).toBe(409);
+    expect(e.outbox(maria.id)).toEqual([]);
+    expect(e.links(maria.id)).toEqual([]);
     await app.shutdown();
+  });
+
+  test("are refused for a user made disabled", async () => {
+    const e = await emailApp();
+    const res = await e.admin.call("POST", "/api/users", {
+      body: { ...NEW_USER, invite: true, disabled: true },
+    });
+    expect(res.status).toBe(400);
+    expect(e.app.users.byUsername("nina")).toBeNull();
+    await e.app.shutdown();
   });
 
   test("are refused while email is off, to a placeholder and to yourself", async () => {
@@ -189,7 +188,7 @@ describe("what ends a link", () => {
       await e.send();
     }
     const signin = e.token();
-    await e.admin.call("POST", `/api/users/${e.maria.id}/invite`);
+    await e.admin.call("POST", `/api/users/${e.maria.id}/reset-link`);
     const dead = async () => {
       expect(e.links(e.maria.id).filter((link) => !link.used)).toEqual([]);
       expect(
@@ -329,9 +328,16 @@ describe("the security notice", () => {
       "Reset your 1ctx password",
       "Your 1ctx password was reset",
     ]);
-    expect(app.emailSender.sent[2]!.message.text).toContain(
-      "An admin reset your password",
-    );
+    // the admin did it: neither the admin's address nor a line to tell
+    // the admin
+    const byAdmin = app.emailSender.sent[2]!.message.text;
+    expect(byAdmin).toContain("An admin reset your password on ");
+    expect(byAdmin).not.toContain(" from ");
+    expect(byAdmin).not.toContain("127.0.0.1");
+    expect(byAdmin).not.toContain("tell your admin");
+    const byLink = app.emailSender.sent[4]!.message.text;
+    expect(byLink).toContain("from 127.0.0.1.");
+    expect(byLink).toContain("If this was not you, tell your admin.");
     await app.shutdown();
   });
 

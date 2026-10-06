@@ -147,7 +147,6 @@ export type Users = {
   setDetails(id: string, fields: { fullName: string; about: string }): void;
   setUsername(id: string, username: string): void;
   setEmail(id: string, email: string): void;
-  confirmEmail(id: string): void;
   setRole(id: string, role: Role): void;
   setTz(id: string, tz: string): void;
   setAgent(id: string, agentId: string | null): void;
@@ -181,7 +180,6 @@ export function usersArea(deps: UsersDeps): Users {
     setDetails: (id, fields) => store.setDetails(id, fields),
     setUsername: (id, username) => store.setUsername(id, username),
     setEmail: (id, email) => store.setEmail(id, email),
-    confirmEmail: (id) => store.confirmEmail(id),
     setRole: (id, role) => store.setRole(id, role),
     setTz: (id, tz) => store.setTz(id, tz),
     setAgent: (id, agentId) => store.setAgent(id, agentId),

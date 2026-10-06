@@ -312,6 +312,36 @@ describe("the sender", () => {
     expect(() => t.email.register("notice", () => "gone")).toThrow();
   });
 
+  test("a text that differs per try gets a Message-ID per try", async () => {
+    const t = setup();
+    t.email.register("notice", (row) =>
+      row.subject === "fresh"
+        ? { subject: "Fresh", text: "x", perTry: true }
+        : { subject: "Kept", text: "x" },
+    );
+    t.fake.result = "timeout";
+    t.enqueue({ subject: "fresh" });
+    t.enqueue({ subject: "kept" });
+    const idOf = new Map(t.rows().map((r) => [r.subject, r.message_id]));
+    const kept = idOf.get("kept")!;
+    const stable = idOf.get("fresh")!;
+    expect(await t.email.pass()).toBe(2);
+    t.move(MINUTE);
+    expect(await t.email.pass()).toBe(2);
+    const sent = (subject: string) =>
+      t.fake.sent
+        .filter((s) => s.message.subject === subject)
+        .map((s) => s.message.messageId);
+    const fresh = sent("Fresh");
+    expect(fresh).toHaveLength(2);
+    expect(new Set([...fresh, stable]).size).toBe(3);
+    const stem = stable.slice(1, stable.indexOf("@"));
+    for (const id of fresh) {
+      expect(id).toMatch(new RegExp(`^<${stem}\\.[a-z0-9]+@example\\.test>$`));
+    }
+    expect(sent("Kept")).toEqual([kept, kept]);
+  });
+
   test("takes a claim left by a dead process after a minute", async () => {
     const t = setup();
     t.enqueue();

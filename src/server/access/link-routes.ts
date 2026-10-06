@@ -25,7 +25,6 @@ export type UsersPort = {
   byId(id: string): UserRow | null;
   setPasswordHash(id: string, hash: string): void;
   setMustChangePassword(id: string, required: boolean): void;
-  confirmEmail(id: string): void;
   hashPassword(password: string): Promise<string>;
 };
 
@@ -45,8 +44,6 @@ export type LinkRoutesDeps = {
 
 // unknown, used, expired or its user disabled: one answer for all
 const GONE = "this link is no longer valid";
-// the token is in the page's address; nothing it loads may carry it on
-const NO_REFERRER = { "referrer-policy": "no-referrer" };
 
 export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
   const ask = (purpose: "reset" | "signin"): RouteDescriptor => ({
@@ -61,7 +58,7 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
       return new Response(null, { status: 202 });
     },
   });
-  const gone = () => json({ error: GONE }, 404, NO_REFERRER);
+  const gone = () => json({ error: GONE }, 404);
   return [
     ask("reset"),
     ask("signin"),
@@ -69,25 +66,26 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
       method: "GET",
       path: "/api/links/:token",
       policy: "public",
+      // a dead link is a 200 with null, as /api/me answers nobody, so
+      // the page's read puts no failed request in the browser's console
       handle(_req, ctx) {
         const token = ctx.params.token;
-        if (!isLinkToken(token)) return gone();
-        const link = deps.store.byTokenHash(sha256(token));
+        const link = isLinkToken(token)
+          ? deps.store.byTokenHash(sha256(token))
+          : null;
         const user = link === null ? null : deps.users.byId(link.userId);
-        if (
-          link === null ||
-          link.usedAt !== null ||
-          link.expiresAt <= deps.clock() ||
-          user === null ||
-          user.disabled
-        ) {
-          return gone();
-        }
+        const live =
+          link !== null &&
+          link.usedAt === null &&
+          link.expiresAt > deps.clock() &&
+          user !== null &&
+          !user.disabled;
         const body: LinkResponse = {
-          purpose: link.purpose,
-          username: user.username,
+          link: live
+            ? { purpose: link.purpose, username: user.username }
+            : null,
         };
-        return json(body, 200, NO_REFERRER);
+        return json(body);
       },
     },
     {
@@ -128,7 +126,6 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
           if (hash !== null) {
             deps.users.setPasswordHash(user.id, hash);
             deps.users.setMustChangePassword(user.id, false);
-            if (used.purpose === "invite") deps.users.confirmEmail(user.id);
             deps.logins.deleteForUser(user.id);
             deps.links.revoke(user.id);
             events.push(loginRevoked(user.id, null));
@@ -155,10 +152,7 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
           purpose: opened.purpose,
         });
         const body: LoginResponse = { user: meOf(opened.user) };
-        return json(body, 200, {
-          ...NO_REFERRER,
-          "set-cookie": opened.setCookie,
-        });
+        return json(body, 200, { "set-cookie": opened.setCookie });
       },
     },
   ];

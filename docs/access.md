@@ -61,7 +61,9 @@ from `emailOn` in `GET /api/me`.
   lookup and the outbox write run after the answer (`links.ask()`),
   which the shutdown awaits. A missing, disabled or placeholder
   account, or one with a live link of that purpose, gets nothing. Only
-  the login limit answers 429.
+  the login limit answers 429. A must-change user who asks for a sign
+  in link gets a reset link, since the forced change asks for a
+  current password they may never have known.
 - **A token is minted when its email is sent.** A `user_links` row is
   written unminted with its outbox row, which holds no text; the kind's
   `prepare` stores the token's hash and starts the expiry at each try:
@@ -70,9 +72,12 @@ from `emailOn` in `GET /api/me`.
   Expired links go with the logins' sweep.
 - **A link never acts on a GET,** since email scanners open links.
   `GET /api/links/:token` names the purpose and the username with no
-  side effect, `no-store` and `no-referrer`; unknown, used, expired and
-  a disabled user's are one 404. Only `POST` acts, and a link issued
-  keeps working if email goes off.
+  side effect and `no-store`; unknown, used, expired and a disabled
+  user's are one 200 with `link: null`, as `/api/me` answers nobody, so
+  the browser logs no failed request. Only `POST` acts (404 for a dead
+  link), and a link issued keeps working if email goes off. The page
+  holds `<meta name="referrer" content="same-origin">`, since Bun sets
+  no header on it, so the token in its address never leaves.
 - **Using a link is one conditional update** (unused, unexpired, user
   enabled) in the transaction that sets the password or opens the
   login. A reset or an invite sets the password, clears must-change,
@@ -82,7 +87,8 @@ from `emailOn` in `GET /api/me`.
   every live link** of the user, with its queued email.
 - **A security notice follows** a password change, a reset (by link or
   an admin) and a sign-in link used: the time in the user's zone and
-  the client address, no link.
+  the client address, no link. An admin's reset leaves out the
+  address, the admin's own, and the line to tell the admin.
 
 ## Users
 
@@ -96,13 +102,13 @@ from `emailOn` in `GET /api/me`.
   clear it.
 - **An admin cannot demote, disable, reset or invite their own row.**
   Demoting or disabling the last enabled admin is a 409 too.
-- **With email on an admin never holds a password.** `POST
-  /api/users` with `invite: true` makes a must-change user whose
-  password is random and unknown, and sends a 7-day invite; `POST
-  /api/users/:id/invite` sends it again and `/reset-link` sends a
-  reset. Each is a 409 while email is off and for a disabled user or a
-  placeholder. The typed reset stays for a user no email reaches. An
-  invite used clears `email_placeholder`.
+- **With email on an admin is offered links in place of a typed
+  password.** `POST /api/users` with `invite: true` makes a must-change
+  user whose password is random and unknown, and sends a 7-day invite;
+  with `disabled: true` too it is a 400. `POST /api/users/:id/invite`
+  sends it again, only while the user must change their password, and
+  `/reset-link` sends a reset. Each is a 409 while email is off and for
+  a disabled user or a placeholder. The typed reset stays.
 - **A user PATCH never takes a password.** A reset is its own route.
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An

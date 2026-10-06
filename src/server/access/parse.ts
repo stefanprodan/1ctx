@@ -193,6 +193,10 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     }
     parsed.disabled = b.disabled;
   }
+  // a disabled user is never emailed, so the invite would not go
+  if (parsed.invite === true && parsed.disabled === true) {
+    throw new BadRequest("disabled must be left out with an invite");
+  }
   if (b.mustChangePassword !== undefined) {
     if (typeof b.mustChangePassword !== "boolean") {
       throw new BadRequest("mustChangePassword must be a boolean");

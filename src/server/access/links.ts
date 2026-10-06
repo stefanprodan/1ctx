@@ -103,7 +103,8 @@ export function links(deps: LinksDeps): Links {
         deps.clock() + LINK_TTL_MS[purpose],
       );
       if (!minted) return "revoked";
-      return linkEmail(purpose, user, deps.email.link(`/link/${token}`));
+      const link = deps.email.link(`/link/${token}`);
+      return { ...linkEmail(purpose, user, link), perTry: true };
     };
   for (const purpose of LINK_PURPOSES) {
     deps.email.register(purpose, prepare(purpose));
@@ -116,10 +117,14 @@ export function links(deps: LinksDeps): Links {
     return { subject: row.subject, text: row.body, html: htmlOf(row.body) };
   });
 
-  const asked = (purpose: "reset" | "signin", name: string) => {
+  const asked = (wanted: "reset" | "signin", name: string) => {
     if (!deps.email.enabled()) return;
     const user = byLoginName(deps.users, name);
     if (user === null || user.disabled || user.emailPlaceholder) return;
+    // signed in by link, a must-change user would be asked for a current
+    // password they never knew; a reset sets one instead
+    const purpose =
+      wanted === "signin" && user.mustChangePassword ? "reset" : wanted;
     const issued = transact(deps.db, () => {
       // one live link per user and purpose: a second ask waits it out
       if (deps.store.live(user.id, purpose, deps.clock())) {

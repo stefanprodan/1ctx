@@ -93,6 +93,12 @@ export function messageIdOf(id: string, fromAddress: string): string {
   return `<${id}@${fromAddress.slice(fromAddress.lastIndexOf("@") + 1)}>`;
 }
 
+// the row's Message-ID made one try's own, for a text that differs per
+// try: a client that kept the first copy must not drop the second
+export function messageIdOfTry(messageId: string, tryId: string): string {
+  return messageId.replace(/^<([^@]+)@/, `<$1.${tryId}@`);
+}
+
 export function linkOf(origin: string, path: string): string {
   if (!path.startsWith("/") || path.startsWith("//")) {
     throw new Error("a link's path starts with one slash");

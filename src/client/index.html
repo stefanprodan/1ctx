@@ -10,6 +10,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
+    <!-- an email link's token is in the address of /link/<token>; Bun
+         sets no header on this document, so the policy is here -->
+    <meta name="referrer" content="same-origin" />
     <meta name="theme-color" content="#131314" />
     <!-- installed on iOS: "default" paints the status bar in the
          theme-color, which app/theme.ts keeps in the page colour, and
