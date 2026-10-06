@@ -197,6 +197,17 @@ test("port messages have bounded exact shapes and UTF-8 fragments", () => {
   }
 });
 
+test("the frame helpers run from their source alone", () => {
+  const fromSource = new Function(
+    `return ${visualMessage.toString()}`,
+  )() as typeof visualMessage;
+  expect(fromSource({ type: "paint", html: "😀" })).toBe(true);
+  expect(fromSource({ type: "theme", scheme: "dark", values: {} })).toBe(true);
+  expect(fromSource(null)).toBe(false);
+  const html = visualDocument();
+  expect(html).not.toMatch(/\bBuffer\b|\bisRecord\b|\bimport_/);
+});
+
 test("the document embeds Idiomorph and browser-valid painter code", () => {
   const html = visualDocument();
   expect(html).toContain("var Idiomorph=function");
