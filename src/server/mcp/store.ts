@@ -431,14 +431,13 @@ export class McpServerStore {
   }
 
   stale(before: number): McpServerRow[] {
-    const tools = this.allTools();
     return this.db
       .query<RawServer, [number]>(
         `select * from mcp_servers where checked_at < ?
          order by checked_at, name`,
       )
       .all(before)
-      .map((raw) => row(raw, tools.get(raw.id) ?? []));
+      .map((raw) => row(raw, this.tools(raw.id)));
   }
 
   agentServers(agentId: string): AgentServer[] {
