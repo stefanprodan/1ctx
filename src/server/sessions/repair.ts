@@ -68,7 +68,9 @@ export function repairRows(
        finished_at = ? where status = 'running'`,
   ).run(error, error, now);
   db.query(
-    "update messages set status = 'stopped', error = ?, finished_at = ? where kind = 'tool' and status = 'streaming'",
+    `update messages set status = 'stopped', error = ?, finished_at = ?
+     where kind = 'tool' and status = 'streaming'
+       and tool_name is not 'delegate'`,
   ).run(error, now);
   db.query(
     "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",

@@ -21,12 +21,14 @@ import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
+import type { ToolCall } from "../providers/index.ts";
 import type { SessionRow, SessionStore } from "../sessions/index.ts";
+import type { DelegateInput, ToolContext } from "../tools/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { AttentionPort } from "./attention.ts";
 import type { CountedPort } from "./compact.ts";
 import type { Event } from "./event.ts";
-import type { ToolsPort } from "./policy.ts";
+import type { ToolResult, ToolsPort } from "./policy.ts";
 import type { PreparedRun } from "./prepare.ts";
 import type { Dispatcher } from "./queue.ts";
 import type { Registry } from "./registry.ts";
@@ -60,7 +62,10 @@ export type RunnerDeps = {
     "read" | "commit" | "view" | "startView" | "endView" | "resetSeen"
   >;
   knowledge: Pick<KnowledgeCapability, "snapshot">;
-  bash: Pick<BashCapability, "startKept">;
+  bash: Pick<
+    BashCapability,
+    "startKept" | "scratchFolder" | "copyScratch" | "returnScratch"
+  >;
   // a send's repositories, looked up at its start
   repos: ReposPort;
   uploads: WriterDeps["uploads"] & {
@@ -119,6 +124,13 @@ export type Runner = {
   stop(principal: Principal, sessionId: string): void;
   // every send on a deleted agent ends as a stop does
   stopAgent(agentId: string): void;
+  // the tools area's delegate port: a subagent of the send whose
+  // session the call's context names, run to its end
+  delegate(
+    input: DelegateInput,
+    call: ToolCall,
+    ctx: ToolContext,
+  ): Promise<ToolResult>;
   live: (sessionId: string) => ReturnType<typeof live> | null;
   // no more admissions, then up to boundMs for the running sends and
   // their asks to end on their own; cut ends the wait

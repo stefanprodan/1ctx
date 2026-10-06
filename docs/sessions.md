@@ -231,7 +231,8 @@ that agent answers the one turn (see Summons).
   memory, email, MCP, skills, repositories), the moved branches
   (`docs/repos.md`), and last the MCP change note (`docs/mcp.md`).
   What is fixed per agent and project comes first; the user's line
-  follows because it changes with a team chat's author.
+  follows because it changes with a team chat's author. A subagent's
+  is `subagentPrompt()` (`docs/subagents.md`).
 
 ## Summons
 

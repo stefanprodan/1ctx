@@ -166,6 +166,9 @@ export type Message = {
   // every other row
   toolCallId: string | null;
   toolName: string | null;
+  // the subagent's session a delegate row started, absent on every
+  // other row; never in the result's text, which a low cut may cut
+  childSessionId?: string;
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;

@@ -40,6 +40,7 @@ import type {
 } from "./protocol.ts";
 import { acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
+import { READ_ONLY_TO_SUBAGENT } from "./tree.ts";
 import type { CommandWorkers } from "./worker.ts";
 
 // the repositories a send mounted, read-only under /repos
@@ -56,6 +57,9 @@ export type CommandCaps = {
   // false while the send has the project docs off: no /knowledge
   knowledge: boolean;
   repos?: CommandRepos;
+  // a subagent's command: /uploads is its parent's, and nothing under
+  // /knowledge or /uploads may change and nothing be opened
+  subagent?: { uploadsFrom: string };
 } & (
   | { web?: null }
   | {
@@ -179,7 +183,9 @@ function mountJob(
       ? ""
       : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
   const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
-  const uploads = deps.knowledge.mountedUploads(sessionId);
+  const uploads = deps.knowledge.mountedUploads(
+    caps.subagent?.uploadsFrom ?? sessionId,
+  );
   const kept = listKept(deps.db, sessionId);
   const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
   // A lowered cap still permits deleting or shrinking the mounted base.
@@ -234,6 +240,7 @@ function mountJob(
     kept: kept.map((entry) => entry.path),
     repos: (repos?.mounts ?? []).map((repo) => ({ ...repo })),
     repoFileBytes: repos?.fileBytes ?? 0,
+    ...(caps.subagent ? { subagent: true } : {}),
   };
   return { job, rows, scratch, skipped, kept, storage, left };
 }
@@ -384,10 +391,15 @@ export async function run(
       docs,
       storage.scratchFiles,
     );
+    // the worker's own refusal is only words; the server's is this
+    if (caps.subagent && answered.knowledge.length > 0) {
+      throw new Error(READ_ONLY_TO_SUBAGENT);
+    }
     const opened = checkOpened(answer.opened, {
       knowledgeFileBytes: storage.knowledgeFileBytes,
       visuals: caps.visuals,
       knowledge: docs,
+      open: !caps.subagent,
     });
     const changes: Change[] = answered.knowledge.map((change) => ({
       name: change.name,

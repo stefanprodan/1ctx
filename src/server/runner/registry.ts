@@ -64,6 +64,9 @@ const projectFull = (n: number): string =>
 
 export class Registry {
   private readonly sends = new Map<string, ActiveSend>();
+  // subagents streaming beside their parents, each a place under
+  // sendsRunning; a parent's first child runs in its place, uncounted
+  private extras = 0;
   private closed = false;
 
   get(sessionId: string): ActiveSend | null {
@@ -116,7 +119,7 @@ export class Registry {
   // the same turn, with no await between
   admit(sessionId: string, who: Starter, caps: SendCaps): void {
     this.locked(sessionId);
-    let running = 0;
+    let running = this.extras;
     let mine = 0;
     let project = 0;
     let scheduled = 0;
@@ -174,6 +177,22 @@ export class Registry {
       if (send.startedBy === userId) n++;
     }
     return n;
+  }
+
+  get extraStreams(): number {
+    return this.extras;
+  }
+
+  // a second child of one send streams now only when sendsRunning has
+  // room; else it waits for its sibling
+  takeExtra(sendsRunning: number): boolean {
+    if (this.sends.size + this.extras >= sendsRunning) return false;
+    this.extras++;
+    return true;
+  }
+
+  freeExtra(): void {
+    if (this.extras > 0) this.extras--;
   }
 
   set(send: ActiveSend): void {

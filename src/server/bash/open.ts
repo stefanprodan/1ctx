@@ -144,8 +144,16 @@ export function openedRecord(
 // post an answer of its own
 export function checkOpened(
   records: readonly OpenedRecord[],
-  caps: { knowledgeFileBytes: number; visuals: boolean; knowledge: boolean },
+  caps: {
+    knowledgeFileBytes: number;
+    visuals: boolean;
+    knowledge: boolean;
+    // false for a subagent, whose worker has no open
+    open?: boolean;
+  },
 ): OpenedRecord[] {
+  if (caps.open === false && records.length > 0)
+    throw new Error("the command worker answered out of protocol");
   const paths = new Set(records.map((record) => record.path));
   const fits = (record: OpenedRecord) => {
     const made = openedRecord(record.path, record.text, caps.visuals);

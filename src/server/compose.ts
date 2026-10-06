@@ -470,6 +470,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       canOpen,
       projects: projects.store,
     },
+    // a closure: the runner is built after the tools
+    delegate: (input, call, ctx) => runner.delegate(input, call, ctx),
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({

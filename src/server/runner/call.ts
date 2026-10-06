@@ -43,6 +43,10 @@ export function toolContext(
     now: clock,
     budget: send.toolBudget,
     caps: send.policy.toolCaps,
+    // a subagent reads its parent's uploads and writes only its /tmp
+    ...(send.child === null
+      ? {}
+      : { subagent: { uploadsFrom: send.child.parent.sessionId } }),
     ...extra,
   };
 }

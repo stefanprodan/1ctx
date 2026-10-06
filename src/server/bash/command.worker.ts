@@ -30,7 +30,13 @@ import {
   type ToWorker,
   transferOf,
 } from "./protocol.ts";
-import { diff, executionLimits, notices, savedCwd } from "./tree.ts";
+import {
+  diff,
+  executionLimits,
+  notices,
+  savedCwd,
+  sharedChanged,
+} from "./tree.ts";
 
 declare var self: Worker;
 
@@ -216,17 +222,20 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     fs: mounted.fs,
     cwd,
     commands: [...KNOWLEDGE_COMMANDS],
-    customCommands: [
-      makeOpenCommand(
-        {
-          knowledgeFileBytes: job.knowledgeFileBytes,
-          visuals: job.visuals,
-          knowledge: job.docs,
-          repoFileBytes: job.repoFileBytes,
-        },
-        opened,
-      ),
-    ],
+    // a subagent shows nothing on a page
+    customCommands: job.subagent
+      ? []
+      : [
+          makeOpenCommand(
+            {
+              knowledgeFileBytes: job.knowledgeFileBytes,
+              visuals: job.visuals,
+              knowledge: job.docs,
+              repoFileBytes: job.repoFileBytes,
+            },
+            opened,
+          ),
+        ],
     defenseInDepth: true,
     ...(job.network ? { fetch: workerFetch(id, running) } : {}),
     executionLimits: executionLimits(job, fs, job.endsAt - Date.now()),
@@ -257,6 +266,8 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
       refused: messageOf(error),
     };
   }
+  const shared = job.subagent ? await sharedChanged(fs, job, changes) : null;
+  if (shared !== null) return { ...printed, changes: null, refused: shared };
   const after = await savedCwd(mounted.fs, result.env.PWD, job.docs);
   return {
     ...printed,

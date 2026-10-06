@@ -69,6 +69,10 @@ export type ToolContext = {
   caps: ToolCaps;
   keep?: KeepPort | null;
   repos?: SendRepos | null;
+  // set in a subagent's own calls: the session whose /uploads its
+  // commands read, and that nothing may be written to /knowledge or
+  // /uploads or opened onto a page
+  subagent?: { uploadsFrom: string } | null;
 };
 
 export type ToolResult = CommandResult & {
@@ -98,9 +102,12 @@ export type MemoryScope = {
     // automation's words on when; null or absent offers no step
     attention?: { guidance: string } | null;
   } | null;
-  phase: "main" | "memory" | "attention";
+  // child: a subagent's offer, the main one less what it may not do
+  phase: "main" | "memory" | "attention" | "child";
   // the chat a main round saves from; absent for a run and a compaction
   chat?: { sessionId: string; userId: string } | null;
+  // the agent's Subagents switch: a main offer carries delegate
+  delegate?: boolean;
 };
 
 // a chat's saves, bound to its project, session and author
@@ -155,4 +162,6 @@ export type Offered = {
   // name
   credentials: OfferedCredential[];
   credentialsOff: { id: string; name: string; prefix: string }[];
+  // a subagent's offer: bash leaves out open
+  subagent?: boolean;
 };

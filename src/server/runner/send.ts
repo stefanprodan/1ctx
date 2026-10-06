@@ -11,6 +11,7 @@ import type {
 } from "../../shared/contracts/session.ts";
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
+import { type Children, noChildren } from "./child-slots.ts";
 import type { KeepPort, SendPolicy, SendRepos, ToolBudget } from "./policy.ts";
 import type { RepoLines } from "./prompt.ts";
 import { unmarked } from "./render.ts";
@@ -169,7 +170,14 @@ export type ActiveSend = {
   // be released
   drained: Promise<void>;
   letGo: () => void;
+  // the subagents this send started, counted before the first await
+  children: Children;
+  // set on a subagent's own send: its parent, the delegate row it hangs
+  // off and the folder of the parent's /tmp its files come back to
+  child: ChildLink | null;
 };
+
+export type ChildLink = { parent: ActiveSend; rowId: string; folder: string };
 
 // the answer as the agent's own words, without the mark another agent's
 // answer carries in its history
@@ -317,6 +325,8 @@ export function newSend(fields: {
     end,
     drained,
     letGo,
+    children: noChildren(),
+    child: null,
   };
 }
 

@@ -33,14 +33,6 @@ const LISTED = new Set<string>([
   "delegate",
 ]);
 
-// the Subagents switch's tool, listed from the switch while no offer
-// carries it
-const DELEGATE = {
-  name: "delegate",
-  description: "Hands a task to a fresh copy of this agent.",
-  provider: null,
-};
-
 // the page's lists read by name, whatever order a send offers them in
 const byName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name);
@@ -79,6 +71,7 @@ export type ToolsPort = {
       automation: null;
       phase: "main";
       chat: { sessionId: string; userId: string };
+      delegate: boolean;
     },
   ): {
     tools: ChatTool[];
@@ -163,6 +156,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                 automation: null,
                 phase: "main",
                 chat: { sessionId: "", userId: "" },
+                delegate: agent.subagents,
               },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
@@ -184,20 +178,14 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
               files: (byId.get(skill.id)?.files ?? 0) + 1,
             }))
             .sort(byName),
-          tools: [
-            ...offered.tools
-              .filter((tool) => LISTED.has(tool.name))
-              .map((tool) => ({
-                name: tool.name,
-                description: firstSentence(tool.description),
-                provider: tool.name === "websearch" ? offered.search : null,
-              })),
-            ...(agent.subagents &&
-            agent.model.tools &&
-            !offered.tools.some((tool) => tool.name === DELEGATE.name)
-              ? [DELEGATE]
-              : []),
-          ].sort(byName),
+          tools: offered.tools
+            .filter((tool) => LISTED.has(tool.name))
+            .map((tool) => ({
+              name: tool.name,
+              description: firstSentence(tool.description),
+              provider: tool.name === "websearch" ? offered.search : null,
+            }))
+            .sort(byName),
           mcp: {
             servers: offered.mcp
               .map((server) => ({

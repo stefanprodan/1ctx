@@ -18,11 +18,9 @@ import {
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import {
-  BUILTIN_TOOLS,
   EMAIL_TOOL,
   type McpMode,
   type SearchProvider,
-  WEB_TOOLS,
 } from "../../shared/words.ts";
 import type { BashCapability } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -38,6 +36,11 @@ import { withCommandHints } from "./bash-hint.ts";
 import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
 import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
+import {
+  DELEGATE_TOOL,
+  type DelegatePort,
+  runDelegate,
+} from "./builtin/delegate.ts";
 import { makeEmailTool } from "./builtin/email.ts";
 import {
   asMcpCall,
@@ -57,6 +60,7 @@ import {
 } from "./builtin/websearch.ts";
 import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
 import { shapeMcpResult } from "./kept.ts";
+import { toolLogName } from "./log-name.ts";
 import {
   type CredentialsPort,
   offered,
@@ -77,10 +81,17 @@ import type {
 
 export { ATTENTION_TOOL } from "./builtin/attention.ts";
 export {
+  DELEGATE_DESCRIPTION,
+  DELEGATE_TOOL,
+  type DelegateInput,
+  type DelegatePort,
+} from "./builtin/delegate.ts";
+export {
   CHAT_MEMORY_DESCRIPTION,
   isMemoryTool,
   MEMORY_WRITE_RULES,
 } from "./builtin/memory.ts";
+export { toolLogName } from "./log-name.ts";
 export type { SkillsPort } from "./offer.ts";
 export {
   isToolName,
@@ -123,6 +134,8 @@ export type ToolsDeps = {
     visuals(since: number, until: number): VisualCounts;
     web(since: number, until: number): WebCounts;
   };
+  // the runner's child run, a closure since the runner is built later
+  delegate?: DelegatePort;
 };
 
 export type Tools = {
@@ -159,24 +172,6 @@ const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
 // an MCP call's own timer runs this far past the registry's, so two
 // timers never race and the timeout words are the registry's
 const MCP_BACKSTOP_MS = 1000;
-
-const LOGGED_TOOLS: ReadonlySet<string> = new Set([
-  ...BUILTIN_TOOLS,
-  ...WEB_TOOLS,
-  EMAIL_TOOL,
-]);
-
-// the name a log line may carry: a built-in's, or `mcp:` and the server's
-// configured name for an offered MCP tool, whose own name is server text;
-// never a name the model wrote
-export function toolLogName(offered: Offered, call: ToolCall): string {
-  const wire = mcpCallName(offered.mcp, call) ?? call.name;
-  const server = offered.mcp.find((item) =>
-    item.tools.some((tool) => tool.wireName === wire),
-  );
-  if (server !== undefined) return `mcp:${server.name}`;
-  return LOGGED_TOOLS.has(call.name) ? call.name : "unknown";
-}
 
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
@@ -219,6 +214,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     visuals: boolean,
     knowledge: boolean,
     credentials: SendCredentials,
+    subagent = false,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -240,6 +236,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       credentials,
       keys: deps.credentials,
       docs: knowledge,
+      subagent,
     }),
   ];
 
@@ -425,6 +422,11 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         return new Registry([], () => PHASE_ONLY).run(call, ctx);
       }
       const allowed = new Set(offered.tools.map((tool) => tool.name));
+      // no await before it: the runner reserves a child's place in the
+      // same turn the round's calls launch
+      if (call.name === DELEGATE_TOOL && allowed.has(DELEGATE_TOOL)) {
+        return runDelegate(deps.delegate, call, ctx);
+      }
       const catalog =
         offered.mcpCatalog === ""
           ? []
@@ -442,6 +444,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
             offered: offered.credentials,
             off: offered.credentialsOff,
           },
+          offered.subagent,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>
