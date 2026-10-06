@@ -18,6 +18,7 @@ import {
   type Inventory,
   type ProjectDocs,
   preflight,
+  type SmtpLogin,
 } from "./parse.ts";
 
 export { readSources } from "./input.ts";
@@ -34,6 +35,7 @@ export type ProvisionDeps = {
   webAccess(): Pick<WebAccess, "mode" | "domains">;
   bootstrap(): Promise<boolean>;
   secret: Secret;
+  smtp(): SmtpLogin | null;
 };
 
 export type Provision = ReturnType<typeof provisionArea>;
@@ -47,6 +49,7 @@ export function provisionArea(deps: ProvisionDeps) {
       deps.webAccess(),
       deps.projectDocs,
       deps.credentials,
+      deps.smtp(),
     );
     const password = secret("user-", ADMIN_SECRET);
     if (password === null || passwordProblem(password) !== null) {

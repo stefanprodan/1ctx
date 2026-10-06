@@ -370,7 +370,7 @@ describe("the pages", () => {
       users.value = [root, casey];
       const html = render(<Users />);
       expect(html).toContain("Stefan Prodan");
-      expect(html).toContain("@admin · admin@1ctx.dev");
+      expect(html).toContain("@admin · admin@example.test");
       expect(html).toContain("@casey · casey@example.com");
       expect(html).toContain('href="/admin/access/users/casey"');
       expect(html).toContain("member · password to change");

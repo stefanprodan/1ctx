@@ -5,7 +5,8 @@ import { type Signal, useSignal } from "@preact/signals";
 import type { SmtpResponse } from "../../../shared/api/smtp.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { saveSmtp, sendTestEmail, smtp, smtpError } from "../../data/smtp.ts";
-import { at, type Save, useAction, useSave } from "../../lib/save.ts";
+import { says } from "../../lib/format.ts";
+import { at, type Save, useSave } from "../../lib/save.ts";
 import { keyOptions } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -34,16 +35,15 @@ import {
 } from "./Smtp.model.ts";
 import "./smtp.css";
 
+// Send test email's last result; a null line while it is out. Each
+// test is its own object, so a save that clears it drops its answer too
+export type Tested = { line: string | null; failed: boolean } | null;
+
 export function Smtp() {
   const state = smtp.value;
   const error = smtpError.value;
-  const off = state === null ? null : offLine(state);
-  // held here, so Send test email knows the form has unsaved edits
   const drafted = useSignal<SmtpDraft | null>(null);
-  const dirty =
-    state !== null &&
-    drafted.value !== null &&
-    smtpDirty(drafted.value, state.settings);
+  const tested = useSignal<Tested>(null);
   return (
     <Page
       steps={[zoneStep("Config")]}
@@ -51,19 +51,31 @@ export function Smtp() {
       loading={state === null && error === null}
       error={error}
     >
-      {state && (
-        <SettingStack>
-          {off !== null && <SettingAlert>{off}</SettingAlert>}
-          <Server state={state} drafted={drafted} />
-          {/* a save starts it over, so an old result never stays */}
-          <Test
-            key={state.settings?.updatedAt ?? 0}
-            state={state}
-            dirty={dirty}
-          />
-        </SettingStack>
-      )}
+      {state && <SmtpCards state={state} drafted={drafted} tested={tested} />}
     </Page>
+  );
+}
+
+// the draft and the test are held above the cards, so Send test email
+// knows the form has unsaved edits and a save clears its result
+export function SmtpCards({
+  state,
+  drafted,
+  tested,
+}: {
+  state: SmtpResponse;
+  drafted: Signal<SmtpDraft | null>;
+  tested: Signal<Tested>;
+}) {
+  const off = offLine(state);
+  const dirty =
+    drafted.value !== null && smtpDirty(drafted.value, state.settings);
+  return (
+    <SettingStack>
+      {off !== null && <SettingAlert>{off}</SettingAlert>}
+      <Server state={state} drafted={drafted} tested={tested} />
+      <Test state={state} dirty={dirty} tested={tested} />
+    </SettingStack>
   );
 }
 
@@ -113,9 +125,11 @@ function Text({
 function Server({
   state,
   drafted,
+  tested,
 }: {
   state: SmtpResponse;
   drafted: Signal<SmtpDraft | null>;
+  tested: Signal<Tested>;
 }) {
   const latest = useLatest(state);
   const save = useSave(async () => {
@@ -123,6 +137,7 @@ function Server({
     if (!("body" in got)) return;
     await saveSmtp(got.body);
     drafted.value = null;
+    tested.value = null;
   }, smtpFieldOf);
   const d = drafted.value ?? draftOf(state.settings);
   const set = (patch: Partial<SmtpDraft>) => {
@@ -223,10 +238,32 @@ function Server({
 }
 
 // it sends through the saved server, so it waits while edits are not
-function Test({ state, dirty }: { state: SmtpResponse; dirty: boolean }) {
-  const send = useAction();
-  const result = useSignal<string | null>(null);
-  const failed = useSignal(false);
+function Test({
+  state,
+  dirty,
+  tested,
+}: {
+  state: SmtpResponse;
+  dirty: boolean;
+  tested: Signal<Tested>;
+}) {
+  const shown = tested.value;
+  const sending = shown !== null && shown.line === null;
+  const run = async () => {
+    const mine: Tested = { line: null, failed: false };
+    tested.value = mine;
+    let line: string;
+    let failed: boolean;
+    try {
+      const got = await sendTestEmail();
+      line = resultLine(got, state.to);
+      failed = got !== "sent";
+    } catch (err) {
+      line = says(err);
+      failed = true;
+    }
+    if (tested.value === mine) tested.value = { line, failed };
+  };
   return (
     <Setting
       title="Send test email"
@@ -235,30 +272,16 @@ function Test({ state, dirty }: { state: SmtpResponse; dirty: boolean }) {
         <button
           type="button"
           class="btn btn-small"
-          disabled={
-            send.busy.value || dirty || !state.enabled || state.to === null
-          }
-          onClick={() =>
-            void send.run(async () => {
-              result.value = null;
-              const got = await sendTestEmail();
-              failed.value = got !== "sent";
-              result.value = resultLine(got, state.to);
-            })
-          }
+          disabled={sending || dirty || !state.enabled || state.to === null}
+          onClick={() => void run()}
         >
-          {send.busy.value ? "Sending" : "Send test email"}
+          {sending ? "Sending" : "Send test email"}
         </button>
       }
     >
-      {(result.value !== null || send.failure.value !== null) && (
-        <p
-          class={`smtp-result${
-            failed.value || send.failure.value !== null ? " error" : ""
-          }`}
-          role="status"
-        >
-          {send.failure.value ?? result.value}
+      {shown !== null && shown.line !== null && (
+        <p class={`smtp-result${shown.failed ? " error" : ""}`} role="status">
+          {shown.line}
         </p>
       )}
     </Setting>

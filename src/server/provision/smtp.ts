@@ -44,10 +44,18 @@ export const SMTP_REQUIRED = [
   "publicAddress",
 ] as const;
 
-// a new server's login, checked offline: both halves or neither
-export function newSmtpPair(spec: SmtpServerSpec): string | null {
-  const username = spec.username ?? null;
-  const keyFrom = spec.keyFrom ?? null;
+// the held server's login, which a document's omitted fields keep
+export type SmtpLogin = { username: string | null; keyName: string | null };
+
+// the login a document leaves, checked offline: both halves or neither
+export function smtpPair(
+  spec: SmtpServerSpec,
+  held: SmtpLogin | null,
+): string | null {
+  const username =
+    spec.username === undefined ? (held?.username ?? null) : spec.username;
+  const keyFrom =
+    spec.keyFrom === undefined ? (held?.keyName ?? null) : spec.keyFrom;
   if (username !== null && keyFrom === null) {
     return "spec.keyFrom is required with spec.username";
   }

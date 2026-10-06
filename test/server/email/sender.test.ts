@@ -15,6 +15,7 @@ import {
 import { UserStore } from "../../../src/server/users/index.ts";
 import type { PutSmtpRequest } from "../../../src/shared/api/smtp.ts";
 import { collectLogs, fakeEmailSender } from "../../helpers/app.ts";
+import { settle } from "../../helpers/async.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 const SERVER: PutSmtpRequest = {
@@ -428,6 +429,45 @@ describe("the sender", () => {
     await stopping;
     expect(t.rows()[0]?.status).toBe("sent");
     t.email.dispose();
+  });
+
+  test.serial("a hard stop leaves the send in flight unwritten", async () => {
+    let release = () => {};
+    const held = new Promise<"sent">((resolve) => {
+      release = () => resolve("sent");
+    });
+    const t = setup({ emailSender: async () => held });
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const asleep = t.sleeping();
+      t.email.start();
+      await asleep;
+      t.enqueue();
+      await t.emailed(1);
+      expect(t.rows()[0]?.status).toBe("queued");
+      const stopping = t.email.stop();
+      t.email.halt();
+      // as after a cut shutdown: any write now throws and is logged
+      t.db.close();
+      release();
+      await stopping;
+      await settle();
+      expect(t.logs.events.map((e) => e.msg)).toEqual([]);
+      expect(rejections).toEqual([]);
+    } finally {
+      (process as NodeJS.EventEmitter).off("unhandledRejection", onRejection);
+      t.email.dispose();
+    }
+  });
+
+  test("link() throws while email is off", () => {
+    const t = setup({ key: false });
+    expect(t.email.enabled()).toBe(false);
+    expect(() => t.email.link("/x")).toThrow("email is off");
+    t.keys["email-relay"] = "secret-pass";
+    expect(t.email.link("/x")).toBe("https://1ctx.example.test/x");
   });
 
   test("a key file that cannot be read turns email off", async () => {

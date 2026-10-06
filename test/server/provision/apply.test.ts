@@ -68,6 +68,37 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("a half login over the held server fails before any kind", async () => {
+    const { app } = await instance();
+    try {
+      app.email.store.saveSettings(
+        {
+          host: "smtp.people.test",
+          port: 465,
+          security: "tls",
+          username: null,
+          keyName: null,
+          fromAddress: "1ctx@people.test",
+          fromName: "1ctx",
+          publicAddress: "https://1ctx.people.test",
+        },
+        0,
+      );
+      const docs = documents(
+        user(),
+        object("SmtpServer", "relay", { username: "api_token" }),
+      );
+      await expect(app.provision.apply(docs, ignore)).rejects.toThrow(
+        "SmtpServer/relay: spec.keyFrom is required with spec.username",
+      );
+      expect(app.users.count()).toBe(0);
+      expect(app.email.settings()?.username).toBeNull();
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
   test("creates all kinds in dependency order and reports bootstrap first", async () => {
     const { app, fake } = await instance();
     try {

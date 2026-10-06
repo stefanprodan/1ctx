@@ -53,7 +53,8 @@ what they name.
   document is refused, and any name updates the server held. A new one
   needs `host`, `port`, `security`, `fromAddress` and
   `publicAddress`; `keyFrom` names an `email-` key file, null takes it
-  off, and must be present.
+  off, and must be present. Validation checks `username` and `keyFrom`
+  over the held login: both set or both null.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused

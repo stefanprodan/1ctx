@@ -45,7 +45,9 @@ the sender, and the admin's SMTP page under Config.
   minute on the clock, which no wake cuts short, so it never spins. A
   key file that cannot be read is a missing one: email is off.
 - **Each row has one `Message-ID`,** kept across retries, so a send
-  repeated after a crash reads as one email.
+  repeated after a crash reads as one email. Delivery is at least once:
+  a second signal's cut leaves the send in flight unwritten
+  (`halt()`), and the row goes again after the restart.
 - **Backoff is 1, 5 and 30 minutes, then failed.** A sent row becomes
   `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it;
   a failed row keeps its word for 7 days. Neither keeps the text, and

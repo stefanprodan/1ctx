@@ -17,7 +17,7 @@ export const admin = (over: Partial<Me> = {}): Me => ({
 
 export const user = (over: Partial<AdminUser> = {}): AdminUser => ({
   ...admin(),
-  email: "admin@1ctx.dev",
+  email: "admin@example.test",
   tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,

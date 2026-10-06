@@ -56,6 +56,9 @@ export type Sender = {
   start(): void;
   // no row is taken from here; resolves once the one in flight ended
   stop(): Promise<void>;
+  // after a cut shutdown: the send in flight writes nothing, since the
+  // db is closed; its claim goes stale and the row is sent again
+  halt(): void;
   wake(): void;
   // rows until none is due; the count taken
   pass(live?: () => boolean): Promise<number>;
@@ -70,6 +73,7 @@ const stored = (row: OutboxRow): EmailContent | null =>
 
 export function sender(deps: SenderDeps): Sender {
   let running = false;
+  let halted = false;
   let epoch = 0;
   let wakeWait: (() => void) | null = null;
   let haltWait: (() => void) | null = null;
@@ -167,12 +171,14 @@ export function sender(deps: SenderDeps): Sender {
         messageId: row.messageId,
       });
     } catch (err) {
+      if (halted) return;
       deps.log.error("email send threw", {
         ...fields(row),
         ...errorFields(err),
       });
       result = "other";
     }
+    if (halted) return;
     if (result !== "sent") {
       failed(row, result);
       return;
@@ -235,6 +241,7 @@ export function sender(deps: SenderDeps): Sender {
     start() {
       if (running) return;
       running = true;
+      halted = false;
       unsubscribe ??= subscribe(onBus, deps.log);
       loop = run(++epoch);
     },
@@ -245,6 +252,10 @@ export function sender(deps: SenderDeps): Sender {
       haltWait = null;
       halt?.();
       return loop;
+    },
+    halt() {
+      running = false;
+      halted = true;
     },
     wake,
     pass,

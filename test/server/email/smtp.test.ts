@@ -11,6 +11,7 @@ import {
   type SmtpServer,
   smtpSender,
 } from "../../../src/server/email/smtp.ts";
+import { isEmail } from "../../../src/shared/words.ts";
 import { fakeSmtp, LOOPBACK_CERT } from "../../helpers/smtp.ts";
 
 const message: Outgoing = {
@@ -77,6 +78,34 @@ describe("the SMTP sender", () => {
       const upgrade = smtp.commands.indexOf("STARTTLS");
       expect(upgrade).toBeGreaterThan(-1);
       expect(smtp.commands.indexOf("AUTH PLAIN")).toBeGreaterThan(upgrade);
+    } finally {
+      smtp.stop();
+    }
+  });
+
+  test("puts an accepted address on the wire as it is stored", async () => {
+    const smtp = fakeSmtp({
+      tls: true,
+      auth: { user: "api_token", pass: "secret-pass" },
+    });
+    const addresses = [
+      "a@b.co",
+      "a.b+tag@sub.example.co",
+      "o'brien@example.ie",
+      "x@1ctx.dev",
+      "first.last-1@mail-1.example.test",
+      "!#$%&'*+/=?^_`{|}~-@example.test",
+    ];
+    try {
+      for (const address of addresses) {
+        expect(isEmail(address)).toBe(true);
+        const to = { name: "Ann Lee", address };
+        const sent = await trusting(server(smtp.port), { ...message, to });
+        expect(sent).toBe("sent");
+        const got = smtp.received.at(-1)!;
+        expect(got.to).toEqual([`<${address}>`]);
+        expect(got.data).toContain(`To: Ann Lee <${address}>`);
+      }
     } finally {
       smtp.stop();
     }

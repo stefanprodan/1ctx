@@ -106,6 +106,8 @@ export type Email = {
   register(kind: EmailKind, prepare: Prepare): void;
   start(): void;
   stop(): Promise<void>;
+  // after a cut shutdown, so the send in flight writes nothing
+  halt(): void;
   dispose(): void;
   wake(): void;
   pass(): Promise<number>;
@@ -203,7 +205,9 @@ export function emailArea(deps: EmailDeps): Email {
     settings: () => store.settings(),
     link(path) {
       const settings = store.settings();
-      if (settings === null) throw new Error("email is not set up");
+      if (settings === null || !hasKey(settings)) {
+        throw new Error("email is off");
+      }
       return linkOf(settings.publicAddress, path);
     },
     enqueue(fields) {
@@ -234,6 +238,7 @@ export function emailArea(deps: EmailDeps): Email {
     },
     start: () => loop.start(),
     stop: () => loop.stop(),
+    halt: () => loop.halt(),
     dispose: () => loop.dispose(),
     wake: () => loop.wake(),
     pass: () => loop.pass(),

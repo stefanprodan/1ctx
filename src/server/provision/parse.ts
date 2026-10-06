@@ -25,7 +25,12 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { object } from "./fields.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
-import { newSmtpPair, SMTP_REQUIRED, smtpServerSpec } from "./smtp.ts";
+import {
+  SMTP_REQUIRED,
+  type SmtpLogin,
+  smtpPair,
+  smtpServerSpec,
+} from "./smtp.ts";
 import * as spec from "./spec.ts";
 
 export const KINDS = [
@@ -72,7 +77,7 @@ export type Document = {
 export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
 export type { RepositorySpec } from "./repository.ts";
-export type { SmtpServerSpec } from "./smtp.ts";
+export type { SmtpLogin, SmtpServerSpec } from "./smtp.ts";
 export type {
   AgentSpec,
   CredentialSpec,
@@ -238,6 +243,8 @@ export function preflight(
   web: Pick<WebAccess, "mode" | "domains">,
   projectDocs: ProjectDocs,
   credentials: CredentialsView,
+  // the held SMTP server's login, null when none is held
+  smtp: SmtpLogin | null = null,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -302,19 +309,19 @@ export function preflight(
         }
         break;
       }
-      case "SmtpServer":
+      case "SmtpServer": {
         // any name updates the one server held
-        if (inventory.SmtpServer.length === 0) {
-          required([...SMTP_REQUIRED]);
-          const pair = newSmtpPair(doc.spec);
-          if (pair !== null) {
-            throw new Error(`${doc.source}: SmtpServer/${doc.name}: ${pair}`);
-          }
+        if (inventory.SmtpServer.length === 0) required([...SMTP_REQUIRED]);
+        // over the held login, so a half pair fails before any apply
+        const pair = smtpPair(doc.spec, smtp);
+        if (pair !== null) {
+          throw new Error(`${doc.source}: SmtpServer/${doc.name}: ${pair}`);
         }
         if (typeof doc.spec.keyFrom === "string") {
           readSecret("keyFrom", "email-", doc.spec.keyFrom);
         }
         break;
+      }
       case "Project":
         for (const name of doc.spec.members ?? [])
           reference("members", "User", name);

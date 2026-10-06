@@ -129,7 +129,15 @@ describe("parseUsername", () => {
 });
 
 describe("parseEmail", () => {
-  test.each(["a@b.co", "name@example.com", "A@B.CO"])("accepts %s", (value) => {
+  test.each([
+    "a@b.co",
+    "name@example.com",
+    "A@B.CO",
+    "a.b+tag@sub.example.co",
+    "o'brien@example.ie",
+    "a@example.xn--p1ai",
+    "x@1ctx.dev",
+  ])("accepts %s", (value) => {
     expect(isEmail(value)).toBe(true);
   });
 
@@ -147,6 +155,19 @@ describe("parseEmail", () => {
     "@b.co",
     "a@@b.co",
     `${"a".repeat(250)}@b.co`,
+    "a@b.co>",
+    "<a@b.co>",
+    "a@b_c.co",
+    '"a"@b.co',
+    "a..b@c.co",
+    ".a@b.co",
+    "a.@b.co",
+    "a@-b.co",
+    "a@b-.co",
+    "a@b,c.co",
+    "a@b.co;x",
+    "a@b.c0",
+    `a@${"b".repeat(64)}.co`,
   ])("refuses %p", (value) => {
     expect(isEmail(value)).toBe(false);
     expect(() => parseEmail(value)).toThrow(BadRequest);

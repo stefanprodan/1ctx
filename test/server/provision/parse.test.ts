@@ -12,6 +12,7 @@ import {
   type Kind,
   parse,
   preflight,
+  type SmtpLogin,
   type Source,
 } from "../../../src/server/provision/parse.ts";
 import {
@@ -458,6 +459,36 @@ describe("provision preflight", () => {
     expect(() =>
       check(parse([source("SmtpServer", "relay", nameOnly)])),
     ).toThrow("spec.keyFrom is required with spec.username");
+  });
+
+  test("an SmtpServer update keeps the held login whole", () => {
+    const update = (spec: object, held: SmtpLogin) =>
+      preflight(
+        parse([source("SmtpServer", "relay", spec)]),
+        inventory({ SmtpServer: ["smtp"] }),
+        () => "secret-pass",
+        web,
+        noDocs,
+        creds,
+        held,
+      );
+    const none = { username: null, keyName: null };
+    const login = { username: "api_token", keyName: "email-relay" };
+    expect(() => update({ username: "api_token" }, none)).toThrow(
+      "SmtpServer/relay: spec.keyFrom is required with spec.username",
+    );
+    expect(() => update({ keyFrom: "email-relay" }, none)).toThrow(
+      "spec.username is required with spec.keyFrom",
+    );
+    expect(() => update({ username: null }, login)).toThrow(
+      "spec.username is required with spec.keyFrom",
+    );
+    // a half the document omits is the held one
+    expect(() => update({ username: "other" }, login)).not.toThrow();
+    expect(() => update({ port: 587 }, login)).not.toThrow();
+    expect(() =>
+      update({ username: null, keyFrom: null }, login),
+    ).not.toThrow();
   });
 
   test("a Decider names a provider that exists or is in the input", () => {

@@ -32,13 +32,17 @@ export function clientFetch(answer: Answer) {
 }
 
 export function deferredFetch() {
-  const calls: { url: string; answer: (response: Response) => void }[] = [];
+  const calls: {
+    url: string;
+    init?: RequestInit;
+    answer: (response: Response) => void;
+  }[] = [];
   beforeEach(() => {
     calls.length = 0;
   });
-  clientFetch((url) => {
+  clientFetch((url, init) => {
     const held = deferred<Response>();
-    calls.push({ url, answer: held.resolve });
+    calls.push({ url, init, answer: held.resolve });
     return held.promise;
   });
   return calls;

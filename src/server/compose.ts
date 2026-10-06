@@ -630,6 +630,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
       docs: knowledge.store,
     }),
     credentials: { key: credentials.keyState, list: credentials.bindings },
+    smtp: () => {
+      const held = email.settings();
+      return held && { username: held.username, keyName: held.keyName };
+    },
     inventory: () =>
       inventoryOf({
         users,
@@ -740,9 +744,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
-      await (cut === undefined
-        ? emailStopped
-        : Promise.race([emailStopped, cut]));
+      if (cut === undefined) await emailStopped;
+      else {
+        await Promise.race([emailStopped, cut]);
+        // a send the cut left in flight must not write once the db closes
+        email.halt();
+      }
       email.dispose();
       await packing;
       overview.close();

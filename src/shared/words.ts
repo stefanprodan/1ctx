@@ -53,26 +53,30 @@ export function isFullName(value: unknown): value is string {
 }
 
 export const MAX_EMAIL = 254;
-const WHITESPACE = /\s/;
+// a strict subset of RFC 5322's addr-spec: a dot-atom local part and a
+// host name. The SMTP library rewrites anything looser (a trailing ">")
+// into another address, past the placeholder rule and the unique index
+const LOCAL =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+const LABEL = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+// letters, or an internationalized one in its xn-- form
+const TOP = /^(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})$/;
 export function isEmail(value: unknown): value is string {
   if (
     typeof value !== "string" ||
     value.length < 3 ||
-    value.length > MAX_EMAIL ||
-    value !== value.trim() ||
-    LINE_BREAK.test(value) ||
-    WHITESPACE.test(value)
+    value.length > MAX_EMAIL
   ) {
     return false;
   }
   const at = value.indexOf("@");
   if (at <= 0 || at !== value.lastIndexOf("@")) return false;
-  const domain = value.slice(at + 1);
-  const labels = domain.split(".");
+  const labels = value.slice(at + 1).split(".");
   return (
+    LOCAL.test(value.slice(0, at)) &&
     labels.length >= 2 &&
-    labels.every((label) => label.length > 0) &&
-    labels[labels.length - 1].length >= 2
+    labels.every((label) => LABEL.test(label)) &&
+    TOP.test(labels[labels.length - 1]!)
   );
 }
 

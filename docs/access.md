@@ -62,7 +62,9 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **A disable deletes the user's logins and keeps every other row.**
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
-  in `UTC`. An address on `1ctx.dev` is a placeholder, never emailed
+  in `UTC`. `isEmail()` takes only a dot-atom `local@host` (no quotes,
+  brackets or IP literals), so the stored value is what SMTP gets. An
+  address on `1ctx.dev` is a placeholder, never emailed
   (`docs/email.md`).
 - **Every change to who sees what publishes `access.changed`.** A role
   change, a team project created or deleted, a member added or removed.
