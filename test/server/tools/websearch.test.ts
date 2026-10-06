@@ -95,7 +95,7 @@ describe("websearch arguments", () => {
 });
 
 describe("provider requests", () => {
-  test("builds the exact Exa envelope ", async () => {
+  test("builds the exact Exa envelope", async () => {
     const request = buildExaRequest(
       { query: "latest kubernetes version", domain: null },
       null,
@@ -142,7 +142,7 @@ describe("provider requests", () => {
     expect(seen[0].init?.redirect).toBe("error");
   });
 
-  test("builds the exact Firecrawl body ", () => {
+  test("builds the exact Firecrawl body", () => {
     expect(
       buildFirecrawlRequest(
         { query: "latest kubernetes version", domain: null },

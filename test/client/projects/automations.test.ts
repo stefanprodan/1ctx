@@ -747,6 +747,11 @@ describe("the form", () => {
     };
     expect(own("none")).toBe(false);
     expect(own("own")).toBe(true);
+    expect(
+      automationFieldOf(
+        "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
+      ),
+    ).toBe("name");
     expect(automationFieldOf("ownMemory must be boolean")).toBe("memory");
   });
 

@@ -107,9 +107,6 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
   return out;
 }
 
-// the body read chunk by chunk and refused past the cap, so a provider
-// cannot fill the process however long it talks
-
 // a server that ignores the query answers its whole list, which is
 // what a local decisions server serves
 const DECISIONS_PATH = "/models?output_modalities=decisions";

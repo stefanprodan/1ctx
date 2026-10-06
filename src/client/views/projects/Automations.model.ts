@@ -380,7 +380,8 @@ type AutomationField =
 export function automationFieldOf(
   message: string,
 ): AutomationField | undefined {
-  if (message === "invalid name" || message === "name is taken") return "name";
+  if (message.startsWith("name must be ") || message === "name is taken")
+    return "name";
   if (message === "no such agent") return "agent";
   if (message.startsWith("instructions")) return "instructions";
   if (message.includes("schedule")) return "schedule";

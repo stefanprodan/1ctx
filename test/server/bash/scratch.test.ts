@@ -287,7 +287,7 @@ describe("scratch store", () => {
     }
   });
 
-  test("skips a held session until it is released", async () => {
+  test.serial("skips a held session until it is released", async () => {
     const ctx = setup();
     try {
       const second = ctx.makeSession();
@@ -298,11 +298,14 @@ describe("scratch store", () => {
         ctx.session.id,
         new AbortController().signal,
       );
-      expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7)).toBe(1);
-      expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
-      expect(usedAt(ctx)).toEqual({ used_at: 100 });
-      expect(ctx.bash.scratch.read(second.id)).toEqual(blank);
-      release();
+      try {
+        expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7)).toBe(1);
+        expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(before);
+        expect(usedAt(ctx)).toEqual({ used_at: 100 });
+        expect(ctx.bash.scratch.read(second.id)).toEqual(blank);
+      } finally {
+        release();
+      }
       expect(ctx.bash.scratch.sweep(101 + 7 * 86_400_000, 7)).toBe(1);
       expect(ctx.bash.scratch.read(ctx.session.id)).toEqual(blank);
       expect(usedAt(ctx)).toBeNull();

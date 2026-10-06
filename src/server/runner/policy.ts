@@ -136,11 +136,11 @@ export type SendPolicy = {
   sendCaps: SendCaps;
 };
 
-// no thinking, or the least effort the wire names for a model that
-// always thinks: for a round that only needs a short answer or a call
 export const offers = (offered: Pick<Offered, "tools">, name: string) =>
   offered.tools.some((tool) => tool.name === name);
 
+// no thinking, or the least effort the wire names for a model that
+// always thinks: for a round that only needs a short answer or a call
 export const leastThinking = (
   policy: Pick<SendPolicy, "thinkingRequired" | "thinkingOff" | "wire">,
 ): Pick<

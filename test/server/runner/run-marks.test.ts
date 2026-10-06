@@ -392,7 +392,8 @@ describe("the attention step", () => {
   });
 
   test("refuses any other tool and keeps the last good reason of a round", async () => {
-    const chat = await chatApp();
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     try {
       const automation = await agentMode(chat);
       const run = await startRun(chat, automation.id);
@@ -422,6 +423,9 @@ describe("the attention step", () => {
         "podinfo and flux-system are failing",
       );
       expect(chat.scripted.scripts).toHaveLength(2);
+      expect(
+        logs.events.find((event) => event.msg === "tool failed")?.fields,
+      ).toMatchObject({ tool: "bash", error_type: "ToolError" });
     } finally {
       await chat.app.shutdown();
     }
