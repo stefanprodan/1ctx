@@ -47,23 +47,34 @@ function listed(
   return out;
 }
 
-// the files part, at most a quarter of the cut, so the answer always shows
+// what did not come back: past the parent's /tmp caps, or a name its
+// rule refuses there
+export const NOT_COPIED =
+  "Not copied back, over this chat's /tmp limits or names:";
+
+// the files part, headings counted, at most a quarter of the cut, so the
+// answer always shows; each group gets an even share
 function filesTail(end: ChildEnd, resultCut: number): string {
-  if (end.copied.length === 0 && end.left.length === 0) return "";
+  const groups = [
+    {
+      head: `Files in /tmp/${end.folder}/:`,
+      lines: end.copied,
+      more: (n: number) => MORE(n, end.folder),
+    },
+    {
+      head: NOT_COPIED,
+      lines: end.left.map((path) => `/tmp/${path}`),
+      more: (n: number) => `and ${n} more`,
+    },
+  ].filter((group) => group.lines.length > 0);
+  if (groups.length === 0) return "";
   const room = Math.floor(resultCut / 4);
-  const parts: string[] = [];
-  if (end.copied.length > 0) {
-    parts.push(
-      `Files in /tmp/${end.folder}/:`,
-      ...listed(end.copied, room / 2, (n) => MORE(n, end.folder)),
-    );
-  }
-  if (end.left.length > 0) {
-    parts.push(
-      "Not copied, past this chat's /tmp limits:",
-      ...listed(end.left, room / 2, (n) => `and ${n} more`),
-    );
-  }
+  // the newline between the groups
+  const share = Math.floor((room - (groups.length - 1)) / groups.length);
+  const parts = groups.flatMap((group) => [
+    group.head,
+    ...listed(group.lines, share - group.head.length - 1, group.more),
+  ]);
   return cutAt(parts.join("\n"), room);
 }
 

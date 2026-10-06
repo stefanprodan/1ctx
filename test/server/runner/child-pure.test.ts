@@ -4,7 +4,10 @@
 // A subagent's prompt, result and places, on fixtures.
 
 import { describe, expect, test } from "bun:test";
-import { childResult } from "../../../src/server/runner/child-result.ts";
+import {
+  childResult,
+  NOT_COPIED,
+} from "../../../src/server/runner/child-result.ts";
 import {
   freeSlot,
   noChildren,
@@ -19,7 +22,9 @@ import {
   subagentPrompt,
   systemPrompt,
 } from "../../../src/server/runner/prompt.ts";
+import { CapFull, Registry } from "../../../src/server/runner/registry.ts";
 import { cutResult } from "../../../src/server/runner/results.ts";
+import type { ActiveSend } from "../../../src/server/runner/send.ts";
 import { makeBashTool } from "../../../src/server/tools/builtin/bash.ts";
 import { schema } from "../../../src/server/tools/catalog.ts";
 import { tick } from "../../helpers/chat.ts";
@@ -142,7 +147,7 @@ describe("what a delegate call gives back", () => {
     expect(result.content.length).toBeLessThanOrEqual(1000);
     const tail = result.content.slice(-result.tail!);
     expect(tail).toBe(
-      "\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/report.md\n/tmp/sub-1/data.json\nNot copied, past this chat's /tmp limits:\nbig.bin",
+      "\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/report.md\n/tmp/sub-1/data.json\nNot copied back, over this chat's /tmp limits or names:\n/tmp/big.bin",
     );
     const cut = cutResult(result, 600);
     expect(cut.content.endsWith(tail)).toBe(true);
@@ -157,6 +162,32 @@ describe("what a delegate call gives back", () => {
     const tail = result.content.slice(-result.tail!);
     expect(tail.length).toBeLessThanOrEqual(caps.resultCut / 4);
     expect(tail).toMatch(/and \d+ more in \/tmp\/sub-1\/$/);
+  });
+
+  test("at a small cut the headings count and no path is cut", () => {
+    const copied = Array.from(
+      { length: 20 },
+      (_, i) => `/tmp/sub-1/a-long-folder-name/file-number-${i}.txt`,
+    );
+    const left = Array.from({ length: 20 }, (_, i) => `big-${i}.bin`);
+    const result = childResult(
+      { ...end, copied, left },
+      { answerChars: 8000, resultCut: 1000 },
+    );
+    const tail = result.content.slice(-result.tail!);
+    expect(tail.length).toBeLessThanOrEqual(1000 / 4 + 2);
+    const lines = tail.trim().split("\n");
+    expect(lines[0]).toBe("Files in /tmp/sub-1/:");
+    for (const line of lines.slice(1)) {
+      expect(
+        copied.includes(line) ||
+          left.some((path) => line === `/tmp/${path}`) ||
+          line === NOT_COPIED ||
+          /^and \d+ more( in \/tmp\/sub-1\/)?$/.test(line),
+      ).toBe(true);
+    }
+    expect(lines).toContain(NOT_COPIED);
+    expect(lines.filter((line) => line.startsWith("and "))).toHaveLength(2);
   });
 
   test("a child that failed or ran out is a failed result with its last words", () => {
@@ -250,5 +281,36 @@ describe("a send's subagent places", () => {
     controller.abort();
     expect(await waiting).toBeNull();
     expect(children.waiting).toEqual([]);
+  });
+});
+
+describe("the registry's extra streams", () => {
+  const send = (n: number) =>
+    ({
+      sessionId: `s${n}`,
+      projectId: `p${n}`,
+      startedBy: `u${n}`,
+      kind: "chat",
+      terminal: null,
+      policy: { fullName: "x" },
+    }) as unknown as ActiveSend;
+  const caps = { sendsPerUser: 4, sendsPerProject: 16, sendsRunning: 4 };
+
+  test("count under sendsRunning, so an extra fills the process", () => {
+    const registry = new Registry();
+    for (let n = 0; n < 3; n++) registry.set(send(n));
+    expect(() =>
+      registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
+    ).not.toThrow();
+    expect(registry.takeExtra(4)).toBe(true);
+    expect(registry.takeExtra(4)).toBe(false);
+    expect(() =>
+      registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
+    ).toThrow(CapFull);
+    registry.freeExtra();
+    expect(registry.extraStreams).toBe(0);
+    expect(() =>
+      registry.admit("s9", { userId: "u9", projectId: "p9" }, caps),
+    ).not.toThrow();
   });
 });

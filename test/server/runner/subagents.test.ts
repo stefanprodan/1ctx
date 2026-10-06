@@ -24,6 +24,7 @@ import {
   delegateRows,
   isChild,
   lastResult,
+  scratchLeft,
   settled,
   subagentApp,
   system,
@@ -98,6 +99,7 @@ describe("a delegated task", () => {
       await settled(chat, sessionId);
 
       const [childId] = childrenOf(chat, sessionId);
+      expect(scratchLeft(chat, childId!)).toBe(0);
       const [row] = delegateRows(chat, sessionId);
       expect(row).toMatchObject({ status: "done", childSessionId: childId });
       const detail = await (
@@ -156,6 +158,35 @@ describe("a delegated task", () => {
     }
   });
 
+  test("a child at its window answers and never compacts", async () => {
+    const chat = await subagentApp();
+    try {
+      chat.app.db
+        .query("update agents set context_length = 20000 where id = ?")
+        .run(chat.agentId);
+      const { script, sessionId } = await startChat(chat);
+      script.toolRound([delegateCall("d1", "big task")]);
+      script.end();
+      const child = await waitScript(chat.scripted, 2);
+      expect(isChild(child)).toBe(true);
+      child.content("a long read, answered");
+      child.finish();
+      child.usage({ prompt: 19_500, completion: 100 });
+      child.end();
+      const next = await waitScript(chat.scripted, 3);
+      expect(isChild(next)).toBe(false);
+      expect(lastResult(next)).toBe("a long read, answered");
+      next.reply("done");
+      await settled(chat, sessionId);
+      const [childId] = childrenOf(chat, sessionId);
+      expect(
+        chat.app.sessions.messages(childId!).map((row) => row.kind),
+      ).toEqual(["user", "reply"]);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a child's time is not the parent's toolMs", async () => {
     const chat = await subagentApp();
     try {
@@ -191,6 +222,7 @@ describe("a delegated task", () => {
       next.reply("I will do it myself");
       await settled(chat, sessionId);
       expect(delegateRows(chat, sessionId)[0]!.status).toBe("failed");
+      expect(scratchLeft(chat, childrenOf(chat, sessionId)[0]!)).toBe(0);
     } finally {
       await chat.app.shutdown();
     }
@@ -218,6 +250,7 @@ describe("the parent's end ends its children", () => {
         status: "stopped",
         cause: "stop",
       });
+      expect(scratchLeft(chat, childId!)).toBe(0);
     } finally {
       await chat.app.shutdown();
     }
@@ -246,6 +279,7 @@ describe("the parent's end ends its children", () => {
       expect(chat.app.sessions.lastSend(childId!)).toMatchObject({
         cause: "deadline",
       });
+      expect(scratchLeft(chat, childId!)).toBe(0);
     } finally {
       await chat.app.shutdown();
     }

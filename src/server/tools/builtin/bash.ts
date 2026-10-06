@@ -149,6 +149,10 @@ export type BashToolOptions = {
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. ";
 
+// a send's bash description as a subagent's, whatever was added after
+export const withoutOpen = (description: string): string =>
+  description.replace(OPEN_WORDS, "");
+
 export function makeBashTool({
   bash,
   web = null,

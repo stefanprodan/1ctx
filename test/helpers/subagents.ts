@@ -103,6 +103,16 @@ export const childrenOf = (chat: ChatApp, rootId: string): string[] =>
     .all(rootId)
     .map((row) => row.id);
 
+// what is left of a session's scratch: nothing once a child has ended
+export const scratchLeft = (chat: ChatApp, sessionId: string) =>
+  chat.app.db
+    .query<{ n: number }, [string, string]>(
+      `select (select count(*) from session_scratch where session_id = ?)
+         + (select count(*) from session_scratch_files where session_id = ?)
+         as n`,
+    )
+    .get(sessionId, sessionId)!.n;
+
 export const delegateRows = (chat: ChatApp, rootId: string): Message[] =>
   chat.app.sessions
     .messages(rootId)

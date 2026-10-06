@@ -80,6 +80,7 @@ import type {
 } from "./types.ts";
 
 export { ATTENTION_TOOL } from "./builtin/attention.ts";
+export { withoutOpen } from "./builtin/bash.ts";
 export {
   DELEGATE_DESCRIPTION,
   DELEGATE_TOOL,

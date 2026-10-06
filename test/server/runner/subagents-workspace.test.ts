@@ -19,6 +19,7 @@ import {
   delegateCall,
   isChild,
   lastResult,
+  scratchLeft,
   settled,
   subagentApp,
 } from "../../helpers/subagents.ts";
@@ -72,7 +73,7 @@ describe("a subagent's /tmp", () => {
         "sub-1/seed.txt": "changed",
       });
       const [childId] = childrenOf(chat, sessionId);
-      expect(scratchOf(chat, childId!)["report.md"]).toBe("report");
+      expect(scratchLeft(chat, childId!)).toBe(0);
     } finally {
       await chat.app.shutdown();
     }
@@ -106,7 +107,8 @@ describe("a subagent's /tmp", () => {
       chat.scripted.scripts[3]!.reply("done");
       await settled(chat, sessionId);
       const [childId] = childrenOf(chat, sessionId);
-      expect(Object.keys(scratchOf(chat, childId!))).toEqual(["q.html"]);
+      expect(scratchLeft(chat, childId!)).toBe(0);
+      expect(Object.keys(scratchOf(chat, sessionId))).toEqual(["sub-1/q.html"]);
       expect(
         chat.app.db
           .query(
@@ -231,6 +233,7 @@ describe("copying back", () => {
         copied: ["/tmp/sub-1/a.txt"],
         left: ["b.txt"],
       });
+      expect(scratchLeft(chat, child.id)).toBe(0);
       expect(scratchOf(chat, parent.id)).toEqual({
         "old.txt": "old",
         "sub-1/a.txt": "a",

@@ -19,7 +19,11 @@ import { messageOf } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
-import type { DelegateInput, ToolContext } from "../tools/index.ts";
+import {
+  type DelegateInput,
+  type ToolContext,
+  withoutOpen,
+} from "../tools/index.ts";
 import { childResult } from "./child-result.ts";
 import { freeSlot, type SlotPort, takeSlot } from "./child-slots.ts";
 import { type EndingDeps, finalize } from "./ending.ts";
@@ -39,7 +43,11 @@ export type ChildDeps = {
   ending: Pick<EndingDeps, "writer" | "pause" | "log">;
   bash: Pick<
     BashCapability,
-    "startKept" | "scratchFolder" | "copyScratch" | "returnScratch"
+    | "startKept"
+    | "scratchFolder"
+    | "copyScratch"
+    | "returnScratch"
+    | "dropScratch"
   >;
   registry: Registry;
   // the process cap now, which an extra stream counts under
@@ -56,8 +64,18 @@ export function childPolicy(
   parent: SendPolicy,
   deadlineMs: number | null,
 ): SendPolicy {
-  const offered = parent.childOffered;
-  if (!offered) throw new Error("the send offers no subagents");
+  const own = parent.childOffered;
+  if (!own) throw new Error("the send offers no subagents");
+  // the repositories mountRepos() named in the parent's bash
+  const bash = parent.offered.tools.find((tool) => tool.name === "bash");
+  const offered = {
+    ...own,
+    tools: own.tools.map((tool) =>
+      tool.name === "bash" && bash !== undefined
+        ? { ...tool, description: withoutOpen(bash.description) }
+        : tool,
+    ),
+  };
   return {
     ...parent,
     summoned: null,
@@ -177,11 +195,17 @@ function startChild(
     now,
   });
   send.child = link;
-  // the parent's trees, which it lets go of once this child has ended
+  // the parent's trees, which it lets go of once this child has ended;
+  // the mount notices stay the parent's to hand out
   send.repos =
     parent.repos === null
       ? null
-      : { off: [], moved: [], tool: parent.repos.tool, release() {} };
+      : {
+          off: [],
+          moved: [],
+          tool: { ...parent.repos.tool, notice: () => "" },
+          release() {},
+        };
   if (!offers(policy.offered, "bash")) return { send, baseline: null };
   const kept = deps.bash.startKept(sessionId, null);
   let next = kept.next;
@@ -352,6 +376,8 @@ async function returned(
       child: send.sessionId,
       ...errorFields(error),
     });
+    // a child is never continued, so its copy of the parent's /tmp goes
+    deps.bash.dropScratch(send.sessionId);
     return { copied: [], left: [] };
   }
 }

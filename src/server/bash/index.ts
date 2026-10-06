@@ -72,6 +72,8 @@ export type BashCapability = {
     folder: string,
     baseline: ScratchBaseline,
   ): Promise<Returned>;
+  // a child's scratch, when its files could not come back
+  dropScratch(sessionId: string): void;
 };
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
@@ -128,6 +130,7 @@ export function bashArea(deps: BashDeps): BashArea {
         baseline,
         deps.clock(),
       ),
+    dropScratch: (sessionId) => scratch.drop(sessionId),
     sweep: (now) => scratch.sweep(now, deps.limits.current().scratchIdleDays),
     close: () => workers.close(),
   };

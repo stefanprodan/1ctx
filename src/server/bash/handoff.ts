@@ -61,7 +61,8 @@ export function copyIn(
 
 // under the parent's command queue, so none of its commands commits
 // between the read and the write; a file that does not fit the
-// parent's caps or name rule is left and named
+// parent's caps or name rule is left and named. The child's scratch
+// goes in the same transaction, since a child is never continued
 export async function copyBack(
   deps: { db: Db; store: ScratchStore; current(): KnowledgeCaps },
   child: string,
@@ -73,66 +74,73 @@ export async function copyBack(
   const release = await acquireSession(parent, new AbortController().signal);
   try {
     return transact(deps.db, () => {
-      const changed = mountableScratch(
-        deps.store.read(child).entries,
-      ).kept.filter((file) => baseline.get(file.path) !== digest(file));
-      const none = { result: { copied: [], left: [] }, events: [] };
-      if (changed.length === 0) return none;
-      const theirs = deps.store.read(parent);
-      const caps = deps.current();
-      const held = new Map(
-        theirs.entries.map((file) => [
-          file.path,
-          sizeOf(file.path, file.data.byteLength),
-        ]),
-      );
-      let files = held.size;
-      let bytes = [...held.values()].reduce((sum, size) => sum + size, 0);
-      const written: ScratchFile[] = [];
-      const left: string[] = [];
-      for (const file of changed) {
-        const path = `${folder}/${file.path}`;
-        const size = sizeOf(path, file.data.byteLength);
-        const before = held.get(path);
-        const nextFiles = files + (before === undefined ? 1 : 0);
-        const nextBytes = bytes - (before ?? 0) + size;
-        if (
-          held.has(folder) ||
-          !isScratchName(path) ||
-          nextFiles > caps.scratchFiles ||
-          nextBytes > caps.scratchBytes
-        ) {
-          left.push(file.path);
-          continue;
-        }
-        files = nextFiles;
-        bytes = nextBytes;
-        held.set(path, size);
-        written.push({ ...file, path });
-      }
-      try {
-        checkScratchNames([...held.keys()]);
-      } catch {
-        // a file of the parent's stands where a folder would go
-        return {
-          result: { copied: [], left: changed.map((file) => file.path) },
-          events: [],
-        };
-      }
-      if (written.length > 0) {
-        deps.store.write(
-          parent,
-          theirs.revision,
-          { written, removed: [], cwd: theirs.cwd },
-          now,
-        );
-      }
-      return {
-        result: { copied: written.map((file) => `/tmp/${file.path}`), left },
-        events: [],
-      };
+      const result = backInto(deps, child, parent, folder, baseline, now);
+      deps.store.drop(child);
+      return { result, events: [] };
     });
   } finally {
     release();
   }
+}
+
+// the changed files under the parent's folder, as many as fit
+function backInto(
+  deps: { store: ScratchStore; current(): KnowledgeCaps },
+  child: string,
+  parent: string,
+  folder: string,
+  baseline: ScratchBaseline,
+  now: number,
+): Returned {
+  const changed = mountableScratch(deps.store.read(child).entries).kept.filter(
+    (file) => baseline.get(file.path) !== digest(file),
+  );
+  if (changed.length === 0) return { copied: [], left: [] };
+  const theirs = deps.store.read(parent);
+  const caps = deps.current();
+  const held = new Map(
+    theirs.entries.map((file) => [
+      file.path,
+      sizeOf(file.path, file.data.byteLength),
+    ]),
+  );
+  let files = held.size;
+  let bytes = [...held.values()].reduce((sum, size) => sum + size, 0);
+  const written: ScratchFile[] = [];
+  const left: string[] = [];
+  for (const file of changed) {
+    const path = `${folder}/${file.path}`;
+    const size = sizeOf(path, file.data.byteLength);
+    const before = held.get(path);
+    const nextFiles = files + (before === undefined ? 1 : 0);
+    const nextBytes = bytes - (before ?? 0) + size;
+    if (
+      held.has(folder) ||
+      !isScratchName(path) ||
+      nextFiles > caps.scratchFiles ||
+      nextBytes > caps.scratchBytes
+    ) {
+      left.push(file.path);
+      continue;
+    }
+    files = nextFiles;
+    bytes = nextBytes;
+    held.set(path, size);
+    written.push({ ...file, path });
+  }
+  try {
+    checkScratchNames([...held.keys()]);
+  } catch {
+    // a file of the parent's stands where a folder would go
+    return { copied: [], left: changed.map((file) => file.path) };
+  }
+  if (written.length > 0) {
+    deps.store.write(
+      parent,
+      theirs.revision,
+      { written, removed: [], cwd: theirs.cwd },
+      now,
+    );
+  }
+  return { copied: written.map((file) => `/tmp/${file.path}`), left };
 }

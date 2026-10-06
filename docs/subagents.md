@@ -43,8 +43,10 @@ is its root.
 
 - **`delegate` is offered in a main offer whose agent has the switch
   on** (`delegate` on the offer's scope), on a model that takes tools,
-  in chats and runs, never to a child. It takes `description` (one
-  line, cut at `MAX_DELEGATE_DESCRIPTION`, never refused) and `task`.
+  in chats and runs, never to a child. It takes `description`, one
+  line, refused only when it breaks a line or nothing is left after
+  cleaning, and cut at `MAX_DELEGATE_DESCRIPTION` rather than refused
+  for its length; and `task`.
 - **It runs outside the tool registry,** so `callTimeoutMs` never cuts
   it: `tools/builtin/delegate.ts` reaches the runner through the
   `delegate` port, a closure in `compose.ts`. `tools.run()` reaches it
@@ -55,7 +57,8 @@ is its root.
   only the ordinary calls' time, up to the last of them to end.
 - **The result is the answer cut to `min(childAnswerChars,
   resultCut)`, then the files as its `tail`** (`runner/child-result.ts`):
-  the paths copied back and those left, at most a quarter of
+  the paths copied back and the child's paths left (over the parent's
+  limits or name rule), headings counted, at most a quarter of
   `resultCut`, then how many more. A child that failed, stopped, ran
   out of time or gave no answer is a failed result with its last
   words; the parent goes on.
@@ -118,4 +121,10 @@ is its root.
   `/tmp/<folder>/`: `sub-N`, the first that no file of the parent's
   stands at and no sibling took. The copy runs under the parent's
   command queue, within the parent's scratch caps and name rule; what
-  does not fit is named in the result.
+  does not fit is named in the result. The child's scratch goes in the
+  same transaction, or alone when the copy fails, since a child is
+  never continued.
+- **Its bash description is the parent's after `mountRepos()`,** less
+  the `open` text (`withoutOpen()`), so it names the same
+  repositories. Its repos handle shares the parent's trees and never
+  takes the parent's mount notices.
