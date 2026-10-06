@@ -12,7 +12,7 @@ import type { SmtpResponse, SmtpTestResponse } from "../../shared/api/smtp.ts";
 import type { SmtpFailure, SmtpSettings } from "../../shared/contracts/smtp.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
@@ -20,6 +20,7 @@ import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import { routes } from "./routes.ts";
 import {
+  ASKED_LINKS_PER_HOUR,
   badSubject,
   type EmailKind,
   FAILED_KEEP_MS,
@@ -36,11 +37,13 @@ export {
   type AlertEmail,
   agentEmail,
   alertEmail,
+  type Framed,
   packBody,
   SUBJECT_TAG,
   sessionPath,
   sessionPrepare,
   unpackBody,
+  withLink,
 } from "./frame.ts";
 export {
   pairProblem,
@@ -54,6 +57,8 @@ export {
   parseSmtpUsername,
 } from "./parse.ts";
 export {
+  ASKED_LINKS_PER_HOUR,
+  ASKED_LINKS_PER_USER_DAY,
   type DropWord,
   EMAIL_KINDS,
   type EmailKind,
@@ -79,6 +84,11 @@ export type Enqueue = {
   userId: string;
   projectId?: string | null;
   sessionId?: string | null;
+  // an alert's automation, which its cap counts
+  automationId?: string | null;
+  // a link email asked for at the sign-in page, which the asks' caps
+  // count
+  asked?: boolean;
   subject?: string | null;
   body?: string | null;
 };
@@ -91,6 +101,8 @@ export type EmailAttention = {
   failed: number;
   lastFailure: SmtpFailure | null;
   lastFailedAt: number | null;
+  // email is on and the instance's hourly cap on asked links is reached
+  linksPaused: boolean;
 };
 
 export type EmailDeps = {
@@ -118,6 +130,9 @@ export type Email = {
   // the user's queued rows of these kinds, in the caller's transaction;
   // the count removed
   dropQueued(userId: string, kinds: readonly EmailKind[]): number;
+  // the link emails asked for at the sign-in page at or after since, a
+  // user's or, with null, the instance's
+  countAsked(userId: string | null, since: number): number;
   start(): void;
   stop(): Promise<void>;
   // after a cut shutdown, so the send in flight writes nothing
@@ -238,6 +253,8 @@ export function emailArea(deps: EmailDeps): Email {
         userId: fields.userId,
         projectId: fields.projectId ?? null,
         sessionId: fields.sessionId ?? null,
+        automationId: fields.automationId ?? null,
+        asked: fields.asked ?? false,
         subject: fields.subject ?? null,
         body: fields.body ?? null,
         messageId: messageIdOf(id, settings.fromAddress),
@@ -251,6 +268,7 @@ export function emailArea(deps: EmailDeps): Email {
       prepares.set(kind, prepare);
     },
     dropQueued: (userId, kinds) => store.dropQueued(userId, kinds),
+    countAsked: (userId, since) => store.countAsked(userId, since),
     start: () => loop.start(),
     stop: () => loop.stop(),
     halt: () => loop.halt(),
@@ -265,6 +283,10 @@ export function emailArea(deps: EmailDeps): Email {
         keyName: settings.keyName,
         hasKey: hasKey(settings),
         ...store.counts(),
+        linksPaused:
+          enabled() &&
+          store.countAsked(null, deps.clock() - HOUR_MS) >=
+            ASKED_LINKS_PER_HOUR,
       };
     },
   };

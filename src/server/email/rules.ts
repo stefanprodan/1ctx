@@ -22,7 +22,8 @@ export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 // why a row was dropped before SMTP: the recipient is gone, disabled
 // or has no real address, or a kind's own check refused it (a link
-// email's link was revoked since, the chat or run it links to deleted)
+// email's link was revoked since, the chat or run it links to deleted,
+// email turned off before its link was built)
 export type DropWord =
   | "gone"
   | "disabled"
@@ -30,7 +31,8 @@ export type DropWord =
   | "opted-out"
   | "no-access"
   | "revoked"
-  | "deleted";
+  | "deleted"
+  | "off";
 
 // the waits after the first, second and third failed try; the fourth
 // failure is final
@@ -40,6 +42,11 @@ export const STALE_CLAIM_MS = MINUTE_MS;
 export const FAILED_KEEP_MS = 7 * DAY_MS;
 // a sent row, for the caps counted per day
 export const SENT_KEEP_MS = DAY_MS;
+// link emails asked for at the sign-in page, so nobody spams a user or
+// spends the server's quota from it: per user a day, per instance an
+// hour
+export const ASKED_LINKS_PER_USER_DAY = 3;
+export const ASKED_LINKS_PER_HOUR = 50;
 
 // when the row is tried again after its attempts-th failure, or null
 // when it has failed for good

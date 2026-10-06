@@ -15,7 +15,6 @@ import {
   type Enqueue,
   type Prepare,
   packBody,
-  sessionPath,
   sessionPrepare,
 } from "../email/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
@@ -84,7 +83,10 @@ const named = (users: UserRow[]) =>
   users.map((user) => `@${user.username}`).join(", ");
 
 export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
-  deps.outbox.register("agent", sessionPrepare(deps.canOpen));
+  deps.outbox.register(
+    "agent",
+    sessionPrepare(deps.canOpen, (path) => deps.outbox.link(path)),
+  );
 
   return {
     email(actor, request) {
@@ -112,8 +114,8 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
         project,
         origin: actor.origin,
         subject: request.subject,
+        sessionId: actor.sessionId,
         body: request.body,
-        link: deps.outbox.link(sessionPath(actor.origin, actor.sessionId)),
       });
       const body = packBody(content);
       return transact(deps.db, () => {

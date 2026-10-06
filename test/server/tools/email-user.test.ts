@@ -345,6 +345,32 @@ describe("a call", () => {
     expect(outbox(chat).map((row) => row.subject)).toEqual([null, null]);
   });
 
+  test("links to the public address as it is at the send", async () => {
+    const { chat, teamId } = await setup();
+    const { script, sessionId } = await startChat(
+      chat,
+      "tell maria",
+      chat.member,
+      teamId,
+    );
+    const { next } = await round(chat, script, [call("c1", email(["maria"]))]);
+    await finish(chat, next);
+    const stored = chat.app.db
+      .query<{ body: string }, []>("select body from email_outbox")
+      .get()!;
+    expect(stored.body).not.toContain(SMTP.publicAddress);
+    const moved = "https://moved.example.test";
+    const put = await chat.admin.call("PUT", "/api/admin/smtp", {
+      body: { ...SMTP, publicAddress: moved },
+    });
+    expect(put.status).toBe(200);
+    expect(await chat.app.email.pass()).toBe(1);
+    const { message } = chat.app.emailSender.sent[0]!;
+    expect(message.text).toContain(`Open the chat: ${moved}/chat/${sessionId}`);
+    expect(message.text).not.toContain(SMTP.publicAddress);
+    expect(message.html).toContain(`<a href="${moved}/chat/${sessionId}">`);
+  });
+
   test("refuses the whole call, naming each user it may not email", async () => {
     const { chat, teamId } = await setup();
     const { script } = await startChat(chat, "tell all", chat.member, teamId);

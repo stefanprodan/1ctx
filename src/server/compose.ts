@@ -781,8 +781,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
-      // a link ask answered before the drain writes its row
-      await access.settled();
+      // a link ask answered before here writes its row; one after does
+      // nothing, since the listener still serves until the db closes
+      await access.closeLinks();
       if (cut === undefined) await emailStopped;
       else {
         await Promise.race([emailStopped, cut]);

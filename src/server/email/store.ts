@@ -23,7 +23,13 @@ export type OutboxRow = {
   createdAt: number;
 };
 
-export type OutboxFields = Omit<OutboxRow, "attempts"> & { now: number };
+// automationId names an alert's automation, for its cap; asked marks a
+// link email asked for at the sign-in page, for the caps on asks
+export type OutboxFields = Omit<OutboxRow, "attempts"> & {
+  automationId: string | null;
+  asked: boolean;
+  now: number;
+};
 
 export type OutboxCounts = {
   queued: number;
@@ -126,8 +132,9 @@ export class EmailStore {
     this.db
       .query(
         `insert into email_outbox (id, kind, user_id, project_id, session_id,
-           subject, body, message_id, next_attempt_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           automation_id, subject, body, message_id, asked, next_attempt_at,
+           created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         fields.id,
@@ -135,9 +142,11 @@ export class EmailStore {
         fields.userId,
         fields.projectId,
         fields.sessionId,
+        fields.automationId,
         fields.subject,
         fields.body,
         fields.messageId,
+        fields.asked ? 1 : 0,
         fields.now,
         fields.createdAt,
         fields.now,
@@ -239,19 +248,33 @@ export class EmailStore {
       .get(projectId, kind, since)!.n;
   }
 
-  // an automation's alert rows at or after since, through the runs they
-  // link to: the project's rows of the day lead, so the run each names
-  // is read by its key, however many runs the automation kept
+  // an automation's alert rows at or after since; only an alert row
+  // names its automation, which a deleted run leaves in place
   countAlerts(automationId: string, since: number): number {
     return this.db
       .query<{ n: number }, [string, number]>(
-        `select count(*) as n from email_outbox o
-         cross join sessions s on s.id = o.session_id
-         where o.project_id = (select project_id from automations where id = ?1)
-           and o.created_at >= ?2 and o.kind = 'alert'
-           and s.automation_id = ?1`,
+        `select count(*) as n from email_outbox
+         where automation_id = ? and created_at >= ?`,
       )
       .get(automationId, since)!.n;
+  }
+
+  // the link emails asked for at the sign-in page at or after since, a
+  // user's or, with null, the instance's
+  countAsked(userId: string | null, since: number): number {
+    return userId === null
+      ? this.db
+          .query<{ n: number }, [number]>(
+            `select count(*) as n from email_outbox
+             where asked = 1 and created_at >= ?`,
+          )
+          .get(since)!.n
+      : this.db
+          .query<{ n: number }, [string, number]>(
+            `select count(*) as n from email_outbox
+             where asked = 1 and user_id = ? and created_at >= ?`,
+          )
+          .get(userId, since)!.n;
   }
 
   // the next time a row is due, a claimed one aside

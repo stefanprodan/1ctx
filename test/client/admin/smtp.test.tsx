@@ -180,8 +180,6 @@ describe("the SMTP page", () => {
   });
 });
 
-const calls = deferredFetch();
-
 // what one render of the cards draws and the handlers it binds; the
 // signals carry the page's state from one render to the next
 function draw(drafted: Signal<SmtpDraft | null>, tested: Signal<Tested>) {
@@ -222,9 +220,12 @@ function draw(drafted: Signal<SmtpDraft | null>, tested: Signal<Tested>) {
   };
 }
 
-const sentBody = (n: number) => JSON.parse(String(calls[n]!.init?.body));
-
 describe("the SMTP page flows", () => {
+  // its hooks swap globalThis.fetch for this describe's serial tests
+  // alone, not the file's concurrent ones
+  const calls = deferredFetch();
+  const sentBody = (n: number) => JSON.parse(String(calls[n]!.init?.body));
+
   afterEach(() => {
     smtp.value = null;
     smtpError.value = null;

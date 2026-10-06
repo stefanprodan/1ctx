@@ -59,6 +59,18 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
     },
   });
   const gone = () => json({ error: GONE }, 404);
+  // the link a token opens while it is live: unused, unexpired and its
+  // user enabled; its user beside it
+  const live = (token: string) => {
+    const link = isLinkToken(token)
+      ? deps.store.byTokenHash(sha256(token))
+      : null;
+    if (link === null || link.usedAt !== null) return null;
+    if (link.expiresAt <= deps.clock()) return null;
+    const user = deps.users.byId(link.userId);
+    if (user === null || user.disabled) return null;
+    return { link, user };
+  };
   return [
     ask("reset"),
     ask("signin"),
@@ -69,21 +81,12 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
       // a dead link is a 200 with null, as /api/me answers nobody, so
       // the page's read puts no failed request in the browser's console
       handle(_req, ctx) {
-        const token = ctx.params.token;
-        const link = isLinkToken(token)
-          ? deps.store.byTokenHash(sha256(token))
-          : null;
-        const user = link === null ? null : deps.users.byId(link.userId);
-        const live =
-          link !== null &&
-          link.usedAt === null &&
-          link.expiresAt > deps.clock() &&
-          user !== null &&
-          !user.disabled;
+        const found = live(ctx.params.token);
         const body: LinkResponse = {
-          link: live
-            ? { purpose: link.purpose, username: user.username }
-            : null,
+          link:
+            found === null
+              ? null
+              : { purpose: found.link.purpose, username: found.user.username },
         };
         return json(body);
       },
@@ -95,13 +98,13 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         deps.guard(ctx);
         const token = ctx.params.token;
-        const { password } = parseLinkUse(await jsonBody(req));
-        if (!isLinkToken(token)) return gone();
+        // a dead link answers as an unknown one, before the body is read
+        // or a password hashed; the write below still decides
+        const found = live(token);
+        if (found === null) return gone();
         const tokenHash = sha256(token);
-        // read first only to know whether to hash; the write decides
-        const seen = deps.store.byTokenHash(tokenHash);
-        if (seen === null) return gone();
-        const sets = seen.purpose !== "signin";
+        const { password } = parseLinkUse(await jsonBody(req));
+        const sets = found.link.purpose !== "signin";
         if (sets && password === undefined) {
           throw new BadRequest("password must be set");
         }

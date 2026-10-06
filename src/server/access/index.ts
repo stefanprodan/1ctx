@@ -92,6 +92,9 @@ export type Access = Auth & {
   sweepLinks(): number;
   // the work a link ask left after its answer, for the shutdown and tests
   settled(): Promise<void>;
+  // at shutdown: a link ask from here answers and does nothing; resolves
+  // once every one before ran
+  closeLinks(): Promise<void>;
   routes: RouteDescriptor[];
 };
 
@@ -122,6 +125,7 @@ export function accessArea(deps: AccessDeps): Access {
     sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
     sweepLinks: () => linkStore.sweep(deps.clock()),
     settled: () => links.settled(),
+    closeLinks: () => links.close(),
     routes: [
       ...routes({
         db: deps.db,

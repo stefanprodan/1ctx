@@ -70,10 +70,15 @@ profile pages show of email. The links themselves are in
   counting them.
 - **A kind's email may carry its own From name** (`fromName`, as
   "<agent> via 1ctx"); the address is always the server's.
+- **Link emails asked for at the sign-in page are capped,** 3 per user
+  a day and 50 per instance an hour, on rows marked `asked`; an
+  admin's links are not. The Monitor shows "Link emails paused" while
+  the instance's cap holds and email is on.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
-  may drop it too (`opted-out`, `no-access`, `revoked`, `deleted`).
+  may drop it too (`opted-out`, `no-access`, `revoked`, `deleted`,
+  `off`).
 - **An address on `1ctx.dev` is a placeholder.** Seeded and
   bootstrapped users get one, so the project's own domain is never
   emailed. The users' `email_placeholder` follows the address's domain,
@@ -85,14 +90,18 @@ profile pages show of email. The links themselves are in
 - **An `agent` row is an agent's `email_user` call, one per user.** It
   carries the project and the session, and holds the email rendered
   when it was queued (`packBody()`): the subject, the text, the HTML
-  and the From name, so a rename later changes nothing sent.
+  and the From name, so a rename later changes nothing sent. The link
+  is stored as a path; `prepare` builds it with `link()` at the send,
+  so a changed public address is the one sent, and drops the row as
+  `off` when email went off.
 - **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
   queues it for the automation's owner in the transaction that sets
   `attention_since` (`automations/alert-email.ts`), only with email on
   and the owner a recipient as below; a run that joins queues none, and
-  past 3 a day per automation it queues none (`docs/automations.md`). A
-  failure to queue is logged `alert email failed` and never fails the
-  run's end.
+  past 3 a day per automation it queues none (`docs/automations.md`).
+  The row names its automation (`automation_id`), so deleting runs keeps
+  the cap. A failure to queue is logged `alert email failed` and never
+  fails the run's end.
 - **Both go only to users who took email from agents.**
   `users.email_from_agents` starts off; the user turns it on on their
   profile (`PUT /api/profile/email`). Each kind's `prepare` checks

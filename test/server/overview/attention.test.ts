@@ -86,6 +86,30 @@ describe("attention", () => {
   });
 });
 
+describe("email's attention", () => {
+  test("puts paused link emails after the key files", () => {
+    const email = {
+      keyName: "email-relay",
+      hasKey: false,
+      queued: 0,
+      failed: 0,
+      lastFailure: null,
+      lastFailedAt: null,
+      linksPaused: true,
+    };
+    expect(attention({ ...none, email })).toEqual([
+      { kind: "smtp-key", name: "email-relay", at: null },
+      { kind: "links-paused", name: "Link emails", at: null },
+    ]);
+    expect(
+      attention({
+        ...none,
+        email: { ...email, hasKey: true, linksPaused: false },
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("the attention route", () => {
   test("follows the key files and the search service", async () => {
     const secrets: Record<string, string> = {

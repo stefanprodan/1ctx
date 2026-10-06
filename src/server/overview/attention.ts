@@ -25,6 +25,7 @@ export type AttentionInput = {
     failed: number;
     lastFailure: string | null;
     lastFailedAt: number | null;
+    linksPaused: boolean;
   } | null;
 };
 
@@ -35,6 +36,7 @@ const KEY_ORDER: AttentionKind[] = [
   "credential-unusable",
   "search-key",
   "smtp-key",
+  "links-paused",
 ];
 
 export function attention(input: AttentionInput): AttentionItem[] {
@@ -58,6 +60,8 @@ export function attention(input: AttentionInput): AttentionItem[] {
   if (email !== null && email.keyName !== null && !email.hasKey) {
     key("smtp-key", email.keyName);
   }
+  // the instance's hourly cap on link emails asked for at sign in
+  if (email?.linksPaused) key("links-paused", "Link emails");
   keys.sort(
     (a, b) =>
       KEY_ORDER.indexOf(a.kind) - KEY_ORDER.indexOf(b.kind) ||

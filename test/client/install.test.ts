@@ -86,7 +86,7 @@ describe("the page", () => {
 
   test("never sends its address to another site", () => {
     expect(read("index.html")).toContain(
-      '<meta name="referrer" content="same-origin" />',
+      '<meta name="referrer" content="no-referrer" />',
     );
   });
 

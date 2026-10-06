@@ -65,7 +65,9 @@ describe("the words", () => {
       password: false,
     });
     for (const purpose of ["reset", "invite", "signin"] as const) {
-      expect(JSON.stringify(linkWords(purpose, "maria"))).not.toMatch(/[—;]/);
+      expect(JSON.stringify(linkWords(purpose, "maria"))).not.toMatch(
+        /[\u2014;]/,
+      );
     }
   });
 

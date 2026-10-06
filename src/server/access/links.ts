@@ -9,15 +9,17 @@
 
 import { LINK_PURPOSES, type LinkPurpose } from "../../shared/api/access.ts";
 import { type Db, transact } from "../db/index.ts";
-import type {
-  DropWord,
-  EmailContent,
-  EmailKind,
-  Enqueue,
-  Prepare,
+import {
+  ASKED_LINKS_PER_HOUR,
+  ASKED_LINKS_PER_USER_DAY,
+  type DropWord,
+  type EmailContent,
+  type EmailKind,
+  type Enqueue,
+  type Prepare,
 } from "../email/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, DAY_MS, HOUR_MS } from "../lib/clock.ts";
 import { newToken, sha256 } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
@@ -36,6 +38,7 @@ export type EmailPort = {
   enqueue(fields: Enqueue): BusEvent[];
   register(kind: EmailKind, prepare: Prepare): void;
   dropQueued(userId: string, kinds: readonly EmailKind[]): number;
+  countAsked(userId: string | null, since: number): number;
 };
 
 export type UsersPort = {
@@ -67,6 +70,8 @@ export type Links = {
   ask(purpose: "reset" | "signin", name: string): void;
   // resolves once every ask so far has run
   settled(): Promise<void>;
+  // no ask starts work from here; resolves once every one so far ran
+  close(): Promise<void>;
 };
 
 // a username, or an email when it holds an @: the sign-in field's rule
@@ -76,8 +81,18 @@ export function byLoginName(users: UsersPort, name: string): UserRow | null {
 
 export function links(deps: LinksDeps): Links {
   const pending = new Set<Promise<void>>();
+  // set at shutdown: an ask still answers 202 and does nothing
+  let closed = false;
+  const settled = async () => {
+    while (pending.size > 0) await Promise.all([...pending]);
+  };
 
-  const issue = (purpose: LinkPurpose, userId: string, issuedBy: string) => {
+  const issue = (
+    purpose: LinkPurpose,
+    userId: string,
+    issuedBy: string,
+    asked = false,
+  ) => {
     const now = deps.clock();
     deps.store.revoke(userId, purpose);
     deps.email.dropQueued(userId, [purpose]);
@@ -88,7 +103,22 @@ export function links(deps: LinksDeps): Links {
       now,
       expiresAt: now + LINK_TTL_MS[purpose],
     });
-    return deps.email.enqueue({ kind: purpose, userId });
+    return deps.email.enqueue({ kind: purpose, userId, asked });
+  };
+
+  // the caps on asks, counted on the outbox in the issuing transaction;
+  // the word for the one reached
+  const capped = (userId: string): "user" | "instance" | null => {
+    const now = deps.clock();
+    if (deps.email.countAsked(null, now - HOUR_MS) >= ASKED_LINKS_PER_HOUR) {
+      return "instance";
+    }
+    if (
+      deps.email.countAsked(userId, now - DAY_MS) >= ASKED_LINKS_PER_USER_DAY
+    ) {
+      return "user";
+    }
+    return null;
   };
 
   // minted at the send, each try a fresh token whose expiry starts now
@@ -125,14 +155,28 @@ export function links(deps: LinksDeps): Links {
     // password they never knew; a reset sets one instead
     const purpose =
       wanted === "signin" && user.mustChangePassword ? "reset" : wanted;
-    const issued = transact(deps.db, () => {
-      // one live link per user and purpose: a second ask waits it out
-      if (deps.store.live(user.id, purpose, deps.clock())) {
-        return { result: false };
-      }
-      return { result: true, events: issue(purpose, user.id, user.id) };
-    });
-    if (issued) deps.log.info("link issued", { user: user.username, purpose });
+    const outcome = transact<"live" | "user" | "instance" | "issued">(
+      deps.db,
+      () => {
+        // one live link per user and purpose: a second ask waits it out
+        if (deps.store.live(user.id, purpose, deps.clock())) {
+          return { result: "live" };
+        }
+        const cap = capped(user.id);
+        if (cap !== null) return { result: cap };
+        return {
+          result: "issued",
+          events: issue(purpose, user.id, user.id, true),
+        };
+      },
+    );
+    if (outcome === "instance") {
+      deps.log.warn("link ask capped", { cap: outcome });
+    } else if (outcome === "user") {
+      deps.log.warn("link ask capped", { cap: outcome, user: user.username });
+    } else if (outcome === "issued") {
+      deps.log.info("link issued", { user: user.username, purpose });
+    }
   };
 
   return {
@@ -152,6 +196,8 @@ export function links(deps: LinksDeps): Links {
       });
     },
     ask(purpose, name) {
+      // past the shutdown's last wait the db may be closed
+      if (closed) return;
       // a macrotask, so the answer is written before the lookup starts
       const work = new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -166,8 +212,10 @@ export function links(deps: LinksDeps): Links {
       pending.add(work);
       void work.then(() => pending.delete(work));
     },
-    async settled() {
-      while (pending.size > 0) await Promise.all([...pending]);
+    settled,
+    close() {
+      closed = true;
+      return settled();
     },
   };
 }

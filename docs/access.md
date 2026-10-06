@@ -59,11 +59,15 @@ from `emailOn` in `GET /api/me`.
 - **An ask never tells.** `POST /api/login/forgot` and
   `/api/login/link` answer 202 with no body before any lookup. The
   lookup and the outbox write run after the answer (`links.ask()`),
-  which the shutdown awaits. A missing, disabled or placeholder
+  which the shutdown awaits; an ask after that point answers the same
+  and does nothing. A missing, disabled or placeholder
   account, or one with a live link of that purpose, gets nothing. Only
   the login limit answers 429. A must-change user who asks for a sign
   in link gets a reset link, since the forced change asks for a
   current password they may never have known.
+- **Asks are capped** at 3 link emails per user a day and 50 per
+  instance an hour, counted on outbox rows; over either the ask does
+  nothing and logs `link ask capped`. An admin's links are not counted.
 - **A token is minted when its email is sent.** A `user_links` row is
   written unminted with its outbox row, which holds no text; the kind's
   `prepare` stores the token's hash and starts the expiry at each try:
@@ -74,10 +78,11 @@ from `emailOn` in `GET /api/me`.
   `GET /api/links/:token` names the purpose and the username with no
   side effect and `no-store`; unknown, used, expired and a disabled
   user's are one 200 with `link: null`, as `/api/me` answers nobody, so
-  the browser logs no failed request. Only `POST` acts (404 for a dead
-  link), and a link issued keeps working if email goes off. The page
-  holds `<meta name="referrer" content="same-origin">`, since Bun sets
-  no header on it, so the token in its address never leaves.
+  the browser logs no failed request. Only `POST` acts: a dead link is
+  the same 404 as an unknown one, before the body is read or a password
+  hashed; a link issued keeps working if email goes off. The page holds
+  `<meta name="referrer" content="no-referrer">`, since Bun sets no
+  header on it, so the token in its address never leaves.
 - **Using a link is one conditional update** (unused, unexpired, user
   enabled) in the transaction that sets the password or opens the
   login. A reset or an invite sets the password, clears must-change,

@@ -93,7 +93,7 @@ describe("the SMTP sender", () => {
       "a.b+tag@sub.example.co",
       "o'brien@example.ie",
       "x@1ctx.dev",
-      "first.last-1@mail-1.example.test",
+      "first.last-1@smtp-1.example.test",
       "!#$%&'*+/=?^_`{|}~-@example.test",
     ];
     try {

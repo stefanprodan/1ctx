@@ -309,8 +309,9 @@ export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 // failed, at when it failed; a provider's, an MCP server's, the search
 // service's or the SMTP server's key file missing; a credential's key
 // missing or unusable; email that failed for good, named by the newest
-// failure's word, at when it failed. name is the object's, the search
-// service's for its key, the key file's for SMTP
+// failure's word, at when it failed; link emails asked for at sign in
+// paused by the hourly cap while email is on. name is the object's, the
+// search service's for its key, the key file's for SMTP
 export type AttentionKind =
   | "mcp-refresh"
   | "skill-refresh"
@@ -320,6 +321,7 @@ export type AttentionKind =
   | "credential-unusable"
   | "search-key"
   | "smtp-key"
+  | "links-paused"
   | "email-failed";
 
 export type AttentionItem = {

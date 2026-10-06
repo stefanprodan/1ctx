@@ -185,6 +185,7 @@ describe("an alert's email", () => {
       userId: chat.memberId,
       projectId: chat.projectId,
       sessionId: run,
+      automationId: automation.id,
       subject: "[1ctx] nightly needs attention",
     });
     expect(JSON.parse(fields.body!).text).toContain(
@@ -227,6 +228,56 @@ describe("an alert's email", () => {
     chat.app.now.value += DAY_MS;
     const later = await markedRun(chat, automation.id, "down again");
     expect(outbox(chat).at(-1)?.session_id).toBe(later);
+  });
+
+  test("deleting its runs keeps the automation's count", async () => {
+    const chat = await setup();
+    const automation = await createAutomation(chat, {
+      name: "nightly",
+      attentionMode: "agent",
+    });
+    for (let i = 0; i < ALERT_EMAILS_PER_DAY; i++) {
+      await markedRun(chat, automation.id, `down ${i}`);
+      await cleanRun(chat, automation.id);
+    }
+    expect(outbox(chat)).toHaveLength(ALERT_EMAILS_PER_DAY);
+    for (const row of outbox(chat)) {
+      const res = await chat.member.call(
+        "DELETE",
+        `/api/sessions/${row.session_id}`,
+      );
+      expect(res.status).toBe(200);
+    }
+    expect(outbox(chat).map((row) => row.session_id)).toEqual(
+      Array(ALERT_EMAILS_PER_DAY).fill(null),
+    );
+    expect(
+      chat.app.email.store.countAlerts(
+        automation.id,
+        chat.app.now.value - DAY_MS,
+      ),
+    ).toBe(ALERT_EMAILS_PER_DAY);
+    await markedRun(chat, automation.id, "down again");
+    expect(outbox(chat)).toHaveLength(ALERT_EMAILS_PER_DAY);
+  });
+
+  test("links to the public address as it is at the send", async () => {
+    const chat = await setup();
+    const automation = await createAutomation(chat, {
+      name: "nightly",
+      attentionMode: "agent",
+    });
+    const run = await markedRun(chat, automation.id, "podinfo is not ready");
+    const moved = "https://moved.example.test";
+    const put = await chat.admin.call("PUT", "/api/admin/smtp", {
+      body: { ...SMTP, publicAddress: moved },
+    });
+    expect(put.status).toBe(200);
+    expect(await chat.app.email.pass()).toBe(1);
+    const { message } = chat.app.emailSender.sent[0]!;
+    expect(message.text).toContain(`Open the run: ${moved}/run/${run}`);
+    expect(message.text).not.toContain(SMTP.publicAddress);
+    expect(message.html).toContain(`<a href="${moved}/run/${run}">`);
   });
 
   test("a throw while queueing leaves the run's end and the alert's opening", async () => {

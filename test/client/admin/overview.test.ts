@@ -531,6 +531,18 @@ describe("needs attention", () => {
     });
     expect(
       attentionRow(
+        { kind: "links-paused", name: "Link emails", at: null },
+        now,
+      ),
+    ).toMatchObject({
+      name: "Link emails",
+      line: "paused",
+      what: "Email",
+      icon: "email",
+      href: "/admin/config/smtp",
+    });
+    expect(
+      attentionRow(
         { kind: "email-failed", name: "auth", at: now - 2 * 3_600_000 },
         now,
         { queued: 3, failed: 2 },

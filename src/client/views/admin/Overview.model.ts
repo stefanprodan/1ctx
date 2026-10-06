@@ -268,6 +268,12 @@ const ATTENTION: Record<
     line: "key file missing",
     href: () => SMTP_HREF,
   },
+  "links-paused": {
+    icon: "email",
+    what: "Email",
+    line: "paused",
+    href: () => SMTP_HREF,
+  },
   "email-failed": {
     icon: "email",
     what: "Email",

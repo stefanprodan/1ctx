@@ -1574,6 +1574,83 @@ describe("the schema", () => {
           .query("select session_id, project_id, status from email_outbox")
           .all(),
       ).toEqual([{ session_id: null, project_id: "p", status: "sent" }]);
+      // the sender's and the caps' reads search an index, and the claim
+      // needs no sort of its own
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail);
+      expect(
+        plans(
+          `select * from email_outbox
+           where status = 'queued' and next_attempt_at <= ?
+             and (claimed_at is null or claimed_at <= ?)
+           order by next_attempt_at, created_at limit 1`,
+          1,
+          1,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING INDEX email_outbox_due (status=? AND next_attempt_at<?)",
+      ]);
+      expect(
+        plans(
+          `delete from email_outbox where user_id = ? and status = 'queued'
+           and kind in (?, ?)`,
+          "u",
+          "reset",
+          "signin",
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_queued (user_id=? AND kind=?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where automation_id = ? and created_at >= ?`,
+          "x",
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_automation (automation_id=? AND created_at>?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where asked = 1 and user_id = ? and created_at >= ?`,
+          "u",
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked (user_id=? AND created_at>?)",
+      ]);
+      expect(
+        plans(
+          `select count(*) from email_outbox
+           where asked = 1 and created_at >= ?`,
+          0,
+        ),
+      ).toEqual([
+        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked_at (created_at>?)",
+      ]);
+      // an alert row goes with its automation, whose cap is gone with it
+      db.exec(`
+        insert into automations (id, project_id, owner_id, agent_id, name,
+            instructions, schedule, tz, retention_days, created_at,
+            updated_at)
+          values ('au', 'p', 'u', 'a', 'daily', 'do', '0 9 * * *', 'UTC', 7,
+            0, 0);
+        insert into email_outbox (id, kind, user_id, project_id,
+            automation_id, message_id, next_attempt_at, created_at,
+            updated_at)
+          values ('al', 'alert', 'u', 'p', 'au', '<al@x>', 0, 0, 0);
+        delete from automations where id = 'au';
+      `);
+      expect(db.query("select id from email_outbox").all()).toEqual([
+        { id: "o" },
+      ]);
     } finally {
       db.close();
     }
@@ -1591,8 +1668,22 @@ describe("the schema", () => {
           values ('b', 'sol', 'az', 'gpt-6.1-sol', 'gpt-6.1-sol', 5),
             ('c', 'prod', 'az', 'prod-sol', 'prod-sol (gpt-6.1-sol)', 5),
             ('d', 'flash', 'ge', 'gemini-3.8-flash', 'Gemini 3.8 Flash', 5);
+        update tools set enabled = 0, updated_at = 7 where name = 'webfetch';
+        update tools set provider = 'tavily', updated_at = 8
+          where name = 'websearch';
+        update tools set hosts = '["a.test","b.test"]', mode = 'listed',
+          updated_at = 9 where name = 'web';
       `);
+      const tools = db.query("select * from tools order by rowid").all();
       expect(migrate(db)).toEqual(expectedFrom("0048-agent-listed-as"));
+      // 0051 rebuilds tools: every row and field an admin set is kept
+      expect(
+        db
+          .query(
+            "select * from tools where name != 'email_user' order by rowid",
+          )
+          .all(),
+      ).toEqual(tools);
       expect(
         db.query("select id, listed_as from agents order by id").all(),
       ).toEqual([

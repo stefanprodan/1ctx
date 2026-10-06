@@ -15,7 +15,6 @@ import {
   type Enqueue,
   type Prepare,
   packBody,
-  sessionPath,
   sessionPrepare,
 } from "../email/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
@@ -65,7 +64,10 @@ const reaches = (deps: AlertEmailDeps, user: UserRow, projectId: string) =>
   deps.canOpen(user.id, projectId);
 
 export function alertEmails(deps: AlertEmailDeps): AlertEmails {
-  deps.outbox.register("alert", sessionPrepare(deps.canOpen));
+  deps.outbox.register(
+    "alert",
+    sessionPrepare(deps.canOpen, (path) => deps.outbox.link(path)),
+  );
   const queue = (
     automation: AutomationSummary,
     sessionId: string,
@@ -86,13 +88,14 @@ export function alertEmails(deps: AlertEmailDeps): AlertEmails {
       automation: automation.name,
       project,
       reason: deps.reason(sessionId),
-      link: deps.outbox.link(sessionPath("automation", sessionId)),
+      sessionId,
     });
     return deps.outbox.enqueue({
       kind: "alert",
       userId: owner.id,
       projectId: automation.projectId,
       sessionId,
+      automationId: automation.id,
       subject: content.subject,
       body: packBody(content),
     });

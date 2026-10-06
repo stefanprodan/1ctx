@@ -6,8 +6,14 @@
 // every account and does its work after the answer, the token is minted
 // when the email is sent, and a link is used once.
 
-import { describe, expect, test } from "bun:test";
-import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
+import { describe, expect, spyOn, test } from "bun:test";
+import {
+  ASKED_LINKS_PER_HOUR,
+  ASKED_LINKS_PER_USER_DAY,
+} from "../../../src/server/email/index.ts";
+import { DAY_MS, HOUR_MS } from "../../../src/server/lib/clock.ts";
+import * as usersModule from "../../../src/server/users/index.ts";
+import { emailApp, MARIA_PASSWORD, SMTP } from "../../helpers/links.ts";
 
 const MINUTE = 60_000;
 
@@ -160,6 +166,31 @@ describe("asking for a link", () => {
     await e.app.shutdown();
   });
 
+  test("an ask after the shutdown's wait answers 202 and does nothing", async () => {
+    const e = await emailApp();
+    const { app, maria } = e;
+    const before = await app.client().call("POST", "/api/login/forgot", {
+      body: { username: "maria" },
+    });
+    expect(before.status).toBe(202);
+    // the shutdown waits for the ask it answered
+    await app.shutdown();
+    expect(e.outbox(maria.id)).toEqual([{ kind: "reset", status: "queued" }]);
+    // the listener still serves until the db closes
+    const after = await app.client().call("POST", "/api/login/link", {
+      body: { username: "maria" },
+    });
+    expect(await shown(after)).toEqual({
+      status: 202,
+      body: "",
+      cookie: null,
+      type: null,
+    });
+    await app.linkAsks();
+    expect(e.outbox(maria.id)).toEqual([{ kind: "reset", status: "queued" }]);
+    expect(e.links(maria.id).map((link) => link.purpose)).toEqual(["reset"]);
+  });
+
   test("is not there while email is off", async () => {
     const e = await emailApp({ email: false });
     for (const path of ["/api/login/forgot", "/api/login/link"]) {
@@ -173,6 +204,119 @@ describe("asking for a link", () => {
     const me = await (await e.app.client().call("GET", "/api/me")).json();
     expect(me.emailOn).toBe(false);
     await e.app.shutdown();
+  });
+});
+
+describe("the caps on asks", () => {
+  const capped = (e: Awaited<ReturnType<typeof emailApp>>) =>
+    e.logs.events
+      .filter((ev) => ev.msg === "link ask capped")
+      .map((ev) => ev.fields);
+
+  test("a user gets 3 asked link emails a day, the 4th answers the same", async () => {
+    const e = await emailApp();
+    const { app, maria } = e;
+    const ask = () =>
+      app.client().call("POST", "/api/login/forgot", {
+        body: { username: "maria" },
+      });
+    const start = app.now.value;
+    for (let i = 0; i <= ASKED_LINKS_PER_USER_DAY; i++) {
+      const res = await ask();
+      expect(await shown(res)).toEqual({
+        status: 202,
+        body: "",
+        cookie: null,
+        type: null,
+      });
+      await app.linkAsks();
+      await e.send();
+      // past the link's life, so the next ask is not limited by it
+      app.now.value += 31 * MINUTE;
+    }
+    expect(app.emailSender.sent).toHaveLength(ASKED_LINKS_PER_USER_DAY);
+    expect(capped(e)).toEqual([{ cap: "user", user: "maria" }]);
+    // a day after the first, it counts no more
+    app.now.value = start + DAY_MS + 1;
+    await ask();
+    await app.linkAsks();
+    expect(await e.send()).toBe(1);
+    expect(app.emailSender.sent).toHaveLength(ASKED_LINKS_PER_USER_DAY + 1);
+    expect(e.outbox(maria.id)).toHaveLength(ASKED_LINKS_PER_USER_DAY + 1);
+    await app.shutdown();
+  });
+
+  test("an admin's links are not counted and not capped", async () => {
+    const e = await emailApp();
+    const { app, admin, maria } = e;
+    for (let i = 0; i <= ASKED_LINKS_PER_USER_DAY; i++) {
+      const res = await admin.call("POST", `/api/users/${maria.id}/reset-link`);
+      expect(res.status).toBe(204);
+      expect(await e.send()).toBe(1);
+    }
+    expect(app.email.countAsked(maria.id, 0)).toBe(0);
+    await app.client().call("POST", "/api/login/link", {
+      body: { username: "maria" },
+    });
+    await app.linkAsks();
+    expect(await e.send()).toBe(1);
+    expect(app.emailSender.sent.at(-1)!.message.subject).not.toContain("Reset");
+    expect(app.email.countAsked(maria.id, 0)).toBe(1);
+    expect(capped(e)).toEqual([]);
+    await app.shutdown();
+  });
+
+  test("the instance gets 50 an hour across users, and the Monitor says so", async () => {
+    const e = await emailApp();
+    const { app, admin } = e;
+    const attention = async () =>
+      (
+        (await (await admin.call("GET", "/api/admin/attention")).json()) as {
+          items: { kind: string }[];
+        }
+      ).items.map((item) => item.kind);
+    const names: string[] = [];
+    for (let i = 0; i <= ASKED_LINKS_PER_HOUR + 1; i++) {
+      const name = `user${i}`;
+      app.createUser({
+        username: name,
+        fullName: name,
+        email: `${name}@example.test`,
+        role: "member",
+        passwordHash: "x",
+        mustChangePassword: false,
+        now: app.now.value,
+      });
+      names.push(name);
+    }
+    const ask = async (i: number) => {
+      // one address each, under the login limit
+      const res = await app
+        .client(`10.2.${i}.1`)
+        .call("POST", "/api/login/link", { body: { username: names[i] } });
+      expect(res.status).toBe(202);
+      await app.linkAsks();
+    };
+    const start = app.now.value;
+    for (let i = 0; i < ASKED_LINKS_PER_HOUR; i++) await ask(i);
+    expect(await attention()).toEqual(["links-paused"]);
+    await ask(ASKED_LINKS_PER_HOUR);
+    expect(await e.send()).toBe(ASKED_LINKS_PER_HOUR);
+    expect(capped(e)).toEqual([{ cap: "instance" }]);
+    // shown only while email is on
+    await admin.call("PUT", "/api/admin/smtp", {
+      body: { ...SMTP, keyName: "email-gone" },
+    });
+    expect(await attention()).toEqual(["smtp-key"]);
+    await admin.call("PUT", "/api/admin/smtp", { body: SMTP });
+    expect(await attention()).toEqual(["links-paused"]);
+    // an hour after the first, they count no more
+    app.now.value = start + HOUR_MS + 1;
+    expect(await attention()).toEqual([]);
+    await ask(ASKED_LINKS_PER_HOUR + 1);
+    expect(await e.send()).toBe(1);
+    expect(capped(e)).toHaveLength(1);
+    await app.shutdown();
   });
 });
 
@@ -201,7 +345,7 @@ describe("a link email", () => {
     expect(message.html).toContain(
       `<a href="https://1ctx.example.test/link/${token}">`,
     );
-    expect(message.text).not.toMatch(/[—;]/);
+    expect(message.text).not.toMatch(/[\u2014;]/);
     app.now.value += 29 * MINUTE;
     expect(await e.read(token)).not.toBeNull();
     app.now.value += MINUTE;
@@ -381,6 +525,59 @@ describe("using a link", () => {
     expect(tab.cookie).toBeNull();
     await disabled.app.shutdown();
   });
+
+  // spies on the hash the users area runs, module state
+  test.serial(
+    "a dead link answers as an unknown one, before the body or a hash",
+    async () => {
+      const e = await sentLink("forgot");
+      const { app } = e;
+      const used = await app.client().call("POST", e.link, {
+        body: { password: "maria-new-pw" },
+      });
+      expect(used.status).toBe(200);
+      const fresh = await sentLink("forgot");
+      const live = await sentLink("forgot");
+      const hashed = spyOn(usersModule, "hashPassword");
+      try {
+        const unknown = await shown(
+          await app.client().call("POST", `/api/links/${"A".repeat(43)}`, {
+            body: {},
+          }),
+        );
+        expect(unknown.status).toBe(404);
+        // used: a missing password, a valid one and a body out of shape
+        for (const body of [
+          {},
+          { password: "maria-other-pw" },
+          { password: 1 },
+        ]) {
+          const res = await app.client().call("POST", e.link, { body });
+          expect(await shown(res)).toEqual(unknown);
+        }
+        // expired, never used
+        fresh.app.now.value += 31 * MINUTE;
+        for (const body of [{}, { password: "maria-other-pw" }]) {
+          const res = await fresh.app
+            .client()
+            .call("POST", fresh.link, { body });
+          expect(await shown(res)).toEqual(unknown);
+        }
+        expect(hashed).not.toHaveBeenCalled();
+        // a live link hashes, so the spy sees the route's hash
+        const res = await live.app.client().call("POST", live.link, {
+          body: { password: "maria-new-pw" },
+        });
+        expect(res.status).toBe(200);
+        expect(hashed).toHaveBeenCalledTimes(1);
+      } finally {
+        hashed.mockRestore();
+      }
+      await app.shutdown();
+      await fresh.app.shutdown();
+      await live.app.shutdown();
+    },
+  );
 
   test("two uses racing: one wins", async () => {
     const e = await sentLink("forgot");

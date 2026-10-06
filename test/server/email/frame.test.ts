@@ -8,15 +8,32 @@
 import { describe, expect, test } from "bun:test";
 import { chatHref, runHref } from "../../../src/client/lib/hrefs.ts";
 import {
-  agentEmail,
-  alertEmail,
+  type AgentEmail,
+  type AlertEmail,
+  agentEmail as agentFrame,
+  alertEmail as alertFrame,
   type OutboxRow,
   packBody,
   sessionPath,
+  sessionPrepare,
   unpackBody,
+  withLink,
 } from "../../../src/server/email/index.ts";
+import type { UserRow } from "../../../src/server/users/index.ts";
 
 const LINK = "https://1ctx.example.test/chat/s1";
+
+// the email as sent, its link built from the path the row stores
+const agentEmail = ({
+  link,
+  ...input
+}: Omit<AgentEmail, "sessionId"> & { link: string }) =>
+  withLink(agentFrame({ ...input, sessionId: "s1" }), link);
+const alertEmail = ({
+  link,
+  ...input
+}: Omit<AlertEmail, "sessionId"> & { link: string }) =>
+  withLink(alertFrame({ ...input, sessionId: "r1" }), link);
 
 describe("an agent's email", () => {
   test("is framed: tag, header line, the text set apart, the link", () => {
@@ -164,21 +181,61 @@ describe("an alert's email", () => {
 });
 
 describe("a row's body", () => {
-  test("holds the text, the HTML and the From name", () => {
-    const email = agentEmail({
+  test("holds the frame and the path, and takes its link at the send", () => {
+    const framed = agentFrame({
       agent: "sre",
       project: { name: "platform", kind: "team" },
       origin: "chat",
+      sessionId: "s1",
       subject: "Hi",
       body: "Text",
-      link: LINK,
+    });
+    expect(framed.path).toBe("/chat/s1");
+    const row = {
+      subject: framed.subject,
+      body: packBody(framed),
+    } as OutboxRow;
+    expect(row.body).not.toContain("https://");
+    expect(unpackBody(row)).toEqual(framed);
+    expect(unpackBody({ ...row, body: null })).toBeNull();
+    const sent = withLink(framed, LINK);
+    expect(sent.fromName).toBe("sre via 1ctx");
+    expect(sent.text).toEndWith(`Open the chat: ${LINK}\n`);
+    expect(
+      alertFrame({
+        automation: "nightly",
+        project: { name: "platform", kind: "team" },
+        reason: null,
+        sessionId: "r1",
+      }).path,
+    ).toBe("/run/r1");
+  });
+
+  test("is dropped when email went off before its link was built", () => {
+    const framed = alertFrame({
+      automation: "nightly",
+      project: { name: "platform", kind: "team" },
+      reason: null,
+      sessionId: "r1",
     });
     const row = {
-      subject: email.subject,
-      body: packBody(email),
+      kind: "alert",
+      projectId: "p1",
+      sessionId: "r1",
+      subject: framed.subject,
+      body: packBody(framed),
     } as OutboxRow;
-    expect(unpackBody(row)).toEqual(email);
-    expect(unpackBody({ ...row, body: null })).toBeNull();
+    const user = { id: "u1", mustChangePassword: false, emailFromAgents: true };
+    const prepare = (link: (path: string) => string) =>
+      sessionPrepare(() => true, link)(row, user as UserRow);
+    expect(
+      prepare(() => {
+        throw new Error("email is off");
+      }),
+    ).toBe("off");
+    expect(prepare((path) => `https://x.test${path}`)).toMatchObject({
+      text: expect.stringContaining("Open the run: https://x.test/run/r1"),
+    });
   });
 
   test("links to the pages the client draws", () => {
