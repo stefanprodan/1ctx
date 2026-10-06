@@ -102,10 +102,11 @@ const NOTICE: Record<NoticeEvent, { subject: string; what: string }> = {
 };
 
 // the time in the user's own zone, named, so it reads the same wherever
-// the email is opened
+// the email is opened; built from parts, since ICU builds join date and
+// time with "at" on one system and a comma on another
 export function noticeTime(at: number, tz: string): string {
   const zone = isTimeZone(tz) ? tz : "UTC";
-  const when = new Intl.DateTimeFormat("en-GB", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: zone,
     day: "numeric",
     month: "short",
@@ -113,8 +114,10 @@ export function noticeTime(at: number, tz: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).format(at);
-  return `${when} (${zone})`;
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("day")} ${part("month")} ${part("year")} at ${part("hour")}:${part("minute")} (${zone})`;
 }
 
 export function noticeEmail(
