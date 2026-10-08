@@ -32,6 +32,7 @@ type Raw = {
   mcp_mode: McpMode;
   upstream: string | null;
   skip_4bit: number;
+  subagents: number;
   created_at: number;
 };
 
@@ -66,6 +67,7 @@ const row = (
   mcpMode: raw.mcp_mode,
   upstream: raw.upstream,
   skip4Bit: raw.skip_4bit === 1,
+  subagents: raw.subagents === 1,
   default: raw.id === defaultId,
   createdAt: raw.created_at,
 });
@@ -84,6 +86,7 @@ export type AgentFields = {
   mcpMode: McpMode;
   upstream: string | null;
   skip4Bit: boolean;
+  subagents: boolean;
 };
 
 export class AgentStore {
@@ -177,8 +180,9 @@ export class AgentStore {
            context_length, prompt_price, completion_price, tools, reasoning,
            thinking_required, reasoning_known, model_described, listed_as,
            thinking, effort, prompt, mcp_mode, upstream, skip_4bit,
-           created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           subagents, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           ?)`,
       )
       .run(
         id,
@@ -202,6 +206,7 @@ export class AgentStore {
         fields.mcpMode,
         fields.upstream,
         fields.skip4Bit ? 1 : 0,
+        fields.subagents ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -215,7 +220,8 @@ export class AgentStore {
            context_length = ?, prompt_price = ?, completion_price = ?,
            tools = ?, reasoning = ?, thinking_required = ?,
            reasoning_known = ?, model_described = ?, listed_as = ?, thinking = ?,
-           effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?
+           effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?,
+           subagents = ?
          where id = ? and deleted_at is null`,
       )
       .run(
@@ -239,6 +245,7 @@ export class AgentStore {
         fields.mcpMode,
         fields.upstream,
         fields.skip4Bit ? 1 : 0,
+        fields.subagents ? 1 : 0,
         id,
       );
     return this.byId(id);

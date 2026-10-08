@@ -30,6 +30,7 @@ const LISTED = new Set<string>([
   ...WEB_TOOLS,
   "bash",
   "memory_edit",
+  "delegate",
 ]);
 
 // the page's lists read by name, whatever order a send offers them in
@@ -70,6 +71,7 @@ export type ToolsPort = {
       automation: null;
       phase: "main";
       chat: { sessionId: string; userId: string };
+      delegate: boolean;
     },
   ): {
     tools: ChatTool[];
@@ -154,6 +156,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                 automation: null,
                 phase: "main",
                 chat: { sessionId: "", userId: "" },
+                delegate: agent.subagents,
               },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };

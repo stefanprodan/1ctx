@@ -62,6 +62,10 @@ export function summonedLine(chatAgent: string): string {
   return `You were summoned for one turn into a chat whose agent is ${chatAgent}. Answers by other agents are marked with their names in brackets. Write yours without a mark.`;
 }
 
+// in place of the user's or automation line in a subagent's prompt
+export const SUBAGENT_LINE =
+  "You are a subagent: another agent handed you the task below and reads your answer, not a user. Nobody can answer questions, so do the task and stop. Answer briefly with what the task asks for. Put long output in a file under /tmp and name the file in your answer: files you add or change in /tmp reach the other agent. /knowledge and /uploads are read-only to you. Copy anything from /mcp the other agent needs into /tmp.";
+
 function userLine(
   policy: Pick<SendPolicy, "fullName" | "username" | "about" | "tz">,
 ): string {
@@ -98,7 +102,27 @@ export type PromptPolicy = Pick<
   | "disabledCapabilities"
   | "mcpOff"
   | "skillsOff"
+  | "subagent"
 >;
+
+// a subagent's prompt keeps only what doing its task needs: no memory,
+// automation, knowledge block, off lines, repository or MCP notes
+export function subagentPrompt(policy: PromptPolicy, now: number): string {
+  const parts = [projectLine(policy)];
+  if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
+  parts.push(SUBAGENT_LINE);
+  if (policy.offered.skills.block !== "") {
+    parts.push(policy.offered.skills.block);
+  }
+  if (policy.offered.mcpCatalog !== "") {
+    parts.push(policy.offered.mcpCatalog);
+  }
+  if (policy.offered.mcpPrompt.text !== "") {
+    parts.push(policy.offered.mcpPrompt.text);
+  }
+  parts.push(dateLine(now));
+  return parts.join("\n\n");
+}
 
 export function systemPrompt(
   policy: PromptPolicy,
@@ -106,6 +130,7 @@ export function systemPrompt(
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
 ): string {
+  if (policy.subagent) return subagentPrompt(policy, now);
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
   if (policy.summoned !== null) parts.push(summonedLine(policy.summoned));

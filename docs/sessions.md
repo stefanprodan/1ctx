@@ -231,7 +231,8 @@ that agent answers the one turn (see Summons).
   memory, email, MCP, skills, repositories), the moved branches
   (`docs/repos.md`), and last the MCP change note (`docs/mcp.md`).
   What is fixed per agent and project comes first; the user's line
-  follows because it changes with a team chat's author.
+  follows because it changes with a team chat's author. A subagent's
+  is `subagentPrompt()` (`docs/subagents.md`).
 
 ## Summons
 
@@ -312,6 +313,11 @@ that agent answers the one turn (see Summons).
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.
 
+## Child sessions
+
+A subagent's child session, its links, access and the readers that
+leave it out are in `docs/subagents.md`.
+
 ## Queries and indexes
 
 - **The server never runs `ANALYZE`.** A sessions query must plan well
@@ -321,8 +327,12 @@ that agent answers the one turn (see Summons).
   parameter. The feed indexes lead with project, origin and running
   rank and carry title, so a search filters inside the index.
 - **A lookup by status alone reads the table,** since the running rank
-  sits behind the project. Lookups by project use the feed index's
-  prefix.
+  sits behind the project. Lookups of roots by project use the feed
+  index's prefix; one of every session by project (a project's delete,
+  a capability forgotten in one) reads the table, as the feed indexes
+  are partial on `parent_session_id is null`, which `project_id = ?`
+  does not imply. The scan is accepted: such a delete is a rare admin
+  action, about 18 ms at production's size.
 - **`sessions_automation` is partial** (`automation_id is not null`).
   An `is null` lookup uses `sessions_feed_unowned` or
   `sessions_orphan_runs`. All's per-automation pick is the one walk

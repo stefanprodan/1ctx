@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A send has many usage rows, so sends and tokens are summed apart and
-// joined by key.
+// joined by key. A child send is no turn or run; its tokens count.
 
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
@@ -116,7 +116,8 @@ export function byAgents(db: Db, bounds: Bounds): GroupRow[] {
     USAGE_BY("agent_id"),
     `select agent_id as key, sum(kind != 'run') as turns,
             sum(kind = 'run') as runs
-       from sends where started_at >= ? and started_at < ? group by key`,
+       from sends where started_at >= ? and started_at < ?
+         and child = 0 group by key`,
     names,
   );
 }
@@ -150,7 +151,8 @@ export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
     `select x.project_id as key, sum(s.kind != 'run') as turns,
             sum(s.kind = 'run') as runs
        from sends s join sessions x on x.id = s.session_id
-       where s.started_at >= ? and s.started_at < ? group by key`,
+       where s.started_at >= ? and s.started_at < ?
+         and s.child = 0 group by key`,
     names,
     DELETED_PROJECTS,
   );

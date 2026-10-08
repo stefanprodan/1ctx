@@ -36,6 +36,9 @@ export type CreateSession = {
   runSource?: EventSource | null;
   forkedFromSessionId?: string | null;
   forkedFromMessageId?: string | null;
+  // a subagent's child session: its root and the root's tool row that
+  // started it, both or neither
+  parent?: { sessionId: string; messageId: string } | null;
   status?: SessionStatus;
   disabledCapabilities?: readonly string[];
   title: string;
@@ -77,6 +80,8 @@ export type RawSession = {
   attention_by: string | null;
   attention_reason: string | null;
   attention_source: AttentionSource | null;
+  parent_session_id: string | null;
+  parent_message_id: string | null;
 };
 
 export type UsagePort = {
@@ -136,6 +141,7 @@ export type RawMessage = {
   tool_calls: string | null;
   tool_call_id: string | null;
   tool_name: string | null;
+  child_session_id: string | null;
   model: string | null;
   ttft_ms: number | null;
   thinking_ms: number | null;
@@ -159,6 +165,9 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
    messages.saved, messages.reasoning, messages.html,
    messages.status, messages.error, messages.finish_reason,
    messages.tool_calls, messages.tool_call_id, messages.tool_name,
+   case when messages.kind = 'tool' and messages.tool_name = 'delegate'
+     then (select id from sessions
+           where parent_message_id = messages.id) end as child_session_id,
    messages.model, messages.ttft_ms, messages.thinking_ms,
    messages.upstream, messages.served_model, messages.native_finish,
    (select usage.prompt_tokens from usage
@@ -216,6 +225,9 @@ export const message = (raw: RawMessage): Message => ({
   toolCalls: safeListOrNull<ToolCall>(raw.tool_calls),
   toolCallId: raw.tool_call_id,
   toolName: raw.tool_name,
+  ...(raw.child_session_id === null
+    ? {}
+    : { childSessionId: raw.child_session_id }),
   model: raw.model,
   ttftMs: raw.ttft_ms,
   thinkingMs: raw.thinking_ms,

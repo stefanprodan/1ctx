@@ -92,6 +92,9 @@ words.
   `datetime` and `bash`. The session's disabled set is applied before
   schemas are built, and the agent page's tool count
   (`agents/directory.ts`) calls the same `offered()`.
+- **`delegate` and a subagent's offer are `docs/subagents.md`'s.**
+  The offer's scope says `delegate` for a main offer and `child` for a
+  subagent's.
 - **The admin's `web` row is one mode: `off`, `all` or `listed`.** Off
   and all keep the saved hosts. Web off (admin or chat) removes
   webfetch, websearch, bash's network and every credential. Websearch

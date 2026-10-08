@@ -14,6 +14,7 @@ import { splitWireName } from "../../shared/mcp.ts";
 import { SKILL_TOOLS } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { countByDay } from "../usage/index.ts";
+import { ROOT } from "./children.ts";
 
 export function personDays(
   db: Db,
@@ -32,10 +33,11 @@ export function personDays(
           and m.created_at >= ? and m.created_at < ?
           -- a fork's copied messages keep their first time
           and s.origin = 'chat' and m.created_at >= s.created_at
+          and s.${ROOT}
        union all
        select created_at as at
          from sessions
-        where owner_id = ?
+        where owner_id = ? and ${ROOT}
           and created_at >= ? and created_at < ?
           and (origin = 'chat'
                or (origin = 'automation' and run_source = 'manual'))`,
@@ -237,15 +239,19 @@ function callArgs(text: string | null): { name: string; path: string } | null {
   return { name, path: typeof path === "string" ? path : "" };
 }
 
-// one seek per agent into sends_agent and sends_running
+// a walk back into sends_agent per agent, which carries the child mark,
+// to its newest root send, and a seek into sends_running for a running
+// root send: a child left running by a failed finalize never counts
 export function agentActivity(db: Db): AgentActivity[] {
   return db
     .query<{ agentId: string; lastAt: number | null; running: number }, []>(
       `select a.id as agentId,
-              (select max(s.started_at) from sends s
-                where s.agent_id = a.id) as lastAt,
+              (select s.started_at from sends s
+                where s.agent_id = a.id and s.child = 0
+                order by s.started_at desc limit 1) as lastAt,
               exists (select 1 from sends s
-                where s.agent_id = a.id and s.status = 'running') as running
+                where s.agent_id = a.id and s.status = 'running'
+                  and s.child = 0) as running
          from agents a
         where a.deleted_at is null`,
     )

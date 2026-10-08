@@ -248,6 +248,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         mcpMode: body.mcpMode,
         upstream: body.upstream,
         skip4Bit: body.skip4Bit,
+        subagents: body.subagents,
         mark: body.mark,
       };
     };

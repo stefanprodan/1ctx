@@ -326,6 +326,8 @@ describe("POST /api/sessions/:id/fork", () => {
         attention_by: null,
         attention_reason: null,
         attention_source: null,
+        parent_session_id: null,
+        parent_message_id: null,
       });
       expect(copied.live).toBeNull();
       expect(copied.send?.kind).toBe("compact");
@@ -1014,7 +1016,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(send.status).toBe("done");
       expect(send.cause).toBe("finish");
       expect(send.finished_at).not.toBeNull();
-      chat.app.sessions.repair(Date.now(), "the server restarted");
+      chat.app.sessions.repair(Date.now(), "the server restarted", () => {});
       expect(chat.app.sessions.byId(copied.session.id)?.status).toBe("done");
     } finally {
       await chat.app.shutdown();

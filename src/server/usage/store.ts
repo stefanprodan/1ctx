@@ -117,11 +117,14 @@ const usageOf = (raw: Raw): RoundUsage => ({
 const CHAT_ROUND = `exists (select 1 from sends
   where sends.id = usage.send_id and sends.summoned = 0)`;
 
-// a turn is a send still there: a regenerate's replaced send and a
-// deleted chat's keep their tokens but are no longer turns
+// a turn is a send still there of a root session: a regenerate's
+// replaced send and a deleted chat's keep their tokens but are no
+// longer turns, and a subagent's child counts its tokens alone, under
+// its root's project, user and agent
 const countLive = (alias: string, column: "send_id" | "session_id") =>
   `count(distinct case when exists (select 1 from sends
-     where sends.id = ${alias}.send_id) then ${alias}.${column} end)`;
+     where sends.id = ${alias}.send_id and sends.child = 0)
+     then ${alias}.${column} end)`;
 
 // the days of a window, each from its start to the next's, the last to
 // the window's end; binds the end, then the starts as a JSON array

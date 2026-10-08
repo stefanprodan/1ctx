@@ -51,6 +51,8 @@ export type SessionsPort = {
     automationId?: string | null;
     runSource?: EventSource | null;
     disabledCapabilities?: readonly string[];
+    // a subagent's child: its root and the root's delegate row
+    parent?: { sessionId: string; messageId: string } | null;
     title: string;
     now: number;
   }): SessionRow;
@@ -140,6 +142,8 @@ export type SessionsPort = {
     firstMessageId: string;
     mcpDigest: McpDigest | null;
     summoned?: boolean;
+    // a subagent's send, exactly when its session is a child
+    child?: boolean;
     now: number;
   }): SendSummary;
   // the last digest of the same agent's sends in the session

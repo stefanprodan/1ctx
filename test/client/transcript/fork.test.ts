@@ -34,6 +34,7 @@ function agent(id: string): AgentSummary {
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,
+    subagents: false,
     default: false,
     createdAt: 0,
   };

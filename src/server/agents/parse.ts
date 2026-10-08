@@ -30,10 +30,12 @@ export type ParsedAgent = Omit<
   | "tools"
   | "upstream"
   | "skip4Bit"
+  | "subagents"
   | "default"
 > & {
   upstream: string | null;
   skip4Bit: boolean;
+  subagents: boolean;
   effort: string | null;
   servers: AgentServer[];
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
@@ -127,6 +129,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "tools",
     "upstream",
     "skip4Bit",
+    "subagents",
     "default",
   ]);
   const name = parseName(b.name);
@@ -187,6 +190,9 @@ export function parseAgent(body: unknown): ParsedAgent {
   if (b.skip4Bit !== undefined && typeof b.skip4Bit !== "boolean") {
     throw new BadRequest("skip4Bit must be true or false");
   }
+  if (b.subagents !== undefined && typeof b.subagents !== "boolean") {
+    throw new BadRequest("subagents must be true or false");
+  }
   if (b.default !== undefined && typeof b.default !== "boolean") {
     throw new BadRequest("default must be true or false");
   }
@@ -207,6 +213,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     mcpMode,
     upstream,
     skip4Bit: b.skip4Bit ?? false,
+    subagents: b.subagents ?? false,
     stated,
     mark: b.default ?? null,
   };

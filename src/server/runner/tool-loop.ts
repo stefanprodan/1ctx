@@ -16,7 +16,7 @@ import type { Clock } from "../lib/clock.ts";
 import { messageOf } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
-import { isMemoryTool } from "../tools/index.ts";
+import { DELEGATE_TOOL, isMemoryTool } from "../tools/index.ts";
 import { runOne, toolContext } from "./call.ts";
 import { ASK_TOKENS } from "./context.ts";
 import type { ToolResult, ToolsPort } from "./policy.ts";
@@ -116,10 +116,12 @@ export async function toolLoop(
         send.policy.contextLength,
         limits.contextReserve,
       );
-      // a summoned turn never compacts: compaction is the chat agent's
+      // a summoned turn never compacts: compaction is the chat agent's;
+      // nor a subagent, whose answer at the threshold is its last
       if (
         send.kind === "chat" &&
         send.policy.summoned === null &&
+        send.child === null &&
         threshold !== null &&
         round.tokens >= threshold
       ) {
@@ -243,7 +245,9 @@ function overCap(
 
 // the round's tools launch in parallel under the call timeout and the
 // send's signal; each end is one finishTool, guarded by streaming. A
-// finishTool that throws terminates the send; the siblings still settle
+// finishTool that throws terminates the send; the siblings still settle.
+// toolMs adds the ordinary calls' time alone: a delegate call's is its
+// child's, bounded by the send's deadline and its own budget
 async function runCalls(
   deps: LoopDeps,
   send: ActiveSend,
@@ -251,6 +255,7 @@ async function runCalls(
   room: number | null,
 ): Promise<boolean> {
   const startedAt = deps.clock();
+  let ordinaryEnd = startedAt;
   const immediate = resultsFit(calls, send.policy.toolCaps.resultCut, room);
   let writeError: unknown = null;
   const store = (call: ToolCall, result: ToolResult) => {
@@ -265,6 +270,9 @@ async function runCalls(
       repos: send.repos?.tool ?? null,
     });
     const result = await runOne(deps, send, send.policy.offered, call, ctx);
+    if (call.name !== DELEGATE_TOOL) {
+      ordinaryEnd = Math.max(ordinaryEnd, deps.clock());
+    }
     let stored = result;
     try {
       stored = cutResult(result, send.policy.toolCaps.resultCut);
@@ -301,7 +309,7 @@ async function runCalls(
       offered.tools = offered.tools.filter((tool) => !isMemoryTool(tool.name));
     }
     send.tools = null;
-    send.budget.toolMs += deps.clock() - startedAt;
+    send.budget.toolMs += ordinaryEnd - startedAt;
   }
   return cut;
 }

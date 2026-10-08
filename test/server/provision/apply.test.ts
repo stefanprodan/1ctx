@@ -446,6 +446,38 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("turns an agent's subagents on, keeps them when left out and off when false", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(await fullDocuments(), ignore);
+      // a new agent left without the field is off
+      expect(app.agents.byName("guide")!.subagents).toBe(false);
+      await app.provision.apply(
+        documents(object("Agent", "guide", { subagents: true })),
+        ignore,
+      );
+      expect(app.agents.byName("guide")!.subagents).toBe(true);
+      await app.provision.apply(
+        documents(object("Agent", "guide", { prompt: "Be brief." })),
+        ignore,
+      );
+      expect(app.agents.byName("guide")).toMatchObject({
+        prompt: "Be brief.",
+        subagents: true,
+      });
+      await app.provision.apply(
+        documents(object("Agent", "guide", { subagents: false })),
+        ignore,
+      );
+      expect(app.agents.byName("guide")!.subagents).toBe(false);
+      expect(() =>
+        documents(object("Agent", "guide", { subagents: "yes" })),
+      ).toThrow("spec.subagents");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("passes an agent's host filter to the API, which holds its rule", async () => {
     const { app } = await instance();
     try {

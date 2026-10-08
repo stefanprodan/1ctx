@@ -11,6 +11,12 @@ import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
+import {
+  copyBack,
+  copyIn,
+  type Returned,
+  type ScratchBaseline,
+} from "./handoff.ts";
 import { startKept } from "./kept.ts";
 import {
   type CommandCaps,
@@ -54,6 +60,18 @@ export type BashCapability = {
     maxBytes: number;
     maxFiles: number;
   };
+  // a subagent's /tmp (bash/handoff.ts): its parent's files copied in
+  // at its start, and what it added or changed copied back at its end
+  // to a folder none of taken nor the parent's files hold
+  copyScratch(from: string, to: string): ScratchBaseline;
+  returnScratch(
+    child: string,
+    parent: string,
+    taken: Set<string>,
+    baseline: ScratchBaseline,
+  ): Promise<Returned>;
+  // a child's scratch, when its files could not come back
+  dropScratch(sessionId: string): void;
 };
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
@@ -98,6 +116,17 @@ export function bashArea(deps: BashDeps): BashArea {
           events: [],
         };
       }),
+    copyScratch: (from, to) => copyIn(deps.db, scratch, from, to, deps.clock()),
+    returnScratch: (child, parent, taken, baseline) =>
+      copyBack(
+        { db: deps.db, store: scratch, current: () => deps.limits.current() },
+        child,
+        parent,
+        taken,
+        baseline,
+        deps.clock(),
+      ),
+    dropScratch: (sessionId) => scratch.drop(sessionId),
     sweep: (now) => scratch.sweep(now, deps.limits.current().scratchIdleDays),
     close: () => workers.close(),
   };
@@ -109,6 +138,7 @@ export {
   type Refusal,
   scrubKeys,
 } from "./credentials.ts";
+export type { Returned, ScratchBaseline } from "./handoff.ts";
 export {
   compressKept,
   copyKeptFiles,

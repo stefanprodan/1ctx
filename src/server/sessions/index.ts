@@ -7,6 +7,7 @@ import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
+import type { ChildOf } from "../../shared/contracts/session.ts";
 import type { QueueFrame } from "../../shared/socket.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
@@ -28,6 +29,7 @@ import {
 } from "./activity.ts";
 import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
+import { childWork, runningChildren } from "./child-work.ts";
 import { detail, sessionInfo } from "./detail.ts";
 import { envelope } from "./envelope.ts";
 import { envelopeRow } from "./feed.ts";
@@ -55,6 +57,7 @@ export {
 } from "./alerts.ts";
 export { refuseArchived } from "./archive.ts";
 export { forgetCapabilityIn } from "./capabilities.ts";
+export { childChanged } from "./child-work.ts";
 export {
   parseFeedCursor,
   parseRunsCursor,
@@ -133,6 +136,8 @@ export type Sessions = {
   sessionProject(principal: Principal, id: string): string | null;
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
+  // each running subagent's rows so far, for a watch's answer
+  runningChildren(sessionId: string): ChildOf[];
   // the chats an agent's delete archives and the sends it stops
   agentImpact(agentId: string): { chats: number; running: number };
   agentActivity(): AgentActivity[];
@@ -180,8 +185,10 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.scratch,
     deps.pruned,
   );
+  // a subagent's child is never a chat of its own: every route and
+  // watch by its id is the same 404 as a missing one
   const visible = (principal: Principal, id: string): SessionRow => {
-    const session = store.byId(id);
+    const session = store.root(id);
     if (session === null) throw new NotFound("no such chat");
     try {
       deps.access.project(principal, session.projectId);
@@ -203,6 +210,17 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
+    runningChildren: (sessionId) =>
+      runningChildren(deps.db, sessionId).flatMap(
+        ({ messageId, sessionId }) => {
+          const child = childWork(
+            deps.db,
+            sessionId,
+            store.messages(sessionId),
+          );
+          return child === null ? [] : [{ messageId, child }];
+        },
+      ),
     agentImpact: (agentId) => ({
       chats: agentChats(deps.db, agentId).length,
       running: agentRunning(deps.db, agentId),
@@ -251,7 +269,9 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       markAttention(deps.db, store, sessionId, attention, by),
     repair() {
       const touched = transact(deps.db, () => {
-        const rows = store.repair(deps.clock(), RESTART_ERROR);
+        const rows = store.repair(deps.clock(), RESTART_ERROR, (id) =>
+          deps.scratch.drop(id),
+        );
         return {
           result: rows,
           events: rows.map((repaired) =>

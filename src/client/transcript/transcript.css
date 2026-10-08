@@ -378,6 +378,16 @@
     display: flex;
     flex-direction: column;
   }
+  /* a subagent's group: its description cut first, its task and its
+     answer one step in like the rounds */
+  .transcript-child-title {
+    min-width: 0;
+    color: var(--fg);
+  }
+  .transcript-child-task,
+  .transcript-child-answer {
+    margin: var(--space-1) 0 var(--space-2);
+  }
 
   .transcript-tool-server {
     flex-shrink: 0;

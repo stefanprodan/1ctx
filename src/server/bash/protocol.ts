@@ -50,6 +50,9 @@ export type Job = {
   repos: JobRepo[];
   // a repository file past it reads as File too large
   repoFileBytes: number;
+  // a subagent's command: no open, and a change under /knowledge or
+  // /uploads refuses the save
+  subagent?: boolean;
 };
 
 export type Changes = {

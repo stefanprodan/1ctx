@@ -33,6 +33,9 @@ export type AgentSummary = {
   // its OpenRouter requests leave out the hosts serving the model at 4
   // bits (int4, fp4, mxfp4, nvfp4); false on every other wire
   skip4Bit: boolean;
+  // whether a turn may hand a task to a fresh copy of it; off until an
+  // admin turns it on
+  subagents: boolean;
   // the agent a new chat starts on for anyone who has not picked one:
   // the one an admin marked, else the first created
   default: boolean;

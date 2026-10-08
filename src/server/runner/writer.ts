@@ -14,6 +14,7 @@ import type { SocketEvent, VisualFrame } from "../../shared/socket.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { ChatEvent } from "../providers/index.ts";
 import { envelope } from "../sessions/index.ts";
@@ -32,7 +33,7 @@ import {
   stopOpenTools,
 } from "./reply-rows.ts";
 import { toolFinish } from "./results.ts";
-import type { ActiveSend } from "./send.ts";
+import type { ActiveSend, ChildLink } from "./send.ts";
 import {
   type StartDeps,
   type Started,
@@ -66,7 +67,15 @@ export type WriterDeps = {
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;
+  // a subagent's changed rows, inside its transaction: the frames its
+  // parent's watchers get after the commit. A child publishes no
+  // envelope, so nothing of it reaches a list, a feed or another
+  // connection
+  childRows(link: ChildLink, sessionId: string, rows: Message[]): BusEvent[];
 };
+
+// a subagent's rows stream to nobody: no watch reaches its session
+const unwatched = () => {};
 
 // the status a cause ends in
 export function statusOf(cause: SendCause): Exclude<SessionStatus, "running"> {
@@ -83,7 +92,27 @@ export function statusOf(cause: SendCause): Exclude<SessionStatus, "running"> {
 }
 
 export class Writer {
-  constructor(private readonly deps: WriterDeps) {}
+  private readonly quiet: WriterDeps;
+
+  constructor(private readonly deps: WriterDeps) {
+    this.quiet = { ...deps, stream: unwatched };
+  }
+
+  // the events a transaction of the send publishes: a root's envelope,
+  // or a subagent's rows to its parent's watchers alone
+  private out(
+    send: ActiveSend,
+    rows: Message[],
+    event: () => BusEvent,
+  ): BusEvent[] {
+    return send.child === null
+      ? [event()]
+      : this.deps.childRows(send.child, send.sessionId, rows);
+  }
+
+  private streams(send: ActiveSend): WriterDeps {
+    return send.child === null ? this.deps : this.quiet;
+  }
 
   startSummary(send: ActiveSend): Message {
     return startAfterAnswer(this.deps, send, {
@@ -110,19 +139,19 @@ export class Writer {
     send: ActiveSend,
     event: Extract<ChatEvent, { kind: "reasoning" | "content" }>,
   ): void {
-    streamDelta(this.deps, send, event);
+    streamDelta(this.streams(send), send, event);
   }
 
   visual(
     send: ActiveSend,
     piece: Pick<VisualFrame, "callIndex" | "title" | "html" | "htmlAt">,
   ): void {
-    streamVisual(this.deps, send, piece);
+    streamVisual(this.streams(send), send, piece);
   }
 
   // a round began or ended a wait to ask its provider again
   retrying(send: ActiveSend, retry: LiveRetry | null): void {
-    streamRetry(this.deps, send, retry);
+    streamRetry(this.streams(send), send, retry);
   }
 
   private session(id: string, now: number): SessionSummary {
@@ -141,7 +170,7 @@ export class Writer {
       const session = this.session(send.sessionId, now);
       return {
         result: undefined,
-        events: [envelope(session, [reply], null)],
+        events: this.out(send, [reply], () => envelope(session, [reply], null)),
       };
     });
   }
@@ -177,9 +206,12 @@ export class Writer {
         toolCalls: launched,
       });
       const session = this.session(send.sessionId, now);
+      const changed = reply ? [reply, ...rows] : rows;
       return {
         result: { rows, toolCalls: launched },
-        events: [envelope(session, reply ? [reply, ...rows] : rows, sendRow)],
+        events: this.out(send, changed, () =>
+          envelope(session, changed, sendRow),
+        ),
       };
     });
     // openTools is keyed by the call object, so duplicate call ids stay apart
@@ -201,7 +233,10 @@ export class Writer {
       if (row === null) return { result: false, events: [] };
       if (result.kept?.length) writeKeptFiles(this.deps.db, rowId, result.kept);
       const session = this.session(send.sessionId, now);
-      return { result: true, events: [envelope(session, [row], null)] };
+      return {
+        result: true,
+        events: this.out(send, [row], () => envelope(session, [row], null)),
+      };
     });
     if (changed) send.openTools.delete(call);
     return changed;
@@ -227,7 +262,10 @@ export class Writer {
         now,
       );
       const session = this.session(send.sessionId, now);
-      return { result: undefined, events: [envelope(session, rows, null)] };
+      return {
+        result: undefined,
+        events: this.out(send, rows, () => envelope(session, rows, null)),
+      };
     });
     round.drafts.clear();
   }
@@ -288,7 +326,9 @@ export class Writer {
       const session = this.session(send.sessionId, now);
       return {
         result: reply,
-        events: [envelope(session, changed, sendRow)],
+        events: this.out(send, changed, () =>
+          envelope(session, changed, sendRow),
+        ),
       };
     });
     if (transition !== undefined) send.round?.drafts.clear();
@@ -331,7 +371,12 @@ export class Writer {
       const last = answerLine(reply, send.policy.agentName);
       return {
         result: { session, reply, send: row, memorySkipped },
-        events: [envelope(session, changed, row, [], last), ...alerted],
+        events: [
+          ...this.out(send, changed, () =>
+            envelope(session, changed, row, [], last),
+          ),
+          ...alerted,
+        ],
       };
     });
     send.openTools = new Map();

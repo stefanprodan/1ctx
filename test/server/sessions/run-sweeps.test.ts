@@ -127,6 +127,7 @@ describe("the sweeps over runs", () => {
                 throw new Error("no running rows");
               },
               lastSend: () => null,
+              dropScratch: () => {},
             }),
           ),
         ].find(([sql]) => sql.includes("from sessions"));

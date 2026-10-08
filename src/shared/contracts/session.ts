@@ -166,6 +166,9 @@ export type Message = {
   // every other row
   toolCallId: string | null;
   toolName: string | null;
+  // the subagent's session a delegate row started, absent on every
+  // other row; never in the result's text, which a low cut may cut
+  childSessionId?: string;
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;
@@ -179,6 +182,20 @@ export type Message = {
   createdAt: number;
   finishedAt: number | null;
 };
+
+// a subagent's work under its parent's delegate row: the child's
+// status, the tokens of every round it ran and its rows, in the
+// transcript's shape. A frame carries the rows a transaction changed;
+// the route carries them all
+export type ChildWork = {
+  sessionId: string;
+  status: SessionStatus;
+  tokens: number;
+  rows: Message[];
+};
+
+// a child's work keyed by the parent's delegate row
+export type ChildOf = { messageId: string; child: ChildWork };
 
 // the last row a person or the agent wrote to a chat, as the feed
 // shows it: a user message, or an answer reply that is done. The

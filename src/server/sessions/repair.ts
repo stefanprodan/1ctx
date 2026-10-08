@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Each repaired session gets its own revision and envelope rather than
-// a global change nobody hears.
+// a global change nobody hears; a subagent's child is ended the same
+// way but publishes nothing, since no list or watch ever shows it, and
+// its copy of its parent's /tmp goes, since a child is never continued.
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
@@ -16,6 +18,7 @@ export function repairRows(
     touch(id: string): SessionRow;
     message(id: string): Message;
     lastSend(id: string): SendSummary | null;
+    dropScratch(id: string): void;
   },
 ): RepairedSession[] {
   // the feed indexes hold the running rank but lead with the project, so
@@ -30,6 +33,16 @@ export function repairRows(
     .all()
     .map((r) => r.id);
   if (ids.length === 0) return [];
+  const children = new Set(
+    db
+      .query<{ id: string }, [string]>(
+        `select id from sessions
+         where id in (select value from json_each(?))
+           and parent_session_id is not null`,
+      )
+      .all(JSON.stringify(ids))
+      .map((r) => r.id),
+  );
   // the reply rows about to end need a slot; a null one becomes an
   // answer before its status moves, so the not-streaming check holds
   db.query(
@@ -57,16 +70,24 @@ export function repairRows(
        finished_at = ? where status = 'running'`,
   ).run(error, error, now);
   db.query(
-    "update messages set status = 'stopped', error = ?, finished_at = ? where kind = 'tool' and status = 'streaming'",
+    `update messages set status = 'stopped', error = ?, finished_at = ?
+     where kind = 'tool' and status = 'streaming'
+       and tool_name is not 'delegate'`,
   ).run(error, now);
   db.query(
     "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
   ).run(error, now);
-  return ids.map((id) => {
-    const session = reads.touch(id);
-    const messages = changedByStatus
-      .filter((row) => row.session_id === id)
-      .map((row) => reads.message(row.id));
-    return { session, messages, send: reads.lastSend(id) };
-  });
+  for (const id of children) {
+    reads.touch(id);
+    reads.dropScratch(id);
+  }
+  return ids
+    .filter((id) => !children.has(id))
+    .map((id) => {
+      const session = reads.touch(id);
+      const messages = changedByStatus
+        .filter((row) => row.session_id === id)
+        .map((row) => reads.message(row.id));
+      return { session, messages, send: reads.lastSend(id) };
+    });
 }

@@ -4,6 +4,7 @@
 // The schema needs no project or session so the agent page can count it;
 // execution takes its identity only from the runner's call context.
 
+import type { HttpMethod } from "../../../shared/contracts/credential.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
   BACKSTOP_MS,
@@ -32,7 +33,7 @@ export type CredentialKeysPort = {
 
 export type BashCredentials = {
   offered: readonly OfferedCredential[];
-  off: readonly { name: string; prefix: string }[];
+  off: readonly { name: string; prefix: string; writes?: true }[];
 };
 
 const NONE: BashCredentials = { offered: [], off: [] };
@@ -57,10 +58,13 @@ function networkWords(
     `curl calls HTTP APIs on ${where}, JSON in and out with -X, -H, -d and jq. Save downloads in /tmp.`,
     ...credentials.map(
       (credential) =>
-        `curl to ${prefixWords(credential.prefix)} (${credential.name}) is signed in; send no key.`,
+        `curl to ${prefixWords(credential.prefix)} (${credential.name}) is signed in${credential.readOnly ? ", GET and HEAD only" : ""}; send no key.`,
     ),
   ].join(" ");
 }
+
+export const isReadMethod = (method: HttpMethod) =>
+  method === "GET" || method === "HEAD";
 
 // a send signs only as its snapshot says, so a row moved under it, the
 // key file it names included, refuses until the next send
@@ -105,10 +109,14 @@ export function commandCredentials(
         key: read.key,
         header: credential.header,
         value: headerValue(credential.template, read.key),
-        methods: [...credential.methods],
+        methods: credential.readOnly
+          ? credential.methods.filter(isReadMethod)
+          : [...credential.methods],
       };
     }),
-    ...credentials.off.map((credential) => refused(credential, "off")),
+    ...credentials.off.map((credential) =>
+      refused(credential, credential.writes ? "writes" : "off"),
+    ),
   ];
 }
 
@@ -142,7 +150,24 @@ export type BashToolOptions = {
   keys?: CredentialKeysPort;
   // false while the send has the project docs off
   docs?: boolean;
+  // a subagent's: no open, so the description leaves it out
+  subagent?: boolean;
 };
+
+const OPEN_WORDS =
+  "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. ";
+
+// a send's bash description as a subagent's, whatever was added after:
+// no open, and the subagent's own credential words
+export const asSubagent = (
+  description: string,
+  web: WebSnapshot | null,
+  parent: readonly OfferedCredential[],
+  own: readonly OfferedCredential[],
+): string =>
+  description
+    .replace(OPEN_WORDS, "")
+    .replace(networkWords(web, parent), () => networkWords(web, own));
 
 export function makeBashTool({
   bash,
@@ -151,13 +176,15 @@ export function makeBashTool({
   credentials = NONE,
   keys,
   docs = true,
+  subagent = false,
 }: BashToolOptions = {}): Tool<ToolResult> {
   return {
     name: "bash",
     // past the mount's own backstop, so its words end a stuck command
     graceMs: BACKSTOP_MS + 500,
     description:
-      "Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. jq, yq, awk and diff are there, git, python and node are not. Never write secrets, since others can read this chat and the project. open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. " +
+      "Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. jq, yq, awk and diff are there, git, python and node are not. Never write secrets, since others can read this chat and the project. " +
+      (subagent ? "" : OPEN_WORDS) +
       networkWords(web, credentials.offered),
     parameters: {
       type: "object",
@@ -195,6 +222,7 @@ export function makeBashTool({
         resultCut: ctx.caps.resultCut,
         visuals,
         knowledge: docs,
+        ...(ctx.subagent ? { subagent: ctx.subagent } : {}),
         ...(repos === null
           ? {}
           : {

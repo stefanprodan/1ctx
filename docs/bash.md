@@ -101,9 +101,9 @@ of that shell that shows a file on the chat page.
   or differing from the send's is refused, and its key is read through
   `readKey()` then, so a replaced file applies to the next command.
 - **Refusals name the credential, never the key file.** Off, keyless,
-  unusable, deleted or changed credentials, a method it lacks and a
-  routing header (`ROUTING_HEADERS`) are refused before anything is
-  sent. Keys ride only in the command caps.
+  unusable, deleted or changed credentials, a subagent's write-only
+  one, a method it lacks and a routing header (`ROUTING_HEADERS`) are
+  refused before anything is sent. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
   JSON-escaped forms (`escapedForms()`), is replaced by `[credential
   <name>]` in body, header values, status text, final URL and errors.
@@ -219,6 +219,17 @@ of that shell that shows a file on the chat page.
 - **The first command of a send says what was left out:** `repo <name>
   is unavailable: <reason>`, and a regenerate's pinned commit no longer
   cached. A folder gone from the cache is left out with a notice.
+
+## Subagents
+
+- **A subagent's command carries `subagent` in its caps.** It mounts
+  `/uploads` of `uploadsFrom`, its parent's session, and its job's
+  `subagent` flag leaves `open` out of the worker. A change under
+  `/knowledge` (the docs on or off) or `/uploads` is refused at commit
+  with `READ_ONLY_TO_SUBAGENT`, nothing saved, by the worker and, for
+  docs, by the server; `checkOpened()` refuses any opened record. Its
+  `/tmp` comes and goes by copy (`bash/handoff.ts`,
+  `docs/subagents.md`).
 
 ## The open command
 

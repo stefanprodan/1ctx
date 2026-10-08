@@ -113,6 +113,10 @@ export type SendPolicy = {
   // the attention step's set, needs_attention alone, for a run whose
   // automation is not off on a model that takes tools
   attentionOffered: Offered | null;
+  // a subagent's set, taken with the send's, when it offers delegate
+  childOffered?: Offered | null;
+  // a subagent's own send: its system prompt is subagentPrompt()
+  subagent?: boolean;
   projectMemory: MemoryEntry[];
   automationMemory: MemoryEntry[];
   knowledge: { empty: boolean };
@@ -230,10 +234,22 @@ export function buildPolicy(input: {
               automationScope === null && input.sessionId
                 ? { sessionId: input.sessionId, userId: user.id }
                 : null,
+            delegate: agent.subagents,
           },
           disabledCapabilities,
         )
       : NONE;
+  const childOffered =
+    tools !== null && agent.subagents
+      ? tools.offered(
+          input.now,
+          agent.id,
+          agent.servers,
+          agent.mcpMode,
+          { projectId: input.project.id, automation: null, phase: "child" },
+          disabledCapabilities,
+        )
+      : null;
   const memoryOffered =
     tools !== null && automationScope?.ownMemory
       ? tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
@@ -300,6 +316,7 @@ export function buildPolicy(input: {
     web: offered.web,
     memoryOffered,
     attentionOffered,
+    childOffered,
     projectMemory: (input.projectMemory ?? []).map((entry) => ({ ...entry })),
     automationMemory: (input.automationMemory ?? []).map((entry) => ({
       ...entry,
@@ -318,6 +335,9 @@ export function buildPolicy(input: {
       summaryMaxTokens: input.limits.summaryMaxTokens,
       memoryPhaseMs: input.limits.memoryPhaseMs,
       memoryPhaseRounds: input.limits.memoryPhaseRounds,
+      childrenAtOnce: input.limits.childrenAtOnce,
+      childrenPerSend: input.limits.childrenPerSend,
+      childAnswerChars: input.limits.childAnswerChars,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

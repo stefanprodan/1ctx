@@ -58,6 +58,7 @@ export function cardBody(
     mcpMode: agent.mcpMode,
     upstream: agent.upstream,
     skip4Bit: agent.skip4Bit,
+    subagents: agent.subagents,
     ...statedFields(
       agent.model,
       windowText(agent.model.contextLength),

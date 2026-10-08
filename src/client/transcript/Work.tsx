@@ -11,8 +11,12 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
+import { childWork } from "../data/session-children.ts";
 import { Icon } from "../lib/icons.tsx";
+import { isDelegate } from "./Delegate.model.ts";
+import { Delegate } from "./Delegate.tsx";
 import { folds, useTick } from "./fold.ts";
+import { Rounds } from "./Rounds.tsx";
 import type { WorkNode } from "./rows.ts";
 import { type Live, leadIn } from "./stream.ts";
 import { Think } from "./Think.tsx";
@@ -86,30 +90,18 @@ export function Work({
         <span>{summary.text}</span>
       </summary>
       <div class="transcript-work-rounds">
-        {node.rounds.map((round) => {
-          const current = running ? (live.get(round.message.id) ?? null) : null;
-          const reasoning = current?.reasoning ?? round.message.reasoning;
-          const content = current?.content ?? round.message.content;
-          const said = content.trim() !== "";
-          return (
-            <div class="transcript-work-round" key={round.message.id}>
-              {(reasoning !== "" || said) && (
-                <Think message={round.message} live={current}>
-                  {said && (
-                    // the words before a call are the model talking to
-                    // itself: plain text like the reasoning, never markdown
-                    <div class="transcript-work-plain">{content}</div>
-                  )}
-                </Think>
-              )}
-              <div class="transcript-work-calls">
-                {round.calls.map((call) => (
-                  <Tool key={call.key} node={call} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+        <Rounds
+          rounds={node.rounds}
+          live={live}
+          running={running}
+          call={(call) =>
+            isDelegate(call, childWork.value.has(call.result?.id ?? "")) ? (
+              <Delegate key={call.key} node={call} />
+            ) : (
+              <Tool key={call.key} node={call} />
+            )
+          }
+        />
         {reply !== null && (replyReasoning !== "" || replyLead !== "") && (
           <div class="transcript-work-round">
             <Think message={reply} live={replyLive}>

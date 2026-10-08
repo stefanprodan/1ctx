@@ -153,6 +153,26 @@ async function reposWritten(fs: InMemoryFs): Promise<boolean> {
   return false;
 }
 
+// why a subagent's command that changed the shared trees saved nothing
+export const READ_ONLY_TO_SUBAGENT =
+  "/knowledge and /uploads are read-only to a subagent: write to /tmp";
+
+// a subagent's command that changed /knowledge or /uploads saves
+// nothing, /tmp included; with the docs off diff() reads no
+// /knowledge, so a file written there counts here. The server refuses
+// doc changes on its own
+export async function sharedChanged(
+  fs: InMemoryFs,
+  job: Job,
+  changes: Pick<Changes, "knowledge">,
+): Promise<string | null> {
+  return changes.knowledge.length > 0 ||
+    (!job.docs && (await docsWritten(fs))) ||
+    (await uploadsChanged(fs, job.uploads))
+    ? READ_ONLY_TO_SUBAGENT
+    : null;
+}
+
 // the discard notices, before the start notice
 export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
   let notice = "";

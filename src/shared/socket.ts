@@ -10,6 +10,7 @@ import type { EnvelopeRow } from "./api/sessions.ts";
 import type { AutomationSummary } from "./contracts/automation.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
+  ChildOf,
   LastLine,
   LiveRetry,
   LiveSend,
@@ -22,7 +23,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 16;
+export const PROTOCOL = 17;
 
 export type VisualFrame = {
   type: "visual";
@@ -122,13 +123,19 @@ export type SocketEvent =
   | { type: "revoked"; projectId: string }
   // an admin changed the user's role: the tab's user takes it
   | { type: "role"; role: Role }
-  // the answer to a watch: the send in flight as far as it got, and the
-  // queue as the queue frame carries it
+  // to the chat's watchers alone: a subagent's rows a transaction
+  // changed, keyed by the parent's delegate row, with its status and
+  // tally. Its stream deltas go nowhere
+  | ({ type: "child"; sessionId: string } & ChildOf)
+  // the answer to a watch: the send in flight as far as it got, the
+  // queue as the queue frame carries it, and each running subagent's
+  // rows so far
   | {
       type: "watched";
       sessionId: string;
       live: LiveSend | null;
       queue?: QueueFrame;
+      children?: ChildOf[];
     }
   | {
       type: "delta";

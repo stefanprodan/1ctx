@@ -31,7 +31,9 @@ import type { Mcp, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
-import { makeAttentionTool } from "./builtin/attention.ts";
+import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
+import { isReadMethod } from "./builtin/bash.ts";
+import { DELEGATE_TOOL, makeDelegateTool } from "./builtin/delegate.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
 import {
   makeChatMemoryHandle,
@@ -82,17 +84,19 @@ type OfferDeps = {
     visuals: boolean,
     knowledge: boolean,
     credentials: SendCredentials,
+    subagent?: boolean,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
 
 // credentials ride on the network: none without it, and none outside a
-// project
+// project. A subagent's are read-only, so curl never writes through one.
 function credentialsFor(
   port: CredentialsPort | undefined,
   projectId: string | null | undefined,
   web: WebSnapshot | null,
   disabledCapabilities: readonly string[],
+  readOnly: boolean,
 ): SendCredentials {
   if (port === undefined || web === null || !projectId) return NO_CREDENTIALS;
   const offered: SendCredentials["offered"] = [];
@@ -100,6 +104,16 @@ function credentialsFor(
   for (const row of port.forProject(projectId)) {
     if (disabledCapabilities.includes(credentialKey(row.id))) {
       off.push({ id: row.id, name: row.name, prefix: row.prefix });
+      continue;
+    }
+    // a subagent's write-only credential refuses, never goes out unsigned
+    if (readOnly && !row.methods.some(isReadMethod)) {
+      off.push({
+        id: row.id,
+        name: row.name,
+        prefix: row.prefix,
+        writes: true,
+      });
       continue;
     }
     offered.push({
@@ -110,6 +124,7 @@ function credentialsFor(
       header: row.header,
       template: row.template,
       methods: [...row.methods],
+      ...(readOnly ? { readOnly: true as const } : {}),
     });
   }
   return { offered, off };
@@ -195,6 +210,50 @@ function directSchemas(servers: OfferedServer[]): ChatTool[] {
   );
 }
 
+// what a subagent is never offered, whatever its parent has: MCP's
+// write side goes by the links below
+const CHILD_CUT: ReadonlySet<string> = new Set([
+  DELEGATE_TOOL,
+  "memory_edit",
+  EMAIL_TOOL,
+  "visualize",
+  ATTENTION_TOOL,
+]);
+
+// A subagent's offer, the one place it is decided: its parent's main
+// offer less CHILD_CUT and every MCP tool on the write side, the links
+// read alone so offeredServers() drops the write side as it always
+// decides it. Its bash leaves out open and its credentials sign GET
+// and HEAD alone. The trimmed array never shares
+// the parent's cached prefix; the alternative is the parent's array
+// here with the cut names refused at dispatch.
+function childOffered(
+  deps: OfferDeps,
+  now: number,
+  agentId: string,
+  agentServers: AgentServer[],
+  requestedMode: McpMode,
+  scope: MemoryScope,
+  disabledCapabilities: readonly string[],
+): Offered {
+  const main = offered(
+    deps,
+    now,
+    agentId,
+    agentServers.map((link) => ({ ...link, write: false })),
+    requestedMode,
+    { projectId: scope.projectId, automation: null, phase: "main" },
+    disabledCapabilities,
+    true,
+  );
+  return {
+    ...main,
+    tools: main.tools.filter((tool) => !CHILD_CUT.has(tool.name)),
+    memory: null,
+    subagent: true,
+  };
+}
+
 export function offered(
   deps: OfferDeps,
   now: number,
@@ -203,7 +262,21 @@ export function offered(
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
+  // building a subagent's offer: its bash says nothing of open and its
+  // credentials are read-only
+  subagent = false,
 ): Offered {
+  if (scope?.phase === "child") {
+    return childOffered(
+      deps,
+      now,
+      agentId,
+      agentServers,
+      requestedMode,
+      scope,
+      disabledCapabilities,
+    );
+  }
   if (scope?.phase === "attention") {
     const attention = attentionFor(scope);
     return {
@@ -239,6 +312,7 @@ export function offered(
     scope?.projectId,
     web,
     disabledCapabilities,
+    subagent,
   );
   const allowed = new Set<string>([
     "datetime",
@@ -272,10 +346,22 @@ export function offered(
   const baseTools = fillYear(
     [
       ...deps
-        .toolsFor(search, visualRow.hosts, web, visuals, knowledge, credentials)
+        .toolsFor(
+          search,
+          visualRow.hosts,
+          web,
+          visuals,
+          knowledge,
+          credentials,
+          subagent,
+        )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory)),
+      // a main offer of an agent whose Subagents switch is on
+      ...(scope?.phase === "main" && scope.delegate
+        ? [makeDelegateTool()]
+        : []),
     ].map(schema),
     now,
   );

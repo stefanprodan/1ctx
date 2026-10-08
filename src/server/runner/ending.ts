@@ -27,7 +27,11 @@ export type EndingDeps = {
   attention: Pick<Attention, "ask">;
 };
 
-async function finalize(deps: EndingDeps, send: ActiveSend): Promise<boolean> {
+// the send's end written, retried a few times; false when it never was
+export async function finalize(
+  deps: Pick<EndingDeps, "writer" | "pause" | "log">,
+  send: ActiveSend,
+): Promise<boolean> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < FINALIZE_ATTEMPTS; attempt++) {
     try {

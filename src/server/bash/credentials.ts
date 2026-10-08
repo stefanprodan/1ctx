@@ -28,7 +28,13 @@ const ALL_METHODS: HttpMethod[] = [
 ];
 
 // why a credential signs nothing in this command
-export type Refusal = "off" | "missing" | "unusable" | "deleted" | "changed";
+export type Refusal =
+  | "off"
+  | "writes"
+  | "missing"
+  | "unusable"
+  | "deleted"
+  | "changed";
 
 // one credential of the send as a command sees it: the key read for this
 // command, or why it signs nothing. The key rides here and nowhere else
@@ -41,6 +47,7 @@ export type FetchLimits = { timeoutMs: number; maxResponseSize: number };
 
 const REFUSALS: Record<Refusal, string> = {
   off: "is off in this chat",
+  writes: "signs only writes, which a subagent cannot send",
   missing: "has no key",
   unusable: "has an unusable key",
   deleted: "was removed",
