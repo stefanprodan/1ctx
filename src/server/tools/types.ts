@@ -141,7 +141,11 @@ export type AttentionHandle = {
 export type OfferedCredential = Pick<
   CredentialRow,
   "id" | "name" | "keyName" | "prefix" | "header" | "template" | "methods"
->;
+> & {
+  // a subagent's: methods stay the row's, so a change is still seen, and
+  // it signs their read ones alone
+  readOnly?: true;
+};
 
 export type Offered = {
   tools: ChatTool[];
@@ -161,7 +165,13 @@ export type Offered = {
   // those the send turned off kept apart, so a command refuses them by
   // name
   credentials: OfferedCredential[];
-  credentialsOff: { id: string; name: string; prefix: string }[];
+  // writes: a subagent's credential that signs no read method
+  credentialsOff: {
+    id: string;
+    name: string;
+    prefix: string;
+    writes?: true;
+  }[];
   // a subagent's offer: bash leaves out open
   subagent?: boolean;
 };

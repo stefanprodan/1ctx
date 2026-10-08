@@ -4,6 +4,7 @@
 // The schema needs no project or session so the agent page can count it;
 // execution takes its identity only from the runner's call context.
 
+import type { HttpMethod } from "../../../shared/contracts/credential.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
   BACKSTOP_MS,
@@ -32,7 +33,7 @@ export type CredentialKeysPort = {
 
 export type BashCredentials = {
   offered: readonly OfferedCredential[];
-  off: readonly { name: string; prefix: string }[];
+  off: readonly { name: string; prefix: string; writes?: true }[];
 };
 
 const NONE: BashCredentials = { offered: [], off: [] };
@@ -57,10 +58,13 @@ function networkWords(
     `curl calls HTTP APIs on ${where}, JSON in and out with -X, -H, -d and jq. Save downloads in /tmp.`,
     ...credentials.map(
       (credential) =>
-        `curl to ${prefixWords(credential.prefix)} (${credential.name}) is signed in; send no key.`,
+        `curl to ${prefixWords(credential.prefix)} (${credential.name}) is signed in${credential.readOnly ? ", GET and HEAD only" : ""}; send no key.`,
     ),
   ].join(" ");
 }
+
+export const isReadMethod = (method: HttpMethod) =>
+  method === "GET" || method === "HEAD";
 
 // a send signs only as its snapshot says, so a row moved under it, the
 // key file it names included, refuses until the next send
@@ -105,10 +109,14 @@ export function commandCredentials(
         key: read.key,
         header: credential.header,
         value: headerValue(credential.template, read.key),
-        methods: [...credential.methods],
+        methods: credential.readOnly
+          ? credential.methods.filter(isReadMethod)
+          : [...credential.methods],
       };
     }),
-    ...credentials.off.map((credential) => refused(credential, "off")),
+    ...credentials.off.map((credential) =>
+      refused(credential, credential.writes ? "writes" : "off"),
+    ),
   ];
 }
 
@@ -149,9 +157,17 @@ export type BashToolOptions = {
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. ";
 
-// a send's bash description as a subagent's, whatever was added after
-export const withoutOpen = (description: string): string =>
-  description.replace(OPEN_WORDS, "");
+// a send's bash description as a subagent's, whatever was added after:
+// no open, and the subagent's own credential words
+export const asSubagent = (
+  description: string,
+  web: WebSnapshot | null,
+  parent: readonly OfferedCredential[],
+  own: readonly OfferedCredential[],
+): string =>
+  description
+    .replace(OPEN_WORDS, "")
+    .replace(networkWords(web, parent), () => networkWords(web, own));
 
 export function makeBashTool({
   bash,

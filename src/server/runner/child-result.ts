@@ -32,6 +32,32 @@ const MORE = (n: number, folder: string) => `and ${n} more in /tmp/${folder}/`;
 export const TAIL_CHARS = 4_000;
 const SEPARATOR = "\n\n";
 
+const ESCAPES: Record<string, string> = {
+  "\n": "\\n",
+  "\r": "\\r",
+  "\t": "\\t",
+};
+
+// a child names its files, and a newline in one would end the files part
+// or forge a line of it, so each path stays one line
+const oneLine = (path: string) =>
+  path.replace(
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the controls are what it escapes.
+    /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g,
+    (c) => ESCAPES[c] ?? `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+
+// the first lines that fit in room whole, so no heading or path is cut
+function wholeLines(lines: readonly string[], room: number): string {
+  let text = "";
+  for (const line of lines) {
+    const next = text === "" ? line : `${text}\n${line}`;
+    if (next.length > room) break;
+    text = next;
+  }
+  return text;
+}
+
 // one path a line while they fit in room, then how many more
 function listed(
   lines: readonly string[],
@@ -61,12 +87,12 @@ function filesTail(end: ChildEnd, resultCut: number): string {
   const groups = [
     {
       head: filesHeading(end.folder),
-      lines: end.copied,
+      lines: end.copied.map(oneLine),
       more: (n: number) => MORE(n, end.folder),
     },
     {
       head: NOT_COPIED,
-      lines: end.left.map((path) => `/tmp/${path}`),
+      lines: end.left.map((path) => `/tmp/${oneLine(path)}`),
       more: (n: number) => `and ${n} more`,
     },
   ].filter((group) => group.lines.length > 0);
@@ -81,7 +107,7 @@ function filesTail(end: ChildEnd, resultCut: number): string {
     group.head,
     ...listed(group.lines, share - group.head.length - 1, group.more),
   ]);
-  return cutAt(parts.join("\n"), room);
+  return wholeLines(parts, room);
 }
 
 function failure(end: ChildEnd): string | null {

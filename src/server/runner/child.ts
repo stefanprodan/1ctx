@@ -21,16 +21,15 @@ import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { childChanged } from "../sessions/index.ts";
 import {
+  asSubagent,
   type DelegateInput,
   type ToolContext,
-  withoutOpen,
 } from "../tools/index.ts";
 import { childResult } from "./child-result.ts";
 import { freeSlot, type SlotPort, takeSlot } from "./child-slots.ts";
 import { type EndingDeps, finalize } from "./ending.ts";
 import { offers, type SendPolicy, type ToolResult } from "./policy.ts";
 import type { Registry } from "./registry.ts";
-import { ProviderRefusal } from "./round.ts";
 import { type ActiveSend, type ChildLink, claim, newSend } from "./send.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import type { SessionsPort } from "./writer-port.ts";
@@ -82,7 +81,15 @@ export function childPolicy(
     ...own,
     tools: own.tools.map((tool) =>
       tool.name === "bash" && bash !== undefined
-        ? { ...tool, description: withoutOpen(bash.description) }
+        ? {
+            ...tool,
+            description: asSubagent(
+              bash.description,
+              own.web,
+              parent.offered.credentials,
+              own.credentials,
+            ),
+          }
         : tool,
     ),
   };
@@ -276,10 +283,8 @@ export async function delegate(
     atOnce: limits.childrenAtOnce,
     takeExtra: () =>
       deps.registry.takeExtra(deps.sendsRunning(), parent.startedBy === null),
-    freeExtra: () => {
-      deps.registry.freeExtra(parent.startedBy === null);
-      deps.wake();
-    },
+    freeExtra: () => deps.registry.freeExtra(parent.startedBy === null),
+    wake: deps.wake,
   };
   const slot = await takeSlot(children, port, ctx.signal);
   if (slot === null) {
@@ -314,6 +319,7 @@ async function runChild(
   const policy = childPolicy(parent.policy, left);
   const send = startChild(deps, link, policy, input, now);
   let baseline: Baseline | null = null;
+  let files: Returned;
   const stop = () => {
     const cause =
       parent.cause === "deadline" || parent.cause === "shutdown"
@@ -334,9 +340,6 @@ async function runChild(
       const end = await toolLoop(deps.loop, send);
       claim(send, end.cause, end.error);
     } catch (error) {
-      if (send.cause === null && error instanceof ProviderRefusal) {
-        send.refusal = { status: error.status };
-      }
       claim(send, "failure", messageOf(error));
     }
     const finalized = await finalize(deps.ending, send);
@@ -346,6 +349,8 @@ async function runChild(
     signal.removeEventListener("abort", stop);
     if (send.tools !== null) await send.tools.catch(() => {});
     send.letGo();
+    // on a throw too, so the child's scratch never outlives it
+    files = await returned(deps, send, link, baseline);
   }
   deps.log.info("child end", {
     chat: parent.sessionId,
@@ -362,7 +367,7 @@ async function runChild(
       cause: send.cause!,
       error: send.error,
       ...answerOf(deps.messages(send.sessionId)),
-      ...(await returned(deps, send, link, baseline)),
+      ...files,
     },
     {
       answerChars: policy.limits.childAnswerChars,
@@ -382,13 +387,15 @@ function answerOf(rows: Message[]): { answer: string | null; last: string } {
   };
 }
 
+type Returned = Awaited<ReturnType<ChildDeps["bash"]["returnScratch"]>>;
+
 // what the child added or changed in its /tmp, back in its parent's
 async function returned(
   deps: ChildDeps,
   send: ActiveSend,
   link: ChildLink,
   baseline: Baseline | null,
-): Promise<Awaited<ReturnType<ChildDeps["bash"]["returnScratch"]>>> {
+): Promise<Returned> {
   const none = { folder: "", copied: [], left: [] };
   if (baseline === null) {
     // a setup that failed may have left part of its copy

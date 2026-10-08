@@ -79,6 +79,34 @@ describe("a subagent's /tmp", () => {
     }
   });
 
+  test("is dropped when reading its answer throws", async () => {
+    const chat = await subagentApp();
+    try {
+      const { script, sessionId } = await startChat(chat, "write a report");
+      script.toolRound([delegateCall("d1", "Write the report.")]);
+      script.end();
+      const child = await waitScript(chat.scripted, 2);
+      expect(isChild(child)).toBe(true);
+      child.toolRound([bashCall("c1", "printf report > /tmp/report.md")]);
+      child.end();
+      const answer = await waitScript(chat.scripted, 3);
+      const messages = chat.app.sessions.messages.bind(chat.app.sessions);
+      chat.app.sessions.messages = (id: string) => {
+        if (id !== sessionId) throw new Error("boom");
+        return messages(id);
+      };
+      answer.reply("Wrote /tmp/report.md.");
+      const back = await waitScript(chat.scripted, 4);
+      chat.app.sessions.messages = messages;
+      back.reply("done");
+      await settled(chat, sessionId);
+      const [childId] = childrenOf(chat, sessionId);
+      expect(scratchLeft(chat, childId!)).toBe(0);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a change to /knowledge or /uploads saves nothing, and open is not there", async () => {
     const chat = await subagentApp();
     try {

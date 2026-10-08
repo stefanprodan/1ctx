@@ -16,10 +16,11 @@ import type { Migration } from "../migration.ts";
 // the mark in its index. The children indexes serve the cascades, which
 // look a child up by each link on every delete of a session or a
 // message. The feed and sweep indexes are remade partial on roots, so a
-// feed walk or a project's count never steps over a child. SQLite never
-// uses a partial index for a foreign-key lookup, so a project's delete
-// finds its sessions by a scan, accepted: such a delete is a rare admin
-// action, measured at about 18 ms at production's size.
+// feed walk or a project's count never steps over a child. A lookup of
+// every session by project, as a project's delete does, cannot use them,
+// since project_id = ? does not imply parent_session_id is null, so it
+// scans, accepted: such a delete is a rare admin action, measured at
+// about 18 ms at production's size.
 export const m0052: Migration = {
   id: "0052-subagents",
   up(db) {

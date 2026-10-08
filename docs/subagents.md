@@ -104,9 +104,11 @@ is its root.
 - **Its offer is `childOffered()`** (`tools/offer.ts`), taken with the
   parent's as `policy.childOffered`: the main offer less `delegate`,
   `memory_edit`, `email_user`, `visualize`, `needs_attention`, its MCP
-  links read alone so `offeredServers()` drops the write side, and a
-  bash that says nothing of `open`. Sending the parent's array and
-  refusing the cut names at dispatch is a swap inside that function.
+  links read alone so `offeredServers()` drops the write side, a bash
+  that says nothing of `open`, and each credential signing `GET` and
+  `HEAD` alone (`readOnly`), refused as `writes` when it had neither.
+  Sending the parent's array and refusing the cut names at dispatch is
+  a swap inside that function.
 
 ## Places
 
@@ -122,7 +124,8 @@ is its root.
   scheduled share and in `sendsRunning`,** never in the per-project
   counts, so its children never take the room users keep.
 - **With `childrenAtOnce` running or no extra free, a call waits** for
-  a sibling to end, first come first served. A freed extra calls `wake`.
+  a sibling to end, first come first served. A freed extra goes to the
+  waiting siblings first, then calls `wake`.
 
 ## The workspace
 
@@ -146,9 +149,9 @@ is its root.
   same transaction, or alone when the copy fails, since a child is
   never continued.
 - **Its bash description is the parent's after `mountRepos()`,** less
-  the `open` text (`withoutOpen()`), so it names the same
-  repositories. Its repos handle shares the parent's trees and never
-  takes the parent's mount notices.
+  the `open` text and with its own credential words (`asSubagent()`),
+  so it names the same repositories. Its repos handle shares the
+  parent's trees and never takes the parent's mount notices.
 
 ## The parent's work fold
 
@@ -175,9 +178,12 @@ is its root.
   shut until opened like a call. Its head is the description, then the
   status (running while the root's row runs, then the child's own:
   done, failed or stopped) and the child's tokens, never a price, as
-  chats show none. Open, it shows the task, the child's rounds drawn
-  by the fold's own `Rounds` and `Tool`, the child's answer once it is
-  done, then only the files part of the parent's result
+  chats show none. With none of the child's rows held, the status is
+  the root's row's (done, stopped, else failed) and no tokens show
+  until the group is opened or a watch brings them. Open, it shows the
+  task, the child's rounds drawn by the fold's own `Rounds` and
+  `Tool`, the child's answer once it is done, then only the files part
+  of the parent's result
   (`filesPart()` in `shared/subagents.ts`, whose headings the server
   writes too). A failed, stopped or answerless child, or a result that
   failed to load, closes with the whole result alone, a partial answer

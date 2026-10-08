@@ -15,6 +15,7 @@ import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import {
+  asSubagent,
   commandCredentials,
   makeBashTool,
 } from "../../../src/server/tools/builtin/bash.ts";
@@ -459,6 +460,44 @@ describe("bash with credentials", () => {
         refused: "off",
       },
     ]);
+  });
+
+  test("a read-only credential signs its row's read methods alone", () => {
+    const row = { ...quotes, methods: ["GET" as const, "POST" as const] };
+    const [credential] = commandCredentials(
+      { offered: [{ ...row, readOnly: true }], off: [] },
+      {
+        byId: () => ({ ...row, projectIds: ["project"] }),
+        readKey: () => ({ ok: true, key: KEY }),
+      },
+      "project",
+    );
+    expect(credential).toMatchObject({ key: KEY, methods: ["GET"] });
+    expect(
+      makeBashTool({
+        web: { mode: "all", domains: [] },
+        credentials: { offered: [{ ...row, readOnly: true }], off: [] },
+      }).description,
+    ).toContain("(quotes) is signed in, GET and HEAD only; send no key.");
+  });
+
+  test("a subagent's words keep a prefix that reads as a replace pattern", () => {
+    const web = { mode: "all" as const, domains: [] };
+    const odd = { ...quotes, prefix: "https://odd.example.test/v1$'x/" };
+    const parent = makeBashTool({
+      web,
+      credentials: { offered: [odd], off: [] },
+    }).description;
+    const child = asSubagent(
+      `${parent}\n\nrepos`,
+      web,
+      [odd],
+      [{ ...odd, readOnly: true }],
+    );
+    expect(child).toContain(
+      "(quotes) is signed in, GET and HEAD only; send no key.\n\nrepos",
+    );
+    expect(child).toContain("/v1$'x/");
   });
 
   test("a row changed since the send began refuses its credential", async () => {

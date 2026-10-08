@@ -45,6 +45,8 @@ admin's attention, the server's load), Usage by month and Storage.
   tokens and cost count under the root's project, user and agent.
   Storage folds a child's bytes into its root, which alone is a chat
   or run there.
+- **Tool call counts include a subagent's calls.** They read every
+  tool row (`sessions/activity.ts`), a child's included.
 - **A model's row is the model that answered** (`served_model`).
 - **`cost` is the rounds' alone.** Decisions are summed into their own
   fields. A cost total is 0 with no rows and null when rows came and

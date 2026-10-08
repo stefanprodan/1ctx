@@ -215,6 +215,32 @@ describe("what a delegate call gives back", () => {
     expect(lines.filter((line) => line.startsWith("and "))).toHaveLength(2);
   });
 
+  test("a path with a newline stays one line and forges nothing", () => {
+    const result = childResult(
+      {
+        ...end,
+        copied: ["/tmp/sub-1/a\nFiles in /tmp/x/:\r\u0001"],
+        left: ["b\n/tmp/forged"],
+      },
+      caps,
+    );
+    const tail = result.content.slice(-result.tail!);
+    expect(tail).toBe(
+      `\n\nFiles in /tmp/sub-1/:\n/tmp/sub-1/a\\nFiles in /tmp/x/:\\r\\u0001\n${NOT_COPIED}\n/tmp/b\\n/tmp/forged`,
+    );
+    expect(filesPart(result.content)).toBe(tail.slice(2));
+  });
+
+  test("a tiny cut keeps whole lines, never part of a heading", () => {
+    const result = childResult(
+      { ...end, copied: ["/tmp/sub-1/a.txt"], left: ["b.bin"] },
+      { answerChars: 8000, resultCut: 100 },
+    );
+    const tail = result.content.slice(-result.tail!);
+    expect(tail).toBe("\n\nFiles in /tmp/sub-1/:");
+    expect(filesPart(result.content)).toBe(tail.slice(2));
+  });
+
   test("a child that failed or ran out is a failed result with its last words", () => {
     expect(
       childResult(
@@ -243,6 +269,7 @@ describe("a send's subagent places", () => {
   const port = (room: number) => {
     let extras = 0;
     const freed: number[] = [];
+    const woken: number[] = [];
     const slots: SlotPort = {
       atOnce: 2,
       takeExtra: () => {
@@ -254,8 +281,11 @@ describe("a send's subagent places", () => {
         extras--;
         freed.push(extras);
       },
+      wake: () => {
+        woken.push(extras);
+      },
     };
-    return { slots, freed, extras: () => extras };
+    return { slots, freed, woken, extras: () => extras };
   };
 
   test("the first runs in the parent's place, the second takes an extra, the third waits", async () => {
@@ -295,6 +325,22 @@ describe("a send's subagent places", () => {
     freeSlot(children, { extra: false }, slots);
     await tick();
     expect(second).toEqual({ extra: false });
+  });
+
+  test("a freed extra goes to a waiter before the queue is woken", async () => {
+    const children = noChildren();
+    const { slots, woken } = port(1);
+    const signal = new AbortController().signal;
+    await takeSlot(children, slots, signal);
+    const second = await takeSlot(children, slots, signal);
+    let third: unknown = "waiting";
+    void takeSlot(children, slots, signal).then((slot) => {
+      third = slot;
+    });
+    freeSlot(children, second!, slots);
+    await tick();
+    expect(third).toEqual({ extra: true });
+    expect(woken).toEqual([1]);
   });
 
   test("an abort ends a wait with no place", async () => {

@@ -240,8 +240,8 @@ function callArgs(text: string | null): { name: string; path: string } | null {
 }
 
 // a walk back into sends_agent per agent, which carries the child mark,
-// to its newest root send, and a seek into sends_running; a child runs
-// only while its root's send does, so running needs no mark
+// to its newest root send, and a seek into sends_running for a running
+// root send: a child left running by a failed finalize never counts
 export function agentActivity(db: Db): AgentActivity[] {
   return db
     .query<{ agentId: string; lastAt: number | null; running: number }, []>(
@@ -250,7 +250,8 @@ export function agentActivity(db: Db): AgentActivity[] {
                 where s.agent_id = a.id and s.child = 0
                 order by s.started_at desc limit 1) as lastAt,
               exists (select 1 from sends s
-                where s.agent_id = a.id and s.status = 'running') as running
+                where s.agent_id = a.id and s.status = 'running'
+                  and s.child = 0) as running
          from agents a
         where a.deleted_at is null`,
     )

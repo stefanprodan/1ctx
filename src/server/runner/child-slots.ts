@@ -30,6 +30,8 @@ export type SlotPort = {
   // an extra stream, when sendsRunning has room for one
   takeExtra(): boolean;
   freeExtra(): void;
+  // a freed extra may admit a queued send, once the waiters had it first
+  wake(): void;
 };
 
 export const noChildren = (): Children => ({
@@ -84,7 +86,8 @@ export function freeSlot(children: Children, slot: Slot, port: SlotPort): void {
   else children.inPlace = false;
   while (children.waiting.length > 0) {
     const next = place(children, port);
-    if (next === null) return;
+    if (next === null) break;
     children.waiting.shift()!(next);
   }
+  if (slot.extra) port.wake();
 }

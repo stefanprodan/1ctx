@@ -440,9 +440,9 @@ describe("lists and counts", () => {
     const until = chat.app.now.value + DAY_MS;
     const days = personDays(chat.app.db, chat.memberId, [since], until);
     const last = agentActivity(chat.app.db);
-    // a child starts after its root's send; a running one runs only
-    // under its root's, which says running itself
-    addChild(chat, root);
+    // a child starts after its root's send, and one left running after
+    // its root ended never marks the agent running
+    addChild(chat, root, { status: "running" });
     expect(personDays(chat.app.db, chat.memberId, [since], until)).toEqual(
       days,
     );

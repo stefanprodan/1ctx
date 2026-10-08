@@ -52,6 +52,22 @@ function parts() {
       edit: () => ({ error: false, content: "" }),
       refuse: (_p: string, _s: string, reason: string) => reason,
     },
+    credentials: {
+      forProject: () =>
+        [
+          ["c-rw", ["GET", "POST", "DELETE"]],
+          ["c-w", ["POST", "PUT"]],
+          ["c-r", ["HEAD"]],
+        ].map(([name, methods]) => ({
+          id: name,
+          name,
+          keyName: name,
+          prefix: `https://${name}.test/`,
+          header: "Authorization",
+          template: "{key}",
+          methods,
+        })),
+    },
     emailOn: () => true,
     toolsFor: () =>
       ["datetime", "bash", "webfetch", "visualize", "email_user"].map(tool),
@@ -109,6 +125,32 @@ describe("a subagent's offer", () => {
       SERVERS,
       [{ serverId: "s1", read: true, write: false }],
     ]);
+  });
+
+  test("marks credentials read-only, one with no read method off", () => {
+    const { deps } = parts();
+    const scope = { projectId: "p", automation: null } as const;
+    const methods = (o: ReturnType<typeof offered>) =>
+      o.credentials.map((c) => [c.name, c.methods, c.readOnly ?? false]);
+    const main = offered(deps, 0, "a", [], "auto", {
+      ...scope,
+      phase: "main",
+    });
+    expect(methods(main)).toEqual([
+      ["c-rw", ["GET", "POST", "DELETE"], false],
+      ["c-w", ["POST", "PUT"], false],
+      ["c-r", ["HEAD"], false],
+    ]);
+    const child = offered(deps, 0, "a", [], "auto", {
+      ...scope,
+      phase: "child",
+    });
+    expect(methods(child)).toEqual([
+      ["c-rw", ["GET", "POST", "DELETE"], true],
+      ["c-r", ["HEAD"], true],
+    ]);
+    expect(main.credentialsOff).toEqual([]);
+    expect(child.credentialsOff.map((c) => c.name)).toEqual(["c-w"]);
   });
 
   test("a main offer without the switch carries no delegate", () => {

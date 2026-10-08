@@ -32,6 +32,7 @@ import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
 import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
+import { isReadMethod } from "./builtin/bash.ts";
 import { DELEGATE_TOOL, makeDelegateTool } from "./builtin/delegate.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
 import {
@@ -89,12 +90,13 @@ type OfferDeps = {
 };
 
 // credentials ride on the network: none without it, and none outside a
-// project
+// project. A subagent's are read-only, so curl never writes through one.
 function credentialsFor(
   port: CredentialsPort | undefined,
   projectId: string | null | undefined,
   web: WebSnapshot | null,
   disabledCapabilities: readonly string[],
+  readOnly: boolean,
 ): SendCredentials {
   if (port === undefined || web === null || !projectId) return NO_CREDENTIALS;
   const offered: SendCredentials["offered"] = [];
@@ -102,6 +104,16 @@ function credentialsFor(
   for (const row of port.forProject(projectId)) {
     if (disabledCapabilities.includes(credentialKey(row.id))) {
       off.push({ id: row.id, name: row.name, prefix: row.prefix });
+      continue;
+    }
+    // a subagent's write-only credential refuses, never goes out unsigned
+    if (readOnly && !row.methods.some(isReadMethod)) {
+      off.push({
+        id: row.id,
+        name: row.name,
+        prefix: row.prefix,
+        writes: true,
+      });
       continue;
     }
     offered.push({
@@ -112,6 +124,7 @@ function credentialsFor(
       header: row.header,
       template: row.template,
       methods: [...row.methods],
+      ...(readOnly ? { readOnly: true as const } : {}),
     });
   }
   return { offered, off };
@@ -210,7 +223,8 @@ const CHILD_CUT: ReadonlySet<string> = new Set([
 // A subagent's offer, the one place it is decided: its parent's main
 // offer less CHILD_CUT and every MCP tool on the write side, the links
 // read alone so offeredServers() drops the write side as it always
-// decides it. Its bash leaves out open. The trimmed array never shares
+// decides it. Its bash leaves out open and its credentials sign GET
+// and HEAD alone. The trimmed array never shares
 // the parent's cached prefix; the alternative is the parent's array
 // here with the cut names refused at dispatch.
 function childOffered(
@@ -248,7 +262,8 @@ export function offered(
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
-  // building a subagent's offer: its bash says nothing of open
+  // building a subagent's offer: its bash says nothing of open and its
+  // credentials are read-only
   subagent = false,
 ): Offered {
   if (scope?.phase === "child") {
@@ -297,6 +312,7 @@ export function offered(
     scope?.projectId,
     web,
     disabledCapabilities,
+    subagent,
   );
   const allowed = new Set<string>([
     "datetime",

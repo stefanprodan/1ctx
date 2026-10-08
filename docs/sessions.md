@@ -330,9 +330,9 @@ leave it out are in `docs/subagents.md`.
   sits behind the project. Lookups of roots by project use the feed
   index's prefix; one of every session by project (a project's delete,
   a capability forgotten in one) reads the table, as the feed indexes
-  leave children out and SQLite never uses a partial index for a
-  foreign-key lookup. The scan is accepted: such a delete is a rare
-  admin action, about 18 ms at production's size.
+  are partial on `parent_session_id is null`, which `project_id = ?`
+  does not imply. The scan is accepted: such a delete is a rare admin
+  action, about 18 ms at production's size.
 - **`sessions_automation` is partial** (`automation_id is not null`).
   An `is null` lookup uses `sessions_feed_unowned` or
   `sessions_orphan_runs`. All's per-automation pick is the one walk
