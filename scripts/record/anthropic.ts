@@ -4,14 +4,12 @@
 // Records the Claude API into test/fixtures/providers/anthropic/, for
 // the anthropic wire's tests, with the bodies the wire itself builds:
 //
-//   bun scripts/record/anthropic.ts
+//   KEY_FILE=<the Claude API key file> bun scripts/record/anthropic.ts
 //
-// The key is read from KEY_FILE, by default staging's
-// workspace/staging/secrets/provider-anthropic.key, and never printed or
-// written out. It records the catalog, a Haiku 5.5 tool round with
-// thinking and its continuation, two parallel calls, a cached pair,
-// thinking off, a summary on Opus 5.5, a 401 and a max_tokens end; a
-// few cents in all.
+// The key is read from its file and never printed or written out. It
+// records the catalog, a Haiku 5.5 tool round with thinking and its
+// continuation, two parallel calls, a cached pair, thinking off, a
+// summary on Opus 5.5, a 401 and a max_tokens end; a few cents in all.
 
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -31,9 +29,11 @@ const OUT = join(ROOT, "test", "fixtures", "providers", "anthropic");
 const HAIKU = "claude-haiku-5-5";
 const OPUS = "claude-opus-5-5";
 
-const keyFile =
-  process.env.KEY_FILE ??
-  join(ROOT, "workspace", "staging", "secrets", "provider-anthropic.key");
+const keyFile = process.env.KEY_FILE;
+if (!keyFile) {
+  console.error("KEY_FILE must name the Claude API provider key file");
+  process.exit(1);
+}
 const key = readFileSync(keyFile, "utf8").trim();
 
 const scrub = (text: string) => text.replaceAll(key, "[key]");

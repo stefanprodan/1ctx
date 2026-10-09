@@ -72,6 +72,12 @@ function usageEvent(usage: any): ChatEvent {
   };
 }
 
+const INPUT_FIELDS = [
+  "input_tokens",
+  "cache_read_input_tokens",
+  "cache_creation_input_tokens",
+] as const;
+
 type Block = {
   type: string;
   thinking: string;
@@ -99,6 +105,8 @@ export function anthropicEvents(): AnthropicStream {
   let shown = false;
   let blockShown = false;
   let contentShown = false;
+  // message_start's input counts: a server may report them only there
+  let started: Record<string, number> = {};
 
   const start = (index: number, block: any): ChatEvent[] => {
     const type = text(block?.type) ?? "";
@@ -211,7 +219,12 @@ export function anthropicEvents(): AnthropicStream {
       );
     }
     if (body.usage && typeof body.usage === "object") {
-      events.push(usageEvent(body.usage));
+      // a null field is no answer and keeps what message_start said
+      const usage: Record<string, unknown> = { ...started };
+      for (const [field, value] of Object.entries(body.usage)) {
+        if (value !== null && value !== undefined) usage[field] = value;
+      }
+      events.push(usageEvent(usage));
     }
     if (reason !== undefined) events.push(finishOf(reason));
     return events;
@@ -226,8 +239,19 @@ export function anthropicEvents(): AnthropicStream {
         return delta(index, body.delta);
       case "content_block_stop":
         return stop(index);
-      // usage comes once, here: message_start's would count as output
-      // and end the round's retries before anything was shown
+      // usage comes once, at message_delta: one at message_start would
+      // count as output and end the round's retries before anything was
+      // shown, so its input counts only fill what message_delta leaves out
+      case "message_start": {
+        const usage = body.message?.usage;
+        if (usage && typeof usage === "object") {
+          started = {};
+          for (const field of INPUT_FIELDS) {
+            if (typeof usage[field] === "number") started[field] = usage[field];
+          }
+        }
+        return [];
+      }
       case "message_delta":
         return finish(body);
       case "message_stop":

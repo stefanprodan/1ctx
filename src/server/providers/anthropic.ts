@@ -41,7 +41,12 @@ export function maxTokensOf(req: ChatRequest): number {
     req.maxTokens ?? DEFAULT_MAX_TOKENS,
     req.outputLimit ?? DEFAULT_MAX_TOKENS,
   );
-  if (req.least && req.thinking) cap = Math.max(cap, THINKING_MIN_TOKENS);
+  if (req.least && req.thinking) {
+    cap = Math.min(
+      Math.max(cap, THINKING_MIN_TOKENS),
+      req.outputLimit ?? DEFAULT_MAX_TOKENS,
+    );
+  }
   return Math.max(1, Math.floor(cap));
 }
 

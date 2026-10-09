@@ -179,6 +179,33 @@ describe("the anthropic wire in a chat", () => {
     }
   });
 
+  test("an overloaded frame before any output is asked again and the turn finishes", async () => {
+    const { chat, fake } = await anthropicChat();
+    try {
+      queue(
+        fake,
+        stream("chat-overloaded-handmade.sse"),
+        stream("chat-thinking-off.sse"),
+      );
+      const sessionId = await start(chat, "say ok");
+      expect(fake.bodies()).toHaveLength(2);
+      expect(fake.bodies()[1]).toEqual(fake.bodies()[0]);
+      expect(chat.app.sessions.lastSend(sessionId)).toMatchObject({
+        status: "done",
+      });
+      const reply = chat.app.sessions
+        .messages(sessionId)
+        .find((row) => row.kind === "reply");
+      expect(reply).toMatchObject({ status: "done", error: null });
+      expect(reply?.content).toBe(
+        recorded("chat-thinking-off.sse").blocks[0]!.text,
+      );
+    } finally {
+      await chat.app.shutdown();
+      chat.app.db.close();
+    }
+  });
+
   test("a refused replay is forgotten for the session and the turn goes on", async () => {
     const { chat, fake } = await anthropicChat();
     try {

@@ -375,6 +375,10 @@ describe("the anthropic wire", () => {
       // a summary or attention round on a model that always thinks
       expect(cap({ maxTokens: 128, least: true, thinking: true })).toBe(1024);
       expect(cap({ maxTokens: 128, least: true, thinking: false })).toBe(128);
+      // the floor never passes the model's own cap
+      expect(
+        cap({ maxTokens: 128, least: true, thinking: true, outputLimit: 512 }),
+      ).toBe(512);
       expect(buildChatBody({ ...request, maxTokens: 300 }).max_tokens).toBe(
         300,
       );
@@ -460,6 +464,54 @@ describe("the anthropic wire", () => {
       expect(of(events, "usage")[0]?.usage).toEqual(usageOf(file));
       expect(of(events, "finish")).toEqual([
         { kind: "finish", reason: "stop", details: null },
+      ]);
+    });
+
+    test("message_start's input counts fill a null or missing field", async () => {
+      const { events } = await run([
+        frames(
+          {
+            type: "message_start",
+            message: {
+              usage: {
+                input_tokens: 40,
+                cache_read_input_tokens: 300,
+                cache_creation_input_tokens: 7,
+                output_tokens: 1,
+              },
+            },
+          },
+          {
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "text", text: "" },
+          },
+          {
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text: "ok" },
+          },
+          { type: "content_block_stop", index: 0 },
+          {
+            type: "message_delta",
+            delta: { stop_reason: "end_turn" },
+            usage: { input_tokens: null, output_tokens: 5 },
+          },
+          { type: "message_stop" },
+        ),
+      ]);
+      expect(of(events, "usage")).toEqual([
+        {
+          kind: "usage",
+          usage: {
+            promptTokens: 347,
+            completionTokens: 5,
+            cachedTokens: 300,
+            cacheWriteTokens: 7,
+            reasoningTokens: null,
+            cost: null,
+          },
+        },
       ]);
     });
 

@@ -117,9 +117,10 @@ since a relative URL inside the binary resolves against `src/server`.
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`,
-`ANTHROPIC_URL`) and fails every other, and a fake email sender that keeps every message. `smtp.ts`
-is a fake SMTP server on loopback. `chat.ts` drives a chat with a
-scripted provider stream. `auth-cases.ts` is the authorization matrix.
+`ANTHROPIC_URL`) and fails every other, and a fake email sender that
+keeps every message. `smtp.ts` is a fake SMTP server on loopback.
+`chat.ts` drives a chat with a scripted provider stream. `auth-cases.ts`
+is the authorization matrix.
 
 ## Docs
 

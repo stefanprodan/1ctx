@@ -49,7 +49,7 @@ export type ChatRequest = {
   // the agent chose Off; a strict server refuses the off field on a
   // model that never thinks
   thinkingOff?: boolean;
-  // the least thinking for a short round; azure alone reads it
+  // the least thinking for a short round; azure and anthropic read it
   least?: boolean;
   reasoningEffort?: Effort | null;
   temperature?: number | null;
