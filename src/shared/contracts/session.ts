@@ -184,7 +184,7 @@ export type Message = {
 };
 
 // a subagent's work under its parent's delegate row: the child's
-// status, the tokens of every round it ran and its rows, in the
+// status, its context (its last round's tokens) and its rows, in the
 // transcript's shape. A frame carries the rows a transaction changed;
 // the route carries them all
 export type ChildWork = {

@@ -158,8 +158,9 @@ is its root.
 - **A child's rows reach the root's watchers alone.** The hook
   publishes `child.changed` (`childChanged()`), built inside the
   child's transaction: the rows it changed in the transcript's wire
-  shape (`offWire`), the child's status, and the tokens of every
-  round it ran, keyed by the root's `delegate` row. The socket
+  shape (`offWire`), the child's status, and its context (its last
+  round's prompt and completion tokens, never a sum of rounds, which
+  re-counts the history), keyed by the root's `delegate` row. The socket
   sends it as the `child` frame to the root's watchers that hold its
   project, as `queue`; never to a project's other connections, the feed
   or another project. Rows appear as each round and call starts and
@@ -177,7 +178,7 @@ is its root.
 - **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
   shut until opened like a call. Its head is the description, then the
   status (running while the root's row runs, then the child's own:
-  done, failed or stopped) and the child's tokens, never a price, as
+  done, failed or stopped) and the child's context, never a price, as
   chats show none. With none of the child's rows held, the status is
   the root's row's (done, stopped, else failed) and no tokens show
   until the group is opened or a watch brings them. Open, it shows the

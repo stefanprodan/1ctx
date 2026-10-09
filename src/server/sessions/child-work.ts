@@ -13,8 +13,10 @@ import { offWire } from "./rows.ts";
 
 type TallyRaw = { status: SessionStatus; tokens: number };
 
-// the child's status and the tokens of every round it ran,
-// with the rows given; null when the session is gone or is no child
+// the child's status and its context, its last round's tokens, with
+// the rows given; null when the session is gone or is no child. A sum
+// of rounds re-counts the history each round sends, so it reads as
+// many times the context
 export function childWork(
   db: Db,
   sessionId: string,
@@ -23,8 +25,9 @@ export function childWork(
   const raw = db
     .query<TallyRaw, [string]>(
       `select sessions.status,
-         (select coalesce(sum(prompt_tokens + completion_tokens), 0)
-            from usage where usage.session_id = sessions.id) as tokens
+         coalesce((select prompt_tokens + completion_tokens
+            from usage where usage.session_id = sessions.id
+            order by seq desc limit 1), 0) as tokens
        from sessions
        where id = ? and parent_session_id is not null`,
     )
