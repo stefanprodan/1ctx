@@ -86,3 +86,53 @@ export function anthropicFetch(): {
     queue,
   };
 }
+
+export type Recorded = {
+  // each block whole, as a reader of the raw frames builds it
+  blocks: {
+    type: string;
+    id?: string;
+    name?: string;
+    text: string;
+    thinking: string;
+    signature: string;
+    json: string;
+  }[];
+  stopReason: string | null;
+  usage: Record<string, any>;
+};
+
+// what a recorded stream says, read straight from its frames, so a test
+// compares the wire's events with the file and holds across recordings
+export function recorded(name: string): Recorded {
+  const out: Recorded = { blocks: [], stopReason: null, usage: {} };
+  for (const line of anthropicFixture(name).split("\n")) {
+    if (!line.startsWith("data:")) continue;
+    const ev = JSON.parse(line.slice(5));
+    if (ev.type === "content_block_start") {
+      const b = ev.content_block;
+      out.blocks[ev.index] = {
+        type: b.type,
+        ...(b.id ? { id: b.id } : {}),
+        ...(b.name ? { name: b.name } : {}),
+        text: "",
+        thinking: "",
+        signature: "",
+        json: "",
+      };
+    }
+    if (ev.type === "content_block_delta") {
+      const b = out.blocks[ev.index]!;
+      const d = ev.delta;
+      if (d.type === "text_delta") b.text += d.text;
+      if (d.type === "thinking_delta") b.thinking += d.thinking;
+      if (d.type === "signature_delta") b.signature += d.signature;
+      if (d.type === "input_json_delta") b.json += d.partial_json;
+    }
+    if (ev.type === "message_delta") {
+      out.stopReason = ev.delta?.stop_reason ?? out.stopReason;
+      out.usage = { ...out.usage, ...ev.usage };
+    }
+  }
+  return out;
+}

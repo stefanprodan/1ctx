@@ -10,9 +10,8 @@
 // workspace/staging/secrets/provider-anthropic.key, and never printed or
 // written out. It records the catalog, a Haiku 5.5 tool round with
 // thinking and its continuation, two parallel calls, a cached pair,
-// thinking off, a summary on Opus 5.5, a visualize call, a 401 and a
-// max_tokens end; a few cents in all. A recorded file replaces the
-// hand-made one of the same stream, whose test then reads it.
+// thinking off, a summary on Opus 5.5, a 401 and a max_tokens end; a
+// few cents in all.
 
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -149,15 +148,6 @@ const add: ChatTool = {
     required: ["a", "b"],
   },
 };
-const visualize: ChatTool = {
-  name: "visualize",
-  description: "Show an SVG or HTML visual to the user.",
-  parameters: {
-    type: "object",
-    properties: { title: { type: "string" }, html: { type: "string" } },
-    required: ["title", "html"],
-  },
-};
 
 const ask = (content: string): ChatMessageIn => ({ role: "user", content });
 const system = (content: string): ChatMessageIn => ({
@@ -248,18 +238,6 @@ await record("chat-summary-opus.sse", {
     { role: "assistant", content: "It is 12:12 EEST on 2026-10-09." },
     ask(SUMMARIZE),
   ],
-});
-
-// a visualize call; the visual test's two streams pin their own call
-await record("chat-visualize-recorded.sse", {
-  model: HAIKU,
-  thinking: false,
-  messages: [
-    ask(
-      "Call visualize with the title Greeting and an 680 by 80 SVG that says Hello.",
-    ),
-  ],
-  tools: [visualize],
 });
 
 // a reply cut by its cap

@@ -32,6 +32,8 @@ import {
   anthropicFetch,
   anthropicFixture,
   frames,
+  type Recorded,
+  recorded,
   refusal,
   stream,
 } from "../../helpers/anthropic.ts";
@@ -386,32 +388,42 @@ describe("the anthropic wire", () => {
   });
 
   describe("the stream", () => {
+    // the usage event the file's last message_delta makes: the prompt is
+    // the uncached input plus the cache read and written
+    const usageOf = (file: Recorded) => ({
+      promptTokens:
+        file.usage.input_tokens +
+        file.usage.cache_read_input_tokens +
+        file.usage.cache_creation_input_tokens,
+      completionTokens: file.usage.output_tokens,
+      cachedTokens: file.usage.cache_read_input_tokens,
+      cacheWriteTokens: file.usage.cache_creation_input_tokens,
+      reasoningTokens: file.usage.output_tokens_details.thinking_tokens,
+      cost: null,
+    });
+    const callsOf = (file: Recorded) =>
+      file.blocks
+        .filter((b) => b.type === "tool_use")
+        .map((b) => ({
+          id: b.id ?? "",
+          name: b.name ?? "",
+          arguments: b.json,
+        }));
+    const joined = (events: ChatEvent[], kind: "content" | "reasoning") =>
+      of(events, kind)
+        .map((e) => e.text)
+        .join("");
+
     test("a recorded tool round streams the call and ends on tool_use", async () => {
+      const file = recorded("chat-tool-round.sse");
       const { events } = await run([stream("chat-tool-round.sse")]);
+      expect(file.stopReason).toBe("tool_use");
       expect(of(events, "toolCalls")).toEqual([
-        {
-          kind: "toolCalls",
-          calls: [
-            {
-              id: "toolu_01PfH3V9JX4RNsTT9Eor2cPw",
-              name: "get_time",
-              arguments: '{"city": "Bucharest"}',
-            },
-          ],
-        },
+        { kind: "toolCalls", calls: callsOf(file) },
       ]);
+      expect(JSON.parse(callsOf(file)[0]!.arguments)).toHaveProperty("city");
       expect(of(events, "usage")).toEqual([
-        {
-          kind: "usage",
-          usage: {
-            promptTokens: 382,
-            completionTokens: 51,
-            cachedTokens: 0,
-            cacheWriteTokens: 0,
-            reasoningTokens: 0,
-            cost: null,
-          },
-        },
+        { kind: "usage", usage: usageOf(file) },
       ]);
       expect(of(events, "finish")).toEqual([
         { kind: "finish", reason: "tool_calls", details: null },
@@ -422,29 +434,30 @@ describe("the anthropic wire", () => {
     });
 
     test("the recorded continuation thinks, keeps the signed block and answers", async () => {
+      const file = recorded("chat-tool-result.sse");
+      expect(file.blocks.map((b) => b.type)).toEqual(["thinking", "text"]);
       const { events } = await run([stream("chat-tool-result.sse")]);
-      const reasoning = of(events, "reasoning")
-        .map((e) => e.text)
-        .join("");
-      expect(reasoning).toStartWith("The tool returned 09:12 UTC");
-      const [detail] = of(events, "reasoningDetail");
-      expect(detail?.item).toMatchObject({
-        type: "thinking",
-        index: 0,
-        thinking: reasoning,
-      });
-      expect(String(detail?.item.signature)).toHaveLength(1240);
-      expect(
-        of(events, "content")
-          .map((e) => e.text)
-          .join(""),
-      ).toStartWith("It's currently **12:12 PM** in Bucharest");
+      const reasoning = joined(events, "reasoning");
+      expect(reasoning).toBe(file.blocks[0]!.thinking);
+      expect(of(events, "reasoningDetail")).toEqual([
+        {
+          kind: "reasoningDetail",
+          item: {
+            type: "thinking",
+            index: 0,
+            thinking: reasoning,
+            signature: file.blocks[0]!.signature,
+          },
+        },
+      ]);
+      expect(file.blocks[0]!.signature).not.toBe("");
+      expect(joined(events, "content")).toBe(file.blocks[1]!.text);
       // the idle check is lifted while the thinking block is open
       const alive = of(events, "alive")
         .map((e) => e.thinking)
         .filter((now, i, all) => i === 0 || now !== all[i - 1]);
       expect(alive).toEqual([false, true, false]);
-      expect(of(events, "usage")[0]?.usage.reasoningTokens).toBe(150);
+      expect(of(events, "usage")[0]?.usage).toEqual(usageOf(file));
       expect(of(events, "finish")).toEqual([
         { kind: "finish", reason: "stop", details: null },
       ]);
@@ -459,62 +472,64 @@ describe("the anthropic wire", () => {
       ]);
     });
 
-    test("parallel calls come out in order, whole, after thinking and text", async () => {
+    test("recorded parallel calls come out in order, whole", async () => {
+      const file = recorded("chat-parallel-calls.sse");
+      expect(callsOf(file)).toHaveLength(2);
+      const { events } = await run([stream("chat-parallel-calls.sse")]);
+      expect(of(events, "toolCalls")[0]?.calls).toEqual(callsOf(file));
+      expect(of(events, "finish")[0]?.reason).toBe("tool_calls");
+    });
+
+    test("thinking and text before two calls keep that order, one record", async () => {
+      const file = recorded("chat-parallel-calls-handmade.sse");
       const { events } = await run([
         stream("chat-parallel-calls-handmade.sse"),
       ]);
-      expect(of(events, "toolCalls")[0]?.calls).toEqual([
-        {
-          id: "toolu_01QdWi9PSsQtwRC7CEX8v4XE",
-          name: "add",
-          arguments: '{"a":12,"b":30}',
-        },
-        {
-          id: "toolu_013TTYdYdH9vDN2pN4MV62a6",
-          name: "add",
-          arguments: '{"a":7,"b":8}',
-        },
-      ]);
+      expect(of(events, "toolCalls")[0]?.calls).toEqual(callsOf(file));
       expect(of(events, "reasoningDetail")).toHaveLength(1);
-      expect(
-        of(events, "content")
-          .map((e) => e.text)
-          .join(""),
-      ).toBe(
-        "I'll add 12 and 30 with the first call, and 7 and 8 with the second.",
-      );
+      expect(joined(events, "content")).toBe(file.blocks[1]!.text);
     });
 
-    test("usage adds the cache to the uncached input", async () => {
-      const { events } = await run([stream("chat-cached-handmade.sse")]);
-      const [usage] = of(events, "usage");
-      expect(usage?.usage).toEqual({
-        promptTokens: 4 + 12_784 + 51,
-        completionTokens: 18,
-        cachedTokens: 12_784,
-        cacheWriteTokens: 51,
-        reasoningTokens: 0,
-        cost: null,
-      });
+    test("usage adds the cache to the uncached input, written then read", async () => {
+      const write = recorded("chat-cached-write.sse");
+      const read = recorded("chat-cached-read.sse");
+      // the pair caches one prefix: what the first wrote the second read
+      expect(write.usage.cache_creation_input_tokens).toBeGreaterThan(0);
+      expect(read.usage.cache_read_input_tokens).toBe(
+        write.usage.cache_creation_input_tokens,
+      );
       const price = modelPrice("anthropic", "claude-haiku-5-5")!;
-      expect(costOf(usage!.usage, "anthropic", price)).toBeCloseTo(
-        (4 * 0.1 + 12_784 * 0.01 + 51 * 0.125 + 18 * 0.5) / 1e6,
-        12,
-      );
+      for (const [name, file] of [
+        ["chat-cached-write.sse", write],
+        ["chat-cached-read.sse", read],
+      ] as const) {
+        const { events } = await run([stream(name)]);
+        const [usage] = of(events, "usage");
+        expect(usage?.usage).toEqual(usageOf(file));
+        const u = file.usage;
+        expect(costOf(usage!.usage, "anthropic", price)).toBeCloseTo(
+          (u.input_tokens * price.input +
+            u.cache_read_input_tokens * price.cacheRead +
+            u.cache_creation_input_tokens * price.cacheWrite +
+            u.output_tokens * price.output) /
+            1e6,
+          12,
+        );
+      }
     });
 
-    test("a summary on a model that always thinks keeps its words, no records", async () => {
-      const { events } = await run([stream("chat-summary-opus-handmade.sse")]);
-      expect(
-        of(events, "content")
-          .map((e) => e.text)
-          .join(""),
-      ).toStartWith("## Goal");
+    test("a summary on a model that always thinks keeps its words and its record", async () => {
+      const file = recorded("chat-summary-opus.sse");
+      expect(file.blocks.map((b) => b.type)).toEqual(["thinking", "text"]);
+      const { events } = await run([stream("chat-summary-opus.sse")]);
+      expect(joined(events, "content")).toBe(file.blocks[1]!.text);
+      expect(of(events, "reasoningDetail")).toHaveLength(1);
       expect(of(events, "finish")[0]?.reason).toBe("stop");
     });
 
     test("max_tokens and a full window are length", async () => {
-      const { events } = await run([stream("chat-max-tokens-handmade.sse")]);
+      expect(recorded("chat-max-tokens.sse").stopReason).toBe("max_tokens");
+      const { events } = await run([stream("chat-max-tokens.sse")]);
       expect(of(events, "finish")).toEqual([
         { kind: "finish", reason: "length", details: null },
       ]);
@@ -593,9 +608,7 @@ describe("the anthropic wire", () => {
 
   describe("the errors and headers", () => {
     test("a refused request is its type and message with the status", async () => {
-      const { events, fake } = await run([
-        refusal("error-401-handmade.json", 401),
-      ]);
+      const { events, fake } = await run([refusal("error-401.json", 401)]);
       expect(events).toEqual([
         {
           kind: "error",
@@ -730,7 +743,7 @@ describe("the anthropic wire", () => {
         contextLength: 200_000,
         outputLimit: 64_000,
         reasoning: false,
-        promptPrice: null,
+        promptPrice: 1,
       });
       expect(fixedThinking(old)).toBe("off");
       expect(fixedThinking(byId.get("claude-haiku-5-5")!)).toBeNull();

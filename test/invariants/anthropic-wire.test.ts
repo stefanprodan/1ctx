@@ -15,6 +15,7 @@ import {
 import {
   type Answer,
   anthropicFetch,
+  recorded,
   refusal,
   stream,
 } from "../helpers/anthropic.ts";
@@ -145,10 +146,11 @@ describe("the anthropic wire in a chat", () => {
       );
       expect(turn).toEqual(["thinking", "text", "tool_use", "tool_use"]);
       const results = blocks(second!, "tool_result");
-      expect(results.map((r) => r.tool_use_id)).toEqual([
-        "toolu_01QdWi9PSsQtwRC7CEX8v4XE",
-        "toolu_013TTYdYdH9vDN2pN4MV62a6",
-      ]);
+      expect(results.map((r) => r.tool_use_id)).toEqual(
+        recorded("chat-parallel-calls-handmade.sse")
+          .blocks.filter((b) => b.type === "tool_use")
+          .map((b) => b.id),
+      );
       expect(results.every((r) => r.is_error === true)).toBe(true);
       expect(second!.messages).toHaveLength(3);
       expect(records(chat, sessionId)).toEqual(["thinking", "thinking"]);
@@ -211,7 +213,7 @@ describe("the anthropic wire in a chat", () => {
     try {
       queue(fake, stream("chat-thinking-off.sse"));
       const sessionId = await start(chat, "what did we decide");
-      queue(fake, stream("chat-summary-opus-handmade.sse"));
+      queue(fake, stream("chat-summary-opus.sse"));
       const res = await chat.member.call(
         "POST",
         `/api/sessions/${sessionId}/compact`,
@@ -245,20 +247,21 @@ describe("the anthropic wire in a chat", () => {
   test("a turn's usage row carries the cost at the model's rates", async () => {
     const { chat, fake } = await anthropicChat();
     try {
-      queue(fake, stream("chat-cached-handmade.sse"));
+      queue(fake, stream("chat-cached-read.sse"));
       const sessionId = await start(chat, "which wires");
       const row = chat.app.db
         .query<{ cost: number | null }, [string]>(
           "select cost from usage where session_id = ?",
         )
         .get(sessionId)!;
-      // 4 uncached in, 12,784 read and 51 written, 18 out
+      // the recording's uncached input, cache read and write, and output
+      const u = recorded("chat-cached-read.sse").usage;
       const price = modelPrice("anthropic", ANTHROPIC_MODEL)!;
       expect(row.cost).toBeCloseTo(
-        (4 * price.input +
-          12_784 * price.cacheRead +
-          51 * price.cacheWrite +
-          18 * price.output) /
+        (u.input_tokens * price.input +
+          u.cache_read_input_tokens * price.cacheRead +
+          u.cache_creation_input_tokens * price.cacheWrite +
+          u.output_tokens * price.output) /
           1_000_000,
         12,
       );
