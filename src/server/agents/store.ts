@@ -26,6 +26,7 @@ type Raw = {
   reasoning_known: number;
   model_described: number;
   listed_as: string | null;
+  output_limit: number | null;
   thinking: "on" | "off" | null;
   effort: Effort | null;
   prompt: string;
@@ -58,6 +59,7 @@ const row = (
     reasoningKnown: raw.reasoning_known === 1,
     described: raw.model_described === 1,
     ...(raw.listed_as !== null && { listedAs: raw.listed_as }),
+    ...(raw.output_limit !== null && { outputLimit: raw.output_limit }),
   },
   thinking: raw.thinking,
   effort: raw.effort,
@@ -179,10 +181,10 @@ export class AgentStore {
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
            thinking_required, reasoning_known, model_described, listed_as,
-           thinking, effort, prompt, mcp_mode, upstream, skip_4bit,
-           subagents, created_at)
+           output_limit, thinking, effort, prompt, mcp_mode, upstream,
+           skip_4bit, subagents, created_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-           ?)`,
+           ?, ?)`,
       )
       .run(
         id,
@@ -200,6 +202,7 @@ export class AgentStore {
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
         m.listedAs ?? null,
+        m.outputLimit ?? null,
         fields.thinking,
         fields.effort,
         fields.prompt,
@@ -219,7 +222,8 @@ export class AgentStore {
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
            tools = ?, reasoning = ?, thinking_required = ?,
-           reasoning_known = ?, model_described = ?, listed_as = ?, thinking = ?,
+           reasoning_known = ?, model_described = ?, listed_as = ?,
+           output_limit = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?,
            subagents = ?
          where id = ? and deleted_at is null`,
@@ -239,6 +243,7 @@ export class AgentStore {
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
         m.listedAs ?? null,
+        m.outputLimit ?? null,
         fields.thinking,
         fields.effort,
         fields.prompt,

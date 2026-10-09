@@ -12,7 +12,7 @@ import type {
   ChatRequest,
 } from "../../../src/server/providers/types.ts";
 import { EFFORTS, WIRES, type Wire } from "../../../src/shared/words.ts";
-import { AZURE_URL } from "../../helpers/app.ts";
+import { ANTHROPIC_URL, AZURE_URL } from "../../helpers/app.ts";
 
 const FIXTURE = new URL(
   "../../fixtures/providers/bodies.json",
@@ -26,6 +26,7 @@ const BASE_URL: Record<Wire, string> = {
   gemini: "https://gemini.test/v1beta",
   opencode: "https://opencode.test/zen/go/v1",
   azure: AZURE_URL,
+  anthropic: ANTHROPIC_URL,
 };
 
 const MODELS: Record<Wire, string[]> = {
@@ -35,6 +36,7 @@ const MODELS: Record<Wire, string[]> = {
   gemini: ["gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash"],
   opencode: ["kimi-k2", "glm-4.6"],
   azure: ["gpt-5"],
+  anthropic: ["claude-haiku-5-5"],
 };
 
 const history = (model: string): ChatMessageIn[] => [

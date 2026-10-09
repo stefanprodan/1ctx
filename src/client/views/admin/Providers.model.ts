@@ -63,6 +63,16 @@ export const PRESETS: Preset[] = [
     name: "gemini",
   },
   {
+    wire: "anthropic",
+    label: "Claude API",
+    text: "Claude models, with the key from platform.claude.com.",
+    baseUrl: "https://api.anthropic.com/v1",
+    fixed: false,
+    hint: null,
+    placeholder: PLACEHOLDER,
+    name: "anthropic",
+  },
+  {
     wire: "opencode",
     label: "OpenCode Go",
     text: "DeepSeek, GLM, Kimi and more on an OpenCode Go plan.",

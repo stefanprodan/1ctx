@@ -190,6 +190,19 @@ describe("the words", () => {
       fixed: false,
       name: "opencode",
     });
+    // the Claude API's address is filled in and may be changed, for a
+    // server that speaks the Messages API elsewhere
+    expect(preset("anthropic")).toEqual({
+      wire: "anthropic",
+      label: "Claude API",
+      text: "Claude models, with the key from platform.claude.com.",
+      baseUrl: expect.stringMatching(/^https:\/\/api\..*\/v1$/),
+      fixed: false,
+      hint: null,
+      placeholder: "http://host:port/v1",
+      name: "anthropic",
+    });
+    expect(presetBaseUrl(preset("anthropic").baseUrl!, "azure")).toBe("");
     // each Foundry resource has its own address, so it is typed
     expect(preset("azure")).toEqual({
       wire: "azure",

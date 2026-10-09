@@ -210,10 +210,12 @@ export function renderRows(
       if (roundComplete(calls, resultRows)) {
         out.push(workMessage(row, calls, policy, lookups, sameProvider(row)));
         calls.forEach((call, index) => {
+          const result = resultRows[index]!;
           out.push({
             role: "tool",
             toolCallId: call.id,
-            content: resultRows[index]!.content,
+            content: result.content,
+            ...(result.status === "failed" ? { failed: true } : {}),
           });
         });
         continue;

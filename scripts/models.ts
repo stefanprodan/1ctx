@@ -13,8 +13,8 @@
 import { join } from "node:path";
 
 const SOURCE = "https://models.dev/api.json";
-const PROVIDERS = ["azure", "google", "opencode-go"];
-const PRICED = new Set(["azure", "google"]);
+const PROVIDERS = ["anthropic", "azure", "google", "opencode-go"];
+const PRICED = new Set(["anthropic", "azure", "google"]);
 const OUT = join(import.meta.dir, "../src/server/providers/models.json");
 
 type Cost = {

@@ -25,7 +25,8 @@ export type ProviderSummary = {
 // server fills both from models.dev where it lists the model, as a
 // suggestion. `listedAs` is the model's models.dev id on a dedicated
 // wire (an Azure deployment's model), which an agent keeps for its
-// cost; absent on the other wires
+// cost; absent on the other wires. `outputLimit` is the most a reply
+// may hold, where the catalog says (anthropic)
 export type CatalogMatch = {
   id: string;
   name: string;
@@ -37,10 +38,11 @@ export type CatalogMatch = {
   // the model always thinks: a request that turns thinking off is refused
   thinkingRequired: boolean;
   // the catalog reliably says whether the model thinks, so reasoning
-  // false means it never does; only OpenRouter and Gemini do
+  // false means it never does; OpenRouter, Gemini and Anthropic do
   reasoningKnown: boolean;
   described: boolean;
   listedAs?: string;
+  outputLimit?: number;
 };
 
 // one provider serving a model behind OpenRouter: the tag a request

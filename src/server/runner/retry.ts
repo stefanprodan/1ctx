@@ -3,8 +3,9 @@
 //
 // Whether a round's failed request is asked again, and after how long.
 // Only a request that failed before its stream started is: a busy or
-// failing server (429, 5xx), a connection that failed, or a headers
-// wait that ran out, the last only once since each costs two minutes.
+// failing server (429, 5xx, Anthropic's overloaded 529), a connection
+// that failed, or a headers wait that ran out, the last only once since
+// each costs two minutes.
 
 import type { ChatEvent } from "../providers/index.ts";
 
@@ -12,7 +13,7 @@ export const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER = 0.25;
 export const MAX_RETRY_AFTER_MS = 30_000;
-const RETRY_STATUSES: readonly number[] = [429, 500, 502, 503, 504];
+const RETRY_STATUSES: readonly number[] = [429, 500, 502, 503, 504, 529];
 
 export type RetryState = {
   // the retries this round has made, and how many were headers waits

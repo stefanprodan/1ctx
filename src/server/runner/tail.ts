@@ -66,6 +66,23 @@ export function costWithin(
   return cost > room ? null : cost;
 }
 
+// a summary edits the history before its tail, and anthropic refuses a
+// thinking block after an edited history on newer accounts, so the
+// tail's replies go without theirs; replay starts again after the summary
+function withoutThinking(
+  wire: Wire | null,
+  messages: ChatMessageIn[],
+): ChatMessageIn[] {
+  if (wire !== "anthropic") return messages;
+  return messages.map((message) => {
+    if (message.role !== "assistant" || !message.reasoningDetails) {
+      return message;
+    }
+    const { reasoningDetails: _, ...rest } = message;
+    return rest;
+  });
+}
+
 export type Tail = {
   // the index of the tail's first row, the summary's own when empty
   start: number;
@@ -93,11 +110,9 @@ export function tailOf(
     const sendId = rows[start - 1]!.sendId;
     let begin = start - 1;
     while (begin > 0 && rows[begin - 1]!.sendId === sendId) begin--;
-    const messages = renderRows(
-      rows.slice(begin, start),
-      policy,
-      lookups,
-      turns,
+    const messages = withoutThinking(
+      wire,
+      renderRows(rows.slice(begin, start), policy, lookups, turns),
     );
     const cost =
       messages.length === 0

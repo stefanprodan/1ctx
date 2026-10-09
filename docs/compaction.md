@@ -23,13 +23,19 @@ Sends, the writer and the queue are in `docs/sessions.md`.
   `requestTokens()` of the whole request. An estimate gets +10%, at
   most what leaves a history at the threshold the whole
   `summaryMaxTokens` (the reserve less it and 256), never capped below
-  half the reserve.
+  half the reserve. On `anthropic` a model that always thinks gets at
+  least 1,024, since its thinking comes out of the cap.
 - **After a done summary, history is the summary, then its tail**
   (`runner/tail.ts`): the newest whole turns before the summary row,
   replayed as they were, then the rows after it. A turn is one send's
   rows but its summary row, so queued messages stay one turn and a call
   keeps its result. The walk goes newest first and stops at the first
   turn that does not fit, so a newest turn over the budget leaves none.
+- **On `anthropic` the tail's replies go without their thinking.** The
+  summary edits the history before them, and the API refuses a thinking
+  block after an edited history on newer accounts; replay starts again
+  with the first turn after the summary, whose thinking was made on the
+  summarized history.
 - **The tail budget** (`tailBudget()`) is the least of 20,000 tokens, a
   tenth of the window, and half of what `compactsAt()` leaves above the
   system prompt, the schemas and the summary, counted with

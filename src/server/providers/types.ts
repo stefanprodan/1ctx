@@ -18,8 +18,8 @@ export type ChatTool = {
   parameters: object;
 };
 
-// an OpenRouter reasoning_details item, or an azure reasoning or phase
-// record; sent back as received
+// an OpenRouter reasoning_details item, an azure reasoning or phase
+// record, or an anthropic thinking block; sent back as received
 export type ReasoningDetail = {
   type: string;
   index?: number;
@@ -39,7 +39,8 @@ export type ChatMessageIn =
       reasoningDetails?: ReasoningDetail[];
       toolCalls?: ToolCall[];
     }
-  | { role: "tool"; toolCallId: string; content: string };
+  // failed: the tool did not finish, which anthropic marks as an error
+  | { role: "tool"; toolCallId: string; content: string; failed?: boolean };
 
 export type ChatRequest = {
   model: string;
@@ -54,6 +55,8 @@ export type ChatRequest = {
   temperature?: number | null;
   topP?: number | null;
   maxTokens?: number | null;
+  // the model's output cap from its catalog row; anthropic alone reads it
+  outputLimit?: number | null;
   tools?: ChatTool[];
   // the session id, so a provider that routes or caches by conversation
   // keeps one session's turns together; omitted when not set
@@ -72,7 +75,7 @@ export type Usage = {
   completionTokens: number;
   cachedTokens: number | null;
   // the prompt tokens written to the cache, which some models bill
-  // apart; Azure and OpenRouter report them
+  // apart; Azure, Anthropic and OpenRouter report them
   cacheWriteTokens: number | null;
   reasoningTokens: number | null;
   // USD

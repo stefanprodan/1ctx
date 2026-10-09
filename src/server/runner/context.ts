@@ -209,13 +209,13 @@ export const cacheKeyOf = (
 export function requestBase(
   policy: Pick<
     SendPolicy,
-    "model" | "agentId" | "summoned" | "upstream" | "skip4Bit"
+    "model" | "agentId" | "summoned" | "upstream" | "skip4Bit" | "outputLimit"
   >,
   sessionId: string,
   messages: ChatMessageIn[],
 ): Pick<
   ChatRequest,
-  "model" | "messages" | "cacheKey" | "upstream" | "skip4Bit"
+  "model" | "messages" | "cacheKey" | "upstream" | "skip4Bit" | "outputLimit"
 > {
   return {
     model: policy.model,
@@ -223,6 +223,9 @@ export function requestBase(
     cacheKey: cacheKeyOf(policy, sessionId),
     upstream: policy.upstream,
     skip4Bit: policy.skip4Bit,
+    ...(policy.outputLimit === undefined
+      ? {}
+      : { outputLimit: policy.outputLimit }),
   };
 }
 

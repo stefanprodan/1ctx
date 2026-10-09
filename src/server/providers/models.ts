@@ -16,7 +16,12 @@ import data from "./models.json" with { type: "json" };
 import type { Usage } from "./types.ts";
 
 // the models.dev provider ids the file holds
-export const MODEL_SOURCES = ["azure", "google", "opencode-go"] as const;
+export const MODEL_SOURCES = [
+  "anthropic",
+  "azure",
+  "google",
+  "opencode-go",
+] as const;
 export type ModelSource = (typeof MODEL_SOURCES)[number];
 
 // USD per million tokens; a cache rate the catalog leaves out is the
@@ -65,7 +70,7 @@ const facts = (m: Listed): ModelFacts => ({
   tools: m.tools,
 });
 
-// every model of the three by its name and its canonical name,
+// every model of the sources by its name and its canonical name,
 // lowercased; two with one name keep the smaller window, since one too
 // large has requests refused, and take tools if either does
 const BY_NAME = new Map<string, ModelFacts>();
@@ -92,6 +97,8 @@ for (const source of MODEL_SOURCES) {
 // for many servers and have none
 export function modelSource(wire: Wire): ModelSource | null {
   switch (wire) {
+    case "anthropic":
+      return "anthropic";
     case "azure":
       return "azure";
     case "gemini":
@@ -113,7 +120,7 @@ export function modelFacts(
 }
 
 // a model of any host, by the last part of its id (z-ai/glm-5.2 is
-// glm-5.2); null when none of the three lists that name
+// glm-5.2); null when no source lists that name
 export function factsByName(model: string): ModelFacts | null {
   const name = model.split("/").pop()?.toLowerCase() ?? "";
   return BY_NAME.get(name) ?? null;

@@ -1919,4 +1919,33 @@ describe("the tail after a summary", () => {
       history(rows, { ...wide, contextLength: null }, lookups, NOW)[1]?.content,
     ).toBe(`${SUMMARY_LEAD}\n\nsummary\n\n${UPLOADS_SUMMARY_LINE}`);
   });
+  test("on anthropic the tail's replies go without their thinking and replay starts after the summary", () => {
+    const thought = [
+      { type: "thinking", index: 0, thinking: "t", signature: "sig" },
+    ];
+    const thinking: ContextLookups = {
+      ...lookups,
+      reasoningDetailsOf: (id) =>
+        id === "a-r" || id === "c-r" ? thought : null,
+    };
+    const rows = [
+      user("a-u", "a", "what time is it"),
+      answer("a-r", "a", "noon"),
+      summary("a-s", "a", "## Goal"),
+      user("c-u", "c", "and now?"),
+      answer("c-r", "c", "one"),
+    ];
+    const replies = (wire: SendPolicy["wire"]) =>
+      history(rows, { ...wide, wire }, thinking, NOW)
+        .slice(1)
+        .filter((message) => message.role === "assistant");
+    expect(replies("anthropic")).toEqual([
+      { role: "assistant", content: "noon" },
+      { role: "assistant", content: "one", reasoningDetails: thought },
+    ]);
+    expect(replies("openrouter")).toEqual([
+      { role: "assistant", content: "noon", reasoningDetails: thought },
+      { role: "assistant", content: "one", reasoningDetails: thought },
+    ]);
+  });
 });

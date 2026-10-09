@@ -91,6 +91,7 @@ describe("modelSource", () => {
       ["gemini", "google"],
       ["opencode", "opencode-go"],
       ["azure", "azure"],
+      ["anthropic", "anthropic"],
     ]);
   });
 });

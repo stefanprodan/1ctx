@@ -15,7 +15,7 @@ const refused = (status: number, extra: Partial<ErrorEvent> = {}) =>
 const fresh = { retries: 0, timeouts: 0 };
 
 describe("which failures are asked again", () => {
-  test.each([429, 500, 502, 503, 504])("%i is retried", (status) => {
+  test.each([429, 500, 502, 503, 504, 529])("%i is retried", (status) => {
     expect(retryWait(refused(status), fresh, null, 0)).toBe(1000);
   });
 

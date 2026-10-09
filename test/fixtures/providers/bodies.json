@@ -1350,5 +1350,149 @@
    "content-type": "application/json"
   },
   "body": "{\"model\":\"gpt-5\",\"input\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"[ana.b] what time is it\"}]},{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"blob\"},{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call_2\",\"name\":\"datetime\",\"arguments\":\"{\\\"tz\\\":\\\"UTC\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_1\",\"output\":\"noon\"},{\"type\":\"function_call_output\",\"call_id\":\"call_2\",\"output\":\"noon UTC\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"it is noon\"}]},{\"type\":\"function_call\",\"call_id\":\"call_3\",\"name\":\"datetime\",\"arguments\":\"{}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_3\",\"output\":\"noon\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"noon\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"thanks\"}]}],\"stream\":true,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"reasoning\":{\"effort\":\"none\"}}"
+ },
+ "anthropic claude-haiku-5-5 default": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 on": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 least": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 full": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":300,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"tools\":[{\"name\":\"datetime\",\"description\":\"the clock\",\"input_schema\":{\"type\":\"object\"}}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"temperature\":0.2,\"top_p\":0.9,\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 bare": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-low": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"low\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-low-off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-medium": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"medium\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-medium-off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-high": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"high\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-high-off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-xhigh": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"xhigh\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-xhigh-off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-max": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"max\"},\"stream\":true}"
+ },
+ "anthropic claude-haiku-5-5 effort-max-off": {
+  "url": "https://claude.test/v1/messages",
+  "headers": {
+   "x-api-key": "k",
+   "anthropic-version": "2023-06-01",
+   "content-type": "application/json"
+  },
+  "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"be brief\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"[ana.b] what time is it\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"datetime\",\"input\":{}},{\"type\":\"tool_use\",\"id\":\"call_2\",\"name\":\"datetime\",\"input\":{\"tz\":\"UTC\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_1\",\"content\":\"noon\"},{\"type\":\"tool_result\",\"tool_use_id\":\"call_2\",\"content\":\"noon UTC\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"it is noon\"},{\"type\":\"tool_use\",\"id\":\"call_3\",\"name\":\"datetime\",\"input\":{}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"call_3\",\"content\":\"noon\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"noon\",\"cache_control\":{\"type\":\"ephemeral\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"thanks\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"thinking\":{\"type\":\"disabled\"},\"stream\":true}"
  }
 }

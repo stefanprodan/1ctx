@@ -89,6 +89,8 @@ export type SendPolicy = {
   wire: Wire | null;
   model: string;
   contextLength: number | null;
+  // the most a reply may hold, where the catalog says; absent elsewhere
+  outputLimit?: number;
   // the models.dev rates of the agent's model, null when none price it;
   // a round whose reply has no cost is priced by them
   price: ModelPrice | null;
@@ -290,6 +292,9 @@ export function buildPolicy(input: {
     price: priceOf(input.wire ?? null, agent.model.listedAs),
     model: agent.model.id,
     contextLength: agent.model.contextLength,
+    ...(agent.model.outputLimit === undefined
+      ? {}
+      : { outputLimit: agent.model.outputLimit }),
     prompt: agent.prompt,
     thinking,
     thinkingOff: fixed === null && agent.thinking === "off",

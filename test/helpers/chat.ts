@@ -4,7 +4,8 @@
 // A chat under test control: the fake fetch answers the catalog as the
 // app helper does, and every chat request with a stream the test
 // drives frame by frame, holds open, or fails. The frames are in the
-// OpenAI shape, so the real wire parses them. chatApp() composes the
+// OpenAI shape, or the Messages shape on anthropic, so the real wire
+// parses them. chatApp() composes the
 // app with it, a provider, an agent and a member, and signs the member
 // in.
 
@@ -16,6 +17,9 @@ import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import type { Wire } from "../../src/shared/words.ts";
 import {
+  ANTHROPIC_CHAT,
+  ANTHROPIC_MODELS,
+  ANTHROPIC_URL,
   AZURE_URL,
   fakeFetch,
   GEMINI_URL,
@@ -30,6 +34,8 @@ export const GEMINI_FLASH = "gemini-3.8-flash";
 // a deployment the azure recording lists, undescribed, so the agent
 // states its window and tools
 export const AZURE_MODEL = "gpt-6-luna";
+// a model the anthropic catalog describes, which can stop thinking
+export const ANTHROPIC_MODEL = "claude-haiku-5-5";
 // the one catalog model whose row has no tools flag: a send on it is
 // offered no tools and behaves as before
 export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
@@ -100,6 +106,91 @@ export type Scripted = {
   chats(): number;
 };
 
+// the Messages frames for the script's calls: a block opened on its first
+// piece, a thinking block closed when another starts, the OpenAI finish
+// words in Anthropic's
+const STOP_REASONS: Record<string, string> = {
+  stop: "end_turn",
+  tool_calls: "tool_use",
+  length: "max_tokens",
+  content_filter: "refusal",
+};
+
+function messagesFrames(frame: (chunk: Record<string, unknown>) => void) {
+  let blocks = 0;
+  let text: number | null = null;
+  let thinking: number | null = null;
+  const tools = new Map<number | string, number>();
+  let lastTool: number | string = 0;
+  const open = (block: Record<string, unknown>) => {
+    if (thinking !== null) {
+      frame({ type: "content_block_stop", index: thinking });
+      thinking = null;
+    }
+    const index = blocks++;
+    frame({ type: "content_block_start", index, content_block: block });
+    return index;
+  };
+  const delta = (index: number, delta: Record<string, unknown>) =>
+    frame({ type: "content_block_delta", index, delta });
+  return {
+    content(piece: string) {
+      if (text === null) text = open({ type: "text", text: "" });
+      delta(text, { type: "text_delta", text: piece });
+    },
+    reasoning(piece: string) {
+      if (thinking === null) {
+        const index = open({ type: "thinking", thinking: "", signature: "" });
+        thinking = index;
+      }
+      delta(thinking, { type: "thinking_delta", thinking: piece });
+    },
+    toolCall(call: ToolCallFrame) {
+      const key = call.index ?? call.id ?? lastTool;
+      lastTool = key;
+      let index = tools.get(key);
+      if (index === undefined) {
+        index = open({
+          type: "tool_use",
+          id: call.id,
+          name: call.name,
+          input: {},
+        });
+        tools.set(key, index);
+      }
+      if (call.arguments) {
+        delta(index, {
+          type: "input_json_delta",
+          partial_json: call.arguments,
+        });
+      }
+    },
+    finish(reason: string) {
+      if (thinking !== null) {
+        frame({ type: "content_block_stop", index: thinking });
+        thinking = null;
+      }
+      frame({
+        type: "message_delta",
+        delta: { stop_reason: STOP_REASONS[reason] ?? reason },
+      });
+    },
+    usage(fields: { prompt?: number; completion?: number; cached?: number }) {
+      const prompt = fields.prompt ?? 10;
+      frame({
+        type: "message_delta",
+        delta: {},
+        usage: {
+          input_tokens: prompt - (fields.cached ?? 0),
+          cache_read_input_tokens: fields.cached ?? 0,
+          cache_creation_input_tokens: 0,
+          output_tokens: fields.completion ?? 5,
+        },
+      });
+    },
+  };
+}
+
 export function scriptedFetch(
   fallback?: typeof fetch,
   window?: number,
@@ -123,12 +214,16 @@ export function scriptedFetch(
     const url = String(input instanceof Request ? input.url : input);
     if (
       url === `${PROVIDER_URL}/models` ||
-      url === `${GEMINI_URL}/models?pageSize=1000`
+      url === `${GEMINI_URL}/models?pageSize=1000` ||
+      url === ANTHROPIC_MODELS
     ) {
       return catalog(input, init);
     }
     const gemini = url === `${GEMINI_URL}/openai/chat/completions`;
-    if (!gemini && url !== `${PROVIDER_URL}/chat/completions`) {
+    // a test that brings its own fetch answers the Messages address with
+    // recordings (helpers/anthropic.ts); others drive it frame by frame
+    const anthropic = url === ANTHROPIC_CHAT && fallback === undefined;
+    if (!gemini && !anthropic && url !== `${PROVIDER_URL}/chat/completions`) {
       if (fallback !== undefined) return fallback(input, init);
       throw new TypeError("unable to connect");
     }
@@ -181,6 +276,7 @@ export function scriptedFetch(
     new Headers(init?.headers).forEach((v, k) => {
       headers[k] = v;
     });
+    const messages = anthropic ? messagesFrames(frame) : null;
     const script: Script = {
       body,
       headers,
@@ -188,45 +284,57 @@ export function scriptedFetch(
         controller.enqueue(encoder.encode(text));
       },
       aborted: false,
-      content: (text) => frame({ choices: [{ delta: { content: text } }] }),
+      content: (text) =>
+        messages
+          ? messages.content(text)
+          : frame({ choices: [{ delta: { content: text } }] }),
       reasoning: (text) =>
-        frame({
-          choices: [
-            {
-              delta: gemini
-                ? {
-                    content: text,
-                    extra_content: { google: { thought: true } },
-                  }
-                : { reasoning_content: text },
-            },
-          ],
-        }),
+        messages
+          ? messages.reasoning(text)
+          : frame({
+              choices: [
+                {
+                  delta: gemini
+                    ? {
+                        content: text,
+                        extra_content: { google: { thought: true } },
+                      }
+                    : { reasoning_content: text },
+                },
+              ],
+            }),
       toolCall: (call) =>
-        frame({
-          choices: [
-            {
-              delta: {
-                tool_calls: [
-                  {
-                    ...(call.index === undefined ? {} : { index: call.index }),
-                    id: call.id,
-                    type: "function",
-                    function: { name: call.name, arguments: call.arguments },
-                    ...(call.signature === undefined
-                      ? {}
-                      : {
-                          extra_content: {
-                            google: { thought_signature: call.signature },
-                          },
-                        }),
+        messages
+          ? messages.toolCall(call)
+          : frame({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        ...(call.index === undefined
+                          ? {}
+                          : { index: call.index }),
+                        id: call.id,
+                        type: "function",
+                        function: {
+                          name: call.name,
+                          arguments: call.arguments,
+                        },
+                        ...(call.signature === undefined
+                          ? {}
+                          : {
+                              extra_content: {
+                                google: { thought_signature: call.signature },
+                              },
+                            }),
+                      },
+                    ],
                   },
-                ],
-              },
-              finish_reason: null,
-            },
-          ],
-        }),
+                  finish_reason: null,
+                },
+              ],
+            }),
       toolRound: (calls, usage = {}) => {
         calls.forEach((call, i) => {
           script.toolCall({ index: call.index ?? i, ...call });
@@ -235,22 +343,29 @@ export function scriptedFetch(
         script.usage(usage);
       },
       finish: (reason = "stop") =>
-        frame({ choices: [{ delta: {}, finish_reason: reason }] }),
+        messages
+          ? messages.finish(reason)
+          : frame({ choices: [{ delta: {}, finish_reason: reason }] }),
       usage: (fields = {}) =>
-        frame({
-          choices: [],
-          usage: {
-            prompt_tokens: fields.prompt ?? 10,
-            completion_tokens: fields.completion ?? 5,
-            total_tokens: (fields.prompt ?? 10) + (fields.completion ?? 5),
-            ...(fields.cached === undefined
-              ? {}
-              : { prompt_tokens_details: { cached_tokens: fields.cached } }),
-          },
-        }),
+        messages
+          ? messages.usage(fields)
+          : frame({
+              choices: [],
+              usage: {
+                prompt_tokens: fields.prompt ?? 10,
+                completion_tokens: fields.completion ?? 5,
+                total_tokens: (fields.prompt ?? 10) + (fields.completion ?? 5),
+                ...(fields.cached === undefined
+                  ? {}
+                  : {
+                      prompt_tokens_details: { cached_tokens: fields.cached },
+                    }),
+              },
+            }),
       end: () => {
         try {
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          if (messages) frame({ type: "message_stop" });
+          else controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch {}
       },
@@ -395,7 +510,9 @@ export async function chatApp(
             ? GEMINI_URL
             : options.wire === "azure"
               ? AZURE_URL
-              : PROVIDER_URL,
+              : options.wire === "anthropic"
+                ? ANTHROPIC_URL
+                : PROVIDER_URL,
         keyName: null,
       },
     })
@@ -431,7 +548,9 @@ export async function chatApp(
         ? GEMINI_FLASH
         : options.wire === "azure"
           ? AZURE_MODEL
-          : FLASH),
+          : options.wire === "anthropic"
+            ? ANTHROPIC_MODEL
+            : FLASH),
   });
   if (options.window !== undefined) {
     app.db

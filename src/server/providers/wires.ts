@@ -30,12 +30,22 @@ export function endpoint(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${path}`;
 }
 
-// Gemini's catalog alone reads its own header
+// the Messages API version every anthropic request names
+export const ANTHROPIC_VERSION = "2023-06-01";
+
+// Gemini's catalog alone reads its own header; anthropic names its
+// version even with no key, the catalog read included
 export function authHeaders(
   wire: Wire,
   key: string | null,
   purpose: "chat" | "catalog" = "chat",
 ): Record<string, string> {
+  if (wire === "anthropic") {
+    return {
+      ...(key === null ? {} : { "x-api-key": key }),
+      "anthropic-version": ANTHROPIC_VERSION,
+    };
+  }
   if (key === null) return {};
   if (wire === "azure") return { "api-key": key };
   if (wire === "gemini" && purpose === "catalog") {
@@ -54,8 +64,12 @@ type ChatWire = {
 
 const none = () => ({});
 
-// every wire but azure, whose Responses API is its own (azure.ts)
-export const CHAT_WIRES: Record<Exclude<Wire, "azure">, ChatWire> = {
+// every wire but azure and anthropic, whose APIs are their own
+// (azure.ts, anthropic.ts)
+export const CHAT_WIRES: Record<
+  Exclude<Wire, "azure" | "anthropic">,
+  ChatWire
+> = {
   openrouter: {
     path: "/chat/completions",
     headers: () => OPENROUTER_HEADERS,

@@ -12,6 +12,7 @@ import { readStream } from "../lib/body.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { BadGateway, messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { parseModels as parseAnthropicModels } from "./anthropic.ts";
 import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
 import { factsByName, modelFacts, modelPrice, modelSource } from "./models.ts";
@@ -168,6 +169,10 @@ const CATALOGS: Record<Wire, WireCatalog> = {
     parse: parseGeminiCatalog,
   },
   azure: { url: (base) => azureUrls(base).catalog, parse: parseDeployments },
+  anthropic: {
+    url: (base) => endpoint(base, "/models?limit=1000"),
+    parse: parseAnthropicModels,
+  },
 };
 
 export async function fetchCatalog(
