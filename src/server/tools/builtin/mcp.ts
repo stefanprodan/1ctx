@@ -109,7 +109,9 @@ export function makeMcpCatalogTools(servers: OfferedServer[]): Tool[] {
       },
       async run(args) {
         const tool = named(servers, args.name);
-        const schema = JSON.stringify(tool.wireInputSchema, null, 2);
+        // minified: the result stays in history, and indentation adds
+        // tokens without meaning
+        const schema = JSON.stringify(tool.wireInputSchema);
         return `${tool.description}\n\n${schema}`;
       },
     },

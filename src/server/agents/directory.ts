@@ -10,7 +10,8 @@ import type {
   DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { firstSentence } from "../../shared/mcp-catalog.ts";
+import { MAX_CATALOG_LINE } from "../../shared/mcp-catalog.ts";
+import { firstSentence } from "../../shared/text.ts";
 import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
 import { parseName, parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -182,7 +183,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             .filter((tool) => LISTED.has(tool.name))
             .map((tool) => ({
               name: tool.name,
-              description: firstSentence(tool.description),
+              description: firstSentence(tool.description, MAX_CATALOG_LINE),
               provider: tool.name === "websearch" ? offered.search : null,
             }))
             .sort(byName),

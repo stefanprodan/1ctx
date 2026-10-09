@@ -7,7 +7,7 @@
 
 import type { PromptServer } from "./mcp.ts";
 import { escapeText } from "./skills.ts";
-import { cutText, oneLine } from "./text.ts";
+import { firstSentence } from "./text.ts";
 import { isRecord, type McpMode } from "./words.ts";
 
 // decision 19: the catalog of discovery mode, and the mode a send runs in
@@ -15,27 +15,15 @@ export const MCP_CATALOG_FROM_TOKENS = 6000;
 export const MAX_CATALOG = 16_000;
 export const MAX_CATALOG_LINE = 160;
 export const CATALOG_LEAD =
-  "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its arguments, then mcp_call with the name and the arguments. Each line is a tool's name, its arguments and what it does. A ? after an argument marks it optional. mcp_describe gives the type and meaning of each argument.";
-const CATALOG_OPEN = `${CATALOG_LEAD}\n\n<available_mcp_tools>\n`;
+  "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its arguments, then mcp_call with the name and the arguments. mcp_describe gives the type and meaning of each argument.";
+// what each tier's lines hold, said after the lead, so a model reading
+// a partial catalog knows to describe before it calls
+export const CATALOG_OPENINGS = [
+  "COMPLETE: every tool, with its arguments and what it does. A ? after an argument marks it optional.",
+  "PARTIAL: every tool with its arguments; mcp_describe gives what each does. A ? after an argument marks it optional.",
+  "PARTIAL: every tool name; mcp_describe gives arguments and what each does.",
+] as const;
 const CATALOG_CLOSE = "</available_mcp_tools>";
-
-// a period closing `e.g` or `i.e` is no sentence end; nothing else is
-// skipped, so two real sentences never merge
-const SENTENCE_END = /[.!?](?=\s|$)/g;
-const ABBREVIATION = /(?:^|[^\p{L}\p{N}_])(?:e\.g|i\.e)$/iu;
-
-// the first sentence of a description, on one line, cut at the line cap
-export function firstSentence(text: string): string {
-  const line = oneLine(text);
-  let sentence = line;
-  for (const end of line.matchAll(SENTENCE_END)) {
-    const before = line.slice(0, end.index);
-    if (end[0] === "." && ABBREVIATION.test(before)) continue;
-    sentence = `${before}${end[0]}`;
-    break;
-  }
-  return cutText(sentence, MAX_CATALOG_LINE);
-}
 
 // a server's names are its own: one outside this set could break the
 // line's grammar or start a new line
@@ -71,36 +59,49 @@ export function catalogArguments(schemaJson: string): string {
   return `(${shown.join(", ")})`;
 }
 
-// one line per tool, servers in the order given while they fit; a
-// server that does not fit is left out whole with every later one,
-// since the enum and the catalog must agree
+type CatalogTool = { name: string; args: string; description: string };
+
+// a line per tier, longest first
+const TIER_LINES: ((tool: CatalogTool) => string)[] = [
+  (t) =>
+    `${t.name}${t.args}: ${escapeText(firstSentence(t.description, MAX_CATALOG_LINE))}`,
+  (t) => `${t.name}${t.args}`,
+  (t) => t.name,
+];
+
+// Every offered tool, under its server's header in the order given, at
+// the first tier whose whole text fits MAX_CATALOG: the cap shortens
+// lines and never removes a tool, since the catalog is the only list of
+// names the model gets. Tier 3 is printed over the cap rather than
+// dropping anything; overCap tells the caller to say so.
 export function mcpCatalog(servers: PromptServer[]): {
   text: string;
-  included: string[];
-  leftOut: string[];
+  overCap: boolean;
 } {
-  let text = CATALOG_OPEN;
-  const included: string[] = [];
-  const leftOut: string[] = [];
-  for (const server of servers) {
-    const lines = server.tools
-      .map(
-        (t) =>
-          `${t.wireName}${catalogArguments(t.schemaJson)}: ${escapeText(firstSentence(t.description))}\n`,
-      )
+  const listed = servers.filter((server) => server.tools.length > 0);
+  if (listed.length === 0) return { text: "", overCap: false };
+  const parsed = listed.map((server) => {
+    const count = server.tools.length;
+    return {
+      header: `${server.name} (${count} ${count === 1 ? "tool" : "tools"}):\n`,
+      tools: server.tools.map(
+        (t): CatalogTool => ({
+          name: t.wireName,
+          args: catalogArguments(t.schemaJson),
+          description: t.description,
+        }),
+      ),
+    };
+  });
+  let text = "";
+  for (const [tier, line] of TIER_LINES.entries()) {
+    const body = parsed
+      .map((s) => s.header + s.tools.map((t) => `${line(t)}\n`).join(""))
       .join("");
-    if (
-      leftOut.length === 0 &&
-      text.length + lines.length + CATALOG_CLOSE.length <= MAX_CATALOG
-    ) {
-      text += lines;
-      included.push(server.name);
-    } else {
-      leftOut.push(server.name);
-    }
+    text = `${CATALOG_LEAD}\n${CATALOG_OPENINGS[tier]}\n\n<available_mcp_tools>\n${body}${CATALOG_CLOSE}`;
+    if (text.length <= MAX_CATALOG) return { text, overCap: false };
   }
-  if (included.length === 0) return { text: "", included, leftOut };
-  return { text: text + CATALOG_CLOSE, included, leftOut };
+  return { text, overCap: true };
 }
 
 // tokens: the offered MCP schemas on the wire, counted by the server

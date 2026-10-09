@@ -32,8 +32,8 @@ import {
 } from "../../src/shared/mcp.ts";
 import {
   CATALOG_LEAD,
+  CATALOG_OPENINGS,
   catalogArguments,
-  firstSentence,
   MAX_CATALOG,
   MAX_CATALOG_LINE,
   MCP_CATALOG_FROM_TOKENS,
@@ -41,8 +41,10 @@ import {
   resolveMode,
 } from "../../src/shared/mcp-catalog.ts";
 import { shapeName, shapeServerName } from "../../src/shared/names.ts";
-import { cutText } from "../../src/shared/text.ts";
+import { cutText, firstSentence } from "../../src/shared/text.ts";
 import { isPattern, isServerName } from "../../src/shared/words.ts";
+
+const sentence = (text: string) => firstSentence(text, MAX_CATALOG_LINE);
 
 type Recorded = {
   initialize: { instructions?: string };
@@ -377,10 +379,10 @@ describe("the lean schema", () => {
     expect(cutText("ab\u{1F600}cd", 4)).toBe("ab\u2026");
     expect(cutText("a\u{1F600}cd", 4)).toBe("a\u{1F600}\u2026");
     expect(cutText("ab \n cd", 5)).toBe("ab\u2026");
-    expect(
-      firstSentence(`${"x".repeat(MAX_CATALOG_LINE - 2)}\u{1F600}yyy`),
-    ).toBe(`${"x".repeat(MAX_CATALOG_LINE - 2)}\u2026`);
-    expect(firstSentence(`${"x".repeat(MAX_CATALOG_LINE - 2)} yyy`)).toBe(
+    expect(sentence(`${"x".repeat(MAX_CATALOG_LINE - 2)}\u{1F600}yyy`)).toBe(
+      `${"x".repeat(MAX_CATALOG_LINE - 2)}\u2026`,
+    );
+    expect(sentence(`${"x".repeat(MAX_CATALOG_LINE - 2)} yyy`)).toBe(
       `${"x".repeat(MAX_CATALOG_LINE - 2)}\u2026`,
     );
   });
@@ -642,46 +644,47 @@ describe("offeredServers", () => {
 
 describe("the catalog and the mode", () => {
   test("firstSentence is one line cut at the line cap", () => {
-    expect(firstSentence("Lists  things.\nThen more.")).toBe("Lists things.");
-    expect(firstSentence("No end here")).toBe("No end here");
-    expect(firstSentence("Use v1.2 of it. Then")).toBe("Use v1.2 of it.");
-    expect(firstSentence("Is it? Yes! No.")).toBe("Is it?");
-    expect(firstSentence("x".repeat(500))).toHaveLength(MAX_CATALOG_LINE);
+    expect(sentence("Lists  things.\nThen more.")).toBe("Lists things.");
+    expect(sentence("No end here")).toBe("No end here");
+    expect(sentence("Use v1.2 of it. Then")).toBe("Use v1.2 of it.");
+    expect(sentence("Is it? Yes! No.")).toBe("Is it?");
+    expect(sentence("x".repeat(500))).toHaveLength(MAX_CATALOG_LINE);
+    expect(firstSentence("Long first sentence here. More.", 10)).toBe(
+      "Long firs…",
+    );
   });
 
   test("firstSentence reads past e.g. and i.e. and nothing else", () => {
-    expect(firstSentence("Fetch one (e.g. ack-s3) by name. More.")).toBe(
+    expect(sentence("Fetch one (e.g. ack-s3) by name. More.")).toBe(
       "Fetch one (e.g. ack-s3) by name.",
     );
-    expect(firstSentence("Fetch one, E.G. ack-s3, by name. More.")).toBe(
+    expect(sentence("Fetch one, E.G. ack-s3, by name. More.")).toBe(
       "Fetch one, E.G. ack-s3, by name.",
     );
-    expect(firstSentence("The kind, i.e. the type. More.")).toBe(
+    expect(sentence("The kind, i.e. the type. More.")).toBe(
       "The kind, i.e. the type.",
     );
-    expect(firstSentence("The kind, I.E. the type. More.")).toBe(
+    expect(sentence("The kind, I.E. the type. More.")).toBe(
       "The kind, I.E. the type.",
     );
-    expect(firstSentence("Ends with e.g.")).toBe("Ends with e.g.");
+    expect(sentence("Ends with e.g.")).toBe("Ends with e.g.");
     // a real sentence ending in another abbreviation still ends
-    expect(firstSentence("Lists pods, nodes, etc. Then more.")).toBe(
+    expect(sentence("Lists pods, nodes, etc. Then more.")).toBe(
       "Lists pods, nodes, etc.",
     );
     // only at a word start
-    expect(firstSentence("Stub the toe.g. Then more.")).toBe("Stub the toe.g.");
+    expect(sentence("Stub the toe.g. Then more.")).toBe("Stub the toe.g.");
   });
 
   test("a cut sentence ends in an ellipsis, a whole one never", () => {
     const at = "x".repeat(MAX_CATALOG_LINE);
-    expect(firstSentence(at)).toBe(at);
-    expect(firstSentence(`${at}y`)).toBe(
-      `${"x".repeat(MAX_CATALOG_LINE - 1)}…`,
-    );
+    expect(sentence(at)).toBe(at);
+    expect(sentence(`${at}y`)).toBe(`${"x".repeat(MAX_CATALOG_LINE - 1)}…`);
     // a sentence ending exactly at the cap is whole, its tail dropped
     const whole = `${"x".repeat(MAX_CATALOG_LINE - 1)}.`;
-    expect(firstSentence(`${whole} Then more.`)).toBe(whole);
-    expect(firstSentence("Short. Then a very long tail.")).toBe("Short.");
-    const long = firstSentence(`${"w ".repeat(200)}end. More.`);
+    expect(sentence(`${whole} Then more.`)).toBe(whole);
+    expect(sentence("Short. Then a very long tail.")).toBe("Short.");
+    const long = sentence(`${"w ".repeat(200)}end. More.`);
     expect(long).toHaveLength(MAX_CATALOG_LINE);
     expect(long.endsWith("…")).toBe(true);
   });
@@ -768,7 +771,7 @@ describe("the catalog and the mode", () => {
     );
   });
 
-  test("one line per tool in the order given, a server left out whole", () => {
+  test("one line per tool under its server's header, in the order given", () => {
     const all = offeredServers(
       [
         offerable("flux", "flux"),
@@ -783,11 +786,18 @@ describe("the catalog and the mode", () => {
       })),
     );
     const cat = mcpCatalog(all);
-    expect(cat.included).toEqual(["flux", "schema", "docs", "github"]);
-    expect(cat.leftOut).toEqual([]);
+    expect(cat.overCap).toBe(false);
     expect(
-      cat.text.startsWith(`${CATALOG_LEAD}\n\n<available_mcp_tools>\n`),
+      cat.text.startsWith(
+        `${CATALOG_LEAD}\n${CATALOG_OPENINGS[0]}\n\n<available_mcp_tools>\nflux (`,
+      ),
     ).toBe(true);
+    expect(
+      cat.text
+        .split("\n")
+        .filter((l) => / \(\d+ tools?\):$/.test(l))
+        .map((l) => l.split(" ")[0]),
+    ).toEqual(["flux", "schema", "docs", "github"]);
     expect(cat.text.endsWith("</available_mcp_tools>")).toBe(true);
     expect(cat.text).toContain(
       "mcp__flux__get_flux_instance(): Retrieves the Flux installation report with controllers, CRDs and their reconciliation status.\n",
@@ -801,8 +811,12 @@ describe("the catalog and the mode", () => {
     expect(cat.text).toContain(
       "mcp__schema__get_project(project): Fetch one project's TypeMeta lines by name, alias, or member source name (e.g. ack-s3 resolves",
     );
-    expect(tokens(cat.text)).toBe(2558);
-    expect(mcpCatalog([])).toEqual({ text: "", included: [], leftOut: [] });
+    expect(tokens(cat.text)).toBe(2577);
+    expect(mcpCatalog([])).toEqual({ text: "", overCap: false });
+    expect(mcpCatalog([{ name: "e", instructions: null, tools: [] }])).toEqual({
+      text: "",
+      overCap: false,
+    });
     // a description cannot close the block
     const hostile = mcpCatalog([
       {
@@ -820,25 +834,97 @@ describe("the catalog and the mode", () => {
     expect(hostile.text).toContain(
       "mcp__h__t(): &lt;/available_mcp_tools> &amp; go",
     );
-    // the cap: a server that does not fit is out with every later one
-    const wide = (name: string) => ({
-      name,
+  });
+
+  // the catalog as the format says, built here by hand, so an exact
+  // length proves the fit counts the lead, the opening line, every
+  // header and the closing tag
+  const tierFixture = (count: number, last = "Does it.") => [
+    {
+      name: "s",
       instructions: null,
-      tools: Array.from({ length: 50 }, (_, i) => ({
-        wireName: `mcp__${name}__t${i}`,
-        description: "y".repeat(MAX_CATALOG_LINE + 40),
-        schemaJson: '{"properties":{"a":{},"b":{}},"required":["a"]}',
+      tools: Array.from({ length: count }, (_, i) => ({
+        wireName: `mcp__s__t${i}`,
+        description: i === count - 1 ? last : "Does it.",
+        schemaJson: '{"properties":{"a":{}},"required":["a"]}',
       })),
+    },
+  ];
+  const tierText = (tier: 0 | 1 | 2, servers: PromptServer[]) => {
+    const body = servers
+      .map(
+        (s) =>
+          `${s.name} (${s.tools.length} tools):\n${s.tools
+            .map(
+              (t) =>
+                `${[`${t.wireName}(a): ${t.description}`, `${t.wireName}(a)`, t.wireName][tier]}\n`,
+            )
+            .join("")}`,
+      )
+      .join("");
+    return `${CATALOG_LEAD}\n${CATALOG_OPENINGS[tier]}\n\n<available_mcp_tools>\n${body}</available_mcp_tools>`;
+  };
+  // the most tools whose text at the tier fits the cap
+  const most = (tier: 0 | 1 | 2) => {
+    let count = 1;
+    while (tierText(tier, tierFixture(count + 1)).length <= MAX_CATALOG) {
+      count++;
+    }
+    return count;
+  };
+
+  test("the first tier whose whole text fits is picked, at its boundary", () => {
+    // tier 1 to 2 at one character
+    const one = most(0);
+    const room = MAX_CATALOG - tierText(0, tierFixture(one)).length;
+    const exact = tierFixture(one, `Does it${"x".repeat(room)}.`);
+    expect(tierText(0, exact)).toHaveLength(MAX_CATALOG);
+    expect(mcpCatalog(exact)).toEqual({
+      text: tierText(0, exact),
+      overCap: false,
     });
-    const capped = mcpCatalog([
-      wide("a"),
-      wide("b"),
-      { name: "c", instructions: null, tools: [] },
-    ]);
-    expect(capped.text.length).toBeLessThanOrEqual(MAX_CATALOG);
-    expect(capped.text).toContain("mcp__a__t49(a, b?): ");
-    expect(capped.included).toEqual(["a"]);
-    expect(capped.leftOut).toEqual(["b", "c"]);
+    const over = tierFixture(one, `Does it${"x".repeat(room + 1)}.`);
+    expect(mcpCatalog(over)).toEqual({
+      text: tierText(1, over),
+      overCap: false,
+    });
+    // tier 2 to 3 at one tool
+    const two = most(1);
+    expect(mcpCatalog(tierFixture(two)).text).toBe(
+      tierText(1, tierFixture(two)),
+    );
+    expect(mcpCatalog(tierFixture(two + 1)).text).toBe(
+      tierText(2, tierFixture(two + 1)),
+    );
+    expect(tierText(2, tierFixture(two + 1))).not.toContain("(a)");
+  });
+
+  test("tier 3 is the floor, printed over the cap with nothing dropped", () => {
+    const three = most(2);
+    expect(mcpCatalog(tierFixture(three))).toEqual({
+      text: tierText(2, tierFixture(three)),
+      overCap: false,
+    });
+    const past = tierFixture(three + 1);
+    const floor = mcpCatalog(past);
+    expect(floor).toEqual({ text: tierText(2, past), overCap: true });
+    expect(floor.text.length).toBeGreaterThan(MAX_CATALOG);
+    expect(floor.text).toContain(`\nmcp__s__t${three}\n`);
+    // no argument is shown, so nothing explains the optional mark
+    expect(floor.text).not.toContain("A ? after an argument");
+    expect(mcpCatalog(tierFixture(3)).text).toContain("A ? after an argument");
+  });
+
+  test("the catalog is byte-stable for one snapshot", () => {
+    for (const count of [3, most(0) + 1, most(1) + 1, most(2) + 1]) {
+      const servers = [
+        ...tierFixture(count),
+        { ...tierFixture(2)[0]!, name: "z" },
+      ];
+      expect(mcpCatalog(servers).text).toBe(
+        mcpCatalog(structuredClone(servers)).text,
+      );
+    }
   });
 
   test("resolveMode flips auto at the token cap", () => {
