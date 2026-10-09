@@ -61,6 +61,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   const writer = new Writer({
     db: deps.db,
     clock: deps.clock,
+    log: deps.log,
     sessions: deps.sessions,
     uploads: deps.uploads,
     usage: deps.usage,

@@ -53,6 +53,7 @@ type PhaseRowsDeps = {
   db: Db;
   clock: Clock;
   sessions: SessionsPort;
+  log: Log;
 };
 
 // the main round's open rows at the run's cut, its completions kept

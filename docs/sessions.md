@@ -194,7 +194,8 @@ that agent answers the one turn (see Summons).
   `finalizeSend`'s transaction or `stopMainTools`'s, writes a completion
   as `finishTool` would, kept files included; the maps clear only after
   the commit, so a retried finalization writes them once. A completion
-  whose write throws, under its savepoint, gets the cut text instead.
+  whose write throws, under its savepoint, logs `tool end not written`
+  and gets the cut text instead.
 - **Any other open row gets the cut text** (`sessions/cut.ts`): why the
   send ended, "No result was recorded.", and what may have happened by
   kind (read, MCP read, bash, bash discarded, delegate, write), decided

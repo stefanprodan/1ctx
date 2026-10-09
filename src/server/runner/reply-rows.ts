@@ -8,6 +8,7 @@ import type { ToolCall } from "../../shared/contracts/tool.ts";
 import type { SendCause, SessionStatus } from "../../shared/words.ts";
 import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import { type CutKind, cutKind, cutText } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
 import type { Offered, ToolResult } from "./policy.ts";
@@ -161,11 +162,14 @@ export function kindOf(offered: Offered, name: string): CutKind {
   return cutKind(name, tool?.side ?? null);
 }
 
+type CutDeps = { db: Db; sessions: SessionsPort; log: Log };
+
 // a completion written as finishTool writes it, under a savepoint: a
 // write that fails leaves the row to the cut text, so a bad result
 // never holds the send's end
 function writeCompletion(
-  deps: { db: Db; sessions: SessionsPort },
+  deps: CutDeps,
+  send: ActiveSend,
   rowId: string,
   result: ToolResult,
   now: number,
@@ -178,7 +182,11 @@ function writeCompletion(
       }
       return { result: row, events: [] };
     });
-  } catch {
+  } catch (error) {
+    deps.log.warn("tool end not written", {
+      chat: send.sessionId,
+      ...errorFields(error, false),
+    });
     return undefined;
   }
 }
@@ -188,7 +196,7 @@ function writeCompletion(
 // cut text. A finish leaves none open; were one, it ended unrecorded.
 // A guard means a late tool that already wrote returns null
 export function cutOpenTools(
-  deps: { db: Db; sessions: SessionsPort },
+  deps: CutDeps,
   send: ActiveSend,
   offered: Offered,
   cause: SendCause,
@@ -198,7 +206,7 @@ export function cutOpenTools(
   for (const [call, open] of send.openTools) {
     const result = send.settled.get(call);
     if (result !== undefined && !result.interrupted) {
-      const row = writeCompletion(deps, open.rowId, result, now);
+      const row = writeCompletion(deps, send, open.rowId, result, now);
       if (row !== undefined) {
         if (row !== null) changed.push(row);
         continue;

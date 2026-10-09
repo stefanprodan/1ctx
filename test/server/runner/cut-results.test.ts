@@ -369,6 +369,64 @@ describe("a cut send's tool rows", () => {
   });
 });
 
+describe("a completion the cut cannot write", () => {
+  test("logs the failed write and leaves the row the cut text", async () => {
+    const logs = collectLogs();
+    let finished = false;
+    const chat = await chatApp({
+      window: 20_000,
+      logFactory: logs.logFactory,
+      tools: fakeTools(
+        ["bash", "visualize"],
+        async (_offered, toolCall, ctx) => {
+          if (toolCall.name === "bash") {
+            finished = true;
+            return completion(ctx.caps.resultCut);
+          }
+          return hang(ctx.signal);
+        },
+      ),
+    });
+    try {
+      const { script, sessionId } = await startChat(chat);
+      script.toolRound(
+        [call("done", "bash"), call("open", "visualize")],
+        BUFFERED,
+      );
+      script.end();
+      for (let i = 0; i < 200 && !finished; i++) await tick();
+      const store = chat.app.sessions;
+      const original = store.finishTool.bind(store);
+      store.finishTool = (id, fields) => {
+        if (fields.status === "done") throw new Error("disk full");
+        return original(id, fields);
+      };
+      await stop(chat, sessionId);
+      await settleRun(chat, sessionId);
+      store.finishTool = original;
+
+      const [done, open] = toolRows(chat, sessionId);
+      expect(done).toMatchObject({
+        status: "stopped",
+        content: cutText("stop", "bash", false),
+      });
+      expect(count(chat, "mcp_kept_files", done!.id)).toBe(0);
+      expect(open).toMatchObject({
+        status: "stopped",
+        content: cutText("stop", "write", false),
+      });
+      expect(
+        logs.events.filter((event) => event.msg === "tool end not written"),
+      ).toMatchObject([
+        { level: "warn", fields: { chat: sessionId, error: "disk full" } },
+      ]);
+      expect(chat.app.sessions.byId(sessionId)?.status).toBe("stopped");
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});
+
 describe("a run cut by its deadline before its memory phase", () => {
   test("keeps the completed rows and gives an aborted command the deadline text", async () => {
     const chat = await chatApp({ window: 20_000 });

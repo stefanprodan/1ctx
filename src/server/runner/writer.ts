@@ -16,6 +16,7 @@ import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
+import type { Log } from "../lib/log.ts";
 import type { ChatEvent } from "../providers/index.ts";
 import { envelope } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
@@ -56,6 +57,7 @@ export type { SessionsPort } from "./writer-port.ts";
 export type WriterDeps = {
   db: Db;
   clock: Clock;
+  log: Log;
   sessions: SessionsPort;
   uploads: UploadsPort;
   usage: { record(fields: UsageFields): unknown };

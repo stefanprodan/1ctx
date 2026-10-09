@@ -291,7 +291,6 @@ export async function delegate(
     return {
       content: "The subagent was stopped before it began.",
       error: true,
-      interrupted: true,
     };
   }
   try {
@@ -363,7 +362,7 @@ async function runChild(
     completion_tokens: send.completionTokens,
     duration: deps.clock() - send.startedAt,
   });
-  const result = childResult(
+  return childResult(
     {
       cause: send.cause!,
       error: send.error,
@@ -375,11 +374,6 @@ async function runChild(
       resultCut: policy.toolCaps.resultCut,
     },
   );
-  // the parent's cut ended the child: its row gets the cut text, which
-  // says files may have come back
-  return signal.aborted && send.cause !== "finish"
-    ? { ...result, interrupted: true }
-    : result;
 }
 
 // the child's done answer, and the last words it wrote
