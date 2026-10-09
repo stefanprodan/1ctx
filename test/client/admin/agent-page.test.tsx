@@ -354,6 +354,9 @@ describe("the model draft", () => {
     expect(d.modelDirty(agent, "openrouter")).toBe(true);
     d.pick({ ...agent.model, listedAs: "flash" }, false);
     expect(d.modelDirty(agent, "openrouter")).toBe(true);
+    // and one whose catalog now names its output cap
+    d.pick({ ...agent.model, outputLimit: 128_000 }, false);
+    expect(d.modelDirty(agent, "anthropic")).toBe(true);
   });
 
   test("a pick clears what belonged to another model", () => {

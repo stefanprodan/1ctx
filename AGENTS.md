@@ -116,10 +116,11 @@ since a relative URL inside the binary resolves against `src/server`.
 **Test helpers.** `test/helpers/app.ts` wires the server over a test db
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
-`GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`) and fails
-every other, and a fake email sender that keeps every message. `smtp.ts`
-is a fake SMTP server on loopback. `chat.ts` drives a chat with a
-scripted provider stream. `auth-cases.ts` is the authorization matrix.
+`GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`,
+`ANTHROPIC_URL`) and fails every other, and a fake email sender that
+keeps every message. `smtp.ts` is a fake SMTP server on loopback.
+`chat.ts` drives a chat with a scripted provider stream. `auth-cases.ts`
+is the authorization matrix.
 
 ## Docs
 
@@ -134,6 +135,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
+| `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |

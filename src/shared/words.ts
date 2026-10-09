@@ -230,8 +230,9 @@ export function isAvatar(value: unknown): value is Avatar {
 // the wire a provider speaks: OpenRouter, an OpenAI-compatible server,
 // a server that refuses any field outside the OpenAI spec, Google AI
 // Studio with its native catalog and compatible chat endpoint,
-// OpenCode Go, which routes a session by its headers, or a Microsoft
-// Foundry or Azure OpenAI resource over the Responses API
+// OpenCode Go, which routes a session by its headers, a Microsoft
+// Foundry or Azure OpenAI resource over the Responses API, or the Claude
+// API over Anthropic's Messages API
 export const WIRES = [
   "openrouter",
   "openai-compatible",
@@ -239,6 +240,7 @@ export const WIRES = [
   "gemini",
   "opencode",
   "azure",
+  "anthropic",
 ] as const;
 export type Wire = (typeof WIRES)[number];
 export function isWire(value: unknown): value is Wire {
@@ -258,6 +260,9 @@ export const EFFORTS = {
   opencode: ["low", "medium", "high", "max"],
   // what Azure lists for its GPT models; minimal is refused
   azure: ["low", "medium", "high", "xhigh", "max"],
+  // every adaptive model lists all five but Opus and Sonnet 4.6, which
+  // refuse xhigh in their own words
+  anthropic: ["low", "medium", "high", "xhigh", "max"],
 } as const satisfies Record<Wire, readonly string[]>;
 export type Effort = (typeof EFFORTS)[Wire][number];
 export function isEffort(wire: Wire, value: unknown): value is Effort {

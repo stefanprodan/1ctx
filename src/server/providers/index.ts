@@ -29,6 +29,12 @@ import {
 } from "./systemone.ts";
 import type { ChatEvent, ChatRequest } from "./types.ts";
 
+export {
+  buildChatBody as buildAnthropicChatBody,
+  maxTokensOf,
+  parseModels as parseAnthropicModels,
+} from "./anthropic.ts";
+export { anthropicEvents } from "./anthropic-stream.ts";
 export { markOf } from "./author.ts";
 export {
   azureBaseUrlProblem,

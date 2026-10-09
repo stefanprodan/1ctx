@@ -6,6 +6,15 @@ import { diff, extract, type File, type Model } from "../../scripts/models.ts";
 
 // the catalog's shape, with the fields the script reads
 const catalog = (azure: Record<string, Model>) => ({
+  anthropic: {
+    models: {
+      "claude-haiku-5-5": {
+        tool_call: true,
+        limit: { context: 1_000_000 },
+        cost: { input: 0.1, output: 0.5, cache_read: 0.01 },
+      },
+    },
+  },
   azure: { models: azure },
   google: { models: {} },
   "opencode-go": {
@@ -80,7 +89,20 @@ describe("scripts/models.ts", () => {
     expect(out["opencode-go"]).toEqual({
       "glm-5.2": { window: 1_000_000, tools: true },
     });
-    expect(Object.keys(out)).toEqual(["azure", "google", "opencode-go"]);
+    expect(Object.keys(out)).toEqual([
+      "anthropic",
+      "azure",
+      "google",
+      "opencode-go",
+    ]);
+    // priced, as azure and google are
+    expect(out.anthropic).toEqual({
+      "claude-haiku-5-5": {
+        window: 1_000_000,
+        tools: true,
+        price: { input: 0.1, output: 0.5, cacheRead: 0.01 },
+      },
+    });
   });
 
   test("leaves out a model with neither a window nor a price", () => {

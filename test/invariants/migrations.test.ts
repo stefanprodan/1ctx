@@ -64,6 +64,8 @@ const EXPECTED_IDS = [
   "0050-user-links",
   "0051-agent-email",
   "0052-subagents",
+  "0053-anthropic",
+  "0054-agent-output-limit",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -80,6 +82,7 @@ const LATER_COLUMNS = [
   "parent_session_id",
   "parent_message_id",
   "child",
+  "output_limit",
 ];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
@@ -1785,6 +1788,60 @@ describe("the schema", () => {
     }
   });
 
+  test("0053 widens the wire check to anthropic and keeps every provider", () => {
+    const db = seed(MIGRATIONS.slice(0, 52));
+    const tables = ["providers", "agents", "deciders", "sends"];
+    const rows = () =>
+      tables.map((table) =>
+        earlier(db.query(`select * from ${table} order by rowid`).all()),
+      );
+    try {
+      db.exec(`
+        insert into providers (id, name, wire, base_url, key_name, created_at)
+          values ('az', 'foundry', 'azure', 'https://a.test', 'provider-az', 5);
+        insert into deciders (id, name, provider_id, model, is_default,
+            created_at)
+          values ('d', 'judge', 'pr', 'm3', 1, 9);
+      `);
+      const before = rows();
+      expect(before.map((table) => table.length)).toEqual([2, 1, 1, 2]);
+      expect(() =>
+        db.exec("update providers set wire = 'anthropic' where id = 'pr'"),
+      ).toThrow(/CHECK/);
+      expect(MIGRATIONS[52]?.rebuilds).toEqual(["providers"]);
+      expect(migrate(db)).toEqual(expectedFrom("0053-anthropic"));
+      expect(rows()).toEqual(before);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      db.exec("update providers set wire = 'anthropic' where id = 'az'");
+      expect(() =>
+        db.exec("update providers set wire = 'claude' where id = 'az'"),
+      ).toThrow(/CHECK/);
+      // the references still hold
+      expect(() => db.exec("delete from providers where id = 'pr'")).toThrow(
+        /FOREIGN KEY/,
+      );
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0054 gives agents a nullable output cap, null for every agent before", () => {
+    const db = seed(MIGRATIONS.slice(0, 53));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0054-agent-output-limit"));
+      expect(db.query("select id, output_limit from agents").all()).toEqual([
+        { id: "a", output_limit: null },
+      ]);
+      db.exec("update agents set output_limit = 128000 where id = 'a'");
+      expect(() =>
+        db.exec("update agents set output_limit = 0 where id = 'a'"),
+      ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0046 widens the wire check and keeps every provider", () => {
     const db = seed(MIGRATIONS.slice(0, 45));
     const tables = ["providers", "agents", "deciders", "sends"];
@@ -1864,6 +1921,7 @@ describe("the schema", () => {
               parent_session_id: _________,
               parent_message_id: __________,
               child: ___________,
+              output_limit: ____________,
               ...rest
             }) => rest,
           ),
@@ -2844,6 +2902,7 @@ describe("0008 search tavily migration", () => {
             skip_4bit: 0,
             listed_as: null,
             subagents: 0,
+            output_limit: null,
           })),
         );
         db.exec(`

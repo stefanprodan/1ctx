@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { CredentialStore } from "../../../src/server/credentials/index.ts";
 import { parse } from "../../../src/server/provision/index.ts";
-import { AZURE_URL, testApp } from "../../helpers/app.ts";
+import { ANTHROPIC_URL, AZURE_URL, testApp } from "../../helpers/app.ts";
 import {
   agent,
   BARE_URL,
@@ -721,6 +721,44 @@ describe("provision through the composed app", () => {
       expect(app.agents.byName("luna")).toMatchObject({
         effort: "max",
         model: { contextLength: 400_000, tools: true, described: false },
+      });
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("an anthropic provider takes a described model, keeping its cap, and drops Off where it cannot stop", async () => {
+    const { app } = await instance();
+    try {
+      const docs = documents(
+        object("Provider", "anthropic", {
+          wire: "anthropic",
+          baseUrl: ANTHROPIC_URL,
+          keyFrom: null,
+        }),
+        object("Agent", "sonnet", {
+          provider: "anthropic",
+          model: "claude-sonnet-5-5",
+          thinking: "off",
+          effort: "xhigh",
+        }),
+      );
+      expect(await app.provision.apply(docs, ignore)).toMatchObject({
+        created: 2,
+      });
+      expect(app.providers.list()).toMatchObject([
+        { name: "anthropic", wire: "anthropic", baseUrl: ANTHROPIC_URL },
+      ]);
+      expect(app.agents.byName("sonnet")).toMatchObject({
+        thinking: null,
+        effort: "xhigh",
+        model: {
+          contextLength: 1_000_000,
+          outputLimit: 128_000,
+          thinkingRequired: true,
+          described: true,
+          listedAs: "claude-sonnet-5-5",
+        },
       });
     } finally {
       await app.shutdown();

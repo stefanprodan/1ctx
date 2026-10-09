@@ -15,6 +15,7 @@ const wires: { wire: Wire; directory: string }[] = [
   { wire: "openai-compatible", directory: "openai" },
   { wire: "openrouter", directory: "openrouter" },
   { wire: "gemini", directory: "gemini" },
+  { wire: "anthropic", directory: "anthropic" },
 ];
 
 describe("visual provider frames through the composed runner", () => {
@@ -65,10 +66,13 @@ describe("visual provider frames through the composed runner", () => {
           );
           expect(res.status).toBe(200);
           expect(await res.json()).toEqual({ title: "Greeting", html });
+          // the arguments go back as a string, or as the input object
           expect(JSON.stringify(answer.body.messages)).toContain(
-            JSON.stringify({ title: "Greeting", html })
-              .replaceAll("\\", "\\\\")
-              .replaceAll('"', '\\"'),
+            wire === "anthropic"
+              ? JSON.stringify({ title: "Greeting", html })
+              : JSON.stringify({ title: "Greeting", html })
+                  .replaceAll("\\", "\\\\")
+                  .replaceAll('"', '\\"'),
           );
           if (wire === "gemini") {
             expect(JSON.stringify(answer.body.messages)).toContain(

@@ -278,10 +278,12 @@ export class AgentDrafts {
       model?.thinkingRequired !== agent.model.thinkingRequired ||
       model?.reasoningKnown !== agent.model.reasoningKnown ||
       model?.reasoning !== agent.model.reasoning ||
-      // and one whose catalog now prices it, or names its models.dev id
+      // and one whose catalog now prices it, names its models.dev id or
+      // its output cap
       model?.promptPrice !== agent.model.promptPrice ||
       model?.completionPrice !== agent.model.completionPrice ||
       model?.listedAs !== agent.model.listedAs ||
+      model?.outputLimit !== agent.model.outputLimit ||
       this.thinking.value !== agent.thinking ||
       sentEffort(model, this.thinking.value, this.effort.value, wire) !==
         agent.effort ||

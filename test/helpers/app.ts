@@ -63,6 +63,11 @@ export const AZURE_URL = "https://foundry.test/openai/v1";
 export const AZURE_CHAT = `${AZURE_URL}/responses?api-version=v1`;
 export const AZURE_DEPLOYMENTS =
   "https://foundry.test/openai/deployments?api-version=2022-12-01";
+// the Claude API on the anthropic wire: the Messages API and the model
+// list under the base (recorded from the API's own catalog)
+export const ANTHROPIC_URL = "https://claude.test/v1";
+export const ANTHROPIC_CHAT = `${ANTHROPIC_URL}/messages`;
+export const ANTHROPIC_MODELS = `${ANTHROPIC_URL}/models?limit=1000`;
 
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
@@ -105,6 +110,24 @@ const azureChatBody = (body: string | null) => {
     "providers",
     "azure",
     tools ? "chat-reasoning-tool.sse" : "chat-text-after-tool.sse",
+  );
+};
+
+// the anthropic recording for a request: the tool round when it offers
+// tools and has no result yet, else the answer after a tool
+const anthropicChatBody = (body: string | null) => {
+  const request = JSON.parse(body ?? "{}");
+  const tools =
+    request.tools?.length > 0 &&
+    !request.messages?.some(
+      (turn: { content?: { type?: string }[] }) =>
+        Array.isArray(turn.content) &&
+        turn.content.some((block) => block.type === "tool_result"),
+    );
+  return fixture(
+    "providers",
+    "anthropic",
+    tools ? "chat-tool-round.sse" : "chat-tool-result.sse",
   );
 };
 
@@ -199,6 +222,16 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
     }
     if (url === AZURE_CHAT) {
       return new Response(azureChatBody(body), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }
+    if (url === ANTHROPIC_MODELS) {
+      return new Response(fixture("providers", "anthropic", "models.json"), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === ANTHROPIC_CHAT) {
+      return new Response(anthropicChatBody(body), {
         headers: { "content-type": "text/event-stream" },
       });
     }

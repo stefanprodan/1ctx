@@ -13,6 +13,7 @@ import models from "../../../src/server/providers/models.json" with {
 };
 import {
   buildPolicy,
+  leastThinking,
   type SendPolicy,
 } from "../../../src/server/runner/policy.ts";
 import type { UserRow } from "../../../src/server/users/index.ts";
@@ -284,10 +285,57 @@ describe("send policy price", () => {
     expect(priced("azure", id)).toEqual(modelPrice("azure", id));
   });
 
+  test("prices an anthropic model by its id", () => {
+    expect(priced("anthropic", "claude-haiku-5-5")).toEqual(
+      modelPrice("anthropic", "claude-haiku-5-5"),
+    );
+    expect(priced("anthropic", "claude-haiku-5-5")).not.toBeNull();
+  });
+
   test("is null with no listed model, no wire or an OpenAI wire", () => {
     const id = Object.keys(models.providers.azure)[0]!;
     expect(priced("azure")).toBeNull();
     expect(priced(null, id)).toBeNull();
     expect(priced("openai-compatible", id)).toBeNull();
+  });
+});
+
+describe("send policy output cap", () => {
+  const capped = (outputLimit?: number) =>
+    buildPolicy({
+      project: { id: "project", kind: "team", name: "ops", description: "" },
+      user,
+      agent: {
+        ...agent,
+        model: {
+          ...agent.model,
+          ...(outputLimit === undefined ? {} : { outputLimit }),
+        },
+      },
+      wire: "anthropic",
+      now: 1,
+      tools: null,
+      knowledge: { empty: true },
+      limits: DEFAULT_LIMITS,
+    });
+
+  test("rides from the agent's model, and is absent where the catalog said none", () => {
+    expect(capped(128_000).outputLimit).toBe(128_000);
+    expect(capped()).not.toHaveProperty("outputLimit");
+  });
+
+  test("the least thinking of a model that always thinks is low on anthropic", () => {
+    expect(
+      leastThinking({
+        thinkingRequired: true,
+        thinkingOff: false,
+        wire: "anthropic",
+      }),
+    ).toEqual({
+      thinking: true,
+      thinkingOff: false,
+      least: true,
+      reasoningEffort: "low",
+    });
   });
 });

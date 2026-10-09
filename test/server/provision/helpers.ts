@@ -5,7 +5,9 @@ import { type App, compose } from "../../../src/server/compose.ts";
 import type { Db } from "../../../src/server/db/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { parse } from "../../../src/server/provision/index.ts";
+import { anthropicFixture } from "../../helpers/anthropic.ts";
 import {
+  ANTHROPIC_MODELS,
   AZURE_DEPLOYMENTS,
   TEST_PASSWORD_COST,
   type TestApp,
@@ -140,6 +142,11 @@ export function network() {
     }
     if (url === AZURE_DEPLOYMENTS) {
       return new Response(azureFixture("deployments.json"), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url === ANTHROPIC_MODELS) {
+      return new Response(anthropicFixture("models.json"), {
         headers: { "content-type": "application/json" },
       });
     }

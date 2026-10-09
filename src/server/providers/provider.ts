@@ -6,6 +6,13 @@ import { messageOf } from "../lib/errors.ts";
 import { type Log, scrubValues } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import {
+  anthropicChat,
+  anthropicError,
+  countedText as anthropicText,
+  anthropicTools,
+} from "./anthropic.ts";
+import { anthropicEvents } from "./anthropic-stream.ts";
+import {
   azureChat,
   azureError,
   azureUrls,
@@ -61,7 +68,8 @@ export function scrubKey(text: string, key: string | null): string {
 }
 
 // the messages as a fit counts them: a message's plain reasoning only
-// where the wire sends it back
+// where the wire sends it back, and no failed mark, which only the
+// anthropic body carries
 function sentMessages(
   wire: Wire | null,
   model: string,
@@ -69,6 +77,10 @@ function sentMessages(
 ): ChatMessageIn[] {
   const sends = wire === "opencode" ? sendsReasoning({ model }) : () => false;
   return messages.map((message) => {
+    if (message.role === "tool" && message.failed !== undefined) {
+      const { failed: _, ...rest } = message;
+      return rest;
+    }
     if (message.role !== "assistant" || sends(message)) return message;
     const { reasoning: _, ...rest } = message;
     return rest;
@@ -76,9 +88,11 @@ function sentMessages(
 }
 
 // a request as the wire counts it: the Chat Completions messages and
-// tools, or the Responses input and tools on azure
+// tools, the Responses input and tools on azure, or the Messages system,
+// turns and tools on anthropic
 export function requestText(wire: Wire | null, req: ChatRequest): string {
   if (wire === "azure") return countedText(req);
+  if (wire === "anthropic") return anthropicText(req);
   return JSON.stringify({
     messages: sentMessages(wire, req.model, req.messages),
     tools: wireTools(req.tools ?? []),
@@ -95,8 +109,11 @@ export function wireTokens(
   tools: readonly ChatTool[],
   wire: Wire | null = null,
 ): number {
-  if (wire !== "azure") return chatToolTokens(tools);
-  return tools.length === 0 ? 0 : tokens(JSON.stringify(responsesTools(tools)));
+  if (tools.length === 0) return 0;
+  if (wire === "azure") return tokens(JSON.stringify(responsesTools(tools)));
+  if (wire === "anthropic")
+    return tokens(JSON.stringify(anthropicTools(tools)));
+  return chatToolTokens(tools);
 }
 
 export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
@@ -134,6 +151,24 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
             },
             noneRefused,
             providerId: row.id,
+            providerName: row.name,
+            ...(deps.log === undefined ? {} : { log: deps.log }),
+          });
+        }
+        if (row.wire === "anthropic") {
+          const url = endpoint(row.baseUrl, "/messages");
+          return anthropicChat(req, {
+            open: (body) => {
+              const stream = anthropicEvents();
+              return streamChat(deps.fetcher, url, body, signal, {
+                ...options,
+                mapEvents: stream.map,
+                ended: stream.ended,
+                thinking: stream.thinking,
+                refusal: anthropicError,
+                headers: authHeaders(row.wire, key),
+              });
+            },
             providerName: row.name,
             ...(deps.log === undefined ? {} : { log: deps.log }),
           });

@@ -17,6 +17,8 @@ import {
 } from "../../src/server/providers/parse.ts";
 import secretNames from "../fixtures/secrets/names.json";
 import {
+  ANTHROPIC_MODELS,
+  ANTHROPIC_URL,
   AZURE_DEPLOYMENTS,
   AZURE_URL,
   GEMINI_URL,
@@ -84,7 +86,7 @@ describe("parseProvider", () => {
       { ...router, name: "a" },
       { ...router, name: "mlx.serve" },
       { ...router, name: "a".repeat(81) },
-      { ...router, wire: "anthropic" },
+      { ...router, wire: "claude" },
       { ...router, wire: "openai" },
       { ...router, baseUrl: "models.test/v1" },
       { ...router, baseUrl: "ftp://models.test/v1" },
@@ -382,6 +384,65 @@ describe("GET /api/providers/:id/catalog", () => {
           headers: {
             "user-agent": "1ctx/v0.0.0-test",
             "api-key": "azure-test-key",
+          },
+          body: null,
+        },
+      ]);
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
+  test("an anthropic provider's catalog is described, read with the key and the version", async () => {
+    const { app, client } = await admin({
+      secrets: { "provider-anthropic": "sk-ant-test" },
+    });
+    try {
+      const created = await client.call("POST", "/api/providers", {
+        body: {
+          name: "anthropic",
+          wire: "anthropic",
+          baseUrl: ANTHROPIC_URL,
+          keyName: "provider-anthropic",
+        },
+      });
+      expect(created.status).toBe(201);
+      const { provider } = await created.json();
+      const result = await client.call(
+        "GET",
+        `/api/providers/${provider.id}/catalog?q=haiku`,
+      );
+      expect(result.status).toBe(200);
+      const { matches } = await result.json();
+      expect(matches.map((model: { id: string }) => model.id)).toEqual([
+        "claude-haiku-5-5",
+        "claude-haiku-4-5-20251001",
+      ]);
+      // described: no window is stated, and the cap is kept
+      const agent = await client.call("POST", "/api/agents", {
+        body: {
+          name: "haiku",
+          providerId: provider.id,
+          model: "claude-haiku-5-5",
+          thinking: "off",
+          effort: null,
+          servers: [],
+          mcpMode: "auto",
+        },
+      });
+      expect(agent.status).toBe(201);
+      expect((await agent.json()).agent).toMatchObject({
+        thinking: "off",
+        model: { described: true, outputLimit: 128_000 },
+      });
+      expect(app.fetched).toEqual([
+        {
+          url: ANTHROPIC_MODELS,
+          headers: {
+            "user-agent": "1ctx/v0.0.0-test",
+            "x-api-key": "sk-ant-test",
+            "anthropic-version": "2023-06-01",
           },
           body: null,
         },

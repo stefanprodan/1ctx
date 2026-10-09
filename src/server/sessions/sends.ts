@@ -121,9 +121,11 @@ export function readReasoningDetails(
 }
 
 // A provider refused a reasoning record sent back: the session's
-// records of type reasoning that this provider and model wrote are
+// reasoning and thinking records that this provider and model wrote are
 // dropped, so no later turn sends them again. Other records, the phase
 // among them, stay. Answers how many messages changed.
+const REFUSABLE = new Set(["reasoning", "thinking", "redacted_thinking"]);
+
 export function forgetReasoning(
   db: Db,
   sessionId: string,
@@ -151,7 +153,7 @@ export function forgetReasoning(
         continue;
       }
       if (!Array.isArray(items)) continue;
-      const kept = items.filter((item) => item?.type !== "reasoning");
+      const kept = items.filter((item) => !REFUSABLE.has(item?.type));
       if (kept.length === items.length) continue;
       update.run(kept.length > 0 ? JSON.stringify(kept) : null, row.id);
       changed++;
