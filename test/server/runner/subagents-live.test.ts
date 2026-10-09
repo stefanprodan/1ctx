@@ -91,7 +91,8 @@ describe("a subagent's live rows", () => {
         ]);
         expect(got[0]!.child.status).toBe("running");
         const last = got.at(-1)!;
-        expect(last.child).toMatchObject({ status: "done", tokens: 110 });
+        // its context is its last round's tokens, never the sum of both
+        expect(last.child).toMatchObject({ status: "done", tokens: 66 });
         const all = got.flatMap((frame) => frame.child.rows);
         const tool = all.findLast((r) => r.kind === "tool")!;
         expect(tool).toMatchObject({ toolName: "datetime", status: "done" });
