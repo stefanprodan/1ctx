@@ -97,15 +97,16 @@ async function send(
   return { detail, script, policy };
 }
 
-test("a skill off leaves the catalog, the tool names and the file tool", async () => {
+test("a skill off leaves the catalog, the snapshot and the file tool", async () => {
   const { chat, gitops, plain } = await setup();
   try {
     const on = await send(chat, null);
     expect(on.policy.skillsOff).toEqual([]);
     expect(system(on.script)).toContain("<name>gitops</name>");
-    expect(
-      tool(on.script, "skill")!.function.parameters.properties.name,
-    ).toMatchObject({ enum: ["gitops", "plain"] });
+    expect(on.policy.offered.skills.skills.map((s) => s.name)).toEqual([
+      "gitops",
+      "plain",
+    ]);
     expect(tool(on.script, "skill_file")).toBeDefined();
     on.script.reply("First.");
     const id = on.detail.session.id;
@@ -134,7 +135,7 @@ test("a skill off leaves the catalog, the tool names and the file tool", async (
     );
     expect(
       tool(off.script, "skill")!.function.parameters.properties.name,
-    ).toMatchObject({ enum: ["plain"] });
+    ).not.toHaveProperty("enum");
     expect(tool(off.script, "skill_file")).toBeUndefined();
     off.script.reply("Second.");
     await settleRun(chat, id);

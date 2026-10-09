@@ -208,7 +208,6 @@ const time: BuiltinToolSummary = {
   parametersHtml: html,
   tokens: 96,
   when: "always",
-  names: false,
   variant: null,
 };
 const fetchTool: WebToolSummary = {

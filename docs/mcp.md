@@ -64,6 +64,9 @@ reach the model in the sends of agents linked to it.
   a name is outside `[A-Za-z0-9_.$-]`, since it would lie or break the
   line. Only the sentence is cut, at `MAX_CATALOG_LINE`; it reads past
   `e.g.` and `i.e.`.
+- **`mcp_describe` and `mcp_call` take `name` as a plain string.** No
+  enum, since the catalog lists the names; a name outside the snapshot
+  is refused, matched exactly.
 - **History never names a function the `tools` array lacks.** In catalog
   mode the tool loop rewrites a call of an offered wire name to
   `mcp_call` before its row is written.

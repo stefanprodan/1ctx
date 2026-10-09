@@ -20,7 +20,7 @@ function named(servers: OfferedServer[], value: unknown): OfferedMcpTool {
   const tool = flat(servers).find((item) => item.wireName === value);
   if (tool === undefined) {
     throw new ToolError(
-      `MCP tool ${value} is not available`,
+      `MCP tool ${value} is not available; use a name from the available MCP tools`,
       "MCP tool not available",
     );
   }
@@ -91,11 +91,10 @@ export function resolveMcpCall(
 
 export function makeMcpCatalogTools(servers: OfferedServer[]): Tool[] {
   if (servers.length === 0) return [];
-  const names = flat(servers).map((tool) => tool.wireName);
+  // no enum: the catalog lists the names, and named() refuses the rest
   const name = {
     type: "string",
-    enum: names,
-    description: "The available MCP tool name.",
+    description: "A tool name from the available MCP tools above.",
   };
   return [
     {

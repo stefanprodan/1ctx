@@ -86,13 +86,11 @@ type ToolSchema = {
   tokens: number;
 };
 
-// a built-in, never switched: a schema naming skills or MCP tools is
-// counted with no names; a variant is a second text the tool may carry
+// a built-in, never switched; a variant is a second text the tool may
+// carry
 export type BuiltinToolSummary = ToolSchema & {
   name: BuiltinTool | "webfetch" | "websearch";
   when: ToolWhen;
-  // the tool lists names a send fills in, each adding tokens
-  names: boolean;
   variant: { description: string; tokens: number } | null;
 };
 

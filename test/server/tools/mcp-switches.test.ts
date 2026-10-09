@@ -86,26 +86,36 @@ test.each(["all", "catalog"] as const)(
           expect(
             off.tools.find((tool) => tool.name === name)?.parameters,
           ).toMatchObject({
-            properties: { name: { enum: ["mcp__docs__get_item0"] } },
+            properties: {
+              name: {
+                type: "string",
+                description: "A tool name from the available MCP tools above.",
+              },
+            },
           });
         }
-        expect(
-          await tools.run(
-            off,
-            {
-              id: "catalog",
-              name: "mcp_call",
-              arguments: JSON.stringify({
-                name: "mcp__flux__get_item0",
-                arguments: {},
-              }),
-            },
-            context(),
-          ),
-        ).toEqual({
-          error: true,
-          content: "Error: MCP tool mcp__flux__get_item0 is not available",
-        });
+        expect(JSON.stringify(off.tools)).not.toContain("enum");
+        // a disabled server's tool, an unprefixed name and an unknown one
+        for (const name of [
+          "mcp__flux__get_item0",
+          "get_item0",
+          "mcp__docs__nope",
+        ]) {
+          expect(
+            await tools.run(
+              off,
+              {
+                id: "catalog",
+                name: "mcp_call",
+                arguments: JSON.stringify({ name, arguments: {} }),
+              },
+              context(),
+            ),
+          ).toEqual({
+            error: true,
+            content: `Error: MCP tool ${name} is not available; use a name from the available MCP tools`,
+          });
+        }
       } else {
         expect(off.mcpCatalog).toBe("");
         expect(off.tools.map((tool) => tool.name)).toContain(

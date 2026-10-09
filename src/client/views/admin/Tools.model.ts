@@ -21,9 +21,6 @@ export const WHEN_WORDS: Record<ToolWhen, string> = {
 export const VARIANT_WHEN_WORDS =
   "Sent in the step after a run that updates its own memory.";
 
-export const NAMES_WORDS =
-  "Shown without names. Each skill or tool name listed adds tokens.";
-
 export function jsonLines(parameters: unknown): number {
   return JSON.stringify(parameters, null, 2).split("\n").length;
 }

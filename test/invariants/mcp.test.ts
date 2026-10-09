@@ -1347,19 +1347,7 @@ describe("MCP catalog and lifecycle end to end", () => {
     }
     await saveServers(chat, links, "catalog");
     const started = await startChat(chat);
-    const describe = (
-      started.script.body.tools as {
-        function: {
-          name: string;
-          parameters: {
-            properties: { name: { enum: string[] } };
-          };
-        };
-      }[]
-    ).find((tool) => tool.function.name === "mcp_describe")!;
-    const names = describe.function.parameters.properties.name.enum;
-    expect(names.some((name) => name.startsWith("mcp__flux__"))).toBe(true);
-    expect(names.some((name) => name.startsWith("mcp__wide__"))).toBe(false);
+    expect(JSON.stringify(started.script.body.tools)).not.toContain("mcp__");
     const system = systemOf(started.script.body);
     expect(system).not.toContain("mcp__wide__");
     expect(system).not.toContain("WIDE INSTRUCTIONS MUST BE LEFT OUT");

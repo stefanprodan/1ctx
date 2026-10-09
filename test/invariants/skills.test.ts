@@ -443,7 +443,7 @@ const call = (id: string, name: string, args: Record<string, unknown>) => ({
 });
 
 describe("skills in a send", () => {
-  test("the prompt, enum and conditional file tool come from one snapshot", async () => {
+  test("the prompt, skill tool and conditional file tool come from one snapshot", async () => {
     const chat = await chatApp();
     assign(chat, [
       loadedSkill("ops"),
@@ -461,17 +461,18 @@ describe("skills in a send", () => {
     expect(system.indexOf("<available_skills>")).toBeLessThan(
       system.indexOf("Today is "),
     );
+    expect(system).toContain("<name>runbooks</name>");
     const tools = script.body.tools as {
       function: {
         name: string;
-        parameters: { properties: { name: { enum: string[] } } };
+        parameters: { properties: { name: object } };
       };
     }[];
     const skill = tools.find((tool) => tool.function.name === "skill")!;
-    expect(skill.function.parameters.properties.name.enum).toEqual([
-      "ops",
-      "runbooks",
-    ]);
+    expect(skill.function.parameters.properties.name).toEqual({
+      type: "string",
+      description: "A skill name from the available skills above.",
+    });
     expect(
       tools.some((tool) => tool.function.name === "skill_file"),
     ).toBeTrue();
@@ -505,7 +506,7 @@ describe("skills in a send", () => {
     await settle(bodyOnly);
   });
 
-  test("the enum leaves out every skill the catalog cap leaves out", async () => {
+  test("the skill tool lists no names past the catalog cap", async () => {
     const chat = await chatApp();
     const skills = Array.from({ length: 20 }, (_, index) =>
       loadedSkill(
@@ -519,20 +520,12 @@ describe("skills in a send", () => {
     const system = (
       started.script.body.messages as { role: string; content: string }[]
     )[0]!.content;
-    const schemas = started.script.body.tools as {
-      function: {
-        name: string;
-        parameters: { properties: { name: { enum: string[] } } };
-      };
-    }[];
-    const names = schemas.find((tool) => tool.function.name === "skill")!
-      .function.parameters.properties.name.enum;
+    const names = skills
+      .map((skill) => skill.name)
+      .filter((name) => system.includes(`<name>${name}</name>`));
     expect(names.length).toBeLessThan(20);
     expect(names.length).toBeGreaterThan(0);
-    for (const name of names) expect(system).toContain(`<name>${name}</name>`);
-    for (const skill of skills.slice(names.length)) {
-      expect(system).not.toContain(`<name>${skill.name}</name>`);
-    }
+    expect(JSON.stringify(started.script.body.tools)).not.toContain("skill-00");
     started.script.reply("done");
     await settle(chat);
   });

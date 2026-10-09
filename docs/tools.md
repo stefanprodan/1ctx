@@ -240,8 +240,9 @@ words.
   another name is a 409. Deleting a skill an agent uses is a 409.
 - **An agent's skills are one send snapshot.** The `skill` and
   `skill_file` tools come from the agent's skills, never from the
-  `tools` rows. The `skill` name is an enum of the capped catalog, and
-  `skill_file` is offered only when it can answer. A call reads the
+  `tools` rows. Their `name` is a plain string, no enum, matched exactly
+  against the snapshot, and `skill_file` is offered only when it can
+  answer. A call reads the
   current body by the snapshot's id and name.
 - **Skill usage is read from the calls.** A tool row holds only the
   result, so `skillLoads()` pairs each `skill` row with its call by

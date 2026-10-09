@@ -3,9 +3,8 @@
 //
 // The built-ins as the Config board lists them. Each schema comes from the
 // factory a send uses, called with sample inputs, so the page never
-// restates a schema. A schema that lists skill or MCP tool names is shown
-// with none, since the names are the send's; memory_edit is the chat's,
-// with the own-note phase's text as its variant.
+// restates a schema. memory_edit is the chat's, with the own-note phase's
+// text as its variant.
 
 import type {
   BuiltinToolSummary,
@@ -92,17 +91,6 @@ function chatMemoryTools(): Tool<string | ToolResult>[] {
   );
 }
 
-// the name enum a send fills, emptied
-function withoutNames(tool: Tool): Tool {
-  const parameters = structuredClone(tool.parameters) as {
-    properties?: { name?: { enum?: string[] } };
-  };
-  if (parameters.properties?.name?.enum !== undefined) {
-    parameters.properties.name.enum = [];
-  }
-  return { ...tool, parameters };
-}
-
 export function builtinCatalog(
   now: number,
   render: (markdown: string) => string,
@@ -129,7 +117,7 @@ export function builtinCatalog(
       ...makeSkillTools([skill], {
         body: () => null,
         file: () => null,
-      }).map(withoutNames),
+      }),
       ...makeMcpCatalogTools([server]),
       ...chatMemoryTools(),
       makeAttentionTool({ guidance: "", reason: null }),
@@ -153,10 +141,6 @@ export function builtinCatalog(
       parametersHtml: parametersHtml(tool, render),
       tokens: wireTokens([tool]),
       when: WHEN[name],
-      names:
-        "enum" in
-        ((tool.parameters as { properties?: { name?: object } }).properties
-          ?.name ?? {}),
       variant: (() => {
         const other = own.find((held) => held.name === name);
         return other === undefined
