@@ -1,0 +1,105 @@
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-haiku-5-5","id":"msg_011Cfs4rsR9fNVHCWsSufVHA","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":452,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":7,"service_tier":"standard","inference_geo":"global"},"diagnostics":null}     }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"The tool returned 09:"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"12 UTC on 2"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"026-10-09. Since"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" Romania's DST do"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"esn't end until October"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 25,"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" Bucharest is still on E"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"EST (UTC+3"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"), so local time is 12:"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"12."}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"CAQSmgcKEAgSGAI4AUIIdGhpbmtpbmcSDCzpSIvulm0BecL72BoM/dy3h3IyTqF52z5EIjA5CX5IqjuAybl1uNo16A9Qts+AwiWA+K64u99gKHVZLGYFjuNPtIqdEG8CrXzq1tUqtwaymKJiCJr7qLT8tuOD/QrtAh5NjQDoivVKSgsml7j3AvyguGuPjSfZCsrkTtaucWt/hz6f3xW6FXgQPeGqeCPp2h2QHQnISo1dW5ECLE8HVxZ2Qq3jwyBHszPYiNeZeOo48pt2RfqMjPeWggDpVvjnY1Kzi3IkkH/iNx1W+rLgUg5W3brrlTBDieEZ6ysHvdXd6ZCkccSOlF3ShnpCCZaFsU5/dfLA5/Bm7P7a6Cl4nq23A0NvMYebpapwakX9nCIpM2LBtXL5mY+L6kycbpsyMH2F23N9y42wlQyWSnpfBG6PmaPiCgLMAG+yKNzZbChRUIRRvAwhQRUXw80kIg8GEZEuO5xO25dfUD2xDjOPqPLyGmNJ8Lpbl9CcO233OgBKppndOjkxoKqPStfS613Fd2ZSquNQm3pFRcLm1FFTwNX/0vuKfuJwCfos+PDBSKHDXz2LEiADXBgasbR21W+09bVyR2HTWT3v6UdNcHSMSz6n/6F9VJLapb+KU2rrcmtnIVFNX1S2YXBzMbyKUCLgldS6c8eVxJBsy/RqULiefaLsICkltFjHki4Zuotb7ee2D/vdzJLN4IPLFZ3wc3lbFHTk+85uM3HAOUfth3LA7APr5hJu7IweUu0QsSGqLVMs0d2d079VjQkZ1GZMMmBAWtxKXJ5nNTfnklpUI7fZS+cHV1iY44smLxG4mSmvNaMo77ijExwRNgxu8iOhJbur3C5cDs/qk1/OPRJwvn3VIlSWDy5NAsdh5n5N++yY41vIAZca+ddISOIet9/iqBGgnd4rKKd9NzNs/8XuveRWoDaE0GzDhVRk8JkuywFWlJPaAMG7R3XLwlswPym8++RfAULjW0lz60k/JuIlAXdNp9prQOJ8xR1sDFJ61lQVy7CisZCG8397MSUPDNrv342yuyfOhocLTd7haduz5uRt0BB/19cpXIZj8Kq3KPmf83+XFRQ4AJRPaP7pfYRyaCIMegmunpq4PJaUna1DpEVjO3gAIJUTdMtbA5BEY9lLHfMHcigr9/NVVl/gOc0zPPAvYlPsD6FhQvmHEdgXZnVwXOVPI1XROoCZq8vutgURrH0KJfqVvDDOGAE="}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0             }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"It"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"'s curr"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"ently **12:12 PM"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"** in Bucharest on"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" October 9, 2026."}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" The tool returned "}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"09:12 UTC,"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" and Bucharest is on"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" Eastern European Summ"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"er Time (UTC+"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"3) until the"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" cl"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"oc"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"ks change at"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" the end of October."}        }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1  }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":452,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":230,"output_tokens_details":{"thinking_tokens":150}}              }
+
+event: message_stop
+data: {"type":"message_stop"    }
+
