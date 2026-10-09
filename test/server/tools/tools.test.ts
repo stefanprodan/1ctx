@@ -7,7 +7,7 @@
 // network.
 
 import { describe, expect, test } from "bun:test";
-import { silent } from "../../../src/server/lib/log.ts";
+import { type Log, silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
@@ -28,6 +28,7 @@ import {
   BUILTIN_TOOLS,
   type SearchProvider,
 } from "../../../src/shared/words.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 const now = Date.UTC(2026, 8, 8, 14, 42, 10);
@@ -81,6 +82,7 @@ function area(
   secrets: Record<string, string> = {},
   provider: SearchProvider | null = null,
   skills: SkillsPort = skillsPort(),
+  log: Log = silent,
 ): ToolsArea {
   const tools = toolsArea({
     db: memoryDb(),
@@ -89,7 +91,7 @@ function area(
     }) as unknown as typeof fetch,
     secret: (name) => secrets[name] ?? null,
     clock: () => now,
-    log: silent,
+    log,
     render: (md) => md,
     skills,
   });
@@ -409,6 +411,39 @@ describe("skill tools from the required skills port", () => {
       "ops",
       "runbooks",
     ]);
+  });
+
+  test("a catalog past its floor offers every skill and logs the count alone", async () => {
+    const logs = collectLogs();
+    const many: OfferedSkill[] = Array.from({ length: 200 }, (_, i) => ({
+      id: `s${i}`,
+      name: `skill-${String(i).padStart(3, "0")}-${"n".repeat(50)}`,
+      description: "Does it.",
+      hasFiles: false,
+    }));
+    const tools = area({}, null, skillsPort(many), logs.logFactory("tools"));
+    const offered = tools.offered(now, "agent");
+    expect(offered.skills.skills).toHaveLength(200);
+    expect(offered.skills.block.length).toBeGreaterThan(16_000);
+    expect(offered.skills.block).not.toContain("<description>");
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "tools",
+        msg: "catalog over cap",
+        fields: { kind: "skills", count: 200 },
+      },
+    ]);
+    const loaded = await tools.run(
+      offered,
+      {
+        id: "c1",
+        name: "skill",
+        arguments: JSON.stringify({ name: many[199]!.name }),
+      },
+      context(),
+    );
+    expect(loaded.error).toBeFalse();
   });
 
   test("omits skill_file when no offered skill has files", () => {

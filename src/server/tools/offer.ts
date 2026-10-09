@@ -328,20 +328,20 @@ export function offered(
       : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,
-  // the skill tool's names and the file tool all come from what is left
-  const skillCatalog = catalog(
-    deps.skills
-      .forAgent(agentId)
-      .filter((skill) => !disabledCapabilities.includes(skillKey(skill.id))),
-    CATALOG_CAP,
-  );
-  for (const name of skillCatalog.leftOut) {
-    deps.log.warn("skill omitted", { skill: name, reason: "catalog cap" });
+  // the skill tools' snapshot and the file tool all come from what is
+  // left, and the catalog never narrows it
+  const agentSkills = deps.skills
+    .forAgent(agentId)
+    .filter((skill) => !disabledCapabilities.includes(skillKey(skill.id)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const skillCatalog = catalog(agentSkills, CATALOG_CAP);
+  if (skillCatalog.overCap) {
+    deps.log.warn("catalog over cap", {
+      kind: "skills",
+      count: agentSkills.length,
+    });
   }
-  const skills = {
-    block: skillCatalog.text,
-    skills: skillCatalog.included,
-  };
+  const skills = { block: skillCatalog.text, skills: agentSkills };
   const baseTools = fillYear(
     [
       ...deps

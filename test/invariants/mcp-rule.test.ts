@@ -35,13 +35,16 @@ import {
   CATALOG_OPENINGS,
   catalogArguments,
   MAX_CATALOG,
-  MAX_CATALOG_LINE,
   MCP_CATALOG_FROM_TOKENS,
   mcpCatalog,
   resolveMode,
 } from "../../src/shared/mcp-catalog.ts";
 import { shapeName, shapeServerName } from "../../src/shared/names.ts";
-import { cutText, firstSentence } from "../../src/shared/text.ts";
+import {
+  cutText,
+  firstSentence,
+  MAX_CATALOG_LINE,
+} from "../../src/shared/text.ts";
 import { isPattern, isServerName } from "../../src/shared/words.ts";
 
 const sentence = (text: string) => firstSentence(text, MAX_CATALOG_LINE);

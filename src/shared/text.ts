@@ -32,6 +32,9 @@ export const oneLine = (text: string): string =>
 const SENTENCE_END = /[.!?](?=\s|$)/g;
 const ABBREVIATION = /(?:^|[^\p{L}\p{N}_])(?:e\.g|i\.e)$/iu;
 
+// the cap of a catalog line's sentence, MCP tools and skills alike
+export const MAX_CATALOG_LINE = 160;
+
 // the first sentence of a description, on one line, cut at cap
 export function firstSentence(text: string, cap: number): string {
   const line = oneLine(text);

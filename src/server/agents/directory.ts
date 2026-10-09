@@ -10,8 +10,7 @@ import type {
   DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { MAX_CATALOG_LINE } from "../../shared/mcp-catalog.ts";
-import { firstSentence } from "../../shared/text.ts";
+import { firstSentence, MAX_CATALOG_LINE } from "../../shared/text.ts";
 import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
 import { parseName, parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";

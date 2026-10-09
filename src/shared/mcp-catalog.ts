@@ -7,13 +7,12 @@
 
 import type { PromptServer } from "./mcp.ts";
 import { escapeText } from "./skills.ts";
-import { firstSentence } from "./text.ts";
+import { firstSentence, MAX_CATALOG_LINE } from "./text.ts";
 import { isRecord, type McpMode } from "./words.ts";
 
 // decision 19: the catalog of discovery mode, and the mode a send runs in
 export const MCP_CATALOG_FROM_TOKENS = 6000;
 export const MAX_CATALOG = 16_000;
-export const MAX_CATALOG_LINE = 160;
 export const CATALOG_LEAD =
   "The following MCP tools are available through two tools: call mcp_describe with a tool's name to get its arguments, then mcp_call with the name and the arguments. mcp_describe gives the type and meaning of each argument.";
 // what each tier's lines hold, said after the lead, so a model reading

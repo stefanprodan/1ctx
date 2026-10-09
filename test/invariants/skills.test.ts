@@ -8,6 +8,7 @@ import type { LogFactory } from "../../src/server/lib/log.ts";
 import { SKILLS_LEAD } from "../../src/server/runner/context.ts";
 import type { LoadedSkill } from "../../src/server/skills/load.ts";
 import { makeSkillTools } from "../../src/server/tools/builtin/skill.ts";
+import { SKILL_CATALOG_OPENINGS } from "../../src/shared/skills.ts";
 import { collectLogs, testApp } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -506,12 +507,15 @@ describe("skills in a send", () => {
     await settle(bodyOnly);
   });
 
-  test("the skill tool lists no names past the catalog cap", async () => {
-    const chat = await chatApp();
+  test("every skill stays in the catalog and loadable past the cap", async () => {
+    const logs = collectLogs();
+    const chat = await chatApp({ logFactory: logs.logFactory });
     const skills = Array.from({ length: 20 }, (_, index) =>
       loadedSkill(
         `skill-${String(index).padStart(2, "0")}`,
-        [],
+        index === 19
+          ? [{ path: "references/a.md", content: "late file", bytes: 9 }]
+          : [],
         `description ${index} ${"x".repeat(1000)}`,
       ),
     );
@@ -520,14 +524,35 @@ describe("skills in a send", () => {
     const system = (
       started.script.body.messages as { role: string; content: string }[]
     )[0]!.content;
-    const names = skills
-      .map((skill) => skill.name)
-      .filter((name) => system.includes(`<name>${name}</name>`));
-    expect(names.length).toBeLessThan(20);
-    expect(names.length).toBeGreaterThan(0);
+    // the long descriptions no longer fit, their first sentences do
+    expect(system).toContain(SKILL_CATALOG_OPENINGS[1]);
+    for (const skill of skills) {
+      expect(system).toContain(`<name>${skill.name}</name>`);
+    }
+    expect(system).not.toContain("x".repeat(1000));
     expect(JSON.stringify(started.script.body.tools)).not.toContain("skill-00");
-    started.script.reply("done");
+    started.script.toolRound([
+      call("c1", "skill", { name: "skill-19" }),
+      call("c2", "skill_file", {
+        name: "skill-19",
+        path: "references/a.md",
+      }),
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    const results = (
+      answer.body.messages as { role: string; content: string }[]
+    ).slice(-2);
+    expect(results[0]?.content).toContain('<skill_content name="skill-19">');
+    expect(results[1]?.content).toBe("late file");
+    answer.reply("done");
     await settle(chat);
+    expect(
+      logs.events.filter(
+        (event) =>
+          event.msg === "skill omitted" || event.msg === "catalog over cap",
+      ),
+    ).toEqual([]);
   });
 
   test("skill and skill_file calls write tool rows and return their text", async () => {
