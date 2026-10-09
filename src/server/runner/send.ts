@@ -89,8 +89,10 @@ export type SendPhase =
 
 export type SendOp = "message" | "regenerate" | "compact" | "run";
 
-// a launched call's streaming row, and the name it was written with
-export type OpenTool = { rowId: string; name: string };
+// a launched call's streaming row, the name it was written with, and
+// whether the work after the answer (attention step, memory phase)
+// opened it, which alone a later cause's cutBy names
+export type OpenTool = { rowId: string; name: string; after: boolean };
 
 export type ActiveSend = {
   id: string;
@@ -175,9 +177,10 @@ export type ActiveSend = {
   // a Stop or a shutdown came after another cause claimed the send, in
   // the work after its answer
   interrupted: boolean;
-  // what cut the work after the answer, when its own cause is another:
-  // a later Stop or shutdown, or the phase's or step's own window. Only
-  // the cut text reads it; the send keeps its cause
+  // what cut the current step or phase after the answer, when the send's
+  // own cause is another: a Stop or shutdown during it, or its own
+  // window. Reset as each starts; only the cut text of the rows it
+  // opened reads it, and the send keeps its cause
   cutBy: "stop" | "shutdown" | "deadline" | null;
   terminal: SendCause | null;
   // every caller of terminate observes the ending run by run().

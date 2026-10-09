@@ -221,7 +221,11 @@ export class Writer {
     send.settled = new Map();
     round.calls.forEach((call, i) => {
       const row = result.rows[i]!;
-      send.openTools.set(call, { rowId: row.id, name: row.toolName ?? "" });
+      send.openTools.set(call, {
+        rowId: row.id,
+        name: row.toolName ?? "",
+        after: send.phase === "memory" || send.phase === "attention",
+      });
     });
     round.drafts.clear();
     return result;

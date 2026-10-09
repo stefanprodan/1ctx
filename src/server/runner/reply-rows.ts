@@ -193,10 +193,10 @@ function writeCompletion(
 
 // the open rows at a cut, inside the caller's transaction: a call that
 // reported a completion keeps it whole, any other is stopped with the
-// cut text. The text names what cut the work after the answer when a
-// later cause did; a finish with nothing after it leaves none open, and
-// one left would have ended unrecorded. A guard means a late tool that
-// already wrote returns null
+// cut text. A row the work after the answer opened names what cut that
+// work when a later cause did; a finish with nothing after it leaves
+// none open, and one left would have ended unrecorded. A guard means a
+// late tool that already wrote returns null
 export function cutOpenTools(
   deps: CutDeps,
   send: ActiveSend,
@@ -216,7 +216,11 @@ export function cutOpenTools(
     }
     const row = deps.sessions.finishTool(open.rowId, {
       content: cutText(
-        send.cutBy ?? (cause === "finish" ? "failure" : cause),
+        open.after && send.cutBy !== null
+          ? send.cutBy
+          : cause === "finish"
+            ? "failure"
+            : cause,
         kindOf(offered, open.name),
         result?.discarded === true,
       ),

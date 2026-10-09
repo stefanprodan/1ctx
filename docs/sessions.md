@@ -191,16 +191,19 @@ that agent answers the one turn (see Summons).
 - **A cut keeps every completion.** Every phase's calls keep their end
   on the send (`settled`) until a row holds it. `cutOpenTools()`
   (`runner/reply-rows.ts`), in `finalizeSend`'s or `stopMainTools`'s
-  transaction, writes a completion as `finishTool` would; the maps
-  clear after the commit, so a retry writes it once. A write that
-  throws, under its savepoint, logs `tool end not written`.
+  transaction, writes a completion as `finishTool` would, kept files
+  included; the maps clear after the commit, so a retry writes it once.
+  A write that throws, under its savepoint, logs `tool end not written`
+  and gets the cut text instead.
 - **Any other open row gets the cut text** (`sessions/cut.ts`): why,
   "No result was recorded.", and what may have happened by kind (read,
-  MCP read, bash, bash discarded, delegate, write), from the row's name
-  and the offered MCP side. Status stays `stopped`. A Stop or shutdown
-  after the run's own cause, or a phase's own window, is the why
-  (`cutBy`). Restart repair writes it with cause `restart`, every MCP
-  name a write.
+  MCP read, bash, bash discarded, delegate, write). The kind is decided
+  at the cut from the row's name and the offered MCP side, never
+  stored. Status stays `stopped`. The why is the send's cause, except
+  for a row the attention step or memory phase opened: a Stop or
+  shutdown during that step, or its own window, names it there
+  (`cutBy`, reset as each starts). Restart repair writes the text with
+  cause `restart`, every MCP name a write.
 - **A failed `finalizeSend` keeps the lock.** The session answers 409
   until a restart, where `sessions.repair()` ends what a crash left
   running with cause `restart`.

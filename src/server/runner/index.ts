@@ -101,7 +101,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
     if (cause === "stop" || cause === "shutdown") {
       if (send.cause !== null && send.terminal === null) {
         send.interrupted = true;
-        send.cutBy ??= cause;
+        // a main row waiting out its tools keeps the cause that cut it
+        if (send.phase === "memory" || send.phase === "attention") {
+          send.cutBy ??= cause;
+        }
       }
       send.ending.abort();
     }

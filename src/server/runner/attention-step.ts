@@ -175,6 +175,7 @@ export async function attentionStep(
   if (offered === null || handle === null || send.ending.signal.aborted) {
     return;
   }
+  send.cutBy = null;
   const controller = new AbortController();
   let timedOut = false;
   const stop = () => {

@@ -232,6 +232,8 @@ export async function memoryPhase(
     return;
   }
   startMemory(deps.writer, send);
+  // an earlier step's window is not this phase's cut
+  send.cutBy = null;
   const controller = new AbortController();
   send.controller = controller;
   const stop = () => {
