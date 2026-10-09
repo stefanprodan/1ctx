@@ -117,7 +117,10 @@ of that shell that shows a file on the chat page.
 `/knowledge` and `/tmp` are the trees a command may change.
 
 - **A command's trees commit once or not at all.** An abort, exit 124
-  or 126, or a throw discards both writable trees. Any other exit,
+  or 126, or a throw discards both writable trees. A command the
+  caller's abort or a shutdown ended (cause `abort`) returns
+  `interrupted` and `discarded`: only then may its cut text say the
+  file changes were discarded. Any other exit,
   nonzero included, commits in one transaction (`bash/commit.ts`): docs
   through `commitDocs`, then scratch. An overflow rolls both back.
 - **A process slot per core holds a mount.** `PROCESS_SLOTS` is the

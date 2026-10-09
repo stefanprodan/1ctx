@@ -14,7 +14,7 @@ import { runOne, toolContext } from "./call.ts";
 import { historyMessages, request } from "./context.ts";
 import { memoryMessages } from "./memory-packet.ts";
 import type { ContextLookups } from "./render.ts";
-import { NOT_RUN, OVER_ROUND, stopOpenTools } from "./reply-rows.ts";
+import { cutOpenTools, NOT_RUN, OVER_ROUND } from "./reply-rows.ts";
 import { cutResult } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { failureFields, runRound } from "./round.ts";
@@ -55,11 +55,18 @@ type PhaseRowsDeps = {
   sessions: SessionsPort;
 };
 
+// the main round's open rows at the run's cut, its completions kept
 export function stopMainTools(deps: PhaseRowsDeps, send: ActiveSend): void {
   if (send.openTools.size === 0) return;
   const now = deps.clock();
   transact(deps.db, () => {
-    const rows = stopOpenTools(deps.sessions, send, now);
+    const rows = cutOpenTools(
+      deps,
+      send,
+      send.policy.offered,
+      send.cause ?? "failure",
+      now,
+    );
     if (rows.length === 0) return { result: undefined, events: [] };
     const session = deps.sessions.touch(send.sessionId, {
       status: "running",
@@ -68,6 +75,7 @@ export function stopMainTools(deps: PhaseRowsDeps, send: ActiveSend): void {
     return { result: undefined, events: [envelope(session, rows, null)] };
   });
   send.openTools = new Map();
+  send.settled = new Map();
 }
 
 function startMemory(writer: Writer, send: ActiveSend): void {

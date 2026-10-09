@@ -142,6 +142,7 @@ describe("visualize", () => {
     const ctx = context();
     ctx.signal = AbortSignal.abort(new Error("stopped"));
     expect(await run({ title: "Chart", html: "x" }, ctx)).toEqual({
+      interrupted: true,
       error: true,
       content: "Error: stopped",
     });

@@ -118,6 +118,8 @@ describe("atomic knowledge and scratch commits", () => {
         error: true,
         content: "nothing saved: send stopped",
         ended: { phase: "run", cause: "abort" },
+        interrupted: true,
+        discarded: true,
       });
       s.unchanged();
     } finally {

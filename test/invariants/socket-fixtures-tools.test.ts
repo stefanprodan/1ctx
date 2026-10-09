@@ -311,7 +311,7 @@ describe("socket fixtures for tools", () => {
   });
 
   test("an abort-ignoring tool", async () => {
-    // The terminal cleanup must win over the tool's late result.
+    // A result the tool still reports after the abort is its end: kept.
     const fake = fakeTools({
       c1: { ignoreAbort: 8, result: { content: "late", error: false } },
     });
@@ -328,7 +328,7 @@ describe("socket fixtures for tools", () => {
     const toolRow = chat.app.sessions
       .messages(sessionId)
       .find((r) => r.kind === "tool")!;
-    expect(toolRow.status).toBe("stopped");
+    expect(toolRow).toMatchObject({ status: "done", content: "late" });
     chat.app.socket.dispose();
   });
 

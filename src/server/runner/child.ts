@@ -266,7 +266,7 @@ export async function delegate(
   call: ToolCall,
   ctx: ToolContext,
 ): Promise<ToolResult> {
-  const rowId = parent.openTools.get(call);
+  const rowId = parent.openTools.get(call)?.rowId;
   if (rowId === undefined || !parent.policy.childOffered) {
     throw new Error("delegate is not offered here");
   }
@@ -291,6 +291,7 @@ export async function delegate(
     return {
       content: "The subagent was stopped before it began.",
       error: true,
+      interrupted: true,
     };
   }
   try {
@@ -362,7 +363,7 @@ async function runChild(
     completion_tokens: send.completionTokens,
     duration: deps.clock() - send.startedAt,
   });
-  return childResult(
+  const result = childResult(
     {
       cause: send.cause!,
       error: send.error,
@@ -374,6 +375,11 @@ async function runChild(
       resultCut: policy.toolCaps.resultCut,
     },
   );
+  // the parent's cut ended the child: its row gets the cut text, which
+  // says files may have come back
+  return signal.aborted && send.cause !== "finish"
+    ? { ...result, interrupted: true }
+    : result;
 }
 
 // the child's done answer, and the last words it wrote

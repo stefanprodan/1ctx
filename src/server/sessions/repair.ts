@@ -8,6 +8,7 @@
 
 import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
+import { cutKind, cutText } from "./cut.ts";
 import type { RepairedSession, SessionRow } from "./rows.ts";
 
 export function repairRows(
@@ -69,6 +70,20 @@ export function repairRows(
          then ? else memory_error end,
        finished_at = ? where status = 'running'`,
   ).run(error, error, now);
+  // what a streaming row held is no result: the call's end was never
+  // recorded, and a crash may fall between a commit and the row
+  const cutRows = db
+    .query<{ id: string; tool_name: string }, []>(
+      "select id, tool_name from messages where kind = 'tool' and status = 'streaming'",
+    )
+    .all();
+  const setContent = db.query("update messages set content = ? where id = ?");
+  for (const row of cutRows) {
+    setContent.run(
+      cutText("restart", cutKind(row.tool_name, null), false),
+      row.id,
+    );
+  }
   db.query(
     `update messages set status = 'stopped', error = ?, finished_at = ?
      where kind = 'tool' and status = 'streaming'

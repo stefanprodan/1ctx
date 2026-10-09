@@ -60,6 +60,8 @@ describe("command admission", () => {
           error: true,
           content: "nothing saved: session wait stopped",
           ended: { phase: "queue", cause: "abort" },
+          interrupted: true,
+          discarded: true,
         });
         expect(scratchState(s).revision).toBe(0);
         expect(heldSessions().has(s.session.id)).toBe(true);

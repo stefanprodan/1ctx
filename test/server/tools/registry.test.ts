@@ -204,4 +204,43 @@ describe("the registry's result cleaning", () => {
     const result = await new Registry([tool]).run(call, context());
     expect(result).toEqual({ content: "answered", error: false });
   });
+
+  test("marks a throw after the send's abort interrupted, never a timeout", async () => {
+    const controller = new AbortController();
+    const tool: Tool = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      run: async (_args, ctx) => {
+        controller.abort();
+        ctx.signal.throwIfAborted();
+        return "never";
+      },
+    };
+    const result = await new Registry([tool]).run(call, {
+      ...context(),
+      signal: controller.signal,
+    });
+    expect(result).toMatchObject({ error: true, interrupted: true });
+    expect(result.timedOut).toBeUndefined();
+  });
+
+  test("leaves a failure of the tool's own, and a timeout, not interrupted", async () => {
+    const own = await echo("the page is gone", true).run(call, context());
+    expect(own.interrupted).toBeUndefined();
+    const tool: Tool = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      timeoutMs: 20,
+      run: async (_args, ctx) => {
+        await Bun.sleep(30);
+        ctx.signal.throwIfAborted();
+        return "late";
+      },
+    };
+    const late = await new Registry([tool]).run(call, context());
+    expect(late.timedOut).toBeTrue();
+    expect(late.interrupted).toBeUndefined();
+  });
 });

@@ -10,6 +10,7 @@ import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import {
   chatMarkdown,
+  cutText,
   RESTART_ERROR,
   RESULT_DISPLAY_CHARS,
   SessionStore,
@@ -1138,9 +1139,62 @@ describe("the tool-loop store", () => {
     expect(byId.get(tool.id)).toMatchObject({
       status: "stopped",
       error: "restart",
+      content: cutText("restart", "read", false),
     });
     // nothing streams after a repair, so foreign keys still check
     expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+
+  test("repair gives each streaming tool row the restart text for its kind", () => {
+    const { db, store, session } = seededStore();
+    const send = store.createSend({
+      id: "s-kinds",
+      sessionId: session.id,
+      userId: "u",
+      agentId: "a",
+      providerId: "pr",
+      model: "m",
+      firstMessageId: "u-kinds",
+      now: 0,
+    });
+    store.addUserMessage({
+      id: "u-kinds",
+      sessionId: session.id,
+      sendId: send.id,
+      userId: "u",
+      content: "hi",
+      now: 0,
+    });
+    const names = ["mcp__x__y", "delegate", "webfetch", "bash"];
+    const rows = store.addToolRows(
+      names.map((toolName, i) => ({
+        sessionId: session.id,
+        sendId: send.id,
+        round: 1,
+        toolCallId: `c${i}`,
+        toolName,
+        now: 0,
+      })),
+    );
+    store.touch(session.id, { status: "running", now: 0 });
+
+    const [repaired] = store.repair(1, "restart", () => {});
+    const byId = new Map(repaired!.messages.map((m) => [m.id, m]));
+    expect(
+      rows.map((row) => {
+        const ended = byId.get(row.id)!;
+        return { status: ended.status, content: ended.content };
+      }),
+    ).toEqual([
+      // an MCP name has no side here, so it fails closed as a write
+      { status: "stopped", content: cutText("restart", "write", false) },
+      { status: "failed", content: cutText("restart", "delegate", false) },
+      { status: "stopped", content: cutText("restart", "read", false) },
+      // a crash may fall between a command's commit and its row
+      { status: "stopped", content: cutText("restart", "bash", false) },
+    ]);
+    expect(byId.get(rows[3]!.id)!.content).toContain("may have been saved");
     db.close();
   });
 

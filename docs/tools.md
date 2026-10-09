@@ -84,6 +84,18 @@ words.
 - **`tool failed` names the tool by `toolLogName()`.** A built-in's
   name, `mcp:<server>` for an offered MCP tool, else `unknown`; never
   the name the model wrote.
+- **A call the send's abort ended is `interrupted`, not failed.** The
+  flag lives on `ToolResult` in memory and is never stored. The
+  registry sets it on a throw once `ctx.signal` aborted (`failedCall`
+  too), `runOne` on a throw of the port, bash and `delegate` when the
+  abort ended them. Only the code that ran the call says so, never the
+  error text. An interrupted result logs no `tool failed`, since the
+  send's end has the cause, and its row gets the cut text
+  (`docs/sessions.md`); any other settled result is a completion,
+  success or failure, and is kept. The cut kinds: read (`webfetch`,
+  `websearch`, `datetime`, `skill`, `skill_file`, `mcp_describe`), MCP
+  read (the read side), `bash`, `delegate`, and write for every other
+  name.
 
 ## The offered set
 

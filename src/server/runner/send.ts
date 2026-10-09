@@ -12,7 +12,13 @@ import type {
 import type { SendCause, SendKind } from "../../shared/words.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
 import { type Children, noChildren } from "./child-slots.ts";
-import type { KeepPort, SendPolicy, SendRepos, ToolBudget } from "./policy.ts";
+import type {
+  KeepPort,
+  SendPolicy,
+  SendRepos,
+  ToolBudget,
+  ToolResult,
+} from "./policy.ts";
 import type { RepoLines } from "./prompt.ts";
 import { unmarked } from "./render.ts";
 
@@ -83,6 +89,9 @@ export type SendPhase =
 
 export type SendOp = "message" | "regenerate" | "compact" | "run";
 
+// a launched call's streaming row, and the name it was written with
+export type OpenTool = { rowId: string; name: string };
+
 export type ActiveSend = {
   id: string;
   sessionId: string;
@@ -135,7 +144,11 @@ export type ActiveSend = {
   mcpNote: string;
   // the current round's launched tool rows still streaming, keyed by
   // the call object so duplicate provider call ids remain distinct
-  openTools: Map<ToolCall, string>;
+  openTools: Map<ToolCall, OpenTool>;
+  // the ends those calls reported and no row holds yet, by the same
+  // key: the cut writes a completion whole, and reads an interrupted
+  // one only for what it says it discarded
+  settled: Map<ToolCall, ToolResult>;
   // Even aborted calls must release their mounts before the send unlocks.
   tools: Promise<void> | null;
   // the stream sequence, per send, from 1
@@ -304,6 +317,7 @@ export function newSend(fields: {
     usedPrompt: fields.usedPrompt ?? null,
     mcpNote: "",
     openTools: new Map(),
+    settled: new Map(),
     tools: null,
     seq: 0,
     controller: new AbortController(),

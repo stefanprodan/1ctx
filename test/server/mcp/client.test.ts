@@ -655,6 +655,7 @@ describe("MCP SDK client", () => {
     const controller = new AbortController();
     const cancelled: Cancelled = { value: false, at: 0 };
     const fetcher = abortAt("tools/call", fake.fetcher, controller, cancelled);
+    // the caller's abort is a stop, never the SDK's request timeout
     await expect(
       withClient(
         { fetcher, version: "test" },
@@ -667,7 +668,7 @@ describe("MCP SDK client", () => {
             timeoutMs: 2_000,
           }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow("the MCP call was stopped");
     expect(cancelled.value).toBeTrue();
     expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });

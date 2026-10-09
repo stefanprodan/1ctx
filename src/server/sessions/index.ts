@@ -63,6 +63,12 @@ export {
   parseRunsCursor,
   type RunsCursor,
 } from "./cursor.ts";
+export {
+  type CutCause,
+  type CutKind,
+  cutKind,
+  cutText,
+} from "./cut.ts";
 export { envelope } from "./envelope.ts";
 export {
   chatMarkdown,

@@ -5,8 +5,8 @@ import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   offeredServers,
-  type PromptServer,
   promptSnapshot,
+  type SidedServer,
   wireName,
 } from "../../shared/mcp.ts";
 import type { Db } from "../db/index.ts";
@@ -41,6 +41,7 @@ export type OfferedMcpTool = {
   inputSchema: Record<string, unknown>;
   wireInputSchema: Record<string, unknown>;
   schemaJson: string;
+  side: "read" | "write";
 };
 
 export type OfferedServer = {
@@ -128,10 +129,7 @@ function switchableOver(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function promptRows(
-  rows: McpServerRow[],
-  links: AgentServer[],
-): PromptServer[] {
+function promptRows(rows: McpServerRow[], links: AgentServer[]): SidedServer[] {
   return offeredServers(
     rows.map((server) => ({
       id: server.id,
@@ -155,7 +153,7 @@ function promptRows(
   );
 }
 
-function offeredRow(row: McpServerRow, prompt: PromptServer): OfferedServer {
+function offeredRow(row: McpServerRow, prompt: SidedServer): OfferedServer {
   const byWire = new Map(
     row.tools.flatMap((tool) => {
       const name = wireName(row.name, tool.name);
@@ -180,6 +178,7 @@ function offeredRow(row: McpServerRow, prompt: PromptServer): OfferedServer {
             unknown
           >,
           schemaJson: tool.schemaJson,
+          side: tool.side,
         },
       ];
     } catch {

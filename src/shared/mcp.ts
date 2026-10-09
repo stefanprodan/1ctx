@@ -279,6 +279,11 @@ export type PromptServer = {
   instructions: string | null;
   tools: PromptTool[];
 };
+// as offered: each tool with the side classify() put it on, which the
+// runner reads for what a cut call may have done
+export type SidedServer = Omit<PromptServer, "tools"> & {
+  tools: (PromptTool & { side: "read" | "write" })[];
+};
 export type McpDigest = Record<
   string,
   { tools: Record<string, string>; instructions: string | null }
@@ -389,8 +394,8 @@ export type OfferableServer = {
 export function offeredServers(
   servers: OfferableServer[],
   agentServers: AgentServer[],
-): PromptServer[] {
-  const out: PromptServer[] = [];
+): SidedServer[] {
+  const out: SidedServer[] = [];
   for (const link of agentServers) {
     const server = servers.find((s) => s.id === link.serverId);
     if (server === undefined) continue;
@@ -402,7 +407,7 @@ export function offeredServers(
       write: server.writePatterns,
       excluded: server.excludedPatterns,
     });
-    const tools: PromptTool[] = [];
+    const tools: SidedServer["tools"] = [];
     for (const tool of server.tools) {
       const side = sides.get(tool.name);
       if (tool.wireName === null) continue;
@@ -419,6 +424,7 @@ export function offeredServers(
         wireName: tool.wireName,
         description: wireDescription(tool.description),
         schemaJson: JSON.stringify(wireSchema(schema)),
+        side,
       });
     }
     if (tools.length === 0) continue;

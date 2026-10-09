@@ -5,6 +5,7 @@ import { expect, test } from "bun:test";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { EXHAUSTED_LINE, SUMMARIZE } from "../../src/server/runner/context.ts";
 import { CONTEXT_CUT } from "../../src/server/runner/results.ts";
+import { cutText } from "../../src/server/sessions/index.ts";
 import { PROVIDER_URL } from "../helpers/app.ts";
 import {
   createAutomation,
@@ -205,7 +206,7 @@ test("result tails past the window threshold are stored and the turn answers", a
   }
 });
 
-test("stopping a buffered round settles its calls without writing late results", async () => {
+test("stopping a buffered round keeps its completed result and cuts the rest", async () => {
   const started: string[] = [];
   let aborted = false;
   const chat = await chatApp({
@@ -237,7 +238,11 @@ test("stopping a buffered round settles its calls without writing late results",
             "abort",
             () => {
               aborted = true;
-              resolve({ content: "a late result", error: false });
+              resolve({
+                content: "a late result",
+                error: false,
+                interrupted: true,
+              });
             },
             { once: true },
           );
@@ -272,8 +277,8 @@ test("stopping a buffered round settles its calls without writing late results",
         .filter((row) => row.kind === "tool")
         .map((row) => ({ status: row.status, content: row.content })),
     ).toEqual([
-      { status: "stopped", content: "stopped before it finished" },
-      { status: "stopped", content: "stopped before it finished" },
+      { status: "done", content: "a completed result" },
+      { status: "stopped", content: cutText("stop", "read", false) },
     ]);
     expect(chat.scripted.scripts).toHaveLength(1);
   } finally {

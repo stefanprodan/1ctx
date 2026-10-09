@@ -51,7 +51,8 @@ export function toolContext(
   };
 }
 
-// a tool that throws is a failed result whose content is the error
+// a tool that throws is a failed result whose content is the error; a
+// call the send's abort ended logs nothing, the send's end has the cause
 export async function runOne(
   deps: CallDeps,
   send: ActiveSend,
@@ -68,9 +69,10 @@ export async function runOne(
       content: messageOf(error),
       error: true,
       failure: error,
+      ...(ctx.signal.aborted ? { interrupted: true } : {}),
     };
   }
-  if (result.error) {
+  if (result.error && !result.interrupted) {
     // a closed name: the model may call any name at all
     const tool = deps.tools.logName?.(offered, call) ?? "unknown";
     deps.log.warn("tool failed", {
