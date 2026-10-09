@@ -26,3 +26,24 @@ export function cutCodePoints(text: string, max: number): string {
 // runs of whitespace as one space, trimmed
 export const oneLine = (text: string): string =>
   text.replace(/\s+/g, " ").trim();
+
+// a period closing `e.g` or `i.e` is no sentence end; nothing else is
+// skipped, so two real sentences never merge
+const SENTENCE_END = /[.!?](?=\s|$)/g;
+const ABBREVIATION = /(?:^|[^\p{L}\p{N}_])(?:e\.g|i\.e)$/iu;
+
+// the cap of a catalog line's sentence, MCP tools and skills alike
+export const MAX_CATALOG_LINE = 160;
+
+// the first sentence of a description, on one line, cut at cap
+export function firstSentence(text: string, cap: number): string {
+  const line = oneLine(text);
+  let sentence = line;
+  for (const end of line.matchAll(SENTENCE_END)) {
+    const before = line.slice(0, end.index);
+    if (end[0] === "." && ABBREVIATION.test(before)) continue;
+    sentence = `${before}${end[0]}`;
+    break;
+  }
+  return cutText(sentence, cap);
+}

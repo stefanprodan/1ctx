@@ -15,7 +15,7 @@ import {
 } from "../../shared/capabilities.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import { type PromptServer, promptSnapshot } from "../../shared/mcp.ts";
+import type { PromptServer } from "../../shared/mcp.ts";
 import { mcpCatalog, resolveMode } from "../../shared/mcp-catalog.ts";
 import { catalog } from "../../shared/skills.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
@@ -25,7 +25,6 @@ import {
   type SearchProvider,
 } from "../../shared/words.ts";
 import type { CredentialRow } from "../credentials/index.ts";
-import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
@@ -329,20 +328,20 @@ export function offered(
       : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,
-  // the skill tool's names and the file tool all come from what is left
-  const skillCatalog = catalog(
-    deps.skills
-      .forAgent(agentId)
-      .filter((skill) => !disabledCapabilities.includes(skillKey(skill.id))),
-    CATALOG_CAP,
-  );
-  for (const name of skillCatalog.leftOut) {
-    deps.log.warn("skill omitted", { skill: name, reason: "catalog cap" });
+  // the skill tools' snapshot and the file tool all come from what is
+  // left, and the catalog never narrows it
+  const agentSkills = deps.skills
+    .forAgent(agentId)
+    .filter((skill) => !disabledCapabilities.includes(skillKey(skill.id)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const skillCatalog = catalog(agentSkills, CATALOG_CAP);
+  if (skillCatalog.overCap) {
+    deps.log.warn("catalog over cap", {
+      kind: "skills",
+      count: agentSkills.length,
+    });
   }
-  const skills = {
-    block: skillCatalog.text,
-    skills: skillCatalog.included,
-  };
+  const skills = { block: skillCatalog.text, skills: agentSkills };
   const baseTools = fillYear(
     [
       ...deps
@@ -370,8 +369,10 @@ export function offered(
       (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
     ),
   );
-  let mcp = offered.servers;
-  let mcpPrompt = {
+  // the catalog never narrows the offer: every offered server keeps its
+  // instructions, its digest and its tools in either mode
+  const mcp = offered.servers;
+  const mcpPrompt = {
     text: offered.prompt.text,
     digest: offered.prompt.digest,
   };
@@ -382,20 +383,16 @@ export function offered(
   let mcpSchemas = allSchemas;
   if (mode === "catalog" && mcp.length > 0) {
     const catalogOffer = mcpCatalog(promptServers(mcp));
-    for (const name of catalogOffer.leftOut) {
-      deps.log.warn("server omitted", {
-        server: name,
-        reason: "catalog cap",
+    if (catalogOffer.overCap) {
+      deps.log.warn("catalog over cap", {
+        kind: "mcp",
+        count: mcp.reduce((n, server) => n + server.tools.length, 0),
       });
     }
-    const included = new Set(catalogOffer.included);
-    mcp = mcp.filter((server) => included.has(server.name));
-    if (mcp.length !== offered.servers.length) {
-      const snapshot = promptSnapshot(promptServers(mcp), sha256);
-      mcpPrompt = { text: snapshot.text, digest: snapshot.digest };
-    }
     mcpCatalogText = catalogOffer.text;
-    mcpSchemas = makeMcpCatalogTools(mcp).map(schema);
+    // no tool to list means no catalog, and neither tool could answer
+    mcpSchemas =
+      mcpCatalogText === "" ? [] : makeMcpCatalogTools(mcp).map(schema);
   }
   return {
     tools: [...baseTools, ...mcpSchemas],

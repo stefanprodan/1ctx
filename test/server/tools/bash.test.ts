@@ -85,7 +85,6 @@ describe("bash", () => {
       description: tool.description,
       parameters: tool.parameters,
       when: "knowledge",
-      names: false,
       variant: null,
     });
     const { name, description, parameters } = tool;

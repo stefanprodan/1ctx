@@ -26,6 +26,7 @@ import { DEFAULT_VISUAL_HOSTS } from "../../src/shared/contracts/tool.ts";
 import {
   catalog,
   MAX_SKILL_RESOURCES,
+  SKILL_CATALOG_OPENINGS,
   skillContent,
 } from "../../src/shared/skills.ts";
 import {
@@ -562,8 +563,8 @@ describe("visualize skill", () => {
     ].map((match) => match[0].replace(/[.,]+$/, ""));
     expect([...new Set(named)].sort()).toEqual(references);
     const offered = catalog([loaded], CATALOG_CAP);
-    expect(offered.included).toEqual([loaded]);
-    expect(offered.leftOut).toEqual([]);
+    expect(offered.overCap).toBe(false);
+    expect(offered.text).toContain(SKILL_CATALOG_OPENINGS[0]);
     expect(offered.text.length).toBeLessThanOrEqual(CATALOG_CAP);
     expect(offered.text).toContain("<name>visualize</name>");
     expect(keptPaths.length).toBeLessThanOrEqual(MAX_SKILL_RESOURCES);

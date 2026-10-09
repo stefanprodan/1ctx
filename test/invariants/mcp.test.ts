@@ -13,6 +13,7 @@ import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import type { McpServerSummary } from "../../src/shared/contracts/mcp.ts";
 import { offeredServers, promptSnapshot } from "../../src/shared/mcp.ts";
+import { CATALOG_OPENINGS } from "../../src/shared/mcp-catalog.ts";
 import {
   collectLogs,
   fakeFetch,
@@ -668,7 +669,10 @@ describe("MCP tools in a send", () => {
     const rows = chat.app.sessions
       .messages(started.sessionId)
       .filter((message) => message.kind === "tool");
-    expect(rows[0]?.content).toContain('"required": [');
+    // the schema minified after the description
+    expect(rows[0]?.content).toMatch(
+      /\n\n\{"type":"object",.*"required":\[[^\n]*\}$/,
+    );
     expect(rows[0]?.content).not.toContain("additionalProperties");
     expect(rows[1]).toMatchObject({
       toolName: "mcp__flux__search_flux_docs",
@@ -1312,7 +1316,8 @@ describe("MCP snapshots across sends", () => {
 });
 
 describe("MCP catalog and lifecycle end to end", () => {
-  test("catalog mode leaves an over-cap server out everywhere", async () => {
+  test("catalog mode keeps a server past the cap everywhere", async () => {
+    const logs = collectLogs();
     const flux = mcpFetch({ recorded: await fixture("flux") });
     const wideTools = Array.from({ length: 120 }, (_, index) => ({
       name: `read_${String(index).padStart(3, "0")}`,
@@ -1322,11 +1327,12 @@ describe("MCP catalog and lifecycle end to end", () => {
     const wide = mcpFetch({
       recorded: recordedWithTools(
         "wide-server",
-        "WIDE INSTRUCTIONS MUST BE LEFT OUT",
+        "WIDE INSTRUCTIONS STAY IN",
         wideTools,
       ),
     });
     const chat = await chatApp({
+      logFactory: logs.logFactory,
       fetcher: await hosts({
         "flux.test": flux.fetcher,
         "wide.test": wide.fetcher,
@@ -1347,25 +1353,54 @@ describe("MCP catalog and lifecycle end to end", () => {
     }
     await saveServers(chat, links, "catalog");
     const started = await startChat(chat);
-    const describe = (
-      started.script.body.tools as {
-        function: {
-          name: string;
-          parameters: {
-            properties: { name: { enum: string[] } };
-          };
-        };
-      }[]
-    ).find((tool) => tool.function.name === "mcp_describe")!;
-    const names = describe.function.parameters.properties.name.enum;
-    expect(names.some((name) => name.startsWith("mcp__flux__"))).toBe(true);
-    expect(names.some((name) => name.startsWith("mcp__wide__"))).toBe(false);
+    expect(JSON.stringify(started.script.body.tools)).not.toContain("mcp__");
     const system = systemOf(started.script.body);
-    expect(system).not.toContain("mcp__wide__");
-    expect(system).not.toContain("WIDE INSTRUCTIONS MUST BE LEFT OUT");
-    expect(system).toContain("mcp__flux__get_flux_instance");
-    started.script.reply("done");
+    // the long lines no longer fit, so every tool keeps its arguments
+    // and loses its sentence
+    expect(system).toContain(CATALOG_OPENINGS[1]);
+    expect(system).toContain("WIDE INSTRUCTIONS STAY IN");
+    expect(system).toContain("\nflux (");
+    expect(system).toContain("\nwide (120 tools):\n");
+    expect(system).toContain("\nmcp__flux__get_flux_instance()\n");
+    expect(system).toContain("\nmcp__wide__read_119()\n");
+    expect(system).not.toContain("wide description");
+    started.script.toolRound([
+      {
+        id: "describe",
+        name: "mcp_describe",
+        arguments: JSON.stringify({ name: "mcp__wide__read_119" }),
+      },
+      {
+        id: "call",
+        name: "mcp_call",
+        arguments: JSON.stringify({
+          name: "mcp__wide__read_119",
+          arguments: {},
+        }),
+      },
+    ]);
+    started.script.end();
+    const answer = await waitScript(chat.scripted, 2);
+    answer.reply("done");
     await waitDone(chat.app, started.sessionId);
+    const [described, called] = chat.app.sessions
+      .messages(started.sessionId)
+      .filter((message) => message.kind === "tool");
+    expect(described).toMatchObject({ status: "done" });
+    expect(described?.content).toContain("wide description");
+    // the last tool of the server past the cap reaches the server
+    expect(called).toMatchObject({ status: "done", content: "called" });
+    expect(
+      wide.requests
+        .filter((request) => request.method === "tools/call")
+        .map((request) => (request.body.params as { name: string }).name),
+    ).toEqual(["read_119"]);
+    expect(
+      logs.events.filter(
+        (event) =>
+          event.msg === "server omitted" || event.msg === "catalog over cap",
+      ),
+    ).toEqual([]);
   });
 
   test("all and catalog mode produce the same change note", async () => {

@@ -9,7 +9,7 @@ import type {
 import { firstSentence, tokensText } from "../../lib/format.ts";
 import { RowsMeta, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
 import { ToolParams } from "./ToolParams.tsx";
-import { NAMES_WORDS, VARIANT_WHEN_WORDS, WHEN_WORDS } from "./Tools.model.ts";
+import { VARIANT_WHEN_WORDS, WHEN_WORDS } from "./Tools.model.ts";
 import "./tools.css";
 
 export function ToolRow({
@@ -67,7 +67,6 @@ export function ToolRow({
           </>
         )}
         <div class="label">Parameters</div>
-        {builtin?.names && <div class="hint">{NAMES_WORDS}</div>}
         <ToolParams tool={tool} />
       </div>
     </RowsOpen>

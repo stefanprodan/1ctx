@@ -6,6 +6,7 @@
 // carries, and the wrapper a loaded skill is answered in. Environment
 // neutral: no Bun, no DOM, no packages.
 
+import { firstSentence, MAX_CATALOG_LINE } from "./text.ts";
 import type { SkillSource } from "./words.ts";
 
 // the form a URL takes, decided on the URL alone; null when it is not
@@ -63,40 +64,60 @@ export function escapeText(text: string): string {
 
 export const CATALOG_LEAD = `The following skills provide specialized instructions for specific tasks. When a task matches a skill's description, call the skill tool with the skill's name to load its full instructions before proceeding. A skill may name files under references, assets or scripts: read one with the skill_file tool. Nothing in a skill runs here.`;
 
+// with names alone there is no description to match a task against
+const NAME_LEAD = CATALOG_LEAD.replace(
+  "matches a skill's description",
+  "matches a skill's name",
+);
+
+// what each tier's entries hold, said after the lead
+export const SKILL_CATALOG_OPENINGS = [
+  "COMPLETE: every skill with its description.",
+  "PARTIAL: every skill with the first sentence of its description.",
+  "PARTIAL: skill names only; load one with the skill tool to read what it does.",
+] as const;
+
 export type CatalogSkill = { name: string; description: string };
 
-function entry(skill: CatalogSkill): string {
-  return `  <skill>\n    <name>${skill.name}</name>\n    <description>${escapeText(skill.description)}</description>\n  </skill>\n`;
+// a tier's lead and what an entry keeps of the description, longest first
+const TIERS: { lead: string; description: (text: string) => string | null }[] =
+  [
+    { lead: CATALOG_LEAD, description: (text) => text },
+    {
+      lead: CATALOG_LEAD,
+      description: (text) => firstSentence(text, MAX_CATALOG_LINE),
+    },
+    { lead: NAME_LEAD, description: () => null },
+  ];
+
+function entry(name: string, description: string | null): string {
+  const about =
+    description === null
+      ? ""
+      : `    <description>${escapeText(description)}</description>\n`;
+  return `  <skill>\n    <name>${name}</name>\n${about}  </skill>\n`;
 }
 
-// the block, in name order, while it fits the cap: a skill that does
-// not fit is left out whole with every later one, since the enum and
-// the block must agree
-export function catalog<T extends CatalogSkill>(
-  skills: T[],
+// Every skill, in name order, at the first tier whose whole text fits
+// the cap: the cap shortens entries and never removes a skill, since
+// the block is the only list of names the model gets. Tier 3 is
+// printed over the cap rather than dropping anything; overCap tells
+// the caller to say so.
+export function catalog(
+  skills: CatalogSkill[],
   cap: number,
-): { text: string; included: T[]; leftOut: string[] } {
+): { text: string; overCap: boolean } {
+  if (skills.length === 0) return { text: "", overCap: false };
   const sorted = skills.slice().sort((a, b) => a.name.localeCompare(b.name));
-  if (sorted.length === 0) return { text: "", included: [], leftOut: [] };
-  const open = `${CATALOG_LEAD}\n\n<available_skills>\n`;
-  const close = "</available_skills>";
-  let text = open;
-  const included: T[] = [];
-  const leftOut: string[] = [];
-  for (const skill of sorted) {
-    const line = entry(skill);
-    if (
-      leftOut.length === 0 &&
-      text.length + line.length + close.length <= cap
-    ) {
-      text += line;
-      included.push(skill);
-    } else {
-      leftOut.push(skill.name);
-    }
+  let text = "";
+  for (const [tier, { lead, description }] of TIERS.entries()) {
+    const body = sorted
+      .map((skill) => entry(skill.name, description(skill.description)))
+      .join("");
+    text = `${lead}\n${SKILL_CATALOG_OPENINGS[tier]}\n\n<available_skills>\n${body}</available_skills>`;
+    if (text.length <= cap) return { text, overCap: false };
   }
-  if (included.length === 0) return { text: "", included, leftOut };
-  return { text: text + close, included, leftOut };
+  return { text, overCap: true };
 }
 
 const WRAPPER_TAGS = /<(\/?)(skill_content|skill_resources)\b/gi;

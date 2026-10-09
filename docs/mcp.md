@@ -54,16 +54,36 @@ reach the model in the sends of agents linked to it.
   cap at discovery stays bare.
 - **`mcpMode` picks schemas or a catalog.** `all` puts every schema on
   the wire. `catalog` offers `mcp_describe` and `mcp_call` and one
-  prompt line per tool. `auto` is `all` while the schemas count at most
+  prompt line per tool, neither tool when no offered server has one.
+  `auto` is `all` while the schemas count at most
   `MCP_CATALOG_FROM_TOKENS`.
-- **A catalog line is `name(args): sentence`**, so a model that skips
-  `mcp_describe` does not guess names. The args are the lean schema's
-  top-level names, then any `required` name `properties` lacks, an
-  optional one marked `?`; types stay with `mcp_describe`. No list
-  when the top level has `anyOf`, `oneOf`, `allOf` or a kept `$ref`, or
-  a name is outside `[A-Za-z0-9_.$-]`, since it would lie or break the
-  line. Only the sentence is cut, at `MAX_CATALOG_LINE`; it reads past
-  `e.g.` and `i.e.`.
+- **The catalog never narrows the snapshot.** Every offered server keeps
+  its instructions, digest and tools in both modes, so the catalog cap
+  is never an access cap. The snapshot's own caps still apply in both
+  modes: past `MAX_SCHEMAS_BYTES` a server is left out whole, past
+  `MAX_INSTRUCTIONS_BLOCK` it keeps its tools and loses its instructions.
+- **The catalog shrinks its lines, never its tools.** It takes the
+  first tier whose whole text (lead, opening line, every
+  `<server> (N tools):` header, every line, closing tag) fits
+  `MAX_CATALOG`: `name(args): sentence`, then `name(args)`, then
+  `name`. The opening line after the lead says which. Arguments are
+  dropped last, since they stop guessed calls. The tier is a pure
+  function of the snapshot, so the prompt stays byte-stable.
+- **Tier 3 is the floor.** Past it the catalog is printed over the cap
+  and the offer logs `catalog over cap` with `kind` and `count`, never a
+  name.
+- **A catalog line is `name(args): sentence`** at tier 1, so a model
+  that skips `mcp_describe` does not guess names. The args are the lean
+  schema's top-level names, then any `required` name `properties`
+  lacks, an optional one marked `?`; types stay with `mcp_describe`. No
+  list when the top level has `anyOf`, `oneOf`, `allOf` or a kept
+  `$ref`, or a name is outside `[A-Za-z0-9_.$-]`, since it would lie or
+  break the line. Only the sentence is cut, at `MAX_CATALOG_LINE`; it
+  reads past `e.g.` and `i.e.`.
+- **`mcp_describe` and `mcp_call` take `name` as a plain string.** No
+  enum, since the catalog lists the names; a name outside the snapshot
+  is refused, matched exactly. `mcp_describe` answers the description,
+  then the schema as minified JSON, since it stays in history.
 - **History never names a function the `tools` array lacks.** In catalog
   mode the tool loop rewrites a call of an offered wire name to
   `mcp_call` before its row is written.

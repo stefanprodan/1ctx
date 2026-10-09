@@ -7,7 +7,7 @@
 // network.
 
 import { describe, expect, test } from "bun:test";
-import { silent } from "../../../src/server/lib/log.ts";
+import { type Log, silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import type { SkillBody } from "../../../src/server/skills/index.ts";
@@ -28,6 +28,7 @@ import {
   BUILTIN_TOOLS,
   type SearchProvider,
 } from "../../../src/shared/words.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 const now = Date.UTC(2026, 8, 8, 14, 42, 10);
@@ -81,6 +82,7 @@ function area(
   secrets: Record<string, string> = {},
   provider: SearchProvider | null = null,
   skills: SkillsPort = skillsPort(),
+  log: Log = silent,
 ): ToolsArea {
   const tools = toolsArea({
     db: memoryDb(),
@@ -89,7 +91,7 @@ function area(
     }) as unknown as typeof fetch,
     secret: (name) => secrets[name] ?? null,
     clock: () => now,
-    log: silent,
+    log,
     render: (md) => md,
     skills,
   });
@@ -234,14 +236,16 @@ describe("the built-in catalog", () => {
     }
   });
 
-  test("a schema naming skills or MCP tools lists none", () => {
-    const named = catalog.filter((tool) => tool.names).map((t) => t.name);
-    expect(named).toEqual(["mcp_call", "mcp_describe", "skill", "skill_file"]);
-    for (const tool of catalog.filter((t) => t.names)) {
-      expect(
-        (tool.parameters as { properties: { name: { enum: string[] } } })
-          .properties.name.enum,
-      ).toEqual([]);
+  test("a tool taking a skill or MCP tool name lists no names", () => {
+    for (const name of ["mcp_call", "mcp_describe", "skill", "skill_file"]) {
+      const tool = catalog.find((t) => t.name === name)!;
+      const property = (
+        tool.parameters as { properties: { name: Record<string, unknown> } }
+      ).properties.name;
+      expect(property).toEqual({
+        type: "string",
+        description: expect.stringContaining(" above."),
+      });
     }
   });
 
@@ -385,7 +389,7 @@ describe("skill tools from the required skills port", () => {
     expect(names).not.toContain("skill_file");
   });
 
-  test("offers skill with the catalog enum and skill_file when a skill has files", () => {
+  test("offers skill with a plain name and skill_file when a skill has files", () => {
     const tools = area({}, null, skillsPort(catalog)).offered(now, "agent");
     const skill = tools.tools.find((tool) => tool.name === "skill")!;
     expect(tools.tools.map((tool) => tool.name)).toEqual([
@@ -397,17 +401,49 @@ describe("skill tools from the required skills port", () => {
       "skill_file",
     ]);
     expect(
-      (
-        skill.parameters as {
-          properties: { name: { enum: string[] } };
-        }
-      ).properties.name.enum,
-    ).toEqual(["ops", "runbooks"]);
+      (skill.parameters as { properties: { name: object } }).properties.name,
+    ).toEqual({
+      type: "string",
+      description: "A skill name from the available skills above.",
+    });
     expect(tools.tools.some((tool) => tool.name === "skill_file")).toBeTrue();
     expect(tools.skills.skills.map((skill) => skill.name)).toEqual([
       "ops",
       "runbooks",
     ]);
+  });
+
+  test("a catalog past its floor offers every skill and logs the count alone", async () => {
+    const logs = collectLogs();
+    const many: OfferedSkill[] = Array.from({ length: 200 }, (_, i) => ({
+      id: `s${i}`,
+      name: `skill-${String(i).padStart(3, "0")}-${"n".repeat(50)}`,
+      description: "Does it.",
+      hasFiles: false,
+    }));
+    const tools = area({}, null, skillsPort(many), logs.logFactory("tools"));
+    const offered = tools.offered(now, "agent");
+    expect(offered.skills.skills).toHaveLength(200);
+    expect(offered.skills.block.length).toBeGreaterThan(16_000);
+    expect(offered.skills.block).not.toContain("<description>");
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "tools",
+        msg: "catalog over cap",
+        fields: { kind: "skills", count: 200 },
+      },
+    ]);
+    const loaded = await tools.run(
+      offered,
+      {
+        id: "c1",
+        name: "skill",
+        arguments: JSON.stringify({ name: many[199]!.name }),
+      },
+      context(),
+    );
+    expect(loaded.error).toBeFalse();
   });
 
   test("omits skill_file when no offered skill has files", () => {
@@ -465,6 +501,28 @@ describe("skill tools from the required skills port", () => {
       context(),
     );
     expect(gone.error).toBeTrue();
-    expect(gone.content).toContain("no longer available");
+    expect(gone.content).toContain(
+      "skill missing is not available; use a name from the available skills",
+    );
+  });
+
+  test("run() refuses a skill the chat turned off though its row exists", async () => {
+    const tools = area({}, null, skillsPort(catalog));
+    const offered = tools.offered(now, "agent", [], "auto", undefined, [
+      "skill:s1",
+    ]);
+    expect(offered.tools.some((tool) => tool.name === "skill_file")).toBeTrue();
+    for (const [name, args] of [
+      ["skill", '{"name":"ops"}'],
+      ["skill_file", '{"name":"ops","path":"references/a.md"}'],
+    ] as const) {
+      const refused = await tools.run(
+        offered,
+        { id: "c5", name, arguments: args },
+        context(),
+      );
+      expect(refused.error).toBeTrue();
+      expect(refused.content).toContain("skill ops is not available");
+    }
   });
 });

@@ -17,7 +17,7 @@ import type {
   DirectoryUsersResponse,
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
-import { firstSentence } from "../../src/shared/mcp-catalog.ts";
+import { firstSentence, MAX_CATALOG_LINE } from "../../src/shared/text.ts";
 import { hashPassword } from "../helpers/app.ts";
 import {
   type ChatApp,
@@ -228,7 +228,7 @@ describe("the directory", () => {
     // all the page draws
     for (const tool of body.tools) {
       const full = offered.find((t) => t.name === tool.name)!.description;
-      expect(tool.description).toBe(firstSentence(full));
+      expect(tool.description).toBe(firstSentence(full, MAX_CATALOG_LINE));
     }
     expect(body.tools.find((t) => t.name === "bash")!.description).not.toBe(
       offered.find((t) => t.name === "bash")!.description,

@@ -47,7 +47,6 @@ const tool = (
   parametersHtml: '<pre class="md-pre">{}</pre>',
   tokens,
   when: "web",
-  names: false,
   variant: null,
 });
 

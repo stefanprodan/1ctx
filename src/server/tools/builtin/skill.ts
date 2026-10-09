@@ -19,6 +19,7 @@ function named(args: Record<string, unknown>): string {
   return args.name;
 }
 
+// a snapshot skill whose row was deleted since the send began
 function gone(name: string): ToolError {
   return new ToolError(
     `skill ${name} is no longer available`,
@@ -32,7 +33,12 @@ function offeredSkill(
 ): OfferedSkill {
   const name = named(args);
   const skill = offered.find((item) => item.name === name);
-  if (skill === undefined) throw gone(name);
+  if (skill === undefined) {
+    throw new ToolError(
+      `skill ${name} is not available; use a name from the available skills`,
+      "skill not available",
+    );
+  }
   return skill;
 }
 
@@ -41,7 +47,12 @@ export function makeSkillTools(
   skills: SkillToolsPort,
 ): Tool[] {
   if (offered.length === 0) return [];
-  const names = offered.map((skill) => skill.name);
+  // no enum: the catalog lists the names, and offeredSkill() refuses
+  // the rest
+  const name = {
+    type: "string",
+    description: "A skill name from the available skills above.",
+  };
   const hasFileTool = offered.some((skill) => skill.hasFiles);
   const tools: Tool[] = [
     {
@@ -51,11 +62,7 @@ export function makeSkillTools(
       parameters: {
         type: "object",
         properties: {
-          name: {
-            type: "string",
-            enum: names,
-            description: "The available skill to load.",
-          },
+          name,
         },
         required: ["name"],
         additionalProperties: false,
@@ -80,7 +87,7 @@ export function makeSkillTools(
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", enum: names, description: "The skill name." },
+          name,
           path: {
             type: "string",
             description: "The file path listed by the skill.",

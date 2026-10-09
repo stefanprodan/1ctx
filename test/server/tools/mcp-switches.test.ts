@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import { silent } from "../../../src/server/lib/log.ts";
-import { mcpArea } from "../../../src/server/mcp/index.ts";
+import { type Log, silent } from "../../../src/server/lib/log.ts";
+import { type Mcp, mcpArea } from "../../../src/server/mcp/index.ts";
 import { wireTokens } from "../../../src/server/providers/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import { mcpKey } from "../../../src/shared/capabilities.ts";
 import { MCP_CATALOG_FROM_TOKENS } from "../../../src/shared/mcp-catalog.ts";
-import { fakeFetch } from "../../helpers/app.ts";
+import { collectLogs, fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { link, seedServer } from "../mcp/switches.helpers.ts";
 import { context } from "./memory.helpers.ts";
@@ -18,7 +18,12 @@ const NO_USAGE = {
   servers: () => ({ calls: 0, failed: 0, servers: [] }),
 };
 
-function setup(large = false, bash?: Parameters<typeof toolsArea>[0]["bash"]) {
+function setup(
+  large = false,
+  bash?: Parameters<typeof toolsArea>[0]["bash"],
+  log: Log = silent,
+  port?: (mcp: Mcp) => NonNullable<Parameters<typeof toolsArea>[0]["mcp"]>,
+) {
   const db = memoryDb();
   const fetched = fakeFetch();
   const mcp = mcpArea({
@@ -42,10 +47,10 @@ function setup(large = false, bash?: Parameters<typeof toolsArea>[0]["bash"]) {
     fetcher: fetched.fetcher,
     secret: () => null,
     clock: () => 1,
-    log: silent,
+    log,
     render: (text) => text,
     skills: { forAgent: () => [], body: () => null, file: () => null },
-    mcp,
+    mcp: port === undefined ? mcp : port(mcp),
     bash,
     memory: {
       work: (projectId, automationId) => ({
@@ -86,26 +91,36 @@ test.each(["all", "catalog"] as const)(
           expect(
             off.tools.find((tool) => tool.name === name)?.parameters,
           ).toMatchObject({
-            properties: { name: { enum: ["mcp__docs__get_item0"] } },
+            properties: {
+              name: {
+                type: "string",
+                description: "A tool name from the available MCP tools above.",
+              },
+            },
           });
         }
-        expect(
-          await tools.run(
-            off,
-            {
-              id: "catalog",
-              name: "mcp_call",
-              arguments: JSON.stringify({
-                name: "mcp__flux__get_item0",
-                arguments: {},
-              }),
-            },
-            context(),
-          ),
-        ).toEqual({
-          error: true,
-          content: "Error: MCP tool mcp__flux__get_item0 is not available",
-        });
+        expect(JSON.stringify(off.tools)).not.toContain("enum");
+        // a disabled server's tool, an unprefixed name and an unknown one
+        for (const name of [
+          "mcp__flux__get_item0",
+          "get_item0",
+          "mcp__docs__nope",
+        ]) {
+          expect(
+            await tools.run(
+              off,
+              {
+                id: "catalog",
+                name: "mcp_call",
+                arguments: JSON.stringify({ name, arguments: {} }),
+              },
+              context(),
+            ),
+          ).toEqual({
+            error: true,
+            content: `Error: MCP tool ${name} is not available; use a name from the available MCP tools`,
+          });
+        }
       } else {
         expect(off.mcpCatalog).toBe("");
         expect(off.tools.map((tool) => tool.name)).toContain(
@@ -144,6 +159,119 @@ test.each(["all", "catalog"] as const)(
     }
   },
 );
+
+test("a tool outside the snapshot is refused though its row exists", async () => {
+  const { db, mcp, tools, docs } = setup();
+  try {
+    const both = seedServer(mcp.store, "both", 2);
+    // the server allows writes, so only the link keeps the write side out
+    mcp.store.updateSettings(both.id, {
+      write: true,
+      readPatterns: ["get_item0"],
+      writePatterns: ["get_item1"],
+    });
+    const call = (name: string) => ({
+      id: "call",
+      name: "mcp_call",
+      arguments: JSON.stringify({ name, arguments: {} }),
+    });
+    const refused = (name: string) => ({
+      error: true,
+      content: `Error: MCP tool ${name} is not available; use a name from the available MCP tools`,
+    });
+    // the write side of a read-only link
+    const read = tools.offered(1, "", [link(both), link(docs)], "catalog");
+    expect(read.mcpCatalog).toContain("mcp__both__get_item0");
+    expect(read.mcpCatalog).not.toContain("mcp__both__get_item1");
+    expect(
+      await tools.run(read, call("mcp__both__get_item1"), context()),
+    ).toEqual(refused("mcp__both__get_item1"));
+    // a subagent's links are read alone, whatever its parent's are
+    const writes = [{ ...link(both), write: true }, link(docs)];
+    expect(tools.offered(1, "", writes, "catalog").mcpCatalog).toContain(
+      "mcp__both__get_item1",
+    );
+    const child = tools.offered(1, "", writes, "catalog", {
+      projectId: null,
+      automation: null,
+      phase: "child",
+    });
+    expect(child.mcpCatalog).not.toContain("mcp__both__get_item1");
+    expect(
+      await tools.run(child, call("mcp__both__get_item1"), context()),
+    ).toEqual(refused("mcp__both__get_item1"));
+  } finally {
+    await mcp.close();
+    db.close();
+  }
+});
+
+test("a catalog past its floor keeps every tool and logs the count alone", async () => {
+  const logs = collectLogs();
+  const { db, mcp, tools, docs } = setup(
+    false,
+    undefined,
+    logs.logFactory("tools"),
+  );
+  try {
+    const huge = seedServer(mcp.store, "huge", 900);
+    const offer = tools.offered(1, "", [link(huge), link(docs)], "catalog");
+    expect(offer.mcp.map((server) => server.name)).toEqual(["docs", "huge"]);
+    expect(offer.mcpCatalog).toContain("\nmcp__huge__get_item899\n");
+    expect(offer.mcpCatalog).toContain(
+      "\ndocs (1 tool):\nmcp__docs__get_item0\n",
+    );
+    expect(Object.keys(offer.mcpPrompt.digest)).toEqual(["docs", "huge"]);
+    expect(logs.events).toEqual([
+      {
+        level: "warn",
+        area: "tools",
+        msg: "catalog over cap",
+        fields: { kind: "mcp", count: 901 },
+      },
+    ]);
+  } finally {
+    await mcp.close();
+    db.close();
+  }
+});
+
+test("a catalog with no tool to list offers neither catalog tool", async () => {
+  // offeredServers drops a server with no tool, so the port strips them
+  const { db, mcp, tools, links } = setup(false, undefined, silent, (m) => ({
+    ...m,
+    offered: (agentLinks) => {
+      const offer = m.offered(agentLinks);
+      return {
+        ...offer,
+        servers: offer.servers.map((server) => ({ ...server, tools: [] })),
+      };
+    },
+  }));
+  try {
+    const offer = tools.offered(1, "", links, "catalog");
+    expect(offer.mcp).toHaveLength(2);
+    expect(offer.mcpCatalog).toBe("");
+    expect(offer.tools.map((tool) => tool.name)).not.toContain("mcp_describe");
+    expect(offer.tools.map((tool) => tool.name)).not.toContain("mcp_call");
+  } finally {
+    await mcp.close();
+    db.close();
+  }
+});
+
+test("all and catalog mode carry the same MCP prompt", async () => {
+  const { db, mcp, tools, links } = setup(true);
+  try {
+    const all = tools.offered(1, "", links, "all");
+    const catalog = tools.offered(1, "", links, "catalog");
+    expect(catalog.mcpPrompt).toEqual(all.mcpPrompt);
+    expect(catalog.mcp).toEqual(all.mcp);
+  } finally {
+    await mcp.close();
+    db.close();
+  }
+});
 
 test("auto recounts the remaining schemas and moves from catalog to all", async () => {
   const { db, mcp, tools, flux, links } = setup(true);
