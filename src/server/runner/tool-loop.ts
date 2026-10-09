@@ -246,6 +246,8 @@ function overCap(
 // the round's tools launch in parallel under the call timeout and the
 // send's signal; each end is one finishTool, guarded by streaming. A
 // finishTool that throws terminates the send; the siblings still settle.
+// Every end is kept on the send until a row holds it, so a cut that
+// lands before it is stored still writes a completion whole.
 // toolMs adds the ordinary calls' time alone: a delegate call's is its
 // child's, bounded by the send's deadline and its own budget
 async function runCalls(
@@ -276,6 +278,7 @@ async function runCalls(
     let stored = result;
     try {
       stored = cutResult(result, send.policy.toolCaps.resultCut);
+      send.settled.set(call, stored);
       if (immediate) store(call, stored);
     } catch (err) {
       writeError ??= err;

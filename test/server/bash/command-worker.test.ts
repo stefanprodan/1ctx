@@ -371,8 +371,48 @@ describe("the command worker", () => {
         error: true,
         content: "nothing saved: the server is shutting down",
         ended: { phase: "run", cause: "abort" },
+        interrupted: true,
+        discarded: true,
       });
       expect(s.knowledge.list(s.projectId).files).toEqual([]);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("an abort before the commit is interrupted with both trees discarded", async () => {
+    const s = setup();
+    try {
+      const controller = new AbortController();
+      const pending = run(
+        s,
+        "echo x > /knowledge/late; echo y > /tmp/late; sleep 30",
+        callCaps,
+        controller.signal,
+      );
+      await untilPhase(s);
+      controller.abort();
+      const result = await pending;
+      expect(result).toMatchObject({
+        error: true,
+        interrupted: true,
+        discarded: true,
+        ended: { phase: "run", cause: "abort" },
+      });
+      expect(s.knowledge.list(s.projectId).files).toEqual([]);
+      expect(s.bash.scratch.read(s.session.id).entries).toEqual([]);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a command that ends on its own is no interruption", async () => {
+    const s = setup();
+    try {
+      const result = await run(s, "echo saved > /tmp/kept");
+      expect(result.error).toBe(false);
+      expect(result.interrupted).toBeUndefined();
+      expect(result.discarded).toBeUndefined();
     } finally {
       s.db.close();
     }

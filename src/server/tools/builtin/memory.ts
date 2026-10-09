@@ -102,9 +102,16 @@ export function runMemory(
       ? {
           error: true,
           content: refusal(handle, result.content).slice(0, ctx.caps.resultCut),
+          ...cutFlag(result),
         }
       : result;
   });
+}
+
+// the registry's word that the send's abort ended the call survives the
+// refusal's rewording, so the runner neither logs it nor keeps it
+function cutFlag(result: ToolResult): Pick<ToolResult, "interrupted"> {
+  return result.interrupted ? { interrupted: true } : {};
 }
 
 function stoppedResult(): ToolResult {
@@ -150,7 +157,11 @@ function runChatMemory(
       answer === null
         ? chat.refuse(result.content)
         : `Error: ${(answer as ChatEditAnswer).content}`;
-    return { error: true, content: content.slice(0, ctx.caps.resultCut) };
+    return {
+      error: true,
+      content: content.slice(0, ctx.caps.resultCut),
+      ...cutFlag(result),
+    };
   });
 }
 

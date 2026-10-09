@@ -36,8 +36,13 @@ is its root.
   while its root's send does.
 - **Restart repair ends a child's rows and publishes nothing for it.**
   The root's `delegate` row ends `failed`, where other tool rows a
-  restart ends are `stopped`; nothing resumes, and the child's scratch
-  goes in the same transaction.
+  restart ends are `stopped`; each reads the restart cut text for its
+  kind (`docs/sessions.md`), the delegate one saying returned files may
+  remain. Nothing resumes, and the child's scratch goes in the same
+  transaction. A child its parent's cut ended still returns its own
+  report (stopped, its last words, the files returned), which is a
+  completion and stays the row's content; only a `delegate` call that
+  never settled gets the delegate cut text.
 - **A child that never finalized stays running until restart repair.**
   Its finalization retried three times and failed; it blocks nothing,
   since no route, watch or cap counts it.

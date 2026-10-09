@@ -160,4 +160,33 @@ describe("memory tool refusals", () => {
       content: expected.slice(0, cut),
     });
   });
+
+  test.each([
+    ["an own-note phase", task],
+    [
+      "a chat",
+      {
+        projectId: "p1",
+        automation: null,
+        phase: "main" as const,
+        chat: { sessionId: "s1", userId: "u1" },
+      },
+    ],
+  ])(
+    "an edit the send's abort ended in %s stays interrupted",
+    async (_, scope) => {
+      const tools = area();
+      const offered = tools.offered(now, "agent", [], "auto", scope);
+      expect(offered.memory).not.toBeNull();
+      const controller = new AbortController();
+      controller.abort();
+      const result = await tools.run(
+        offered,
+        { id: "edit", name: "memory_edit", arguments: "{" },
+        { ...context(), signal: controller.signal },
+      );
+      expect(result.error).toBe(true);
+      expect(result.interrupted).toBe(true);
+    },
+  );
 });

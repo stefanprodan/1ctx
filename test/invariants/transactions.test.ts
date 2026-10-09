@@ -10,6 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import { FINALIZE_RETRY_MS } from "../../src/server/runner/index.ts";
+import { cutText } from "../../src/server/sessions/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import { collectLogs } from "../helpers/app.ts";
 import { chatApp, startChat, tick } from "../helpers/chat.ts";
@@ -351,7 +352,7 @@ describe("finishTool rollback", () => {
               () => {
                 clearTimeout(timer);
                 siblingAborted = true;
-                resolve({ content: "aborted", error: true });
+                resolve({ content: "aborted", error: true, interrupted: true });
               },
               { once: true },
             );
@@ -403,10 +404,11 @@ describe("finishTool rollback", () => {
           .messages(sessionId)
           .filter((row) => row.kind === "tool");
         expect(siblingAborted).toBe(true);
-        expect(rows.map((row) => row.status)).toEqual(["stopped", "stopped"]);
+        // the first call completed: its end is kept though its write failed
+        expect(rows.map((row) => row.status)).toEqual(["done", "stopped"]);
         expect(rows.map((row) => row.content)).toEqual([
-          "stopped before it finished",
-          "stopped before it finished",
+          "first result",
+          cutText("failure", "read", false),
         ]);
         expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
           status: "failed",
@@ -459,7 +461,8 @@ describe("finalizeSend rollback", () => {
         new Promise((resolve) => {
           ctx.signal.addEventListener(
             "abort",
-            () => resolve({ content: "aborted", error: true }),
+            () =>
+              resolve({ content: "aborted", error: true, interrupted: true }),
             { once: true },
           );
         }),
@@ -502,7 +505,7 @@ describe("finalizeSend rollback", () => {
       chat.app.sessions.messages(sessionId).find((row) => row.kind === "tool"),
     ).toMatchObject({
       status: "stopped",
-      content: "stopped before it finished",
+      content: cutText("stop", "read", false),
     });
     expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
       status: "stopped",

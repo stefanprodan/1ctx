@@ -139,6 +139,8 @@ async function runCalls(
   for (const call of calls) {
     if (signal.aborted) return;
     const result = await runOne(deps, send, offered, call, ctx);
+    // kept until a row holds it, so the cut writes a call that ended
+    send.settled.set(call, result);
     if (signal.aborted) return;
     deps.writer.finishTool(send, call, result);
   }
@@ -173,6 +175,7 @@ export async function attentionStep(
   if (offered === null || handle === null || send.ending.signal.aborted) {
     return;
   }
+  send.cutBy = null;
   const controller = new AbortController();
   let timedOut = false;
   const stop = () => {
@@ -182,6 +185,7 @@ export async function attentionStep(
   send.ending.signal.addEventListener("abort", stop, { once: true });
   const disarm = after(deps.clock, ATTENTION_STEP_MS, () => {
     timedOut = true;
+    send.cutBy ??= "deadline";
     stop();
   });
   const deadline = deps.clock() + ATTENTION_STEP_MS;

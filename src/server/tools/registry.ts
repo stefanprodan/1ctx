@@ -40,10 +40,13 @@ function failed(
   timedOut: boolean,
   timeoutMs: number,
   cut: number,
+  interrupted: boolean,
 ): ToolResult {
   const result: ToolResult = {
     content: clean(`Error: ${describe(failure, timeoutMs)}`, cut),
     error: true,
+    // a throw once the send aborted is the cut's, not the tool's own end
+    ...(interrupted ? { interrupted: true } : {}),
   };
   Object.defineProperty(result, timedOut ? "timedOut" : "failure", {
     value: timedOut ? true : failure,
@@ -53,7 +56,13 @@ function failed(
 
 // a call that failed before any tool ran, shaped as the registry would
 export function failedCall(error: unknown, ctx: ToolContext): ToolResult {
-  return failed(error, false, ctx.caps.callTimeoutMs, ctx.caps.resultCut);
+  return failed(
+    error,
+    false,
+    ctx.caps.callTimeoutMs,
+    ctx.caps.resultCut,
+    ctx.signal.aborted,
+  );
 }
 
 export class Registry {
@@ -125,7 +134,13 @@ export class Registry {
       const failure = timedOut
         ? new DOMException("the tool call timed out", "TimeoutError")
         : error;
-      return failed(failure, timedOut, timeoutMs, ctx.caps.resultCut);
+      return failed(
+        failure,
+        timedOut,
+        timeoutMs,
+        ctx.caps.resultCut,
+        ctx.signal.aborted,
+      );
     }
   }
 }

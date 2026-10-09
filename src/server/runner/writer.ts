@@ -16,6 +16,7 @@ import { writeKeptFiles } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
+import type { Log } from "../lib/log.ts";
 import type { ChatEvent } from "../providers/index.ts";
 import { envelope } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
@@ -24,13 +25,13 @@ import { type AlertsPort, alertEvents, runMark } from "./marks.ts";
 import type { ToolResult } from "./policy.ts";
 import {
   cutCalls,
+  cutOpenTools,
   finalizeRound,
   finishReplyRow,
   NOT_RUN,
   newToolRows,
   notRun,
   recordUsage,
-  stopOpenTools,
 } from "./reply-rows.ts";
 import { toolFinish } from "./results.ts";
 import type { ActiveSend, ChildLink } from "./send.ts";
@@ -56,6 +57,7 @@ export type { SessionsPort } from "./writer-port.ts";
 export type WriterDeps = {
   db: Db;
   clock: Clock;
+  log: Log;
   sessions: SessionsPort;
   uploads: UploadsPort;
   usage: { record(fields: UsageFields): unknown };
@@ -216,8 +218,14 @@ export class Writer {
     });
     // openTools is keyed by the call object, so duplicate call ids stay apart
     send.openTools = new Map();
+    send.settled = new Map();
     round.calls.forEach((call, i) => {
-      send.openTools.set(call, result.rows[i]!.id);
+      const row = result.rows[i]!;
+      send.openTools.set(call, {
+        rowId: row.id,
+        name: row.toolName ?? "",
+        after: send.phase === "memory" || send.phase === "attention",
+      });
     });
     round.drafts.clear();
     return result;
@@ -225,7 +233,7 @@ export class Writer {
 
   // guarded by status streaming, so a late tool after cleanup writes nothing
   finishTool(send: ActiveSend, call: ToolCall, result: ToolResult): boolean {
-    const rowId = send.openTools.get(call);
+    const rowId = send.openTools.get(call)?.rowId;
     if (rowId === undefined) return false;
     const now = this.deps.clock();
     const changed = transact(this.deps.db, () => {
@@ -238,7 +246,10 @@ export class Writer {
         events: this.out(send, [row], () => envelope(session, [row], null)),
       };
     });
-    if (changed) send.openTools.delete(call);
+    if (changed) {
+      send.openTools.delete(call);
+      send.settled.delete(call);
+    }
     return changed;
   }
 
@@ -346,7 +357,13 @@ export class Writer {
     const result = transact(this.deps.db, () => {
       const memorySkipped = this.deps.commitMemory(send);
       const reply = finalizeRound(this.deps, send, status, error, now);
-      const stopped = stopOpenTools(this.deps.sessions, send, now);
+      const stopped = cutOpenTools(
+        this.deps,
+        send,
+        send.policy.offered,
+        cause,
+        now,
+      );
       const row = this.deps.sessions.finishSend(send.id, {
         status,
         cause,
@@ -379,7 +396,9 @@ export class Writer {
         ],
       };
     });
+    // after the commit, so a retry after a rollback still has the ends
     send.openTools = new Map();
+    send.settled = new Map();
     send.memorySkipped = result.memorySkipped;
     return result;
   }

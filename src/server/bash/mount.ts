@@ -80,6 +80,12 @@ export type CommandResult = {
   // where a command that saved nothing ended, for the log; finishTool
   // stores a row's fields by name, so it never reaches one
   ended?: CommandEnd;
+  // the caller's abort ended it, so this is no result: the runner writes
+  // its cut text instead. Never stored
+  interrupted?: boolean;
+  // with interrupted: it stopped before the commit, so neither tree was
+  // written
+  discarded?: boolean;
 };
 // what a command reads and writes of the docs and uploads, bound to
 // knowledge's stores
@@ -455,6 +461,8 @@ export async function run(
       ...result,
       content: notice + result.content,
       ended: { phase, cause: why },
+      // a throw at any phase, the commit's included, wrote nothing
+      ...(why === "abort" ? { interrupted: true, discarded: true } : {}),
     };
   } finally {
     clearTimeout(timer);

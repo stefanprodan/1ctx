@@ -266,7 +266,7 @@ export async function delegate(
   call: ToolCall,
   ctx: ToolContext,
 ): Promise<ToolResult> {
-  const rowId = parent.openTools.get(call);
+  const rowId = parent.openTools.get(call)?.rowId;
   if (rowId === undefined || !parent.policy.childOffered) {
     throw new Error("delegate is not offered here");
   }

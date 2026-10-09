@@ -354,7 +354,7 @@ describe("bash", () => {
     });
     expect(
       await new Registry([tool]).run(call({ command: "ls" }), ctx),
-    ).toEqual({ error: true, content: "Error: stopped" });
+    ).toEqual({ error: true, content: "Error: stopped", interrupted: true });
   });
 });
 

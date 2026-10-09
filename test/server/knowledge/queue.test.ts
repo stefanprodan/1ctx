@@ -47,6 +47,8 @@ describe("process slots", () => {
           error: true,
           content: "nothing saved: process wait stopped",
           ended: { phase: "queue", cause: "abort" },
+          interrupted: true,
+          discarded: true,
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
         expect(scratchState(s).revision).toBe(0);

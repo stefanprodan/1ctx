@@ -96,6 +96,13 @@ reach the model in the sends of agents linked to it.
 - **A call runs under the snapshot.** One client per call over the
   snapshot's URL and key name, under the server's `timeoutMs` or the
   call timeout.
+- **A stop is not a timeout.** The SDK reports every abort as its
+  request timeout; `withClient` maps an abort of the caller's signal or
+  the call's, other than a timer's, to "the MCP call was stopped",
+  decided as the call fails, before a cleanup that may outlast the
+  deadline.
+  "MCP request timed out" and `cause: timeout` stay for its own timer
+  and the registry's.
 - **A change in the offer is a note, not a new prefix.** A send stores
   a digest of its MCP offer (`sends.mcp`, null for a compact send).
   `startSend` compares it with the session's previous send of the same

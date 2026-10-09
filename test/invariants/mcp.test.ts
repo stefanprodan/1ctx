@@ -11,6 +11,7 @@ import { sha256 } from "../../src/server/lib/ids.ts";
 import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
+import { cutText } from "../../src/server/sessions/index.ts";
 import type { McpServerSummary } from "../../src/shared/contracts/mcp.ts";
 import { offeredServers, promptSnapshot } from "../../src/shared/mcp.ts";
 import { CATALOG_OPENINGS } from "../../src/shared/mcp-catalog.ts";
@@ -800,7 +801,12 @@ describe("MCP tools in a send", () => {
         }
         return fetcher(input, init);
       }) as typeof fetch;
-    const { chat } = await sendFixture({ timeoutMs: 1000, wrap });
+    const logs = collectLogs();
+    const { chat } = await sendFixture({
+      timeoutMs: 1000,
+      wrap,
+      logFactory: logs.logFactory,
+    });
     const started = await startChat(chat);
     started.script.toolRound([
       {
@@ -824,6 +830,10 @@ describe("MCP tools in a send", () => {
       /timed out after 1 seconds|MCP request timed out/,
     );
     expect(rows[1]).toMatchObject({ status: "done", toolName: "datetime" });
+    // a real timeout is still the log's
+    expect(
+      logs.events.filter((event) => event.msg === "tool failed"),
+    ).toMatchObject([{ fields: { tool: "mcp:flux", cause: "timeout" } }]);
     answer.reply("done");
     await waitDone(chat.app, started.sessionId);
   });
@@ -852,7 +862,12 @@ describe("MCP tools in a send", () => {
         }
         return fetcher(input, init);
       }) as typeof fetch;
-    const { chat } = await sendFixture({ timeoutMs: 60_000, wrap });
+    const logs = collectLogs();
+    const { chat } = await sendFixture({
+      timeoutMs: 60_000,
+      wrap,
+      logFactory: logs.logFactory,
+    });
     const started = await startChat(chat);
     started.script.toolRound([
       {
@@ -878,6 +893,18 @@ describe("MCP tools in a send", () => {
       ),
     ]);
     expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("stopped");
+    // a stop is no timeout and no tool failure: the row says why it ended
+    const row = chat.app.sessions
+      .messages(started.sessionId)
+      .find((message) => message.kind === "tool");
+    expect(row).toMatchObject({
+      status: "stopped",
+      content: cutText("stop", "mcp-read", false),
+    });
+    expect(row?.content).not.toContain("timed out");
+    expect(logs.events.filter((event) => event.msg === "tool failed")).toEqual(
+      [],
+    );
   });
 
   test("skips compact digests and regenerate compares with the turn before", async () => {

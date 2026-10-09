@@ -5,8 +5,14 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
-import type { SessionStatus } from "../../shared/words.ts";
+import type { SendCause, SessionStatus } from "../../shared/words.ts";
+import { writeKeptFiles } from "../bash/index.ts";
+import { type Db, transact } from "../db/index.ts";
+import { errorFields, type Log } from "../lib/log.ts";
+import { type CutKind, cutKind, cutText } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
+import type { Offered, ToolResult } from "./policy.ts";
+import { toolFinish } from "./results.ts";
 import {
   type ActiveSend,
   afterRun,
@@ -26,8 +32,6 @@ export const OVER_ROUND = "not run: too many calls in one round";
 export function notRun(reason: string): string {
   return reason === "tool_loop" ? NOT_RUN_LOOP : NOT_RUN;
 }
-// the text a call still running when the send ended gets
-export const CUT_SHORT = "stopped before it finished";
 
 export type ReplyRowsDeps = {
   sessions: SessionsPort;
@@ -149,23 +153,84 @@ export function cutCalls(
   return reply ? [reply, ...stopped] : stopped;
 }
 
-// a guard means a late tool that already wrote returns null
-export function stopOpenTools(
-  sessions: SessionsPort,
+// a row's name as the cut reads it: an MCP tool by the side the offer
+// put it on
+export function kindOf(offered: Offered, name: string): CutKind {
+  const tool = offered.mcp
+    .flatMap((server) => server.tools)
+    .find((candidate) => candidate.wireName === name);
+  return cutKind(name, tool?.side ?? null);
+}
+
+type CutDeps = { db: Db; sessions: SessionsPort; log: Log };
+
+// a completion written as finishTool writes it, under a savepoint: a
+// write that fails leaves the row to the cut text, so a bad result
+// never holds the send's end
+function writeCompletion(
+  deps: CutDeps,
   send: ActiveSend,
+  rowId: string,
+  result: ToolResult,
+  now: number,
+): Message | null | undefined {
+  try {
+    return transact(deps.db, () => {
+      const row = deps.sessions.finishTool(rowId, toolFinish(result, now));
+      if (row !== null && result.kept?.length) {
+        writeKeptFiles(deps.db, rowId, result.kept);
+      }
+      return { result: row, events: [] };
+    });
+  } catch (error) {
+    deps.log.warn("tool end not written", {
+      chat: send.sessionId,
+      ...errorFields(error, false),
+    });
+    return undefined;
+  }
+}
+
+// the open rows at a cut, inside the caller's transaction: a call that
+// reported a completion keeps it whole, any other is stopped with the
+// cut text. A row the work after the answer opened names what cut that
+// work when a later cause did; a finish with nothing after it leaves
+// none open, and one left would have ended unrecorded. A guard means a
+// late tool that already wrote returns null
+export function cutOpenTools(
+  deps: CutDeps,
+  send: ActiveSend,
+  offered: Offered,
+  cause: SendCause,
   now: number,
 ): Message[] {
-  const stopped: Message[] = [];
-  for (const rowId of send.openTools.values()) {
-    const row = sessions.finishTool(rowId, {
-      content: CUT_SHORT,
+  const changed: Message[] = [];
+  for (const [call, open] of send.openTools) {
+    const result = send.settled.get(call);
+    if (result !== undefined && !result.interrupted) {
+      const row = writeCompletion(deps, send, open.rowId, result, now);
+      if (row !== undefined) {
+        if (row !== null) changed.push(row);
+        continue;
+      }
+    }
+    const row = deps.sessions.finishTool(open.rowId, {
+      content: cutText(
+        open.after && send.cutBy !== null
+          ? send.cutBy
+          : cause === "finish"
+            ? "failure"
+            : cause,
+        kindOf(offered, open.name),
+        result?.discarded === true,
+      ),
       status: "stopped",
       error: null,
       finishedAt: now,
     });
-    if (row !== null) stopped.push(row);
+    if (row !== null) changed.push(row);
   }
-  return stopped;
+  return changed;
 }
 
 // the round's reply as it ends and its usage; a null slot becomes

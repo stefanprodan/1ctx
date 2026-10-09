@@ -305,6 +305,19 @@ async function cleanup(
   if (timer !== undefined) clearTimeout(timer);
 }
 
+// the SDK reports every abort as its request timeout; an abort the
+// caller made, other than a timer's, is a stop and never reads as one
+function stoppedBy(signals: readonly AbortSignal[]): boolean {
+  return signals.some(
+    (signal) =>
+      signal.aborted &&
+      !(
+        signal.reason instanceof DOMException &&
+        signal.reason.name === "TimeoutError"
+      ),
+  );
+}
+
 function remaining(deadline: number, signal: AbortSignal): number {
   signal.throwIfAborted();
   const timeoutMs = deadline - Date.now();
@@ -348,10 +361,15 @@ export async function withClient<T>(
     options.timeoutMs,
   );
   const signal = AbortSignal.any([options.signal, timeout.signal]);
+  // the caller's signals, the calls' own included
+  const callers = [options.signal];
   signal.addEventListener("abort", close);
   if (signal.aborted) close();
   let value: T | undefined;
   let failure: unknown;
+  // decided as the call fails: the client's timer may ring during a
+  // cleanup that outlasts the deadline, which makes no stop a timeout
+  let stopped = false;
   try {
     await client.connect(transport, {
       signal,
@@ -365,6 +383,7 @@ export async function withClient<T>(
         }) as Promise<{ tools: ListedTool[] }>,
       callTool: async (name, args, definition, callOptions) => {
         const callSignal = AbortSignal.any([signal, callOptions.signal]);
+        callers.push(callOptions.signal);
         return (await client.callTool(
           { name, arguments: args },
           {
@@ -394,6 +413,7 @@ export async function withClient<T>(
     value = await fn(view);
   } catch (error) {
     failure = error;
+    stopped = !timeout.signal.aborted && stoppedBy(callers);
   } finally {
     await cleanup(client, transport, deadline);
     signal.removeEventListener("abort", close);
@@ -401,6 +421,9 @@ export async function withClient<T>(
   }
   // a tool's own error answer is already in the caller's words
   if (!budget.over && failure instanceof ToolError) throw failure;
+  if (!budget.over && stopped) {
+    throw new ToolError("the MCP call was stopped", "MCP call stopped");
+  }
   if (budget.over || failure !== undefined) {
     throw errorText(failure, key, budget);
   }
