@@ -475,3 +475,150 @@ describe("a run cut by its deadline before its memory phase", () => {
     }
   });
 });
+
+// a fake tools port whose attention step offers needs_attention alone
+function attentionTools(run: Tools["run"]): Tools {
+  const base = fakeTools(["datetime"], run);
+  return {
+    ...base,
+    offered: (now, agentId, servers, mode, scope) => {
+      const offered = base.offered(now, agentId, servers, mode, scope);
+      if (scope?.phase !== "attention") return offered;
+      return {
+        ...offered,
+        tools: [
+          {
+            name: "needs_attention",
+            description: "mark",
+            parameters: { type: "object" },
+          },
+        ],
+        attention: { guidance: "when it fails", reason: null },
+      };
+    },
+  } as Tools;
+}
+
+const MARK = {
+  id: "mark",
+  name: "needs_attention",
+  arguments: '{"reason":"podinfo is not ready"}',
+};
+
+describe("the work after a run's answer", () => {
+  test("an attention call a Stop cuts reads the stop, not a failure", async () => {
+    let reached = false;
+    const chat = await chatApp({
+      tools: attentionTools(async (_offered, _call, ctx) => {
+        reached = true;
+        return hang(ctx.signal);
+      }),
+    });
+    try {
+      const automation = await createAutomation(chat, {
+        attentionMode: "agent",
+      });
+      const run = await startRun(chat, automation.id);
+      run.main.reply("The check failed.");
+      const step = await waitScript(chat.scripted, 2);
+      step.toolRound([MARK]);
+      step.end();
+      for (let i = 0; i < 200 && !reached; i++) await tick();
+      await stop(chat, run.sessionId);
+      await settleRun(chat, run.sessionId);
+      const [row] = toolRows(chat, run.sessionId);
+      expect(row).toMatchObject({
+        status: "stopped",
+        toolName: "needs_attention",
+        content: cutText("stop", "write", false),
+      });
+      // the run's own end stays its answer's
+      expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
+        cause: "finish",
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("an attention call whose row write failed keeps its end", async () => {
+    const chat = await chatApp({
+      tools: attentionTools(async () => ({
+        content: "marked",
+        error: false,
+      })),
+    });
+    try {
+      const automation = await createAutomation(chat, {
+        attentionMode: "agent",
+      });
+      const run = await startRun(chat, automation.id);
+      const store = chat.app.sessions;
+      const original = store.finishTool.bind(store);
+      let failed = false;
+      store.finishTool = (id, fields) => {
+        if (!failed && fields.status === "done") {
+          failed = true;
+          throw new Error("disk full");
+        }
+        return original(id, fields);
+      };
+      run.main.reply("The check failed.");
+      const step = await waitScript(chat.scripted, 2);
+      step.toolRound([MARK]);
+      step.end();
+      await settleRun(chat, run.sessionId);
+      store.finishTool = original;
+      expect(failed).toBe(true);
+      expect(toolRows(chat, run.sessionId)[0]).toMatchObject({
+        status: "done",
+        content: "marked",
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a memory edit whose row write failed keeps its end", async () => {
+    const chat = await chatApp();
+    try {
+      const automation = await createAutomation(chat, { ownMemory: true });
+      const run = await startRun(chat, automation.id);
+      run.main.reply("Done.");
+      const phase = await waitScript(chat.scripted, 2);
+      const store = chat.app.sessions;
+      const original = store.finishTool.bind(store);
+      let failed = false;
+      store.finishTool = (id, fields) => {
+        if (!failed && fields.status === "done") {
+          failed = true;
+          throw new Error("disk full");
+        }
+        return original(id, fields);
+      };
+      phase.toolRound([
+        {
+          id: "m1",
+          name: "memory_edit",
+          arguments:
+            '{"action":"set","topic":"Note","text":"Stopped at step two."}',
+        },
+      ]);
+      phase.end();
+      await settleRun(chat, run.sessionId);
+      store.finishTool = original;
+      expect(failed).toBe(true);
+      const [row] = toolRows(chat, run.sessionId);
+      expect(row).toMatchObject({ status: "done", toolName: "memory_edit" });
+      expect(row!.content).not.toContain("No result was recorded.");
+      expect(
+        chat.app.memory.read({
+          projectId: chat.projectId,
+          automationId: automation.id,
+        }).entries,
+      ).toEqual([{ topic: "Note", text: "Stopped at step two." }]);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});

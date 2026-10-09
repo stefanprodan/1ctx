@@ -175,6 +175,10 @@ export type ActiveSend = {
   // a Stop or a shutdown came after another cause claimed the send, in
   // the work after its answer
   interrupted: boolean;
+  // what cut the work after the answer, when its own cause is another:
+  // a later Stop or shutdown, or the phase's or step's own window. Only
+  // the cut text reads it; the send keeps its cause
+  cutBy: "stop" | "shutdown" | "deadline" | null;
   terminal: SendCause | null;
   // every caller of terminate observes the ending run by run().
   ended: Promise<boolean>;
@@ -334,6 +338,7 @@ export function newSend(fields: {
     memorySkipped: null,
     memoryStopped: false,
     interrupted: false,
+    cutBy: null,
     terminal: null,
     ended,
     end,

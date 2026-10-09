@@ -157,14 +157,16 @@ async function runCalls(
   const settled = calls.map(async (call) => {
     const ctx = toolContext(send, signal, deps.clock, { web: null });
     const result = await runOne(deps, send, offered, call, ctx);
-    if (signal.aborted) return;
-    if (result.error || call.name !== "memory_edit") clean = false;
     try {
       const stored = cutResult(result, send.policy.toolCaps.resultCut);
+      // kept until a row holds it, so the cut writes an edit that ended
+      send.settled.set(call, stored);
+      if (signal.aborted) return;
+      if (result.error || call.name !== "memory_edit") clean = false;
       spend.resultBytes += Buffer.byteLength(stored.content);
       deps.writer.finishTool(send, call, stored);
     } catch (error) {
-      writeError ??= error;
+      if (!signal.aborted) writeError ??= error;
     }
   });
   const task = Promise.allSettled(settled).then(() => {});
@@ -240,7 +242,10 @@ export async function memoryPhase(
   if (send.ending.signal.aborted) stop();
   // the phase runs past the turn's deadline, within its own window
   const deadline = deps.clock() + send.policy.limits.memoryPhaseMs;
-  const disarm = after(deps.clock, send.policy.limits.memoryPhaseMs, stop);
+  const disarm = after(deps.clock, send.policy.limits.memoryPhaseMs, () => {
+    send.cutBy ??= "deadline";
+    stop();
+  });
   // the phase counts its own rounds and calls; the send's budget is the
   // run's and never cuts the phase
   const spend: PhaseSpend = { calls: 0, toolMs: 0, resultBytes: 0 };

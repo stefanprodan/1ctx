@@ -98,7 +98,9 @@ reach the model in the sends of agents linked to it.
   call timeout.
 - **A stop is not a timeout.** The SDK reports every abort as its
   request timeout; `withClient` maps an abort of the caller's signal or
-  the call's, other than a timer's, to "the MCP call was stopped".
+  the call's, other than a timer's, to "the MCP call was stopped",
+  decided as the call fails, before a cleanup that may outlast the
+  deadline.
   "MCP request timed out" and `cause: timeout` stay for its own timer
   and the registry's.
 - **A change in the offer is a note, not a new prefix.** A send stores

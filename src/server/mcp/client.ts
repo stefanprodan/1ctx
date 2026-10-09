@@ -367,6 +367,9 @@ export async function withClient<T>(
   if (signal.aborted) close();
   let value: T | undefined;
   let failure: unknown;
+  // decided as the call fails: the client's timer may ring during a
+  // cleanup that outlasts the deadline, which makes no stop a timeout
+  let stopped = false;
   try {
     await client.connect(transport, {
       signal,
@@ -410,6 +413,7 @@ export async function withClient<T>(
     value = await fn(view);
   } catch (error) {
     failure = error;
+    stopped = !timeout.signal.aborted && stoppedBy(callers);
   } finally {
     await cleanup(client, transport, deadline);
     signal.removeEventListener("abort", close);
@@ -417,12 +421,7 @@ export async function withClient<T>(
   }
   // a tool's own error answer is already in the caller's words
   if (!budget.over && failure instanceof ToolError) throw failure;
-  if (
-    !budget.over &&
-    failure !== undefined &&
-    !timeout.signal.aborted &&
-    stoppedBy(callers)
-  ) {
+  if (!budget.over && stopped) {
     throw new ToolError("the MCP call was stopped", "MCP call stopped");
   }
   if (budget.over || failure !== undefined) {

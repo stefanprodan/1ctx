@@ -673,6 +673,42 @@ describe("MCP SDK client", () => {
     expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
+  test("a stop stays a stop when the session cleanup outlasts the deadline", async () => {
+    const recorded = await fixture("flux-docs");
+    const fake = mcpFetch({ era: "legacy", recorded, sessionId: "session-1" });
+    const controller = new AbortController();
+    const cancelled: Cancelled = { value: false, at: 0 };
+    const stopped = abortAt("tools/call", fake.fetcher, controller, cancelled);
+    let deletes = 0;
+    // a DELETE that never answers holds the cleanup to the deadline,
+    // so the client's own timer fires before it ends
+    const fetcher = (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const request =
+        input instanceof Request ? input : new Request(String(input), init);
+      if (request.method !== "DELETE") return stopped(request);
+      deletes++;
+      return new Promise<Response>(() => {});
+    }) as typeof fetch;
+    await expect(
+      withClient(
+        { fetcher, version: "test" },
+        { url: URL },
+        null,
+        { ...options(), signal: controller.signal, timeoutMs: 300 },
+        async (client) =>
+          client.callTool("echo", {}, definition, {
+            signal: options().signal,
+            timeoutMs: 2_000,
+          }),
+      ),
+    ).rejects.toThrow("the MCP call was stopped");
+    expect(cancelled.value).toBeTrue();
+    expect(deletes).toBe(1);
+  });
+
   test("a DELETE answered 405 does not change the outcome", async () => {
     const recorded = await fixture();
     const fake = mcpFetch({

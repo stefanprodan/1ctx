@@ -130,8 +130,9 @@ of that shell that shows a file on the chat page.
   (`bash/queue.ts`) is taken before a process slot (`acquireProcess()`,
   shared with uploads) and released after it.
 - **Written doc paths go on the tool row.** `finishTool` stores them as
-  `savedDocs` for another agent's trace (`docs/sessions.md`). A call a
-  terminal stop ends before its row is finished keeps none.
+  `savedDocs` for another agent's trace (`docs/sessions.md`). A command
+  that completed keeps them even when a cut writes its row; one the
+  cut interrupted committed nothing and keeps none.
 - **Knowledge off leaves no `/knowledge`.** With the `knowledge`
   capability off the mount reads no rows. Anything written there is
   discarded with a notice, the command starts in `/tmp`, and a saved cwd
