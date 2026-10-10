@@ -22,6 +22,7 @@ import {
 } from "../../../src/client/data/tools.ts";
 import { firstSentence } from "../../../src/client/lib/format.ts";
 import {
+  automationLine,
   builtinsOf,
   CONFIG_TABS,
   configTab,
@@ -76,6 +77,7 @@ import { deferred } from "../../helpers/async.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import {
   admin as adminFixture,
+  automationTool,
   emailUser,
 } from "../../helpers/client-fixtures.ts";
 
@@ -227,6 +229,7 @@ const body = (visualize = fetchTool, web = access): ToolsResponse => ({
   search,
   visualize,
   emailUser: emailUser(),
+  automation: automationTool(),
 });
 const search: SearchState = {
   provider: "exa",
@@ -664,6 +667,7 @@ describe("the Config board", () => {
 
   test.serial("a tool is off while no turn is offered it", () => {
     const state = body();
+    // automation has its own card with its switch
     expect(builtinsOf(state).map((t) => t.name)).toEqual([
       "datetime",
       "visualize",
@@ -685,6 +689,7 @@ describe("the Config board", () => {
     const email = (over: Partial<ToolsResponse["emailUser"]>) => ({
       ...state,
       emailUser: emailUser(over),
+      automation: automationTool(),
     });
     const on = email({ enabled: true, emailOn: true });
     expect(offered(on.emailUser, on)).toBe(true);
@@ -791,12 +796,46 @@ describe("the Config board", () => {
     );
     // visualize is switched off: Off in place of its tokens
     expect(html).toContain("rows-item rows-item-off");
-    expect(html).not.toContain('role="switch"');
+    // the automation tool's card is the one switch, its Save in a form
+    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    const card = forms.find((form) =>
+      form.includes("Agents read scheduled tasks"),
+    )!;
+    expect(card).toContain('role="switch"');
+    expect(card).toContain('aria-checked="true"');
+    expect(card).toContain('type="submit"');
+    expect(card).toContain(automationLine(true));
+    expect(card).toContain('<span class="cut">automation</span>');
     expect(html).not.toContain("md-pre");
     // the cards of the other tabs are drawn, hidden
     expect(html.match(/config-board-away/g)).toHaveLength(2);
     expect(html).toContain(">Instance<");
     expect(html).toContain('href="/admin/config/visuals"');
+    path.value = "/";
+  });
+
+  test("the automation card's line says what its switch does", () => {
+    expect(automationLine(true)).toBe(
+      "A chat's agent may read its project's scheduled tasks. Each chat can turn it off.",
+    );
+    expect(automationLine(false)).toBe("No agent reads scheduled tasks.");
+  });
+
+  test.serial("the automation switch draws the row off", async () => {
+    tools.value = body();
+    tools.value = {
+      ...tools.value,
+      automation: automationTool({ enabled: false }),
+    };
+    limits.value = rows;
+    path.value = "/admin/config";
+    const html = render(<ConfigBoard />);
+    const card = (html.match(/<form\b[\s\S]*?<\/form>/g) ?? []).find((form) =>
+      form.includes("Agents read scheduled tasks"),
+    )!;
+    expect(card).toContain('aria-checked="false"');
+    expect(card).toContain(automationLine(false));
     path.value = "/";
   });
 
@@ -808,7 +847,11 @@ describe("the Config board", () => {
     expect(html).toContain(">Turns<");
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
-    expect(html.match(/<form/g)).toHaveLength(8);
+    // the automation card stays mounted, hidden, so its draft is kept
+    expect(html.match(/<form/g)).toHaveLength(9);
+    expect(html).toMatch(
+      /config-board-cards config-board-away"><form[\s\S]*?Agents read scheduled tasks/,
+    );
     expect(html).toContain(">Running<");
     expect(html).toContain("Per user");
     expect(html).toContain("Scheduled runs are not counted.");

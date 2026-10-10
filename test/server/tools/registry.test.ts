@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { ToolError } from "../../../src/server/lib/errors.ts";
 import { errorFields } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { Registry } from "../../../src/server/tools/registry.ts";
+import { Registry, resultCutLine } from "../../../src/server/tools/registry.ts";
 import type {
   Tool,
   ToolContext,
@@ -82,6 +82,28 @@ describe("the registry's result cleaning", () => {
       });
     },
   );
+
+  test("a body cut before its tail says so when the line fits", async () => {
+    const ctx = context();
+    ctx.caps = { ...ctx.caps, resultCut: 60 };
+    const tail = "exit 0";
+    const tool: Tool<ToolResult> = {
+      name: "echo",
+      description: "",
+      parameters: {},
+      run: async () => ({
+        content: `${"x".repeat(100)}\n${tail}`,
+        error: false,
+        tail: tail.length,
+      }),
+    };
+    const result = await new Registry([tool]).run(call, ctx);
+    expect(result.content).toBe(
+      `${"x".repeat(25)}\n${resultCutLine(60)}\nexit 0`,
+    );
+    expect(result.content.length).toBe(60);
+    expect(result.tail).toBe(6);
+  });
 
   test("a zero-length tail leaves the normal result cut", async () => {
     const ctx = context();

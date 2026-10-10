@@ -47,6 +47,7 @@ import type {
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import {
   admin as adminFixture,
+  automationTool,
   emailUser,
 } from "../../helpers/client-fixtures.ts";
 
@@ -471,6 +472,7 @@ describe("the pages", () => {
         updatedAt: 0,
       },
       emailUser: emailUser(),
+      automation: automationTool(),
     };
     const html = render(<CredentialList />);
     expect(html).toContain(

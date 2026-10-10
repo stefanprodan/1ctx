@@ -4,6 +4,7 @@
 // Markdown is rendered on the server so the client receives safe HTML and
 // ships no parser. Model output is untrusted, making this the safety boundary.
 
+import { ID_SHAPE } from "../lib/ids.ts";
 import { highlight } from "./highlight.ts";
 
 const OPTIONS = { noHtmlBlocks: true, noHtmlSpans: true } as const;
@@ -27,6 +28,12 @@ function unescapeHtml(value: string): string {
 }
 
 const SAFE_HREF = /^(https?:|mailto:)/i;
+// the app's own pages an agent links to: a task, its memory and a run,
+// with nothing after the id. A fixed list, since the route table is the
+// client's; any other relative path stays text
+const APP_HREF = new RegExp(
+  `^/(?:automations/${ID_SHAPE}(?:/memory)?|run/${ID_SHAPE})$`,
+);
 // the same strokes as the client's copy and check icons; the button
 // carries both and the client shows the check for a moment after a copy
 const ICON =
@@ -79,8 +86,12 @@ const CALLBACKS = {
   code: (content: string, meta?: { language?: string }) =>
     codeBlock(content, meta?.language),
   link: (content: string, meta: { href: string; title?: string }): string => {
-    if (!SAFE_HREF.test(meta.href)) return content;
     const title = meta.title ? ` title="${escapeHtml(meta.title)}"` : "";
+    // no new tab, so the client's router takes the click in place
+    if (APP_HREF.test(meta.href)) {
+      return `<a class="md-link" href="${escapeHtml(meta.href)}"${title}>${content}</a>`;
+    }
+    if (!SAFE_HREF.test(meta.href)) return content;
     return `<a class="md-link" href="${escapeHtml(meta.href)}"${title} target="_blank" rel="noopener">${content}</a>`;
   },
   // Showing the source preserves useful context without causing a browser

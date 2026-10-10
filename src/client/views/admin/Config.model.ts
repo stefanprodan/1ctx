@@ -123,7 +123,7 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
 type AnyTool = BuiltinToolSummary | WebToolSummary | EmailToolSummary;
 
 // email_user only once email is set up, so the board looks as it did
-// before email
+// before email; automation has its own card with its switch
 export function builtinsOf(state: ToolsResponse): AnyTool[] {
   const email = state.emailUser.emailOn ? [state.emailUser] : [];
   return [...state.builtin, state.visualize, ...email].sort((a, b) =>
@@ -206,4 +206,11 @@ export function instanceLines(
     },
     ...counted("Credentials", lists.credentials, CREDENTIALS_HREF),
   ];
+}
+
+// the automation card's line, by its switch
+export function automationLine(on: boolean): string {
+  return on
+    ? "A chat's agent may read its project's scheduled tasks. Each chat can turn it off."
+    : "No agent reads scheduled tasks.";
 }

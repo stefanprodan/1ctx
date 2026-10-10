@@ -8,6 +8,7 @@ import type {
   WebCounts,
 } from "../../shared/api/tools.ts";
 import {
+  AUTOMATIONS,
   EMAIL,
   KNOWLEDGE,
   MEMORY,
@@ -18,6 +19,7 @@ import {
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import {
+  AUTOMATION_TOOL,
   EMAIL_TOOL,
   type McpMode,
   type SearchProvider,
@@ -30,10 +32,14 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
-import { type ToolCall, wireTokens } from "../providers/index.ts";
+import type { ToolCall } from "../providers/index.ts";
 import { type AgentEmailDeps, agentEmails } from "./agent-email.ts";
 import { withCommandHints } from "./bash-hint.ts";
 import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
+import {
+  type AutomationsPort,
+  makeAutomationTool,
+} from "./builtin/automation.ts";
 import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
@@ -58,7 +64,6 @@ import {
   makeWebsearchTool,
   type SearchDependencies,
 } from "./builtin/websearch.ts";
-import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
 import { shapeMcpResult } from "./kept.ts";
 import { toolLogName } from "./log-name.ts";
 import {
@@ -69,6 +74,7 @@ import {
 } from "./offer.ts";
 import type { ToolName } from "./parse.ts";
 import { failedCall, Registry } from "./registry.ts";
+import { toolsResponse } from "./response.ts";
 import { routes } from "./routes.ts";
 import { ToolStore } from "./store.ts";
 import type {
@@ -80,6 +86,11 @@ import type {
 } from "./types.ts";
 
 export { ATTENTION_TOOL } from "./builtin/attention.ts";
+export type {
+  AutomationsPort,
+  LastRun,
+  SwitchNames,
+} from "./builtin/automation.ts";
 export { asSubagent } from "./builtin/bash.ts";
 export {
   DELEGATE_DESCRIPTION,
@@ -137,6 +148,8 @@ export type ToolsDeps = {
   };
   // the runner's child run, a closure since the runner is built later
   delegate?: DelegatePort;
+  // what the automation tool reads; without it the tool is never offered
+  automations?: AutomationsPort;
 };
 
 export type Tools = {
@@ -174,6 +187,17 @@ const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
 // timers never race and the timeout words are the registry's
 const MCP_BACKSTOP_MS = 1000;
 
+// the row each switch moves: a tool's own, named, so no switch moves
+// another's
+function switchOf(name: ToolName): SwitchedTool {
+  if (name === "web" || name === "websearch") {
+    throw new BadRequest(`${name} has no switch`);
+  }
+  return name;
+}
+
+type SwitchedTool = Exclude<ToolName, "web" | "websearch">;
+
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
   const skillStore: SkillsPort = deps.skills;
@@ -207,6 +231,10 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   // with both
   const emailOn = () =>
     email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
+  const automations = deps.automations ?? null;
+  // the admin's row, with the tasks wired to read
+  const automationOn = () =>
+    automations !== null && store.row(AUTOMATION_TOOL).enabled;
 
   const toolsFor = (
     search: SearchProvider | null,
@@ -230,6 +258,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         ]),
     makeVisualizeTool(hosts),
     makeEmailTool(emailPort),
+    makeAutomationTool(automations),
     makeBashTool({
       bash: deps.bash,
       web,
@@ -279,44 +308,15 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     };
   };
 
-  const response = (now: number): ToolsResponse => {
-    const visual = store.row("visualize");
-    const tool = fillYear([makeVisualizeTool(visual.hosts)], now)[0]!;
-    const emailRow = store.row(EMAIL_TOOL);
-    const emailTool = makeEmailTool(null);
-    return {
-      builtin: builtinCatalog(now, deps.render),
+  const response = (now: number): ToolsResponse =>
+    toolsResponse({
+      store,
       access: webAccess(),
-      visualize: {
-        name: "visualize",
-        description: tool.description,
-        parameters: tool.parameters,
-        parametersHtml: parametersHtml(tool, deps.render),
-        tokens: wireTokens([tool]),
-        enabled: visual.enabled,
-        hosts: visual.hosts,
-        updatedAt: visual.updatedAt,
-      },
-      emailUser: {
-        name: EMAIL_TOOL,
-        description: emailTool.description,
-        parameters: emailTool.parameters,
-        parametersHtml: parametersHtml(emailTool, deps.render),
-        tokens: wireTokens([emailTool]),
-        enabled: emailRow.enabled,
-        emailOn: email?.enabled() ?? false,
-        updatedAt: emailRow.updatedAt,
-      },
-      search: {
-        provider: store.row("websearch").provider,
-        keys: {
-          exa: deps.secret("search-exa") !== null,
-          firecrawl: deps.secret("search-firecrawl") !== null,
-          tavily: deps.secret("search-tavily") !== null,
-        },
-      },
-    };
-  };
+      render: deps.render,
+      secret: deps.secret,
+      emailOn: email?.enabled() ?? false,
+      now,
+    });
 
   const patch = (
     name: ToolName,
@@ -333,11 +333,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         store.setAccess(mode, domains, now);
       }
       if (change.enabled !== undefined) {
-        store.setEnabled(
-          name === EMAIL_TOOL ? EMAIL_TOOL : "visualize",
-          change.enabled,
-          now,
-        );
+        store.setEnabled(switchOf(name), change.enabled, now);
       }
       if ("provider" in change) store.setProvider(change.provider ?? null, now);
       if (change.hosts !== undefined) store.setHosts(change.hosts, now);
@@ -352,6 +348,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       ...(webAccess().mode === "off" ? [] : [WEB]),
       ...(store.row("visualize").enabled ? [VISUALIZE] : []),
       ...(emailOn() ? [EMAIL] : []),
+      ...(automationOn() ? [AUTOMATIONS] : []),
       // no admin row governs these
       KNOWLEDGE,
       MEMORY,
@@ -380,6 +377,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           memory: deps.memory,
           credentials: deps.credentials,
           emailOn,
+          automationOn,
           toolsFor,
           log: deps.log,
         },

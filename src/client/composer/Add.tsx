@@ -15,6 +15,7 @@ import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import {
+  AUTOMATIONS,
   EMAIL,
   KNOWLEDGE,
   MEMORY,
@@ -125,6 +126,7 @@ export function Add({
   knowledge,
   memory,
   email,
+  tasks,
   servers,
   skills,
   repos,
@@ -141,6 +143,8 @@ export function Add({
   memory: WebItem;
   // null while the instance does not offer email
   email: WebItem | null;
+  // the automation tool, which reads the project's scheduled tasks
+  tasks: WebItem;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
@@ -282,6 +286,12 @@ export function Add({
               onFlip={() => onFlip(EMAIL)}
             />
           )}
+          <SwitchItem
+            name="Scheduled tasks"
+            icon="clock"
+            item={tasks}
+            onFlip={() => onFlip(AUTOMATIONS)}
+          />
           {(["servers", "skills", "repos"] as const).map((name) => {
             const item = items[name];
             return item === null ? null : (

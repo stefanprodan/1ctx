@@ -12,10 +12,12 @@ import {
   serversItem,
   skillsItem,
   switchItem,
+  tasksItem,
   webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import {
+  AUTOMATIONS,
   EMAIL,
   KNOWLEDGE,
   MEMORY,
@@ -165,6 +167,25 @@ describe("the Email item", () => {
     });
     expect(
       emailItem({ tools: false, switchable: [EMAIL], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
+  });
+});
+
+describe("the Scheduled tasks item", () => {
+  test("is on unless the chat turned it off, locked while the admin's row is off", () => {
+    expect(
+      tasksItem({ tools: true, switchable: [AUTOMATIONS], off: false }),
+    ).toEqual({ live: true, on: true, reason: null });
+    expect(
+      tasksItem({ tools: true, switchable: [AUTOMATIONS], off: true }),
+    ).toEqual({ live: true, on: false, reason: null });
+    expect(tasksItem({ tools: true, switchable: [WEB], off: false })).toEqual({
+      live: false,
+      on: false,
+      reason: "Turned off by an admin",
+    });
+    expect(
+      tasksItem({ tools: false, switchable: [AUTOMATIONS], off: false }),
     ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
   });
 });

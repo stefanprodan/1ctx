@@ -4,7 +4,10 @@
 import type { AdminUser } from "../../src/shared/api/users.ts";
 import type { DeciderSummary } from "../../src/shared/contracts/decider.ts";
 import type { ProviderSummary } from "../../src/shared/contracts/provider.ts";
-import type { EmailToolSummary } from "../../src/shared/contracts/tool.ts";
+import type {
+  AutomationToolSummary,
+  EmailToolSummary,
+} from "../../src/shared/contracts/tool.ts";
 import type { Me } from "../../src/shared/contracts/user.ts";
 
 export const admin = (over: Partial<Me> = {}): Me => ({
@@ -66,6 +69,20 @@ export const emailUser = (
   tokens: 150,
   enabled: false,
   emailOn: false,
+  updatedAt: 0,
+  ...over,
+});
+
+// automation as GET /api/tools answers it: on
+export const automationTool = (
+  over: Partial<AutomationToolSummary> = {},
+): AutomationToolSummary => ({
+  name: "automation",
+  description: "Read this project's scheduled tasks.",
+  parameters: {},
+  parametersHtml: "",
+  tokens: 200,
+  enabled: true,
   updatedAt: 0,
   ...over,
 });

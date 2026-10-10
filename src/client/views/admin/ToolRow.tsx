@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  AutomationToolSummary,
   BuiltinToolSummary,
   EmailToolSummary,
   WebToolSummary,
@@ -18,7 +19,11 @@ export function ToolRow({
   onToggle,
   offered,
 }: {
-  tool: BuiltinToolSummary | WebToolSummary | EmailToolSummary;
+  tool:
+    | BuiltinToolSummary
+    | WebToolSummary
+    | EmailToolSummary
+    | AutomationToolSummary;
   open: boolean;
   onToggle: () => void;
   // the Config board's list: Off while no turn is offered it

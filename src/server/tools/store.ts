@@ -3,14 +3,15 @@
 
 import type { WebAccessMode } from "../../shared/web.ts";
 import type {
+  AUTOMATION_TOOL,
   EMAIL_TOOL,
   SearchProvider,
   WebTool,
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 
-// a row per web tool, the web's own and email_user's
-type RowName = WebTool | "web" | typeof EMAIL_TOOL;
+// a row per web tool, the web's own, email_user's and automation's
+type RowName = WebTool | "web" | typeof EMAIL_TOOL | typeof AUTOMATION_TOOL;
 
 export type ToolRow = {
   name: RowName;
@@ -77,7 +78,7 @@ export class ToolStore {
   }
 
   setEnabled(
-    name: WebTool | typeof EMAIL_TOOL,
+    name: WebTool | typeof EMAIL_TOOL | typeof AUTOMATION_TOOL,
     enabled: boolean,
     now: number,
   ): void {

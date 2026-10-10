@@ -7,6 +7,8 @@
 // leads to a pane instead: Web access first, then a switch per
 // credential, which goes with it. Memory and Knowledge are live
 // whenever the agent takes tools, since no admin switch governs them.
+// Scheduled tasks is the automation tool's, live while the admin's row
+// is on.
 // MCP servers is there when the picked agent is offered any, and leads
 // to a switch per server; Skills is the same for the skills it carries,
 // and Repositories for the project's repositories.
@@ -20,6 +22,7 @@ import type {
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
 import {
+  AUTOMATIONS,
   credentialKey,
   EMAIL,
   mcpKey,
@@ -72,6 +75,11 @@ export function offeredItem(
 
 export const emailItem = (input: Parameters<typeof switchItem>[1]) =>
   offeredItem(EMAIL, input);
+
+// Scheduled tasks, the automation tool's: locked with the admin's row
+// off, as Visuals is
+export const tasksItem = (input: Parameters<typeof switchItem>[1]) =>
+  switchItem(AUTOMATIONS, input);
 
 // whether another agent was picked. The list going away for a moment,
 // a project loading or a failed refresh, is no pick: the flips of the

@@ -142,7 +142,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
-| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
+| `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user`, `automation` |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |

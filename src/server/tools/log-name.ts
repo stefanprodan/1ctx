@@ -1,7 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { BUILTIN_TOOLS, EMAIL_TOOL, WEB_TOOLS } from "../../shared/words.ts";
+import {
+  AUTOMATION_TOOL,
+  BUILTIN_TOOLS,
+  EMAIL_TOOL,
+  WEB_TOOLS,
+} from "../../shared/words.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { DELEGATE_TOOL } from "./builtin/delegate.ts";
 import { mcpCallName } from "./builtin/mcp.ts";
@@ -11,6 +16,7 @@ const LOGGED_TOOLS: ReadonlySet<string> = new Set([
   ...BUILTIN_TOOLS,
   ...WEB_TOOLS,
   EMAIL_TOOL,
+  AUTOMATION_TOOL,
   DELEGATE_TOOL,
 ]);
 

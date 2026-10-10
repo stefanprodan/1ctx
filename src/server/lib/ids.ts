@@ -6,7 +6,12 @@
 
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-export function newId(length = 12): string {
+const ID_LENGTH = 12;
+
+// a row id as newId() makes them, and nothing else
+export const ID_SHAPE = `[0-9a-z]{${ID_LENGTH}}`;
+
+export function newId(length = ID_LENGTH): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   let out = "";
   for (const b of bytes) out += ALPHABET[b % ALPHABET.length];

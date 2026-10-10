@@ -16,6 +16,7 @@ import { Page } from "../../ui/Page.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { AutomationTool } from "./AutomationTool.tsx";
 import {
   builtinsOf,
   CONFIG_TABS,
@@ -77,6 +78,12 @@ export function ConfigBoard() {
             {tab === "overview" && <Builtins state={state} />}
             {cards(LIMITS_CARDS, tab === "limits")}
             {cards(STORAGE_CARDS, tab === "storage")}
+            {/* drawn on every tab, so its draft outlives a look at another */}
+            <div
+              class={`config-board-cards${tab === "overview" ? "" : " config-board-away"}`}
+            >
+              <AutomationTool tool={state.automation} />
+            </div>
           </div>
         </Split>
       )}

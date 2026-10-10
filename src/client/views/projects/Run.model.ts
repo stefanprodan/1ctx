@@ -6,7 +6,7 @@
 
 import type { FeedRow } from "../../../shared/api/sessions.ts";
 import type { SessionSummary } from "../../../shared/contracts/session.ts";
-import { pad } from "./Schedule.model.ts";
+import { pad } from "../../../shared/schedule.ts";
 
 export const RESTART_WORDS = "Restarted";
 // the run page's line over a restart run's transcript

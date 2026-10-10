@@ -68,6 +68,7 @@ const EXPECTED_IDS = [
   "0054-agent-output-limit",
   "0055-automation-edit-revision",
   "0056-automation-once",
+  "0057-automation-tool",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -962,6 +963,7 @@ describe("the schema", () => {
       { name: "web", enabled: 1, provider: null, updated_at: 0 },
       // off until an admin turns it on
       { name: "email_user", enabled: 0, provider: null, updated_at: 0 },
+      { name: "automation", enabled: 1, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -1777,7 +1779,7 @@ describe("the schema", () => {
       expect(
         db
           .query(
-            "select * from tools where name != 'email_user' order by rowid",
+            "select * from tools where name not in ('email_user', 'automation') order by rowid",
           )
           .all(),
       ).toEqual(tools);
@@ -1895,6 +1897,42 @@ describe("the schema", () => {
       expect(() =>
         db.exec("update automations set once_run_session_id = 'none'"),
       ).toThrow(/FOREIGN KEY/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0057 adds the automation row on and keeps every tool row", () => {
+    const db = seed(MIGRATIONS.slice(0, 56));
+    try {
+      db.exec(`
+        update tools set enabled = 0, hosts = '["https://cdn.test"]',
+          updated_at = 5 where name = 'visualize';
+        update tools set enabled = 1, updated_at = 6 where name = 'email_user';
+        update tools set mode = 'listed', hosts = '["a.test"]', updated_at = 7
+          where name = 'web';
+      `);
+      const tools = db.query("select * from tools order by rowid").all();
+      expect(migrate(db)).toEqual(expectedFrom("0057-automation-tool"));
+      expect(
+        db
+          .query(
+            "select * from tools where name != 'automation' order by rowid",
+          )
+          .all(),
+      ).toEqual(tools);
+      expect(
+        db
+          .query(
+            "select name, enabled, updated_at from tools where name = 'automation'",
+          )
+          .get(),
+      ).toEqual({ name: "automation", enabled: 1, updated_at: 0 });
+      expect(() =>
+        db.exec(
+          "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
+        ),
+      ).toThrow(/CHECK/);
     } finally {
       db.close();
     }
@@ -3027,7 +3065,14 @@ test("a test's memory database is a fresh migrate", () => {
         .query<{ name: string }, []>("select name from tools order by rowid")
         .all()
         .map((row) => row.name),
-    ).toEqual(["webfetch", "websearch", "visualize", "web", "email_user"]);
+    ).toEqual([
+      "webfetch",
+      "websearch",
+      "visualize",
+      "web",
+      "email_user",
+      "automation",
+    ]);
     expect(state(first)).toEqual(state(fresh));
     first.exec("create table scratch (a int)");
     expect(state(second)).toEqual(state(fresh));

@@ -38,6 +38,41 @@ describe("renderMarkdown", () => {
     );
   });
 
+  test("keeps the app's task, memory and run links, opened in place", () => {
+    const id = "abc123def456";
+    for (const path of [
+      `/automations/${id}`,
+      `/automations/${id}/memory`,
+      `/run/${id}`,
+    ]) {
+      expect(renderMarkdown(`[task](${path})`)).toBe(
+        `<p class="md-p"><a class="md-link" href="${path}">task</a></p>`,
+      );
+    }
+  });
+
+  test("leaves every other relative link as text", () => {
+    const id = "abc123def456";
+    for (const href of [
+      "/api/sessions",
+      `/api/automations/${id}`,
+      "/link/token",
+      "//evil.test/automations/abc123def456",
+      `/run\\${id}`,
+      `/automations/abc%2F${id}`,
+      `/automations/${id}/edit`,
+      `/run/${id}/x`,
+      `/run/${id}?x=1`,
+      `/run/${id}#top`,
+      "/run/ABC123DEF456",
+      "/run/abc",
+      "automations/abc123def456",
+      "./run/abc123def456",
+    ]) {
+      expect(renderMarkdown(`[t](${href})`)).toBe('<p class="md-p">t</p>');
+    }
+  });
+
   test("renders images as text without an img element", () => {
     const html = renderMarkdown("![logo](https://example.test/logo.png)");
     expect(html).not.toContain("<img");

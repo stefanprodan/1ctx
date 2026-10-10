@@ -9,6 +9,7 @@
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { WEEK } from "../../../shared/schedule.ts";
 import { MAX_SCHEDULE } from "../../../shared/words.ts";
 import { narrow } from "../../app/shell.ts";
 import { loadPreview, preview, previewKey } from "../../data/automations.ts";
@@ -30,7 +31,6 @@ import {
   STEPS,
   scheduleTitle,
   switchEvery,
-  WEEK,
 } from "./Schedule.model.ts";
 
 // the preview waits for the typing to pause

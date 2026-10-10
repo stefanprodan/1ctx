@@ -6,29 +6,28 @@ Governs `src/server/sessions/` and the runner's sends in
 A session is one conversation row, of one of two origins
 (`SESSION_ORIGINS`): a chat, which users write in, or a run, which an
 automation (a scheduled task) starts on its schedule or by Run now. Both
-share the table, the writer, the runner, the caps and the sweep, so this
-doc covers both and says "chat" or "run" where a rule holds for one
-only. A send is one pass of the runner over a session (`SEND_KINDS`:
+share the table, the writer, the runner, the caps and the sweep; this
+doc says "chat" or "run" where a rule holds for one only. A send is one pass of the runner over a session (`SEND_KINDS`:
 `chat`, `compact`, `run`): a turn in a chat (the user messages that open
 it and the agent's reply), the whole of a run, or a compaction. A send
-is one or more rounds, each one request to the model and the tool calls
-it answers with. What only runs and automations do is in
+is one or more rounds, each a request to the model and the calls it
+answers with. What only runs and automations do is in
 `docs/automations.md`; the tool loop in `docs/tools.md`; memory in
 `docs/memory.md`; archive, packing and the sweep in `docs/archive.md`;
 compaction in `docs/compaction.md`.
 
-An envelope is the `session` socket frame (`shared/socket.ts`) one
+An envelope is the `session` socket frame (`shared/socket.ts`) a
 session transaction publishes: the summary with its revision, the rows
 written, the ids removed, the send row and the session's row in the
 session list. A summon is a chat message whose first word is `@name`:
-that agent answers the one turn (see Summons).
+that agent answers the one turn (Summons below).
 
 ## Sends and caps
 
 - **One send per session, under the runner's lock.** The lock is taken
   synchronously in `runner/registry.ts` before anything is written.
   `admit()` checks the caps and the caller reserves with `set()` in the
-  same turn, with no `await` between.
+  same turn, no `await` between.
 - **Every send counts in one tally.** A message, regenerate, compact,
   Run now and a scheduled run all count under `sendsPerUser`,
   `sendsPerProject` and `sendsRunning`. The user is whoever started it
@@ -228,12 +227,12 @@ that agent answers the one turn (see Summons).
 ## Capabilities and the system prompt
 
 - **A session's disabled capabilities are one sorted set.** A capability
-  is a part of what a send offers that a user may switch off for one
-  chat or automation. Create, send and regenerate take a `capabilities`
+  is a part of a send's offer a user may switch off for one chat or
+  automation. Create, send and regenerate take a `capabilities`
   change of `disable` and `enable` keys (`web`, `visualize`,
-  `knowledge`, `memory`, `mcp:<id>`, `skill:<id>`, `credential:<id>`,
-  `repo:<id>`). The parser checks only an id's shape; unknown ids are
-  kept and ignored.
+  `knowledge`, `memory`, `email`, `automations`, `mcp:<id>`,
+  `skill:<id>`, `credential:<id>`, `repo:<id>`). The parser checks only
+  an id's shape; unknown ids are kept and ignored.
 - **The change is applied twice.** The policy resolves it before
   schemas are built, and `startSend` applies it again to the current
   row in its transaction, a turn's changes in message order, the later
@@ -244,10 +243,10 @@ that agent answers the one turn (see Summons).
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, email, MCP, skills, repositories), the moved branches
-  (`docs/repos.md`), and last the MCP change note (`docs/mcp.md`).
-  What is fixed per agent and project comes first; the user's line
-  follows because it changes with a team chat's author. A subagent's
+  memory, email, tasks, MCP, skills, repositories), the moved
+  branches (`docs/repos.md`), and last the MCP change note
+  (`docs/mcp.md`). What is fixed per agent and project leads; the user's
+  line follows, as a team chat's author changes it. A subagent's
   is `subagentPrompt()` (`docs/subagents.md`).
 
 ## Summons

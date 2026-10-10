@@ -68,7 +68,6 @@ import {
 import {
   scheduleColumn,
   scheduleTitle,
-  scheduleWords,
 } from "../../../src/client/views/projects/Schedule.model.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
@@ -77,6 +76,7 @@ import {
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
+import { scheduleWords } from "../../../src/shared/schedule.ts";
 import type { RunFilter } from "../../../src/shared/words.ts";
 
 const now = new Date(2026, 8, 14, 12).getTime();
@@ -773,6 +773,13 @@ describe("the form", () => {
       "mcp:a1",
       "skill:s1",
     ]);
+  });
+
+  test("the saved set drops the chat's own keys a task cannot switch", () => {
+    const row = automation({
+      disabledCapabilities: ["automations", "memory", "web"],
+    });
+    expect(disabledOf(draftOf(row, "a1", "UTC", 600_000))).toEqual(["web"]);
   });
 
   test("the saved set keeps email off with the built-ins", () => {

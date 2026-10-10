@@ -64,7 +64,12 @@ export async function loadTools(): Promise<void> {
 let toolWrites = 0;
 let limitWrites = 0;
 
-type PatchedTool = "web" | "websearch" | "visualize" | "email_user";
+type PatchedTool =
+  | "web"
+  | "websearch"
+  | "visualize"
+  | "email_user"
+  | "automation";
 
 export async function patchTool(
   name: PatchedTool,

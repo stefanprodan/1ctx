@@ -62,6 +62,7 @@ import { m0053 } from "./0053-anthropic.ts";
 import { m0054 } from "./0054-agent-output-limit.ts";
 import { m0055 } from "./0055-automation-edit-revision.ts";
 import { m0056 } from "./0056-automation-once.ts";
+import { m0057 } from "./0057-automation-tool.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -120,4 +121,5 @@ export const MIGRATIONS: Migration[] = [
   m0054,
   m0055,
   m0056,
+  m0057,
 ];

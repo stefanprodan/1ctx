@@ -6,9 +6,13 @@
 
 import { parseArguments } from "../../shared/contracts/tool.ts";
 import { sanitize } from "../../shared/memory.ts";
+import { cutAt } from "../../shared/text.ts";
 import { messageOf, ToolError } from "../lib/errors.ts";
 import type { ToolCall } from "../providers/index.ts";
 import type { Tool, ToolContext, ToolResult } from "./types.ts";
+
+// the line a body cut before its tail ends with
+export const resultCutLine = (cut: number) => `result cut at ${cut} characters`;
 
 function clean(text: string, cut: number): string {
   return sanitize(text).slice(0, cut);
@@ -102,16 +106,19 @@ export class Registry {
         const content = sanitize(result.content);
         const start = Math.max(0, result.content.length - result.tail);
         const tail = clean(result.content.slice(start), ctx.caps.resultCut);
+        const body = content.slice(0, content.length - tail.length);
+        const room = ctx.caps.resultCut - tail.length;
+        // a cut body says so when the line fits, so it never reads whole
+        const marker = `\n${resultCutLine(ctx.caps.resultCut)}\n`;
+        const kept =
+          body.length <= room
+            ? body
+            : room >= marker.length
+              ? cutAt(body, room - marker.length) + marker
+              : body.slice(0, room);
         return {
           ...result,
-          content:
-            content.slice(
-              0,
-              Math.min(
-                content.length - tail.length,
-                ctx.caps.resultCut - tail.length,
-              ),
-            ) + tail,
+          content: kept + tail,
           error: result.error,
           tail: tail.length,
         };

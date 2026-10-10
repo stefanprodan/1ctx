@@ -9,6 +9,7 @@
 
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
+import { ATTENTION_AT } from "../shared/contracts/decision.ts";
 import {
   EMAIL_KEY_PREFIX,
   MCP_KEY_PREFIX,
@@ -471,6 +472,45 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     // a closure: the runner is built after the tools
     delegate: (input, call, ctx) => runner.delegate(input, call, ctx),
+    // closures: automations are built after the tools
+    automations: {
+      byProject: (projectId) => automations.store.byProject(projectId),
+      byId: (id) => automations.store.byId(id),
+      runDeadlineMs: () => limits.current().runDeadlineMs,
+      lastRun(sessionId) {
+        const send = sessions.store.lastSend(sessionId);
+        if (send === null) return null;
+        const session = sessions.store.byId(sessionId);
+        return {
+          status: send.status,
+          cause: send.cause,
+          error: send.error,
+          // a running send's answer is not its result yet
+          answer:
+            send.status === "running"
+              ? null
+              : sessions.runAnswer(send.id, send.memoryRound),
+          flagged:
+            session !== null &&
+            session.attention !== null &&
+            session.attention >= ATTENTION_AT
+              ? { reason: session.attentionReason, by: session.attentionBy }
+              : null,
+          judged: session !== null && session.attention !== null,
+        };
+      },
+      // the names the task's page shows: its agent's switchable servers
+      // and skills, its project's credentials and repositories
+      switchNames(agentId, projectId) {
+        const agent = agents.byId(agentId);
+        return {
+          servers: agent === null ? [] : mcp.switchable(agent.servers),
+          skills: skills.forAgent(agentId),
+          credentials: credentials.forProject(projectId),
+          repos: repos.switchable(projectId),
+        };
+      },
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({

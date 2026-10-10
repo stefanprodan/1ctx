@@ -4,11 +4,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   builderOf,
-  daysOf,
   expressionOf,
   fireLabel,
   switchEvery,
 } from "../../../src/client/views/projects/Schedule.model.ts";
+import { daysOf } from "../../../src/shared/schedule.ts";
 
 describe("reading an expression into a shape", () => {
   test("the shapes the builder writes", () => {
