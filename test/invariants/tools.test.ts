@@ -98,6 +98,7 @@ describe("tools administration", () => {
     const body = JSON.parse(text);
     expect(Object.keys(body).sort()).toEqual([
       "access",
+      "automation",
       "builtin",
       "emailUser",
       "search",

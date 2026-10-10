@@ -254,8 +254,8 @@ Flagged.
   cold and keeps only the tally; a tally refresh is warm.
 - **The editor saves the whole `disabledCapabilities`.** `disabledOf()`
   in `Access.model.ts` keeps only keys the picked agent and the project
-  have, so a stale key is dropped on save. Memory has no switch there
-  and is dropped too.
+  have, so a stale key is dropped on save. Memory and Scheduled tasks,
+  a chat's alone, have no switch there and are dropped too.
 - **An automation on a deleted agent cannot be saved as is.** Run now
   and Resume are off, and Save stays off until a live agent is picked
   (`retiredPick()`).

@@ -394,6 +394,7 @@ async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
         websearch: found.search,
         visualize: found.visualize,
         email_user: found.emailUser,
+        automation: found.automation,
       }[doc.name]
     : null;
   if (!before) throw new Error("no such tool");

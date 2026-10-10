@@ -4,6 +4,7 @@
 // The set offered to one send, shared by the agent page and the runner.
 
 import {
+  AUTOMATIONS,
   credentialKey,
   EMAIL,
   KNOWLEDGE,
@@ -20,6 +21,7 @@ import { mcpCatalog, resolveMode } from "../../shared/mcp-catalog.ts";
 import { catalog } from "../../shared/skills.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import {
+  AUTOMATION_TOOL,
   EMAIL_TOOL,
   type McpMode,
   type SearchProvider,
@@ -76,6 +78,8 @@ type OfferDeps = {
   credentials?: CredentialsPort;
   // the admin's email_user row is on and email is set up
   emailOn?(): boolean;
+  // the admin's automation row is on and the tasks are wired to read
+  automationOn?(): boolean;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -241,7 +245,12 @@ function childOffered(
     agentId,
     agentServers.map((link) => ({ ...link, write: false })),
     requestedMode,
-    { projectId: scope.projectId, automation: null, phase: "main" },
+    {
+      projectId: scope.projectId,
+      automation: null,
+      phase: "main",
+      origin: scope.origin,
+    },
     disabledCapabilities,
     true,
   );
@@ -313,6 +322,13 @@ export function offered(
     disabledCapabilities,
     subagent,
   );
+  // a chat's main rounds, a summoned agent's and a chat's subagents: a
+  // run's subagent offer has no automation of its own, so its origin
+  // says it is a run's
+  const chatSend =
+    scope?.phase === "main" &&
+    scope.automation === null &&
+    scope.origin !== "automation";
   const allowed = new Set<string>([
     "datetime",
     "bash",
@@ -325,6 +341,11 @@ export function offered(
       : []),
     ...(deps.emailOn?.() && !disabledCapabilities.includes(EMAIL)
       ? [EMAIL_TOOL]
+      : []),
+    ...(chatSend &&
+    deps.automationOn?.() &&
+    !disabledCapabilities.includes(AUTOMATIONS)
+      ? [AUTOMATION_TOOL]
       : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,

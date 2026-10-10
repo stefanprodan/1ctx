@@ -4,6 +4,8 @@
 // The system prompt; its order is fixed in docs/sessions.md.
 
 import {
+  AUTOMATIONS,
+  AUTOMATIONS_OFF_LINE,
   EMAIL,
   EMAIL_OFF_LINE,
   KNOWLEDGE,
@@ -186,6 +188,14 @@ export function systemPrompt(
     policy.offered.tools.length > 0
   ) {
     parts.push(EMAIL_OFF_LINE);
+  }
+  // only a chat is offered the tool, so the key means nothing in a run
+  if (
+    policy.disabledCapabilities.includes(AUTOMATIONS) &&
+    policy.offered.tools.length > 0 &&
+    policy.automation === null
+  ) {
+    parts.push(AUTOMATIONS_OFF_LINE);
   }
   if (policy.mcpOff.length > 0) parts.push(mcpOffLine(policy.mcpOff));
   if (policy.skillsOff.length > 0) {

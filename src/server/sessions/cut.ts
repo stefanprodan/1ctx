@@ -44,6 +44,7 @@ const READS: ReadonlySet<string> = new Set([
   "skill",
   "skill_file",
   "mcp_describe",
+  "automation",
 ]);
 
 // side is the offered MCP tool's, null when unknown: repair has no

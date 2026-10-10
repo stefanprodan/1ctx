@@ -379,6 +379,7 @@ test("project agents expose the same switchable map to members and admins", asyn
     expect(body.capabilities).toEqual([
       "web",
       "visualize",
+      "automations",
       "knowledge",
       "memory",
     ]);

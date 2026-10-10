@@ -9,6 +9,7 @@
 // name one shape.
 
 import {
+  type AUTOMATION_TOOL,
   type BuiltinTool,
   type EMAIL_TOOL,
   isRecord,
@@ -108,6 +109,13 @@ export type EmailToolSummary = ToolSchema & {
   name: typeof EMAIL_TOOL;
   enabled: boolean;
   emailOn: boolean;
+  updatedAt: number;
+};
+
+// automation, on until an admin turns it off; only a chat is offered it
+export type AutomationToolSummary = ToolSchema & {
+  name: typeof AUTOMATION_TOOL;
+  enabled: boolean;
   updatedAt: number;
 };
 

@@ -248,7 +248,12 @@ export function buildPolicy(input: {
           agent.id,
           agent.servers,
           agent.mcpMode,
-          { projectId: input.project.id, automation: null, phase: "child" },
+          {
+            projectId: input.project.id,
+            automation: null,
+            phase: "child",
+            origin: automationScope === null ? "chat" : "automation",
+          },
           disabledCapabilities,
         )
       : null;

@@ -649,7 +649,7 @@ describe("GET /api/projects/:id/agents", () => {
     expect(await visible.json()).toEqual({
       agents: [expect.objectContaining({ id: chat.agentId, name: "coder" })],
       startsOn: chat.agentId,
-      capabilities: ["web", "visualize", "knowledge", "memory"],
+      capabilities: ["web", "visualize", "automations", "knowledge", "memory"],
       servers: {},
       skills: {},
       credentials: [],

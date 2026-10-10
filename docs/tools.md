@@ -94,7 +94,7 @@ words.
   and its row gets the cut text (`docs/sessions.md`); any other
   settled result is a completion, success or failure, and is kept.
   The cut kinds: read (`webfetch`, `websearch`, `datetime`, `skill`,
-  `skill_file`, `mcp_describe`), MCP read (the read side), `bash`,
+  `skill_file`, `mcp_describe`, `automation`), MCP read (the read side), `bash`,
   `delegate`, and write for every other name.
 
 ## The offered set
@@ -114,8 +114,10 @@ words.
   redirect against the listed origins. The send keeps its web snapshot.
 - **Websearch needs no key.** Every provider answers keyless; a
   `search-<provider>.key` file only raises the rate.
-- **Only the `visualize` row's `enabled` is read.** Webfetch's and
-  websearch's `enabled` are ignored, and no route patches webfetch.
+- **Only the `visualize`, `email_user` and `automation` rows'
+  `enabled` is read.** A patch moves the named tool's row alone.
+  Webfetch's and websearch's `enabled` are ignored, and no route
+  patches webfetch.
 - **`needs_attention` is offered only in a run's attention step**, alone
   (`phase: "attention"` in `offer.ts`, `attentionOffered` on the
   policy), whose automation's mode is not off (`docs/automations.md`),
@@ -138,21 +140,54 @@ words.
   - `memory`: drops a chat's `memory_edit`; the note stays in the
     prompt. It means nothing in a run.
   - `email`: drops `email_user` only.
+  - `automations`: drops a chat's `automation`. It means nothing in a
+    run.
   - `mcp:<id>`, `skill:<id>`, `credential:<id>`: removed before the
     offer is built, so nothing of them reaches the send.
 - **Each off key adds its line to the prompt.** The lines are
   `WEB_OFF_LINE`, `VISUALIZE_OFF_LINE`, `KNOWLEDGE_OFF_LINE`,
-  `MEMORY_OFF_LINE`, `EMAIL_OFF_LINE`, `mcpOffLine()` and
+  `MEMORY_OFF_LINE`, `EMAIL_OFF_LINE`, `AUTOMATIONS_OFF_LINE` (a chat
+  only), `mcpOffLine()` and
   `skillsOffLine()`, added only
   when the send offers tools (the knowledge line only with `bash`).
   They exist because history may still show what the switch turned
   off. `tools.capabilities()` lists the switchable keys: `web`
   unless the mode is off, `visualize` while its row is on, `email`
-  while `email_user` is offered, and `knowledge` and `memory` always.
+  while `email_user` is offered, `automations` while the `automation`
+  row is on, and `knowledge` and `memory` always.
 - **A delete forgets its key.** Deleting an MCP server, a skill or a
   credential forgets `mcp:`, `skill:` or `credential:<id>` in sessions
   and automations in the same transaction; deleting a repository forgets
   `repo:<id>` in its project's alone. Unassigning forgets nothing.
+
+## Scheduled tasks
+
+- **`automation` reads the chat's project's tasks, in a chat only.**
+  Its main rounds, a summoned agent's and a chat's subagents are
+  offered it; a run, a run's subagents (the scope's `origin`), the
+  memory phase and the attention step never are, and a call whose
+  actor is not a chat is refused. The row starts on.
+- **It grows by actions, never by tools.** `action` is an enum, and
+  dispatch takes only its own list; each action names the fields it
+  takes and refuses the rest. `list` is one line per task, never the
+  instructions; `show` is every setting the task's page shows, then
+  the instructions, the open alert and the last run's result.
+- **It reads through `AutomationsPort`,** wired in `compose.ts`. An id
+  of another project is not found. A switch is named only from the
+  task's agent's servers and skills and its project's credentials and
+  repositories; any other key is an item no longer available.
+- **The last run's line is its send's.** `lastSend()`, then
+  `runAnswer()` before its memory round: by status, cause and error,
+  never the status alone, and a running run has no result yet.
+- **Task text is quoted as data.** The instructions, the guidance and
+  the answer are fenced past any backticks they hold and labelled as
+  the task's. The instructions and the answer are cut at `FIELD_BYTES`
+  of UTF-8 at a character boundary, reasons and errors at
+  `SHORT_BYTES`. A cut field is read on with `part`, an `offset` in
+  characters and the `ref` its note gives: the edit revision or the
+  run's id. A ref that no longer holds starts again at 0.
+- **The notes and links are the result's `tail`,** so a cut keeps them.
+  Links are the app's own paths, which the renderer keeps.
 
 ## Email to users
 

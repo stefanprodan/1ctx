@@ -6,6 +6,7 @@
 // started on.
 
 import type {
+  AutomationToolSummary,
   BuiltinToolSummary,
   EmailToolSummary,
   SearchState,
@@ -23,12 +24,13 @@ export type ToolsResponse = {
   search: SearchState;
   visualize: WebToolSummary;
   emailUser: EmailToolSummary;
+  automation: AutomationToolSummary;
 };
 
 // PATCH /api/tools/:name. `web` takes the mode and the domains, and
 // `listed` needs at least one host, given or stored. `websearch` takes
 // the provider, null for None. `visualize` takes its switch and hosts,
-// `email_user` its switch.
+// `email_user` and `automation` their switches.
 // Any other name, any other field and an empty body are a 400.
 export type PatchToolRequest = {
   mode?: WebAccessMode;

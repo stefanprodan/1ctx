@@ -223,6 +223,7 @@ test("tools routes expose access, None and the independent visual settings", asy
     ).json()) as ToolsResponse;
     expect(Object.keys(first).sort()).toEqual([
       "access",
+      "automation",
       "builtin",
       "emailUser",
       "search",

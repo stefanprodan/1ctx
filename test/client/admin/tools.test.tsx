@@ -76,6 +76,7 @@ import { deferred } from "../../helpers/async.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import {
   admin as adminFixture,
+  automationTool,
   emailUser,
 } from "../../helpers/client-fixtures.ts";
 
@@ -227,6 +228,7 @@ const body = (visualize = fetchTool, web = access): ToolsResponse => ({
   search,
   visualize,
   emailUser: emailUser(),
+  automation: automationTool(),
 });
 const search: SearchState = {
   provider: "exa",
@@ -665,9 +667,16 @@ describe("the Config board", () => {
   test.serial("a tool is off while no turn is offered it", () => {
     const state = body();
     expect(builtinsOf(state).map((t) => t.name)).toEqual([
+      "automation",
       "datetime",
       "visualize",
     ]);
+    expect(offered(state.automation, state)).toBe(true);
+    const tasksOff = {
+      ...state,
+      automation: automationTool({ enabled: false }),
+    };
+    expect(offered(tasksOff.automation, tasksOff)).toBe(false);
     expect(offered(time, state)).toBe(true);
     const webfetch = { ...time, name: "webfetch" as const };
     const websearch = { ...time, name: "websearch" as const };
@@ -685,10 +694,12 @@ describe("the Config board", () => {
     const email = (over: Partial<ToolsResponse["emailUser"]>) => ({
       ...state,
       emailUser: emailUser(over),
+      automation: automationTool(),
     });
     const on = email({ enabled: true, emailOn: true });
     expect(offered(on.emailUser, on)).toBe(true);
     expect(builtinsOf(on).map((t) => t.name)).toEqual([
+      "automation",
       "datetime",
       "email_user",
       "visualize",
@@ -785,7 +796,7 @@ describe("the Config board", () => {
     expect(html).toContain('class="tabs"');
     expect(html).toContain("datetime");
     expect(html).toContain("The current date and time in a timezone.");
-    expect(html).toMatch(/rows-hint[^>]*>2.81K tokens/);
+    expect(html).toMatch(/rows-hint[^>]*>3.01K tokens/);
     expect(html).toContain(
       '<span class="rows-name rows-name-mono"><span class="cut">datetime',
     );

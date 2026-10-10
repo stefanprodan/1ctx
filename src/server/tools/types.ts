@@ -7,7 +7,7 @@
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
-import type { SearchProvider } from "../../shared/words.ts";
+import type { SearchProvider, SessionOrigin } from "../../shared/words.ts";
 import type { CommandResult, JobRepo, KeptFile } from "../bash/index.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
@@ -108,6 +108,9 @@ export type MemoryScope = {
   chat?: { sessionId: string; userId: string } | null;
   // the agent's Subagents switch: a main offer carries delegate
   delegate?: boolean;
+  // the send's origin; a subagent's offer has no automation of its own,
+  // so it carries its parent's, and a run's children read no tasks
+  origin?: SessionOrigin;
 };
 
 // a chat's saves, bound to its project, session and author

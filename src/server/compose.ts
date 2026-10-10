@@ -471,6 +471,37 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     // a closure: the runner is built after the tools
     delegate: (input, call, ctx) => runner.delegate(input, call, ctx),
+    // closures: automations are built after the tools
+    automations: {
+      byProject: (projectId) => automations.store.byProject(projectId),
+      byId: (id) => automations.store.byId(id),
+      runDeadlineMs: () => limits.current().runDeadlineMs,
+      lastRun(sessionId) {
+        const send = sessions.store.lastSend(sessionId);
+        if (send === null) return null;
+        return {
+          status: send.status,
+          cause: send.cause,
+          error: send.error,
+          // a running send's answer is not its result yet
+          answer:
+            send.status === "running"
+              ? null
+              : sessions.runAnswer(send.id, send.memoryRound),
+        };
+      },
+      // the names the task's page shows: its agent's switchable servers
+      // and skills, its project's credentials and repositories
+      switchNames(agentId, projectId) {
+        const agent = agents.byId(agentId);
+        return {
+          servers: agent === null ? [] : mcp.switchable(agent.servers),
+          skills: skills.forAgent(agentId),
+          credentials: credentials.forProject(projectId),
+          repos: repos.switchable(projectId),
+        };
+      },
+    },
   });
   const tools = options.tools ?? configuredTools;
   const socket = socketArea({

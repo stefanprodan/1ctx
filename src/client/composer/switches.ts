@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import {
+  AUTOMATIONS,
   CREDENTIAL,
   EMAIL,
   KNOWLEDGE,
@@ -88,6 +89,7 @@ export function useSwitches({
     knowledge: item(KNOWLEDGE),
     memory: item(MEMORY),
     email: emailItem(input(EMAIL)),
+    tasks: item(AUTOMATIONS),
     servers: serversItem({
       tools: readable,
       servers: (agent === null ? undefined : servers.value[agent]) ?? [],

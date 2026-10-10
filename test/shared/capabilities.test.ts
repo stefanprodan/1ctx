@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  AUTOMATIONS,
   applyChange,
   credentialKey,
   credentialOf,
@@ -33,6 +34,12 @@ describe("capability keys", () => {
       ok: true,
       set: ["email", "web"],
     });
+  });
+
+  test("the automation tool is a kind alone, a chat's", () => {
+    expect(AUTOMATIONS).toBe("automations");
+    expect(isCapabilityKey(AUTOMATIONS)).toBe(true);
+    expect(isCapabilityKey("automations:x")).toBe(false);
   });
 
   test("the visualize tool is a kind alone, like web access", () => {

@@ -7,7 +7,8 @@
 // never touched a switch. A key is a kind, or a kind and a name after a
 // colon. Web access is a kind alone, and so are the visualize tool, the
 // project docs under /knowledge, saving to the project's memory,
-// which only a chat is offered, and the email_user tool. An
+// which only a chat is offered, the email_user tool, and the
+// automation tool, which only a chat is offered too. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
 // agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
 // HTTP credential is `credential:<credential id>`, a repository
@@ -18,6 +19,7 @@ export const VISUALIZE = "visualize";
 export const KNOWLEDGE = "knowledge";
 export const MEMORY = "memory";
 export const EMAIL = "email";
+export const AUTOMATIONS = "automations";
 export const MCP = "mcp";
 export const SKILL = "skill";
 export const CREDENTIAL = "credential";
@@ -65,6 +67,7 @@ export function isCapabilityKey(value: unknown): value is string {
       value === KNOWLEDGE ||
       value === MEMORY ||
       value === EMAIL ||
+      value === AUTOMATIONS ||
       serverOf(value) !== null ||
       skillOf(value) !== null ||
       credentialOf(value) !== null ||
@@ -174,6 +177,11 @@ export const MEMORY_OFF_LINE =
 // before the flip is in the history
 export const EMAIL_OFF_LINE =
   "Email to users is off. Do not call email_user. Say so in your answer if a user should be told.";
+
+// the line after it while a chat has the automation tool off: a
+// task read before the flip is in the history
+export const AUTOMATIONS_OFF_LINE =
+  "The user turned reading scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
 
 // the line after it while a chat has servers off that its agent would
 // otherwise be offered: names sorted, so it is constant between flips

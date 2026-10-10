@@ -7,6 +7,8 @@
 // leads to a pane instead: Web access first, then a switch per
 // credential, which goes with it. Memory and Knowledge are live
 // whenever the agent takes tools, since no admin switch governs them.
+// Scheduled tasks is the automation tool's, live while the admin's row
+// is on.
 // MCP servers is there when the picked agent is offered any, and leads
 // to a switch per server; Skills is the same for the skills it carries,
 // and Repositories for the project's repositories.
