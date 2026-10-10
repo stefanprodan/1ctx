@@ -12,7 +12,6 @@ import { render } from "preact-render-to-string";
 import {
   priceLine,
   shortModel,
-  thinkingLine,
   windowLine,
 } from "../../../src/client/agents/meta.ts";
 import {
@@ -363,14 +362,6 @@ describe("the words", () => {
     // a model that never thinks takes no effort whatever the row says
     expect(effortApplies({ ...flash, reasoning: false }, "on")).toBe(false);
     expect(effortApplies(flash, "off")).toBe(false);
-    expect(thinkingLine({ thinking: null, effort: null })).toBe("");
-    expect(thinkingLine({ thinking: "off", effort: "high" })).toBe(
-      "thinking off",
-    );
-    expect(thinkingLine({ thinking: "on", effort: "high" })).toBe(
-      "thinking on · effort high",
-    );
-    expect(thinkingLine({ thinking: null, effort: "low" })).toBe("effort low");
   });
 
   test.serial("a model that cannot stop thinking offers no Off", () => {

@@ -892,14 +892,12 @@ describe("the pages", () => {
       } as never,
     ];
     html = render(<Members params={{ id: "p1" }} />);
+    // the Directory's row: the handle over the model, the rest on its page
     expect(html).toContain(
-      'class="rows-name rows-name-mono"><span class="cut">coder<',
+      'class="rows-name rows-name-mono"><span class="cut">@coder<',
     );
     expect(html).toContain("deepseek/deepseek-v4-flash");
-    // no provider name for a member, and no form to open
-    expect(html).toContain(
-      'class="rows-meta-long">128K · $0.14 / $0.28 · tools · reasoning<',
-    );
+    expect(html).not.toContain("rows-meta");
     expect(html).not.toContain("rows-toggle");
     expect(html).toContain('class="rows-line rows-go" href="/agents/coder"');
     projectAgents.value = [];

@@ -6,6 +6,7 @@
 // tab, each row leading to their page. A tab is an address, so the
 // head's tabs are links and every list loads on each.
 
+import { AgentRow } from "../../agents/AgentRow.tsx";
 import { shortModel } from "../../agents/meta.ts";
 import { path } from "../../app/router.ts";
 import {
@@ -17,7 +18,6 @@ import {
   directoryUsersError,
 } from "../../data/directory.ts";
 import { me } from "../../data/me.ts";
-import { AvatarIcon } from "../../lib/avatars.tsx";
 import { count, initials } from "../../lib/format.ts";
 import { agentHref, deciderHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
@@ -97,25 +97,7 @@ function AgentsCard({ list }: { list: ListedAgent[] }) {
       )}
       {shown.map((a) => (
         <RowsGo key={a.id} href={agentHref(a.name)}>
-          <RowsAvatar>
-            <AvatarIcon name={a.avatar} size={15} />
-          </RowsAvatar>
-          <RowsTitle
-            mono
-            name={
-              <>
-                <span class="cut">@{a.name}</span>
-                {a.default && <RowsTag>default</RowsTag>}
-              </>
-            }
-            sub={
-              <Fit
-                class="directory-model cut"
-                long={a.model}
-                short={shortModel(a.model)}
-              />
-            }
-          />
+          <AgentRow agent={a} />
         </RowsGo>
       ))}
     </RowsCard>

@@ -1,65 +1,44 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One agent as the parts of a row: the avatar, the name over the model
-// id, and the faint meta: "default" on the agent new chats start on
-// for anyone who has not picked one, the provider's name when the caller
-// knows it (only an admin lists providers), the model's window and
-// prices, the provider OpenRouter tries first, the thinking level and
-// the skill and MCP counts; a phone shows only the default word, the
-// window and the price. The admin page puts them in the button that
-// opens the form; the project's members tab in a line. They are the
-// row's own parts, so a phone wraps them as it wraps a user's.
+// One agent as the parts of a row, the same in the Directory and on a
+// project's Members tab: the avatar, the handle with the default tag,
+// and the model id, its org dropped when it does not fit. The rest is
+// on the agent's page the row leads to.
 
-import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import type { Avatar } from "../../shared/words.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { RowsAvatar, RowsMeta, RowsTitle } from "../ui/Rows.tsx";
-import {
-  modelMeta,
-  priceLine,
-  serversLine,
-  skillsLine,
-  thinkingLine,
-  windowLine,
-} from "./meta.ts";
+import { Fit } from "../ui/Fit.tsx";
+import { RowsAvatar, RowsTag, RowsTitle } from "../ui/Rows.tsx";
+import { shortModel } from "./meta.ts";
+import "./agent-row.css";
 
 export function AgentRow({
   agent,
-  providerName,
-  lit,
 }: {
-  agent: AgentSummary;
-  providerName?: string;
-  // the avatar in the foreground, for the row that is open
-  lit?: boolean;
+  agent: { name: string; avatar: Avatar; model: string; default: boolean };
 }) {
-  const meta = [
-    agent.default ? "default" : "",
-    providerName ?? "",
-    modelMeta(agent.model),
-    agent.upstream === null ? "" : `via ${agent.upstream}`,
-    thinkingLine(agent),
-    skillsLine(agent),
-    serversLine(agent),
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
-  // a phone shows the default word, the window and the price; the rest
-  // is in the open row
-  const short = [
-    agent.default ? "default" : "",
-    windowLine(agent.model.contextLength),
-    priceLine(agent.model.promptPrice, agent.model.completionPrice),
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
   return (
     <>
-      <RowsAvatar lit={lit}>
+      <RowsAvatar>
         <AvatarIcon name={agent.avatar} size={15} />
       </RowsAvatar>
-      <RowsTitle name={agent.name} sub={agent.model.id} mono />
-      <RowsMeta short={short}>{meta}</RowsMeta>
+      <RowsTitle
+        mono
+        name={
+          <>
+            <span class="cut">@{agent.name}</span>
+            {agent.default && <RowsTag>default</RowsTag>}
+          </>
+        }
+        sub={
+          <Fit
+            class="agent-row-model cut"
+            long={agent.model}
+            short={shortModel(agent.model)}
+          />
+        }
+      />
     </>
   );
 }

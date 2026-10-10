@@ -1,10 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words on an agent row: the model's window and prices and the
-// agent's thinking level, shared by the admin page and the row.
+// The words on an agent and its model: the window, the prices and the
+// model's short name.
 
-import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Wire } from "../../shared/words.ts";
 
@@ -44,32 +43,6 @@ export function modelMeta(m: CatalogMatch, wire: Wire | null = null): string {
   ]
     .filter((s) => s !== "")
     .join(" · ");
-}
-
-// "thinking off", "effort high": only what is off the default
-export function thinkingLine(
-  agent: Pick<AgentSummary, "thinking" | "effort">,
-): string {
-  return [
-    agent.thinking === null ? "" : `thinking ${agent.thinking}`,
-    agent.effort === null || agent.thinking === "off"
-      ? ""
-      : `effort ${agent.effort}`,
-  ]
-    .filter((s) => s !== "")
-    .join(" · ");
-}
-
-// "2 MCPs": what the row says of the agent's MCP servers, empty for none
-export function serversLine(agent: Pick<AgentSummary, "servers">): string {
-  const n = agent.servers.length;
-  return n === 0 ? "" : `${n} MCP${n === 1 ? "" : "s"}`;
-}
-
-// "2 skills": what the row says of the agent's skills, empty for none
-export function skillsLine(agent: Pick<AgentSummary, "skills">): string {
-  const n = agent.skills.length;
-  return n === 0 ? "" : `${n} skill${n === 1 ? "" : "s"}`;
 }
 
 // the model's own name, the org before the slash gone: what a narrow

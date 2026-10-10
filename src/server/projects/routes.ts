@@ -88,6 +88,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       const user = deps.users.byId(id);
       if (user !== null) members.push(userSummary(user));
     }
+    // the Directory's order, the users table's byte order on username
+    members.sort((a, b) =>
+      a.username < b.username ? -1 : a.username > b.username ? 1 : 0,
+    );
     return {
       ...summary(project, members.length),
       description: project.description,
