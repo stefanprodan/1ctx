@@ -48,6 +48,7 @@ import {
   scheduleTitle,
   scheduleWords,
   staleEdit,
+  staleWords,
   suspendedText,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
@@ -375,6 +376,18 @@ describe("the row's words", () => {
     expect(staleEdit({ error: "name is taken", status: 409 })).toBe(false);
     expect(staleEdit({ error: STALE_EDIT })).toBe(false);
     expect(staleEdit(null)).toBe(false);
+  });
+
+  test("a stale save keeps its words until Reload lands", () => {
+    const refusal = { error: STALE_EDIT, status: 409 };
+    // the notice says it, so the start does not
+    expect(staleWords(true, refusal)).toBeNull();
+    // an edit or Reload's own call cleared the notice
+    expect(staleWords(true, null)).toBe("Changed since you opened it.");
+    expect(staleWords(true, { error: "Name is empty" })).toBe(
+      "Changed since you opened it.",
+    );
+    expect(staleWords(false, null)).toBeNull();
   });
 
   test("the page finds its row and project, or says it was deleted", () => {

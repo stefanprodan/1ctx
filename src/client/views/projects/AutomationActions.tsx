@@ -3,8 +3,8 @@
 //
 // The automation page's buttons over its runs. Anyone in the project
 // runs, suspends, resumes, edits and deletes, and Delete asks once, in
-// place. Run now and Resume
-// wait while its agent is deleted, until an edit picks another.
+// place. Run now and Resume wait while its agent is deleted, until an
+// edit picks another.
 
 import { useSignal } from "@preact/signals";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";

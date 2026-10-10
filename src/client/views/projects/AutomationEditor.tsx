@@ -62,6 +62,7 @@ import {
   requestOf,
   retiredPick,
   staleEdit,
+  staleWords,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
@@ -86,6 +87,8 @@ function Editor({
   // the edit revision the draft started from: the row on the page moves
   // with every frame, so a save never sends that one
   const opened = useSignal(automation?.editRevision ?? 0);
+  // set by a stale save, cleared only by a Reload that lands
+  const stale = useSignal(false);
   const asking = useSignal(false);
   const deadlineTouched = useSignal(false);
   const form = useRef<HTMLFormElement>(null);
@@ -145,6 +148,7 @@ function Editor({
       const saved = await reloadAutomation(id);
       draft.value = draftOf(saved, saved.agentId, saved.tz, limitRef.current);
       opened.value = saved.editRevision;
+      stale.value = false;
       deadlineTouched.value = false;
     });
   };
@@ -158,7 +162,12 @@ function Editor({
   };
   const busy = save.busy;
   const off = busy;
-  const stale = staleEdit(save.notice());
+  const notice = save.notice();
+  const isStale = stale.value || staleEdit(notice);
+  // latched after the render, never written during it
+  useEffect(() => {
+    if (staleEdit(save.notice())) stale.value = true;
+  }, [save.status.value]);
   const note = ownerNote(automation, me.value?.id ?? null);
   const d = draft.value;
   const takesTools =
@@ -349,7 +358,10 @@ function Editor({
           save={save}
           dirty={dirtyOf(d, automation, limitMs) && gone === null}
           label={automation === null ? "Create scheduled task" : "Save"}
-          above={note !== null && <p class="automations-owner-note">{note}</p>}
+          above={
+            note !== null &&
+            !asking.value && <p class="automations-owner-note">{note}</p>
+          }
           start={
             automation === null ? (
               <span />
@@ -357,7 +369,8 @@ function Editor({
               <EditorStart
                 save={save}
                 asking={asking}
-                stale={stale}
+                stale={isStale}
+                words={staleWords(isStale, notice)}
                 onReload={() => void reload()}
                 onRemove={(runs) => void remove(runs)}
               />

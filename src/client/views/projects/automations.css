@@ -179,6 +179,10 @@
   }
   /* what a save does to a task someone else owns, a line of its own
      over the buttons */
+  /* a stale save's words beside Reload, once the notice is gone */
+  .automations-stale {
+    font-size: var(--text-ui);
+  }
   .automations-owner-note {
     flex-basis: 100%;
     margin: 0;

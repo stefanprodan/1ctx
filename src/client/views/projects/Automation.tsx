@@ -6,10 +6,10 @@
 // them, cut to a few lines. An automation whose agent was deleted names
 // it with a tag and says it is paused until an edit picks another.
 // Suspend or Resume, Run now, Edit and Delete, which anyone in the
-// project presses, sit over two tabs. Runs is a log
-// of RunRow.tsx rows, a page at a time, filtered to the manual or the
-// flagged runs. An open alert sits over the brief with
-// Dismiss. Memory is the automation's own note.
+// project presses, sit over two tabs. Runs is a log of RunRow.tsx rows,
+// a page at a time, filtered to the manual or the flagged runs. An open
+// alert sits over the brief with Dismiss. Memory is the automation's
+// own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 

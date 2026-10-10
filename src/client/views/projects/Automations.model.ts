@@ -3,10 +3,10 @@
 //
 // What the automation pages say and check without a DOM: a schedule
 // in words for the shapes people write most, the list row's state, what
-// a save does to the owner, and the editor's fields to a request; a
-// run's words are in Run.model.ts. The server parses the schedule and the zone; the
-// words here only read them, and the expression itself stands in for
-// any shape they do not know.
+// a save does to the owner, a stale save, and the editor's fields to a
+// request; a run's words are in Run.model.ts. The server parses the
+// schedule and the zone; the words here only read them, and the
+// expression itself stands in for any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import {
@@ -28,7 +28,13 @@ import {
   type AttentionMode,
   DEFERRED_BY_RESTART,
 } from "../../../shared/words.ts";
-import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
+import {
+  ago,
+  elapsed,
+  type Failure,
+  sentence,
+  until,
+} from "../../lib/format.ts";
 import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
 import {
   daysOf,
@@ -215,6 +221,17 @@ export function ownerNote(
 export const staleEdit = (
   problem: { error: string; status?: number } | null,
 ): boolean => problem?.status === 409 && problem.error === STALE_EDIT;
+
+// The words beside Reload. A stale save stays stale until Reload lands,
+// whatever the form shows since: an edit clears the foot's notice, and
+// Reload's own call clears it while it runs. Null while not stale, or
+// while the notice still says it.
+export function staleWords(
+  stale: boolean,
+  notice: { error: string; status?: number } | null,
+): string | null {
+  return stale && !staleEdit(notice) ? sentence(STALE_EDIT) : null;
+}
 
 // The automation page and its editor: the row, the project it was found
 // in, and the failure, a deleted row once the list is in without it.
