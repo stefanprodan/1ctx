@@ -37,6 +37,7 @@ import {
   serversItem,
   skillsItem,
   switchItem,
+  tasksItem,
   webPaneItem,
 } from "./Add.model.ts";
 
@@ -89,7 +90,7 @@ export function useSwitches({
     knowledge: item(KNOWLEDGE),
     memory: item(MEMORY),
     email: emailItem(input(EMAIL)),
-    tasks: item(AUTOMATIONS),
+    tasks: tasksItem(input(AUTOMATIONS)),
     servers: serversItem({
       tools: readable,
       servers: (agent === null ? undefined : servers.value[agent]) ?? [],

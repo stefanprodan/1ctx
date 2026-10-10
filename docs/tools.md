@@ -60,6 +60,9 @@ words.
   `compactsAt()`; tails past it still go to the answer round with
   `context_limit`, since the reserve above holds them, and never fail
   the send.
+- **The per-call cut keeps the tail too.** The registry cuts a body
+  to `resultCut` before its `tail`, ending it with `resultCutLine()`
+  when the line fits.
 - **A round's calls run in parallel.** Each runs under the call
   timeout plus its tool's `graceMs` and the send's signal. Each call's
   end is one transaction, one revision, one envelope.
@@ -166,7 +169,8 @@ words.
   Its main rounds, a summoned agent's and a chat's subagents are
   offered it; a run, a run's subagents (the scope's `origin`), the
   memory phase and the attention step never are, and a call whose
-  actor is not a chat is refused. The row starts on.
+  actor is not a chat is refused. The row starts on; its switch is a
+  card on the Config board (`AutomationTool.tsx`), saved on Save.
 - **It grows by actions, never by tools.** `action` is an enum, and
   dispatch takes only its own list; each action names the fields it
   takes and refuses the rest. `list` is one line per task, never the
@@ -183,7 +187,7 @@ words.
   the answer are fenced past any backticks they hold and labelled as
   the task's. The instructions and the answer are cut at `FIELD_BYTES`
   of UTF-8 at a character boundary, reasons and errors at
-  `SHORT_BYTES`. A cut field is read on with `part`, an `offset` in
+  `SHORT_BYTES`, a list line's reason at `LIST_REASON_BYTES`. A cut field is read on with `part`, an `offset` in
   characters and the `ref` its note gives: the edit revision or the
   run's id. A ref that no longer holds starts again at 0.
 - **The notes and links are the result's `tail`,** so a cut keeps them.

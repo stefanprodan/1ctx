@@ -775,6 +775,13 @@ describe("the form", () => {
     ]);
   });
 
+  test("the saved set drops the chat's own keys a task cannot switch", () => {
+    const row = automation({
+      disabledCapabilities: ["automations", "memory", "web"],
+    });
+    expect(disabledOf(draftOf(row, "a1", "UTC", 600_000))).toEqual(["web"]);
+  });
+
   test("the saved set keeps email off with the built-ins", () => {
     const draft = {
       web: true,

@@ -14,7 +14,14 @@ import {
   settleRun,
   startRun,
 } from "../../helpers/automations.ts";
-import { type ChatApp, chatApp, type Script } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  FLASH,
+  type Script,
+  tick,
+  waitScript,
+} from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { allowSubagents, system, toolNames } from "../../helpers/subagents.ts";
 import { settle } from "../../helpers/tool-loop.ts";
@@ -35,11 +42,15 @@ const childNames = (chat: ChatApp, sessionId: string) =>
     .get(sessionId)!
     .policy.childOffered!.tools.map((tool) => tool.name);
 
-async function start(chat: ChatApp, disable: string[] = []) {
+async function start(
+  chat: ChatApp,
+  disable: string[] = [],
+  projectId = chat.projectId,
+) {
   const pending = chat.scripted.next();
   const res = await chat.member.call("POST", "/api/sessions", {
     body: {
-      projectId: chat.projectId,
+      projectId,
       agentId: chat.agentId,
       message: "how did the nightly check go",
       ...(disable.length === 0 ? {} : { capabilities: { disable } }),
@@ -125,6 +136,32 @@ describe("the offer", () => {
       expect(childNames(chat, run.sessionId)).toContain("bash");
       run.main.reply("done");
       await settleRun(chat, run.sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a summoned agent's turn holds it", async () => {
+    const chat = await app();
+    try {
+      await chat.makeAgent({ name: "checker", model: FLASH });
+      const { script, sessionId } = await start(chat);
+      await finish(chat, script);
+      for (let i = 0; i < 400; i++) {
+        if (chat.app.runner.registry.get(sessionId) === null) break;
+        await tick();
+      }
+      const count = chat.scripted.scripts.length;
+      const posted = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/messages`,
+        { body: { message: "@checker which tasks watch the cluster" } },
+      );
+      expect(posted.status).toBe(201);
+      const summoned = await waitScript(chat.scripted, count + 1);
+      expect(system(summoned)).toStartWith("You are checker,");
+      expect(toolNames(summoned)).toContain("automation");
+      await finish(chat, summoned);
     } finally {
       await chat.app.shutdown();
     }
@@ -284,6 +321,67 @@ describe("a chat reading its project's tasks", () => {
       expect(gone.answers[0]).toContain("Last run: no run kept");
       expect(gone.answers[0]).not.toContain("/run/");
       await finish(chat, gone.next);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});
+
+describe("the switches a task shows", () => {
+  test("name only its own project's credentials and its agent's servers", async () => {
+    const chat = await chatApp({
+      secrets: {
+        "http-grafana": "grafana-key-0123",
+        "http-billing": "billing-key-0123",
+      },
+    });
+    chat.app.automationScheduler.stop();
+    try {
+      const mine = await createTeam(chat.admin, "platform", [chat.memberId]);
+      const other = await createTeam(chat.admin, "finops", []);
+      const credential = async (name: string, projectId: string) => {
+        const res = await chat.admin.call("POST", "/api/credentials", {
+          body: {
+            name,
+            keyName: `http-${name}`,
+            prefix: `https://${name}.example.test/`,
+            header: "X-Api-Key",
+            template: "{key}",
+            methods: ["GET"],
+            projectIds: [projectId],
+          },
+        });
+        expect(res.status).toBe(201);
+        return (await res.json()).credential.id as string;
+      };
+      const grafana = await credential("grafana", mine.id);
+      const billing = await credential("billing", other.id);
+      const created = await chat.member.call(
+        "POST",
+        `/api/projects/${mine.id}/automations`,
+        {
+          body: automationBody(chat, {
+            name: "nightly-check",
+            disabledCapabilities: [
+              `credential:${billing}`,
+              `credential:${grafana}`,
+              // a server the agent has never had
+              "mcp:gone00000000",
+            ],
+          }),
+        },
+      );
+      expect(created.status).toBe(201);
+      const automation = (await created.json()).automation as { id: string };
+      const { script } = await start(chat, [], mine.id);
+      const shown = await round(chat, script, [
+        { action: "show", id: automation.id },
+      ]);
+      expect(shown.answers[0]).toContain(
+        "Turned off for its runs: credential grafana, 2 items no longer available",
+      );
+      expect(shown.answers[0]).not.toContain("billing");
+      await finish(chat, shown.next);
     } finally {
       await chat.app.shutdown();
     }

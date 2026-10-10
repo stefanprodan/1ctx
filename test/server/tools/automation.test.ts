@@ -289,6 +289,26 @@ describe("list", () => {
     expect(await ok(port([due]), { action: "list" })).toContain(
       "next fire 2026-10-10 11:59",
     );
+    // the page's own edge: due by the grace exactly is waiting
+    const edge = task({ nextAt: NOW - 10_000 });
+    expect(await ok(port([edge]), { action: "list" })).toContain(
+      "waiting for a run slot since 2026-10-10 11:59",
+    );
+  });
+
+  test("a line cuts the event's reason shorter than show does", async () => {
+    const reason = "the agent was deleted and nobody picked another ".repeat(8);
+    const given = port([
+      task({ lastEventOutcome: "skipped", lastEventReason: reason }),
+    ]);
+    const line = (await ok(given, { action: "list" })).split("\n")[1]!;
+    const listed = /last event skipped: "([^"]*)"/.exec(line)![1]!;
+    expect(listed.endsWith("…")).toBe(true);
+    expect(bytes(listed)).toBeLessThanOrEqual(100);
+    const shown = await ok(given, { action: "show", id: ID });
+    const full = /Last event: [^"]*"([^"]*)"/.exec(shown)![1]!;
+    expect(bytes(full)).toBeGreaterThan(200);
+    expect(bytes(full)).toBeLessThanOrEqual(300);
   });
 });
 
@@ -427,7 +447,7 @@ describe("show", () => {
           answer: null,
         },
         {},
-        'Last run: failed past its deadline: "the run hit its deadline"',
+        'Last run: stopped past its deadline: "the run hit its deadline"',
       ],
       [
         { status: "stopped", cause: "shutdown", error: null, answer: null },
@@ -504,6 +524,16 @@ describe("show", () => {
       { action: "show", id: ID },
     );
     expect(webOff).toContain("Turned off for its runs: web access");
+    // a chat's own keys mean nothing for a run and are not named
+    const chatOnly = await ok(
+      port(
+        [task({ disabledCapabilities: ["automations", "memory", "web"] })],
+        null,
+        names,
+      ),
+      { action: "show", id: ID },
+    );
+    expect(chatOnly).toContain("Turned off for its runs: web access\n");
     const one = await ok(
       port([task({ disabledCapabilities: ["skill:gone1"] })], null, names),
       { action: "show", id: ID },

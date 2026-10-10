@@ -22,6 +22,7 @@ import type {
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
 import {
+  AUTOMATIONS,
   credentialKey,
   EMAIL,
   mcpKey,
@@ -74,6 +75,11 @@ export function offeredItem(
 
 export const emailItem = (input: Parameters<typeof switchItem>[1]) =>
   offeredItem(EMAIL, input);
+
+// Scheduled tasks, the automation tool's: locked with the admin's row
+// off, as Visuals is
+export const tasksItem = (input: Parameters<typeof switchItem>[1]) =>
+  switchItem(AUTOMATIONS, input);
 
 // whether another agent was picked. The list going away for a moment,
 // a project loading or a failed refresh, is no pick: the flips of the

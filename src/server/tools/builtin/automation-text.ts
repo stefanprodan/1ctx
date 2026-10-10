@@ -31,6 +31,8 @@ import { localMinute } from "../../lib/clock.ts";
 export const FIELD_BYTES = 4000;
 // an event's reason, an alert's reason, a run's error
 export const SHORT_BYTES = 300;
+// an event's reason on a line of list, so 20 lines stay short
+export const LIST_REASON_BYTES = 100;
 
 export type Named = { id: string; name: string };
 
@@ -133,14 +135,15 @@ export function firesText(
   now: number,
 ): string {
   if (a.suspendedAt !== null || a.nextAt === null) return "no next fire";
-  if (a.nextAt + WAIT_GRACE_MS < now) {
+  // the page's test (waitingSince()), so both say waiting alike
+  if (a.nextAt <= now - WAIT_GRACE_MS) {
     return `waiting for a run slot since ${at(a)(a.nextAt)}`;
   }
   return `next fire ${at(a)(a.nextAt)}`;
 }
 
-const reasonText = (a: AutomationSummary) =>
-  a.lastEventReason === null ? "" : `: "${short(a.lastEventReason)}"`;
+const reasonText = (a: AutomationSummary, bytes = SHORT_BYTES) =>
+  a.lastEventReason === null ? "" : `: "${short(a.lastEventReason, bytes)}"`;
 
 // show's: when, when it was due, its outcome and reason
 function lastEventText(a: AutomationSummary): string {
@@ -161,7 +164,7 @@ export function listLine(a: AutomationSummary, now: number): string {
     a.suspendedAt === null ? "active" : "suspended",
     firesText(a, now),
     // list's: the outcome and reason alone
-    `last event ${a.lastEventOutcome ?? "none"}${reasonText(a)}`,
+    `last event ${a.lastEventOutcome ?? "none"}${reasonText(a, LIST_REASON_BYTES)}`,
     `last run ${a.lastRunStatus ?? "none"}`,
     a.alert === null ? "no open alert" : "alert open",
   ];
@@ -173,9 +176,10 @@ const KIND_WORDS: Record<string, string> = {
   [VISUALIZE]: "visuals",
   [KNOWLEDGE]: "project docs",
   [EMAIL]: "email to users",
-  [MEMORY]: "saving to project memory",
-  [AUTOMATIONS]: "reading scheduled tasks",
 };
+
+// a chat's alone: they mean nothing for a run, so show names neither
+const CHAT_ONLY: ReadonlySet<string> = new Set([MEMORY, AUTOMATIONS]);
 
 // the names of what a task's runs go without, read only from what its
 // agent and project hold, as the page names them; with the web off a
@@ -194,7 +198,8 @@ export function switchedOff(
   const out: string[] = [];
   let gone = 0;
   for (const key of keys) {
-    const kind = KIND_WORDS[key];
+    if (CHAT_ONLY.has(key)) continue;
+    const kind = Object.hasOwn(KIND_WORDS, key) ? KIND_WORDS[key] : undefined;
     if (kind !== undefined) {
       out.push(kind);
       continue;
@@ -269,7 +274,7 @@ function runText(
     case "failure":
       return { line: `failed${error}`, answer: null };
     case "deadline":
-      return { line: `failed past its deadline${error}`, answer: null };
+      return { line: `stopped past its deadline${error}`, answer: null };
     case "shutdown":
     case "restart":
       return { line: "cut by a restart", answer: null };
