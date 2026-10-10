@@ -69,6 +69,7 @@ const EXPECTED_IDS = [
   "0055-automation-edit-revision",
   "0056-automation-once",
   "0057-automation-tool",
+  "0058-automation-drafts",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns

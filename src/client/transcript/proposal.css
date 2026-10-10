@@ -1,0 +1,165 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  .proposal {
+    width: 100%;
+    max-width: 680px;
+    min-width: 0;
+    margin-block: var(--space-2);
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  /* one line, like a call in the fold */
+  .proposal-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-height: 28px;
+  }
+  /* the chevron and icon lead; the words wrap under the first word */
+  .proposal-line {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: flex-start;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .proposal-lead {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    height: 1lh;
+  }
+  .proposal-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+  }
+  .proposal-toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--faint);
+    cursor: pointer;
+  }
+  .proposal-toggle:hover {
+    color: var(--fg);
+  }
+  .proposal-chevron {
+    transition: transform 0.15s;
+  }
+  .proposal-chevron-open {
+    transform: rotate(90deg);
+  }
+  .proposal-icon,
+  .proposal-kind {
+    flex-shrink: 0;
+  }
+  /* a long name wraps, so a phone never scrolls sideways */
+  .proposal-name {
+    min-width: 0;
+    font-family: var(--mono);
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+  .proposal-detail,
+  .proposal-state {
+    min-width: 0;
+    color: var(--faint);
+  }
+  .proposal-user {
+    color: var(--dim);
+  }
+  .proposal-buttons {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+  .proposal-confirm {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+  .proposal-confirm:hover {
+    border-color: var(--brand-hover);
+    background: var(--brand-hover);
+    color: var(--on-brand);
+  }
+  /* a refusal that leaves it waiting, until the next press */
+  .proposal-failed {
+    margin: var(--space-1) 0 0;
+    margin-inline-start: 24px;
+    color: var(--failed);
+  }
+  /* under the line, lined up with its icon */
+  .proposal-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-block-start: var(--space-2);
+    margin-inline-start: 24px;
+  }
+  .proposal-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .proposal-label {
+    min-width: 80px;
+    color: var(--faint);
+  }
+  .proposal-value {
+    color: var(--fg);
+  }
+  .proposal-was {
+    color: var(--faint);
+    text-decoration: line-through;
+  }
+  /* the whole text, scrolling inside the box once long */
+  .proposal-text {
+    max-height: 18lh;
+    overflow-y: auto;
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+  }
+  .proposal-body {
+    margin: 0;
+    font-size: var(--text-input);
+    line-height: 1.6;
+    color: var(--fg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .proposal-diff {
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-cell);
+  }
+  .proposal-added {
+    background: var(--done-wash);
+  }
+  .proposal-removed {
+    background: var(--failed-wash);
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+  .proposal-mark {
+    padding: 0 3px;
+    border: 1px solid var(--failed-line);
+    border-radius: var(--radius-cell);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--failed);
+  }
+}

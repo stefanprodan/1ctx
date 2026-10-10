@@ -13,6 +13,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    // the answer's JSON, for a refusal that says more than its words
+    readonly body: unknown = null,
   ) {
     super(message);
   }
@@ -47,7 +49,7 @@ function responseFailure(status: number, body: unknown): ApiError {
     body.error.trim() !== ""
       ? body.error
       : statusWords(status);
-  return new ApiError(status, words);
+  return new ApiError(status, words, body);
 }
 
 export async function api<T>(

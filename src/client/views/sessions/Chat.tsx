@@ -234,6 +234,11 @@ function SessionPage({
                       forkSession(shown.session.id, messageId, agentId),
                   }
             }
+            proposals={
+              run
+                ? undefined
+                : { drafts: shown.automationDrafts, session: shown.session }
+            }
             queue={
               shown.queued.length === 0
                 ? undefined

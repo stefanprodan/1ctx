@@ -6,6 +6,7 @@
 // a save that changes a field makes its editor the owner.
 
 import type { AutomationSummary } from "../contracts/automation.ts";
+import type { DraftState } from "../contracts/automation-draft.ts";
 import type { AttentionMode, SessionStatus } from "../words.ts";
 import type { FeedRow } from "./sessions.ts";
 
@@ -22,6 +23,10 @@ export type AutomationsResponse = {
 // POST /api/projects/:id/automations (201), GET, PATCH and
 // POST /api/automations/:id/suspend|resume answer the row
 export type AutomationResponse = { automation: AutomationSummary };
+
+// POST /api/automation-drafts/:id/confirm|dismiss: 200 with the state it
+// took, else 409 with why; a 409 still pending can be pressed again
+export type DraftDecisionResponse = { state: DraftState; error?: string };
 
 // POST /api/projects/:id/automations: guidance defaults to empty and
 // the attention mode to agent; PATCH

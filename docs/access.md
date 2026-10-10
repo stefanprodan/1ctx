@@ -172,6 +172,9 @@ from `emailOn` in `GET /api/me`.
   transaction.**
 - **Anyone who may open a chat may archive it.** Rename and delete are
   in `docs/sessions.md`.
+- **Task draft Confirm and Dismiss use the chat's same visibility rule.**
+  Missing drafts and drafts in hidden chats answer the same "no such chat"
+  404 as opening that chat, an admin in another personal project included.
 
 ## Secrets
 
@@ -203,7 +206,16 @@ connections watching that session.
   is built and encoded once, on the first connection in its audience,
   so an unseen event costs nothing. A `session` frame's `row` holds only
   fields that read the same for every viewer. `queue` and `child` go
-  only to the chat's watchers, `notSent` only to its author.
+  only to the chat's watchers, as does `draft`; `notSent` only to its author.
+- **`draft` carries the whole committed `AutomationDraft`,** including a
+  new pending proposal, read by the same query as session detail:
+  `{ type: "draft", sessionId, draft }`. Regenerate removes it with
+  `{ type: "draft", sessionId, draftId, removed: true }`. It has no revision;
+  decisions are final and a reconnect reads the chat's drafts again. The
+  `watched` answer carries them too, so none falls between read and watch.
+  `isDraftFrame()` guards both shapes and the nested draft. The
+  `watched` guard only checks its `drafts` is a list; the client skips a
+  draft `isAutomationDraft()` refuses, so one never stalls the answer.
 - **Stream frames go to the session's watchers.** `watch` is authorized
   through the sessions port, and the watcher is registered before the
   `watched` snapshot, so no frame falls between.

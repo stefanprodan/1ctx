@@ -8,6 +8,7 @@ import { DAY_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import { ROOT } from "./children.ts";
+import type { DraftsPort } from "./drafts.ts";
 import { envelope } from "./envelope.ts";
 import { PACKABLE } from "./pack.ts";
 import type { SessionRow } from "./rows.ts";
@@ -27,6 +28,7 @@ export type SweepDeps = {
   store: SessionStore;
   scratch: SweepScratch;
   log: Log;
+  drafts?: Pick<DraftsPort, "expired" | "expire">;
 };
 
 // the fields of the sweep event, snake case like the startup event's
@@ -37,6 +39,7 @@ export type ChatSweep = {
   runs_packed: number;
   chats_deleted: number;
   runs_deleted: number;
+  drafts_expired: number;
 };
 
 // the roots that ended and still hold a result worth packing, theirs
@@ -85,6 +88,11 @@ function steps(deps: SweepDeps): Step[] {
     return deleted === null || deleted === "running" ? null : [deleted];
   };
   return [
+    {
+      field: "drafts_expired",
+      candidates: (now, _caps, limit) => deps.drafts?.expired(now, limit) ?? [],
+      apply: (id, now) => (deps.drafts?.expire(id, now) ? [] : null),
+    },
     {
       field: "chats_archived",
       // over sessions_idle, whose predicate the where repeats
@@ -227,6 +235,7 @@ export function sweepChats(
     runs_packed: 0,
     chats_deleted: 0,
     runs_deleted: 0,
+    drafts_expired: 0,
   };
   for (const step of steps(deps)) {
     // a failed query skips its step, never the rest or the startup

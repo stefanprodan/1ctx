@@ -47,6 +47,7 @@ export type Scheduler = {
   pass(): Promise<void>;
   fire(id: string): Promise<SessionDetail | null>;
   runNow(row: AutomationSummary, user: UserRow): SessionDetail;
+  prepareNow(row: AutomationSummary, user: UserRow): PreparedRun;
   sweep(): number;
   reconcile(): number;
   dispose(): void;
@@ -208,7 +209,18 @@ export function scheduler(deps: Deps): Scheduler {
                 : recordedRun;
           recorded.value = { msg: "fire", user: resolved.user.username };
           return {
-            result: { detail: prepared.detail, launch: prepared.launch },
+            result: {
+              detail: prepared.detail,
+              launch() {
+                deps.log.info("fire", {
+                  automation: id,
+                  source,
+                  user: resolved.user.username,
+                });
+                prepared.launch();
+              },
+              abandon: prepared.abandon,
+            },
             events: [automationChanged(updated)],
           };
         } catch (err) {
@@ -237,13 +249,7 @@ export function scheduler(deps: Deps): Scheduler {
           return { result: null, events: [automationChanged(updated)] };
         }
       });
-      if (recorded.value?.msg === "fire") {
-        deps.log.info("fire", {
-          automation: id,
-          source,
-          user: recorded.value.user,
-        });
-      } else if (recorded.value?.msg === "skip") {
+      if (recorded.value?.msg === "skip") {
         deps.log.info("skip", {
           automation: id,
           reason: recorded.value.reason,
@@ -430,6 +436,14 @@ export function scheduler(deps: Deps): Scheduler {
     }
   };
 
+  const prepareNow = (row: AutomationSummary, user: UserRow): PreparedRun => {
+    const result = attempt(row.id, "manual", user);
+    if (result === null || "wait" in result) {
+      throw new Conflict("no such automation");
+    }
+    return result;
+  };
+
   return {
     start() {
       if (running) return 0;
@@ -456,13 +470,11 @@ export function scheduler(deps: Deps): Scheduler {
     pass,
     fire,
     runNow(row, user) {
-      const result = attempt(row.id, "manual", user);
-      if (result === null || "wait" in result) {
-        throw new Conflict("no such automation");
-      }
+      const result = prepareNow(row, user);
       result.launch();
       return result.detail;
     },
+    prepareNow,
     sweep,
     reconcile,
     dispose() {
@@ -472,4 +484,4 @@ export function scheduler(deps: Deps): Scheduler {
   };
 }
 
-type Started = { detail: SessionDetail; launch: () => void } | Waiting;
+type Started = PreparedRun | Waiting;

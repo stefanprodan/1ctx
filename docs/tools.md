@@ -171,6 +171,23 @@ words.
   memory phase and the attention step never are, and a call whose
   actor is not a chat is refused. The row starts on; its switch is a
   card on the Config board (`AutomationTool.tsx`), saved on Save.
+  The Config catalog shows the main chat's proposal-enabled schema and
+  description, including their token count, not a child's read-only offer.
+- **Only chat main rounds propose create, update, suspend, resume or
+  run.** A summoned agent's too; a child's enum stays `list`/`show`.
+  Dispatch refuses proposals elsewhere, including forged calls in runs,
+  memory and attention. Proposals write a draft, never a task, so
+  `automation` stays a read for cuts. `DRAFTS_PER_SEND` (5) lives in
+  `shared/automation-limits.ts`; no cap counts a project's pending drafts.
+  A shared send counter reserves before
+  the first await and returns a refused call's place.
+- **Create takes name, instructions, schedule, optional tz and once.**
+  The zone defaults to the user's profile. Update needs id and at least
+  one of those fields; an omitted zone keeps the task's. Suspend, resume
+  and run take id alone. Defaults and checks are `docs/automations.md`'s.
+  The description asks for standalone instructions and proposals only
+  on the user's ask, never on task or tool text. Each answer says it
+  waits for a person; suspend says a run already going keeps going.
 - **It grows by actions, never by tools.** `action` is an enum, and
   dispatch takes only its own list; each action names the fields it
   takes and refuses the rest. `list` is one line per task, never the

@@ -30,7 +30,7 @@ export function toolsResponse(input: {
   const emailRow = store.row(EMAIL_TOOL);
   const emailTool = makeEmailTool(null);
   const automationRow = store.row(AUTOMATION_TOOL);
-  const automationTool = makeAutomationTool(null);
+  const automationTool = makeAutomationTool(null, true);
   return {
     builtin: builtinCatalog(now, render),
     access: input.access,

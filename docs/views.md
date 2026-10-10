@@ -63,6 +63,26 @@ Flagged.
   from the parent's watch and read from the child route when opened
   later; its rules are in `docs/subagents.md`.
 
+- **A task proposal is one line under its turn's fold**
+  (`transcript/Proposal.tsx`), drawn where visuals are. A call's draft
+  is the one whose `messageId` is the call's tool row. A fork copies
+  rows under new ids and no drafts, so a copied done row of a proposing
+  call, older than the fork, is an inert line; a refused call draws
+  none. `data/session-drafts.ts` upserts the `draft` frame and a
+  press's answer into the detail's drafts; a decided draft never goes
+  back to pending, and a detail read before a frame keeps the frame's
+  draft while its tool row is there. Only a 200 names the presser as
+  decider. A 409 that leaves it pending shows its words under the
+  line. A task's name and an update's old values come from
+  `GET /api/automations/:id`, read once per id: a 404 or 403, or an
+  `automationDeleted` frame, makes it a deleted task; another failure
+  draws the line naming "the task", with no details to open, and a
+  timer asks again after `TASK_RETRY_MS`. Above `DIFF_CELLS` the
+  changed middle of the instructions is drawn as all removed, then all
+  added. A pending rename shows the task's name; the new one is in the
+  details. Tag characters are marked everywhere but in the England,
+  Scotland and Wales flags.
+
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin.
 - **A run's rounds after its answer are one fold.** `transcript/rows.ts`
@@ -237,6 +257,9 @@ Flagged.
   saves the text as a new revision.
 
 ## Automations
+
+- **Create defaults come from `shared/automation-defaults.ts`,** shared
+  with the chat's task proposals; `draftOf()` only maps them to fields.
 
 - **An open alert sits over the brief** (`OpenAttention.tsx`): the
   feed line's words, the latest reason and Dismiss. The Runs list's

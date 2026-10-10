@@ -12,17 +12,12 @@ import type {
   SaveMemoryRequest,
   UndoMemoryRequest,
 } from "../../shared/api/memory.ts";
-import {
-  type AutomationSummary,
-  STALE_EDIT,
-} from "../../shared/contracts/automation.ts";
 import { PREVIEW_FIRES } from "../../shared/words.ts";
-import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
-import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import { Conflict } from "../lib/errors.ts";
+import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Limits } from "../limits/index.ts";
 import {
   MAX_MEMORY_BODY,
@@ -30,9 +25,8 @@ import {
   parseSaveMemory,
   parseUndoMemory,
 } from "../memory/index.ts";
-import type { ProjectRow } from "../projects/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
-import type { UserRow } from "../users/index.ts";
+import type { AccessPort, AutomationActions } from "./actions.ts";
 import type { Alerts } from "./alerts.ts";
 import {
   MAX_AUTOMATION_BODY,
@@ -42,19 +36,9 @@ import {
   parseSaveAutomation,
   parseSchedulePreview,
 } from "./parse.ts";
-import { checkSchedule, nextFire, nextFires } from "./schedule.ts";
+import { nextFires } from "./schedule.ts";
 import type { Scheduler } from "./scheduler.ts";
-import {
-  type AutomationFields,
-  type AutomationStore,
-  automationChanged,
-  MAX_AUTOMATIONS_PER_PROJECT,
-  RETIRED,
-} from "./store.ts";
-
-export type AccessPort = {
-  project(principal: Principal, id: string): ProjectRow;
-};
+import type { AutomationStore } from "./store.ts";
 
 export type RoutesDeps = {
   db: Db;
@@ -62,8 +46,7 @@ export type RoutesDeps = {
   store: AutomationStore;
   scheduler: Scheduler;
   access: AccessPort;
-  agents: { byId(id: string): AgentRow | null };
-  users: { byId(id: string): UserRow | null };
+  actions: AutomationActions;
   limits: { current(): Limits };
   sessions: SessionStore;
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
@@ -73,34 +56,7 @@ export type RoutesDeps = {
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  const visible = (principal: Principal, id: string) => {
-    const row = deps.store.byId(id);
-    if (row === null) throw new NotFound("no such automation");
-    deps.access.project(principal, row.projectId);
-    return row;
-  };
-  // whether a patch changes any field of the row
-  const changes = (
-    current: AutomationSummary,
-    patch: Partial<AutomationSummary>,
-  ) =>
-    (Object.keys(patch) as (keyof AutomationSummary)[]).some((key) => {
-      const was = current[key];
-      const now = patch[key];
-      return Array.isArray(was) && Array.isArray(now)
-        ? was.join("\n") !== now.join("\n")
-        : was !== now;
-    });
-  const agent = (id: string): AgentRow => {
-    const row = deps.agents.byId(id);
-    if (row === null) throw new BadRequest("no such agent");
-    return row;
-  };
-  const deadline = (value: number | null) => {
-    if (value !== null && value > deps.limits.current().runDeadlineMs) {
-      throw new BadRequest("deadline is above the run limit");
-    }
-  };
+  const { visible } = deps.actions;
 
   return [
     {
@@ -140,28 +96,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body = parseSaveAutomation(
           await jsonBody(req, MAX_AUTOMATION_BODY),
         );
-        agent(body.agentId);
-        deadline(body.deadlineMs);
-        const now = deps.clock();
-        const nextAt = checkSchedule(body.schedule, body.tz, now);
-        const automation = transact(deps.db, () => {
-          deps.access.project(principal, project.id);
-          agent(body.agentId);
-          deadline(body.deadlineMs);
-          if (deps.store.count(project.id) >= MAX_AUTOMATIONS_PER_PROJECT) {
-            throw new Conflict("project has too many automations");
-          }
-          if (deps.store.nameTaken(project.id, body.name)) {
-            throw new Conflict("name is taken");
-          }
-          const fields: AutomationFields = {
-            ...body,
-            projectId: project.id,
-            ownerId: principal.userId,
-          };
-          const created = deps.store.create({ ...fields, nextAt, now });
-          return { result: created, events: [automationChanged(created)] };
-        });
+        const automation = deps.actions.create(principal, project.id, body);
         deps.scheduler.wake();
         const response: AutomationResponse = { automation };
         return json(response, 201);
@@ -236,46 +171,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         const found = visible(principal, ctx.params.id);
-        const { patch, editRevision } = parsePatchAutomation(
+        const request = parsePatchAutomation(
           await jsonBody(req, MAX_AUTOMATION_BODY),
         );
-        const automation = transact(deps.db, () => {
-          const current = visible(principal, found.id);
-          // a fire, a run's end or an alert moves revision, never this
-          if (current.editRevision !== editRevision) {
-            throw new Conflict(STALE_EDIT);
-          }
-          const next = { ...current, ...patch };
-          if (next.agentId === current.agentId && current.agentRetired) {
-            throw new Conflict(RETIRED);
-          }
-          agent(next.agentId);
-          deadline(next.deadlineMs);
-          if (deps.store.nameTaken(current.projectId, next.name, current.id)) {
-            throw new Conflict("name is taken");
-          }
-          const now = deps.clock();
-          checkSchedule(next.schedule, next.tz, now);
-          // a save that changes nothing keeps the owner and writes nothing
-          if (!changes(current, patch)) return { result: current };
-          // a new schedule or zone ends a wait; other fields leave it
-          const scheduleChanged =
-            next.schedule !== current.schedule || next.tz !== current.tz;
-          const nextAt =
-            current.suspendedAt !== null
-              ? null
-              : scheduleChanged
-                ? nextFire(next.schedule, next.tz, now)
-                : current.nextAt;
-          // the editor's words run from now on, so the runs act as them
-          const updated = deps.store.update(current.id, {
-            ...next,
-            ownerId: principal.userId,
-            nextAt,
-            now,
-          })!;
-          return { result: updated, events: [automationChanged(updated)] };
-        });
+        const automation = deps.actions.update(principal, found.id, request);
         deps.scheduler.wake();
         const body: AutomationResponse = { automation };
         return json(body);
@@ -286,18 +185,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/automations/:id/suspend",
       policy: "authenticated",
       handle(_req, ctx) {
-        const principal = ctx.principal!;
-        const found = visible(principal, ctx.params.id);
-        const automation = transact(deps.db, () => {
-          const current = visible(principal, found.id);
-          if (current.suspendedAt !== null) return { result: current };
-          const updated = deps.store.suspend(
-            current.id,
-            principal.userId,
-            deps.clock(),
-          )!;
-          return { result: updated, events: [automationChanged(updated)] };
-        });
+        const automation = deps.actions.suspend(ctx.principal!, ctx.params.id);
         deps.scheduler.wake();
         return json({ automation } satisfies AutomationResponse);
       },
@@ -307,20 +195,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/automations/:id/resume",
       policy: "authenticated",
       handle(_req, ctx) {
-        const principal = ctx.principal!;
-        const found = visible(principal, ctx.params.id);
-        const automation = transact(deps.db, () => {
-          const current = visible(principal, found.id);
-          if (current.suspendedAt === null) return { result: current };
-          if (current.agentRetired) throw new Conflict(RETIRED);
-          const now = deps.clock();
-          const updated = deps.store.resume(
-            current.id,
-            nextFire(current.schedule, current.tz, now),
-            now,
-          )!;
-          return { result: updated, events: [automationChanged(updated)] };
-        });
+        const automation = deps.actions.resume(ctx.principal!, ctx.params.id);
         deps.scheduler.wake();
         return json({ automation } satisfies AutomationResponse);
       },
@@ -347,11 +222,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/automations/:id/run",
       policy: "authenticated",
       handle(_req, ctx) {
-        const principal = ctx.principal!;
-        const row = visible(principal, ctx.params.id);
-        const user = deps.users.byId(principal.userId);
-        if (user === null) throw new BadRequest("the user is gone");
-        return json(deps.scheduler.runNow(row, user), 201);
+        const prepared = deps.actions.run(ctx.principal!, ctx.params.id);
+        prepared.launch();
+        return json(prepared.detail, 201);
       },
     },
     {

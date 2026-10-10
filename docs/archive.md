@@ -9,6 +9,14 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 
 - **An archived chat is read-only for good.** There is no unarchive;
   Fork is the way on. A run is never archived.
+- **Archiving expires pending task drafts in the same transaction.**
+  Packing changes no draft. Regenerate deletes pending drafts from the
+  sends it removes in its transaction, keeping decided records; fork
+  copies no drafts. A chat's deletion cascades to every draft.
+  Archive expiry, sweep expiry and regenerate removal return one
+  `draft.changed` per draft through nested `transact()`, so no watcher
+  hears a state or removal that rolled back. Expiry carries the whole
+  draft as session detail reads it; removal carries its id and `removed: true`.
 - **Where archive is refused.** A send and regenerate in `startSend`'s
   transaction, compact in `startCompact`'s, never in `startSummary`,
   so a send an agent delete stops ends as a stop. `runner.send`,
@@ -37,7 +45,10 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   context builder and the memory packet never meet a packed row.
 - **The sweep is an ordered list of steps** (`sessions/sweep.ts`), run
   hourly and at startup. Each step takes at most `CHATS_PER_STEP`
-  sessions, one transaction each that rechecks the row. Order: archive
+  sessions, one transaction each that rechecks the row. First expire
+  pending task drafts at their 24-hour expiry, over the partial expiry
+  index, at most `CHATS_PER_STEP` drafts with one transaction each.
+  Then archive
   idle chats, pack archived chats and free their scratch, pack ended
   runs, delete old archived chats and orphaned runs.
 - **Scratch is skipped while a command holds it,** since a chat

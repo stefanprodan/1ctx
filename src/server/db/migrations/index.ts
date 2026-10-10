@@ -63,6 +63,7 @@ import { m0054 } from "./0054-agent-output-limit.ts";
 import { m0055 } from "./0055-automation-edit-revision.ts";
 import { m0056 } from "./0056-automation-once.ts";
 import { m0057 } from "./0057-automation-tool.ts";
+import { m0058 } from "./0058-automation-drafts.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -122,4 +123,5 @@ export const MIGRATIONS: Migration[] = [
   m0055,
   m0056,
   m0057,
+  m0058,
 ];

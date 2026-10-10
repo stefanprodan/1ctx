@@ -28,6 +28,9 @@ import { freshSignal, type Setup, setup } from "../bash/helpers.ts";
 
 const context = (): ToolContext => ({
   web: null,
+  sendId: "send00000001",
+  messageId: "tool00000001",
+  disabledCapabilities: [],
   actor: {
     projectId: "project",
     userId: "user",
@@ -52,6 +55,9 @@ const call = (args: unknown) => ({
 function mountedContext(s: Setup): ToolContext {
   return {
     ...context(),
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: {
       projectId: s.projectId,
       userId: s.author.id,

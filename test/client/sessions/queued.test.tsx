@@ -98,6 +98,7 @@ function detail(changes: Partial<SessionDetail> = {}): SessionDetail {
     live: null,
     authors: [],
     queued: [],
+    automationDrafts: [],
     ...changes,
   };
 }

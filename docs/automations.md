@@ -64,6 +64,46 @@ an event whose outcome is `run`, `skipped` or `deferred`
   is one `automation.deleted` with `runs`, never a `session.deleted`
   per run.
 
+## Task proposals
+
+- **A chat's main rounds propose create, update, suspend, resume and
+  run through the `automation` tool.** Each writes one pending draft,
+  never a task or a run. The answering agent is fixed by the turn;
+  updates keep the task's agent. The parsers and schedule checks are
+  the form's. A taken name links its task. An update on a retired agent
+  or with a deadline above the current limit sends the user to the task
+  page.
+- **The form and tool read `shared/automation-defaults.ts`.** A create
+  follows the deadline limit, keeps 30 days, uses own memory with
+  `OWN_MEMORY_GUIDANCE`, attention by the agent with no guidance, no
+  rerun on restart and `once` off. A proposal takes the send's disabled
+  set without `automations` and `memory`; an update keeps the task's set.
+- **`AutomationDraftStore` belongs to automations.** Its session
+  foreign key cascades; send, message, task and created run ids have no
+  foreign keys, so decided records survive regenerate and retention.
+  Session lifecycle operations reach it through closures in `compose.ts`,
+  inside their own transactions. Lifecycle and expiry are in
+  `docs/archive.md`; session detail carries its wire shape.
+- **Confirm and Dismiss are authenticated writes on a draft id.** Anyone
+  who may open its chat may press either. Confirm calls the same exported
+  `actions` as the page, taking the presser's `Principal` and parsed
+  request; an unchanged update keeps the owner. The draft's fields pass
+  the form parsers again, using its stored edit revision for a PATCH.
+- **A decision and its task write commit together.** `decide()` guards
+  pending state; a second press answers 409 with the state. A create
+  records its task id, a run its session id. Run uses `prepareNow()` over
+  the scheduler's fire path; it launches only after the outer commit and
+  abandons its reservation on a throw.
+- **Stale refusals are kept before answering 409.** A moved edit revision,
+  a task gone or a name taken turns the draft stale; its expiry turns it
+  expired. A full run cap or a run still going answers 409 and leaves it
+  pending. A fire moves revision alone and leaves the draft valid.
+- **Every state change publishes `draft.changed` after commit,** carrying
+  the whole `AutomationDraft`, a new pending proposal included.
+  `draft-read.ts` supplies both frames and session detail, so fields and
+  usernames agree. Regenerate sends the draft id with `removed: true`.
+  The socket sends it to the chat's watchers, never the whole project.
+
 ## The scheduler
 
 - **The scheduler is a loop of passes on the clock port.** Never

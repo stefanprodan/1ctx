@@ -28,8 +28,12 @@ export function toolContext(
   signal: AbortSignal,
   clock: Clock,
   extra: Pick<ToolContext, "web" | "keep" | "repos">,
+  messageId: string,
 ): ToolContext {
   return {
+    sendId: send.id,
+    messageId,
+    disabledCapabilities: send.policy.disabledCapabilities,
     actor: {
       projectId: send.projectId,
       userId: send.policy.userId,

@@ -154,6 +154,7 @@ function detail(
     live: null,
     authors: [],
     queued: [],
+    automationDrafts: [],
     ...changes,
   };
 }

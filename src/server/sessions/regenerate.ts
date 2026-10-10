@@ -7,6 +7,7 @@
 
 import type { Message } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
+import type { DraftsPort } from "./drafts.ts";
 import { readMessage } from "./messages.ts";
 
 // users: the turn's user messages in seq order, nothing but them between
@@ -15,6 +16,7 @@ export function replaceSendRows(
   db: Db,
   users: readonly Message[],
   newSendId: string,
+  drafts: Pick<DraftsPort, "removePending"> | null = null,
 ): {
   users: Message[];
   removedMessageIds: string[];
@@ -29,6 +31,7 @@ export function replaceSendRows(
     .all(first.sessionId, first.seq);
   const removedMessageIds = tail.slice(users.length).map((row) => row.id);
   const removedSendIds = [...new Set(tail.map((row) => row.send_id))];
+  drafts?.removePending(first.sessionId, removedSendIds);
   db.query("delete from messages where session_id = ? and seq > ?").run(
     last.sessionId,
     last.seq,

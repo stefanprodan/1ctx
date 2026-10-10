@@ -28,6 +28,9 @@ const SHALOM = char(0x5e9, 0x5dc, 0x5d5, 0x5dd);
 
 function context(): ToolContext {
   return {
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: null,
     web: null,
     signal: new AbortController().signal,

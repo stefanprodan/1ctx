@@ -141,6 +141,7 @@ export type App = {
   bash: BashArea;
   sessions: SessionStore;
   automations: Automations["store"];
+  automationDrafts: Automations["drafts"];
   automationScheduler: Automations["scheduler"];
   usage: UsageStore;
   catalogs: Catalogs;
@@ -440,6 +441,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
     pruned: (run) => automations.runDeleted(run),
+    drafts: {
+      bySession: (id) => automations.drafts.bySession(id),
+      removePending: (id, sends) =>
+        automations.draftLifecycle.removePending(id, sends),
+      expireSession: (id, now) =>
+        automations.draftLifecycle.expireSession(id, now),
+      expired: (now, limit) => automations.drafts.expired(now, limit),
+      expire: (id, now) => automations.draftLifecycle.expire(id, now),
+    },
   });
   const configuredTools = toolsArea({
     db,
@@ -477,6 +487,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       byProject: (projectId) => automations.store.byProject(projectId),
       byId: (id) => automations.store.byId(id),
       runDeadlineMs: () => limits.current().runDeadlineMs,
+      userZone: (id) => users.byId(id)!.tz,
+      propose: (input) => automations.propose(input),
       lastRun(sessionId) {
         const send = sessions.store.lastSend(sessionId);
         if (send === null) return null;
@@ -523,6 +535,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     live: (sessionId) => runner.live(sessionId),
     queue: (sessionId) => sessions.queueFrame(sessionId),
     children: (sessionId) => sessions.runningChildren(sessionId),
+    drafts: (sessionId) => automations.drafts.bySession(sessionId),
   });
   const runner = runnerArea({
     db,
@@ -574,6 +587,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
   });
   automations = automationsArea({
+    visibleSession: (principal, id) => sessions.visible(principal, id),
     db,
     clock,
     log: log("automations"),
@@ -739,6 +753,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     bash,
     sessions: sessions.store,
     automations: automations.store,
+    automationDrafts: automations.drafts,
     automationScheduler: automations.scheduler,
     usage: usage.store,
     catalogs: providers.catalogs,

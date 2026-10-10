@@ -88,6 +88,7 @@ type OfferDeps = {
     knowledge: boolean,
     credentials: SendCredentials,
     subagent?: boolean,
+    automationProposals?: boolean,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -374,6 +375,7 @@ export function offered(
           knowledge,
           credentials,
           subagent,
+          chatSend && !subagent,
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
@@ -417,6 +419,7 @@ export function offered(
   }
   return {
     tools: [...baseTools, ...mcpSchemas],
+    automationProposals: chatSend && !subagent,
     visuals,
     knowledge,
     web,

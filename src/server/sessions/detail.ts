@@ -24,6 +24,7 @@ type DetailStore = {
   authors(id: string): SessionAuthor[];
   agents(id: string): SessionAgent[];
   archiveOf(id: string, keptDays: number): SessionArchive | null;
+  automationDrafts(id: string): SessionDetail["automationDrafts"];
   queue: {
     ofChat(id: string, viewerId: string | null): SessionDetail["queued"];
   };
@@ -47,6 +48,7 @@ export function detail(
     agents: store.agents(session.id),
     archive: store.archiveOf(session.id, keptDays),
     queued: store.queue.ofChat(session.id, viewerId),
+    automationDrafts: store.automationDrafts(session.id),
   };
 }
 

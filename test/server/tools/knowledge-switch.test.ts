@@ -33,6 +33,9 @@ function setup() {
 
 const context = (): ToolContext => ({
   web: null,
+  sendId: "send00000001",
+  messageId: "tool00000001",
+  disabledCapabilities: [],
   actor: {
     projectId: "p",
     sessionId: "s",

@@ -42,6 +42,9 @@ export function context(
   deadlineMs = 10_000,
 ): ToolContext {
   return {
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: null,
     web: null,
     signal,
