@@ -16,6 +16,7 @@ import { Page } from "../../ui/Page.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { AutomationTool } from "./AutomationTool.tsx";
 import {
   builtinsOf,
   CONFIG_TABS,
@@ -75,6 +76,7 @@ export function ConfigBoard() {
               active={CONFIG_TABS.find((t) => t.tab === tab)!.href}
             />
             {tab === "overview" && <Builtins state={state} />}
+            {tab === "overview" && <AutomationTool tool={state.automation} />}
             {cards(LIMITS_CARDS, tab === "limits")}
             {cards(STORAGE_CARDS, tab === "storage")}
           </div>

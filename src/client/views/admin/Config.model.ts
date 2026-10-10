@@ -4,7 +4,6 @@
 import type { ToolsResponse } from "../../../shared/api/tools.ts";
 import type { LimitName } from "../../../shared/contracts/limit.ts";
 import type {
-  AutomationToolSummary,
   BuiltinToolSummary,
   EmailToolSummary,
   WebToolSummary,
@@ -121,18 +120,14 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
   },
 ];
 
-type AnyTool =
-  | BuiltinToolSummary
-  | WebToolSummary
-  | EmailToolSummary
-  | AutomationToolSummary;
+type AnyTool = BuiltinToolSummary | WebToolSummary | EmailToolSummary;
 
 // email_user only once email is set up, so the board looks as it did
-// before email
+// before email; automation has its own card with its switch
 export function builtinsOf(state: ToolsResponse): AnyTool[] {
   const email = state.emailUser.emailOn ? [state.emailUser] : [];
-  return [...state.builtin, state.visualize, ...email, state.automation].sort(
-    (a, b) => a.name.localeCompare(b.name),
+  return [...state.builtin, state.visualize, ...email].sort((a, b) =>
+    a.name.localeCompare(b.name),
   );
 }
 
@@ -142,7 +137,6 @@ export function offered(tool: AnyTool, state: ToolsResponse): boolean {
     return state.access.mode !== "off" && state.search.provider !== null;
   }
   if (tool.name === "visualize") return state.visualize.enabled;
-  if (tool.name === "automation") return state.automation.enabled;
   // the admin's switch, and email set up
   if (tool.name === "email_user") {
     return state.emailUser.enabled && state.emailUser.emailOn;
@@ -212,4 +206,11 @@ export function instanceLines(
     },
     ...counted("Credentials", lists.credentials, CREDENTIALS_HREF),
   ];
+}
+
+// the automation card's line, by its switch
+export function automationLine(on: boolean): string {
+  return on
+    ? "A chat's agent may read its project's scheduled tasks. Each chat can turn it off."
+    : "No agent reads scheduled tasks.";
 }
