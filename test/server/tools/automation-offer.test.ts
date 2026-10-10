@@ -449,4 +449,36 @@ describe("task text through the composed server", () => {
       await chat.app.shutdown();
     }
   });
+
+  test("a run's mark shows after its alert is gone", async () => {
+    const chat = await app();
+    try {
+      const automation = await createAutomation(chat, { name: "marked" });
+      const run = await startRun(chat, automation.id);
+      run.main.reply("Pods down.");
+      await settleRun(chat, run.sessionId);
+      // marked, with no open alert, as after a dismiss
+      chat.app.db
+        .query(
+          "update sessions set attention = 1, attention_reason = 'Pods down', attention_by = 'sre' where id = ?",
+        )
+        .run(run.sessionId);
+      chat.app.db
+        .query(
+          "update automations set attention_mode = 'agent', attention_since = null where id = ?",
+        )
+        .run(automation.id);
+      const { script } = await start(chat);
+      const { answers, next } = await round(chat, script, [
+        { action: "show", id: automation.id },
+      ]);
+      expect(answers[0]).toContain("Open alert: none");
+      expect(answers[0]).toContain(
+        'Last run: done, flagged by sre: "Pods down"',
+      );
+      await finish(chat, next);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
 });

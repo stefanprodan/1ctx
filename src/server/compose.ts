@@ -9,6 +9,7 @@
 
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
+import { ATTENTION_AT } from "../shared/contracts/decision.ts";
 import {
   EMAIL_KEY_PREFIX,
   MCP_KEY_PREFIX,
@@ -479,6 +480,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       lastRun(sessionId) {
         const send = sessions.store.lastSend(sessionId);
         if (send === null) return null;
+        const session = sessions.store.byId(sessionId);
         return {
           status: send.status,
           cause: send.cause,
@@ -488,6 +490,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
             send.status === "running"
               ? null
               : sessions.runAnswer(send.id, send.memoryRound),
+          flagged:
+            session !== null &&
+            session.attention !== null &&
+            session.attention >= ATTENTION_AT
+              ? { reason: session.attentionReason, by: session.attentionBy }
+              : null,
         };
       },
       // the names the task's page shows: its agent's switchable servers

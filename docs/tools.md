@@ -182,7 +182,9 @@ words.
   repositories; any other key is an item no longer available.
 - **The last run's line is its send's.** `lastSend()`, then
   `runAnswer()` before its memory round: by status, cause and error,
-  never the status alone, and a running run has no result yet.
+  never the status alone, and a running run has no result yet. One that
+  ended says whether it was flagged, from its session, since a
+  dismissed alert leaves no other trace; not with attention off.
 - **Task text is quoted as data.** The instructions, the guidance and
   the answer go through the registry's `sanitize()` first (`asSent()`),
   then are fenced past any backticks left and labelled as the task's.

@@ -32,6 +32,9 @@ export type LastRun = {
   cause: SendCause | null;
   error: string | null;
   answer: string | null;
+  // set when the run was marked as needing attention, whether or not
+  // its alert is still open
+  flagged: { reason: string | null; by: string | null } | null;
 };
 
 export type Page = { text: string; from: number; to: number; total: number };
@@ -243,6 +246,25 @@ function runText(
   }
 }
 
+// a run that ended says whether it was flagged, since a dismissed alert
+// leaves no other trace of the mark; with attention off nothing marks
+function withFlag(
+  text: { line: string; answer: string | null },
+  run: LastRun | null,
+  mode: AutomationSummary["attentionMode"],
+): { line: string; answer: string | null } {
+  if (run === null || run.status === "running") return text;
+  if (run.flagged === null) {
+    return mode === "off"
+      ? text
+      : { ...text, line: `${text.line}, not flagged` };
+  }
+  const by = run.flagged.by === null ? "" : ` by ${run.flagged.by}`;
+  const reason =
+    run.flagged.reason === null ? "" : `: "${short(run.flagged.reason)}"`;
+  return { ...text, line: `${text.line}, flagged${by}${reason}` };
+}
+
 export type ShowInput = {
   automation: AutomationSummary;
   run: LastRun | null;
@@ -296,7 +318,7 @@ export function showText(input: ShowInput): { body: string; tail: string } {
             ? ""
             : `, latest reason "${short(a.alert.reason)}"`
         }${a.alert.by === null ? "" : `, marked by ${a.alert.by}`}`;
-  const run = runText(a, input.run);
+  const run = withFlag(runText(a, input.run), input.run, a.attentionMode);
   const instructions = asSent(a.instructions);
   const instructionsFence = fenceFor(instructions);
   const answerFence = run.answer === null ? "" : fenceFor(run.answer);
