@@ -1,0 +1,11 @@
+/* An agent's row: the model id under the handle. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .agent-row-model {
+    display: block;
+    min-width: 0;
+    font-family: var(--mono);
+  }
+}

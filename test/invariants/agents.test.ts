@@ -453,6 +453,32 @@ describe("the agents", () => {
     expect((await patch("none", "x")).status).toBe(404);
   });
 
+  test("every list names them in name order, not the order made", async () => {
+    const { app, client, provider } = await setup();
+    // "-", "_" and digits order apart in SQLite's bytes and localeCompare
+    const made = ["zeta", "a1", "a-b", "alpha", "a_b", "mid"];
+    for (const name of made) {
+      app.now.value += 1000;
+      const made = await client.call("POST", "/api/agents", {
+        body: { ...defaults, name, providerId: provider.id, model: flash.id },
+      });
+      expect(made.status).toBe(201);
+    }
+    const names = async (path: string) =>
+      (await (await client.call("GET", path)).json()).agents.map(
+        (a: { name: string }) => a.name,
+      );
+    const { projects } = await (
+      await client.call("GET", "/api/projects")
+    ).json();
+    const expected = made.toSorted((a, b) => a.localeCompare(b));
+    expect(await names("/api/agents")).toEqual(expected);
+    expect(await names(`/api/projects/${projects[0].id}/agents`)).toEqual(
+      expected,
+    );
+    expect(await names("/api/directory/agents")).toEqual(expected);
+  });
+
   test("a race with a delete or a twin name ends in the right status", async () => {
     const { app, client, provider } = await setup();
     // the catalog answers only when told, so a second request can move

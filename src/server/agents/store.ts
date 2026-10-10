@@ -120,14 +120,15 @@ export class AgentStore {
     );
   }
 
+  // by name as every page sorts them, in JS since SQLite's byte order
+  // puts "-" and "_" apart from localeCompare
   list(): AgentRow[] {
     const defaultId = this.defaultId();
     return this.db
-      .query<Raw, []>(
-        "select * from agents where deleted_at is null order by created_at, name",
-      )
+      .query<Raw, []>("select * from agents where deleted_at is null")
       .all()
-      .map((raw) => this.row(raw, defaultId));
+      .map((raw) => this.row(raw, defaultId))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   byId(id: string): AgentRow | null {

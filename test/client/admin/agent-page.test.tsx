@@ -485,7 +485,8 @@ describe("the cards", () => {
     providers.value = [];
     const oldest = { ...agent, default: true };
     const other = { ...agent, id: "ag9", name: "other", createdAt: 9 };
-    agents.value = [oldest, other];
+    // the list is by name, so the oldest is found by its age, not its place
+    agents.value = [other, oldest];
     const kept = render(
       <AgentGeneral agent={oldest} drafts={AgentDrafts.of(oldest)} />,
     );
@@ -493,9 +494,11 @@ describe("the cards", () => {
     expect(kept).toMatch(
       /<input type="checkbox"[^>]*name="default"[^>]*disabled/,
     );
-    agents.value = [other, oldest];
+    // a younger agent marked the default, its name first, may give it back
+    const marked = { ...other, name: "aaa", default: true };
+    agents.value = [marked, { ...oldest, default: false }];
     expect(
-      render(<AgentGeneral agent={oldest} drafts={AgentDrafts.of(oldest)} />),
+      render(<AgentGeneral agent={marked} drafts={AgentDrafts.of(marked)} />),
     ).not.toContain("Mark another agent");
     agents.value = null;
   });

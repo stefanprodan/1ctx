@@ -67,7 +67,7 @@ export function Members({ params }: { params: Params }) {
             ) : (
               agents.map((a) => (
                 <RowsGo key={a.id} href={agentHref(a.name)}>
-                  <AgentRow agent={a} />
+                  <AgentRow agent={{ ...a, model: a.model.id }} />
                 </RowsGo>
               ))
             )}

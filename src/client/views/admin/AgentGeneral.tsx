@@ -84,7 +84,18 @@ function Identity({
     cardFieldOf(["name", "prompt"]),
   );
   const taken = nameTaken(agents.value, d.name.value, agent.id);
-  const kept = agent.default && agents.value?.[0]?.id === agent.id;
+  // the oldest agent is where the default falls back, so unticking it
+  // cannot move the mark; the server picks it by created_at, then name
+  const oldest = (agents.value ?? []).reduce<AgentSummary | null>(
+    (o, a) =>
+      o === null ||
+      a.createdAt < o.createdAt ||
+      (a.createdAt === o.createdAt && a.name < o.name)
+        ? a
+        : o,
+    null,
+  );
+  const kept = agent.default && oldest?.id === agent.id;
   return (
     <SettingForm
       save={save}
