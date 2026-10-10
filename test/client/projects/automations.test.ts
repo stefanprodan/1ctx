@@ -68,7 +68,6 @@ import {
 import {
   scheduleColumn,
   scheduleTitle,
-  scheduleWords,
 } from "../../../src/client/views/projects/Schedule.model.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
@@ -77,6 +76,7 @@ import {
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
+import { scheduleWords } from "../../../src/shared/schedule.ts";
 import type { RunFilter } from "../../../src/shared/words.ts";
 
 const now = new Date(2026, 8, 14, 12).getTime();
