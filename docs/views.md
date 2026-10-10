@@ -260,8 +260,7 @@ Flagged.
   and Resume are off, and Save stays off until a live agent is picked
   (`retiredPick()`).
 - **Delete asks in place** with Keep, Delete and Delete with runs, and
-  hides every other button while it asks. Run now's title says it does
-  everything a scheduled run does.
+  hides every other button while it asks.
 - **A task that runs once says so.** The editor's Run once box sits
   under the schedule; with it on, the reading and the page's next runs
   show the one fire with its year (`nextRunWords()`), or "Waiting
