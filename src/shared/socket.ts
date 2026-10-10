@@ -8,6 +8,10 @@
 
 import type { EnvelopeRow } from "./api/sessions.ts";
 import type { AutomationSummary } from "./contracts/automation.ts";
+import {
+  type AutomationDraft,
+  isAutomationDraft,
+} from "./contracts/automation-draft.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
   ChildOf,
@@ -23,7 +27,11 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 17;
+export const PROTOCOL = 18;
+
+export type DraftFrame =
+  | { type: "draft"; sessionId: string; draft: AutomationDraft }
+  | { type: "draft"; sessionId: string; draftId: string; removed: true };
 
 export type VisualFrame = {
   type: "visual";
@@ -50,6 +58,7 @@ export type SocketEvent =
   // running the client an older server shipped, and reloads the page
   | { type: "hello"; protocol: number; version: string }
   | VisualFrame
+  | DraftFrame
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
   // the feed's last line when the transaction wrote one. row is the
@@ -128,14 +137,15 @@ export type SocketEvent =
   // tally. Its stream deltas go nowhere
   | ({ type: "child"; sessionId: string } & ChildOf)
   // the answer to a watch: the send in flight as far as it got, the
-  // queue as the queue frame carries it, and each running subagent's
-  // rows so far
+  // queue as the queue frame carries it, each running subagent's rows
+  // so far, and the chat's task proposals, any written since its read
   | {
       type: "watched";
       sessionId: string;
       live: LiveSend | null;
       queue?: QueueFrame;
       children?: ChildOf[];
+      drafts?: AutomationDraft[];
     }
   | {
       type: "delta";
@@ -211,5 +221,32 @@ export function isVisualFrame(value: unknown): value is VisualFrame {
         "htmlAt",
       ].includes(key),
     )
+  );
+}
+
+export function isDraftFrame(value: unknown): value is DraftFrame {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const v = value as Record<string, unknown>;
+  const id = (value: unknown) => typeof value === "string" && value !== "";
+  return (
+    v.type === "draft" &&
+    id(v.sessionId) &&
+    (Object.hasOwn(v, "removed")
+      ? v.removed === true && id(v.draftId) && Object.keys(v).length === 4
+      : isAutomationDraft(v.draft) && Object.keys(v).length === 3)
+  );
+}
+
+// a watched answer's drafts, when it carries them, are whole drafts
+export function hasWatchedDrafts(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const drafts = (value as Record<string, unknown>).drafts;
+  return (
+    !Object.hasOwn(value, "drafts") ||
+    (Array.isArray(drafts) && drafts.every(isAutomationDraft))
   );
 }

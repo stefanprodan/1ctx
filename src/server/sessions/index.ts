@@ -32,6 +32,7 @@ import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { childWork, runningChildren } from "./child-work.ts";
 import { detail, sessionInfo } from "./detail.ts";
+import type { DraftsPort } from "./drafts.ts";
 import { envelope } from "./envelope.ts";
 import { envelopeRow } from "./feed.ts";
 import { listAlerts } from "./list.ts";
@@ -134,6 +135,7 @@ export type SessionsDeps = {
   // names: its open alert and its revision, built later in the
   // automations area
   pruned: (run: DeletedRun) => BusEvent[];
+  drafts?: DraftsPort;
 };
 
 export type Sessions = {
@@ -193,6 +195,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.usage,
     deps.scratch,
     deps.pruned,
+    deps.drafts,
   );
   // a subagent's child is never a chat of its own: every route and
   // watch by its id is the same 404 as a missing one
@@ -295,7 +298,13 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     },
     sweep: (now, caps) =>
       sweepChats(
-        { db: deps.db, store, scratch: deps.scratch, log: deps.log },
+        {
+          db: deps.db,
+          store,
+          scratch: deps.scratch,
+          log: deps.log,
+          drafts: deps.drafts,
+        },
         now,
         caps,
       ),

@@ -266,11 +266,17 @@ async function runCalls(
     deps.writer.finishTool(send, call, result);
   };
   const settled = calls.map(async (call) => {
-    const ctx = toolContext(send, send.controller.signal, deps.clock, {
-      web: send.policy.web,
-      keep: send.keep,
-      repos: send.repos?.tool ?? null,
-    });
+    const ctx = toolContext(
+      send,
+      send.controller.signal,
+      deps.clock,
+      {
+        web: send.policy.web,
+        keep: send.keep,
+        repos: send.repos?.tool ?? null,
+      },
+      send.openTools.get(call)!.rowId,
+    );
     const result = await runOne(deps, send, send.policy.offered, call, ctx);
     if (call.name !== DELEGATE_TOOL) {
       ordinaryEnd = Math.max(ordinaryEnd, deps.clock());

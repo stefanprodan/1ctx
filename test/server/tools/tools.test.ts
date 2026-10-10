@@ -69,6 +69,9 @@ function budget(): ToolBudget {
 
 function context(shared: ToolBudget = budget()): ToolContext {
   return {
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: null,
     web: null,
     signal: new AbortController().signal,

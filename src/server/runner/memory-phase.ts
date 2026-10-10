@@ -155,7 +155,13 @@ async function runCalls(
   let writeError: unknown = null;
   let clean = true;
   const settled = calls.map(async (call) => {
-    const ctx = toolContext(send, signal, deps.clock, { web: null });
+    const ctx = toolContext(
+      send,
+      signal,
+      deps.clock,
+      { web: null },
+      send.openTools.get(call)!.rowId,
+    );
     const result = await runOne(deps, send, offered, call, ctx);
     try {
       const stored = cutResult(result, send.policy.toolCaps.resultCut);

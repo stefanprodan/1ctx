@@ -10,6 +10,8 @@
 
 import { effect } from "@preact/signals";
 import {
+  hasWatchedDrafts,
+  isDraftFrame,
   PROTOCOL,
   type SocketCommand,
   type SocketEvent,
@@ -74,10 +76,14 @@ export function onSocketEvent(fn: Dispatch): () => void {
   };
 }
 
-const isEvent = (value: unknown): value is SocketEvent =>
-  typeof value === "object" &&
-  value !== null &&
-  typeof (value as { type?: unknown }).type === "string";
+const isEvent = (value: unknown): value is SocketEvent => {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
+  const type = (value as { type?: unknown }).type;
+  if (type === "draft") return isDraftFrame(value);
+  if (type === "watched") return hasWatchedDrafts(value);
+  return typeof type === "string";
+};
 
 function send(command: SocketCommand): void {
   if (wire !== null && wire.readyState === OPEN) {

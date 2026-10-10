@@ -244,6 +244,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     knowledge: boolean,
     credentials: SendCredentials,
     subagent = false,
+    automationProposals = false,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -258,7 +259,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         ]),
     makeVisualizeTool(hosts),
     makeEmailTool(emailPort),
-    makeAutomationTool(automations),
+    makeAutomationTool(automations, automationProposals),
     makeBashTool({
       bash: deps.bash,
       web,
@@ -444,6 +445,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
             off: offered.credentialsOff,
           },
           offered.subagent,
+          offered.automationProposals === true,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>

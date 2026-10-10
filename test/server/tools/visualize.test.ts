@@ -11,6 +11,9 @@ import { MAX_TITLE } from "../../../src/shared/words.ts";
 
 const registry = new Registry([makeVisualizeTool([])]);
 const context = (): ToolContext => ({
+  sendId: "send00000001",
+  messageId: "tool00000001",
+  disabledCapabilities: [],
   actor: null,
   web: null,
   signal: new AbortController().signal,

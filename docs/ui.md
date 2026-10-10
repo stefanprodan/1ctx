@@ -31,6 +31,9 @@ draws is in `docs/views.md`, the admin pages in `docs/admin-pages.md`.
   runs the route's load and re-watches the session on screen, so a
   reconnect takes the navigation path. A new server build or protocol
   reloads the page.
+  The socket guard validates a whole draft, pending included, or its
+  `removed: true` frame; until proposal lines
+  are drawn, entity handlers ignore them and reconnect still reads detail.
 - **`data/socket.ts` knows no entity.** Modules register for frames.
   `data/sessions.ts` applies an envelope (`docs/sessions.md`) only when
   its revision is above the one held, and applies stream frames in

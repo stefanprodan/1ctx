@@ -238,6 +238,9 @@ Flagged.
 
 ## Automations
 
+- **Create defaults come from `shared/automation-defaults.ts`,** shared
+  with the chat's task proposals; `draftOf()` only maps them to fields.
+
 - **An open alert sits over the brief** (`OpenAttention.tsx`): the
   feed line's words, the latest reason and Dismiss. The Runs list's
   filters are Manual and Flagged (the marked runs). A row adds the

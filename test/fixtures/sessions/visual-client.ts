@@ -54,6 +54,7 @@ export function visualDetail(): SessionDetail {
     agents: [],
     archive: null,
     queued: [],
+    automationDrafts: [],
     session: {
       archived: null,
       attention: null,

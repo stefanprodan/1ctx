@@ -7,6 +7,7 @@
 // publisher of durable changes; it publishes after commit.
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import type { AutomationDraft } from "../../shared/contracts/automation-draft.ts";
 import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type {
   ChildOf,
@@ -16,10 +17,15 @@ import type {
   SendSummary,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
+import type { DraftFrame } from "../../shared/socket.ts";
 import { errorFields, type Log } from "./log.ts";
 
 // the event map: one entry per event, payload by name
 export type BusEvents = {
+  "draft.changed": { projectId: string } & (
+    | Omit<Extract<DraftFrame, { draft: AutomationDraft }>, "type">
+    | Omit<Extract<DraftFrame, { removed: true }>, "type">
+  );
   // every way a login ends; loginId null is all of the user's
   "login.revoked": { userId: string; loginId: string | null };
   // one envelope per session transaction: the summary with its

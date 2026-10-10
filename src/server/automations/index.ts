@@ -5,17 +5,30 @@ import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import type { RouteDescriptor } from "../lib/http.ts";
+import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
-import type { DeletedRun, SessionStore } from "../sessions/index.ts";
+import type {
+  DeletedRun,
+  SessionRow,
+  SessionStore,
+} from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import {
+  type AccessPort,
+  type AutomationActions,
+  automationActions,
+} from "./actions.ts";
 import { type AlertEmailDeps, alertEmails } from "./alert-email.ts";
 import { type Alerts, alerts } from "./alerts.ts";
-import { type AccessPort, routes } from "./routes.ts";
+import { draftDecisions, draftRoutes } from "./draft-decisions.ts";
+import { draftLifecycle } from "./draft-lifecycle.ts";
+import { AutomationDraftStore } from "./draft-store.ts";
+import { type ProposalInput, proposeTask } from "./propose.ts";
+import { routes } from "./routes.ts";
 import { type Scheduler, scheduler } from "./scheduler.ts";
 import { AutomationStore, automationChanged } from "./store.ts";
 
@@ -35,6 +48,7 @@ export type AutomationsDeps = {
   limits: { current(): Limits };
   memory: Pick<MemoryCapability, "read" | "save" | "undo">;
   sessions: SessionStore;
+  visibleSession(principal: Principal, id: string): SessionRow;
   runner: { startRun(event: Event): PreparedRun };
   // the run-attention decision is on with a decider to ask
   deciderOn(): boolean;
@@ -46,6 +60,10 @@ export type AutomationsDeps = {
 
 export type Automations = {
   store: AutomationStore;
+  drafts: AutomationDraftStore;
+  actions: AutomationActions;
+  draftLifecycle: ReturnType<typeof draftLifecycle>;
+  propose(input: ProposalInput): string;
   // the open alert: a run's end, a decider's word, a dismiss
   alerts: Alerts;
   scheduler: Scheduler;
@@ -66,7 +84,16 @@ export type Automations = {
 
 export function automationsArea(deps: AutomationsDeps): Automations {
   const store = new AutomationStore(deps.db);
+  const drafts = new AutomationDraftStore(deps.db);
   const scheduled = scheduler({ ...deps, store });
+  const actions = automationActions({ ...deps, store, scheduler: scheduled });
+  const decisions = draftDecisions({
+    ...deps,
+    store,
+    drafts,
+    actions,
+    wake: scheduled.wake,
+  });
   store.setWake(scheduled.wake);
   const alerted = alerts({
     db: deps.db,
@@ -87,6 +114,19 @@ export function automationsArea(deps: AutomationsDeps): Automations {
   });
   return {
     store,
+    drafts,
+    actions,
+    draftLifecycle: draftLifecycle(deps.db, drafts),
+    propose: (input) =>
+      proposeTask(
+        {
+          db: deps.db,
+          store,
+          drafts,
+          runDeadlineMs: () => deps.limits.current().runDeadlineMs,
+        },
+        input,
+      ),
     alerts: alerted,
     scheduler: scheduled,
     suspendAgent: (agentId, by, now) =>
@@ -105,11 +145,15 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     drain: scheduled.drain,
     stop: scheduled.stop,
     dispose: scheduled.dispose,
-    routes: routes({
-      ...deps,
-      store,
-      scheduler: scheduled,
-      alerts: alerted,
-    }),
+    routes: [
+      ...routes({
+        ...deps,
+        store,
+        scheduler: scheduled,
+        alerts: alerted,
+        actions,
+      }),
+      ...draftRoutes(decisions),
+    ],
   };
 }

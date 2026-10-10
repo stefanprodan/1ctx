@@ -10,6 +10,7 @@
 // a test drives the module with fakes.
 
 import type { EnvelopeRow } from "../../shared/api/sessions.ts";
+import type { AutomationDraft } from "../../shared/contracts/automation-draft.ts";
 import type { ChildOf, LiveSend } from "../../shared/contracts/session.ts";
 import {
   isSocketCommand,
@@ -70,6 +71,8 @@ export type SocketDeps = {
   queue(sessionId: string): QueueFrame;
   // each running subagent's rows so far
   children(sessionId: string): ChildOf[];
+  // the chat's task proposals as the session read carries them
+  drafts(sessionId: string): AutomationDraft[];
 };
 
 export type Socket = {
@@ -260,12 +263,16 @@ export function socketArea(deps: SocketDeps): Socket {
         }));
         break;
       case "queue.changed":
-      case "child.changed": {
-        // every queued row's text is a preview and a child frame carries
-        // only the rows changed, so each stays small; both go to the
-        // chat's watchers alone, as the stream frames do
+      case "child.changed":
+      case "draft.changed": {
+        // These matter only to the open chat, so other tabs skip them.
         const { projectId, ...data } = event.data;
-        const type = event.type === "child.changed" ? "child" : "queue";
+        const type =
+          event.type === "child.changed"
+            ? "child"
+            : event.type === "draft.changed"
+              ? "draft"
+              : "queue";
         let text: string | undefined;
         for (const conn of [...(watchers.get(data.sessionId) ?? [])]) {
           if (!sees(conn, projectId)) continue;
@@ -435,12 +442,14 @@ export function socketArea(deps: SocketDeps): Socket {
       // between the two
       const live = deps.live(parsed.sessionId);
       const children = live === null ? [] : deps.children(parsed.sessionId);
+      const drafts = deps.drafts(parsed.sessionId);
       deliver(conn, {
         type: "watched",
         sessionId: parsed.sessionId,
         live,
         queue: deps.queue(parsed.sessionId),
         ...(children.length > 0 ? { children } : {}),
+        ...(drafts.length > 0 ? { drafts } : {}),
       });
     },
     drain(conn) {

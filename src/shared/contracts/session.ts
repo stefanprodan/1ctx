@@ -22,6 +22,7 @@ import type {
   SessionOrigin,
   SessionStatus,
 } from "../words.ts";
+import type { AutomationDraft } from "./automation-draft.ts";
 import type { ToolCall } from "./tool.ts";
 
 export type SessionSummary = {
@@ -311,6 +312,7 @@ export type SessionDetail = {
   // the messages waiting for the reply to end, oldest first; a not-sent
   // one only to its author
   queued: QueuedMessage[];
+  automationDrafts: AutomationDraft[];
 };
 
 // the characters of a queued message's text a socket frame carries

@@ -290,6 +290,7 @@ describe("sweep", () => {
         runs_packed: 0,
         chats_deleted: 0,
         runs_deleted: 0,
+        drafts_expired: 0,
       },
     });
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({

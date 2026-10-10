@@ -23,6 +23,7 @@ import {
   archive as readArchive,
   authors as readAuthors,
 } from "./detail.ts";
+import type { DraftsPort } from "./drafts.ts";
 import { exportRows } from "./export.ts";
 import {
   copyRows,
@@ -99,6 +100,7 @@ export class SessionStore {
     private readonly usage: UsagePort,
     private readonly scratch: ScratchPort,
     private readonly pruned: Pruned = () => [],
+    private readonly drafts: DraftsPort | null = null,
   ) {
     this.queue = new QueueStore(db);
   }
@@ -210,6 +212,10 @@ export class SessionStore {
     return readAuthors(this.db, id);
   }
 
+  automationDrafts(id: string) {
+    return this.drafts?.bySession(id) ?? [];
+  }
+
   agents(id: string) {
     return readAgents(this.db, id);
   }
@@ -228,6 +234,7 @@ export class SessionStore {
     now: number,
   ): SessionRow | null {
     if (!archiveRow(this.db, id, reason, by, now)) return null;
+    this.drafts?.expireSession(id, now);
     const children = this.children(id);
     for (const child of children) archiveRow(this.db, child, reason, by, now);
     if (reason !== "agent") {
@@ -367,7 +374,7 @@ export class SessionStore {
   }
 
   replaceSend(users: readonly Message[], newSendId: string) {
-    return replaceSendRows(this.db, users, newSendId);
+    return replaceSendRows(this.db, users, newSendId, this.drafts);
   }
 
   addReply(fields: AgentMessageFields): Message {

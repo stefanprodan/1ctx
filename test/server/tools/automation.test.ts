@@ -102,6 +102,10 @@ function port(
     runDeadlineMs: () => 10 * MINUTE,
     lastRun: () => run,
     switchNames: () => names,
+    userZone: () => "UTC",
+    propose: () => {
+      throw new Error("not proposed by a read");
+    },
   };
 }
 
@@ -110,6 +114,9 @@ const context = (
   resultCut = DEFAULT_LIMITS.resultCut,
 ): ToolContext => ({
   web: null,
+  sendId: "send00000001",
+  messageId: "tool00000001",
+  disabledCapabilities: [],
   actor: {
     projectId: "p1",
     userId: "u1",

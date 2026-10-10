@@ -135,9 +135,15 @@ async function runCalls(
   calls: ToolCall[],
   signal: AbortSignal,
 ): Promise<void> {
-  const ctx = toolContext(send, signal, deps.clock, { web: null });
   for (const call of calls) {
     if (signal.aborted) return;
+    const ctx = toolContext(
+      send,
+      signal,
+      deps.clock,
+      { web: null },
+      send.openTools.get(call)!.rowId,
+    );
     const result = await runOne(deps, send, offered, call, ctx);
     // kept until a row holds it, so the cut writes a call that ended
     send.settled.set(call, result);

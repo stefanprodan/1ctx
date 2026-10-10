@@ -49,6 +49,9 @@ export function area(): ToolsArea {
 
 export function context(resultCut = DEFAULT_LIMITS.resultCut): ToolContext {
   return {
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: null,
     web: null,
     signal: new AbortController().signal,

@@ -30,6 +30,9 @@ function context(signal = new AbortController().signal): ToolContext {
     visuals: 0,
   };
   return {
+    sendId: "send00000001",
+    messageId: "tool00000001",
+    disabledCapabilities: [],
     actor: null,
     web: { mode: "all", domains: [] },
     signal,
@@ -252,6 +255,9 @@ describe("fetch URL guard", () => {
       visuals: 0,
     };
     const ctx: ToolContext = {
+      sendId: "send00000001",
+      messageId: "tool00000001",
+      disabledCapabilities: [],
       actor: null,
       web: { mode: "all", domains: [] },
       signal: new AbortController().signal,
@@ -424,6 +430,9 @@ describe("fetch extraction and slicing", () => {
 describe("fetch deadline", () => {
   test("times out a fetch that never resolves", async () => {
     const ctx: ToolContext = {
+      sendId: "send00000001",
+      messageId: "tool00000001",
+      disabledCapabilities: [],
       actor: null,
       web: { mode: "all", domains: [] },
       signal: new AbortController().signal,

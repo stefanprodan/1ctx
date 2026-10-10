@@ -3,15 +3,10 @@
 Governs `src/server/sessions/` and the runner's sends in
 `src/server/runner/`.
 
-A session is one conversation row, of one of two origins
-(`SESSION_ORIGINS`): a chat, which users write in, or a run, which an
-automation (a scheduled task) starts on its schedule or by Run now. Both
-share the table, the writer, the runner, the caps and the sweep; this
-doc says "chat" or "run" where a rule holds for one only. A send is one pass of the runner over a session (`SEND_KINDS`:
-`chat`, `compact`, `run`): a turn in a chat (the user messages that open
-it and the agent's reply), the whole of a run, or a compaction. A send
-is one or more rounds, each a request to the model and the calls it
-answers with. What only runs and automations do is in
+A session (`SESSION_ORIGINS`) is a chat users write in or an automation's
+run. Both share the writer, caps and sweep. A send (`SEND_KINDS`:
+`chat`, `compact`, `run`) is one turn, compaction or run. Its rounds each
+ask the model and run its calls. Rules for runs alone are in
 `docs/automations.md`; the tool loop in `docs/tools.md`; memory in
 `docs/memory.md`; archive, packing and the sweep in `docs/archive.md`;
 compaction in `docs/compaction.md`.
@@ -21,6 +16,14 @@ session transaction publishes: the summary with its revision, the rows
 written, the ids removed, the send row and the session's row in the
 session list. A summon is a chat message whose first word is `@name`:
 that agent answers the one turn (Summons below).
+
+Detail carries the chat's task proposals as `automationDrafts`, whole
+drafts with their state, who asked and decided, and the task or run a
+confirm made. Their lifecycle is in `docs/archive.md` and their `draft`
+frames in `docs/access.md`; a frame moves neither activity nor
+revision. A reconnect reads detail again, and the `watched` answer
+carries the drafts, so one written between the read and the watch
+still arrives.
 
 ## Sends and caps
 

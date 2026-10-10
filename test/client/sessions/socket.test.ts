@@ -11,6 +11,7 @@ import {
   watch,
 } from "../../../src/client/data/socket.ts";
 import { PROTOCOL, type SocketEvent } from "../../../src/shared/socket.ts";
+import { pendingDraft } from "../../fixtures/automations/draft-frame.ts";
 import { FakeWire } from "../../helpers/client-socket.ts";
 
 const casey = {
@@ -233,4 +234,50 @@ describe("the tab socket", () => {
 
     expect(seen).toEqual([]);
   });
+  test.serial(
+    "accepts valid draft frames and skips malformed ones without a reload",
+    () => {
+      const seen: SocketEvent[] = [];
+      offs.push(onSocketEvent((event) => seen.push(event)));
+      start();
+      const frame = {
+        type: "draft",
+        sessionId: "s1",
+        draft: pendingDraft,
+      } as const;
+      const removed = {
+        type: "draft",
+        sessionId: "s1",
+        draftId: "draft",
+        removed: true,
+      } as const;
+      wires[0].message(JSON.stringify(frame));
+      wires[0].message(
+        JSON.stringify({
+          ...frame,
+          draft: { ...pendingDraft, state: "unknown" },
+        }),
+      );
+      wires[0].message(
+        JSON.stringify({ ...frame, draft: { ...pendingDraft, fields: [] } }),
+      );
+      wires[0].message(JSON.stringify(removed));
+      wires[0].message(JSON.stringify({ ...removed, removed: false }));
+      wires[0].message(
+        JSON.stringify({
+          type: "draft",
+          sessionId: "s1",
+          draftId: "draft",
+          state: "confirmed",
+          decidedBy: null,
+          decidedAt: 100,
+          createdAutomationId: null,
+          runSessionId: null,
+        }),
+      );
+      expect(seen).toEqual([frame, removed]);
+      expect(pageReloads).toBe(0);
+      expect(reloads).toBe(0);
+    },
+  );
 });

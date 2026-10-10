@@ -51,6 +51,9 @@ export type SendRepos = {
 };
 
 export type ToolContext = {
+  sendId: string;
+  messageId: string;
+  disabledCapabilities: readonly string[];
   web: WebSnapshot | null;
   actor: {
     projectId: string;
@@ -151,6 +154,7 @@ export type OfferedCredential = Pick<
 };
 
 export type Offered = {
+  automationProposals?: boolean;
   tools: ChatTool[];
   visuals: boolean;
   // false while the send has the project docs off
