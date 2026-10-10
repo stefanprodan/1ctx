@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { DraftDecisionResponse } from "../../shared/api/automations.ts";
 import { STALE_EDIT } from "../../shared/contracts/automation.ts";
 import type { DraftState } from "../../shared/contracts/automation-draft.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -25,7 +26,7 @@ type Deps = {
   wake(): void;
 };
 
-type Decision = { state: DraftState; error?: string };
+type Decision = DraftDecisionResponse;
 
 export function draftDecisions(deps: Deps) {
   const visible = (principal: Principal, id: string) => {

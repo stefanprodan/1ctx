@@ -34,6 +34,7 @@ import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { takeChildren, takeWatched } from "./session-children.ts";
+import { draftsShown, forgetTask, onDraftSocket } from "./session-drafts.ts";
 import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
@@ -101,7 +102,7 @@ effect(() => {
 });
 
 function show(shown: SessionDetail): void {
-  const detail = queueShown(shown);
+  const detail = draftsShown(queueShown(shown), session.value);
   visualPreviews.value = snapshotVisuals(
     reconcileVisuals(visualPreviews.value, detail),
     detail,
@@ -440,6 +441,7 @@ export function onSocket(ev: SocketEvent): void {
       drop(ev.sessionId, ev.projectId);
       break;
     case "automationDeleted":
+      forgetTask(ev.automationId);
       if (ev.runs) leaveRuns(ev.automationId, ev.projectId);
       break;
     case "granted":
@@ -463,9 +465,13 @@ export function onSocket(ev: SocketEvent): void {
       onQueueSocket(ev);
       onWatched(ev);
       takeWatched(ev.sessionId, ev.children ?? []);
+      onDraftSocket(ev);
       break;
     case "child":
       takeChildren(ev.sessionId, [ev]);
+      break;
+    case "draft":
+      onDraftSocket(ev);
       break;
     case "queue":
     case "notSent":

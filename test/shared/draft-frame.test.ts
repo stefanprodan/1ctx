@@ -184,13 +184,14 @@ test("draft frames validate every proposal field and reject foreign fields", () 
   }
 });
 
-test("a watched answer's drafts are whole drafts when present", () => {
+test("a watched answer's drafts are a list when present", () => {
   const watched = { type: "watched", sessionId: "chat", live: null };
   expect(hasWatchedDrafts(watched)).toBe(true);
   expect(hasWatchedDrafts({ ...watched, drafts: [pendingDraft] })).toBe(true);
   expect(hasWatchedDrafts({ ...watched, drafts: [] })).toBe(true);
   expect(hasWatchedDrafts({ ...watched, drafts: pendingDraft })).toBe(false);
+  // a bad draft is the reader's to skip, never the whole answer's
   expect(
     hasWatchedDrafts({ ...watched, drafts: [{ ...pendingDraft, id: "" }] }),
-  ).toBe(false);
+  ).toBe(true);
 });

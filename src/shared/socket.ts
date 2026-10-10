@@ -145,7 +145,8 @@ export type SocketEvent =
       live: LiveSend | null;
       queue?: QueueFrame;
       children?: ChildOf[];
-      drafts?: AutomationDraft[];
+      // each checked with isAutomationDraft() before it is used
+      drafts?: unknown[];
     }
   | {
       type: "delta";
@@ -239,14 +240,13 @@ export function isDraftFrame(value: unknown): value is DraftFrame {
   );
 }
 
-// a watched answer's drafts, when it carries them, are whole drafts
+// a watched answer's drafts, when it carries them, are a list; each is
+// checked by the reader, so one draft of an older shape never stalls
+// the answer the chat's live tail waits on
 export function hasWatchedDrafts(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
   const drafts = (value as Record<string, unknown>).drafts;
-  return (
-    !Object.hasOwn(value, "drafts") ||
-    (Array.isArray(drafts) && drafts.every(isAutomationDraft))
-  );
+  return !Object.hasOwn(value, "drafts") || Array.isArray(drafts);
 }

@@ -14,13 +14,19 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import type { LiveRetry } from "../../shared/contracts/session.ts";
+import type { AutomationDraft } from "../../shared/contracts/automation-draft.ts";
+import type {
+  LiveRetry,
+  SessionSummary,
+} from "../../shared/contracts/session.ts";
 import { visualPreviews } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
 import { copyCode } from "./copy.ts";
 import { FileCard } from "./FileCard.tsx";
 import type { OnFork } from "./Fork.tsx";
+import { proposalLines } from "./Proposal.model.ts";
+import { Proposal } from "./Proposal.tsx";
 import { QueuedRows, type QueueProps } from "./Queued.tsx";
 import { type Agent, Reply } from "./Reply.tsx";
 import type { Node } from "./rows.ts";
@@ -49,6 +55,7 @@ export function Transcript({
   fork,
   foot,
   queue,
+  proposals,
   retry = null,
   marked = false,
 }: {
@@ -74,6 +81,11 @@ export function Transcript({
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   // the messages that wait, under the last turn
   queue?: QueueProps;
+  // a chat's task proposals, drawn under the turn whose call made them
+  proposals?: {
+    drafts: AutomationDraft[];
+    session: Pick<SessionSummary, "forkedFromId" | "createdAt">;
+  };
   foot?: ComponentChildren;
 }) {
   const rows = useRef<HTMLDivElement>(null);
@@ -201,13 +213,22 @@ export function Transcript({
                 retry={last ? retry : null}
                 marked={marked}
                 fork={fork}
-                visuals={visualCards(node, visualPreviews.value).map((card) =>
-                  isFileCard(card) ? (
-                    <FileCard key={card.key} card={card} />
-                  ) : (
-                    <Visual key={card.key} card={card} />
+                visuals={[
+                  ...visualCards(node, visualPreviews.value).map((card) =>
+                    isFileCard(card) ? (
+                      <FileCard key={card.key} card={card} />
+                    ) : (
+                      <Visual key={card.key} card={card} />
+                    ),
                   ),
-                )}
+                  ...(proposals === undefined
+                    ? []
+                    : proposalLines(
+                        node,
+                        proposals.drafts,
+                        proposals.session,
+                      ).map((line) => <Proposal key={line.key} line={line} />)),
+                ]}
               />
             );
           })}
