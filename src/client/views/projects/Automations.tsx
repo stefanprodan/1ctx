@@ -5,7 +5,8 @@
 // leads to its page, with the schedule in words and the agent under
 // the name and its state at the right: running, a failed last run,
 // suspended, paused once its agent was deleted, or the next fire. New
-// automation leads to the editor. The words are Automations.model.ts.
+// automation leads to the editor. The words are Automations.model.ts
+// and Schedule.model.ts.
 
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
@@ -26,8 +27,9 @@ import {
   RowsTag,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { rowState, scheduleWords } from "./Automations.model.ts";
+import { rowState } from "./Automations.model.ts";
 import { Frame } from "./Frame.tsx";
+import { scheduleColumn } from "./Schedule.model.ts";
 import "./automations.css";
 
 export function Automations({ params }: { params: Params }) {
@@ -86,8 +88,7 @@ export function Automations({ params }: { params: Params }) {
                     mono
                     sub={
                       <>
-                        {scheduleWords(automation.schedule) ??
-                          automation.schedule}
+                        {scheduleColumn(automation)}
                         {" · "}
                         <RowsHandle
                           name={agent?.name ?? automation.agentName}

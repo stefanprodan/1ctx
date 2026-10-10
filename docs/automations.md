@@ -23,8 +23,8 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **A deadline may only tighten the `runDeadlineMs` limit.**
 - **Omitted fields: a create defaults, a PATCH keeps.**
   `disabledCapabilities` is a whole sorted set, empty on create;
-  `rerunOnRestart` is false on create. Each run snapshots the set onto
-  its session.
+  `rerunOnRestart` and `once` are false on create. Each run snapshots
+  the set onto its session.
 - **Anyone who sees the project runs, suspends, resumes, edits and
   deletes,** lowering retention included: a team project's members and
   every admin, a personal project's owner alone. A hidden project's
@@ -41,6 +41,15 @@ an event whose outcome is `run`, `skipped` or `deferred`
   it. A PATCH that changes the schedule or zone recomputes it from
   now, which ends a cap wait; other fields leave it. Resume computes
   it from now.
+- **A `once` task runs once.** The schedule stays cron. The fire that
+  starts its run (source `schedule`, a `restart` that takes a due fire,
+  or a Run now that takes a waiting one, since each moves `next_at`)
+  records the event, then `spendOnce()` suspends it with
+  `suspended_by` null and `once_fired_at` equal to `suspended_at`, in
+  that order in the fire's transaction. A plain Run now, a skip, a wait
+  and a deferral spend nothing. Resume arms it for one more run and
+  clears `once_fired_at`; suspend on it is a no-op, as on any
+  suspended task.
 - **A retired agent blocks its automations.** Deleting an agent retires
   it (the row stays) and suspends them (`docs/archive.md`). While the
   agent is retired, resume, Run now and a PATCH that keeps the agent are
@@ -106,7 +115,9 @@ an event whose outcome is `run`, `skipped` or `deferred`
   rows with source `restart`, through the scheduled fire's checks and
   cap waits. A suspend, the flag turned off, or a later run drops a
   row (`stillCut()`); the list is memory only, so a second restart
-  lists the cut run again.
+  lists the cut run again. A `once` task its own fire suspended
+  (`suspended_at` equal to `once_fired_at`, agent not retired) still
+  reruns, and stays suspended.
 - **The scheduler starts after `sessions.repair()`** and stops after
   the runner's shutdown.
 

@@ -4,9 +4,12 @@
 // The schedule builder without a DOM: an expression read into the
 // simplest shape that holds it (every few minutes, hourly, daily,
 // weekly, monthly) or left as cron, a shape written back to its
-// expression, and a fire as a line reads it. The
+// expression, a fire as a line reads it, and a schedule in words. The
 // server parses every expression; the builder only writes the ones
-// people pick most, so a shape it does not know stays the user's text.
+// people pick most, so a shape it does not know stays the user's text,
+// and the words stand the expression in for a shape they do not know.
+
+import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
 
 export const EVERY = [
   "minutes",
@@ -226,12 +229,15 @@ export function switchEvery(b: Builder, every: Every): Builder {
 }
 
 // a fire as a list reads it, in the zone: "Today 21:15", "Tomorrow
-// 09:00", "Wed Sep 16 09:00"; lowercase inside a sentence
+// 09:00", "Wed Sep 16 09:00"; lowercase inside a sentence. With year,
+// a later day names it, "Sun Oct 11 2026 09:00", since a task's one
+// fire may be a year off
 export function fireLabel(
   fire: number,
   now: number,
   tz: string,
   inline = false,
+  year = false,
 ): string {
   try {
     const day = (ms: number) =>
@@ -260,6 +266,7 @@ export function fireLabel(
       weekday: "short",
       day: "numeric",
       month: "short",
+      ...(year ? { year: "numeric" as const } : {}),
     })
       .formatToParts(fire)
       .filter((p) => p.type !== "literal")
@@ -269,4 +276,79 @@ export function fireLabel(
   } catch {
     return "";
   }
+}
+
+const ordinal = (n: number) => {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+};
+
+// "Monday", "Monday and Friday", "Monday, Wednesday and Friday", in
+// week order
+const dayList = (days: number[]): string => {
+  const names = WEEK.filter((d) => days.includes(d.value)).map((d) => d.name);
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+};
+
+// "every weekday at 09:00", "every 15 minutes"; null for a shape the
+// words do not know
+export function scheduleWords(schedule: string): string | null {
+  const fields = fieldsOf(schedule);
+  if (fields === null) return null;
+  const [min, hour, dom, month, dow] = fields as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+  if (month !== "*") return null;
+  const step = /^\*\/(\d{1,2})$/.exec(min);
+  if (step && hour === "*" && dom === "*" && dow === "*") {
+    const n = Number(step[1]);
+    return n === 1 ? "every minute" : `every ${n} minutes`;
+  }
+  const m = whole(min, 0, 59);
+  if (m === null) return null;
+  if (hour === "*" && dom === "*" && dow === "*") {
+    return m === 0 ? "every hour" : `every hour at :${pad(m)}`;
+  }
+  const h = whole(hour, 0, 23);
+  if (h === null) return null;
+  const at = `at ${pad(h)}:${pad(m)}`;
+  if (dom === "*") {
+    const days = daysOf(dow);
+    if (days === null) return null;
+    const key = days.join(",");
+    if (days.length === 7) return `every day ${at}`;
+    if (key === "1,2,3,4,5") return `every weekday ${at}`;
+    if (key === "0,6") return `every weekend day ${at}`;
+    return `every ${dayList(days)} ${at}`;
+  }
+  if (dow === "*") {
+    const d = whole(dom, 0, 31);
+    return d === null || d === 0
+      ? null
+      : `on the ${ordinal(d)} of each month ${at}`;
+  }
+  return null;
+}
+
+// the words with a capital, for a line of their own
+export function scheduleTitle(schedule: string): string {
+  const words = scheduleWords(schedule);
+  return words === null
+    ? schedule
+    : `${words[0].toUpperCase()}${words.slice(1)}`;
+}
+
+// the list's schedule column: the words, or the expression, and
+// "once" for a task that runs once
+export function scheduleColumn(
+  a: Pick<AutomationSummary, "schedule" | "once">,
+): string {
+  const words = scheduleWords(a.schedule) ?? a.schedule;
+  return a.once ? `${words}, once` : words;
 }

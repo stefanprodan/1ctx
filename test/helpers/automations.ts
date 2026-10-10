@@ -21,6 +21,8 @@ export const automationBody = (
     disabledCapabilities: string[];
     attentionMode: AttentionMode;
     attentionGuidance: string;
+    once: boolean;
+    rerunOnRestart: boolean;
   }> = {},
 ) => ({
   name: fields.name ?? "daily-run",
@@ -41,6 +43,10 @@ export const automationBody = (
   ...(fields.attentionGuidance === undefined
     ? {}
     : { attentionGuidance: fields.attentionGuidance }),
+  ...(fields.once === undefined ? {} : { once: fields.once }),
+  ...(fields.rerunOnRestart === undefined
+    ? {}
+    : { rerunOnRestart: fields.rerunOnRestart }),
 });
 
 export async function createAutomation(

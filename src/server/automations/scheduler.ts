@@ -180,7 +180,7 @@ export function scheduler(deps: Deps): Scheduler {
             eventFor(row, source, dueAt!, resolved),
           );
           const prepared = holder.value;
-          const updated = deps.store.recordEvent(row.id, {
+          const recordedRun = deps.store.recordEvent(row.id, {
             at: now,
             dueAt: dueAt!,
             source,
@@ -195,6 +195,12 @@ export function scheduler(deps: Deps): Scheduler {
             nextAt,
             runSessionId: prepared.detail.session.id,
           })!;
+          // a run that took a due fire spends a once task, after its
+          // event: the table holds next_at null exactly while suspended
+          const updated =
+            row.once && nextAt !== undefined
+              ? deps.store.spendOnce(row.id, now)!
+              : recordedRun;
           recorded.value = { msg: "fire", user: resolved.user.username };
           return {
             result: { detail: prepared.detail, launch: prepared.launch },

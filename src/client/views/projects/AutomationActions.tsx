@@ -58,7 +58,11 @@ export function AutomationActions({
           type="button"
           class="btn btn-small btn-primary"
           disabled={off || running || gone !== undefined}
-          title={running ? "A run is on its way" : gone}
+          title={
+            running
+              ? "A run is on its way"
+              : (gone ?? "Does everything a scheduled run does")
+          }
           onClick={() => void act("run", () => runAutomation(automation.id))}
         >
           <Icon name="bolt" size={12} />

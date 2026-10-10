@@ -49,6 +49,11 @@ export type AutomationSummary = {
   alert: AutomationAlert | null;
   // a run a restart cut starts again at the next start
   rerunOnRestart: boolean;
+  // the first fire that starts a run suspends it; resume arms it again
+  once: boolean;
+  // when that fire suspended it, equal to suspendedAt until a resume
+  // clears it; null while it has not fired
+  onceFiredAt: number | null;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
   // who suspended it, an admin outside the project included; null while

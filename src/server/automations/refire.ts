@@ -27,13 +27,16 @@ export function cutRuns(
 }
 
 // a suspend, the flag turned off, or a later run whatever its end,
-// leaves the cut one alone
+// leaves the cut one alone. A once task its own fire suspended reruns
+// and stays suspended: suspend cannot tell a rerun to stop
 export function stillCut(
   row: AutomationSummary,
   listed: Cut | undefined,
 ): boolean {
+  const ranOnce =
+    row.once && !row.agentRetired && row.suspendedAt === row.onceFiredAt;
   return (
-    row.suspendedAt === null &&
+    (row.suspendedAt === null || ranOnce) &&
     row.rerunOnRestart &&
     listed !== undefined &&
     row.lastRunSessionId === listed.sessionId

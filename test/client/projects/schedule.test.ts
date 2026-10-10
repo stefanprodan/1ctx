@@ -119,6 +119,11 @@ describe("a fire in words", () => {
     expect(fireLabel(at(15, 9), now, tz, true)).toBe("tomorrow 09:00");
     expect(fireLabel(at(16, 9), now, tz)).toBe("Wed Sep 16 09:00");
     expect(fireLabel(at(16, 9), now, "Not/AZone")).toBe("");
+    // with the year, a later day names it; today and tomorrow need none
+    expect(fireLabel(at(16, 9), now, tz, false, true)).toBe(
+      "Wed Sep 16 2026 09:00",
+    );
+    expect(fireLabel(at(15, 9), now, tz, false, true)).toBe("Tomorrow 09:00");
   });
 
   test("tomorrow is the next calendar day across a daylight change", () => {
