@@ -369,6 +369,15 @@ export class AutomationStore {
     return this.byId(id);
   }
 
+  // a write the row did not make, such as a foreign key clearing a run
+  // it named: the revision moves, so a client takes the row again
+  touch(id: string): AutomationSummary | null {
+    this.db
+      .query("update automations set revision = revision + 1 where id = ?")
+      .run(id);
+    return this.byId(id);
+  }
+
   forgetCapability(key: string, projectId?: string): void {
     forgetCapabilityIn(this.db, "automations", key, projectId);
   }

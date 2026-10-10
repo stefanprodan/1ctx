@@ -47,6 +47,7 @@ import {
   eventNote,
   followDeadlineLimit,
   nextLine,
+  nextRunsOf,
   nextRunWords,
   OWN_MEMORY_GUIDANCE,
   pickMemory,
@@ -359,6 +360,29 @@ describe("the row's words", () => {
     expect(nextLine(once, clock)).toBe(
       `Runs once on Wed Sep 1 2027 09:00, ${until(nextYear, clock)}`,
     );
+  });
+
+  test("a once task's next run is its one fire, or the fire it waits on", () => {
+    const tz = "UTC";
+    const nine = Date.UTC(2026, 9, 10, 9);
+    const fires = [nine + HOUR, nine + 2 * HOUR];
+    // a recurring task lists every fire ahead
+    expect(nextRunsOf(automation({ tz }), fires, nine + 10 * 60_000)).toEqual({
+      waiting: null,
+      fires,
+    });
+    const once = automation({ tz, once: true, nextAt: nine + HOUR });
+    expect(nextRunsOf(once, fires, nine + 10 * 60_000)).toEqual({
+      waiting: null,
+      fires: [nine + HOUR],
+    });
+    // waiting since 09:00 for a slot, 10:00 never comes: once it gets a
+    // slot it runs and suspends
+    const waiting = { ...once, nextAt: nine };
+    expect(nextRunsOf(waiting, fires, nine + 10 * 60_000)).toEqual({
+      waiting: "Waiting since 09:00",
+      fires: [],
+    });
   });
 
   test("the list's schedule column adds once", () => {

@@ -7,6 +7,8 @@
 // and stays suspended.
 
 import { describe, expect, test } from "bun:test";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import { RunCapacity } from "../../../src/server/runner/index.ts";
 import {
   type AutomationSummary,
@@ -129,13 +131,17 @@ describe("a task that runs once", () => {
 
   test("no second run starts while a long first one runs past its next time", async () => {
     const chat = await stopped();
-    const automation = await createAutomation(chat, { once: true });
+    // every five minutes, within the ten-minute run deadline
+    const automation = await createAutomation(chat, {
+      once: true,
+      schedule: "*/5 * * * *",
+    });
     const now = chat.app.now.value;
     setDue(chat.app, automation.id, now);
     const pending = chat.scripted.next();
     await chat.app.automationScheduler.pass();
     const script = await pending;
-    chat.app.now.value += 5 * HOUR;
+    chat.app.now.value += 6 * 60_000;
     await chat.app.automationScheduler.pass();
     await chat.app.automationScheduler.pass();
     await tick();
@@ -143,6 +149,11 @@ describe("a task that runs once", () => {
     const row = chat.app.automations.byId(automation.id)!;
     expectSpent(row, now);
     expect(row.lastEventAt).toBe(now);
+    // the first run still runs past the occurrence it skipped
+    expect(chat.app.sessions.byId(row.lastRunSessionId!)!.status).toBe(
+      "running",
+    );
+    expect(row.lastRunStatus).toBe("running");
     await finishRun(chat, script, row.lastRunSessionId!);
     chat.app.now.value += 24 * HOUR;
     await chat.app.automationScheduler.pass();
@@ -311,6 +322,65 @@ describe("a task that runs once", () => {
     expect(row.onceFiredAt).toBeNull();
     await chat.app.shutdown();
   });
+});
+
+describe("a run the row names, deleted", () => {
+  test.serial(
+    "the once run and the last run each move the revision and publish",
+    async () => {
+      const chat = await stopped();
+      const automation = await createAutomation(chat, { once: true });
+      setDue(chat.app, automation.id, chat.app.now.value);
+      const pending = chat.scripted.next();
+      await chat.app.automationScheduler.pass();
+      const script = await pending;
+      const onceRun = chat.app.automations.byId(automation.id)!
+        .lastRunSessionId!;
+      await finishRun(chat, script, onceRun);
+      const manual = await startRun(chat, automation.id);
+      await finishRun(chat, manual.main, manual.sessionId);
+      const changed: AutomationSummary[] = [];
+      const unsubscribe = subscribe((event: BusEvent) => {
+        if (event.type === "automation.changed") {
+          changed.push(event.data.automation);
+        }
+      }, silent);
+      try {
+        const before = chat.app.automations.byId(automation.id)!;
+        expect(before).toMatchObject({
+          onceRunSessionId: onceRun,
+          lastRunSessionId: manual.sessionId,
+        });
+        const once = await chat.member.call(
+          "DELETE",
+          `/api/sessions/${onceRun}`,
+        );
+        expect(once.status).toBe(200);
+        const cleared = chat.app.automations.byId(automation.id)!;
+        expect(cleared).toMatchObject({
+          onceRunSessionId: null,
+          lastRunSessionId: manual.sessionId,
+          revision: before.revision + 1,
+        });
+        expect(changed).toEqual([cleared]);
+
+        const last = await chat.member.call(
+          "DELETE",
+          `/api/sessions/${manual.sessionId}`,
+        );
+        expect(last.status).toBe(200);
+        const gone = chat.app.automations.byId(automation.id)!;
+        expect(gone).toMatchObject({
+          lastRunSessionId: null,
+          revision: cleared.revision + 1,
+        });
+        expect(changed).toEqual([cleared, gone]);
+      } finally {
+        unsubscribe();
+        await chat.app.shutdown();
+      }
+    },
+  );
 });
 
 describe("a once task cut by a restart", () => {

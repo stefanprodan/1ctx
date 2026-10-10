@@ -3,7 +3,7 @@
 
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
-import { markedRun } from "./alerts.ts";
+import { type DeletedRun, deletedRun } from "./alerts.ts";
 
 export type SessionDeleted = {
   type: "session.deleted";
@@ -26,21 +26,25 @@ function deleteSession(db: Db, id: string): SessionDeleted | "running" | null {
   };
 }
 
-export type Pruned = (automationId: string, endedAt: number) => BusEvent[];
+export type Pruned = (run: DeletedRun) => BusEvent[];
 
-// a marked run's delete updates its automation's open alert
+// a marked run's delete updates its automation's open alert, and one
+// the row names moves its revision, so a client drops the link
 export function removeSession(
   db: Db,
   id: string,
   pruned: Pruned,
 ): SessionDeleted | "running" | null {
   return transact(db, () => {
-    const marked = markedRun(db, id);
+    const run = deletedRun(db, id);
     const deleted = deleteSession(db, id);
     const events =
-      marked === null || deleted === null || deleted === "running"
+      run === null ||
+      (!run.marked && !run.named) ||
+      deleted === null ||
+      deleted === "running"
         ? []
-        : pruned(marked.automationId, marked.endedAt);
+        : pruned(run);
     return { result: deleted, events };
   });
 }

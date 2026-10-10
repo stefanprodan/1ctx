@@ -27,6 +27,7 @@ import {
   visualCounts,
   webCounts,
 } from "./activity.ts";
+import type { DeletedRun } from "./alerts.ts";
 import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { childWork, runningChildren } from "./child-work.ts";
@@ -50,6 +51,7 @@ import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 export {
   alertColumns,
   alertOf,
+  type DeletedRun,
   endedAfter,
   MARKED,
   openAlertRuns,
@@ -128,9 +130,10 @@ export type SessionsDeps = {
   limits: { current(): { archivedDeleteDays: number } };
   // the queue's dispatcher, built later in the runner
   wakeQueue(): void;
-  // a marked run's delete, with when it ended: its automation's open
-  // alert, built later in the automations area
-  pruned: (automationId: string, endedAt: number) => BusEvent[];
+  // a marked run's delete, with when it ended, or one its automation
+  // names: its open alert and its revision, built later in the
+  // automations area
+  pruned: (run: DeletedRun) => BusEvent[];
 };
 
 export type Sessions = {

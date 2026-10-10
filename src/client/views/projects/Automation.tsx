@@ -63,6 +63,7 @@ import {
   automationPageOf,
   eventNote,
   nextLine,
+  nextRunsOf,
   suspendedText,
 } from "./Automations.model.ts";
 import { OpenAttention } from "./OpenAttention.tsx";
@@ -133,10 +134,11 @@ function NextRuns({
     return <div class="split-line">Suspended</div>;
   }
   // a task that runs once has one fire, named with its year
-  const ahead = (held?.fires ?? []).filter((fire) => fire > now);
+  const next = nextRunsOf(automation, held?.fires ?? [], now);
   return (
     <>
-      {(automation.once ? ahead.slice(0, 1) : ahead).map((fire) => (
+      {next.waiting !== null && <div class="split-line">{next.waiting}</div>}
+      {next.fires.map((fire) => (
         <div key={fire} class="split-line automations-fire">
           <span>
             {fireLabel(fire, now, automation.tz, false, automation.once)}

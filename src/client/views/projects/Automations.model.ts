@@ -76,6 +76,23 @@ export function nextLine(
   return `Waiting since ${at.replace(/^today /, "")}`;
 }
 
+// The page's next runs: the preview's fires still ahead. A task that
+// runs once has one, and while its fire waits for a slot that fire is
+// it, said as the brief says a wait, since the next occurrence never
+// comes once the waiting one runs.
+export function nextRunsOf(
+  a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz" | "once">,
+  fires: readonly number[],
+  now: number,
+): { waiting: string | null; fires: number[] } {
+  const ahead = fires.filter((fire) => fire > now);
+  if (!a.once) return { waiting: null, fires: ahead };
+  if (waitingSince(a, now) !== null) {
+    return { waiting: nextLine(a, now), fires: [] };
+  }
+  return { waiting: null, fires: ahead.slice(0, 1) };
+}
+
 // the row's meta: the last failure, red on its own, then running,
 // waiting, suspended or the next fire
 export function rowState(

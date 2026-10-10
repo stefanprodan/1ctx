@@ -264,7 +264,8 @@ Flagged.
   everything a scheduled run does.
 - **A task that runs once says so.** The editor's Run once box sits
   under the schedule; with it on, the reading and the page's next runs
-  show the one fire with its year (`nextRunWords()`). A task its own
+  show the one fire with its year (`nextRunWords()`), or "Waiting
+  since" while that fire waits for a slot (`nextRunsOf()`). A task its own
   fire suspended (`ranOnce()`) reads "Ran once" and the time, linked to
   its once run; another reads "Suspended by". The list's schedule
   column adds "once" (`scheduleColumn()` in `Schedule.model.ts`).

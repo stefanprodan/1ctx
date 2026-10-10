@@ -438,8 +438,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     uploads: knowledge,
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
-    pruned: (automationId, endedAt) =>
-      automations.alerts.pruned(automationId, endedAt),
+    pruned: (run) => automations.runDeleted(run),
   });
   const configuredTools = toolsArea({
     db,

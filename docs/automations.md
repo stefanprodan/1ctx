@@ -136,6 +136,13 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **The row keeps its last event apart from its last run.**
   `last_run_*` is written from `session.changed` and by `reconcile()`
   at start, so a crash never leaves it stale.
+- **Deleting a run the row names moves its revision.** A foreign key
+  clears `last_run_session_id` or `once_run_session_id`, which bumps
+  nothing, so `removeSession()` (the route and both sweeps) hands the
+  run to `runDeleted()` in its transaction: the revision moves once and
+  the automation is published once, with its alert's change when the
+  run was marked.
+  `?runs=delete` needs none, since the row goes with them.
 - **Retention is per automation; orphaned runs fall to the chats
   sweep.** The scheduler deletes runs past `retention_days` through
   the sessions area's one delete. A run whose automation is gone is
