@@ -26,7 +26,7 @@ function Text({
   label: string;
   name: keyof Who;
   value: string;
-  type?: string;
+  type?: "email";
   hint?: string;
   save: Save;
   onInput: (e: Event) => void;
@@ -37,7 +37,10 @@ function Text({
       <span class="label label-required">{label}</span>
       <input
         name={name}
-        type={type}
+        // preact types an input by its type, so a union type fits no branch
+        {...(type === "email"
+          ? { type: "email" as const }
+          : { type: "text" as const })}
         aria-required="true"
         aria-invalid={invalid || undefined}
         autocomplete="off"

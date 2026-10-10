@@ -116,7 +116,7 @@ export function TextFold({
   onOpen,
 }: {
   block: TextBlock;
-  el?: RefObject<HTMLDivElement>;
+  el?: RefObject<HTMLDivElement | null>;
   open: boolean;
   long: boolean;
   onOpen: () => void;

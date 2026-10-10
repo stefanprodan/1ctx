@@ -63,7 +63,7 @@
     "node-liblzma": "2.2.0",
     "nodemailer": "10.0.16",
     "papaparse": "5.7.0",
-    "preact": "10.29.8",
+    "preact": "11.0.1",
     "preact-render-to-string": "6.8.0",
     "re2js": "1.4.0",
     "seek-bzip": "2.0.0",
