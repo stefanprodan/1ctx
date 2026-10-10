@@ -6,6 +6,7 @@
 // Confirm or Dismiss while it waits. The task page has the rest.
 
 import { useSignal } from "@preact/signals";
+import type { RefObject } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type {
@@ -22,20 +23,25 @@ import { ago } from "../lib/format.ts";
 import { automationHref, runHref, userHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { useNow } from "../lib/now.ts";
+import { useCut } from "../lib/resize.ts";
 import { useAction } from "../lib/save.ts";
+import { Fold } from "../ui/Fold.tsx";
 import {
   agoTickMs,
   changedFields,
+  changedLines,
+  createTexts,
   GONE_NAME,
   HEADS,
   INERT_WORDS,
   lineDetail,
-  lineDiff,
   lineHead,
   nameTarget,
   opens,
   type ProposalLine,
+  type TextBlock,
   UNREAD_NAME,
+  updateTexts,
   visibleParts,
 } from "./Proposal.model.ts";
 import "./proposal.css";
@@ -56,8 +62,9 @@ function Text({ text }: { text: string }) {
   );
 }
 
-// a new task's instructions; an update's changed fields with their old
-// values, then its changed lines, or the whole text once nothing differs
+// a new task's instructions and guidance; an update's changed fields
+// with their old values, then each text's changed lines, or the whole
+// text once nothing differs
 export function Details({
   draft,
   before,
@@ -68,17 +75,93 @@ export function Details({
   if (draft.action === "create") {
     return (
       <div class="proposal-details">
-        <div class="proposal-text">
-          <p class="proposal-body">
-            <Text text={draft.fields.instructions} />
-          </p>
-        </div>
+        {createTexts(draft.fields).map((block) => (
+          <TextBox key={block.label ?? ""} block={block} />
+        ))}
+        {!draft.fields.ownMemory && <p class="proposal-note">No memory</p>}
       </div>
     );
   }
   return draft.action === "update" ? (
     <UpdateDetails fields={draft.fields} before={before} />
   ) : null;
+}
+
+// the lines a box shows before Show all, the same count as proposal.css
+export const CUT_LINES = 18;
+
+function TextBox({ block }: { block: TextBlock }) {
+  const { el, open, long } = useCut<HTMLDivElement>([block.was, block.value]);
+  return (
+    <TextFold
+      block={block}
+      el={el}
+      open={open.value}
+      long={long.value}
+      onOpen={() => {
+        open.value = true;
+      }}
+    />
+  );
+}
+
+// a text, or its changed lines, cut to a few lines with Show all in the
+// fade, never a scroll box of its own; a count of lines cuts it before
+// the measure, which also catches long lines that wrap
+export function TextFold({
+  block,
+  el,
+  open,
+  long,
+  onOpen,
+}: {
+  block: TextBlock;
+  el?: RefObject<HTMLDivElement>;
+  open: boolean;
+  long: boolean;
+  onOpen: () => void;
+}) {
+  const { was, value } = block;
+  const changed = useMemo(
+    () => (was === undefined ? [] : changedLines(was, value)),
+    [was, value],
+  );
+  // pre-wrap draws no line for a trailing newline
+  const lines =
+    changed.length > 0
+      ? changed.length
+      : value.replace(/\n$/, "").split("\n").length;
+  const cut = long || lines > CUT_LINES;
+  return (
+    <div class="proposal-block">
+      {block.label !== null && (
+        <span class="proposal-label">{block.label}</span>
+      )}
+      {/* a cleared guidance with nothing to strike draws no empty box */}
+      {changed.length === 0 && value === "" ? (
+        <p class="proposal-note">None</p>
+      ) : (
+        <div class="proposal-text">
+          <Fold cut={cut && !open} onOpen={onOpen} label="Show all">
+            <div
+              ref={el}
+              class={`proposal-body${open ? "" : " proposal-clip"}`}
+            >
+              {changed.length === 0 ? (
+                <Text text={value} />
+              ) : (
+                changed.map((line, i) => (
+                  <div key={i} class={`proposal-diff proposal-${line.kind}`}>
+                    <Text text={line.text === "" ? " " : line.text} />
+                  </div>
+                ))
+              )}
+            </div>
+          </Fold>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function UpdateDetails({
@@ -88,18 +171,6 @@ function UpdateDetails({
   fields: Partial<ProposalFields>;
   before: AutomationSummary | null;
 }) {
-  const old = before?.instructions;
-  const changed = useMemo(
-    () =>
-      f.instructions === undefined
-        ? null
-        : old === undefined
-          ? []
-          : lineDiff(old, f.instructions).filter(
-              (line) => line.kind !== "same",
-            ),
-    [old, f.instructions],
-  );
   return (
     <div class="proposal-details">
       {changedFields(f, before).map((row) => (
@@ -109,23 +180,9 @@ function UpdateDetails({
           <span class="proposal-value">{row.value}</span>
         </div>
       ))}
-      {changed !== null && (
-        <div class="proposal-text">
-          {changed.length === 0 ? (
-            <p class="proposal-body">
-              <Text text={f.instructions ?? ""} />
-            </p>
-          ) : (
-            <div class="proposal-body">
-              {changed.map((line, i) => (
-                <div key={i} class={`proposal-diff proposal-${line.kind}`}>
-                  <Text text={line.text === "" ? " " : line.text} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {updateTexts(f, before).map((block) => (
+        <TextBox key={block.label ?? ""} block={block} />
+      ))}
     </div>
   );
 }

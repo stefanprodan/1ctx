@@ -80,8 +80,10 @@ Flagged.
   timer asks again after `TASK_RETRY_MS`. Above `DIFF_CELLS` the
   changed middle of the instructions is drawn as all removed, then all
   added. A pending rename shows the task's name; the new one is in the
-  details. Tag characters are marked everywhere but in the England,
-  Scotland and Wales flags.
+  details. A create opens to its memory and attention guidance under
+  the instructions when set, or "No memory"; an update diffs each
+  changed guidance as it does the instructions. Tag characters are
+  marked everywhere but in the England, Scotland and Wales flags.
 
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin.

@@ -11,6 +11,8 @@ import { onSocket } from "../../../src/client/data/sessions.ts";
 import {
   agoTickMs,
   changedFields,
+  changedLines,
+  createTexts,
   INERT_WORDS,
   lineDetail,
   lineDiff,
@@ -19,9 +21,15 @@ import {
   opens,
   proposalAction,
   proposalLines,
+  updateTexts,
   visibleParts,
 } from "../../../src/client/transcript/Proposal.model.ts";
-import { Details, Proposal } from "../../../src/client/transcript/Proposal.tsx";
+import {
+  CUT_LINES,
+  Details,
+  Proposal,
+  TextFold,
+} from "../../../src/client/transcript/Proposal.tsx";
 import {
   groupRows,
   type ReplyNode,
@@ -191,6 +199,25 @@ describe("the line's words", () => {
         } as Partial<AutomationDraft>),
       ),
     ).toBe("schedule, instructions");
+    expect(
+      lineDetail(
+        taskDraft("update", {
+          fields: {
+            name: "x",
+            ownMemory: true,
+            memoryGuidance: "Keep it.",
+            attentionGuidance: "Alert.",
+          },
+        } as Partial<AutomationDraft>),
+      ),
+    ).toBe("name, memory, attention");
+    expect(
+      lineDetail(
+        taskDraft("update", {
+          fields: { attentionGuidance: "" },
+        } as Partial<AutomationDraft>),
+      ),
+    ).toBe("attention");
     expect(lineDetail(taskDraft("run"))).toBeNull();
     expect(lineDetail({ ...createDraft(), state: "confirmed" })).toBeNull();
   });
@@ -248,6 +275,43 @@ describe("the line's words", () => {
     expect(changedFields({ once: true }, task({ once: false }))).toEqual([
       { label: "Run once", value: "yes", was: "no" },
     ]);
+    expect(
+      changedFields({ ownMemory: false }, task({ ownMemory: true })),
+    ).toEqual([{ label: "Own memory", value: "no", was: "yes" }]);
+    expect(changedFields({ ownMemory: false }, null)).toEqual([
+      { label: "Own memory", value: "no", was: null },
+    ]);
+  });
+
+  test("a create's guidance shows when set, an update's when changed", () => {
+    const fields = {
+      instructions: "Read the feed.",
+      ownMemory: true,
+      memoryGuidance: "Keep it.",
+      attentionGuidance: "",
+    };
+    expect(createTexts(fields)).toEqual([
+      { label: null, value: "Read the feed." },
+      { label: "Memory", value: "Keep it." },
+    ]);
+    expect(
+      createTexts({ ...fields, ownMemory: false, attentionGuidance: "Alert." }),
+    ).toEqual([
+      { label: null, value: "Read the feed." },
+      { label: "Attention", value: "Alert." },
+    ]);
+    expect(
+      updateTexts(
+        { attentionGuidance: "Alert.", memoryGuidance: "Keep it." },
+        task({ memoryGuidance: "", attentionGuidance: "Old." }),
+      ),
+    ).toEqual([
+      { label: "Memory", value: "Keep it.", was: "" },
+      { label: "Attention", value: "Alert.", was: "Old." },
+    ]);
+    expect(updateTexts({ memoryGuidance: "Keep it." }, null)).toEqual([
+      { label: "Memory", value: "Keep it.", was: undefined },
+    ]);
   });
 });
 
@@ -279,6 +343,19 @@ describe("the instructions as drawn", () => {
     expect(lineDiff("", "x")).toEqual([
       { kind: "removed", text: "" },
       { kind: "added", text: "x" },
+    ]);
+  });
+
+  test("a text set or cleared draws no blank line", () => {
+    expect(changedLines("", "a\nb")).toEqual([
+      { kind: "added", text: "a" },
+      { kind: "added", text: "b" },
+    ]);
+    expect(changedLines("a", "")).toEqual([{ kind: "removed", text: "a" }]);
+    expect(changedLines("", "")).toEqual([]);
+    expect(changedLines("a\nb", "a\nc")).toEqual([
+      { kind: "removed", text: "b" },
+      { kind: "added", text: "c" },
     ]);
   });
 
@@ -614,5 +691,117 @@ describe("an opened line", () => {
     expect(html).toContain("Report failures.");
     expect(html).toContain("proposal-added");
     expect(html).not.toContain("Check the queue.");
+  });
+
+  test("a create shows its guidance under the instructions, or No memory", () => {
+    const draft = createDraft();
+    if (draft.action === "create") {
+      draft.fields.memoryGuidance = "Keep failing sources.";
+      draft.fields.attentionGuidance = "A price moved.";
+    }
+    const html = render(<Details draft={draft} before={null} />);
+    expect(html.indexOf("Write a digest.")).toBeLessThan(
+      html.indexOf('<span class="proposal-label">Memory</span>'),
+    );
+    expect(html).toContain("Keep failing sources.");
+    expect(html).toContain('<span class="proposal-label">Attention</span>');
+    expect(html).toContain("A price moved.");
+    expect(html).not.toContain("No memory");
+    if (draft.action === "create") {
+      draft.fields.ownMemory = false;
+      draft.fields.memoryGuidance = "";
+      draft.fields.attentionGuidance = "";
+    }
+    const none = render(<Details draft={draft} before={null} />);
+    expect(none).toContain('<p class="proposal-note">No memory</p>');
+    expect(none).not.toContain("proposal-label");
+  });
+
+  test("a long text is cut with Show all and opens whole", () => {
+    const value = Array.from(
+      { length: CUT_LINES + 1 },
+      (_, i) => `line ${i}`,
+    ).join("\n");
+    const block = { label: "Memory", value };
+    const fold = (open: boolean, long = false) =>
+      render(
+        <TextFold block={block} open={open} long={long} onOpen={() => {}} />,
+      );
+    const cut = fold(false);
+    expect(cut).toContain("proposal-clip");
+    expect(cut).toContain(
+      '<button type="button" class="btn-text">Show all</button>',
+    );
+    expect(cut).toContain("fold-inset");
+    const whole = fold(true);
+    expect(whole).not.toContain("proposal-clip");
+    expect(whole).not.toContain("Show all");
+    expect(whole).toContain(`line ${CUT_LINES}`);
+    // a short text is cut only once the measure says it hides something
+    const short = { label: null, value: "one line" };
+    expect(
+      render(
+        <TextFold block={short} open={false} long={false} onOpen={() => {}} />,
+      ),
+    ).not.toContain("Show all");
+    expect(
+      render(<TextFold block={short} open={false} long onOpen={() => {}} />),
+    ).toContain("Show all");
+    // the changed lines of a diff are what the count cuts
+    const diff = render(
+      <TextFold
+        block={{ label: null, value: `${value}\nnew`, was: value }}
+        open={false}
+        long={false}
+        onOpen={() => {}}
+      />,
+    );
+    expect(diff).toContain("proposal-added");
+    expect(diff).not.toContain("Show all");
+  });
+
+  test("a guidance cleared on an unread task says None, not an empty box", () => {
+    const draft = taskDraft("update", {
+      fields: { attentionGuidance: "" },
+    } as Partial<AutomationDraft>);
+    const html = render(<Details draft={draft} before={null} />);
+    expect(html).toContain('<span class="proposal-label">Attention</span>');
+    expect(html).toContain('<p class="proposal-note">None</p>');
+    expect(html).not.toContain("proposal-text");
+  });
+
+  test("an update draws each changed guidance as it draws instructions", () => {
+    const draft = taskDraft("update", {
+      fields: {
+        ownMemory: true,
+        memoryGuidance: "Keep failing sources.",
+        attentionGuidance: "Only outages.\nA script failed.",
+      },
+    } as Partial<AutomationDraft>);
+    const html = render(
+      <Details
+        draft={draft}
+        before={task({
+          ownMemory: false,
+          memoryGuidance: "Keep everything.",
+          attentionGuidance: "Only outages.\nAny error.",
+        })}
+      />,
+    );
+    expect(html).toContain('<span class="proposal-label">Own memory</span>');
+    expect(html).toContain('<span class="proposal-was">no</span>');
+    expect(html).toContain('<span class="proposal-label">Memory</span>');
+    expect(html).toContain('<span class="proposal-label">Attention</span>');
+    for (const [kind, text] of [
+      ["removed", "Keep everything."],
+      ["added", "Keep failing sources."],
+      ["removed", "Any error."],
+      ["added", "A script failed."],
+    ]) {
+      expect(html).toContain(
+        `<div class="proposal-diff proposal-${kind}">${text}</div>`,
+      );
+    }
+    expect(html).not.toContain("Only outages.");
   });
 });
