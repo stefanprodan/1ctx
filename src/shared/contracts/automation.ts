@@ -54,6 +54,8 @@ export type AutomationSummary = {
   // when that fire suspended it, equal to suspendedAt until a resume
   // clears it; null while it has not fired
   onceFiredAt: number | null;
+  // the run that fire started; null once the session is deleted
+  onceRunSessionId: string | null;
   // an epoch while suspended; nextAt is null exactly then
   suspendedAt: number | null;
   // who suspended it, an admin outside the project included; null while
@@ -88,6 +90,22 @@ export type AutomationAlert = {
   // who marked its latest run
   by: string | null;
 };
+
+// its own fire suspended it and its run is kept: what the page says
+// "Ran once" for and what a restart may rerun while suspended. Whether
+// once is still set does not matter
+export function ranOnce(
+  a: Pick<
+    AutomationSummary,
+    "suspendedAt" | "onceFiredAt" | "onceRunSessionId"
+  >,
+): boolean {
+  return (
+    a.suspendedAt !== null &&
+    a.suspendedAt === a.onceFiredAt &&
+    a.onceRunSessionId !== null
+  );
+}
 
 // a PATCH whose edit revision the row has moved past; nothing is written
 export const STALE_EDIT = "changed since you opened it";

@@ -45,11 +45,15 @@ an event whose outcome is `run`, `skipped` or `deferred`
   starts its run (source `schedule`, a `restart` that takes a due fire,
   or a Run now that takes a waiting one, since each moves `next_at`)
   records the event, then `spendOnce()` suspends it with
-  `suspended_by` null and `once_fired_at` equal to `suspended_at`, in
-  that order in the fire's transaction. A plain Run now, a skip, a wait
-  and a deferral spend nothing. Resume arms it for one more run and
-  clears `once_fired_at`; suspend on it is a no-op, as on any
-  suspended task.
+  `suspended_by` null, `once_fired_at` equal to `suspended_at` and
+  `once_run_session_id` naming the run, in that order in the fire's
+  transaction. A plain Run now, a skip, a wait and a deferral spend
+  nothing. Resume arms it for one more run and clears both; suspend on
+  it is a no-op, as on any suspended task.
+- **`ranOnce()` in `shared/contracts/automation.ts` is the one test**
+  of a task its own fire suspended: `suspended_at` equal to
+  `once_fired_at` and a once run kept, whether `once` is still set.
+  The page and `stillCut()` both read it.
 - **A retired agent blocks its automations.** Deleting an agent retires
   it (the row stays) and suspends them (`docs/archive.md`). While the
   agent is retired, resume, Run now and a PATCH that keeps the agent are
@@ -115,9 +119,11 @@ an event whose outcome is `run`, `skipped` or `deferred`
   rows with source `restart`, through the scheduled fire's checks and
   cap waits. A suspend, the flag turned off, or a later run drops a
   row (`stillCut()`); the list is memory only, so a second restart
-  lists the cut run again. A `once` task its own fire suspended
-  (`suspended_at` equal to `once_fired_at`, agent not retired) still
-  reruns, and stays suspended.
+  lists the cut run again. A suspended task reruns only when
+  `ranOnce()` holds, its agent is not retired and the cut run is its
+  once run, never a later Run now. It stays suspended, and the rerun
+  becomes the once run (`carryOnceRun()`), so a second restart reruns
+  it again.
 - **The scheduler starts after `sessions.repair()`** and stops after
   the runner's shutdown.
 

@@ -88,6 +88,7 @@ const LATER_COLUMNS = [
   "edit_revision",
   "once",
   "once_fired_at",
+  "once_run_session_id",
 ];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
@@ -1883,9 +1884,17 @@ describe("the schema", () => {
       `);
       expect(migrate(db)).toEqual(expectedFrom("0056-automation-once"));
       expect(
-        db.query("select once, once_fired_at from automations").all(),
-      ).toEqual([{ once: 0, once_fired_at: null }]);
+        db
+          .query(
+            "select once, once_fired_at, once_run_session_id from automations",
+          )
+          .all(),
+      ).toEqual([{ once: 0, once_fired_at: null, once_run_session_id: null }]);
       expect(() => db.exec("update automations set once = 2")).toThrow(/CHECK/);
+      // the once run is a session, as the last run is
+      expect(() =>
+        db.exec("update automations set once_run_session_id = 'none'"),
+      ).toThrow(/FOREIGN KEY/);
     } finally {
       db.close();
     }

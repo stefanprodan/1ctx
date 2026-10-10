@@ -50,7 +50,6 @@ import {
   nextRunWords,
   OWN_MEMORY_GUIDANCE,
   pickMemory,
-  ranOnce,
   requestOf,
   retiredPick,
   rowState,
@@ -73,6 +72,7 @@ import {
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
   type AutomationSummary,
+  ranOnce,
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
@@ -105,6 +105,7 @@ const automation = (
   rerunOnRestart: false,
   once: false,
   onceFiredAt: null,
+  onceRunSessionId: null,
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -286,6 +287,7 @@ describe("the row's words", () => {
       suspendedBy: { id: "u9", username: "admin" },
       agentRetired: false,
       onceFiredAt: null,
+      onceRunSessionId: null,
       tz: "UTC",
     };
     expect(suspendedText(off, now)).toBe("Suspended by @admin 2h ago");
@@ -306,6 +308,8 @@ describe("the row's words", () => {
       once: true,
       suspendedAt: clock - 3 * HOUR,
       onceFiredAt: clock - 3 * HOUR,
+      onceRunSessionId: "s1",
+      lastRunSessionId: "s2",
       nextAt: null,
     });
     expect(ranOnce(spent)).toBe(true);
@@ -321,8 +325,18 @@ describe("the row's words", () => {
     };
     expect(ranOnce(held)).toBe(false);
     expect(suspendedText(held, clock)).toBe("Suspended by @admin 3h ago");
+    // turned off since, it still says it ran once
+    expect(suspendedText(automation({ ...spent, once: false }), clock)).toBe(
+      "Ran once today 09:00",
+    );
+    // its run deleted, nothing is left to say it ran
+    const gone = { ...spent, onceRunSessionId: null, suspendedBy: null };
+    expect(ranOnce(gone)).toBe(false);
+    expect(suspendedText(gone, clock)).toBe("Suspended 3h ago");
     // resumed: armed again, not suspended
-    expect(ranOnce({ suspendedAt: null, onceFiredAt: null })).toBe(false);
+    expect(
+      ranOnce({ suspendedAt: null, onceFiredAt: null, onceRunSessionId: null }),
+    ).toBe(false);
   });
 
   test("a task that runs once names its one fire with its year", () => {

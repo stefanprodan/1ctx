@@ -38,6 +38,7 @@ type Raw = RawAlert & {
   rerun_on_restart: number;
   once: number;
   once_fired_at: number | null;
+  once_run_session_id: string | null;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -96,6 +97,7 @@ const row = (raw: Raw): AutomationSummary => ({
   rerunOnRestart: raw.rerun_on_restart === 1,
   once: raw.once === 1,
   onceFiredAt: raw.once_fired_at,
+  onceRunSessionId: raw.once_run_session_id,
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -332,16 +334,38 @@ export class AutomationStore {
   }
 
   // a once task's fire spends it, after its event in the same
-  // transaction: suspended by nobody, at the time it fired
-  spendOnce(id: string, now: number): AutomationSummary | null {
+  // transaction: suspended by nobody, at the time it fired, naming the
+  // run it started
+  spendOnce(
+    id: string,
+    sessionId: string,
+    now: number,
+  ): AutomationSummary | null {
     this.db
       .query(
         `update automations set suspended_at = ?, suspended_by = null,
-           once_fired_at = ?, next_at = null, revision = revision + 1,
-           updated_at = ?
+           once_fired_at = ?, once_run_session_id = ?, next_at = null,
+           revision = revision + 1, updated_at = ?
          where id = ? and once = 1 and suspended_at is null`,
       )
-      .run(now, now, now, id);
+      .run(now, now, sessionId, now, id);
+    return this.byId(id);
+  }
+
+  // a restart's rerun of the once run is the once run from now on, so
+  // the page links it and a second restart reruns it again
+  carryOnceRun(
+    id: string,
+    sessionId: string,
+    now: number,
+  ): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set once_run_session_id = ?,
+           revision = revision + 1, updated_at = ?
+         where id = ? and once_run_session_id is not null`,
+      )
+      .run(sessionId, now, id);
     return this.byId(id);
   }
 
@@ -354,7 +378,7 @@ export class AutomationStore {
     this.db
       .query(
         `update automations set suspended_at = null, suspended_by = null,
-           next_at = ?, once_fired_at = null,
+           next_at = ?, once_fired_at = null, once_run_session_id = null,
            revision = revision + 1, updated_at = ?
          where id = ? and suspended_at is not null`,
       )

@@ -19,6 +19,7 @@ import {
 } from "../../../shared/capabilities.ts";
 import {
   type AutomationSummary,
+  ranOnce,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import {
@@ -98,18 +99,18 @@ export function rowState(
   return { bad: failed, text: next ?? "" };
 }
 
-// its own fire suspended it: its once_fired_at is the suspend's time
-export const ranOnce = (
-  a: Pick<AutomationSummary, "suspendedAt" | "onceFiredAt">,
-): boolean => a.suspendedAt !== null && a.suspendedAt === a.onceFiredAt;
-
 // "Suspended by @bogdan 2h ago"; a row suspended before the name was
 // kept says only when; one whose agent was deleted stays paused until
 // an edit picks another; one its run suspended "Ran once today 09:00"
 export function suspendedText(
   a: Pick<
     AutomationSummary,
-    "suspendedAt" | "suspendedBy" | "agentRetired" | "onceFiredAt" | "tz"
+    | "suspendedAt"
+    | "suspendedBy"
+    | "agentRetired"
+    | "onceFiredAt"
+    | "onceRunSessionId"
+    | "tz"
   >,
   now: number,
 ): string {

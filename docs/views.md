@@ -266,7 +266,7 @@ Flagged.
   under the schedule; with it on, the reading and the page's next runs
   show the one fire with its year (`nextRunWords()`). A task its own
   fire suspended (`ranOnce()`) reads "Ran once" and the time, linked to
-  its last run; another reads "Suspended by". The list's schedule
+  its once run; another reads "Suspended by". The list's schedule
   column adds "once" (`scheduleColumn()` in `Schedule.model.ts`).
 - **Edit and Delete show for every member.** On a task someone else
   owns the save row says a save makes the user the owner

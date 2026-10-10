@@ -8,8 +8,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { RunCapacity } from "../../../src/server/runner/index.ts";
-import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
-import { type TestApp, testApp } from "../../helpers/app.ts";
+import {
+  type AutomationSummary,
+  ranOnce,
+} from "../../../src/shared/contracts/automation.ts";
+import { collectLogs, type TestApp, testApp } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -28,22 +31,31 @@ const HOUR = 3_600_000;
 const setDue = (app: TestApp, id: string, at: number) =>
   app.db.query("update automations set next_at = ? where id = ?").run(at, id);
 
-async function stopped() {
-  const chat = await chatApp();
+async function stopped(logs?: ReturnType<typeof collectLogs>) {
+  const chat = await chatApp(
+    logs === undefined ? {} : { logFactory: logs.logFactory },
+  );
   chat.app.automationScheduler.stop();
   await tick();
   return chat;
 }
 
-// suspended by its own fire at that time, nobody named
-function expectSpent(row: AutomationSummary, at: number) {
+// suspended by its own fire at that time, nobody named, its once run
+// the last run unless the test names another
+function expectSpent(
+  row: AutomationSummary,
+  at: number,
+  run: string | null = row.lastRunSessionId,
+) {
   expect(row).toMatchObject({
     once: true,
     suspendedAt: at,
     onceFiredAt: at,
+    onceRunSessionId: run,
     suspendedBy: null,
     nextAt: null,
   });
+  expect(ranOnce(row)).toBe(true);
 }
 
 // the run's answer, then the run ended
@@ -67,9 +79,9 @@ describe("a task that runs once", () => {
         calls.push({ name: "recordEvent", open: chat.app.db.inTransaction });
         return recordEvent(id, fields);
       };
-      store.spendOnce = (id, now) => {
+      store.spendOnce = (id, sessionId, now) => {
         calls.push({ name: "spendOnce", open: chat.app.db.inTransaction });
-        return spendOnce(id, now);
+        return spendOnce(id, sessionId, now);
       };
       const now = chat.app.now.value;
       setDue(chat.app, automation.id, now);
@@ -93,30 +105,27 @@ describe("a task that runs once", () => {
     },
   );
 
-  test.serial(
-    "a failed suspend writes no event and starts no run",
-    async () => {
-      const chat = await stopped();
-      const automation = await createAutomation(chat, { once: true });
-      const store = chat.app.automations;
-      store.spendOnce = () => {
-        throw new Error("disk full");
-      };
-      setDue(chat.app, automation.id, chat.app.now.value);
-      await chat.app.automationScheduler.pass();
-      await tick();
-      const row = store.byId(automation.id)!;
-      // the fire's own failure is recorded as a skip, with no run
-      expect(row).toMatchObject({
-        lastEventOutcome: "skipped",
-        lastRunSessionId: null,
-        suspendedAt: null,
-        onceFiredAt: null,
-      });
-      expect(chat.app.sessions.runningAutomation(automation.id)).toBe(false);
-      await chat.app.shutdown();
-    },
-  );
+  test.serial("a failed suspend records a skip and starts no run", async () => {
+    const chat = await stopped();
+    const automation = await createAutomation(chat, { once: true });
+    const store = chat.app.automations;
+    store.spendOnce = () => {
+      throw new Error("disk full");
+    };
+    setDue(chat.app, automation.id, chat.app.now.value);
+    await chat.app.automationScheduler.pass();
+    await tick();
+    const row = store.byId(automation.id)!;
+    // the fire's own failure is recorded as a skip, with no run
+    expect(row).toMatchObject({
+      lastEventOutcome: "skipped",
+      lastRunSessionId: null,
+      suspendedAt: null,
+      onceFiredAt: null,
+    });
+    expect(chat.app.sessions.runningAutomation(automation.id)).toBe(false);
+    await chat.app.shutdown();
+  });
 
   test("no second run starts while a long first one runs past its next time", async () => {
     const chat = await stopped();
@@ -215,7 +224,8 @@ describe("a task that runs once", () => {
   });
 
   test("after a long downtime it fires once, at the newest missed time", async () => {
-    const chat = await stopped();
+    const logs = collectLogs();
+    const chat = await stopped(logs);
     const automation = await createAutomation(chat, { once: true });
     const missed = chat.app.now.value;
     setDue(chat.app, automation.id, missed);
@@ -233,6 +243,14 @@ describe("a task that runs once", () => {
       Math.floor(chat.app.now.value / HOUR) * HOUR,
     );
     expect(row.lastEventDueAt).toBeGreaterThan(missed + 9 * HOUR);
+    expect(
+      logs.events
+        .filter((event) => event.msg === "skip" || event.msg === "fire")
+        .map((event) => ({ msg: event.msg, reason: event.fields.reason })),
+    ).toEqual([
+      { msg: "skip", reason: "still waiting" },
+      { msg: "fire", reason: undefined },
+    ]);
     await finishRun(chat, script, row.lastRunSessionId!);
     await chat.app.shutdown();
   });
@@ -266,6 +284,7 @@ describe("a task that runs once", () => {
       once: true,
       suspendedAt: null,
       onceFiredAt: null,
+      onceRunSessionId: null,
     });
     expect(armed.nextAt).toBeGreaterThan(chat.app.now.value);
 
@@ -342,6 +361,7 @@ describe("a once task cut by a restart", () => {
     const rerun = second.automations.byId(automation.id)!;
     expect(rerun.lastEventSource).toBe("restart");
     expect(rerun.lastRunSessionId).not.toBe(first.lastRunSessionId);
+    // the rerun carries the once run on
     expectSpent(rerun, now);
     await second.shutdown();
 
@@ -364,6 +384,112 @@ describe("a once task cut by a restart", () => {
     expect(chat.scripted.scripts).toHaveLength(3);
     expectSpent(fourth.automations.byId(automation.id)!, now);
     await fourth.shutdown();
+  });
+
+  test("a Run now on a spent task is not rerun after a restart", async () => {
+    const chat = await stopped();
+    const automation = await createAutomation(chat, {
+      once: true,
+      rerunOnRestart: true,
+    });
+    const now = chat.app.now.value;
+    setDue(chat.app, automation.id, now);
+    const pending = chat.scripted.next();
+    await chat.app.automationScheduler.pass();
+    const script = await pending;
+    const spentRun = chat.app.automations.byId(automation.id)!
+      .lastRunSessionId!;
+    await finishRun(chat, script, spentRun);
+    const manual = await startRun(chat, automation.id);
+    await chat.app.shutdown();
+
+    const next = await restart(chat);
+    await next.automationScheduler.pass();
+    await tick();
+    expect(chat.scripted.scripts).toHaveLength(2);
+    const row = next.automations.byId(automation.id)!;
+    expect(row.lastRunSessionId).toBe(manual.sessionId);
+    expect(row.lastEventSource).toBe("manual");
+    expectSpent(row, now, spentRun);
+    await next.shutdown();
+  });
+
+  test("turned off on a spent task, it still ran once and its cut run reruns", async () => {
+    const chat = await stopped();
+    const automation = await createAutomation(chat, {
+      once: true,
+      rerunOnRestart: true,
+    });
+    const now = chat.app.now.value;
+    setDue(chat.app, automation.id, now);
+    const pending = chat.scripted.next();
+    await chat.app.automationScheduler.pass();
+    await pending;
+    const spent = chat.app.automations.byId(automation.id)!;
+    const off = await chat.member.call(
+      "PATCH",
+      `/api/automations/${automation.id}`,
+      { body: { editRevision: spent.editRevision, once: false } },
+    );
+    expect(off.status).toBe(200);
+    const turned: AutomationSummary = (await off.json()).automation;
+    expect(turned).toMatchObject({
+      once: false,
+      suspendedAt: now,
+      onceRunSessionId: spent.lastRunSessionId,
+    });
+    expect(ranOnce(turned)).toBe(true);
+    await chat.app.shutdown();
+
+    const next = await restart(chat);
+    await waitScript(chat.scripted, 2);
+    const row = next.automations.byId(automation.id)!;
+    expect(row).toMatchObject({
+      lastEventSource: "restart",
+      once: false,
+      suspendedAt: now,
+      onceFiredAt: now,
+      nextAt: null,
+    });
+    expect(row.onceRunSessionId).toBe(row.lastRunSessionId);
+    expect(row.lastRunSessionId).not.toBe(spent.lastRunSessionId);
+    chat.scripted.scripts.at(-1)!.reply("done");
+    await settleRun({ ...chat, app: next }, row.lastRunSessionId!);
+    await next.shutdown();
+  });
+
+  test("a spent task whose agent was deleted does not rerun", async () => {
+    const chat = await stopped();
+    const automation = await createAutomation(chat, {
+      once: true,
+      rerunOnRestart: true,
+    });
+    const now = chat.app.now.value;
+    setDue(chat.app, automation.id, now);
+    const pending = chat.scripted.next();
+    await chat.app.automationScheduler.pass();
+    await pending;
+    const spent = chat.app.automations.byId(automation.id)!;
+    await chat.app.shutdown();
+    // as an agent's delete leaves it: retired, the task still suspended
+    chat.app.db
+      .query(
+        "update agents set deleted_at = ?, provider_id = null where id = ?",
+      )
+      .run(now, chat.agentId);
+
+    const next = await restart(chat);
+    await next.automationScheduler.pass();
+    await tick();
+    expect(chat.scripted.scripts).toHaveLength(1);
+    expect(next.automations.byId(automation.id)).toMatchObject({
+      agentRetired: true,
+      lastRunSessionId: spent.lastRunSessionId,
+      lastEventSource: "schedule",
+      lastEventOutcome: "run",
+      suspendedAt: now,
+    });
+    await next.shutdown();
   });
 
   test("a member's suspend still drops the cut run", async () => {
@@ -405,12 +531,12 @@ describe("the setting on the wire", () => {
     // a change of once is a change: the edit revision moves
     expect(turned.editRevision).toBe(plain.editRevision + 1);
     expect(turned.nextAt).toBe(plain.nextAt);
-    const kept = await patch({ name: "renamed" });
-    expect((await kept.json()).automation.once).toBe(true);
+    const kept: AutomationSummary = (
+      await (await patch({ name: "renamed" })).json()
+    ).automation;
+    expect(kept.once).toBe(true);
     const same = await patch({ once: true });
-    expect((await same.json()).automation.editRevision).toBe(
-      turned.editRevision + 1,
-    );
+    expect((await same.json()).automation.editRevision).toBe(kept.editRevision);
     const bad = await patch({ once: "yes" });
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ error: "once must be boolean" });

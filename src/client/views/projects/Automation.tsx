@@ -16,7 +16,10 @@
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  ranOnce,
+} from "../../../shared/contracts/automation.ts";
 import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
@@ -60,7 +63,6 @@ import {
   automationPageOf,
   eventNote,
   nextLine,
-  ranOnce,
   suspendedText,
 } from "./Automations.model.ts";
 import { OpenAttention } from "./OpenAttention.tsx";
@@ -293,8 +295,8 @@ export function Automation({ params }: { params: Params }) {
                     {/* the run that spent it says how it went */}
                     {!row.agentRetired &&
                     ranOnce(row) &&
-                    row.lastRunSessionId !== null ? (
-                      <a href={runHref(row.lastRunSessionId)}>
+                    row.onceRunSessionId !== null ? (
+                      <a href={runHref(row.onceRunSessionId)}>
                         {suspendedText(row, now)}
                       </a>
                     ) : (
