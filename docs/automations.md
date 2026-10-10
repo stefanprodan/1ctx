@@ -70,14 +70,22 @@ an event whose outcome is `run`, `skipped` or `deferred`
   run through the `automation` tool.** Each writes one pending draft,
   never a task or a run. The answering agent is fixed by the turn;
   updates keep the task's agent. The parsers and schedule checks are
-  the form's. A taken name links its task. An update on a retired agent
-  or with a deadline above the current limit sends the user to the task
-  page.
+  the form's, after a name is shaped as the page shapes it. A taken
+  name links its task. An update on a retired agent or with a deadline
+  above the current limit sends the user to the task page.
 - **The form and tool read `shared/automation-defaults.ts`.** A create
   follows the deadline limit, keeps 30 days, uses own memory with
   `OWN_MEMORY_GUIDANCE`, attention by the agent with no guidance, no
   rerun on restart and `once` off. A proposal takes the send's disabled
   set without `automations` and `memory`; an update keeps the task's set.
+- **A proposal never stores a guidance nothing reads.** `memoryGuidance`
+  without own memory, on the create or the task after the update, is
+  refused; a create with `ownMemory` false stores none. As on the page,
+  an update turning own memory on with the guidance omitted fills the
+  task's blank one, and turning it off drops an unchanged default; a
+  given guidance, `""` included, is kept as given. An attention
+  guidance on a task whose attention is off sends the user to the task
+  page. The attention mode is the page's alone.
 - **`AutomationDraftStore` belongs to automations.** Its session
   foreign key cascades; send, message, task and created run ids have no
   foreign keys, so decided records survive regenerate and retention.

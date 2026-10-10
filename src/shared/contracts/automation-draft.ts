@@ -6,8 +6,27 @@ import type { AutomationSummary } from "./automation.ts";
 
 export type ProposalFields = Pick<
   AutomationSummary,
-  "name" | "instructions" | "schedule" | "tz" | "once"
+  | "name"
+  | "instructions"
+  | "schedule"
+  | "tz"
+  | "once"
+  | "ownMemory"
+  | "memoryGuidance"
+  | "attentionGuidance"
 >;
+
+// what an update may change
+export const PROPOSAL_FIELDS = [
+  "name",
+  "schedule",
+  "tz",
+  "once",
+  "instructions",
+  "ownMemory",
+  "memoryGuidance",
+  "attentionGuidance",
+] as const satisfies readonly (keyof ProposalFields)[];
 
 export type CreateTaskFields = ProposalFields &
   Pick<
@@ -15,10 +34,7 @@ export type CreateTaskFields = ProposalFields &
     | "agentId"
     | "deadlineMs"
     | "retentionDays"
-    | "ownMemory"
-    | "memoryGuidance"
     | "attentionMode"
-    | "attentionGuidance"
     | "rerunOnRestart"
     | "disabledCapabilities"
   >;
@@ -98,7 +114,7 @@ function proposal(value: Record<string, unknown>): boolean {
       keys.length > 0 &&
       keys.every(
         (key) =>
-          ["name", "instructions", "schedule", "tz", "once"].includes(key) &&
+          (PROPOSAL_FIELDS as readonly string[]).includes(key) &&
           fieldGuards[key as keyof ProposalFields](fields[key]),
       )
     );

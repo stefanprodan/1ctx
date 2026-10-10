@@ -78,7 +78,8 @@ export const automationTool = (
   over: Partial<AutomationToolSummary> = {},
 ): AutomationToolSummary => ({
   name: "automation",
-  description: "Read this project's scheduled tasks.",
+  description:
+    "Read this project's scheduled tasks and propose changes to them.",
   parameters: {},
   parametersHtml: "",
   tokens: 200,

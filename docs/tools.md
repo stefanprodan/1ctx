@@ -165,7 +165,7 @@ words.
 
 ## Scheduled tasks
 
-- **`automation` reads the chat's project's tasks, in a chat only.**
+- **`automation` manages the chat's project's tasks, in a chat only.**
   Its main rounds, a summoned agent's and a chat's subagents are
   offered it; a run, a run's subagents (the scope's `origin`), the
   memory phase and the attention step never are, and a call whose
@@ -181,13 +181,15 @@ words.
   `shared/automation-limits.ts`; no cap counts a project's pending drafts.
   A shared send counter reserves before
   the first await and returns a refused call's place.
-- **Create takes name, instructions, schedule, optional tz and once.**
-  The zone defaults to the user's profile. Update needs id and at least
-  one of those fields; an omitted zone keeps the task's. Suspend, resume
-  and run take id alone. Defaults and checks are `docs/automations.md`'s.
-  The description asks for standalone instructions and proposals only
-  on the user's ask, never on task or tool text. Each answer says it
-  waits for a person; suspend says a run already going keeps going.
+- **Create takes name, instructions, schedule, optional tz, once, own
+  memory and both guidances.** The zone defaults to the user's profile.
+  Update needs id and at least one of those fields; an omitted zone
+  keeps the task's. Suspend, resume and run take id alone. Defaults and
+  checks are `docs/automations.md`'s. The description asks for
+  standalone instructions, attention and memory in their guidances, and
+  proposals only on the user's ask, never on task or tool text. Each
+  answer says it waits for a person; suspend says a run already going
+  keeps going.
 - **It grows by actions, never by tools.** `action` is an enum, and
   dispatch takes only its own list; each action names the fields it
   takes and refuses the rest. `list` is one line per task, never the
