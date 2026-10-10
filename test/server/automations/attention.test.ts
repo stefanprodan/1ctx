@@ -36,20 +36,27 @@ describe("an automation's attention mode", () => {
       const path = `/api/automations/${automation.id}`;
       const set = await chat.member.call("PATCH", path, {
         body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
           attentionMode: "decider",
           attentionGuidance: " \u0000Only when Flux is behind. ",
         },
       });
       expect(set.status).toBe(200);
       const kept = await chat.member.call("PATCH", path, {
-        body: { name: "renamed" },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          name: "renamed",
+        },
       });
       expect((await kept.json()).automation).toMatchObject({
         attentionMode: "decider",
         attentionGuidance: "Only when Flux is behind.",
       });
       const off = await chat.member.call("PATCH", path, {
-        body: { attentionMode: "off" },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          attentionMode: "off",
+        },
       });
       expect((await off.json()).automation.attentionMode).toBe("off");
       expect(chat.app.automations.byId(automation.id)).toMatchObject({
@@ -78,11 +85,19 @@ describe("an automation's attention mode", () => {
         expect(() =>
           parseSaveAutomation({ ...automationBody(chat), ...fields }),
         ).toThrow(said);
-        expect(() => parsePatchAutomation(fields)).toThrow(said);
+        expect(() =>
+          parsePatchAutomation({ ...fields, editRevision: 0 }),
+        ).toThrow(said);
         const changed = await chat.member.call(
           "PATCH",
           `/api/automations/${automation.id}`,
-          { body: fields },
+          {
+            body: {
+              ...fields,
+              editRevision: chat.app.automations.byId(automation.id)!
+                .editRevision,
+            },
+          },
         );
         expect(changed.status).toBe(400);
         expect(chat.app.automations.byId(automation.id)).toEqual(automation);

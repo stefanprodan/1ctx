@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The automation page's buttons over its runs. Anyone in the project
-// runs, suspends and resumes; Edit and Delete are for whoever may change
-// the automation, and Delete asks once, in place. Run now and Resume
+// runs, suspends, resumes, edits and deletes, and Delete asks once, in
+// place. Run now and Resume
 // wait while its agent is deleted, until an edit picks another.
 
 import { useSignal } from "@preact/signals";
@@ -18,16 +18,14 @@ import { says } from "../../lib/format.ts";
 import { automationHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 
-// Run now at the left; Suspend or Resume, Edit and Delete at the right,
-// the last two for whoever may change it. A refusal shows on its own
+// Run now at the left; Suspend or Resume, Edit and Delete at the
+// right. A refusal shows on its own
 // line under them
 export function AutomationActions({
   automation,
-  editable,
   onFailure,
 }: {
   automation: AutomationSummary;
-  editable: boolean;
   onFailure: (text: string | null) => void;
 }) {
   const busy = useSignal<"run" | "suspend" | "delete" | "purge" | null>(null);
@@ -52,7 +50,7 @@ export function AutomationActions({
   const gone = automation.agentRetired ? "Its agent was deleted" : undefined;
   const off = busy.value !== null;
   // while Delete asks, the confirmation is the only thing to press
-  const ask = editable && asking.value;
+  const ask = asking.value;
   return (
     <div class="automations-actions">
       {!ask && (
@@ -119,28 +117,24 @@ export function AutomationActions({
               <Icon name={suspended ? "play" : "pause"} size={12} />
               {suspended ? "Resume" : "Suspend"}
             </button>
-            {editable && (
-              <a
-                class="btn btn-small"
-                href={`${automationHref(automation.id)}/edit`}
-              >
-                <Icon name="pencil" size={12} />
-                Edit
-              </a>
-            )}
-            {editable && (
-              <button
-                type="button"
-                class="btn btn-small"
-                disabled={off}
-                onClick={() => {
-                  asking.value = true;
-                }}
-              >
-                <Icon name="trash" size={12} />
-                Delete
-              </button>
-            )}
+            <a
+              class="btn btn-small"
+              href={`${automationHref(automation.id)}/edit`}
+            >
+              <Icon name="pencil" size={12} />
+              Edit
+            </a>
+            <button
+              type="button"
+              class="btn btn-small"
+              disabled={off}
+              onClick={() => {
+                asking.value = true;
+              }}
+            >
+              <Icon name="trash" size={12} />
+              Delete
+            </button>
           </>
         )}
       </div>

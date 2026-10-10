@@ -81,7 +81,13 @@ describe("automation scheduler", () => {
         const changed = await chat.member.call(
           "PATCH",
           `/api/automations/${automation.id}`,
-          { body: { memoryGuidance: "Snapshot: remember the latest result" } },
+          {
+            body: {
+              editRevision: chat.app.automations.byId(automation.id)!
+                .editRevision,
+              memoryGuidance: "Snapshot: remember the latest result",
+            },
+          },
         );
         expect(changed.status).toBe(200);
         expect(policy.automation?.memoryGuidance).toBe(

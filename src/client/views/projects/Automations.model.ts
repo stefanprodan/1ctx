@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation pages say and check without a DOM: a schedule
-// in words for the shapes people write most, the list row's state, who
-// may change a row, and the editor's fields to a request; a run's words
-// are in Run.model.ts. The server parses the schedule and the zone; the
+// in words for the shapes people write most, the list row's state, what
+// a save does to the owner, and the editor's fields to a request; a
+// run's words are in Run.model.ts. The server parses the schedule and the zone; the
 // words here only read them, and the expression itself stands in for
 // any shape they do not know.
 
@@ -21,13 +21,12 @@ import {
 } from "../../../shared/capabilities.ts";
 import {
   type AutomationSummary,
+  STALE_EDIT,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import {
   type AttentionMode,
   DEFERRED_BY_RESTART,
-  type ProjectKind,
-  type Role,
 } from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
@@ -202,15 +201,20 @@ export function eventNote(a: AutomationSummary, now: number): string | null {
   return deferred ? `The last run was ${DEFERRED_BY_RESTART}` : null;
 }
 
-// the owner edits and deletes; in a team project an admin does too
-export function canChange(
-  a: Pick<AutomationSummary, "ownerId">,
-  user: { id: string; role: Role } | null,
-  kind: ProjectKind,
-): boolean {
-  if (user === null) return false;
-  return a.ownerId === user.id || (kind === "team" && user.role === "admin");
+// a save that changes a field makes its editor the owner, so the save
+// row says so on a task someone else owns
+export function ownerNote(
+  a: Pick<AutomationSummary, "ownerId"> | null,
+  userId: string | null,
+): string | null {
+  if (a === null || userId === null || a.ownerId === userId) return null;
+  return "Saving makes you the owner. Scheduled runs will act as you.";
 }
+
+// the refusal of a save someone else's change got to first
+export const staleEdit = (
+  problem: { error: string; status?: number } | null,
+): boolean => problem?.status === 409 && problem.error === STALE_EDIT;
 
 // The automation page and its editor: the row, the project it was found
 // in, and the failure, a deleted row once the list is in without it.

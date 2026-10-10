@@ -177,6 +177,14 @@
     padding-top: var(--space-4);
     border-top: 1px solid var(--line);
   }
+  /* what a save does to a task someone else owns, a line of its own
+     over the buttons */
+  .automations-owner-note {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
   .automations-aside-text {
     margin: 0;
     color: var(--dim);

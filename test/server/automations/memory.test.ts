@@ -34,7 +34,12 @@ describe("automation memory flag", () => {
     const patched = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
-      { body: { projectMemory: true } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          projectMemory: true,
+        },
+      },
     );
     expect(patched.status).toBe(400);
     expect(chat.app.automations.byId(automation.id)).toEqual(automation);
@@ -49,7 +54,13 @@ describe("automation memory flag", () => {
       const changed = await chat.member.call(
         "PATCH",
         `/api/automations/${automation.id}`,
-        { body: { ownMemory } },
+        {
+          body: {
+            editRevision: chat.app.automations.byId(automation.id)!
+              .editRevision,
+            ownMemory,
+          },
+        },
       );
       expect(changed.status).toBe(200);
       expect((await changed.json()).automation).toMatchObject({ ownMemory });

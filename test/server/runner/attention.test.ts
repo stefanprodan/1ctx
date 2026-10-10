@@ -428,7 +428,12 @@ describe("a finished run", () => {
     const moved = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
-      { body: { agentId: plain } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          agentId: plain,
+        },
+      },
     );
     expect(moved.status).toBe(200);
     const failed = await startRun(chat, automation.id);

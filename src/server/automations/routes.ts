@@ -12,13 +12,16 @@ import type {
   SaveMemoryRequest,
   UndoMemoryRequest,
 } from "../../shared/api/memory.ts";
-import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  STALE_EDIT,
+} from "../../shared/contracts/automation.ts";
 import { PREVIEW_FIRES } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { Limits } from "../limits/index.ts";
 import {
@@ -76,11 +79,18 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     deps.access.project(principal, row.projectId);
     return row;
   };
-  const editable = (principal: Principal, row: AutomationSummary) => {
-    if (row.ownerId !== principal.userId && principal.role !== "admin") {
-      throw new Forbidden("only the owner or an admin edits an automation");
-    }
-  };
+  // whether a patch changes any field of the row
+  const changes = (
+    current: AutomationSummary,
+    patch: Partial<AutomationSummary>,
+  ) =>
+    (Object.keys(patch) as (keyof AutomationSummary)[]).some((key) => {
+      const was = current[key];
+      const now = patch[key];
+      return Array.isArray(was) && Array.isArray(now)
+        ? was.join("\n") !== now.join("\n")
+        : was !== now;
+    });
   const agent = (id: string): AgentRow => {
     const row = deps.agents.byId(id);
     if (row === null) throw new BadRequest("no such agent");
@@ -226,13 +236,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         const found = visible(principal, ctx.params.id);
-        editable(principal, found);
-        const patch = parsePatchAutomation(
+        const { patch, editRevision } = parsePatchAutomation(
           await jsonBody(req, MAX_AUTOMATION_BODY),
         );
         const automation = transact(deps.db, () => {
           const current = visible(principal, found.id);
-          editable(principal, current);
+          // a fire, a run's end or an alert moves revision, never this
+          if (current.editRevision !== editRevision) {
+            throw new Conflict(STALE_EDIT);
+          }
           const next = { ...current, ...patch };
           if (next.agentId === current.agentId && current.agentRetired) {
             throw new Conflict(RETIRED);
@@ -244,6 +256,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
           const now = deps.clock();
           checkSchedule(next.schedule, next.tz, now);
+          // a save that changes nothing keeps the owner and writes nothing
+          if (!changes(current, patch)) return { result: current };
           // a new schedule or zone ends a wait; other fields leave it
           const scheduleChanged =
             next.schedule !== current.schedule || next.tz !== current.tz;
@@ -253,8 +267,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               : scheduleChanged
                 ? nextFire(next.schedule, next.tz, now)
                 : current.nextAt;
+          // the editor's words run from now on, so the runs act as them
           const updated = deps.store.update(current.id, {
             ...next,
+            ownerId: principal.userId,
             nextAt,
             now,
           })!;
@@ -346,10 +362,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const principal = ctx.principal!;
         const { runs } = parseDeleteAutomation(new URL(req.url));
         const found = visible(principal, ctx.params.id);
-        editable(principal, found);
         transact(deps.db, () => {
           const current = visible(principal, found.id);
-          editable(principal, current);
           if (deps.sessions.runningAutomation(current.id)) {
             throw new Conflict("automation has a running run");
           }

@@ -32,7 +32,6 @@ import {
 import {
   automationFieldOf,
   automationPageOf,
-  canChange,
   type Draft,
   dirtyOf,
   draftOf,
@@ -41,12 +40,14 @@ import {
   nextLine,
   nextRunWords,
   OWN_MEMORY_GUIDANCE,
+  ownerNote,
   pickMemory,
   requestOf,
   retiredPick,
   rowState,
   scheduleTitle,
   scheduleWords,
+  staleEdit,
   suspendedText,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
@@ -59,7 +60,10 @@ import {
   sourceText,
 } from "../../../src/client/views/projects/Run.model.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
-import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  STALE_EDIT,
+} from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 import type { RunFilter } from "../../../src/shared/words.ts";
 
@@ -99,6 +103,7 @@ const automation = (
   lastRunSessionId: null,
   lastRunStatus: null,
   revision: 1,
+  editRevision: 0,
   createdAt: now - 24 * HOUR,
   updatedAt: now - 24 * HOUR,
   disabledCapabilities: [],
@@ -355,13 +360,21 @@ describe("the row's words", () => {
     );
   });
 
-  test("the owner changes a row, and an admin only in a team project", () => {
+  test("the save row says a save takes over a task someone else owns", () => {
     const row = automation();
-    expect(canChange(row, { id: "u1", role: "member" }, "team")).toBe(true);
-    expect(canChange(row, { id: "u2", role: "member" }, "team")).toBe(false);
-    expect(canChange(row, { id: "u2", role: "admin" }, "team")).toBe(true);
-    expect(canChange(row, { id: "u2", role: "admin" }, "personal")).toBe(false);
-    expect(canChange(row, null, "team")).toBe(false);
+    expect(ownerNote(row, "u2")).toBe(
+      "Saving makes you the owner. Scheduled runs will act as you.",
+    );
+    expect(ownerNote(row, "u1")).toBeNull();
+    expect(ownerNote(row, null)).toBeNull();
+    expect(ownerNote(null, "u2")).toBeNull();
+  });
+
+  test("only the stale edit refusal offers Reload", () => {
+    expect(staleEdit({ error: STALE_EDIT, status: 409 })).toBe(true);
+    expect(staleEdit({ error: "name is taken", status: 409 })).toBe(false);
+    expect(staleEdit({ error: STALE_EDIT })).toBe(false);
+    expect(staleEdit(null)).toBe(false);
   });
 
   test("the page finds its row and project, or says it was deleted", () => {

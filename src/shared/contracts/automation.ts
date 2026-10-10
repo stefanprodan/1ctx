@@ -6,7 +6,8 @@
 // event (a fire, run or skipped) and the last run (a session) are kept
 // apart, so a skip never hides a run in flight. The revision counts the
 // row's writes; a client applies an event only when its revision is
-// above the one it holds.
+// above the one it holds. The edit revision counts only the saves that
+// changed a field; an edit names the one it started from.
 
 import type {
   AttentionMode,
@@ -18,7 +19,8 @@ import type {
 export type AutomationSummary = {
   id: string;
   projectId: string;
-  // who made it, and whom a scheduled run acts as
+  // who last saved a change to it, or made it, and whom a scheduled
+  // run acts as
   ownerId: string;
   // the owner's username, an admin outside the project included
   ownerName: string;
@@ -64,6 +66,7 @@ export type AutomationSummary = {
   lastRunSessionId: string | null;
   lastRunStatus: SessionStatus | null;
   revision: number;
+  editRevision: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -80,6 +83,9 @@ export type AutomationAlert = {
   // who marked its latest run
   by: string | null;
 };
+
+// a PATCH whose edit revision the row has moved past; nothing is written
+export const STALE_EDIT = "changed since you opened it";
 
 // a fire starts within milliseconds; the grace covers that and a clock
 // a little ahead. A row due longer than this waits for a run slot

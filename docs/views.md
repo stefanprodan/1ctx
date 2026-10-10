@@ -261,6 +261,12 @@ Flagged.
   (`retiredPick()`).
 - **Delete asks in place** with Keep, Delete and Delete with runs, and
   hides every other button while it asks.
+- **Edit and Delete show for every member.** On a task someone else
+  owns the save row says a save makes the user the owner
+  (`ownerNote()`).
+- **A save sends the edit revision the form opened on,** never the
+  live row's. Its 409 (`staleEdit()`) keeps the draft, and Reload
+  replaces the draft with the saved row: no merge.
 - **Needs attention follows what can mark** (`Attention.model.ts`).
   Agent is off for a model without tools, as Memory's own note is, and
   Decider while the list's `deciderOn` is false, with a hint saying

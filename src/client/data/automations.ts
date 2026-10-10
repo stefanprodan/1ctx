@@ -269,6 +269,15 @@ export async function updateAutomation(
   return automation;
 }
 
+// the saved row read again, for an editor whose save someone else's
+// change got to first
+export async function reloadAutomation(id: string): Promise<AutomationSummary> {
+  const forUser = owner;
+  const { automation } = await api<AutomationResponse>(path(id));
+  take(automation, forUser);
+  return automation;
+}
+
 export async function suspendAutomation(id: string, suspend: boolean) {
   const forUser = owner;
   const { automation } = await api<AutomationResponse>(

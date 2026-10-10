@@ -4,9 +4,11 @@
 // The automation editor, for a new automation and one that exists, in
 // steps: its name, the task (the composer's box with its agent chip),
 // memory, who marks a run, what it may use, a restart, when it runs and
-// its limits. The owner, or an admin in a team project, saves and
-// deletes; anyone else reads. The deadline starts at the server's
-// limit, the value a run is held to when none is set.
+// its limits. Anyone in the project saves and deletes; a save names the
+// edit revision the form opened on, and when the row has moved on the
+// draft stays until Reload replaces it with the saved row. The deadline
+// starts at the server's limit, the value a run is held to when none is
+// set.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -25,6 +27,7 @@ import {
   automationsError,
   createAutomation,
   deleteAutomation,
+  reloadAutomation,
   runDeadlineMs,
   updateAutomation,
 } from "../../data/automations.ts";
@@ -45,18 +48,20 @@ import { Seg } from "../../ui/Seg.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
+import { EditorStart } from "./AutomationEditorStart.tsx";
 import {
   automationFieldOf,
   automationPageOf,
-  canChange,
   type Draft,
   dirtyOf,
   draftOf,
   followDeadlineLimit,
   MEMORY_MODES,
+  ownerNote,
   pickMemory,
   requestOf,
   retiredPick,
+  staleEdit,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
@@ -68,19 +73,19 @@ function Editor({
   projectId,
   agents,
   limitMs,
-  editable,
 }: {
   automation: AutomationSummary | null;
   projectId: string;
   agents: AgentSummary[];
   // the run deadline limit, in ms
   limitMs: number;
-  // false shows the fields to read, with no foot
-  editable: boolean;
 }) {
   const draft = useSignal<Draft>(
     draftOf(automation, startingAgent(agents) ?? "", browserZone(), limitMs),
   );
+  // the edit revision the draft started from: the row on the page moves
+  // with every frame, so a save never sends that one
+  const opened = useSignal(automation?.editRevision ?? 0);
   const asking = useSignal(false);
   const deadlineTouched = useSignal(false);
   const form = useRef<HTMLFormElement>(null);
@@ -111,7 +116,10 @@ function Editor({
     const saved =
       automation === null
         ? await createAutomation(projectId, current.body)
-        : await updateAutomation(automation.id, current.body);
+        : await updateAutomation(automation.id, {
+            ...current.body,
+            editRevision: opened.value,
+          });
     navigate(automationHref(saved.id));
   }, automationFieldOf);
   useFocusField(save, form);
@@ -128,9 +136,20 @@ function Editor({
       navigate(`/projects/${projectId}/automations`);
     }
   };
+  // the saved row replaces the draft whole: no merge, the user makes
+  // their change again
+  const reload = async () => {
+    if (automation === null) return;
+    const id = automation.id;
+    await save.act("reload", async () => {
+      const saved = await reloadAutomation(id);
+      draft.value = draftOf(saved, saved.agentId, saved.tz, limitRef.current);
+      opened.value = saved.editRevision;
+      deadlineTouched.value = false;
+    });
+  };
   const submit = (event: Event) => {
     event.preventDefault();
-    if (!editable) return;
     void save.run(
       "problem" in request
         ? { error: request.problem, field: request.field }
@@ -138,7 +157,9 @@ function Editor({
     );
   };
   const busy = save.busy;
-  const off = busy || !editable;
+  const off = busy;
+  const stale = staleEdit(save.notice());
+  const note = ownerNote(automation, me.value?.id ?? null);
   const d = draft.value;
   const takesTools =
     agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
@@ -149,11 +170,6 @@ function Editor({
   const kind = (key: string) => switchItem(key, input);
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
-      {!editable && (
-        <p class="automations-note">
-          Its owner or an admin changes it. You can run, suspend and resume it.
-        </p>
-      )}
       <Section title="Name" text="Unique in this project">
         <NameField
           disabled={off}
@@ -329,75 +345,35 @@ function Editor({
         </div>
       </Section>
       <div class="automations-foot">
-        {editable ? (
-          <Foot
-            save={save}
-            dirty={dirtyOf(d, automation, limitMs) && gone === null}
-            label={automation === null ? "Create scheduled task" : "Save"}
-            start={
-              automation === null ? (
-                <span />
-              ) : asking.value ? (
-                <>
-                  <button
-                    type="button"
-                    class="btn"
-                    disabled={busy}
-                    onClick={() => {
-                      asking.value = false;
-                      save.touch();
-                    }}
-                  >
-                    Keep
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void remove(false)}
-                  >
-                    {save.pending.value === "delete" ? "Deleting" : "Delete"}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void remove(true)}
-                  >
-                    {save.pending.value === "purge"
-                      ? "Deleting"
-                      : "Delete with runs"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  class="btn"
-                  disabled={busy}
-                  onClick={() => {
-                    asking.value = true;
-                  }}
-                >
-                  Delete
-                </button>
-              )
-            }
-            before={
-              !asking.value && (
-                <a class="btn" href={back}>
-                  Cancel
-                </a>
-              )
-            }
-          >
-            {/* while Delete asks, its buttons are the only ones */}
-            {asking.value ? <span /> : undefined}
-          </Foot>
-        ) : (
-          <a class="btn" href={back}>
-            Back
-          </a>
-        )}
+        <Foot
+          save={save}
+          dirty={dirtyOf(d, automation, limitMs) && gone === null}
+          label={automation === null ? "Create scheduled task" : "Save"}
+          above={note !== null && <p class="automations-owner-note">{note}</p>}
+          start={
+            automation === null ? (
+              <span />
+            ) : (
+              <EditorStart
+                save={save}
+                asking={asking}
+                stale={stale}
+                onReload={() => void reload()}
+                onRemove={(runs) => void remove(runs)}
+              />
+            )
+          }
+          before={
+            !asking.value && (
+              <a class="btn" href={back}>
+                Cancel
+              </a>
+            )
+          }
+        >
+          {/* while Delete asks, its buttons are the only ones */}
+          {asking.value ? <span /> : undefined}
+        </Foot>
       </div>
     </form>
   );
@@ -450,7 +426,6 @@ export function NewAutomation({ params }: { params: Params }) {
             projectId={id}
             agents={agents}
             limitMs={limit}
-            editable
           />
         </Split>
       )}
@@ -489,7 +464,6 @@ export function EditAutomation({ params }: { params: Params }) {
             projectId={row.projectId}
             agents={agents}
             limitMs={limit}
-            editable={canChange(row, me.value ?? null, shown.kind)}
           />
         </Split>
       )}

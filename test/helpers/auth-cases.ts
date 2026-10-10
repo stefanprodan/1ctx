@@ -615,7 +615,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "PATCH",
     path: "/api/automations/:id",
-    body: { instructions: "check again" },
+    body: { instructions: "check again", editRevision: 0 },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

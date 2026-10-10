@@ -25,9 +25,18 @@ an event whose outcome is `run`, `skipped` or `deferred`
   `disabledCapabilities` is a whole sorted set, empty on create;
   `rerunOnRestart` is false on create. Each run snapshots the set onto
   its session.
-- **Anyone who sees the project runs, suspends and resumes.** Only the
-  owner, or an admin in a team project, edits and deletes; else 403.
-  At most `MAX_AUTOMATIONS_PER_PROJECT` per project.
+- **Anyone who sees the project runs, suspends, resumes, edits and
+  deletes,** lowering retention included: a team project's members and
+  every admin, a personal project's owner alone. A hidden project's
+  task is a 404. At most `MAX_AUTOMATIONS_PER_PROJECT` per project.
+- **A save that changes a field makes its editor the owner,** in the
+  same transaction, so no run acts on someone else's words. A PATCH
+  that changes nothing writes nothing and keeps the owner. Suspend,
+  resume, dismiss and Run now keep it.
+- **A PATCH names the `editRevision` it started from.** Only a save
+  that changes a field moves `edit_revision`; a fire, a run's end and
+  an alert move `revision` alone. A row past it is the 409
+  `STALE_EDIT` and nothing is written.
 - **`next_at` is null exactly while suspended.** A table check holds
   it. A PATCH that changes the schedule or zone recomputes it from
   now, which ends a cap wait; other fields leave it. Resume computes
@@ -73,10 +82,12 @@ an event whose outcome is `run`, `skipped` or `deferred`
   process; the sleep then counts only rows due after the pass.
 - **Every other refusal is a skipped event.** It records the reason
   and moves `next_at`.
-- **A scheduled run acts as the owner; Run now acts as who pressed
-  it.** A manual start is a 409 while one runs and the 429 of a full
-  cap, never a wait. It takes a waiting row's fire by moving its
-  `next_at` past now.
+- **A scheduled run acts as the owner its fire reads; Run now acts as
+  who pressed it.** A run already going keeps its session, usage and
+  authorship when a save moves the owner; an alert opening later
+  emails the owner of that moment. A manual start is a 409 while one
+  runs and the 429 of a full cap, never a wait. It takes a waiting
+  row's fire by moving its `next_at` past now.
 
 ## Restarts
 

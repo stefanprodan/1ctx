@@ -372,7 +372,12 @@ describe("the flag on the wire", () => {
     const patched = await chat.member.call(
       "PATCH",
       `/api/automations/${plain.id}`,
-      { body: { rerunOnRestart: true } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(plain.id)!.editRevision,
+          rerunOnRestart: true,
+        },
+      },
     );
     expect(patched.status).toBe(200);
     expect((await patched.json()).automation).toMatchObject({
@@ -383,13 +388,23 @@ describe("the flag on the wire", () => {
     const off = await chat.member.call(
       "PATCH",
       `/api/automations/${plain.id}`,
-      { body: { rerunOnRestart: false } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(plain.id)!.editRevision,
+          rerunOnRestart: false,
+        },
+      },
     );
     expect((await off.json()).automation.rerunOnRestart).toBe(false);
     const bad = await chat.member.call(
       "PATCH",
       `/api/automations/${plain.id}`,
-      { body: { rerunOnRestart: "yes" } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(plain.id)!.editRevision,
+          rerunOnRestart: "yes",
+        },
+      },
     );
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({
