@@ -76,9 +76,14 @@ export function ConfigBoard() {
               active={CONFIG_TABS.find((t) => t.tab === tab)!.href}
             />
             {tab === "overview" && <Builtins state={state} />}
-            {tab === "overview" && <AutomationTool tool={state.automation} />}
             {cards(LIMITS_CARDS, tab === "limits")}
             {cards(STORAGE_CARDS, tab === "storage")}
+            {/* drawn on every tab, so its draft outlives a look at another */}
+            <div
+              class={`config-board-cards${tab === "overview" ? "" : " config-board-away"}`}
+            >
+              <AutomationTool tool={state.automation} />
+            </div>
           </div>
         </Split>
       )}
