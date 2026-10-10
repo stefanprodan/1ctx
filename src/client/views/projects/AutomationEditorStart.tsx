@@ -3,8 +3,7 @@
 //
 // The start of the automation editor's foot: Delete, which asks in
 // place with Keep, Delete and Delete with runs, or Reload once a save
-// came after someone else's, with the words when the notice no longer
-// says them.
+// came after someone else's.
 
 import type { Signal } from "@preact/signals";
 import type { Save } from "../../lib/save.ts";
@@ -13,7 +12,6 @@ export function EditorStart({
   save,
   asking,
   stale,
-  words,
   onReload,
   onRemove,
 }: {
@@ -21,7 +19,6 @@ export function EditorStart({
   asking: Signal<boolean>;
   // the last save was refused as stale
   stale: boolean;
-  words: string | null;
   onReload: () => void;
   // true deletes the runs too
   onRemove: (runs: boolean) => void;
@@ -29,16 +26,9 @@ export function EditorStart({
   const busy = save.busy;
   if (stale) {
     return (
-      <>
-        {words !== null && (
-          <span class="error automations-stale" role="alert">
-            {words}
-          </span>
-        )}
-        <button type="button" class="btn" disabled={busy} onClick={onReload}>
-          Reload
-        </button>
-      </>
+      <button type="button" class="btn" disabled={busy} onClick={onReload}>
+        Reload
+      </button>
     );
   }
   if (!asking.value) {

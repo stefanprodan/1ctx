@@ -42,6 +42,7 @@ import { useFocusField, useSave } from "../../lib/save.ts";
 import { browserZone } from "../../lib/zone.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
+import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
@@ -169,6 +170,7 @@ function Editor({
     if (staleEdit(save.notice())) stale.value = true;
   }, [save.status.value]);
   const note = ownerNote(automation, me.value?.id ?? null);
+  const words = staleWords(isStale, notice);
   const d = draft.value;
   const takesTools =
     agents.find((a) => a.id === d.agentId)?.model.tools ?? true;
@@ -320,34 +322,30 @@ function Editor({
       >
         <div class="pair">
           <label class="field">
-            <span class="label">Deadline (in minutes)</span>
-            <input
+            <span class="label">Deadline</span>
+            <NumberBox
               name="deadline"
-              inputMode="decimal"
-              autocomplete="off"
-              aria-invalid={invalid("deadline") || undefined}
+              unit="min"
+              invalid={invalid("deadline")}
               disabled={off}
               value={d.deadline}
-              onInput={(e) => {
+              onInput={(text) => {
                 deadlineTouched.value = true;
-                set({ deadline: (e.currentTarget as HTMLInputElement).value });
+                set({ deadline: text });
               }}
             />
             <FieldError save={save} field="deadline" />
           </label>
           <label class="field">
-            <span class="label">History retention (in days)</span>
-            <input
+            <span class="label">History retention</span>
+            <NumberBox
               name="retention"
-              inputMode="numeric"
-              autocomplete="off"
+              unit="days"
               placeholder={String(RETENTION_DAYS.default)}
-              aria-invalid={invalid("retention") || undefined}
+              invalid={invalid("retention")}
               disabled={off}
               value={d.retention}
-              onInput={(e) =>
-                set({ retention: (e.currentTarget as HTMLInputElement).value })
-              }
+              onInput={(text) => set({ retention: text })}
             />
             <FieldError save={save} field="retention" />
           </label>
@@ -359,8 +357,16 @@ function Editor({
           dirty={dirtyOf(d, automation, limitMs) && gone === null}
           label={automation === null ? "Create scheduled task" : "Save"}
           above={
-            note !== null &&
-            !asking.value && <p class="automations-owner-note">{note}</p>
+            <>
+              {note !== null && !asking.value && (
+                <p class="automations-owner-note">{note}</p>
+              )}
+              {words !== null && (
+                <p class="error automations-stale" role="alert">
+                  {words}
+                </p>
+              )}
+            </>
           }
           start={
             automation === null ? (
@@ -370,7 +376,6 @@ function Editor({
                 save={save}
                 asking={asking}
                 stale={isStale}
-                words={staleWords(isStale, notice)}
                 onReload={() => void reload()}
                 onRemove={(runs) => void remove(runs)}
               />
