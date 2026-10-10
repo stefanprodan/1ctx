@@ -395,8 +395,8 @@ export type WebTool = (typeof WEB_TOOLS)[number];
 // the tool an agent emails users with, off until an admin turns it on
 export const EMAIL_TOOL = "email_user";
 
-// the tool a chat's agent reads its project's scheduled tasks with, on
-// until an admin turns it off
+// the tool a chat's agent reads its project's scheduled tasks and
+// proposes changes to them with, on until an admin turns it off
 export const AUTOMATION_TOOL = "automation";
 
 // the tools the server writes itself, besides the web ones, by name;

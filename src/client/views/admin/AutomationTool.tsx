@@ -16,7 +16,7 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import { ToolRow } from "./ToolRow.tsx";
 
-const TITLE = "Agents read scheduled tasks";
+const TITLE = "Agents manage scheduled tasks";
 
 export function AutomationTool({ tool }: { tool: AutomationToolSummary }) {
   const drafted = useSignal<boolean | null>(null);

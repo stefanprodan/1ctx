@@ -181,7 +181,7 @@ export const EMAIL_OFF_LINE =
 // the line after it while a chat has the automation tool off: a
 // task read before the flip is in the history
 export const AUTOMATIONS_OFF_LINE =
-  "The user turned reading scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
+  "The user turned scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
 
 // the line after it while a chat has servers off that its agent would
 // otherwise be offered: names sorted, so it is constant between flips
