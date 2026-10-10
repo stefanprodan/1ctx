@@ -27,7 +27,7 @@ test: ## Run tests
 vendor-test: ## Run just-bash's own suite on vendor/just-bash against its expected failures
 	@bun run vendor-test
 
-lint: ## Format and lint with Biome, then type-check with tsc
+lint: ## Format and lint with Biome, then type-check with bun check
 	@bun run lint
 
 build: ## Compile a standalone binary into bin/ (release: VERSION=v1.2.3)

@@ -31,7 +31,7 @@ read-only `OverlayFs` may be, nothing writable (`ReadWriteFs`, a
 writable `OverlayFs`).
 
 The vendored tree is outside Biome (`biome.json`) and the structure test.
-`tsc` checks the files our code imports, with our settings.
+`bun check` checks the files our code imports, with our settings.
 
 ## What we removed
 

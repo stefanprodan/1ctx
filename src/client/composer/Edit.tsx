@@ -92,7 +92,7 @@ export function editGone(
 export function useHandoff(
   chat: string | null,
   box: Box,
-  input: RefObject<HTMLTextAreaElement>,
+  input: RefObject<HTMLTextAreaElement | null>,
   queued: readonly QueuedMessage[] | undefined,
 ): Signal<boolean> {
   const saving = useSignal(false);

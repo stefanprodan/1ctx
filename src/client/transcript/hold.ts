@@ -10,7 +10,7 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 // tallest height it reached at its current width: a new width rewraps
 // the text, so the hold starts again from what it measures then.
 export function useHeldHeight(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   streaming: boolean,
 ): void {
   const width = useRef(0);

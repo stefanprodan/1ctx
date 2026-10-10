@@ -164,6 +164,8 @@ describe("the SMTP page", () => {
     ]) {
       expect(html).toContain(`name="${name}"`);
     }
+    // the sender is an address, so phones offer the email keyboard
+    expect(html).toContain('name="fromAddress" type="email"');
     expect(html).toContain('value="smtp.example.test"');
     expect(html).not.toContain("Unsaved changes");
     expect(html).not.toContain("setting-alert");
