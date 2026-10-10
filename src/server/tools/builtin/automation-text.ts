@@ -35,6 +35,9 @@ export type LastRun = {
   // set when the run was marked as needing attention, whether or not
   // its alert is still open
   flagged: { reason: string | null; by: string | null } | null;
+  // whether anything has judged it yet: a decider reads a finished run
+  // after it ends, so until then null is not a no
+  judged: boolean;
 };
 
 export type Page = { text: string; from: number; to: number; total: number };
@@ -247,7 +250,8 @@ function runText(
 }
 
 // a run that ended says whether it was flagged, since a dismissed alert
-// leaves no other trace of the mark; with attention off nothing marks
+// leaves no other trace of the mark. Not flagged is said only where a
+// mark could be, never with attention off or after a restart cut it
 function withFlag(
   text: { line: string; answer: string | null },
   run: LastRun | null,
@@ -255,9 +259,15 @@ function withFlag(
 ): { line: string; answer: string | null } {
   if (run === null || run.status === "running") return text;
   if (run.flagged === null) {
-    return mode === "off"
-      ? text
-      : { ...text, line: `${text.line}, not flagged` };
+    const could =
+      mode !== "off" &&
+      (run.cause === "finish" ||
+        run.cause === "stop" ||
+        run.cause === "failure" ||
+        run.cause === "deadline");
+    if (!could) return text;
+    const yet = mode === "decider" && run.cause === "finish" && !run.judged;
+    return { ...text, line: `${text.line}, not flagged${yet ? " yet" : ""}` };
   }
   const by = run.flagged.by === null ? "" : ` by ${run.flagged.by}`;
   const reason =

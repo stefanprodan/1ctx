@@ -184,7 +184,9 @@ words.
   `runAnswer()` before its memory round: by status, cause and error,
   never the status alone, and a running run has no result yet. One that
   ended says whether it was flagged, from its session, since a
-  dismissed alert leaves no other trace; not with attention off.
+  dismissed alert leaves no other trace. Not flagged only where a mark
+  could be (attention on, not cut by a restart), and not yet while a
+  decider has still to read it.
 - **Task text is quoted as data.** The instructions, the guidance and
   the answer go through the registry's `sanitize()` first (`asSent()`),
   then are fenced past any backticks left and labelled as the task's.

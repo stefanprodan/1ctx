@@ -477,6 +477,30 @@ describe("task text through the composed server", () => {
         'Last run: done, flagged by sre: "Pods down"',
       );
       await finish(chat, next);
+
+      // a decider's chance under the mark is a no; the runner's mark
+      // names nobody
+      const lineAfter = async (attention: number, by: string | null) => {
+        chat.app.db
+          .query(
+            "update sessions set attention = ?, attention_reason = 'The run failed', attention_by = ? where id = ?",
+          )
+          .run(attention, by, run.sessionId);
+        const again = await start(chat);
+        const read = await round(chat, again.script, [
+          { action: "show", id: automation.id },
+        ]);
+        await finish(chat, read.next);
+        return read.answers[0]
+          .split("\n")
+          .find((l) => l.startsWith("Last run"));
+      };
+      expect(await lineAfter(0.3, "checker")).toBe(
+        "Last run: done, not flagged",
+      );
+      expect(await lineAfter(1, null)).toBe(
+        'Last run: done, flagged: "The run failed"',
+      );
     } finally {
       await chat.app.shutdown();
     }

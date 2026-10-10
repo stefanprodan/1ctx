@@ -496,6 +496,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             session.attention >= ATTENTION_AT
               ? { reason: session.attentionReason, by: session.attentionBy }
               : null,
+          judged: session !== null && session.attention !== null,
         };
       },
       // the names the task's page shows: its agent's switchable servers
