@@ -49,6 +49,7 @@ import { Seg } from "../../ui/Seg.tsx";
 import { AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
+import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
 import { EditorStart } from "./AutomationEditorStart.tsx";
 import {
   automationFieldOf,
@@ -58,12 +59,9 @@ import {
   draftOf,
   followDeadlineLimit,
   MEMORY_MODES,
-  ownerNote,
   pickMemory,
   requestOf,
   retiredPick,
-  staleEdit,
-  staleWords,
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
@@ -123,6 +121,11 @@ function Editor({
         : await updateAutomation(automation.id, {
             ...current.body,
             editRevision: opened.value,
+          }).catch((err: unknown) => {
+            // latched here, before the notice shows: an edit or Reload
+            // clears the notice, never this
+            if (staleFailure(err)) stale.value = true;
+            throw err;
           });
     navigate(automationHref(saved.id));
   }, automationFieldOf);
@@ -164,11 +167,7 @@ function Editor({
   const busy = save.busy;
   const off = busy;
   const notice = save.notice();
-  const isStale = stale.value || staleEdit(notice);
-  // latched after the render, never written during it
-  useEffect(() => {
-    if (staleEdit(save.notice())) stale.value = true;
-  }, [save.status.value]);
+  const isStale = stale.value;
   const note = ownerNote(automation, me.value?.id ?? null);
   const words = staleWords(isStale, notice);
   const d = draft.value;

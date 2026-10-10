@@ -566,8 +566,25 @@ describe("automation rights", () => {
     // lowering retention is any member's too
     expect((await patch(otherClient, { retentionDays: 1 })).status).toBe(200);
     expect(row()).toMatchObject({ ownerId: other.id, retentionDays: 1 });
+    // and so is deleting, by a member who never saved it
+    const third = chat.app.createUser({
+      username: "third",
+      fullName: "Third User",
+      email: "third@example.com",
+      role: "member",
+      passwordHash: await hashPassword("pw"),
+      mustChangePassword: false,
+      now: chat.app.now.value,
+    });
+    chat.app.db
+      .query(
+        "insert into memberships (project_id, user_id, created_at) values ('team-auto', ?, ?)",
+      )
+      .run(third.id, chat.app.now.value);
+    const thirdClient = chat.app.client();
+    await thirdClient.login("third", "pw");
     expect(
-      (await otherClient.call("DELETE", `/api/automations/${automation.id}`))
+      (await thirdClient.call("DELETE", `/api/automations/${automation.id}`))
         .status,
     ).toBe(204);
     expect(chat.app.automations.byId(automation.id)).toBeNull();
@@ -619,41 +636,52 @@ describe("automation rights", () => {
     chat.app.automationScheduler.stop();
     await tick();
     const opened = row();
-    chat.app.now.value = opened.nextAt!;
-    const pending = chat.scripted.next();
-    const fired = await chat.app.automationScheduler.fire(automation.id);
-    const script = await pending;
-    expect(fired?.session.ownerId).toBe(chat.memberId);
-    // the fire moved the revision, never the edit revision
-    expect(row().revision).toBeGreaterThan(opened.revision);
+    // a scheduled fire as the owner, and the next one's run
+    const fire = async () => {
+      chat.app.now.value = row().nextAt!;
+      const pending = chat.scripted.next();
+      const fired = await chat.app.automationScheduler.fire(automation.id);
+      return { fired: fired!, script: await pending };
+    };
+
+    // a whole run, its fire and its end, moves the revision, never the
+    // edit revision
+    const first = await fire();
+    expect(first.fired.session.ownerId).toBe(chat.memberId);
+    const fired = row().revision;
+    expect(fired).toBeGreaterThan(opened.revision);
+    first.script.reply("done");
+    await settle(chat, first.fired.session.id);
+    expect(row().revision).toBeGreaterThan(fired);
     expect(row().editRevision).toBe(opened.editRevision);
 
-    // a save while the run goes moves the owner of the runs after it,
-    // never of the one going
+    // a save from before both runs, while the second goes, lands and
+    // moves the owner of the runs after it, never of the one going
+    const second = await fire();
     const saved = await patch(
       otherClient,
       { instructions: "check again" },
       opened.editRevision,
     );
     expect(saved.status).toBe(200);
-    expect(row().ownerId).toBe(other.id);
-    expect(chat.app.sessions.byId(fired!.session.id)?.ownerId).toBe(
+    expect(row()).toMatchObject({
+      ownerId: other.id,
+      editRevision: opened.editRevision + 1,
+    });
+    expect(chat.app.sessions.byId(second.fired.session.id)?.ownerId).toBe(
       chat.memberId,
     );
-    script.reply("done");
-    await settle(chat, fired!.session.id);
-    expect(chat.app.sessions.byId(fired!.session.id)?.ownerId).toBe(
+    second.script.reply("done");
+    await settle(chat, second.fired.session.id);
+    expect(chat.app.sessions.byId(second.fired.session.id)?.ownerId).toBe(
       chat.memberId,
     );
 
-    chat.app.now.value = row().nextAt!;
-    const nextPending = chat.scripted.next();
-    const next = await chat.app.automationScheduler.fire(automation.id);
-    const nextScript = await nextPending;
-    expect(next?.session.ownerId).toBe(other.id);
-    expect(next?.messages[0]?.content).toBe("check again");
-    nextScript.reply("done");
-    await settle(chat, next!.session.id);
+    const third = await fire();
+    expect(third.fired.session.ownerId).toBe(other.id);
+    expect(third.fired.messages[0]?.content).toBe("check again");
+    third.script.reply("done");
+    await settle(chat, third.fired.session.id);
     await chat.app.shutdown();
   });
 

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation pages say and check without a DOM: a schedule
-// in words for the shapes people write most, the list row's state, what
-// a save does to the owner, a stale save, and the editor's fields to a
-// request; a run's words are in Run.model.ts. The server parses the
-// schedule and the zone; the words here only read them, and the
+// in words for the shapes people write most, the list row's state, and
+// the editor's fields to a request; a run's words are in Run.model.ts,
+// and what a save says in AutomationEdit.model.ts. The server parses
+// the schedule and the zone; the words here only read them, and the
 // expression itself stands in for any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
@@ -21,20 +21,13 @@ import {
 } from "../../../shared/capabilities.ts";
 import {
   type AutomationSummary,
-  STALE_EDIT,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import {
   type AttentionMode,
   DEFERRED_BY_RESTART,
 } from "../../../shared/words.ts";
-import {
-  ago,
-  elapsed,
-  type Failure,
-  sentence,
-  until,
-} from "../../lib/format.ts";
+import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
 import {
   daysOf,
@@ -205,32 +198,6 @@ export function eventNote(a: AutomationSummary, now: number): string | null {
     return deferred ? `${late}, ${DEFERRED_BY_RESTART}` : late;
   }
   return deferred ? `The last run was ${DEFERRED_BY_RESTART}` : null;
-}
-
-// a save that changes a field makes its editor the owner, so the save
-// row says so on a task someone else owns
-export function ownerNote(
-  a: Pick<AutomationSummary, "ownerId"> | null,
-  userId: string | null,
-): string | null {
-  if (a === null || userId === null || a.ownerId === userId) return null;
-  return "Saving makes you the owner. Scheduled runs will act as you.";
-}
-
-// the refusal of a save someone else's change got to first
-export const staleEdit = (
-  problem: { error: string; status?: number } | null,
-): boolean => problem?.status === 409 && problem.error === STALE_EDIT;
-
-// The words beside Reload. A stale save stays stale until Reload lands,
-// whatever the form shows since: an edit clears the foot's notice, and
-// Reload's own call clears it while it runs. Null while not stale, or
-// while the notice still says it.
-export function staleWords(
-  stale: boolean,
-  notice: { error: string; status?: number } | null,
-): string | null {
-  return stale && !staleEdit(notice) ? sentence(STALE_EDIT) : null;
 }
 
 // The automation page and its editor: the row, the project it was found
