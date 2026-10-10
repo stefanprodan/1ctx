@@ -83,6 +83,8 @@
     max-width: 160px;
   }
 
+  /* the agent list overrides the side and the height with what the
+     room around its chip allows */
   .composer-menu {
     position: absolute;
     bottom: calc(100% + 6px);
@@ -90,6 +92,7 @@
     z-index: 1;
     min-width: 240px;
     max-width: 420px;
+    overflow-y: auto;
   }
   /* the chip's type, not the menu's */
   .composer-option {
@@ -308,8 +311,6 @@
     color: var(--faint);
   }
   .composer-menu-field {
-    top: calc(100% + 4px);
-    bottom: auto;
     right: 0;
     z-index: 3;
     min-width: 0;
