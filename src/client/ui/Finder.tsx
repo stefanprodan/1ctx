@@ -7,6 +7,7 @@ import { useEffect, useId, useRef } from "preact/hooks";
 import { navigate } from "../app/router.ts";
 import { fixedFrame, NARROW } from "../app/shell.ts";
 import { Icon } from "../lib/icons.tsx";
+import { visibleBottom } from "../lib/scroll.ts";
 import { touch } from "../lib/touch.ts";
 import { type Place, placeOf } from "./Finder.model.ts";
 import { ListboxSearch, useActiveInView } from "./Listbox.tsx";
@@ -18,12 +19,6 @@ import {
   type Option,
 } from "./Select.model.ts";
 import "./finder.css";
-
-// the window's bottom a phone's keyboard leaves, in the window's numbers
-const visibleBottom = (): number => {
-  const view = window.visualViewport;
-  return view ? view.offsetTop + view.height : window.innerHeight;
-};
 
 export type FinderOption = Option & {
   sub?: string;

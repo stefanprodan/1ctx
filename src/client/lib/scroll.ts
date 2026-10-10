@@ -5,6 +5,12 @@
 // anything that follows or reacts to the page's scroll, and keeping a
 // row that opens in view.
 
+// the window's bottom a phone's keyboard leaves, in the window's numbers
+export function visibleBottom(): number {
+  const view = window.visualViewport;
+  return view ? view.offsetTop + view.height : window.innerHeight;
+}
+
 export function scrollParent(el: Element): HTMLElement | null {
   for (let p = el.parentElement; p !== null; p = p.parentElement) {
     const overflow = getComputedStyle(p).overflowY;
