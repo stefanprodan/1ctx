@@ -38,7 +38,7 @@ make preview-reset FILE=x.yaml SECRETS=dir  # wipe it, copy the secrets in, prov
 make start ARGS="..."  # run the source in the foreground with the server's flags
 make dev ARGS="..."    # the same with ONECTX_DEV=1 and a restart on server changes
 make clean          # preview-clean, then remove bin/ and Bun's build leftovers
-make lint           # biome check --write, then tsc; run after any code change
+make lint           # biome check --write, then bun check; run after any code change
 make test           # bun test; run after any code change, before finishing
 make vendor-test    # just-bash's own suite, against its expected failures
 make build          # standalone binary in bin/
