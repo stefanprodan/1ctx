@@ -233,6 +233,26 @@ describe("team project administration", () => {
     });
     chat.app.socket.dispose();
   });
+  test("members are listed by username, not the order they joined", async () => {
+    const chat = await chatApp();
+    const project = await createTeam(chat.admin, "ops");
+    let shown: ProjectDetail | undefined;
+    for (const name of ["zed", "amy", "kim"]) {
+      chat.app.now.value += 1000;
+      const { user } = await makeUser(chat, name);
+      shown = await addMember(chat, project.id, user.id);
+    }
+    const expected = ["amy", "kim", "zed"];
+    expect(shown?.members.map((m) => m.username)).toEqual(expected);
+    const read = await chat.admin.call("GET", `/api/projects/${project.id}`);
+    expect(
+      (await read.json()).project.members.map(
+        (m: { username: string }) => m.username,
+      ),
+    ).toEqual(expected);
+    chat.app.socket.dispose();
+  });
+
   test("a team project needs a description, a personal one may not", async () => {
     const chat = await chatApp();
     const made = await chat.admin.call("POST", "/api/projects", {
