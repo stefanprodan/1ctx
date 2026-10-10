@@ -6,6 +6,10 @@ import { nextFire, nextFires } from "../../src/server/automations/index.ts";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { FeedRow } from "../../src/shared/api/sessions.ts";
+import {
+  type AutomationSummary,
+  STALE_EDIT,
+} from "../../src/shared/contracts/automation.ts";
 import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp, tick } from "../helpers/chat.ts";
@@ -124,6 +128,7 @@ describe("automations", () => {
       `/api/automations/${automation.id}`,
       {
         body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
           schedule: "0 2 * * *",
           tz: "America/New_York",
         },
@@ -146,7 +151,12 @@ describe("automations", () => {
     const changedZone = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
-      { body: { tz: "UTC" } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          tz: "UTC",
+        },
+      },
     );
     expect(changedZone.status).toBe(200);
     expect(chat.app.automations.byId(automation.id)?.nextAt).toBe(
@@ -399,7 +409,9 @@ describe("automations", () => {
 });
 
 describe("automation rights", () => {
-  test("lets project operators run and suspend but only owners and admins edit", async () => {
+  // a team project with the member casey and another member, other, and
+  // a task casey made
+  async function teamApp() {
     const chat = await chatApp();
     const other = chat.app.createUser({
       username: "other",
@@ -440,27 +452,31 @@ describe("automation rights", () => {
         },
       },
     );
-    const automation = (await created.json()).automation;
+    const automation: AutomationSummary = (await created.json()).automation;
     const otherClient = chat.app.client();
     await otherClient.login("other", "pw");
-    expect(
-      (
-        await otherClient.call("PATCH", `/api/automations/${automation.id}`, {
-          body: { instructions: "change", memoryGuidance: "change" },
-        })
-      ).status,
-    ).toBe(403);
-    expect(chat.app.automations.byId(automation.id)?.memoryGuidance).toBe("");
-    expect(
-      (await otherClient.call("DELETE", `/api/automations/${automation.id}`))
-        .status,
-    ).toBe(403);
+    const row = () => chat.app.automations.byId(automation.id)!;
+    const patch = (
+      client: typeof otherClient,
+      body: Record<string, unknown>,
+      editRevision = row().editRevision,
+    ) =>
+      client.call("PATCH", `/api/automations/${automation.id}`, {
+        body: { ...body, editRevision },
+      });
+    return { chat, other, otherClient, automation, row, patch };
+  }
+
+  test("lets every project member run, suspend, edit and delete", async () => {
+    const { chat, other, otherClient, automation, row, patch } =
+      await teamApp();
     const suspended = await otherClient.call(
       "POST",
       `/api/automations/${automation.id}/suspend`,
     );
     expect(suspended.status).toBe(200);
-    // the row names who suspended it, and a resume clears the name
+    // the row names who suspended it, and a resume clears the name;
+    // neither moves the owner
     const suspendedRow = (await suspended.json()).automation;
     expect(suspendedRow.suspendedBy).toEqual({
       id: other.id,
@@ -471,7 +487,15 @@ describe("automation rights", () => {
       "POST",
       `/api/automations/${automation.id}/resume`,
     );
-    expect((await resumed.json()).automation.suspendedBy).toBeNull();
+    expect((await resumed.json()).automation).toMatchObject({
+      suspendedBy: null,
+      ownerId: chat.memberId,
+    });
+    const dismissed = await otherClient.call(
+      "POST",
+      `/api/automations/${automation.id}/dismiss`,
+    );
+    expect((await dismissed.json()).automation.ownerId).toBe(chat.memberId);
 
     const pending = chat.scripted.next();
     const run = await otherClient.call(
@@ -483,6 +507,7 @@ describe("automation rights", () => {
     expect(detail.session.ownerId).toBe(other.id);
     script.reply("done");
     await settle(chat, detail.session.id);
+    expect(row().ownerId).toBe(chat.memberId);
 
     // an admin outside the project is named on what they do: the run
     // they start and the suspend they press
@@ -512,27 +537,168 @@ describe("automation rights", () => {
       "POST",
       `/api/automations/${automation.id}/suspend`,
     );
-    expect((await adminSuspend.json()).automation.suspendedBy).toEqual({
-      id: chat.adminId,
-      username: "admin",
+    expect((await adminSuspend.json()).automation).toMatchObject({
+      suspendedBy: { id: chat.adminId, username: "admin" },
+      ownerId: chat.memberId,
     });
 
+    // a member's save makes them the owner
+    const edited = await patch(otherClient, {
+      instructions: "change",
+      memoryGuidance: "change",
+    });
+    expect(edited.status).toBe(200);
+    expect((await edited.json()).automation).toMatchObject({
+      ownerId: other.id,
+      ownerName: "other",
+      instructions: "change",
+      memoryGuidance: "change",
+      editRevision: 1,
+    });
+    // so does an admin outside the team project
+    const adminEdit = await patch(chat.admin, { instructions: "admin change" });
+    expect(adminEdit.status).toBe(200);
+    expect(row()).toMatchObject({
+      ownerId: chat.adminId,
+      instructions: "admin change",
+      editRevision: 2,
+    });
+    // lowering retention is any member's too
+    expect((await patch(otherClient, { retentionDays: 1 })).status).toBe(200);
+    expect(row()).toMatchObject({ ownerId: other.id, retentionDays: 1 });
+    // and so is deleting, by a member who never saved it
+    const third = chat.app.createUser({
+      username: "third",
+      fullName: "Third User",
+      email: "third@example.com",
+      role: "member",
+      passwordHash: await hashPassword("pw"),
+      mustChangePassword: false,
+      now: chat.app.now.value,
+    });
+    chat.app.db
+      .query(
+        "insert into memberships (project_id, user_id, created_at) values ('team-auto', ?, ?)",
+      )
+      .run(third.id, chat.app.now.value);
+    const thirdClient = chat.app.client();
+    await thirdClient.login("third", "pw");
     expect(
-      (
-        await chat.admin.call("PATCH", `/api/automations/${automation.id}`, {
-          body: { instructions: "admin change" },
-        })
-      ).status,
-    ).toBe(200);
-    expect(
-      (await chat.admin.call("DELETE", `/api/automations/${automation.id}`))
+      (await thirdClient.call("DELETE", `/api/automations/${automation.id}`))
         .status,
     ).toBe(204);
+    expect(chat.app.automations.byId(automation.id)).toBeNull();
+    await chat.app.shutdown();
+  });
 
-    const personal = await createAutomation(chat, { name: "private-run" });
+  test("moves the owner only on a change", async () => {
+    const { chat, other, otherClient, row, patch } = await teamApp();
+    const before = row();
+    // every field as it is: no write, the owner stays
+    const same = await patch(otherClient, {
+      name: before.name,
+      instructions: before.instructions,
+      schedule: before.schedule,
+      tz: before.tz,
+      deadlineMs: before.deadlineMs,
+      retentionDays: before.retentionDays,
+      disabledCapabilities: before.disabledCapabilities,
+    });
+    expect(same.status).toBe(200);
+    expect(row()).toEqual(before);
+    const changed = await patch(otherClient, { instructions: "check again" });
+    expect(changed.status).toBe(200);
+    expect(row()).toMatchObject({
+      ownerId: other.id,
+      editRevision: before.editRevision + 1,
+      revision: before.revision + 1,
+    });
+    await chat.app.shutdown();
+  });
+
+  test("refuses an edit made on a row someone else saved since", async () => {
+    const { chat, otherClient, row, patch } = await teamApp();
+    const opened = row().editRevision;
     expect(
-      (await chat.admin.call("GET", `/api/automations/${personal.id}`)).status,
+      (await patch(chat.member, { instructions: "casey's" }, opened)).status,
+    ).toBe(200);
+    const after = row();
+    const stale = await patch(otherClient, { name: "other-run" }, opened);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ error: STALE_EDIT });
+    expect(row()).toEqual(after);
+    await chat.app.shutdown();
+  });
+
+  test("keeps an edit good across a fire and a run's end", async () => {
+    const { chat, other, otherClient, automation, row, patch } =
+      await teamApp();
+    chat.app.automationScheduler.stop();
+    await tick();
+    const opened = row();
+    // a scheduled fire as the owner, and the next one's run
+    const fire = async () => {
+      chat.app.now.value = row().nextAt!;
+      const pending = chat.scripted.next();
+      const fired = await chat.app.automationScheduler.fire(automation.id);
+      return { fired: fired!, script: await pending };
+    };
+
+    // a whole run, its fire and its end, moves the revision, never the
+    // edit revision
+    const first = await fire();
+    expect(first.fired.session.ownerId).toBe(chat.memberId);
+    const fired = row().revision;
+    expect(fired).toBeGreaterThan(opened.revision);
+    first.script.reply("done");
+    await settle(chat, first.fired.session.id);
+    expect(row().revision).toBeGreaterThan(fired);
+    expect(row().editRevision).toBe(opened.editRevision);
+
+    // a save from before both runs, while the second goes, lands and
+    // moves the owner of the runs after it, never of the one going
+    const second = await fire();
+    const saved = await patch(
+      otherClient,
+      { instructions: "check again" },
+      opened.editRevision,
+    );
+    expect(saved.status).toBe(200);
+    expect(row()).toMatchObject({
+      ownerId: other.id,
+      editRevision: opened.editRevision + 1,
+    });
+    expect(chat.app.sessions.byId(second.fired.session.id)?.ownerId).toBe(
+      chat.memberId,
+    );
+    second.script.reply("done");
+    await settle(chat, second.fired.session.id);
+    expect(chat.app.sessions.byId(second.fired.session.id)?.ownerId).toBe(
+      chat.memberId,
+    );
+
+    const third = await fire();
+    expect(third.fired.session.ownerId).toBe(other.id);
+    expect(third.fired.messages[0]?.content).toBe("check again");
+    third.script.reply("done");
+    await settle(chat, third.fired.session.id);
+    await chat.app.shutdown();
+  });
+
+  test("keeps a task of a project the caller cannot see hidden", async () => {
+    const chat = await chatApp();
+    const personal = await createAutomation(chat, { name: "private-run" });
+    const path = `/api/automations/${personal.id}`;
+    expect((await chat.admin.call("GET", path)).status).toBe(404);
+    expect(
+      (
+        await chat.admin.call("PATCH", path, {
+          body: { instructions: "admin change", editRevision: 0 },
+        })
+      ).status,
     ).toBe(404);
+    expect((await chat.admin.call("DELETE", path)).status).toBe(404);
+    expect(chat.app.automations.byId(personal.id)).toEqual(personal);
     await chat.app.shutdown();
   });
 });

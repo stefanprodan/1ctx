@@ -51,6 +51,7 @@ type Raw = RawAlert & {
   last_run_session_id: string | null;
   last_run_status: SessionStatus | null;
   revision: number;
+  edit_revision: number;
   created_at: number;
   updated_at: number;
 };
@@ -105,6 +106,7 @@ const row = (raw: Raw): AutomationSummary => ({
   lastRunSessionId: raw.last_run_session_id,
   lastRunStatus: raw.last_run_status,
   revision: raw.revision,
+  editRevision: raw.edit_revision,
   createdAt: raw.created_at,
   updatedAt: raw.updated_at,
 });
@@ -128,7 +130,7 @@ export type AutomationFields = Pick<
   | "rerunOnRestart"
 >;
 
-export type AutomationEdit = Omit<AutomationFields, "projectId" | "ownerId"> & {
+export type AutomationEdit = Omit<AutomationFields, "projectId"> & {
   nextAt: number | null;
   now: number;
 };
@@ -276,17 +278,21 @@ export class AutomationStore {
     return this.byId(id)!;
   }
 
+  // a save that changed a field: its editor owns the row from now on
   update(id: string, fields: AutomationEdit): AutomationSummary | null {
     this.db
       .query(
-        `update automations set agent_id = ?, name = ?, instructions = ?,
+        `update automations set owner_id = ?, agent_id = ?, name = ?,
+           instructions = ?,
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, own_memory = ?, memory_guidance = ?,
            attention_mode = ?, attention_guidance = ?,
            disabled_capabilities = ?, rerun_on_restart = ?,
-           revision = revision + 1, updated_at = ? where id = ?`,
+           revision = revision + 1, edit_revision = edit_revision + 1,
+           updated_at = ? where id = ?`,
       )
       .run(
+        fields.ownerId,
         fields.agentId,
         fields.name,
         fields.instructions,

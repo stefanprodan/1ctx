@@ -67,7 +67,13 @@ describe("a send's disabled capabilities", () => {
       const changed = await chat.member.call(
         "PATCH",
         `/api/automations/${automation.id}`,
-        { body: { disabledCapabilities: [] } },
+        {
+          body: {
+            editRevision: chat.app.automations.byId(automation.id)!
+              .editRevision,
+            disabledCapabilities: [],
+          },
+        },
       );
       expect(changed.status).toBe(200);
       expect(policy.disabledCapabilities).toEqual(["web"]);

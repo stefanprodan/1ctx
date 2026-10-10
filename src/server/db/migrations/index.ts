@@ -60,6 +60,7 @@ import { m0051 } from "./0051-agent-email.ts";
 import { m0052 } from "./0052-subagents.ts";
 import { m0053 } from "./0053-anthropic.ts";
 import { m0054 } from "./0054-agent-output-limit.ts";
+import { m0055 } from "./0055-automation-edit-revision.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -116,4 +117,5 @@ export const MIGRATIONS: Migration[] = [
   m0052,
   m0053,
   m0054,
+  m0055,
 ];

@@ -66,6 +66,7 @@ const EXPECTED_IDS = [
   "0052-subagents",
   "0053-anthropic",
   "0054-agent-output-limit",
+  "0055-automation-edit-revision",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -83,6 +84,7 @@ const LATER_COLUMNS = [
   "parent_message_id",
   "child",
   "output_limit",
+  "edit_revision",
 ];
 const earlier = (rows: unknown[]) =>
   rows.map((row) =>
@@ -1836,6 +1838,30 @@ describe("the schema", () => {
       db.exec("update agents set output_limit = 128000 where id = 'a'");
       expect(() =>
         db.exec("update agents set output_limit = 0 where id = 'a'"),
+      ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0055 starts every automation's edit revision at zero", () => {
+    const db = seed(MIGRATIONS.slice(0, 54));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, revision, created_at, updated_at)
+          values ('auto', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 1000, 7, 0, 0);
+      `);
+      expect(migrate(db)).toEqual(
+        expectedFrom("0055-automation-edit-revision"),
+      );
+      expect(
+        db.query("select revision, edit_revision from automations").all(),
+      ).toEqual([{ revision: 7, edit_revision: 0 }]);
+      expect(() =>
+        db.exec("update automations set edit_revision = -1"),
       ).toThrow(/CHECK/);
     } finally {
       db.close();

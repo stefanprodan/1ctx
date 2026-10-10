@@ -60,17 +60,26 @@ describe("automation memory guidance", () => {
       expect(automation.memoryGuidance).toBe(clean);
       const path = `/api/automations/${automation.id}`;
       const set = await chat.member.call("PATCH", path, {
-        body: { memoryGuidance: "Last snapshot: the latest result" },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          memoryGuidance: "Last snapshot: the latest result",
+        },
       });
       expect(set.status).toBe(200);
       const kept = await chat.member.call("PATCH", path, {
-        body: { name: "guidance-kept" },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          name: "guidance-kept",
+        },
       });
       expect((await kept.json()).automation.memoryGuidance).toBe(
         "Last snapshot: the latest result",
       );
       const changed = await chat.member.call("PATCH", path, {
-        body: { memoryGuidance: raw },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          memoryGuidance: raw,
+        },
       });
       expect(changed.status).toBe(200);
       expect((await changed.json()).automation.memoryGuidance).toBe(clean);
@@ -103,9 +112,9 @@ describe("automation memory guidance", () => {
         const said =
           typeof value === "string" ? "memory guidance" : "memoryGuidance";
         expect(() => parseSaveAutomation(body)).toThrow(said);
-        expect(() => parsePatchAutomation({ memoryGuidance: value })).toThrow(
-          said,
-        );
+        expect(() =>
+          parsePatchAutomation({ memoryGuidance: value, editRevision: 0 }),
+        ).toThrow(said);
         const created = await chat.member.call(
           "POST",
           `/api/projects/${chat.projectId}/automations`,
@@ -115,7 +124,13 @@ describe("automation memory guidance", () => {
         const changed = await chat.member.call(
           "PATCH",
           `/api/automations/${automation.id}`,
-          { body: { memoryGuidance: value } },
+          {
+            body: {
+              editRevision: chat.app.automations.byId(automation.id)!
+                .editRevision,
+              memoryGuidance: value,
+            },
+          },
         );
         expect(changed.status).toBe(400);
         expect(chat.app.automations.byId(automation.id)).toEqual(automation);

@@ -9,11 +9,27 @@ import {
 import { MAX_NAME, MIN_NAME } from "../../../src/shared/words.ts";
 
 test("an automation's name follows the shared name rule", () => {
-  expect(parsePatchAutomation({ name: "nightly-report" }).name).toBe(
-    "nightly-report",
-  );
-  expect(() => parsePatchAutomation({ name: "Nightly Report" })).toThrow(
-    `name must be ${MIN_NAME} to ${MAX_NAME} `,
+  expect(
+    parsePatchAutomation({ name: "nightly-report", editRevision: 0 }).patch
+      .name,
+  ).toBe("nightly-report");
+  expect(() =>
+    parsePatchAutomation({ name: "Nightly Report", editRevision: 0 }),
+  ).toThrow(`name must be ${MIN_NAME} to ${MAX_NAME} `);
+});
+
+test("a patch names the edit revision it started from", () => {
+  expect(parsePatchAutomation({ tz: "UTC", editRevision: 3 })).toEqual({
+    patch: { tz: "UTC" },
+    editRevision: 3,
+  });
+  for (const editRevision of [undefined, -1, 1.5, "2"]) {
+    expect(() => parsePatchAutomation({ tz: "UTC", editRevision })).toThrow(
+      "editRevision must be a non-negative integer",
+    );
+  }
+  expect(() => parsePatchAutomation({ editRevision: 0 })).toThrow(
+    "empty patch",
   );
 });
 

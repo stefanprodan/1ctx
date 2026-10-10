@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation pages say and check without a DOM: a schedule
-// in words for the shapes people write most, the list row's state, who
-// may change a row, and the editor's fields to a request; a run's words
-// are in Run.model.ts. The server parses the schedule and the zone; the
-// words here only read them, and the expression itself stands in for
-// any shape they do not know.
+// in words for the shapes people write most, the list row's state, and
+// the editor's fields to a request; a run's words are in Run.model.ts,
+// and what a save says in AutomationEdit.model.ts. The server parses
+// the schedule and the zone; the words here only read them, and the
+// expression itself stands in for any shape they do not know.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import {
@@ -26,8 +26,6 @@ import {
 import {
   type AttentionMode,
   DEFERRED_BY_RESTART,
-  type ProjectKind,
-  type Role,
 } from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
@@ -200,16 +198,6 @@ export function eventNote(a: AutomationSummary, now: number): string | null {
     return deferred ? `${late}, ${DEFERRED_BY_RESTART}` : late;
   }
   return deferred ? `The last run was ${DEFERRED_BY_RESTART}` : null;
-}
-
-// the owner edits and deletes; in a team project an admin does too
-export function canChange(
-  a: Pick<AutomationSummary, "ownerId">,
-  user: { id: string; role: Role } | null,
-  kind: ProjectKind,
-): boolean {
-  if (user === null) return false;
-  return a.ownerId === user.id || (kind === "team" && user.role === "admin");
 }
 
 // The automation page and its editor: the row, the project it was found

@@ -5,11 +5,11 @@
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines. An automation whose agent was deleted names
 // it with a tag and says it is paused until an edit picks another.
-// Suspend or Resume and Run now, which anyone in the project presses,
-// and Edit for whoever may change it, sit over two tabs. Runs is a log
-// of RunRow.tsx rows, a page at a time, filtered to the manual or the
-// flagged runs. An open alert sits over the brief with
-// Dismiss. Memory is the automation's own note.
+// Suspend or Resume, Run now, Edit and Delete, which anyone in the
+// project presses, sit over two tabs. Runs is a log of RunRow.tsx rows,
+// a page at a time, filtered to the manual or the flagged runs. An open
+// alert sits over the brief with Dismiss. Memory is the automation's
+// own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
@@ -30,7 +30,6 @@ import {
   previewKey,
   runDeadlineMs,
 } from "../../data/automations.ts";
-import { me } from "../../data/me.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { closeRunsOf, loadMoreRuns, runs } from "../../data/runs.ts";
@@ -54,7 +53,6 @@ import { AccessLines } from "./AutomationAccess.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
   automationPageOf,
-  canChange,
   eventNote,
   nextLine,
   scheduleTitle,
@@ -194,10 +192,6 @@ export function Automation({ params }: { params: Params }) {
       ? 0
       : tally.done + tally.failed + tally.stopped + tally.running;
   const note = row === null ? null : eventNote(row, now);
-  const editable =
-    row !== null &&
-    shown !== null &&
-    canChange(row, me.value ?? null, shown.kind);
   return (
     <Page
       crumb={shown?.name ?? "Project"}
@@ -303,7 +297,6 @@ export function Automation({ params }: { params: Params }) {
           {note !== null && <p class="automations-note">{note}</p>}
           <AutomationActions
             automation={row}
-            editable={editable}
             onFailure={(text) => {
               failure.value = text;
             }}

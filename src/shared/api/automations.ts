@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Request and response bodies of the automation routes. Anyone who
-// sees the project creates, runs, suspends and resumes; the owner or,
-// in a team project, an admin edits and deletes.
+// sees the project creates, runs, suspends, resumes, edits and deletes;
+// a save that changes a field makes its editor the owner.
 
 import type { AutomationSummary } from "../contracts/automation.ts";
 import type { AttentionMode, SessionStatus } from "../words.ts";
@@ -25,7 +25,8 @@ export type AutomationResponse = { automation: AutomationSummary };
 
 // POST /api/projects/:id/automations: guidance defaults to empty and
 // the attention mode to agent; PATCH
-// /api/automations/:id: any of them, each given one checked
+// /api/automations/:id: any of them, each given one checked, and the
+// edit revision the form started from, a 409 once the row moved on
 export type SaveAutomationRequest = {
   name: string;
   agentId: string;
@@ -44,7 +45,9 @@ export type SaveAutomationRequest = {
   attentionMode?: AttentionMode;
   attentionGuidance?: string;
 };
-export type PatchAutomationRequest = Partial<SaveAutomationRequest>;
+export type PatchAutomationRequest = Partial<SaveAutomationRequest> & {
+  editRevision: number;
+};
 
 // GET /api/automations/:id/runs?filter=manual|attention&before=: a page of
 // its sessions, newest first, narrowed by the filter, with next as for

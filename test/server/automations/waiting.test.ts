@@ -593,7 +593,12 @@ describe("a fire waiting for a free place", () => {
     const start = fakeStart(chat, () => "project");
     await chat.app.automationScheduler.pass();
     const patch = (body: Record<string, unknown>) =>
-      chat.member.call("PATCH", `/api/automations/${waiting.id}`, { body });
+      chat.member.call("PATCH", `/api/automations/${waiting.id}`, {
+        body: {
+          ...body,
+          editRevision: chat.app.automations.byId(waiting.id)!.editRevision,
+        },
+      });
 
     expect((await patch({ instructions: "check again" })).status).toBe(200);
     expect(row(chat, waiting.id).nextAt).toBe(due);

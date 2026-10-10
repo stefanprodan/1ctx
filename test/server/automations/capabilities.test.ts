@@ -48,7 +48,13 @@ describe("automation capability sets", () => {
       const preserved = await chat.member.call(
         "PATCH",
         `/api/automations/${automation.id}`,
-        { body: { name: "renamed" } },
+        {
+          body: {
+            editRevision: chat.app.automations.byId(automation.id)!
+              .editRevision,
+            name: "renamed",
+          },
+        },
       );
       expect(preserved.status).toBe(200);
       expect((await preserved.json()).automation.disabledCapabilities).toEqual([
@@ -66,7 +72,13 @@ describe("automation capability sets", () => {
       const cleared = await chat.member.call(
         "PATCH",
         `/api/automations/${automation.id}`,
-        { body: { disabledCapabilities: [] } },
+        {
+          body: {
+            editRevision: chat.app.automations.byId(automation.id)!
+              .editRevision,
+            disabledCapabilities: [],
+          },
+        },
       );
       expect(cleared.status).toBe(200);
       expect((await cleared.json()).automation.disabledCapabilities).toEqual(
@@ -100,13 +112,17 @@ describe("automation capability sets", () => {
             disabledCapabilities,
           }),
         ).toThrow(BadRequest);
-        expect(() => parsePatchAutomation({ disabledCapabilities })).toThrow(
-          "disabledCapabilities",
-        );
+        expect(() =>
+          parsePatchAutomation({ disabledCapabilities, editRevision: 0 }),
+        ).toThrow("disabledCapabilities");
         for (const response of [
           await save(chat, disabledCapabilities),
           await chat.member.call("PATCH", `/api/automations/${automation.id}`, {
-            body: { disabledCapabilities },
+            body: {
+              editRevision: chat.app.automations.byId(automation.id)!
+                .editRevision,
+              disabledCapabilities,
+            },
           }),
         ]) {
           expect(response.status).toBe(400);
@@ -163,7 +179,13 @@ describe("automation capability sets", () => {
         const patch = await chat.member.call(
           "PATCH",
           `/api/automations/${automation.id}`,
-          { body: { disabledCapabilities: [] } },
+          {
+            body: {
+              editRevision: chat.app.automations.byId(automation.id)!
+                .editRevision,
+              disabledCapabilities: [],
+            },
+          },
         );
         expect(patch.status).toBe(200);
         expect(events[0]?.automation.disabledCapabilities).toEqual(["web"]);

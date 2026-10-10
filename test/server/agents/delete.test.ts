@@ -426,7 +426,10 @@ describe("an automation on a retired agent", () => {
         `/api/automations/${automation.id}/resume`,
       ),
       await chat.member.call("PATCH", `/api/automations/${automation.id}`, {
-        body: { name: "renamed" },
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          name: "renamed",
+        },
       }),
       await chat.member.call("POST", `/api/automations/${automation.id}/run`),
     ];
@@ -441,7 +444,12 @@ describe("an automation on a retired agent", () => {
     const moved = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
-      { body: { agentId: helperId } },
+      {
+        body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
+          agentId: helperId,
+        },
+      },
     );
     expect(moved.status).toBe(200);
     expect((await moved.json()).automation).toMatchObject({

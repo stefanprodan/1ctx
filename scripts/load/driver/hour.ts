@@ -212,7 +212,11 @@ export async function step(api: Api, admin: Who, d: Directory, o: StepOptions) {
       admin,
       "PATCH",
       `/api/automations/${row.id}`,
-      { schedule: times.get(row.id), tz: row.tz === "UTC" ? "Etc/UTC" : "UTC" },
+      {
+        schedule: times.get(row.id),
+        tz: row.tz === "UTC" ? "Etc/UTC" : "UTC",
+        editRevision: row.editRevision,
+      },
     );
     if (res.status !== 200) {
       patchErrors++;

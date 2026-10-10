@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, test } from "bun:test";
+import { ApiError } from "../../../src/client/data/api.ts";
 import {
   automationCount,
   automations,
@@ -9,6 +10,7 @@ import {
   loadAutomations,
   matchesFilter,
   onAutomationsSocket,
+  reloadAutomation,
   runDeadlineMs,
   upsertAutomation,
   upsertRun,
@@ -30,9 +32,14 @@ import {
   disabledOf,
 } from "../../../src/client/views/projects/Access.model.ts";
 import {
+  ownerNote,
+  staleEdit,
+  staleFailure,
+  staleWords,
+} from "../../../src/client/views/projects/AutomationEdit.model.ts";
+import {
   automationFieldOf,
   automationPageOf,
-  canChange,
   type Draft,
   dirtyOf,
   draftOf,
@@ -59,7 +66,10 @@ import {
   sourceText,
 } from "../../../src/client/views/projects/Run.model.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
-import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  STALE_EDIT,
+} from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 import type { RunFilter } from "../../../src/shared/words.ts";
 
@@ -99,6 +109,7 @@ const automation = (
   lastRunSessionId: null,
   lastRunStatus: null,
   revision: 1,
+  editRevision: 0,
   createdAt: now - 24 * HOUR,
   updatedAt: now - 24 * HOUR,
   disabledCapabilities: [],
@@ -355,13 +366,36 @@ describe("the row's words", () => {
     );
   });
 
-  test("the owner changes a row, and an admin only in a team project", () => {
+  test("the save row says a save takes over a task someone else owns", () => {
     const row = automation();
-    expect(canChange(row, { id: "u1", role: "member" }, "team")).toBe(true);
-    expect(canChange(row, { id: "u2", role: "member" }, "team")).toBe(false);
-    expect(canChange(row, { id: "u2", role: "admin" }, "team")).toBe(true);
-    expect(canChange(row, { id: "u2", role: "admin" }, "personal")).toBe(false);
-    expect(canChange(row, null, "team")).toBe(false);
+    expect(ownerNote(row, "u2")).toBe(
+      "Saving makes you the owner. Scheduled runs will act as you.",
+    );
+    expect(ownerNote(row, "u1")).toBeNull();
+    expect(ownerNote(row, null)).toBeNull();
+    expect(ownerNote(null, "u2")).toBeNull();
+  });
+
+  test("only the stale edit refusal offers Reload", () => {
+    expect(staleEdit({ error: STALE_EDIT, status: 409 })).toBe(true);
+    expect(staleEdit({ error: "name is taken", status: 409 })).toBe(false);
+    expect(staleEdit({ error: STALE_EDIT })).toBe(false);
+    expect(staleEdit(null)).toBe(false);
+    expect(staleFailure(new ApiError(409, STALE_EDIT))).toBe(true);
+    expect(staleFailure(new ApiError(409, "name is taken"))).toBe(false);
+    expect(staleFailure(new Error(STALE_EDIT))).toBe(false);
+  });
+
+  test("a stale save keeps its words until Reload lands", () => {
+    const refusal = { error: STALE_EDIT, status: 409 };
+    // the notice says it, so the start does not
+    expect(staleWords(true, refusal)).toBeNull();
+    // an edit or Reload's own call cleared the notice
+    expect(staleWords(true, null)).toBe("Changed since you opened it.");
+    expect(staleWords(true, { error: "Name is empty" })).toBe(
+      "Changed since you opened it.",
+    );
+    expect(staleWords(false, null)).toBeNull();
   });
 
   test("the page finds its row and project, or says it was deleted", () => {
@@ -1014,6 +1048,73 @@ describe("the entity over the socket", () => {
     await page;
     expect(automations.value?.map((a) => a.id)).toEqual([]);
   });
+
+  // a list of p1 holding au1, and a read of au1 that answers on release
+  async function heldReload() {
+    me.value = {
+      id: "u1",
+      username: "casey",
+      fullName: "Casey",
+      role: "member",
+      mustChangePassword: false,
+    };
+    let release: (response: Response) => void = () => {};
+    globalThis.fetch = (async (url: string) => {
+      if (url === "/api/automations/au1") {
+        return new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      }
+      return Response.json({
+        automations: [automation()],
+        runDeadlineMs: LIMIT,
+      });
+    }) as unknown as typeof fetch;
+    await loadAutomations("p1");
+    const reload = reloadAutomation("au1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return {
+      reload,
+      release: (row: AutomationSummary) =>
+        release(Response.json({ automation: row })),
+    };
+  }
+
+  test.serial(
+    "a reload answered after a delete never brings it back",
+    async () => {
+      const { reload, release } = await heldReload();
+      onAutomationsSocket({
+        type: "automationDeleted",
+        projectId: "p1",
+        automationId: "au1",
+        runs: false,
+      });
+      release(automation({ revision: 2 }));
+      await reload;
+      expect(automations.value).toEqual([]);
+    },
+  );
+
+  test.serial(
+    "a reload answers the newer of its read and a frame",
+    async () => {
+      const { reload, release } = await heldReload();
+      const newer = automation({
+        revision: 4,
+        editRevision: 2,
+        name: "theirs",
+      });
+      onAutomationsSocket({
+        type: "automation",
+        projectId: "p1",
+        automation: newer,
+      });
+      release(automation({ revision: 3, editRevision: 1 }));
+      expect(await reload).toEqual(newer);
+      expect(automations.value).toEqual([newer]);
+    },
+  );
 
   test.serial("frames of the project on screen move its rows", async () => {
     me.value = {

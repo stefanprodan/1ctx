@@ -60,11 +60,13 @@ function guidance(value: unknown, field: string, label: string, max: number) {
   return cleaned;
 }
 
+type AutomationValues = Omit<PatchAutomationRequest, "editRevision">;
+
 function parseValues(
   body: Record<string, unknown>,
   required: boolean,
-): PatchAutomationRequest {
-  const out: PatchAutomationRequest = {};
+): AutomationValues {
+  const out: AutomationValues = {};
   const take = (name: string) => required || Object.hasOwn(body, name);
   // a field a create leaves out takes its default
   const given = (name: string, fallback: unknown) =>
@@ -172,10 +174,24 @@ export function parseSaveAutomation(
   return parseValues(parsed, true) as Required<SaveAutomationRequest>;
 }
 
-export function parsePatchAutomation(body: unknown): PatchAutomationRequest {
-  const parsed = fields(body, [...KEYS, ...OPTIONAL]);
+export function parsePatchAutomation(body: unknown): {
+  patch: AutomationValues;
+  editRevision: number;
+} {
+  const { editRevision, ...parsed } = fields(body, [
+    ...KEYS,
+    ...OPTIONAL,
+    "editRevision",
+  ]);
+  if (
+    typeof editRevision !== "number" ||
+    !Number.isSafeInteger(editRevision) ||
+    editRevision < 0
+  ) {
+    throw new BadRequest("editRevision must be a non-negative integer");
+  }
   if (Object.keys(parsed).length === 0) throw new BadRequest("empty patch");
-  return parseValues(parsed, false);
+  return { patch: parseValues(parsed, false), editRevision };
 }
 
 export function parseRunsQuery(url: URL): {

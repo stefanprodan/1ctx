@@ -235,7 +235,10 @@ export async function loadPreview(
   }
 }
 
+// a write's or a read's answer joins the list by the revision rule; a
+// row deleted since it was asked never joins again
 function take(row: AutomationSummary, forUser: string | null): void {
+  if (gone.has(row.id)) return;
   if (owner !== forUser || projectFor !== row.projectId) return;
   listTurn++;
   if (automations.value === null) {
@@ -267,6 +270,20 @@ export async function updateAutomation(
   const { automation } = await api<AutomationResponse>(path(id), "PATCH", body);
   take(automation, forUser);
   return automation;
+}
+
+// the saved row read again, for an editor whose save someone else's
+// change got to first: the newer of the answer and a frame held since,
+// so the editor never opens on an older edit revision
+export async function reloadAutomation(id: string): Promise<AutomationSummary> {
+  const forUser = owner;
+  const { automation } = await api<AutomationResponse>(path(id));
+  take(automation, forUser);
+  const held =
+    owner === forUser ? automations.value?.find((a) => a.id === id) : undefined;
+  return held !== undefined && held.revision > automation.revision
+    ? held
+    : automation;
 }
 
 export async function suspendAutomation(id: string, suspend: boolean) {

@@ -38,6 +38,7 @@ describe("automation memory phase", () => {
       `/api/automations/${automation.id}`,
       {
         body: {
+          editRevision: chat.app.automations.byId(automation.id)!.editRevision,
           instructions: "A different task for later runs.",
           memoryGuidance: "New guidance for later runs.",
         },
