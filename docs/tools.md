@@ -184,12 +184,18 @@ words.
   `runAnswer()` before its memory round: by status, cause and error,
   never the status alone, and a running run has no result yet.
 - **Task text is quoted as data.** The instructions, the guidance and
-  the answer are fenced past any backticks they hold and labelled as
-  the task's. The instructions and the answer are cut at `FIELD_BYTES`
-  of UTF-8 at a character boundary, reasons and errors at
-  `SHORT_BYTES`, a list line's reason at `LIST_REASON_BYTES`. A cut field is read on with `part`, an `offset` in
-  characters and the `ref` its note gives: the edit revision or the
-  run's id. A ref that no longer holds starts again at 0.
+  the answer go through the registry's `sanitize()` first (`asSent()`),
+  then are fenced past any backticks left and labelled as the task's.
+  An empty answer is no answer.
+- **Every page fits the call's `resultCut`.** The instructions and the
+  answer are cut at `FIELD_BYTES` of UTF-8 at a character boundary, and
+  to what the cut leaves after the rest and the longest tail, so the
+  fence closes and a note's offset is where the text ended. Reasons and
+  errors are cut at `SHORT_BYTES`, a list line's at
+  `LIST_REASON_BYTES`. A cut field is read on with `part`, an `offset`
+  in characters and the `ref` its note gives: the edit revision or the
+  run's id. A ref that no longer holds starts again at 0. `list` pages
+  by task with `offset`.
 - **The notes and links are the result's `tail`,** so a cut keeps them.
   Links are the app's own paths, which the renderer keeps.
 
