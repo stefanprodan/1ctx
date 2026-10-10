@@ -126,10 +126,18 @@
     color: var(--faint);
     text-decoration: line-through;
   }
-  /* the whole text, scrolling inside the box once long */
+  /* a guidance's label sits over its box */
+  .proposal-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .proposal-note {
+    margin: 0;
+    color: var(--faint);
+  }
   .proposal-text {
-    max-height: 18lh;
-    overflow-y: auto;
     padding: var(--space-3);
     border-radius: var(--radius);
     background: var(--inset);
@@ -141,6 +149,11 @@
     color: var(--fg);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+  /* cut at CUT_LINES lines until Show all */
+  .proposal-clip {
+    max-height: 18lh;
+    overflow: clip;
   }
   .proposal-diff {
     padding-inline: var(--space-2);

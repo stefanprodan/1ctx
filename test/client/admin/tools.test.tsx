@@ -800,7 +800,7 @@ describe("the Config board", () => {
     expect(html.match(/role="switch"/g)).toHaveLength(1);
     const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
     const card = forms.find((form) =>
-      form.includes("Agents read scheduled tasks"),
+      form.includes("Agents manage scheduled tasks"),
     )!;
     expect(card).toContain('role="switch"');
     expect(card).toContain('aria-checked="true"');
@@ -817,9 +817,11 @@ describe("the Config board", () => {
 
   test("the automation card's line says what its switch does", () => {
     expect(automationLine(true)).toBe(
-      "A chat's agent may read its project's scheduled tasks. Each chat can turn it off.",
+      "A chat's agent may read its project's scheduled tasks and propose changes a user confirms. Each chat can turn it off.",
     );
-    expect(automationLine(false)).toBe("No agent reads scheduled tasks.");
+    expect(automationLine(false)).toBe(
+      "No agent reads or changes scheduled tasks.",
+    );
   });
 
   test.serial("the automation switch draws the row off", async () => {
@@ -832,7 +834,7 @@ describe("the Config board", () => {
     path.value = "/admin/config";
     const html = render(<ConfigBoard />);
     const card = (html.match(/<form\b[\s\S]*?<\/form>/g) ?? []).find((form) =>
-      form.includes("Agents read scheduled tasks"),
+      form.includes("Agents manage scheduled tasks"),
     )!;
     expect(card).toContain('aria-checked="false"');
     expect(card).toContain(automationLine(false));
@@ -850,7 +852,7 @@ describe("the Config board", () => {
     // the automation card stays mounted, hidden, so its draft is kept
     expect(html.match(/<form/g)).toHaveLength(9);
     expect(html).toMatch(
-      /config-board-cards config-board-away"><form[\s\S]*?Agents read scheduled tasks/,
+      /config-board-cards config-board-away"><form[\s\S]*?Agents manage scheduled tasks/,
     );
     expect(html).toContain(">Running<");
     expect(html).toContain("Per user");

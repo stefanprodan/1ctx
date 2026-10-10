@@ -143,7 +143,8 @@ export function Add({
   memory: WebItem;
   // null while the instance does not offer email
   email: WebItem | null;
-  // the automation tool, which reads the project's scheduled tasks
+  // the automation tool, which reads the project's scheduled tasks and
+  // proposes changes to them
   tasks: WebItem;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;

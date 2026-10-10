@@ -4,13 +4,16 @@
 import { AUTOMATION_DEFAULTS } from "../../../shared/automation-defaults.ts";
 import { DRAFTS_PER_SEND } from "../../../shared/automation-limits.ts";
 import { AUTOMATIONS, MEMORY } from "../../../shared/capabilities.ts";
-import type { AutomationProposal } from "../../../shared/contracts/automation-draft.ts";
+import {
+  type AutomationProposal,
+  PROPOSAL_FIELDS,
+} from "../../../shared/contracts/automation-draft.ts";
 import { messageOf, ToolError } from "../../lib/errors.ts";
 import type { ToolBudget, ToolContext } from "../types.ts";
 
 export const PROPOSAL_ACTIONS = {
-  create: ["action", "name", "instructions", "schedule", "tz", "once"],
-  update: ["action", "id", "name", "instructions", "schedule", "tz", "once"],
+  create: ["action", ...PROPOSAL_FIELDS],
+  update: ["action", "id", ...PROPOSAL_FIELDS],
   suspend: ["action", "id"],
   resume: ["action", "id"],
   run: ["action", "id"],
@@ -58,6 +61,9 @@ export async function propose(
         ? {
             ...AUTOMATION_DEFAULTS,
             tz: port.userZone(actor.userId),
+            // the default guidance is for own memory, so a task
+            // without one stores none
+            ...(call.fields.ownMemory === false ? { memoryGuidance: "" } : {}),
             ...call.fields,
             agentId: actor.agentId,
             disabledCapabilities: ctx.disabledCapabilities.filter(

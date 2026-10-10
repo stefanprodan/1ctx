@@ -174,6 +174,9 @@ test("draft frames validate every proposal field and reject foreign fields", () 
   for (const [action, fields] of [
     ["update", {}],
     ["update", { once: "true" }],
+    ["update", { ownMemory: "no" }],
+    ["update", { memoryGuidance: 1 }],
+    ["update", { attentionMode: "off" }],
     ["update", { agentId: "agent" }],
     ["run", { once: true }],
     ["other", {}],
@@ -182,6 +185,20 @@ test("draft frames validate every proposal field and reject foreign fields", () 
       isDraftFrame({ ...frame, draft: { ...pendingDraft, action, fields } }),
     ).toBe(false);
   }
+});
+
+test("an update carries memory and attention guidance", () => {
+  const fields = {
+    ownMemory: false,
+    memoryGuidance: "",
+    attentionGuidance: "A script failed.",
+  };
+  expect(
+    isDraftFrame({
+      ...frame,
+      draft: { ...pendingDraft, action: "update", fields },
+    }),
+  ).toBe(true);
 });
 
 test("a watched answer's drafts are a list when present", () => {

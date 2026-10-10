@@ -11,10 +11,14 @@ import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
   type AutomationsPort,
   makeAutomationTool,
+  PROPOSAL_DESCRIPTION,
   parseAutomationArgs,
 } from "../../../src/server/tools/builtin/automation.ts";
 import type { ToolContext } from "../../../src/server/tools/index.ts";
-import { AUTOMATION_DEFAULTS } from "../../../src/shared/automation-defaults.ts";
+import {
+  AUTOMATION_DEFAULTS,
+  OWN_MEMORY_GUIDANCE,
+} from "../../../src/shared/automation-defaults.ts";
 import {
   refusedProposalFields,
   refusedTaskValues,
@@ -42,6 +46,45 @@ test("the proposal parser refuses fields an action never takes", () => {
   }
   expect(() => parseAutomationArgs({ action: "delete" }, true)).toThrow(
     "action must be",
+  );
+});
+
+test("the description says which text goes where", () => {
+  for (const sentence of [
+    "Write instructions that stand alone: what to check and what is worth reporting.",
+    "attentionGuidance says what in the answer needs a person, since a step after the run reads the answer, not the files.",
+    "Keep it out of the instructions, and never tell the run to mark attention: it cannot.",
+    "ownMemory is for what a run learns that no file holds, such as a source that fails and its workaround.",
+    "Set ownMemory false when every run reads its state from files.",
+    "memoryGuidance says what the note keeps. A step after the run writes it, so the instructions never say to update memory.",
+  ]) {
+    expect(PROPOSAL_DESCRIPTION).toContain(sentence);
+  }
+  expect(PROPOSAL_DESCRIPTION).not.toContain("when to mark attention");
+  for (const call of [{ action: "create" }, { action: "update", id: "task" }]) {
+    expect(
+      parseAutomationArgs(
+        {
+          ...call,
+          ownMemory: false,
+          memoryGuidance: "",
+          attentionGuidance: "A script failed.",
+        },
+        true,
+      ),
+    ).toMatchObject({
+      fields: {
+        ownMemory: false,
+        memoryGuidance: "",
+        attentionGuidance: "A script failed.",
+      },
+    });
+  }
+});
+
+test("the default memory guidance leaves out what every run reads", () => {
+  expect(OWN_MEMORY_GUIDANCE).toEndWith(
+    " Leave out what the run reads from files or its task on every run.",
   );
 });
 
@@ -155,3 +198,17 @@ test.serial(
     await expect(tool.run(args, ctx)).rejects.toThrow("5 task proposals");
   },
 );
+
+test("a valid name is never reshaped", () => {
+  for (const name of ["daily-check_", "a_", "weekly-cve", "x--y"]) {
+    expect(
+      parseAutomationArgs({ action: "update", id: "task", name }, true),
+    ).toMatchObject({ fields: { name } });
+  }
+  expect(
+    parseAutomationArgs(
+      { action: "update", id: "task", name: " Weekly CVE " },
+      true,
+    ),
+  ).toMatchObject({ fields: { name: "weekly-cve" } });
+});

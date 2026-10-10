@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { OWN_MEMORY_GUIDANCE } from "../../shared/automation-defaults.ts";
 import type { AutomationProposal } from "../../shared/contracts/automation-draft.ts";
 import { type Db, transact } from "../db/index.ts";
 import { BadRequest, ToolError } from "../lib/errors.ts";
@@ -23,6 +24,10 @@ export type ProposalInput = {
   now: number;
 };
 
+// a proposal never stores a guidance nothing reads
+const UNREAD_MEMORY =
+  "memoryGuidance needs ownMemory. Leave it out when the task keeps no memory.";
+
 export function proposeTask(
   deps: {
     db: Db;
@@ -44,6 +49,9 @@ export function proposeTask(
     let proposal: AutomationProposal;
     if (input.action === "create") {
       const fields = parseSaveAutomation(input.fields);
+      if (!fields.ownMemory && fields.memoryGuidance !== "") {
+        throw new BadRequest(UNREAD_MEMORY);
+      }
       checkSchedule(fields.schedule, fields.tz, input.now);
       if (
         fields.deadlineMs !== null &&
@@ -58,6 +66,37 @@ export function proposeTask(
         editRevision: current!.editRevision,
       });
       const next = { ...current!, ...patch };
+      if (!next.ownMemory && (patch.memoryGuidance ?? "") !== "") {
+        throw new BadRequest(UNREAD_MEMORY);
+      }
+      if (
+        (patch.attentionGuidance ?? "") !== "" &&
+        next.attentionMode === "off"
+      ) {
+        throw new ToolError(
+          `Attention is off on [${current!.name}](/automations/${current!.id}). Open it to turn attention on first.`,
+          "task needs page edit",
+        );
+      }
+      // as the page's pickMemory: turning own memory on fills a blank
+      // guidance, and turning it off drops an unchanged default, so a
+      // later turn-on takes the default of that day
+      if (patch.memoryGuidance === undefined && patch.ownMemory !== undefined) {
+        if (
+          patch.ownMemory &&
+          !current!.ownMemory &&
+          current!.memoryGuidance.trim() === ""
+        ) {
+          patch.memoryGuidance = OWN_MEMORY_GUIDANCE;
+        }
+        if (
+          !patch.ownMemory &&
+          current!.ownMemory &&
+          current!.memoryGuidance === OWN_MEMORY_GUIDANCE
+        ) {
+          patch.memoryGuidance = "";
+        }
+      }
       if (
         current!.agentRetired ||
         (next.deadlineMs !== null && next.deadlineMs > deps.runDeadlineMs())

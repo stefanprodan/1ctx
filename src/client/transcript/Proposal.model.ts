@@ -198,6 +198,9 @@ const FIELD_WORDS: [keyof ProposalFields, string][] = [
   ["tz", "time zone"],
   ["once", "run once"],
   ["instructions", "instructions"],
+  ["ownMemory", "memory"],
+  ["memoryGuidance", "memory"],
+  ["attentionGuidance", "attention"],
 ];
 
 // what the line says after the name while it waits: when a new task
@@ -209,9 +212,10 @@ export function lineDetail(draft: AutomationDraft): string | null {
   }
   if (draft.action === "update") {
     const fields = draft.fields;
-    return FIELD_WORDS.filter(([key]) => fields[key] !== undefined)
-      .map(([, words]) => words)
-      .join(", ");
+    const words = FIELD_WORDS.filter(([key]) => fields[key] !== undefined).map(
+      ([, words]) => words,
+    );
+    return [...new Set(words)].join(", ");
   }
   return null;
 }
@@ -229,7 +233,10 @@ const yes = (on: boolean) => (on ? "yes" : "no");
 // they differ
 export function changedFields(
   fields: Partial<ProposalFields>,
-  before: Pick<ProposalFields, "name" | "schedule" | "tz" | "once"> | null,
+  before: Pick<
+    ProposalFields,
+    "name" | "schedule" | "tz" | "once" | "ownMemory"
+  > | null,
 ): FieldRow[] {
   const rows: FieldRow[] = [];
   const was = (now: string, then: string | undefined) =>
@@ -266,7 +273,77 @@ export function changedFields(
       ),
     });
   }
+  if (fields.ownMemory !== undefined) {
+    rows.push({
+      label: "Own memory",
+      value: yes(fields.ownMemory),
+      was: was(
+        yes(fields.ownMemory),
+        before?.ownMemory === undefined ? undefined : yes(before.ownMemory),
+      ),
+    });
+  }
   return rows;
+}
+
+export type TextBlock = {
+  // null for the instructions, which need none
+  label: string | null;
+  value: string;
+  // the task's text an update replaces; undefined for a create, or
+  // while the task is not read
+  was?: string;
+};
+
+// a create's texts under its instructions, each only when set
+export function createTexts(
+  fields: Pick<
+    ProposalFields,
+    "instructions" | "ownMemory" | "memoryGuidance" | "attentionGuidance"
+  >,
+): TextBlock[] {
+  const texts: TextBlock[] = [{ label: null, value: fields.instructions }];
+  if (fields.ownMemory && fields.memoryGuidance !== "") {
+    texts.push({ label: "Memory", value: fields.memoryGuidance });
+  }
+  if (fields.attentionGuidance !== "") {
+    texts.push({ label: "Attention", value: fields.attentionGuidance });
+  }
+  return texts;
+}
+
+// an update's changed texts beside the task's
+export function updateTexts(
+  fields: Partial<ProposalFields>,
+  before: Pick<
+    ProposalFields,
+    "instructions" | "memoryGuidance" | "attentionGuidance"
+  > | null,
+): TextBlock[] {
+  const texts: TextBlock[] = [];
+  const keys = [
+    ["instructions", null],
+    ["memoryGuidance", "Memory"],
+    ["attentionGuidance", "Attention"],
+  ] as const;
+  for (const [key, label] of keys) {
+    const value = fields[key];
+    if (value !== undefined) texts.push({ label, value, was: before?.[key] });
+  }
+  return texts;
+}
+
+// the lines an update changes; an empty side has no lines, so a
+// guidance set or cleared draws no blank line
+export function changedLines(before: string, after: string): DiffLine[] {
+  if (before === after) return [];
+  if (before === "") {
+    return after.split("\n").map((text) => ({ kind: "added", text }));
+  }
+  if (after === "") {
+    return before.split("\n").map((text) => ({ kind: "removed", text }));
+  }
+  return lineDiff(before, after).filter((line) => line.kind !== "same");
 }
 
 export type DiffLine = { kind: "same" | "added" | "removed"; text: string };
