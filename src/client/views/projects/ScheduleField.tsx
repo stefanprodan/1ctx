@@ -15,10 +15,11 @@ import { loadPreview, preview, previewKey } from "../../data/automations.ts";
 import { sentence } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useDayTurn } from "../../lib/now.ts";
+import { RowsCheck } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
-import { nextRunWords, scheduleTitle } from "./Automations.model.ts";
+import { nextRunWords } from "./Automations.model.ts";
 import {
   type Builder,
   builderOf,
@@ -27,6 +28,7 @@ import {
   type Every,
   expressionOf,
   STEPS,
+  scheduleTitle,
   switchEvery,
   WEEK,
 } from "./Schedule.model.ts";
@@ -40,6 +42,8 @@ export function ScheduleField({
   tz,
   disabled,
   invalidTz,
+  once = false,
+  onOnce,
   onSchedule,
   onTz,
 }: {
@@ -49,6 +53,10 @@ export function ScheduleField({
   disabled: boolean;
   // a refusal names the zone
   invalidTz?: boolean;
+  // the reading names the one fire with its date
+  once?: boolean;
+  // the Run once box under the reading, the editor's alone
+  onOnce?: () => void;
   onSchedule: (expression: string) => void;
   onTz: (tz: string) => void;
 }) {
@@ -263,7 +271,7 @@ export function ScheduleField({
         ) : fires !== null && fires.length > 0 ? (
           <span class="automations-next">
             <Icon name="arrow-right" size={14} />
-            {nextRunWords(fires[0], now, tz)}
+            {nextRunWords(fires[0], now, tz, once)}
           </span>
         ) : (
           // holds the line's room while the reading is on its way, so
@@ -273,6 +281,17 @@ export function ScheduleField({
           </span>
         )}
       </div>
+      {onOnce && (
+        <RowsCheck
+          name="once"
+          checked={once}
+          disabled={disabled}
+          note="Suspends after its first scheduled run"
+          onChange={onOnce}
+        >
+          Run once
+        </RowsCheck>
+      )}
     </div>
   );
 }

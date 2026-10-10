@@ -16,7 +16,10 @@
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  ranOnce,
+} from "../../../shared/contracts/automation.ts";
 import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate, path } from "../../app/router.ts";
@@ -37,7 +40,12 @@ import { projectAgents } from "../../data/sessions.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
 import { tickMs } from "../../feed/Row.model.ts";
 import { longDate, sentence, until } from "../../lib/format.ts";
-import { agentHref, automationHref, userHref } from "../../lib/hrefs.ts";
+import {
+  agentHref,
+  automationHref,
+  runHref,
+  userHref,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
@@ -55,13 +63,13 @@ import {
   automationPageOf,
   eventNote,
   nextLine,
-  scheduleTitle,
+  nextRunsOf,
   suspendedText,
 } from "./Automations.model.ts";
 import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
-import { fireLabel } from "./Schedule.model.ts";
+import { fireLabel, scheduleTitle } from "./Schedule.model.ts";
 import "./automations.css";
 
 const FILTERS: { value: RunFilter | null; label: string }[] = [
@@ -125,16 +133,19 @@ function NextRuns({
   if (automation.suspendedAt !== null) {
     return <div class="split-line">Suspended</div>;
   }
+  // a task that runs once has one fire, named with its year
+  const next = nextRunsOf(automation, held?.fires ?? [], now);
   return (
     <>
-      {(held?.fires ?? [])
-        .filter((fire) => fire > now)
-        .map((fire) => (
-          <div key={fire} class="split-line automations-fire">
-            <span>{fireLabel(fire, now, automation.tz)}</span>
-            <span class="automations-faint">{until(fire, now)}</span>
-          </div>
-        ))}
+      {next.waiting !== null && <div class="split-line">{next.waiting}</div>}
+      {next.fires.map((fire) => (
+        <div key={fire} class="split-line automations-fire">
+          <span>
+            {fireLabel(fire, now, automation.tz, false, automation.once)}
+          </span>
+          <span class="automations-faint">{until(fire, now)}</span>
+        </div>
+      ))}
       {held?.problem && (
         <div class="split-line error">{sentence(held.problem)}</div>
       )}
@@ -283,7 +294,16 @@ export function Automation({ params }: { params: Params }) {
                 row.agentRetired || row.suspendedAt !== null ? (
                   <p class="automations-brief-next">
                     <Icon name="pause" size={14} />
-                    {suspendedText(row, now)}
+                    {/* the run that spent it says how it went */}
+                    {!row.agentRetired &&
+                    ranOnce(row) &&
+                    row.onceRunSessionId !== null ? (
+                      <a href={runHref(row.onceRunSessionId)}>
+                        {suspendedText(row, now)}
+                      </a>
+                    ) : (
+                      suspendedText(row, now)
+                    )}
                   </p>
                 ) : row.nextAt !== null ? (
                   <p class="automations-brief-next">

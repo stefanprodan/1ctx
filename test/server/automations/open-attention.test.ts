@@ -507,7 +507,9 @@ describe("a deleted marked run", () => {
             data: expect.objectContaining({
               automation: expect.objectContaining({
                 id,
+                // one move for the alert and the last run it cleared
                 revision: revision + 1,
+                lastRunSessionId: null,
                 alert: {
                   since: endOf(chat, first),
                   runs: 1,

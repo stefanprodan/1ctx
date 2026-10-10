@@ -11,7 +11,7 @@ import type { Limits } from "../limits/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { Event, PreparedRun } from "../runner/index.ts";
-import type { SessionStore } from "../sessions/index.ts";
+import type { DeletedRun, SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { type AlertEmailDeps, alertEmails } from "./alert-email.ts";
 import { type Alerts, alerts } from "./alerts.ts";
@@ -53,6 +53,10 @@ export type Automations = {
   // suspended by the admin who deleted it, and an envelope for every one
   // of its automations, so a run held on a feed learns the agent is gone
   suspendAgent(agentId: string, by: string, now: number): BusEvent[];
+  // in the caller's transaction, after one of its runs was deleted: the
+  // open alert, and the revision when the row named the run, whose link
+  // the foreign key cleared
+  runDeleted(run: DeletedRun): BusEvent[];
   start(): number;
   drain(): void;
   stop(): void;
@@ -87,6 +91,16 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     scheduler: scheduled,
     suspendAgent: (agentId, by, now) =>
       store.retireAgent(agentId, by, now).map(automationChanged),
+    runDeleted(run) {
+      const events = run.marked
+        ? alerted.pruned(run.automationId, run.endedAt)
+        : [];
+      // the alert's change moved the revision and read the row after
+      // the delete, so it carries the cleared link too
+      if (!run.named || events.length > 0) return events;
+      const row = store.touch(run.automationId);
+      return row === null ? events : [automationChanged(row)];
+    },
     start: scheduled.start,
     drain: scheduled.drain,
     stop: scheduled.stop,

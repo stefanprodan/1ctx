@@ -36,6 +36,9 @@ type Raw = RawAlert & {
   attention_guidance: string;
   disabled_capabilities: string;
   rerun_on_restart: number;
+  once: number;
+  once_fired_at: number | null;
+  once_run_session_id: string | null;
   suspended_at: number | null;
   suspended_by: string | null;
   suspended_by_name: string | null;
@@ -92,6 +95,9 @@ const row = (raw: Raw): AutomationSummary => ({
   alert: alertOf(raw),
   disabledCapabilities: JSON.parse(raw.disabled_capabilities),
   rerunOnRestart: raw.rerun_on_restart === 1,
+  once: raw.once === 1,
+  onceFiredAt: raw.once_fired_at,
+  onceRunSessionId: raw.once_run_session_id,
   suspendedAt: raw.suspended_at,
   suspendedBy:
     raw.suspended_by === null
@@ -128,6 +134,7 @@ export type AutomationFields = Pick<
   | "attentionGuidance"
   | "disabledCapabilities"
   | "rerunOnRestart"
+  | "once"
 >;
 
 export type AutomationEdit = Omit<AutomationFields, "projectId"> & {
@@ -250,9 +257,9 @@ export class AutomationStore {
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, own_memory,
            memory_guidance, attention_mode, attention_guidance,
-           disabled_capabilities, rerun_on_restart,
+           disabled_capabilities, rerun_on_restart, once,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -271,6 +278,7 @@ export class AutomationStore {
         fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
+        fields.once ? 1 : 0,
         fields.nextAt,
         fields.now,
         fields.now,
@@ -287,7 +295,7 @@ export class AutomationStore {
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, own_memory = ?, memory_guidance = ?,
            attention_mode = ?, attention_guidance = ?,
-           disabled_capabilities = ?, rerun_on_restart = ?,
+           disabled_capabilities = ?, rerun_on_restart = ?, once = ?,
            revision = revision + 1, edit_revision = edit_revision + 1,
            updated_at = ? where id = ?`,
       )
@@ -307,6 +315,7 @@ export class AutomationStore {
         fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
+        fields.once ? 1 : 0,
         fields.now,
         id,
       );
@@ -324,15 +333,61 @@ export class AutomationStore {
     return this.byId(id);
   }
 
+  // a once task's fire spends it, after its event in the same
+  // transaction: suspended by nobody, at the time it fired, naming the
+  // run it started
+  spendOnce(
+    id: string,
+    sessionId: string,
+    now: number,
+  ): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set suspended_at = ?, suspended_by = null,
+           once_fired_at = ?, once_run_session_id = ?, next_at = null,
+           revision = revision + 1, updated_at = ?
+         where id = ? and once = 1 and suspended_at is null`,
+      )
+      .run(now, now, sessionId, now, id);
+    return this.byId(id);
+  }
+
+  // a restart's rerun of the once run is the once run from now on, so
+  // the page links it and a second restart reruns it again
+  carryOnceRun(
+    id: string,
+    sessionId: string,
+    now: number,
+  ): AutomationSummary | null {
+    this.db
+      .query(
+        `update automations set once_run_session_id = ?,
+           revision = revision + 1, updated_at = ?
+         where id = ? and once_run_session_id is not null`,
+      )
+      .run(sessionId, now, id);
+    return this.byId(id);
+  }
+
+  // a write the row did not make, such as a foreign key clearing a run
+  // it named: the revision moves, so a client takes the row again
+  touch(id: string): AutomationSummary | null {
+    this.db
+      .query("update automations set revision = revision + 1 where id = ?")
+      .run(id);
+    return this.byId(id);
+  }
+
   forgetCapability(key: string, projectId?: string): void {
     forgetCapabilityIn(this.db, "automations", key, projectId);
   }
 
+  // armed again: a task that ran once runs once more
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {
     this.db
       .query(
         `update automations set suspended_at = null, suspended_by = null,
-           next_at = ?,
+           next_at = ?, once_fired_at = null, once_run_session_id = null,
            revision = revision + 1, updated_at = ?
          where id = ? and suspended_at is not null`,
       )

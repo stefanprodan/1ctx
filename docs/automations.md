@@ -23,8 +23,8 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **A deadline may only tighten the `runDeadlineMs` limit.**
 - **Omitted fields: a create defaults, a PATCH keeps.**
   `disabledCapabilities` is a whole sorted set, empty on create;
-  `rerunOnRestart` is false on create. Each run snapshots the set onto
-  its session.
+  `rerunOnRestart` and `once` are false on create. Each run snapshots
+  the set onto its session.
 - **Anyone who sees the project runs, suspends, resumes, edits and
   deletes,** lowering retention included: a team project's members and
   every admin, a personal project's owner alone. A hidden project's
@@ -41,6 +41,19 @@ an event whose outcome is `run`, `skipped` or `deferred`
   it. A PATCH that changes the schedule or zone recomputes it from
   now, which ends a cap wait; other fields leave it. Resume computes
   it from now.
+- **A `once` task runs once.** The schedule stays cron. The fire that
+  starts its run (source `schedule`, a `restart` that takes a due fire,
+  or a Run now that takes a waiting one, since each moves `next_at`)
+  records the event, then `spendOnce()` suspends it with
+  `suspended_by` null, `once_fired_at` equal to `suspended_at` and
+  `once_run_session_id` naming the run, in that order in the fire's
+  transaction. A plain Run now, a skip, a wait and a deferral spend
+  nothing. Resume arms it for one more run and clears both; suspend on
+  it is a no-op, as on any suspended task.
+- **`ranOnce()` in `shared/contracts/automation.ts` is the one test**
+  of a task its own fire suspended: `suspended_at` equal to
+  `once_fired_at` and a once run kept, whether `once` is still set.
+  The page and `stillCut()` both read it.
 - **A retired agent blocks its automations.** Deleting an agent retires
   it (the row stays) and suspends them (`docs/archive.md`). While the
   agent is retired, resume, Run now and a PATCH that keeps the agent are
@@ -106,7 +119,11 @@ an event whose outcome is `run`, `skipped` or `deferred`
   rows with source `restart`, through the scheduled fire's checks and
   cap waits. A suspend, the flag turned off, or a later run drops a
   row (`stillCut()`); the list is memory only, so a second restart
-  lists the cut run again.
+  lists the cut run again. A suspended task reruns only when
+  `ranOnce()` holds, its agent is not retired and the cut run is its
+  once run, never a later Run now. It stays suspended, and the rerun
+  becomes the once run (`carryOnceRun()`), so a second restart reruns
+  it again.
 - **The scheduler starts after `sessions.repair()`** and stops after
   the runner's shutdown.
 
@@ -119,6 +136,13 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **The row keeps its last event apart from its last run.**
   `last_run_*` is written from `session.changed` and by `reconcile()`
   at start, so a crash never leaves it stale.
+- **Deleting a run the row names moves its revision.** A foreign key
+  clears `last_run_session_id` or `once_run_session_id`, which bumps
+  nothing, so `removeSession()` (the route and both sweeps) hands the
+  run to `runDeleted()` in its transaction: the revision moves once and
+  the automation is published once, with its alert's change when the
+  run was marked.
+  `?runs=delete` needs none, since the row goes with them.
 - **Retention is per automation; orphaned runs fall to the chats
   sweep.** The scheduler deletes runs past `retention_days` through
   the sessions area's one delete. A run whose automation is gone is

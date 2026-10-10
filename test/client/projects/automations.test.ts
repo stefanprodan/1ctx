@@ -24,6 +24,7 @@ import {
   relabelRuns,
   runs,
 } from "../../../src/client/data/runs.ts";
+import { until } from "../../../src/client/lib/format.ts";
 import { placeOf } from "../../../src/client/lib/places.ts";
 import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
@@ -46,14 +47,13 @@ import {
   eventNote,
   followDeadlineLimit,
   nextLine,
+  nextRunsOf,
   nextRunWords,
   OWN_MEMORY_GUIDANCE,
   pickMemory,
   requestOf,
   retiredPick,
   rowState,
-  scheduleTitle,
-  scheduleWords,
   suspendedText,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
@@ -65,9 +65,15 @@ import {
   sourceIcon,
   sourceText,
 } from "../../../src/client/views/projects/Run.model.ts";
+import {
+  scheduleColumn,
+  scheduleTitle,
+  scheduleWords,
+} from "../../../src/client/views/projects/Schedule.model.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
   type AutomationSummary,
+  ranOnce,
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
@@ -98,6 +104,9 @@ const automation = (
   attentionGuidance: "",
   alert: null,
   rerunOnRestart: false,
+  once: false,
+  onceFiredAt: null,
+  onceRunSessionId: null,
   suspendedAt: null,
   suspendedBy: null,
   nextAt: now + 4 * HOUR,
@@ -278,17 +287,112 @@ describe("the row's words", () => {
       suspendedAt: now - 2 * HOUR,
       suspendedBy: { id: "u9", username: "admin" },
       agentRetired: false,
+      onceFiredAt: null,
+      onceRunSessionId: null,
+      tz: "UTC",
     };
     expect(suspendedText(off, now)).toBe("Suspended by @admin 2h ago");
     expect(suspendedText({ ...off, suspendedBy: null }, now)).toBe(
       "Suspended 2h ago",
     );
     expect(
-      suspendedText(
-        { suspendedAt: null, suspendedBy: null, agentRetired: false },
-        now,
-      ),
+      suspendedText({ ...off, suspendedAt: null, suspendedBy: null }, now),
     ).toBe("");
+  });
+
+  test("a task its own run suspended says it ran once, and when", () => {
+    const tz = "Europe/Bucharest";
+    // Monday 14 September 2026, 12:00 in Bucharest
+    const clock = Date.UTC(2026, 8, 14, 9);
+    const spent = automation({
+      tz,
+      once: true,
+      suspendedAt: clock - 3 * HOUR,
+      onceFiredAt: clock - 3 * HOUR,
+      onceRunSessionId: "s1",
+      lastRunSessionId: "s2",
+      nextAt: null,
+    });
+    expect(ranOnce(spent)).toBe(true);
+    expect(suspendedText(spent, clock)).toBe("Ran once today 09:00");
+    expect(suspendedText(spent, clock + 48 * HOUR)).toBe(
+      "Ran once on Mon Sep 14 2026 09:00",
+    );
+    // a member's suspend of a task not fired yet reads as any other
+    const held = {
+      ...spent,
+      onceFiredAt: null,
+      suspendedBy: { id: "u9", username: "admin" },
+    };
+    expect(ranOnce(held)).toBe(false);
+    expect(suspendedText(held, clock)).toBe("Suspended by @admin 3h ago");
+    // turned off since, it still says it ran once
+    expect(suspendedText(automation({ ...spent, once: false }), clock)).toBe(
+      "Ran once today 09:00",
+    );
+    // its run deleted, nothing is left to say it ran
+    const gone = { ...spent, onceRunSessionId: null, suspendedBy: null };
+    expect(ranOnce(gone)).toBe(false);
+    expect(suspendedText(gone, clock)).toBe("Suspended 3h ago");
+    // resumed: armed again, not suspended
+    expect(
+      ranOnce({ suspendedAt: null, onceFiredAt: null, onceRunSessionId: null }),
+    ).toBe(false);
+  });
+
+  test("a task that runs once names its one fire with its year", () => {
+    const tz = "Europe/Bucharest";
+    const clock = Date.UTC(2026, 9, 10, 9);
+    // 0 9 11 10 *: 11 October at 9:00, tomorrow
+    const tomorrow = Date.UTC(2026, 9, 11, 6);
+    expect(nextRunWords(tomorrow, clock, tz, true)).toBe(
+      "Runs once tomorrow 09:00, in 21h",
+    );
+    // a date already past this year is next year's
+    const nextYear = Date.UTC(2027, 8, 1, 6);
+    expect(nextRunWords(nextYear, clock, tz, true)).toBe(
+      `Runs once on Wed Sep 1 2027 09:00, ${until(nextYear, clock)}`,
+    );
+    expect(nextRunWords(nextYear, clock, tz)).toBe(
+      `Next run Wed Sep 1 09:00, ${until(nextYear, clock)}`,
+    );
+    const once = automation({ once: true, tz, nextAt: nextYear });
+    expect(nextLine(once, clock)).toBe(
+      `Runs once on Wed Sep 1 2027 09:00, ${until(nextYear, clock)}`,
+    );
+  });
+
+  test("a once task's next run is its one fire, or the fire it waits on", () => {
+    const tz = "UTC";
+    const nine = Date.UTC(2026, 9, 10, 9);
+    const fires = [nine + HOUR, nine + 2 * HOUR];
+    // a recurring task lists every fire ahead
+    expect(nextRunsOf(automation({ tz }), fires, nine + 10 * 60_000)).toEqual({
+      waiting: null,
+      fires,
+    });
+    const once = automation({ tz, once: true, nextAt: nine + HOUR });
+    expect(nextRunsOf(once, fires, nine + 10 * 60_000)).toEqual({
+      waiting: null,
+      fires: [nine + HOUR],
+    });
+    // waiting since 09:00 for a slot, 10:00 never comes: once it gets a
+    // slot it runs and suspends
+    const waiting = { ...once, nextAt: nine };
+    expect(nextRunsOf(waiting, fires, nine + 10 * 60_000)).toEqual({
+      waiting: "Waiting since 09:00",
+      fires: [],
+    });
+  });
+
+  test("the list's schedule column adds once", () => {
+    expect(scheduleColumn(automation())).toBe("every weekday at 09:00");
+    expect(scheduleColumn(automation({ once: true }))).toBe(
+      "every weekday at 09:00, once",
+    );
+    expect(
+      scheduleColumn(automation({ once: true, schedule: "0 9 11 10 *" })),
+    ).toBe("0 9 11 10 *, once");
   });
 
   test("a deleted agent leaves it paused until another is picked", () => {
@@ -456,6 +560,7 @@ describe("the form", () => {
       attention: "agent",
       attentionGuidance: "",
       rerunOnRestart: false,
+      once: false,
       web: true,
       visuals: true,
       knowledge: true,
@@ -484,6 +589,7 @@ describe("the form", () => {
         attentionMode: "agent",
         attentionGuidance: "",
         rerunOnRestart: false,
+        once: false,
         disabledCapabilities: [],
       },
     });
@@ -526,6 +632,16 @@ describe("the form", () => {
     expect(shown.rerunOnRestart).toBe(true);
     expect(dirtyOf(shown, row, LIMIT)).toBe(false);
     expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
+  });
+
+  test("run once is off for a new task and saved as drafted", () => {
+    const on = requestOf(filled({ once: true }), LIMIT);
+    expect("body" in on && on.body.once).toBe(true);
+    const row = automation({ once: true });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.once).toBe(true);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, once: false }, row, LIMIT)).toBe(true);
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {

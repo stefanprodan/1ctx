@@ -1,7 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import {
+  type AutomationSummary,
+  ranOnce,
+} from "../../shared/contracts/automation.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import { type RecordDeps, recordOn } from "./events.ts";
 import type { AutomationStore } from "./store.ts";
@@ -27,13 +30,20 @@ export function cutRuns(
 }
 
 // a suspend, the flag turned off, or a later run whatever its end,
-// leaves the cut one alone
+// leaves the cut one alone. The run of a task its own fire suspended
+// reruns and the task stays suspended, since suspend cannot tell a rerun
+// to stop; only that run, never a later Run now, nor once its agent is
+// deleted
 export function stillCut(
   row: AutomationSummary,
   listed: Cut | undefined,
 ): boolean {
+  const spent =
+    ranOnce(row) &&
+    !row.agentRetired &&
+    listed?.sessionId === row.onceRunSessionId;
   return (
-    row.suspendedAt === null &&
+    (row.suspendedAt === null || spent) &&
     row.rerunOnRestart &&
     listed !== undefined &&
     row.lastRunSessionId === listed.sessionId

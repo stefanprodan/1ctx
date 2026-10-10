@@ -79,19 +79,43 @@ export function endedAfter(
   );
 }
 
-// the automation whose marked run this is and when the run ended, null
-// for any other session: its delete may change the open alert
-export function markedRun(
-  db: Db,
-  sessionId: string,
-): { automationId: string; endedAt: number } | null {
+// What a run's delete changes on its automation, null for a session
+// that is no run: a marked run may change the open alert, and a run the
+// row names as its last or once run is cleared from it by the foreign
+// key, which moves no revision. Two lookups by key.
+export type DeletedRun = {
+  automationId: string;
+  endedAt: number;
+  marked: boolean;
+  named: boolean;
+};
+
+export function deletedRun(db: Db, sessionId: string): DeletedRun | null {
   const row = db
-    .query<{ automation_id: string; last_activity_at: number }, [string]>(
-      `select automation_id, last_activity_at from sessions
-       where id = ? and automation_id is not null and ${MARKED}`,
+    .query<
+      {
+        automation_id: string;
+        last_activity_at: number;
+        marked: number;
+        named: number;
+      },
+      [string]
+    >(
+      `select sessions.automation_id, sessions.last_activity_at,
+         coalesce(sessions.${MARKED}, 0) as marked,
+         coalesce(automations.last_run_session_id = sessions.id, 0)
+           or coalesce(automations.once_run_session_id = sessions.id, 0)
+           as named
+       from sessions join automations on automations.id = sessions.automation_id
+       where sessions.id = ?`,
     )
     .get(sessionId);
   return row === null
     ? null
-    : { automationId: row.automation_id, endedAt: row.last_activity_at };
+    : {
+        automationId: row.automation_id,
+        endedAt: row.last_activity_at,
+        marked: row.marked === 1,
+        named: row.named === 1,
+      };
 }

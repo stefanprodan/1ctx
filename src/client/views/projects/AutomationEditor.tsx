@@ -309,6 +309,8 @@ function Editor({
           tz={d.tz}
           disabled={off}
           invalidTz={invalid("tz")}
+          once={d.once}
+          onOnce={() => set({ once: !d.once })}
           onSchedule={(schedule) => set({ schedule })}
           onTz={(tz) => set({ tz })}
         />

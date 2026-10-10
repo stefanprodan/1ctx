@@ -1,12 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the automation pages say and check without a DOM: a schedule
-// in words for the shapes people write most, the list row's state, and
-// the editor's fields to a request; a run's words are in Run.model.ts,
-// and what a save says in AutomationEdit.model.ts. The server parses
-// the schedule and the zone; the words here only read them, and the
-// expression itself stands in for any shape they do not know.
+// What the automation pages say and check without a DOM: the list
+// row's state, the next run and the editor's fields to a request; a
+// run's words are in Run.model.ts, a schedule's in Schedule.model.ts
+// and what a save says in AutomationEdit.model.ts.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import {
@@ -21,6 +19,7 @@ import {
 } from "../../../shared/capabilities.ts";
 import {
   type AutomationSummary,
+  ranOnce,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
 import {
@@ -29,80 +28,7 @@ import {
 } from "../../../shared/words.ts";
 import { ago, elapsed, type Failure, until } from "../../lib/format.ts";
 import { type AccessDraft, disabledOf, type Shown } from "./Access.model.ts";
-import {
-  daysOf,
-  fieldsOf,
-  fireLabel,
-  pad,
-  WEEK,
-  whole,
-} from "./Schedule.model.ts";
-
-const ordinal = (n: number) => {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 13) return `${n}th`;
-  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
-};
-
-// "Monday", "Monday and Friday", "Monday, Wednesday and Friday", in
-// week order
-const dayList = (days: number[]): string => {
-  const names = WEEK.filter((d) => days.includes(d.value)).map((d) => d.name);
-  if (names.length === 1) return names[0];
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-};
-
-// "every weekday at 09:00", "every 15 minutes"; null for a shape the
-// words do not know
-export function scheduleWords(schedule: string): string | null {
-  const fields = fieldsOf(schedule);
-  if (fields === null) return null;
-  const [min, hour, dom, month, dow] = fields as [
-    string,
-    string,
-    string,
-    string,
-    string,
-  ];
-  if (month !== "*") return null;
-  const step = /^\*\/(\d{1,2})$/.exec(min);
-  if (step && hour === "*" && dom === "*" && dow === "*") {
-    const n = Number(step[1]);
-    return n === 1 ? "every minute" : `every ${n} minutes`;
-  }
-  const m = whole(min, 0, 59);
-  if (m === null) return null;
-  if (hour === "*" && dom === "*" && dow === "*") {
-    return m === 0 ? "every hour" : `every hour at :${pad(m)}`;
-  }
-  const h = whole(hour, 0, 23);
-  if (h === null) return null;
-  const at = `at ${pad(h)}:${pad(m)}`;
-  if (dom === "*") {
-    const days = daysOf(dow);
-    if (days === null) return null;
-    const key = days.join(",");
-    if (days.length === 7) return `every day ${at}`;
-    if (key === "1,2,3,4,5") return `every weekday ${at}`;
-    if (key === "0,6") return `every weekend day ${at}`;
-    return `every ${dayList(days)} ${at}`;
-  }
-  if (dow === "*") {
-    const d = whole(dom, 0, 31);
-    return d === null || d === 0
-      ? null
-      : `on the ${ordinal(d)} of each month ${at}`;
-  }
-  return null;
-}
-
-// the words with a capital, for a line of their own
-export function scheduleTitle(schedule: string): string {
-  const words = scheduleWords(schedule);
-  return words === null
-    ? schedule
-    : `${words[0].toUpperCase()}${words.slice(1)}`;
-}
+import { fireLabel } from "./Schedule.model.ts";
 
 // a fire the server left due waits for a run slot
 export function waitingSince(
@@ -116,20 +42,55 @@ export function waitingSince(
     : null;
 }
 
-// "Next run tomorrow 09:00, in 14h", the brief's and the editor's
-export const nextRunWords = (fire: number, now: number, tz: string) =>
-  `Next run ${fireLabel(fire, now, tz, true)}, ${until(fire, now)}`;
+// a once task's fire with its year: "today 09:00", "on Sun Oct 11 2026
+// 09:00"
+const onceAt = (fire: number, now: number, tz: string) => {
+  const label = fireLabel(fire, now, tz, true, true);
+  return /^to(day|morrow) /.test(label) ? label : `on ${label}`;
+};
+
+// "Next run tomorrow 09:00, in 14h", the brief's and the editor's; a
+// task that runs once names its one fire's date with the year, "Runs
+// once on Sun Oct 11 2026 09:00, in 3d"
+export const nextRunWords = (
+  fire: number,
+  now: number,
+  tz: string,
+  once = false,
+) =>
+  once
+    ? `Runs once ${onceAt(fire, now, tz)}, ${until(fire, now)}`
+    : `Next run ${fireLabel(fire, now, tz, true)}, ${until(fire, now)}`;
 
 // the brief's foot: "Waiting since 09:00", the day
 // named when not today, or the next run and how far off it is
 export function nextLine(
-  a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz">,
+  a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz" | "once">,
   now: number,
 ): string {
   if (a.nextAt === null) return "";
-  if (waitingSince(a, now) === null) return nextRunWords(a.nextAt, now, a.tz);
+  if (waitingSince(a, now) === null) {
+    return nextRunWords(a.nextAt, now, a.tz, a.once);
+  }
   const at = fireLabel(a.nextAt, now, a.tz, true);
   return `Waiting since ${at.replace(/^today /, "")}`;
+}
+
+// The page's next runs: the preview's fires still ahead. A task that
+// runs once has one, and while its fire waits for a slot that fire is
+// it, said as the brief says a wait, since the next occurrence never
+// comes once the waiting one runs.
+export function nextRunsOf(
+  a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz" | "once">,
+  fires: readonly number[],
+  now: number,
+): { waiting: string | null; fires: number[] } {
+  const ahead = fires.filter((fire) => fire > now);
+  if (!a.once) return { waiting: null, fires: ahead };
+  if (waitingSince(a, now) !== null) {
+    return { waiting: nextLine(a, now), fires: [] };
+  }
+  return { waiting: null, fires: ahead.slice(0, 1) };
 }
 
 // the row's meta: the last failure, red on its own, then running,
@@ -157,13 +118,24 @@ export function rowState(
 
 // "Suspended by @bogdan 2h ago"; a row suspended before the name was
 // kept says only when; one whose agent was deleted stays paused until
-// an edit picks another
+// an edit picks another; one its run suspended "Ran once today 09:00"
 export function suspendedText(
-  a: Pick<AutomationSummary, "suspendedAt" | "suspendedBy" | "agentRetired">,
+  a: Pick<
+    AutomationSummary,
+    | "suspendedAt"
+    | "suspendedBy"
+    | "agentRetired"
+    | "onceFiredAt"
+    | "onceRunSessionId"
+    | "tz"
+  >,
   now: number,
 ): string {
   if (a.agentRetired) return "Paused, its agent was deleted.";
   if (a.suspendedAt === null) return "";
+  if (ranOnce(a)) {
+    return `Ran once ${onceAt(a.suspendedAt, now, a.tz)}`;
+  }
   const by = a.suspendedBy === null ? "" : ` by @${a.suspendedBy.username}`;
   return `Suspended${by} ${ago(a.suspendedAt, now)}`;
 }
@@ -276,6 +248,7 @@ export type Draft = {
   // when a run needs attention, as typed
   attentionGuidance: string;
   rerunOnRestart: boolean;
+  once: boolean;
 } & AccessDraft;
 
 const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -303,6 +276,7 @@ export function draftOf(
       attention: "agent",
       attentionGuidance: "",
       rerunOnRestart: false,
+      once: false,
       web: true,
       visuals: true,
       knowledge: true,
@@ -326,6 +300,7 @@ export function draftOf(
     attention: a.attentionMode,
     attentionGuidance: a.attentionGuidance,
     rerunOnRestart: a.rerunOnRestart,
+    once: a.once,
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
@@ -437,6 +412,7 @@ export function requestOf(
       // kept while off, so turning a mode on again brings it back
       attentionGuidance: d.attentionGuidance.trim(),
       rerunOnRestart: d.rerunOnRestart,
+      once: d.once,
       disabledCapabilities: disabledOf(d, shown),
     },
   };

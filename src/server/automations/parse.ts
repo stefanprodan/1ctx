@@ -120,6 +120,13 @@ function parseValues(
     }
     out.rerunOnRestart = value;
   }
+  if (take("once")) {
+    const value = given("once", false);
+    if (typeof value !== "boolean") {
+      throw new BadRequest("once must be boolean");
+    }
+    out.once = value;
+  }
   if (take("memoryGuidance")) {
     out.memoryGuidance = guidance(
       given("memoryGuidance", ""),
@@ -159,6 +166,7 @@ const OPTIONAL = [
   "memoryGuidance",
   "disabledCapabilities",
   "rerunOnRestart",
+  "once",
   "attentionMode",
   "attentionGuidance",
 ];
