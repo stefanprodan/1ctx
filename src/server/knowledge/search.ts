@@ -3,17 +3,15 @@
 
 import {
   type KnowledgeSearchResponse,
-  SEARCH_LINE_CHARS,
-  SEARCH_LINES,
   SEARCH_NAMES,
   SEARCH_PAGE,
 } from "../../shared/api/knowledge.ts";
 import type {
   KnowledgeFile,
   KnowledgeSearchHit,
-  KnowledgeSearchLine,
 } from "../../shared/contracts/knowledge.ts";
-import { TooManyRequests } from "../lib/errors.ts";
+import { holdsAll, matchText, searchTerms } from "../../shared/search.ts";
+import { BadRequest, TooManyRequests } from "../lib/errors.ts";
 
 // the text read a request at most; past it the page ends early with
 // next set, so a large base is searched a page at a time
@@ -25,11 +23,21 @@ export const SEARCH_SCAN_BYTES = 8 * 1024 * 1024;
 export type SearchSource = {
   // the live files past the name, in name order
   files(after: string | null): Iterable<KnowledgeFile>;
-  // those whose name holds the lowercased query
-  named(after: string | null, query: string): Iterable<KnowledgeFile>;
+  // those whose name holds every one of the lowercased terms
+  named(
+    after: string | null,
+    terms: readonly string[],
+  ): Iterable<KnowledgeFile>;
   // empty for a file gone since its row was read
   text(fileId: string): string;
 };
+
+// the query's words, refused when it holds none
+export function queryTerms(q: string): string[] {
+  const terms = searchTerms(q);
+  if (terms.length === 0) throw new BadRequest("q must hold a word");
+  return terms;
+}
 
 // The cursor is a name, so a rename between two pages may move a file
 // across it: it can then show twice or not at all.
@@ -39,7 +47,7 @@ export function search(
   after: string | null,
   budget = SEARCH_SCAN_BYTES,
 ): KnowledgeSearchResponse {
-  const query = q.toLowerCase();
+  const terms = queryTerms(q);
   const first = after === null;
   const files: KnowledgeSearchHit[] = [];
   const names: KnowledgeFile[] = [];
@@ -58,9 +66,9 @@ export function search(
     }
     read += file.bytes;
     last = file.name;
-    const hit = matchText(source.text(file.id), query);
+    const hit = matchText(source.text(file.id), terms);
     if (hit === null) {
-      if (first && file.name.toLowerCase().includes(query)) name(file);
+      if (first && holdsAll(file.name, terms)) name(file);
       continue;
     }
     if (files.length === SEARCH_PAGE) {
@@ -73,95 +81,16 @@ export function search(
   // the names past where the page stopped, their text read while the
   // budget lasts and, past it, listed on the name alone
   let spent = false;
-  for (const file of source.named(last, query)) {
+  for (const file of source.named(last, terms)) {
     if (!spent && read + file.bytes > budget) spent = true;
     if (spent) {
       name(file);
       continue;
     }
     read += file.bytes;
-    if (!source.text(file.id).toLowerCase().includes(query)) name(file);
+    if (!holdsAll(source.text(file.id), terms)) name(file);
   }
   return { names, namesTotal, files, next };
-}
-
-// query is lowercased; null when no line holds it
-export function matchText(
-  text: string,
-  query: string,
-): { count: number; lines: KnowledgeSearchLine[] } | null {
-  if (!text.toLowerCase().includes(query)) return null;
-  let count = 0;
-  const lines: KnowledgeSearchLine[] = [];
-  let start = 0;
-  for (let number = 1; start <= text.length; number++) {
-    let end = text.indexOf("\n", start);
-    if (end < 0) end = text.length;
-    const line = text.slice(start, end);
-    start = end + 1;
-    const at = findIn(line, query);
-    if (at === null) continue;
-    count++;
-    if (lines.length < SEARCH_LINES) lines.push(cut(line, number, at));
-  }
-  return count === 0 ? null : { count, lines };
-}
-
-// where the query sits in the line as written. Lowercasing can change a
-// string's length, so each lowered unit maps back to its source unit
-function findIn(
-  line: string,
-  query: string,
-): { from: number; to: number } | null {
-  const lower = line.toLowerCase();
-  if (lower.length === line.length) {
-    const from = lower.indexOf(query);
-    return from < 0 ? null : { from, to: from + query.length };
-  }
-  let folded = "";
-  const source: number[] = [];
-  for (let i = 0; i < line.length; ) {
-    const point = line.codePointAt(i)!;
-    const width = point > 0xffff ? 2 : 1;
-    const lowered = line.slice(i, i + width).toLowerCase();
-    folded += lowered;
-    for (let j = 0; j < lowered.length; j++) source.push(i);
-    i += width;
-  }
-  source.push(line.length);
-  const from = folded.indexOf(query);
-  if (from < 0) return null;
-  const last = source[from + query.length - 1]!;
-  const lastWidth = line.codePointAt(last)! > 0xffff ? 2 : 1;
-  return { from: source[from]!, to: last + lastWidth };
-}
-
-function cut(
-  line: string,
-  number: number,
-  at: { from: number; to: number },
-): KnowledgeSearchLine {
-  const text = line.endsWith("\r") ? line.slice(0, -1) : line;
-  if (text.length <= SEARCH_LINE_CHARS) {
-    return { line: number, text, cutStart: false, cutEnd: false };
-  }
-  const room = Math.max(0, SEARCH_LINE_CHARS - (at.to - at.from));
-  let from = Math.max(0, at.from - Math.floor(room / 2));
-  let to = Math.min(text.length, from + SEARCH_LINE_CHARS);
-  from = Math.max(0, to - SEARCH_LINE_CHARS);
-  // never split a surrogate pair at either end
-  if (from > 0 && isLow(text.charCodeAt(from))) from++;
-  if (to < text.length && isLow(text.charCodeAt(to))) to--;
-  return {
-    line: number,
-    text: text.slice(from, to),
-    cutStart: from > 0,
-    cutEnd: to < text.length,
-  };
-}
-
-function isLow(unit: number): boolean {
-  return unit >= 0xdc00 && unit <= 0xdfff;
 }
 
 // one scan per user at a time, should the scan ever yield

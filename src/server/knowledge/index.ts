@@ -298,7 +298,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         search(
           {
             files: (from) => store.after(projectId, from),
-            named: (from, query) => store.named(projectId, from, query),
+            named: (from, terms) => store.named(projectId, from, terms),
             text: (fileId) => store.text(projectId, fileId),
           },
           q,

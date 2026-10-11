@@ -16,6 +16,7 @@ import {
 } from "../../shared/words.ts";
 import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { queryTerms } from "./search.ts";
 
 export function parseId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
@@ -84,6 +85,7 @@ export function parseSearch(url: URL): SearchQuery {
   if (/[\r\n]/.test(q)) {
     throw new BadRequest("q must be one line of text");
   }
+  queryTerms(q);
   const after = get("after");
   if (after === null) return { q, after: null };
   if (!isKnowledgeName(after)) {

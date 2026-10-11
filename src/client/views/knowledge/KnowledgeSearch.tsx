@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The Knowledge card's body while the box asks for something: the files
-// whose name alone holds it, then the files whose text does, each with
-// its first lines holding it, every match marked. A line leads to the
-// file at that line.
+// whose name alone holds its every word, then the files whose text
+// does, each with its first lines holding a word, every word marked. A
+// line leads to the file at that line.
 
 import { useSignal } from "@preact/signals";
 import type { KnowledgeSearchLine } from "../../../shared/contracts/knowledge.ts";
@@ -19,7 +19,12 @@ import {
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { fileHref, NAME_ROWS, namesWords } from "./Knowledge.model.ts";
+import {
+  fileHref,
+  NAME_ROWS,
+  namesWords,
+  noMatchWords,
+} from "./Knowledge.model.ts";
 import { Marks, PathName } from "./PathName.tsx";
 import "./knowledge.css";
 
@@ -61,9 +66,7 @@ export function SearchResults({
   if (!held) {
     return (
       <RowsNote>
-        {search.state === "done"
-          ? `No file names or lines hold “${q}”.`
-          : "Searching"}
+        {search.state === "done" ? noMatchWords(q) : "Searching"}
       </RowsNote>
     );
   }

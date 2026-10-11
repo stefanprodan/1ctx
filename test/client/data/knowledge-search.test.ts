@@ -78,6 +78,8 @@ describe("the search's shapes", () => {
     expect(searchQuery(" d ")).toBeNull();
     expect(searchQuery(" de ")).toBe("de");
     expect(searchQuery("x".repeat(120))).toHaveLength(100);
+    expect(searchQuery('""')).toBeNull();
+    expect(searchQuery('" "')).toBeNull();
   });
 
   test.serial("a new query keeps the last rows while it loads", () => {

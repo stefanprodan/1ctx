@@ -13,6 +13,7 @@ import type {
   KnowledgeFile,
   KnowledgeTotals,
 } from "../../../shared/contracts/knowledge.ts";
+import { searchTerms, termRanges } from "../../../shared/search.ts";
 import { ago, count, plural } from "../../lib/format.ts";
 import { agentHref, chatHref, runHref, userHref } from "../../lib/hrefs.ts";
 import type { IconName } from "../../lib/icons.tsx";
@@ -269,24 +270,29 @@ export function pathParts(name: string): { dir: string; base: string } {
   return { dir: name.slice(0, at), base: name.slice(at) };
 }
 
-// a text in runs, every place it holds q marked, not case-sensitive
+// a text in runs, every place it holds a word of q marked, not
+// case-sensitive
 type Marked = { text: string; mark: boolean }[];
 
 export function marked(text: string, q: string): Marked {
-  const needle = q.toLowerCase();
-  if (needle === "") return text === "" ? [] : [{ text, mark: false }];
-  const hay = text.toLowerCase();
   const out: Marked = [];
   let from = 0;
-  for (;;) {
-    const at = hay.indexOf(needle, from);
-    if (at < 0) break;
-    if (at > from) out.push({ text: text.slice(from, at), mark: false });
-    out.push({ text: text.slice(at, at + needle.length), mark: true });
-    from = at + needle.length;
+  for (const range of termRanges(text, searchTerms(q))) {
+    if (range.from > from) {
+      out.push({ text: text.slice(from, range.from), mark: false });
+    }
+    out.push({ text: text.slice(range.from, range.to), mark: true });
+    from = range.to;
   }
   if (from < text.length) out.push({ text: text.slice(from), mark: false });
   return out;
+}
+
+// what the search box says when nothing matched
+export function noMatchWords(q: string): string {
+  return searchTerms(q).length > 1
+    ? `No file holds every word of “${q}”.`
+    : `No file names or lines hold “${q}”.`;
 }
 
 // the Names group's label and what is left past the names answered

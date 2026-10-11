@@ -1,8 +1,9 @@
 # Knowledge and uploads
 
 Governs `src/server/knowledge/` (the project docs, their history,
-search, views, uploads, chat staging and the process slots) and
-`shared/knowledge.ts`. The bash side is in `docs/bash.md`.
+search, views, uploads, chat staging and the process slots),
+`shared/knowledge.ts` and `shared/search.ts`. The bash side is in
+`docs/bash.md`.
 
 Knowledge is a project's shared text files (docs): users edit them on
 the Knowledge page and agents read and write them under `/knowledge` in
@@ -59,6 +60,11 @@ bash. An upload adds files to it, or attaches them to a chat message.
 - **Views are rendered at read, never stored.** A view is a file as its
   page draws it. A renderer change then reaches every file and version.
   `RenderCache` keys a view by a file's revision or a version id.
+- **A query matches by words.** `shared/search.ts` splits it on
+  whitespace, a double-quoted run being one phrase (an unclosed quote
+  runs to the end); a text or name matches when it holds every word in
+  any case, and its hit lines are those holding any. Knowledge search,
+  session search and the page's marks share it.
 - **Search streams, never indexes.** Each row query is its own
   statement, finalized at the end: a cached one left mid-step by an
   early stop refuses its next use. A text is read only once it fits
