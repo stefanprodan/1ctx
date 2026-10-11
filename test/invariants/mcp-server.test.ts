@@ -661,7 +661,7 @@ describe("the composed inbound MCP endpoint", () => {
       ).toBe(200);
       expect(
         resultText(await client.tool("projects", { action: "list" })),
-      ).toBe("");
+      ).toBe("End of projects.");
       expect(
         (
           await client.tool("knowledge", {

@@ -1,7 +1,19 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { parseId } from "../knowledge/index.ts";
 import { BadRequest } from "../lib/errors.ts";
+
+export function requiredId(value: unknown, field: string): string {
+  if (value === undefined || value === null) {
+    throw new BadRequest(`${field} is required`);
+  }
+  return parseId(value, field);
+}
+
+export function optionalId(value: unknown, field: string): string | null {
+  return value === undefined || value === null ? null : parseId(value, field);
+}
 
 export function nonNegative(value: unknown, field: string): number {
   if (value === undefined) return 0;

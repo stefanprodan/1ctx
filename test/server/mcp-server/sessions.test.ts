@@ -75,6 +75,19 @@ describe("the inbound MCP sessions tool", () => {
       },
     ]);
 
+    state.sessionSearch = {
+      hits: [{ ...state.sessionSearch.hits[0]!, lines: [] }],
+      next: null,
+    };
+    const last = await toolCall(send, "sessions", {
+      action: "search",
+      projectId: project.id,
+      q: "external tasks",
+    });
+    expect(last.result.content[0].text).toEndWith(
+      '\nEnd of search results for "external tasks".',
+    );
+
     state.sessionSearch = { hits: [], next: null };
     const empty = await toolCall(send, "sessions", {
       action: "search",

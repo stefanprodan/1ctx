@@ -92,12 +92,14 @@ ignore `resultBytes`. Knowledge files and versions page by whole stored lines.
 how many lines the call returns, but a page still stops before 32 KiB. The
 header names the page's lines and total, or says the file is empty. A live-file
 continuation includes its revision, and a changed revision says the file
-changed and to read from the start. A version is immutable, so its continuation
+changed and to read from the start. A live read past line 1 needs that
+revision, and its refusal says where to take it from. A version is immutable, so its continuation
 needs only version id and offset. An offset past the end is refused clearly. A
 stored line that cannot fit with the required header, fence and footer is the
 sole exception: it is sent whole on its own page and the header says so.
 
-A transcript continuation pins its message and UTF-16 `position`. Its one-part
+Session `read` takes an optional `projectId`, since every other call names
+one; a session outside it is not found. A transcript continuation pins its message and UTF-16 `position`. Its one-part
 header names the title, id and text position; its footer carries the next
 message and position or says the transcript ends. A page ends at the last line
 ending that fits. Only when no line ending fits may it end mid-line, and its
@@ -116,7 +118,9 @@ and search file metadata carry `by` in the page's `@name` words, the author's
 ISO 8601 UTC; `change` appears only with `since`. Version rows carry the same
 `by` and `sessionId` and an ISO 8601 UTC `writtenAt`. Searches page their
 underlying rows by `after` and oversized formatted knowledge-search rows by
-`skip`; they explicitly say when nothing matched.
+`skip`; they explicitly say when nothing matched. Every list, search,
+version list and project list page ends with an end line or the exact next
+call, as a read does.
 With `fileId`, knowledge search checks only that reachable file under the same
 per-user one-at-a-time guard as project search. Each answer gives the file
 metadata once, then only line and sanitized text per hit. It stops scanning

@@ -5,7 +5,6 @@ import {
   type KnowledgeEdit,
   MAX_EDITS,
   parseCreate,
-  parseId,
   parseName,
   parseRename,
   parseReplace,
@@ -13,7 +12,13 @@ import {
 } from "../knowledge/index.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { nonNegative, optionalBoolean, positive } from "./parse-values.ts";
+import {
+  nonNegative,
+  optionalBoolean,
+  optionalId,
+  positive,
+  requiredId,
+} from "./parse-values.ts";
 
 const action = <T extends string>(value: unknown, allowed: readonly T[]): T => {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
@@ -102,10 +107,7 @@ export function parseProjects(value: unknown): ProjectsInput {
   const body = fields(value, ["action", "after"]);
   return {
     action: action(body.action, ["list"] as const),
-    after:
-      body.after === undefined || body.after === null
-        ? null
-        : parseId(body.after, "after"),
+    after: optionalId(body.after, "after"),
   };
 }
 
@@ -239,7 +241,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     "rename",
     "delete",
   ] as const);
-  const projectId = parseId(head.projectId, "projectId");
+  const projectId = requiredId(head.projectId, "projectId");
   if (picked === "list") {
     fields(value, [
       "action",
@@ -285,7 +287,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     const fileId =
       head.fileId === undefined || head.fileId === null
         ? null
-        : parseId(head.fileId, "fileId");
+        : requiredId(head.fileId, "fileId");
     if (fileId !== null && head.after !== undefined && head.after !== null) {
       throw new BadRequest("after cannot be used with fileId");
     }
@@ -328,12 +330,14 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
         ? null
         : revision(head.revision);
     if (start > 1 && pinned === null) {
-      throw new BadRequest("revision is required with offset");
+      throw new BadRequest(
+        "revision is required with offset; take it from the outline, a list row, a search hit or the page before",
+      );
     }
     return {
       action: picked,
       projectId,
-      fileId: parseId(head.fileId, "fileId"),
+      fileId: requiredId(head.fileId, "fileId"),
       revision: pinned,
       offset: start,
       limit: capped,
@@ -343,10 +347,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
   }
   if (picked === "versions") {
     fields(value, ["action", "projectId", "fileId", "after", "stamp"]);
-    const after =
-      head.after === undefined || head.after === null
-        ? null
-        : parseId(head.after, "after");
+    const after = optionalId(head.after, "after");
     const listStamp = stamp(head.stamp);
     if (after !== null && listStamp === null) {
       throw new BadRequest("stamp is required with after");
@@ -357,7 +358,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     return {
       action: picked,
       projectId,
-      fileId: parseId(head.fileId, "fileId"),
+      fileId: requiredId(head.fileId, "fileId"),
       after,
       stamp: listStamp,
     };
@@ -367,7 +368,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     return {
       action: picked,
       projectId,
-      versionId: parseId(head.versionId, "versionId"),
+      versionId: requiredId(head.versionId, "versionId"),
       offset: positive(head.offset, "offset", 1)!,
       limit: positive(head.limit, "limit", null),
     };
@@ -380,7 +381,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
       ...parseCreate({ name: head.name, text: head.text }),
     };
   }
-  const fileId = parseId(head.fileId, "fileId");
+  const fileId = requiredId(head.fileId, "fileId");
   const rev = revision(head.revision);
   if (picked === "edit") {
     fields(value, ["action", "projectId", "fileId", "revision", "edits"]);
@@ -430,6 +431,7 @@ export type SessionsInput =
     }
   | {
       action: "read";
+      projectId: string | null;
       sessionId: string;
       messageId: string | null;
       position: number;
@@ -449,18 +451,22 @@ export function parseSessions(value: unknown): SessionsInput {
   ]);
   const picked = action(head.action, ["search", "list", "read"] as const);
   if (picked === "read") {
-    fields(value, ["action", "sessionId", "messageId", "position"]);
+    fields(value, [
+      "action",
+      "projectId",
+      "sessionId",
+      "messageId",
+      "position",
+    ]);
     return {
       action: picked,
-      sessionId: parseId(head.sessionId, "sessionId"),
-      messageId:
-        head.messageId === undefined || head.messageId === null
-          ? null
-          : parseId(head.messageId, "messageId"),
+      projectId: optionalId(head.projectId, "projectId"),
+      sessionId: requiredId(head.sessionId, "sessionId"),
+      messageId: optionalId(head.messageId, "messageId"),
       position: nonNegative(head.position, "position"),
     };
   }
-  const projectId = parseId(head.projectId, "projectId");
+  const projectId = requiredId(head.projectId, "projectId");
   const after = optionalString(head.after, "after");
   if (picked === "search") {
     fields(value, ["action", "projectId", "q", "after"]);

@@ -82,7 +82,7 @@ const READ_ACTIONS = ["list", "search", "read", "versions", "version"];
 const WRITE_ACTIONS = ["create", "edit", "replace", "rename", "delete"];
 
 const READ_DESCRIPTION =
-  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId and q, optional fileId for every hit line in one file, then after and skip from the footer. A match needs every word; double quotes make a phrase. Read uses projectId and fileId, optional offset and limit for lines, or outline=true and its skip footer for Markdown headings. A continued live read also uses revision. Versions uses projectId and fileId, then after and stamp. Version uses projectId and versionId, with optional offset and limit.";
+  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId and q, optional fileId for every hit line in one file, then after and skip from the footer. A match needs every word; double quotes make a phrase. Read uses projectId and fileId, optional offset and limit for lines, or outline=true and its skip footer for Markdown headings. A read past line 1 also uses the revision from the outline, a row or the page before. Versions uses projectId and fileId, then after and stamp. Version uses projectId and versionId, with optional offset and limit.";
 
 const WRITE_DESCRIPTION = `${READ_DESCRIPTION} Create uses projectId, name and text. Edit changes part of a file with projectId, fileId, revision and 1 to ${MAX_EDITS} old/new pairs; every old must match exactly once, and all pairs apply or none. Replace sends the whole text only when the current file fits one read page; use edit for a larger file. Rename uses projectId, fileId, revision and name. Delete uses projectId, fileId and revision. Every change to an existing file names the revision read.`;
 
@@ -187,7 +187,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "sessions",
     {
       description:
-        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript, then use the footer's messageId and position to continue.",
+        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript, projectId optional, then use the footer's messageId and position to continue.",
       inputSchema: schema(["search", "list", "read"], {
         action: { type: "string" },
         projectId: { type: "string" },

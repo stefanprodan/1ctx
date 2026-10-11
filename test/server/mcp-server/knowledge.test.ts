@@ -225,9 +225,11 @@ describe("the inbound MCP knowledge tool", () => {
       projectId: project.id,
       fileId: "file00000001",
     });
-    const versionRows = (versions.result.content[0].text as string)
+    const versionText = versions.result.content[0].text as string;
+    expect(versionText).toEndWith("\nEnd of versions of file00000001.");
+    const versionRows = versionText
       .split("\n")
-      .filter(Boolean)
+      .filter((line) => line.startsWith("{"))
       .map((line) => JSON.parse(line));
     expect(versionRows.map((item) => item.by)).toEqual([
       "@casey",
@@ -293,6 +295,7 @@ describe("the inbound MCP knowledge tool", () => {
     expect(result).toContain('"name":"a.md"');
     expect(result).toContain("matchline");
     expect(result).not.toContain("skip=");
+    expect(result).toEndWith('\nEnd of search results for "match".');
 
     const refused = await toolCall(send, "knowledge", {
       action: "search",
@@ -303,6 +306,38 @@ describe("the inbound MCP knowledge tool", () => {
     expect(refused.result.isError).toBe(true);
     expect(refused.result.content[0].text).toBe(
       "skip must be a non-negative integer",
+    );
+    await area.close();
+  });
+
+  test("names a missing id and where an offset read takes its revision", async () => {
+    const { area, send } = fixture();
+    const missing = await toolCall(send, "knowledge", {
+      action: "read",
+      fileId: "file00000001",
+    });
+    expect(missing.result.isError).toBe(true);
+    expect(missing.result.content[0].text).toBe("projectId is required");
+    const noFile = await toolCall(send, "knowledge", {
+      action: "read",
+      projectId: project.id,
+    });
+    expect(noFile.result.content[0].text).toBe("fileId is required");
+    const badId = await toolCall(send, "knowledge", {
+      action: "read",
+      projectId: "no",
+      fileId: "file00000001",
+    });
+    expect(badId.result.content[0].text).toBe("projectId must be an id");
+    const jump = await toolCall(send, "knowledge", {
+      action: "read",
+      projectId: project.id,
+      fileId: "file00000001",
+      offset: 5,
+    });
+    expect(jump.result.isError).toBe(true);
+    expect(jump.result.content[0].text).toBe(
+      "revision is required with offset; take it from the outline, a list row, a search hit or the page before",
     );
     await area.close();
   });
@@ -517,7 +552,10 @@ describe("the inbound MCP knowledge tool", () => {
         found.push(hit.line);
       }
       const next = text.match(/fileId="file00000001", skip=(\d+)\./);
-      if (next === null) break;
+      if (next === null) {
+        expect(text).toEndWith("\nEnd of hits in file00000001, revision 7.");
+        break;
+      }
       skip = Number(next[1]);
     }
     expect(found).toEqual(Array.from({ length: 400 }, (_, index) => index + 1));

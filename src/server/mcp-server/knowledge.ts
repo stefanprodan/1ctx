@@ -11,6 +11,7 @@ import {
 import { transact } from "../db/index.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import { sha256 } from "../lib/ids.ts";
+import { outlineRows } from "./outline.ts";
 import type { KnowledgeInput } from "./parse.ts";
 import type { KeyPrincipal, McpServerDeps } from "./ports.ts";
 import {
@@ -197,42 +198,11 @@ function fileSearch(
     rows.push(
       `No line in file ${file.id} holds every word of ${JSON.stringify(q)}.`,
     );
+  } else {
+    // shorter than the continuation each row left room for
+    rows.push(`End of hits in ${file.id}, revision ${file.revision}.`);
   }
   return textResult(`${prefix}\n${rows.join("\n")}`);
-}
-
-type OutlineRow = { line: number; level: number; text: string };
-
-function outlineRows(text: string): OutlineRow[] {
-  const rows: OutlineRow[] = [];
-  let fence: { marker: string; length: number } | null = null;
-  for (const [index, line] of text.split("\n").entries()) {
-    if (fence !== null) {
-      const close = line.match(/^ {0,3}(`+|~+)[ \t]*\r?$/);
-      if (
-        close !== null &&
-        close[1]![0] === fence.marker &&
-        close[1]!.length >= fence.length
-      ) {
-        fence = null;
-      }
-      continue;
-    }
-    const opening = line.match(/^ {0,3}(`{3,}|~{3,})/);
-    if (opening !== null) {
-      fence = { marker: opening[1]![0]!, length: opening[1]!.length };
-      continue;
-    }
-    const heading = line.match(/^(#{1,6})(?:[ \t]+(.*)|[ \t]*)\r?$/);
-    if (heading === null) continue;
-    const headingText = (heading[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "");
-    rows.push({
-      line: index + 1,
-      level: heading[1]!.length,
-      text: cutSearchLine(headingText, index + 1, { from: 0, to: 0 }).text,
-    });
-  }
-  return rows;
 }
 
 export function knowledgeTool(
@@ -317,6 +287,8 @@ export function knowledgeTool(
       lines.push(
         `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`,
       );
+    } else if (lines.length > 0) {
+      lines.push(`End of search results for ${JSON.stringify(input.q)}.`);
     }
     if (lines.length === 0) {
       lines.push(
@@ -398,20 +370,23 @@ export function knowledgeTool(
     const versions = all.slice(start);
     return textResult(
       cappedLines(
-        versions.map((version) =>
-          jsonLine({
-            id: version.id,
-            fileId: version.fileId,
-            name: version.name,
-            revision: version.revision,
-            bytes: version.bytes,
-            lines: version.lines,
-            by: byWords(version.author),
-            sessionId: version.author.sessionId,
-            writtenAt: new Date(version.writtenAt).toISOString(),
-            deleted: version.deleted,
-          }),
-        ),
+        [
+          ...versions.map((version) =>
+            jsonLine({
+              id: version.id,
+              fileId: version.fileId,
+              name: version.name,
+              revision: version.revision,
+              bytes: version.bytes,
+              lines: version.lines,
+              by: byWords(version.author),
+              sessionId: version.author.sessionId,
+              writtenAt: new Date(version.writtenAt).toISOString(),
+              deleted: version.deleted,
+            }),
+          ),
+          `End of versions of ${input.fileId}.`,
+        ],
         (next) =>
           `Read on with knowledge action=versions, projectId=${project.id}, fileId=${input.fileId}, after=${versions[next - 1]!.id}, stamp=${stamp}.\n`,
       ),
