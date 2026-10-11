@@ -46,6 +46,12 @@ import {
   type UploadsPort,
 } from "./routes.ts";
 import type { SessionRow, UsagePort } from "./rows.ts";
+import {
+  listSessionsOf,
+  type SessionListPage,
+  type SessionSearchPage,
+  searchSessions,
+} from "./search.ts";
 import { SessionStore } from "./store.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 
@@ -110,6 +116,16 @@ export {
   type SessionRow,
   type UsagePort,
 } from "./rows.ts";
+export {
+  SESSION_LIST_PAGE,
+  SESSION_SCAN_BYTES,
+  type SessionKind,
+  type SessionListPage,
+  type SessionListRow,
+  type SessionSearchHit,
+  type SessionSearchLine,
+  type SessionSearchPage,
+} from "./search.ts";
 export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
 export { SessionStore } from "./store.ts";
 export { type SummonAgents, summonOf } from "./summon.ts";
@@ -149,6 +165,17 @@ export type Sessions = {
   sessionProject(principal: Principal, id: string): string | null;
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
+  // a project's sessions, children and archived ones included, newest
+  // activity first, whose transcript text holds every word of q; after
+  // is a page's next. The caller checks the project
+  search(projectId: string, q: string, after: string | null): SessionSearchPage;
+  // a project's sessions as search reads them, those active at or after
+  // since (epoch ms) when given
+  list(
+    projectId: string,
+    since: number | null,
+    after: string | null,
+  ): SessionListPage;
   // each running subagent's rows so far, for a watch's answer
   runningChildren(sessionId: string): ChildOf[];
   // the chats an agent's delete archives and the sends it stops
@@ -224,6 +251,10 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
+    search: (projectId, q, after) =>
+      searchSessions(deps.db, projectId, q, after),
+    list: (projectId, since, after) =>
+      listSessionsOf(deps.db, projectId, since, after),
     runningChildren: (sessionId) =>
       runningChildren(deps.db, sessionId).flatMap(
         ({ messageId, sessionId }) => {

@@ -682,6 +682,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       visible: (principal, id) => sessions.visible(principal, id),
       exportRows: (id) => sessions.store.exportRows(id),
+      search: (projectId, q, after) => sessions.search(projectId, q, after),
+      list: (projectId, since, after) => sessions.list(projectId, since, after),
     },
   });
   let repaired = 0;

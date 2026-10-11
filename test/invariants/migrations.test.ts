@@ -72,6 +72,7 @@ const EXPECTED_IDS = [
   "0058-automation-drafts",
   "0059-access-keys",
   "0060-knowledge-keys",
+  "0061-session-activity",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns

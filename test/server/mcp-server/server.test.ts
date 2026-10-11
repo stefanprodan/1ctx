@@ -164,6 +164,8 @@ function fixture(scope: "read" | "write" = "read", log: Log = silent) {
         return session;
       },
       exportRows: () => state.rows,
+      search: () => ({ hits: [], next: null }),
+      list: () => ({ sessions: [], next: null }),
     },
     knowledge: {
       list: () => ({

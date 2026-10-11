@@ -12,7 +12,12 @@ import type { KnowledgeEdit } from "../knowledge/index.ts";
 import type { Principal, Via } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import type { ExportRow, SessionRow } from "../sessions/index.ts";
+import type {
+  ExportRow,
+  SessionListPage,
+  SessionRow,
+  SessionSearchPage,
+} from "../sessions/index.ts";
 
 export type KeyPrincipal = Omit<Principal, "via"> & {
   via: Extract<Via, { kind: "key" }>;
@@ -90,6 +95,13 @@ export type ProjectsPort = { byId(id: string): ProjectRow | null };
 export type SessionsPort = {
   visible(principal: Principal, id: string): SessionRow;
   exportRows(sessionId: string): ExportRow[];
+  // access is the caller's: the project is checked before either
+  search(projectId: string, q: string, after: string | null): SessionSearchPage;
+  list(
+    projectId: string,
+    since: number | null,
+    after: string | null,
+  ): SessionListPage;
 };
 
 export type McpServerDeps = {
