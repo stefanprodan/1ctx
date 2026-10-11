@@ -674,6 +674,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     knowledge: {
       ...knowledge,
+      projectOf: (kind, id) => knowledge.store.projectOf(kind, id),
       rawFile: (projectId, fileId) => knowledge.store.byId(projectId, fileId),
       rawVersion: (projectId, versionId) =>
         knowledge.store.version(projectId, versionId),

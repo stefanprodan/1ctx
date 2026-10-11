@@ -123,7 +123,7 @@ export type KnowledgeInput =
     }
   | {
       action: "search";
-      projectId: string;
+      projectId: string | null;
       q: string;
       after: string | null;
       fileId: string | null;
@@ -131,7 +131,7 @@ export type KnowledgeInput =
     }
   | {
       action: "read";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       revision: number | null;
       offset: number;
@@ -141,14 +141,14 @@ export type KnowledgeInput =
     }
   | {
       action: "versions";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       after: string | null;
       stamp: string | null;
     }
   | {
       action: "version";
-      projectId: string;
+      projectId: string | null;
       versionId: string;
       offset: number;
       limit: number | null;
@@ -156,28 +156,28 @@ export type KnowledgeInput =
   | { action: "create"; projectId: string; name: string; text: string }
   | {
       action: "edit";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       revision: number;
       edits: readonly KnowledgeEdit[];
     }
   | {
       action: "replace";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       revision: number;
       text: string;
     }
   | {
       action: "rename";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       revision: number;
       name: string;
     }
   | {
       action: "delete";
-      projectId: string;
+      projectId: string | null;
       fileId: string;
       revision: number;
     };
@@ -241,7 +241,8 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     "rename",
     "delete",
   ] as const);
-  const projectId = requiredId(head.projectId, "projectId");
+  // a file or version id names its project, so only calls without one need it
+  const projectId = optionalId(head.projectId, "projectId");
   if (picked === "list") {
     fields(value, [
       "action",
@@ -272,7 +273,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     }
     return {
       action: picked,
-      projectId,
+      projectId: requiredId(head.projectId, "projectId"),
       after,
       stamp: listStamp,
       prefix: prefix(head.prefix),
@@ -299,7 +300,8 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     const parsed = parseSearch(url);
     return {
       action: picked,
-      projectId,
+      projectId:
+        fileId === null ? requiredId(head.projectId, "projectId") : projectId,
       ...parsed,
       fileId,
       skip: nonNegative(head.skip, "skip"),
@@ -377,7 +379,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     fields(value, ["action", "projectId", "name", "text"]);
     return {
       action: picked,
-      projectId,
+      projectId: requiredId(head.projectId, "projectId"),
       ...parseCreate({ name: head.name, text: head.text }),
     };
   }

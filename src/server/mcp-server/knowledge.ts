@@ -9,7 +9,7 @@ import {
   termRanges,
 } from "../../shared/search.ts";
 import { transact } from "../db/index.ts";
-import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, HttpError, NotFound } from "../lib/errors.ts";
 import { sha256 } from "../lib/ids.ts";
 import { outlineRows } from "./outline.ts";
 import type { KnowledgeInput } from "./parse.ts";
@@ -205,12 +205,36 @@ function fileSearch(
   return textResult(`${prefix}\n${rows.join("\n")}`);
 }
 
+// a file or version the key cannot reach answers as a missing one
+function projectOf(
+  deps: McpServerDeps,
+  principal: KeyPrincipal,
+  input: KnowledgeInput,
+) {
+  if (input.projectId !== null) {
+    return deps.access.project(principal, input.projectId);
+  }
+  const owner =
+    input.action === "version"
+      ? deps.knowledge.projectOf("version", input.versionId)
+      : "fileId" in input && input.fileId !== null
+        ? deps.knowledge.projectOf("file", input.fileId)
+        : null;
+  if (owner === null) throw new NotFound();
+  try {
+    return deps.access.project(principal, owner);
+  } catch (error) {
+    if (error instanceof HttpError) throw new NotFound();
+    throw error;
+  }
+}
+
 export function knowledgeTool(
   deps: McpServerDeps,
   principal: KeyPrincipal,
   input: KnowledgeInput,
 ): McpResult {
-  const project = deps.access.project(principal, input.projectId);
+  const project = projectOf(deps, principal, input);
   if (input.action === "list") {
     const all = deps.knowledge.list(project.id).files;
     const selected = all.filter(

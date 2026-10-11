@@ -32,6 +32,7 @@ export type AccessPort = {
 export type KnowledgePort = {
   oneAtATime<T>(userId: string, scan: () => T): T;
   list(projectId: string): KnowledgeListResponse;
+  projectOf(kind: "file" | "version", id: string): string | null;
   rawFile(
     projectId: string,
     fileId: string,

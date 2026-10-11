@@ -55,6 +55,11 @@ same port; hidden and missing sessions both answer `no such chat`. This MCP
 lookup does not widen the page's root-only `visible()`. A list starts from
 `reachableProjectIds()`. Hidden and missing objects have the same answer.
 
+A file, version or session id is unique across projects, so a call that
+names one takes `projectId` as optional: the server reads the project from
+the row and answers a row the key cannot reach as missing. A `projectId`
+that is given and differs from the row's answers the same.
+
 A knowledge write uses the key's user as author, with origin `key` and a
 copy of the key name. Its outer transaction calls `checkKey()` before the
 knowledge area's create, edit, replace, rename or revisioned remove. The
@@ -90,17 +95,17 @@ Lists, both searches, version lists and transcripts page under the cap and
 ignore `resultBytes`. Knowledge files and versions page by whole stored lines.
 `offset` is a one-based first line and defaults to 1; `limit` optionally caps
 how many lines the call returns, but a page still stops before 32 KiB. The
-header names the page's lines and total, or says the file is empty. A live-file
-continuation includes its revision, and a changed revision says the file
-changed and to read from the start. A live read past line 1 needs that
-revision, and its refusal says where to take it from. A version is
-immutable, so its continuation needs only version id and offset. An offset
-past the end is refused clearly. A stored line that cannot fit with the required header, fence and footer is the
-sole exception: it is sent whole on its own page and the header says so.
+header names the page's lines and total, or says the file is empty. A
+live-file continuation includes its revision, and a changed revision says the
+file changed and to read from the start. A live read past line 1 needs that
+revision, and its refusal says where to take it from. A version is immutable,
+so its continuation needs only version id and offset. An offset past the end
+is refused clearly. A stored line that cannot fit with the required header,
+fence and footer is the sole exception: it is sent whole on its own page and
+the header says so.
 
-Session `read` takes an optional `projectId`, since every other call names
-one; a session outside it is not found. A transcript continuation pins its
-message and UTF-16 `position`. Its one-part header names the title, id and text position; its footer carries the next
+A transcript continuation pins its message and UTF-16 `position`. Its one-part
+header names the title, id and text position; its footer carries the next
 message and position or says the transcript ends. A page ends at the last line
 ending that fits. Only when no line ending fits may it end mid-line, and its
 footer says that the next page continues the line. A removed continuation

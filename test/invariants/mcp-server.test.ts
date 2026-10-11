@@ -580,6 +580,25 @@ describe("the composed inbound MCP endpoint", () => {
       });
       expect(crossedFile).toEqual(missingFile);
 
+      const teamFile = await createFile(chat, team.id, "team.md", "team");
+      expect(
+        resultText(
+          await client.tool("knowledge", {
+            action: "read",
+            fileId: teamFile.id,
+          }),
+        ),
+      ).toContain(`id ${teamFile.id}, revision 1, complete`);
+      for (const action of ["read", "versions", "delete"] as const) {
+        const alone = (fileId: string) =>
+          client.tool("knowledge", {
+            action,
+            fileId,
+            ...(action === "delete" ? { revision: 1 } : {}),
+          });
+        expect(await alone(hiddenFile.id)).toEqual(await alone("missing00002"));
+      }
+
       const pending = chat.scripted.next();
       const started = await chat.member.call("POST", "/api/sessions", {
         body: {

@@ -31,6 +31,21 @@ export class KnowledgeVersions {
       .map(versionOf);
   }
 
+  // a deleted file lives on only in its versions
+  projectOf(kind: "file" | "version", id: string): string | null {
+    const sql =
+      kind === "file"
+        ? `select project_id from knowledge_files where id = ?1
+           union all
+           select project_id from knowledge_versions where file_id = ?1
+           limit 1`
+        : "select project_id from knowledge_versions where id = ?1";
+    return (
+      this.db.query<{ project_id: string }, [string]>(sql).get(id)
+        ?.project_id ?? null
+    );
+  }
+
   version(projectId: string, id: string): KnowledgeVersionDetail | null {
     const raw = this.db
       .query<VersionRaw & { text: string }, [string, string]>(

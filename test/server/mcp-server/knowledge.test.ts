@@ -319,14 +319,52 @@ describe("the inbound MCP knowledge tool", () => {
     await area.close();
   });
 
-  test("names a missing id and where an offset read takes its revision", async () => {
-    const { area, send } = fixture();
-    const missing = await toolCall(send, "knowledge", {
+  test("finds a file's or version's project from its id", async () => {
+    const { area, send, state } = fixture("write");
+    const read = await toolCall(send, "knowledge", {
       action: "read",
       fileId: "file00000001",
     });
+    expect(soleText(read)).toStartWith("Knowledge file ");
+    const version = await toolCall(send, "knowledge", {
+      action: "version",
+      versionId: "version00001",
+    });
+    expect(soleText(version)).toStartWith("Knowledge version ");
+    const edited = await toolCall(send, "knowledge", {
+      action: "edit",
+      fileId: "file00000001",
+      revision: 7,
+      edits: [{ old: "a", new: "b" }],
+    });
+    expect(edited.result.isError).toBeUndefined();
+    expect(state.writes.map((write) => write.action)).toEqual(["edit"]);
+    const missing = await toolCall(send, "knowledge", {
+      action: "read",
+      fileId: "missing00001",
+    });
     expect(missing.result.isError).toBe(true);
-    expect(missing.result.content[0].text).toBe("projectId is required");
+    expect(missing.result.content[0].text).toBe("not found");
+    state.reachable = [];
+    const hidden = await toolCall(send, "knowledge", {
+      action: "read",
+      fileId: "file00000001",
+    });
+    expect(hidden.result.content[0].text).toBe("not found");
+    await area.close();
+  });
+
+  test("names a missing id and where an offset read takes its revision", async () => {
+    const { area, send } = fixture("write");
+    for (const args of [
+      { action: "list" },
+      { action: "search", q: "word" },
+      { action: "create", name: "a.md", text: "a" },
+    ]) {
+      const missing = await toolCall(send, "knowledge", args);
+      expect(missing.result.isError).toBe(true);
+      expect(missing.result.content[0].text).toBe("projectId is required");
+    }
     const noFile = await toolCall(send, "knowledge", {
       action: "read",
       projectId: project.id,
