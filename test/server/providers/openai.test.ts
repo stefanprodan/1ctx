@@ -534,4 +534,65 @@ describe("OpenAI chat stream", () => {
     expect(thrown).toBeInstanceOf(Unanswered);
     expect((thrown as Unanswered).timedOut).toBe(false);
   });
+
+  // a 200 whose body sends the prefix, then drops like a reset socket
+  async function dropped(
+    prefix: string,
+    mapEvents?: (frame: string) => ChatEvent[],
+  ) {
+    const fetcher = (async () =>
+      new Response(
+        new ReadableStream({
+          // an error in start() discards what was queued, so the drop
+          // waits for the read after the prefix
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(prefix));
+          },
+          pull(controller) {
+            controller.error(new Error("ECONNRESET: the socket closed"));
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      )) as unknown as typeof fetch;
+    const events: ChatEvent[] = [];
+    let thrown: unknown;
+    try {
+      for await (const event of streamChat(
+        fetcher,
+        "http://models.test/v1/chat/completions",
+        buildChatBody(request),
+        new AbortController().signal,
+        mapEvents === undefined ? {} : { mapEvents },
+      )) {
+        events.push(event);
+      }
+    } catch (err) {
+      thrown = err;
+    }
+    return { events, thrown };
+  }
+
+  test("a stream that drops before its first event is unanswered", async () => {
+    const { events, thrown } = await dropped(": keepalive\n\n");
+    expect(events).toEqual([]);
+    expect(thrown).toBeInstanceOf(Unanswered);
+    expect((thrown as Unanswered).timedOut).toBe(false);
+  });
+
+  test("a stream that drops after only alive events is unanswered", async () => {
+    const { events, thrown } = await dropped(frames([{}], false), () => [
+      { kind: "alive", thinking: true },
+    ]);
+    expect(events).toEqual([{ kind: "alive", thinking: true }]);
+    expect(thrown).toBeInstanceOf(Unanswered);
+  });
+
+  test("a stream that drops after an event is a plain failure", async () => {
+    const { events, thrown } = await dropped(
+      frames([{ choices: [{ delta: { content: "hi" } }] }], false),
+    );
+    expect(events.length).toBeGreaterThan(0);
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown).not.toBeInstanceOf(Unanswered);
+  });
 });

@@ -292,8 +292,9 @@ async function readErrorBody(
   }
 }
 
-// no response at all, so asking again is safe; timedOut when the
-// headers wait ran out, which the round asks again only once
+// no response at all, or a stream that dropped before its first event,
+// so asking again is safe; timedOut when the headers wait ran out,
+// which the round asks again only once
 export class Unanswered extends Error {
   constructor(
     message: string,
@@ -395,6 +396,9 @@ export async function* streamChat(
   let rest = "";
   let done = false;
   let sawFinish = false;
+  // whether anything but a served or alive event went out: a connection
+  // that drops before then lost nothing, as unanswered as no response
+  let heard = false;
   try {
     while (!done) {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -417,7 +421,10 @@ export async function* streamChat(
         yield { kind: "error", message: "the provider was silent for 5 min" };
         return;
       }
-      if ("error" in result) throw result.error;
+      if ("error" in result) {
+        if (heard || signal.aborted) throw result.error;
+        throw new Unanswered(messageOf(result.error));
+      }
       if (result.value.done) break;
       let parsed: ReturnType<typeof parseSse>;
       try {
@@ -440,6 +447,7 @@ export async function* streamChat(
           break;
         }
         for (const event of mapEvents(frame)) {
+          if (event.kind !== "served" && event.kind !== "alive") heard = true;
           if (event.kind === "toolCallDelta") {
             yield { ...event, ...tracker.push(event) };
             continue;
