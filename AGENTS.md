@@ -10,7 +10,8 @@ them on schedules (automations), with shared knowledge and memory.
   official npm only, `bun install --ignore-scripts`. A new package needs
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
-  only `server/email/smtp.ts` imports `nodemailer`, and only
+  only `server/email/smtp.ts` imports `nodemailer`, only
+  `server/mcp-server/` imports `@modelcontextprotocol/server`, and only
   `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
   patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
   and unknown types are not read as regular files, and cancelling an
@@ -144,6 +145,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user`, `automation` |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
+| `docs/mcp-server.md` | `mcp-server/`, the inbound `/mcp` endpoint and its tools |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
@@ -238,7 +240,8 @@ fixture under `test/fixtures/structure/`.
   frames. A `ToolError` logs its fixed `logged` phrase, never its
   message.
 - **The router logs a `request`** for a signed-in user's writes and 4xx
-  answers and for any 5xx; never an anonymous 4xx, health or ready.
+  answers and for any 5xx; a successful `key` route is the exception because
+  its MCP tool logs the call. Never log an anonymous 4xx, health or ready.
   Refreshes and sweeps log only work done or a failure. A test collects
   events with `collectLogs()`, passing its `logFactory` to `testApp()`.
 - **Pure logic is separate from I/O** and tested on fixtures; a bug is

@@ -348,6 +348,7 @@ describe("Project.model", () => {
         name: "casey",
         sessionId: null,
         origin: null,
+        keyName: null,
       },
       createdAt: 1,
       updatedAt,

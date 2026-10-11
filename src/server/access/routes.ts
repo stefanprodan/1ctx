@@ -16,6 +16,7 @@ import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import {
   json,
+  loginOf,
   type Principal,
   type RouteContext,
   type RouteDescriptor,
@@ -122,9 +123,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       passwordChange: true,
       handle(_req, ctx) {
         const principal = ctx.principal!;
+        const loginId = loginOf(principal)!;
         const cleared = transact(deps.db, () => ({
-          result: deps.auth.close(principal.loginId),
-          events: [loginRevoked(principal.userId, principal.loginId)],
+          result: deps.auth.close(loginId),
+          events: [loginRevoked(principal.userId, loginId)],
         }));
         deps.log.info("login closed", { user: principal.username });
         return json({ ok: true }, 200, { "set-cookie": cleared });

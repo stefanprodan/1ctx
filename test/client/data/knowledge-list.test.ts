@@ -47,6 +47,7 @@ function file(changes: Partial<KnowledgeFile> = {}): KnowledgeFile {
       name: "reader",
       sessionId: null,
       origin: null,
+      keyName: null,
     },
     createdAt: 1,
     updatedAt: 1,

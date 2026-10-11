@@ -65,6 +65,24 @@ export function serve(options: ServeOptions) {
     maxRequestBodySize: MAX_REQUEST_BYTES,
     routes: {
       ...files,
+      "/mcp": (req, server) =>
+        options.handle(
+          req,
+          clientAddress(
+            req,
+            server.requestIP(req)?.address ?? null,
+            options.trustProxy,
+          ),
+        ),
+      "/mcp/*": (req, server) =>
+        options.handle(
+          req,
+          clientAddress(
+            req,
+            server.requestIP(req)?.address ?? null,
+            options.trustProxy,
+          ),
+        ),
       "/api/*": (req, server) =>
         options.handle(
           req,

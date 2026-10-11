@@ -19,7 +19,7 @@ function conn(chat: Awaited<ReturnType<typeof chatApp>>, admin: boolean) {
         fullName: admin ? "Stefan Prodan" : "Casey Doe",
         role: admin ? "admin" : "member",
         mustChangePassword: false,
-        loginId: admin ? "la" : "lm",
+        via: { kind: "login", id: admin ? "la" : "lm" },
       },
       projects: new Set(
         chat.app.projects

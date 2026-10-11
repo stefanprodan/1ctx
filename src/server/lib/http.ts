@@ -6,28 +6,50 @@
 // descriptor an area's routes() returns. Areas import this; web/ imports
 // this; neither imports the other for it.
 
+import type { AccessKeyScope } from "../../shared/contracts/access-key.ts";
 import type { Role } from "../../shared/words.ts";
 
-// who is asking: resolved by access from the cookie, checked by the router
+// how the principal came in. A login is the row behind the cookie, so
+// logout revokes exactly it; a message that starts later has none and
+// an empty id. A key is the access key behind a bearer, its scope and
+// the projects it narrows the user's to, null for all they see.
+export type Via =
+  | { kind: "login"; id: string }
+  | {
+      kind: "key";
+      id: string;
+      name: string;
+      scope: AccessKeyScope;
+      projectIds: string[] | null;
+    };
+
+// who is asking: resolved by access from the cookie or the bearer,
+// checked by the router
 export type Principal = {
   userId: string;
   username: string;
   fullName: string;
   role: Role;
   mustChangePassword: boolean;
-  // the login row behind the cookie, so logout can revoke exactly it
-  loginId: string;
+  via: Via;
 };
+
+// the login behind a cookie principal; null for a key, which has none
+export const loginOf = (principal: Principal): string | null =>
+  principal.via.kind === "login" ? principal.via.id : null;
 
 // public: no principal needed. authenticated: any signed-in user, member
 // or admin. admin: the admin role. webhook: no login, a signature
-// checked by the handler over the raw body.
-export type Policy = "public" | "authenticated" | "admin" | "webhook";
+// checked by the handler over the raw body. key: an access key in
+// Authorization: Bearer and never the cookie; the cookie policies never
+// read a bearer.
+export type Policy = "public" | "authenticated" | "admin" | "webhook" | "key";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type RouteContext = {
-  // null only under the public and webhook policies
+  // null only under the public and webhook policies; under key, via is
+  // a key
   principal: Principal | null;
   // the :name segments of the matched pattern
   params: Record<string, string>;

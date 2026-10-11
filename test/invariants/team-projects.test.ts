@@ -494,7 +494,7 @@ describe("team project chat lifecycle", () => {
         fullName: "Casey Doe",
         role: "member",
         mustChangePassword: false,
-        loginId: "test",
+        via: { kind: "login", id: "test" },
       },
       { projectId: project.id, agentId: chat.agentId, message: "hello" },
     );

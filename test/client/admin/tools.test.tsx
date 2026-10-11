@@ -655,6 +655,7 @@ describe("the Config board", () => {
       "Turns",
       "Running",
       "Automations",
+      "External tasks",
     ]);
     expect(STORAGE_CARDS.map((c) => c.title)).toEqual([
       "Knowledge",
@@ -850,7 +851,7 @@ describe("the Config board", () => {
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
     // the automation card stays mounted, hidden, so its draft is kept
-    expect(html.match(/<form/g)).toHaveLength(9);
+    expect(html.match(/<form/g)).toHaveLength(10);
     expect(html).toMatch(
       /config-board-cards config-board-away"><form[\s\S]*?Agents manage scheduled tasks/,
     );

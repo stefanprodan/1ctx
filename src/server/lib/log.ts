@@ -231,7 +231,13 @@ export function scrubErrors(log: Log, values: () => string[]): Log {
     if (typeof fields?.error !== "string") return fields;
     return {
       ...fields,
-      error: cut(scrubValues(fields.error, values(), "[key]")),
+      // an access key is a row, never a key file, so its shape is masked
+      error: cut(
+        scrubValues(fields.error, values(), "[key]").replace(
+          /1ctx_[A-Za-z0-9_-]{43}/g,
+          "[key]",
+        ),
+      ),
     };
   };
   const write = (level: LogLevel) => (msg: string, fields?: LogFields) =>

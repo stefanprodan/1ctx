@@ -25,5 +25,5 @@ export const principalOf = (user: UserRow): Principal => ({
   role: user.role,
   mustChangePassword: user.mustChangePassword,
   // no login stands behind a message that starts later
-  loginId: "",
+  via: { kind: "login", id: "" },
 });

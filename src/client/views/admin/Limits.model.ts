@@ -210,6 +210,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Cache size",
     text: "Every repository's files on disk together.",
   },
+  accessKeysPerUser: {
+    label: "Access keys per user",
+    text: "Keys one user may make for /mcp. 0 turns it off.",
+  },
 };
 
 // thousands: typed in whole thousands as the agent's window is, a

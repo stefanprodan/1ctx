@@ -9,7 +9,7 @@ import { jsonBody } from "../lib/body.ts";
 import { loginRevoked } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { Forbidden, TooManyRequests, Unauthorized } from "../lib/errors.ts";
-import { json, type RouteDescriptor } from "../lib/http.ts";
+import { json, loginOf, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { profile, type UserRow, verifyPassword } from "../users/index.ts";
 import type { Links } from "./links.ts";
@@ -124,7 +124,10 @@ export function profileRoutes(deps: ProfileDeps): RouteDescriptor[] {
           if (self(user.id).passwordHash !== user.passwordHash) throw wrong;
           deps.users.setPasswordHash(user.id, hash);
           deps.users.setMustChangePassword(user.id, false);
-          const revoked = deps.logins.deleteOthers(user.id, principal.loginId);
+          const revoked = deps.logins.deleteOthers(
+            user.id,
+            loginOf(principal)!,
+          );
           // a link asked for before the change would undo it
           deps.links.revoke(user.id);
           const changed = self(user.id);

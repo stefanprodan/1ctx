@@ -21,6 +21,7 @@ import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import { newToken } from "../lib/ids.ts";
+import type { Log } from "../lib/log.ts";
 import { lastDays } from "../usage/index.ts";
 import {
   account,
@@ -28,6 +29,11 @@ import {
   type UserFields,
   type UserRow,
 } from "../users/index.ts";
+import {
+  type AccessKeyRow,
+  type AccessKeyStore,
+  logRevokedKeys,
+} from "./key-store.ts";
 import type { Links } from "./links.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
@@ -64,6 +70,8 @@ export type UsersUsagePort = {
 export type UsersRoutesDeps = {
   db: Db;
   logins: LoginStore;
+  keys: AccessKeyStore;
+  log: Log;
   visits: VisitStore;
   users: UsersPort;
   projects: UsersProjectsPort;
@@ -208,6 +216,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const id = ctx.params.id;
         const changed = transact(deps.db, () => {
           const user = find(id);
+          let revokedKeys: AccessKeyRow[] = [];
           if (
             patch.username !== undefined &&
             patch.username !== user.username
@@ -255,11 +264,12 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             deps.users.setDisabled(user.id, patch.disabled!);
             if (patch.disabled === true) {
               deps.logins.deleteForUser(user.id);
+              revokedKeys = deps.keys.deleteForUser(user.id);
               deps.links.revoke(user.id);
             }
           }
           return {
-            result: find(user.id),
+            result: { user: find(user.id), revokedKeys },
             events: [
               ...(roleChanged ? [accessChanged([user.id])] : []),
               ...(disabledChanged && patch.disabled === true
@@ -268,7 +278,8 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             ],
           };
         });
-        const body: UserResponse = { user: oneUser(changed) };
+        logRevokedKeys(deps.log, changed.user.username, changed.revokedKeys);
+        const body: UserResponse = { user: oneUser(changed.user) };
         return json(body);
       },
     },
@@ -298,20 +309,22 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           throw new Conflict("cannot reset your own password");
         }
         const passwordHash = await deps.users.hashPassword(password);
-        transact(deps.db, () => {
+        const changed = transact(deps.db, () => {
           const user = find(id);
           deps.users.setPasswordHash(user.id, passwordHash);
           deps.users.setMustChangePassword(user.id, true);
           deps.logins.deleteForUser(user.id);
+          const revokedKeys = deps.keys.deleteForUser(user.id);
           deps.links.revoke(user.id);
           return {
-            result: undefined,
+            result: { user, revokedKeys },
             events: [
               loginRevoked(user.id, null),
               ...deps.links.notice(user, "admin-reset", ctx.address),
             ],
           };
         });
+        logRevokedKeys(deps.log, changed.user.username, changed.revokedKeys);
         return new Response(null, { status: 204 });
       },
     },

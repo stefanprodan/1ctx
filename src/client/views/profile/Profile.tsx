@@ -39,6 +39,7 @@ import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import { roleWords } from "../directory/Directory.model.ts";
+import { AccessKeys } from "./AccessKeys.tsx";
 import {
   aboutProblem,
   detailsFieldOf,
@@ -293,6 +294,7 @@ export function Profile() {
             >
               <PasswordForm />
             </Section>
+            <AccessKeys user={user} />
           </div>
         </Split>
       )}

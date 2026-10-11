@@ -170,8 +170,8 @@ export class KnowledgeStore extends KnowledgeVersions {
         `insert into knowledge_files
        (id, project_id, name, kind, text, bytes, lines, digest, tokens,
         revision, author_kind, author_id, author_name, session_id, origin,
-        created_at, updated_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+        key_name, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -185,6 +185,7 @@ export class KnowledgeStore extends KnowledgeVersions {
         author.name,
         author.sessionId,
         author.origin,
+        author.keyName,
         now,
         now,
       );
@@ -203,8 +204,8 @@ export class KnowledgeStore extends KnowledgeVersions {
       .query(
         `update knowledge_files set text = ?, bytes = ?, lines = ?, digest = ?,
        tokens = ?, revision = revision + 1, author_kind = ?, author_id = ?,
-       author_name = ?, session_id = ?, origin = ?, updated_at = ?
-       where project_id = ? and id = ?`,
+       author_name = ?, session_id = ?, origin = ?, key_name = ?,
+       updated_at = ? where project_id = ? and id = ?`,
       )
       .run(
         text,
@@ -214,6 +215,7 @@ export class KnowledgeStore extends KnowledgeVersions {
         author.name,
         author.sessionId,
         author.origin,
+        author.keyName,
         now,
         current.projectId,
         current.id,
@@ -234,8 +236,8 @@ export class KnowledgeStore extends KnowledgeVersions {
       .query(
         `update knowledge_files set name = ?, kind = ?,
        revision = revision + 1, author_kind = ?, author_id = ?,
-       author_name = ?, session_id = ?, origin = ?, updated_at = ?
-       where project_id = ? and id = ?`,
+       author_name = ?, session_id = ?, origin = ?, key_name = ?,
+       updated_at = ? where project_id = ? and id = ?`,
       )
       .run(
         name,
@@ -245,6 +247,7 @@ export class KnowledgeStore extends KnowledgeVersions {
         author.name,
         author.sessionId,
         author.origin,
+        author.keyName,
         now,
         current.projectId,
         current.id,

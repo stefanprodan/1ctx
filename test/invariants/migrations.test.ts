@@ -70,6 +70,8 @@ const EXPECTED_IDS = [
   "0056-automation-once",
   "0057-automation-tool",
   "0058-automation-drafts",
+  "0059-access-keys",
+  "0060-knowledge-keys",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1934,6 +1936,103 @@ describe("the schema", () => {
           "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
         ),
       ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0060 widens the knowledge origin to key and keeps every row, rowid and index", () => {
+    const db = seed(MIGRATIONS.slice(0, 59));
+    const tables = ["knowledge_files", "knowledge_versions"];
+    const rows = () =>
+      tables.map((table) =>
+        db.query(`select rowid, * from ${table} order by rowid`).all(),
+      );
+    const indexes = () =>
+      db
+        .query<{ name: string; tbl_name: string; sql: string | null }, []>(
+          `select name, tbl_name, sql from sqlite_schema where type = 'index'
+             and tbl_name in ('knowledge_files', 'knowledge_versions')
+           order by name`,
+        )
+        .all();
+    try {
+      // rowids out of insert order, since a tie on time sorts by rowid
+      db.exec(`
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('p2', 'team', 'team', 'u', 0);
+        insert into knowledge_files (rowid, id, project_id, name, kind, text,
+            bytes, lines, digest, tokens, revision, author_kind, author_id,
+            author_name, session_id, origin, created_at, updated_at)
+          values (7, 'f1', 'p', 'docs/a.md', 'md', 'hello', 5, 1, 'd1', 1, 2,
+            'agent', 'a', 'agent', 'sess', 'chat', 1, 2),
+          (3, 'f2', 'p2', 'notes.txt', 'txt', 'x', 1, 1, 'd2', 1, 1,
+            'user', 'u', 'user', null, null, 3, 3);
+        insert into knowledge_versions (rowid, id, file_id, project_id, name,
+            revision, text, bytes, lines, author_kind, author_id,
+            author_name, session_id, origin, written_at, deleted,
+            file_snapshot)
+          values (9, 'v1', 'f1', 'p', 'docs/a.md', 1, 'hel', 3, 1, 'user',
+            'u', 'user', null, null, 1, 0, null),
+          (4, 'v2', 'f1', 'p', 'docs/a.md', 2, 'hello', 5, 1, 'agent', 'a',
+            'agent', 'sess', 'chat', 2, 0, null),
+          (5, 'v3', 'f2', 'p2', 'notes.txt', 1, 'x', 1, 1, 'user', 'u',
+            'user', null, null, 3, 0, null),
+          (2, 'v4', 'gone', 'p2', 'old.md', 2, '', 0, 0, 'agent', 'a',
+            'agent', 'run', 'automation', 4, 1, '{"id":"gone"}');
+      `);
+      const before = rows();
+      expect(before.map((table) => table.length)).toEqual([2, 4]);
+      const existing = indexes();
+      // the two named indexes and the key and unique name ones
+      expect(existing.length).toBe(5);
+      for (const table of tables) {
+        expect(() =>
+          db.exec(`update ${table} set origin = 'key' where rowid in (3, 5)`),
+        ).toThrow(/CHECK/);
+      }
+      expect(MIGRATIONS[59]?.rebuilds).toEqual(tables);
+      expect(migrate(db)).toEqual(expectedFrom("0060-knowledge-keys"));
+      expect(rows()).toEqual(
+        before.map((table) =>
+          table.map((row) => ({ ...(row as object), key_name: null })),
+        ),
+      );
+      expect(indexes()).toEqual(existing);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      for (const table of tables) {
+        db.exec(
+          `update ${table} set origin = 'key', key_name = 'laptop' where rowid in (3, 5)`,
+        );
+        expect(() =>
+          db.exec(`update ${table} set origin = 'other' where rowid in (3, 5)`),
+        ).toThrow(/CHECK/);
+        expect(() =>
+          db.exec(
+            `update ${table} set author_kind = 'other' where rowid in (3, 5)`,
+          ),
+        ).toThrow(/CHECK/);
+      }
+      expect(
+        db.query("select key_name from knowledge_files where id = 'f2'").get(),
+      ).toEqual({ key_name: "laptop" });
+      expect(() =>
+        db.exec("update knowledge_versions set deleted = 2"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec(
+          "update knowledge_files set name = 'notes.txt', project_id = 'p2' where id = 'f1'",
+        ),
+      ).toThrow(/UNIQUE/);
+      // the project reference still cascades
+      db.exec("delete from projects where id = 'p2'");
+      expect(
+        db.query("select id from knowledge_files order by id").all(),
+      ).toEqual([{ id: "f1" }]);
+      expect(
+        db.query("select id from knowledge_versions order by id").all(),
+      ).toEqual([{ id: "v1" }, { id: "v2" }]);
+      expect(migrate(db)).toEqual([]);
     } finally {
       db.close();
     }

@@ -17,6 +17,7 @@ import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import { jsonBody, MAX_BODY } from "../lib/body.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
+import type { KnowledgeEdit } from "./edit.ts";
 import { MAX_KNOWLEDGE_BODY } from "./limits.ts";
 import {
   parseCreate,
@@ -79,10 +80,22 @@ export type KnowledgePort = {
     q: string,
     after: string | null,
   ): KnowledgeSearchResponse;
+  // a revision refuses a delete of a file written since it was read;
+  // the page names none
   remove(
     projectId: string,
     author: KnowledgeAuthor,
     fileId: string,
+    revision?: number,
+  ): KnowledgeFileResponse["file"];
+  // exact replacements on the text at a revision, all or none, through
+  // replace's caps, history and event
+  edit(
+    projectId: string,
+    author: KnowledgeAuthor,
+    fileId: string,
+    revision: number,
+    edits: readonly KnowledgeEdit[],
   ): KnowledgeFileResponse["file"];
   emptyBin(projectId: string): number;
 };
@@ -96,6 +109,7 @@ function author(principal: Principal): KnowledgeAuthor {
     name: principal.username,
     sessionId: null,
     origin: null,
+    keyName: null,
   };
 }
 

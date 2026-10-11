@@ -68,7 +68,7 @@ export function linkCardWords(user: UserAccount): {
     : {
         kind: "reset-link",
         title: "Reset password",
-        line: `Emails ${user.fullName} a link to choose a new password. It works for 30 minutes.`,
+        line: `Emails ${user.fullName} a link to choose a new password. It works for 30 minutes. Using it deletes their access keys.`,
         button: "Send reset link",
         sent,
       };

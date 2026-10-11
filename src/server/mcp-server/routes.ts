@@ -1,0 +1,70 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+
+import type { AuthInfo, McpHttpHandler } from "@modelcontextprotocol/server";
+import { RateLimit } from "../access/index.ts";
+import { MAX_KNOWLEDGE_BODY } from "../knowledge/index.ts";
+import { jsonBody } from "../lib/body.ts";
+import { MINUTE_MS } from "../lib/clock.ts";
+import { TooManyRequests } from "../lib/errors.ts";
+import { json, type RouteDescriptor } from "../lib/http.ts";
+import type { KeyPrincipal, McpServerDeps } from "./ports.ts";
+
+export const MCP_MESSAGES_PER_MINUTE = 120;
+
+const messages = (body: unknown): number =>
+  Array.isArray(body) ? Math.max(1, body.length) : 1;
+
+function authInfo(principal: KeyPrincipal): AuthInfo {
+  return {
+    token: principal.via.id,
+    clientId: principal.userId,
+    scopes: [principal.via.scope],
+    extra: { principal },
+  };
+}
+
+const methodNotAllowed = () => json({ error: "method not allowed" }, 405);
+
+export function routes(
+  deps: McpServerDeps,
+  handler: () => McpHttpHandler,
+): RouteDescriptor[] {
+  const rate = new RateLimit(MCP_MESSAGES_PER_MINUTE, MINUTE_MS);
+  return [
+    {
+      method: "POST",
+      path: "/mcp",
+      policy: "key",
+      async handle(req, ctx) {
+        const principal = ctx.principal as KeyPrincipal;
+        const now = deps.clock();
+        if (!rate.hit(principal.via.id, now)) {
+          throw new TooManyRequests();
+        }
+        const body = await jsonBody(req, MAX_KNOWLEDGE_BODY);
+        let admitted = true;
+        for (let index = 1; index < messages(body); index++) {
+          if (!rate.hit(principal.via.id, now)) admitted = false;
+        }
+        if (!admitted) throw new TooManyRequests();
+        return handler().fetch(req, {
+          parsedBody: body,
+          authInfo: authInfo(principal),
+        });
+      },
+    },
+    {
+      method: "GET",
+      path: "/mcp",
+      policy: "key",
+      handle: methodNotAllowed,
+    },
+    {
+      method: "DELETE",
+      path: "/mcp",
+      policy: "key",
+      handle: methodNotAllowed,
+    },
+  ];
+}

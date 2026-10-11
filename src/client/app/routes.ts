@@ -12,6 +12,7 @@
 import { isDecisionId } from "../../shared/contracts/decision.ts";
 import { isRunFilter, type SessionOrigin } from "../../shared/words.ts";
 import { refreshAccessBoard } from "../data/access-board.ts";
+import { loadAccessKeys, loadUserKeys } from "../data/access-keys.ts";
 import {
   loadAdminProject,
   loadAdminProjects,
@@ -543,7 +544,9 @@ export const ROUTES: Route[] = [
         [loadUsers(), loadProjects()],
         users,
         (u) => u.username === params.username,
-        loadUserUsage,
+        async (id) => {
+          await Promise.all([loadUserUsage(id), loadUserKeys(id)]);
+        },
       ),
   },
   {
@@ -854,7 +857,15 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
-    load: () => loadProfile(),
+    // the projects name a key's picks; the server refuses both until
+    // the password changes, which loads the page again
+    load: async () => {
+      await Promise.all(
+        me.value?.mustChangePassword
+          ? [loadProfile()]
+          : [loadProfile(), loadAccessKeys(), loadProjects()],
+      );
+    },
   },
 ];
 

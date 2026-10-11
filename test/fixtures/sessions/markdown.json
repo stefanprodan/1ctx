@@ -11,7 +11,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m1-1"
       },
       {
         "sendId": "s1",
@@ -23,7 +24,8 @@
         "createdAt": 1010000,
         "finishedAt": 1010000,
         "finishReason": "tool_calls",
-        "error": null
+        "error": null,
+        "id": "m1-2"
       },
       {
         "sendId": "s1",
@@ -35,7 +37,8 @@
         "finishedAt": 1030000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m1-3"
       },
       {
         "sendId": "s1",
@@ -47,7 +50,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m1-4"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nwhat time is it?\n\n## @coder 1970-01-01 00:17\n\nIt is noon.\n"
@@ -64,7 +68,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m2-1"
       },
       {
         "sendId": "s1",
@@ -76,7 +81,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m2-2"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nwrite a poem\n\n## @coder 1970-01-01 00:17\n\nRoses are\n\n_stopped_\n"
@@ -93,7 +99,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m3-1"
       },
       {
         "sendId": "s1",
@@ -105,7 +112,8 @@
         "createdAt": 1010000,
         "finishedAt": 1010000,
         "finishReason": "tool_calls",
-        "error": null
+        "error": null,
+        "id": "m3-2"
       },
       {
         "sendId": "s1",
@@ -117,7 +125,8 @@
         "finishedAt": 1060000,
         "error": "tool timed out",
         "slot": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m3-3"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlook it up\n\n## @coder 1970-01-01 00:17\n\n_tool timed out_\n"
@@ -134,7 +143,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m4-1"
       },
       {
         "sendId": "s1",
@@ -146,7 +156,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m4-2"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_failed_\n"
@@ -163,7 +174,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m5-1"
       },
       {
         "sendId": "s1",
@@ -175,7 +187,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "finishReason": "length",
-        "error": null
+        "error": null,
+        "id": "m5-2"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nand then\n\n_cut at max tokens_\n"
@@ -192,7 +205,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m6-1"
       },
       {
         "sendId": "s1",
@@ -204,7 +218,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "finishReason": "tool_text",
-        "error": null
+        "error": null,
+        "id": "m6-2"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nlong\n\n## @coder 1970-01-01 00:17\n\nLet me check.\n\n_tool call dropped_\n"
@@ -221,7 +236,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-1"
       },
       {
         "sendId": "s1",
@@ -233,7 +249,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-2"
       },
       {
         "sendId": "s1",
@@ -245,7 +262,8 @@
         "finishedAt": 1090000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-3"
       },
       {
         "sendId": "s2",
@@ -257,7 +275,8 @@
         "finishedAt": 1090000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-4"
       },
       {
         "sendId": "s3",
@@ -268,7 +287,8 @@
         "finishedAt": 1120000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-5"
       },
       {
         "sendId": "s3",
@@ -280,7 +300,8 @@
         "createdAt": 1060000,
         "finishedAt": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m7-6"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nfirst\n\n## @coder 1970-01-01 00:17\n\none\n\n## @casey 1970-01-01 00:18\n\nsecond\n"
@@ -297,7 +318,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m8-1"
       },
       {
         "sendId": "s1",
@@ -309,7 +331,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m8-2"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\n    indented code\nline with break  \nend\n\n## @coder 1970-01-01 00:17\n\n  - nested\n"
@@ -327,7 +350,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m9-1"
       },
       {
         "sendId": "s1",
@@ -339,7 +363,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": "bad _thing_\nhappened",
-        "finishReason": null
+        "finishReason": null,
+        "id": "m9-2"
       }
     ],
     "expected": "# \\[x\\](http://evil) \\# \\*bold\\* \\<b\\>\\&amp;\n\n## @casey 1970-01-01 00:16\n\nhi\n\n## @coder 1970-01-01 00:17\n\n_bad \\_thing\\_ happened_\n"
@@ -357,7 +382,8 @@
         "finishedAt": 1774744200000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m10-1"
       },
       {
         "sendId": "s1",
@@ -369,7 +395,8 @@
         "createdAt": 1774747800000,
         "finishedAt": 1774747800000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m10-2"
       }
     ],
     "expected": "# chat\n\n## @casey 2026-03-29 02:30\n\nbefore\n\n## @coder 2026-03-29 04:30\n\nafter\n"
@@ -386,7 +413,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m11-1"
       },
       {
         "sendId": "s1",
@@ -398,7 +426,8 @@
         "createdAt": 1060000,
         "finishedAt": 1060000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m11-2"
       }
     ],
     "expected": "# chat\n\n## @someone 1970-01-01 00:16\n\nhi\n\n## @agent 1970-01-01 00:17\n\nhello\n"
@@ -418,7 +447,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m12-1"
       },
       {
         "sendId": "s1",
@@ -432,7 +462,8 @@
         "createdAt": 1010000,
         "finishedAt": 1020000,
         "error": "provider failed",
-        "finishReason": null
+        "finishReason": null,
+        "id": "m12-2"
       },
       {
         "sendId": "s1",
@@ -446,7 +477,8 @@
         "createdAt": 1030000,
         "finishedAt": 1040000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m12-3"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\n_provider failed_\n"
@@ -466,7 +498,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m13-1"
       },
       {
         "sendId": "s1",
@@ -480,7 +513,8 @@
         "createdAt": 1010000,
         "finishedAt": 1020000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m13-2"
       },
       {
         "sendId": "s1",
@@ -494,7 +528,8 @@
         "createdAt": 1030000,
         "finishedAt": 1040000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m13-3"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\ncheck it\n\n## @coder 1970-01-01 00:17\n\nrun answer\n"
@@ -511,7 +546,8 @@
         "finishedAt": 1000000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m14-1"
       },
       {
         "sendId": "s1",
@@ -522,7 +558,8 @@
         "finishedAt": 1060000,
         "slot": null,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m14-2"
       },
       {
         "sendId": "s1",
@@ -534,7 +571,8 @@
         "createdAt": 1120000,
         "finishedAt": 1120000,
         "error": null,
-        "finishReason": null
+        "finishReason": null,
+        "id": "m14-3"
       }
     ],
     "expected": "# chat\n\n## @casey 1970-01-01 00:16\n\nroll back the deploy\n\n## @ana 1970-01-01 00:17\n\nwait, keep it and scale up\n\n## @coder 1970-01-01 00:18\n\nYou disagree, so I did neither.\n"

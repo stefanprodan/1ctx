@@ -29,6 +29,7 @@ const uploads: MessageUpload[] = [
 const attached =
   "Attached: docs\\_\\[one\\]\\*\\`\\\\\\<\\>\\#\\|\\~\\& .zip (43 files), notes.md";
 const row = (fields: Partial<ExportRow>): ExportRow => ({
+  id: "message",
   sendId: "send",
   round: 1,
   memoryRound: null,

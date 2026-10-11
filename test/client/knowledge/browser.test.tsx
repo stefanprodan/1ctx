@@ -35,6 +35,7 @@ const byAgent: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "chat",
+  keyName: null,
 };
 
 function file(id: string, name: string): KnowledgeFile {

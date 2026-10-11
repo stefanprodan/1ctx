@@ -75,7 +75,9 @@ export {
 export { envelope } from "./envelope.ts";
 export {
   chatMarkdown,
+  chatMarkdownParts,
   type ExportRow,
+  type MarkdownPart,
   markdownFilename,
 } from "./markdown.ts";
 export type { RunMark } from "./marks.ts";

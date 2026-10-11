@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type Signal, useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { RepoView } from "../../../shared/api/repos.ts";
 import { refWords } from "../../composer/Add.model.ts";
@@ -31,6 +30,7 @@ import {
 import { countOf } from "../../lib/search.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { AskDelete, Foot } from "../../ui/Foot.tsx";
+import { Labelled } from "../../ui/Labelled.tsx";
 import {
   RowsAdd,
   RowsEnd,
@@ -428,34 +428,6 @@ export function RepoFields({
           <span class="hint">{IGNORE_HINT}</span>
         )}
       </label>
-    </div>
-  );
-}
-
-function Labelled({
-  label,
-  field,
-  save,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  field: string;
-  save: Save;
-  required?: boolean;
-  hint?: string;
-  children: ComponentChildren;
-}) {
-  return (
-    <div class="field">
-      <span class={`label${required ? " label-required" : ""}`}>{label}</span>
-      {children}
-      {save.fieldError(field) !== null ? (
-        <FieldError save={save} field={field} />
-      ) : (
-        hint !== undefined && <span class="hint">{hint}</span>
-      )}
     </div>
   );
 }

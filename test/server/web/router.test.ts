@@ -5,8 +5,12 @@
 // renewed cookie riding back, and the conflict check at construction.
 
 import { describe, expect, test } from "bun:test";
-import { BadRequest } from "../../../src/server/lib/errors.ts";
-import { json, type RouteDescriptor } from "../../../src/server/lib/http.ts";
+import { BadRequest, HttpError } from "../../../src/server/lib/errors.ts";
+import {
+  json,
+  type Principal,
+  type RouteDescriptor,
+} from "../../../src/server/lib/http.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   conflicts,
@@ -126,6 +130,30 @@ describe("router", () => {
   );
   const get = (path: string) => handle(new Request(`http://x${path}`), "a");
 
+  test("resolver HttpErrors keep their status and only 5xx are logged", async () => {
+    const collected = collectLogs();
+    let status = 404;
+    const route = answered(
+      router({
+        routes: [echo],
+        resolve: () => {
+          throw new HttpError(status, "unavailable");
+        },
+        trustProxy: false,
+        log: collected.logFactory("router"),
+      }),
+    );
+    const req = () => new Request("http://x/api/things/1");
+    const absent = await route(req(), "127.0.0.1");
+    expect(absent.status).toBe(404);
+    expect(await absent.json()).toEqual({ error: "unavailable" });
+    expect(collected.events).toEqual([]);
+    status = 503;
+    expect((await route(req(), "127.0.0.1")).status).toBe(503);
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]!.fields.status).toBe(503);
+  });
+
   test("checks the origin of GET upgrade routes", async () => {
     let reached = 0;
     const upgrade: RouteDescriptor = {
@@ -235,7 +263,7 @@ describe("router", () => {
             fullName: "U",
             role: "member",
             mustChangePassword: false,
-            loginId: "l",
+            via: { kind: "login" as const, id: "l" },
           },
           setCookie: "login=t; Max-Age=9",
         }),
@@ -270,7 +298,7 @@ describe("a handler that throws", () => {
     username: "maria",
     fullName: "Maria",
     role: "member" as const,
-    loginId: "l1",
+    via: { kind: "login" as const, id: "l1" },
     mustChangePassword: false,
   };
 
@@ -383,6 +411,59 @@ describe("a handler that throws", () => {
     expect(collected.events[0]).toMatchObject({
       level: "error",
       fields: { route: "/api/boom", status: 500, user: "nobody" },
+    });
+  });
+
+  test("a successful key route is not logged but its refusal is", async () => {
+    const collected = collectLogs();
+    const keyPrincipal: Principal = {
+      ...principal,
+      via: {
+        kind: "key",
+        id: "key1",
+        name: "terminal",
+        scope: "read",
+        projectIds: null,
+      },
+    };
+    const handle = answered(
+      router({
+        routes: [
+          {
+            method: "POST",
+            path: "/mcp",
+            policy: "key",
+            handle: (req) => {
+              if (new URL(req.url).searchParams.has("bad")) {
+                throw new BadRequest("no");
+              }
+              return json({ ok: true });
+            },
+          },
+        ],
+        resolve: () => ({ principal: keyPrincipal, setCookie: null }),
+        trustProxy: false,
+        log: collected.logFactory("router"),
+      }),
+    );
+
+    expect(
+      (await handle(new Request("http://x/mcp", { method: "POST" }), "1.2.3.4"))
+        .status,
+    ).toBe(200);
+    expect(collected.events).toHaveLength(0);
+    expect(
+      (
+        await handle(
+          new Request("http://x/mcp?bad", { method: "POST" }),
+          "1.2.3.4",
+        )
+      ).status,
+    ).toBe(400);
+    expect(collected.events).toHaveLength(1);
+    expect(collected.events[0]).toMatchObject({
+      msg: "request",
+      fields: { route: "/mcp", status: 400, user: "maria" },
     });
   });
 });

@@ -16,6 +16,7 @@ export type AuthorRaw = {
   author_name: string;
   session_id: string | null;
   origin: KnowledgeAuthor["origin"];
+  key_name: string | null;
 };
 
 export type FileRaw = AuthorRaw & {
@@ -36,7 +37,7 @@ export type FullRaw = FileRaw & { text: string; digest: string };
 
 export const FILE_COLUMNS = `id, project_id, name, kind, bytes, lines, tokens,
   revision, author_kind, author_id, author_name, session_id, origin,
-  created_at, updated_at`;
+  key_name, created_at, updated_at`;
 
 export function authorOf(raw: AuthorRaw): KnowledgeAuthor {
   return {
@@ -45,6 +46,7 @@ export function authorOf(raw: AuthorRaw): KnowledgeAuthor {
     name: raw.author_name,
     sessionId: raw.session_id,
     origin: raw.origin,
+    keyName: raw.key_name,
   };
 }
 
@@ -84,7 +86,8 @@ export type VersionRaw = AuthorRaw & {
 };
 
 export const VERSION_COLUMNS = `id, file_id, name, revision, bytes, lines,
-  author_kind, author_id, author_name, session_id, origin, written_at, deleted`;
+  author_kind, author_id, author_name, session_id, origin, key_name,
+  written_at, deleted`;
 
 export function versionOf(raw: VersionRaw): KnowledgeVersion {
   return {

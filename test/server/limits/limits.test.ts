@@ -237,12 +237,13 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(51);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(51);
+      expect(rows).toHaveLength(52);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(52);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(15);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "sends")).toHaveLength(5);
+      expect(rows.filter((row) => row.scope === "external")).toHaveLength(1);
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
       expect(rows.filter((row) => row.scope === "repos")).toHaveLength(4);
@@ -456,7 +457,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(51);
+      expect(body.limits).toHaveLength(52);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

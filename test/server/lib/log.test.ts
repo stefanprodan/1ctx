@@ -102,6 +102,22 @@ describe("error fields", () => {
     expect(line).toContain("[key]");
   });
 
+  test("scrubs an access token pattern without a known value", () => {
+    const token = `1ctx_${"a".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const log = scrubErrors(
+      {
+        info() {},
+        warn() {},
+        error: (_msg, fields) => {
+          lines.push(fields ?? {});
+        },
+      },
+      () => [],
+    );
+    log.error("b", errorFields(new Error(`failed with ${token}`), false));
+    expect(lines[0]?.error).toBe("failed with [key]");
+  });
   test("keeps only source frame locations", () => {
     const error = new Error("boom");
     error.stack = [

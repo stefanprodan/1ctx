@@ -111,6 +111,7 @@ describe("knowledge routes", () => {
           name: "writer",
           sessionId: null,
           origin: null,
+          keyName: null,
         });
         const path = filePath(projectId, file.id);
         expect(await (await s.client.call("GET", path)).json()).toEqual({

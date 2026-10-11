@@ -9,6 +9,7 @@ import { BadRequest, HttpError } from "../lib/errors.ts";
 import {
   json,
   type Method,
+  type Policy,
   type Principal,
   type RouteDescriptor,
   type RouteOutcome,
@@ -30,7 +31,10 @@ export type Router = (
   upgrader?: Upgrader,
 ) => Promise<RouteOutcome>;
 
-export type Resolver = (req: Request) => {
+export type Resolver = (
+  req: Request,
+  policy: Policy,
+) => {
   principal: Principal | null;
   setCookie: string | null;
 };
@@ -92,9 +96,14 @@ export function lastForwarded(req: Request, name: string): string | null {
 // a browser sends Origin on every non-GET; a request without one is not
 // from a page, and one from another host or a plaintext page of the
 // same host is refused
-export function sameOrigin(req: Request, url: URL, trustProxy: boolean) {
+export function sameOrigin(
+  req: Request,
+  url: URL,
+  trustProxy: boolean,
+  key = false,
+) {
   const origin = req.headers.get("origin");
-  if (origin === null) return req.headers.get("sec-fetch-site") === null;
+  if (origin === null) return key || req.headers.get("sec-fetch-site") === null;
   let parsed: URL;
   try {
     parsed = new URL(origin);
@@ -104,6 +113,7 @@ export function sameOrigin(req: Request, url: URL, trustProxy: boolean) {
   if (parsed.host !== url.host) return false;
   const forwarded = trustProxy ? lastForwarded(req, "x-forwarded-proto") : null;
   const scheme = forwarded ? `${forwarded}:` : url.protocol;
+  if (key) return origin === `${scheme}//${url.host}`;
   return parsed.protocol === scheme || parsed.protocol === "https:";
 }
 
@@ -120,6 +130,12 @@ async function dispatch(
     upgrade?: (data: unknown) => boolean;
   },
 ): Promise<RouteOutcome> {
+  if (route.policy === "key" && principal?.via.kind !== "key") {
+    return json({ error: "sign in" }, 401);
+  }
+  if (route.policy === "key" && principal!.mustChangePassword) {
+    return json({ error: "change your password first" }, 403);
+  }
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
     if (route.policy === "admin" && principal.role !== "admin") {
@@ -169,9 +185,10 @@ export function router(deps: RouterDeps): Router {
       route: string,
       status: number,
       principal: Principal | null | undefined,
+      policy?: Policy,
       error?: unknown,
     ): void => {
-      if (probe) return;
+      if (probe || (policy === "key" && status < 400)) return;
       // a 5xx is our bug whoever asked; below that only a signed-in user's
       // requests say anything, since our client never calls a missing route
       // or writes cross-origin, and a scanner's 4xx would fill the disk
@@ -205,22 +222,35 @@ export function router(deps: RouterDeps): Router {
       pathMatched = true;
       if (route.method !== method) continue;
       if (
+        route.policy !== "key" &&
         (method !== "GET" || route.upgrade) &&
         !sameOrigin(req, url, deps.trustProxy)
       ) {
         const res = json({ error: "cross-origin request" }, 403);
-        record(route.path, res.status, undefined);
+        record(route.path, res.status, undefined, route.policy);
         return res;
       }
       const resolves = route.policy !== "webhook";
       let resolution: ReturnType<Resolver>;
       try {
         resolution = resolves
-          ? deps.resolve(req)
+          ? deps.resolve(req, route.policy)
           : { principal: null, setCookie: null };
       } catch (error) {
+        if (error instanceof HttpError) {
+          record(route.path, error.status, undefined, route.policy);
+          return json({ error: error.message }, error.status);
+        }
         const res = json({ error: "internal error" }, 500);
-        record(route.path, res.status, undefined, error);
+        record(route.path, res.status, undefined, route.policy, error);
+        return res;
+      }
+      if (
+        route.policy === "key" &&
+        !sameOrigin(req, url, deps.trustProxy, true)
+      ) {
+        const res = json({ error: "cross-origin request" }, 403);
+        record(route.path, res.status, resolution.principal, route.policy);
         return res;
       }
       const upgrade =
@@ -256,6 +286,7 @@ export function router(deps: RouterDeps): Router {
         route.path,
         res.status,
         resolves ? resolution.principal : undefined,
+        route.policy,
         unexpected,
       );
       return res;

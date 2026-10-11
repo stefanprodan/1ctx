@@ -26,6 +26,10 @@ import { project } from "../../../src/client/data/projects.ts";
 import { treeOf } from "../../../src/client/lib/tree.ts";
 import type { RowsTreeNode } from "../../../src/client/ui/Rows.tsx";
 import {
+  Author,
+  AuthorText,
+} from "../../../src/client/views/knowledge/Author.tsx";
+import {
   authorOf,
   deletedLine,
   emptyAsk,
@@ -73,6 +77,7 @@ const byUser: KnowledgeAuthor = {
   name: "casey",
   sessionId: null,
   origin: null,
+  keyName: null,
 };
 
 const byAgent: KnowledgeAuthor = {
@@ -81,6 +86,7 @@ const byAgent: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "automation",
+  keyName: null,
 };
 
 function file(changes: Partial<KnowledgeFile> = {}): KnowledgeFile {
@@ -188,6 +194,7 @@ describe("the knowledge words", () => {
       href: "/agents/sre",
       where: "in a run",
       whereHref: "/run/s1",
+      via: null,
     });
     const chat = authorOf({ ...byAgent, origin: "chat" });
     expect(chat.where).toBe("in a chat");
@@ -196,6 +203,34 @@ describe("the knowledge words", () => {
     expect(user.href).toBe("/users/casey");
     // a write from the page belongs to no session
     expect(user.where).toBeNull();
+    expect(user.via).toBeNull();
+  });
+
+  test("a write over an access key reads as its user via the key", () => {
+    const byKey: KnowledgeAuthor = {
+      ...byUser,
+      origin: "key",
+      keyName: "laptop-claude",
+    };
+    const words = authorOf(byKey);
+    expect(words).toEqual({
+      name: "casey",
+      href: "/users/casey",
+      where: null,
+      whereHref: null,
+      via: "laptop-claude",
+    });
+    const text = render(<AuthorText words={words} />);
+    expect(text).toContain(">@casey</span> via laptop-claude");
+    const linked = render(<Author words={words} />);
+    expect(linked).toContain('href="/users/casey"');
+    expect(linked).toContain("</a> via laptop-claude");
+    // the bin and the history read through the same words
+    expect(deletedLine(deleted({ deletedBy: byKey }), NOW).author.via).toBe(
+      "laptop-claude",
+    );
+    // a write before the key's name was kept still says how it came
+    expect(authorOf({ ...byKey, keyName: null }).via).toBe("an access key");
   });
 
   test("a deleted row says who deleted it and when", () => {

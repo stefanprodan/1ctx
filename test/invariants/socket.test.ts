@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { transact } from "../../src/server/db/index.ts";
 import { publish } from "../../src/server/lib/bus.ts";
+import { loginOf } from "../../src/server/lib/http.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import {
   CLOSE_BAD_COMMAND,
@@ -430,6 +431,7 @@ describe("the socket", () => {
           name: "casey",
           sessionId: null,
           origin: null,
+          keyName: null,
         },
         "locked.md",
         "not sent to the locked tab",
@@ -559,7 +561,7 @@ describe("the socket", () => {
           type: "login.revoked" as const,
           data: {
             userId: conn.data.principal.userId,
-            loginId: conn.data.principal.loginId,
+            loginId: loginOf(conn.data.principal),
           },
         },
       ],

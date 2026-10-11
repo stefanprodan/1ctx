@@ -7,6 +7,7 @@ import type { Role } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { address, navigate } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
+import { revokeUserKey, userKeys } from "../../data/access-keys.ts";
 import { me } from "../../data/me.ts";
 import { projects, projectsError } from "../../data/projects.ts";
 import {
@@ -28,6 +29,13 @@ import { RowsNote } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { KeyRow } from "../keys/KeyRow.tsx";
+import {
+  expired,
+  expiryWords,
+  scopeWords,
+  usedWords,
+} from "../keys/Keys.model.ts";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { teamsOf } from "./Credentials.model.ts";
@@ -116,6 +124,7 @@ function Body({ user }: { user: AdminUser }) {
       <ProfileCard user={user} saving={saving} />
       <RoleCard user={user} saving={saving} />
       <ProjectsCard user={user} saving={saving} />
+      <KeysCard user={user} />
       {!self &&
         (byLink ? (
           <LinkCard user={user} saving={saving} />
@@ -288,6 +297,39 @@ function ProjectsCard({ user, saving }: CardProps) {
         )}
       </Setting>
     </SettingForm>
+  );
+}
+
+// made by the user on their profile; an admin sees and revokes, never
+// makes one
+function KeysCard({ user }: { user: AdminUser }) {
+  const keys = userKeys.valueFor(user.id);
+  const now = useNow(60_000);
+  return (
+    <Setting
+      title="Access keys"
+      count={keys ? countOf(keys.length, keys.length) : undefined}
+      line="Made on their profile. Revoke stops their agents at once."
+      list
+    >
+      {keys === undefined ? (
+        <RowsNote>Loading</RowsNote>
+      ) : keys === null ? (
+        <RowsNote>Did not load.</RowsNote>
+      ) : keys.length === 0 ? (
+        <RowsNote>No access keys.</RowsNote>
+      ) : (
+        keys.map((key) => (
+          <KeyRow
+            key={key.id}
+            row={key}
+            sub={`${scopeWords(key.scope)} · ${usedWords(key, now)}`}
+            lines={[{ text: expiryWords(key, now), bad: expired(key, now) }]}
+            onRevoke={() => revokeUserKey(user.id, key.id)}
+          />
+        ))
+      )}
+    </Setting>
   );
 }
 
