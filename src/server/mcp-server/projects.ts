@@ -26,6 +26,7 @@ export function projectsTool(
             id: project.id,
             name: project.name,
             kind: project.kind,
+            description: project.description,
           }),
         ),
         "End of projects.",

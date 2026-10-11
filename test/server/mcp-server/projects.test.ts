@@ -33,7 +33,12 @@ describe("the inbound MCP project boundary", () => {
     const { area, send } = fixture();
     const answer = await toolCall(send, "projects", { action: "list" });
     const text = answer.result.content[0].text as string;
-    expect(text).toContain(`"id":"${project.id}"`);
+    expect(JSON.parse(text.split("\n")[0]!)).toEqual({
+      id: project.id,
+      name: project.name,
+      kind: project.kind,
+      description: project.description,
+    });
     expect(text).toEndWith("\nEnd of projects.");
     await area.close();
   });

@@ -163,7 +163,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "projects",
     {
       description:
-        "List reachable projects. Use after from the continuation to page.",
+        "List reachable projects with their descriptions. Use after from the continuation to page.",
       inputSchema: schema(["list"], {
         action: { type: "string" },
         after: { type: ["string", "null"] },

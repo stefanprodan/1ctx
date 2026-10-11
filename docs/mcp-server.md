@@ -29,8 +29,8 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
 
 ## Tools
 
-- `projects` lists id, name and whether each reachable project is personal
-  or team, paging by id with `after` when needed.
+- `projects` lists id, name, whether each reachable project is personal
+  or team, and its description, paging by id with `after` when needed.
 - `knowledge` reads with `list`, `search`, `read`, `versions` and
   `version`. List may filter a folder with `prefix` and files updated at or
   after an ISO 8601 `since`; matching rows say `new` or `changed`. A write key
