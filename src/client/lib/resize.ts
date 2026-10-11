@@ -29,7 +29,7 @@ export function onResize(node: Element, measure: () => void): () => void {
 // anything. The measure runs again when the node resizes or a dep moves.
 export function useCut<T extends Element>(
   deps: unknown[],
-): { el: RefObject<T>; open: Signal<boolean>; long: Signal<boolean> } {
+): { el: RefObject<T | null>; open: Signal<boolean>; long: Signal<boolean> } {
   const el = useRef<T>(null);
   const open = useSignal(false);
   const long = useSignal(false);

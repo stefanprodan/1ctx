@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { JSX, Ref, RefObject } from "preact";
+import type { InputHTMLAttributes, Ref, RefObject } from "preact";
 import { useEffect } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./listbox.css";
@@ -11,7 +11,7 @@ export function ListboxSearch({
   ...input
 }: {
   inputRef: Ref<HTMLInputElement>;
-} & JSX.InputHTMLAttributes<HTMLInputElement>) {
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "role">) {
   return (
     <div class="listbox-search">
       <Icon name="search" size={14} class="listbox-glass" />

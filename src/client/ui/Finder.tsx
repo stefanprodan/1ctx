@@ -243,8 +243,8 @@ export function Finder({
                     )}
                   </>
                 );
+                // a key in a spread reaches the DOM in Preact 11
                 const common = {
-                  key: option.value,
                   class: cls,
                   role: "menuitem" as const,
                   "data-index": i,
@@ -257,6 +257,7 @@ export function Finder({
                 };
                 return option.href !== undefined ? (
                   <a
+                    key={option.value}
                     {...common}
                     href={option.href}
                     onClick={() => close(false)}
@@ -265,6 +266,7 @@ export function Finder({
                   </a>
                 ) : (
                   <button
+                    key={option.value}
                     {...common}
                     type="button"
                     onClick={() => pick(option)}

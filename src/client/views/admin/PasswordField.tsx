@@ -50,7 +50,10 @@ export function PasswordField({
           id={id}
           name={name}
           class="users-password-input"
-          type={shown.value ? "text" : "password"}
+          // preact types an input by its type, so a union type fits no branch
+          {...(shown.value
+            ? { type: "text" as const }
+            : { type: "password" as const })}
           autocomplete="new-password"
           spellcheck={false}
           aria-invalid={invalid || undefined}

@@ -98,7 +98,7 @@ function Text({
   field: SmtpField;
   draft: SmtpDraft;
   save: Save;
-  type?: string;
+  type?: "email";
   required?: boolean;
   placeholder?: string;
   onInput: (value: string) => void;
@@ -108,7 +108,10 @@ function Text({
       <span class={`label${required ? " label-required" : ""}`}>{label}</span>
       <input
         name={field}
-        type={type}
+        // preact types an input by its type, so a union type fits no branch
+        {...(type === "email"
+          ? { type: "email" as const }
+          : { type: "text" as const })}
         aria-required={required || undefined}
         aria-invalid={save.fieldError(field) !== null || undefined}
         autocomplete="off"
@@ -151,7 +154,7 @@ function Server({
   const text = (
     label: string,
     field: SmtpField,
-    extra: { type?: string; placeholder?: string } = {},
+    extra: { type?: "email"; placeholder?: string } = {},
   ) => (
     <Text
       label={label}
